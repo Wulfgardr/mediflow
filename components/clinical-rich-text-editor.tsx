@@ -50,6 +50,24 @@ const BLOCK_ACTIONS: Array<ToolbarAction & { icon: typeof Heading1 }> = [
 ];
 
 export type ClinicalEditorFocus = { resume: () => void };
+export type ClinicalSelectionExcerpt = { before: string; selected: string; after: string };
+
+function selectionExcerpt(editor: HTMLElement, range: Range): ClinicalSelectionExcerpt {
+    const before = document.createRange();
+    before.selectNodeContents(editor);
+    before.setEnd(range.startContainer, range.startOffset);
+    const after = document.createRange();
+    after.selectNodeContents(editor);
+    after.setStart(range.endContainer, range.endOffset);
+    const left = Array.from(before.toString());
+    const right = Array.from(after.toString());
+    const selected = Array.from(range.toString());
+    return {
+        before: (left.length > 72 ? '…' : '') + left.slice(-72).join(''),
+        selected: selected.slice(0, 48).join('') + (selected.length > 48 ? '…' : ''),
+        after: right.slice(0, 48).join('') + (right.length > 48 ? '…' : ''),
+    };
+}
 
 interface ClinicalRichTextEditorProps {
     ref?: Ref<ClinicalEditorFocus>;
@@ -57,6 +75,7 @@ interface ClinicalRichTextEditorProps {
     description?: string;
     label?: string;
     onChange: (value: string) => void;
+    onLeaveSelection?: (excerpt: ClinicalSelectionExcerpt) => void;
     placeholder?: string;
     value: string;
 }
@@ -76,6 +95,7 @@ export function ClinicalRichTextEditor({
     description = 'Editor su più righe. Usa la barra degli strumenti per formattare il resoconto; Tab sposta il focus al controllo successivo.',
     label = 'Resoconto clinico',
     onChange,
+    onLeaveSelection,
     placeholder = '',
     value,
 }: ClinicalRichTextEditorProps) {
@@ -94,10 +114,12 @@ export function ClinicalRichTextEditor({
     }), []);
     const rememberSelection = () => {
         const selection = window.getSelection();
+        const editor = editorRef.current;
         if (selection?.anchorNode && selection.focusNode
-            && editorRef.current?.contains(selection.anchorNode) && editorRef.current.contains(selection.focusNode)) {
+            && editor?.contains(selection.anchorNode) && editor.contains(selection.focusNode)) {
             selectionRef.current = { anchor: selection.anchorNode, anchorOffset: selection.anchorOffset,
                 focus: selection.focusNode, focusOffset: selection.focusOffset };
+            onLeaveSelection?.(selectionExcerpt(editor, selection.getRangeAt(0)));
         }
     };
     const descriptionId = useId();

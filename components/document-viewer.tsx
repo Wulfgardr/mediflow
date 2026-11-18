@@ -3,20 +3,23 @@
 import ink from './ink-secondary.module.css';
 import styles from './clinical-register.module.css';
 import { X, FileText } from 'lucide-react';
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import DocumentPreviewCanvas from './document-viewer-canvas';
 import DocumentOriginalSave from './document-original-save';
 import { readDocumentPreview, releaseDocumentPreview, type DocumentPreview } from './document-viewer-preview.ts';
 import { PREVIEW_LIMITS, PreviewError, previewFailure, textWindow, type PreviewFailure } from './document-viewer-policy.ts';
 
-interface DocumentViewerProps {
-    file: Blob | string;
+type DocumentFile = Blob | string;
+
+type DocumentViewerProps = {
     fileName: string;
     onClose: () => void;
     inline?: boolean;
     closeLabel?: string;
     signal?: AbortSignal;
-}
+    draftPreview?: ReactNode;
+} & ({ file: DocumentFile; pending?: never } | { file?: undefined; pending: ReactNode });
 
 function DocumentText({ text }: { text: string }) {
     const [page, setPage] = useState(1);
@@ -37,7 +40,7 @@ type Source = { file: Blob | string; fileName: string; attempt: number };
 type PreviewState = { source: Source; preview: DocumentPreview; signal: AbortSignal }
     | { source: Source; error: PreviewFailure };
 
-function DocumentPreviewBody({ file, fileName }: Pick<DocumentViewerProps, 'file' | 'fileName'>) {
+function DocumentPreviewBody({ file, fileName, fitWidth }: { file: DocumentFile; fileName: string; fitWidth: boolean }) {
     const [attempt, setAttempt] = useState(0);
     const source = useMemo(() => ({ file, fileName, attempt }), [file, fileName, attempt]);
     const [state, setState] = useState<PreviewState | null>(null);
@@ -76,11 +79,12 @@ function DocumentPreviewBody({ file, fileName }: Pick<DocumentViewerProps, 'file
     </div>;
     return current.preview.kind === 'text'
         ? <DocumentText text={current.preview.text} />
-        : <DocumentPreviewCanvas source={current.preview} signal={current.signal} />;
+        : <DocumentPreviewCanvas source={current.preview} signal={current.signal} fitWidth={fitWidth} />;
 }
 
-export default function DocumentViewer({ file, fileName, onClose, inline = false, signal, closeLabel = 'Chiudi' }: DocumentViewerProps) {
+export default function DocumentViewer({ file, fileName, onClose, inline = false, signal, closeLabel = 'Chiudi', draftPreview, pending }: DocumentViewerProps) {
 
+    const fromDraft = Boolean(draftPreview);
     const source = useMemo(() => ({ file, fileName, signal, token: Symbol('document-view') }), [file, fileName, signal]);
     const [closedView, setClosedView] = useState<symbol | null>(null);
     const closed = closedView === source.token;
@@ -101,9 +105,9 @@ export default function DocumentViewer({ file, fileName, onClose, inline = false
         const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
         closeButton.current?.focus();
         const keydown = (event: KeyboardEvent) => {
-            if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closeButton.current?.click(); }
+            if (event.key === 'Escape' && !event.defaultPrevented) { event.preventDefault(); event.stopPropagation(); closeButton.current?.click(); }
             if (event.key !== 'Tab') return;
-            const items = Array.from(root.querySelectorAll<HTMLElement>('button:not([disabled]), [tabindex="0"]'))
+            const items = Array.from(root.querySelectorAll<HTMLElement>('button:not([disabled]), select:not([disabled]), [tabindex="0"]'))
                 .filter((item) => item.getClientRects().length > 0);
             const first = items[0], last = items[items.length - 1];
             if (!first || !last) { event.preventDefault(); return; }
@@ -116,25 +120,33 @@ export default function DocumentViewer({ file, fileName, onClose, inline = false
         document.addEventListener('keydown', keydown);
         return () => {
             document.removeEventListener('keydown', keydown);
-            if (previous?.isConnected) previous.focus();
+            if (!fromDraft && previous?.isConnected) previous.focus();
         };
-    }, [closed, inline]);
+    }, [closed, inline, fromDraft]);
     if (closed) return null;
 
+    const save = file ? <DocumentOriginalSave file={file} fileName={fileName} signal={signal} /> : null;
     const viewer = <div ref={shell} role={inline ? 'region' : 'dialog'} aria-modal={inline ? undefined : true} aria-labelledby={titleId} data-testid="document-viewer"
-        className={inline ? styles.inlineViewer : `${ink.surface} ${ink.viewer} mf-modal-shell lume-overlay-shadow relative w-full h-full max-w-6xl flex flex-col overflow-hidden`}>
-        <header className={inline ? undefined : 'flex items-center justify-between gap-3 p-4 graphite-divider'}>
+        onKeyDown={event => { if (fromDraft && event.key === 'Escape' && !event.defaultPrevented) { event.preventDefault(); event.stopPropagation(); close(); } }}
+        className={inline ? styles.inlineViewer : `${ink.surface} ${ink.viewer} mf-modal-shell lume-overlay-shadow relative w-full h-full flex flex-col overflow-hidden ${fromDraft ? styles.draftViewer : 'max-w-6xl'}`}>
+        <header className={inline ? undefined : fromDraft ? styles.draftViewerHeader : 'flex items-center justify-between gap-3 p-4 graphite-divider'}>
             <div className="flex min-w-0 items-center gap-3"><FileText size={18} aria-hidden /><h3 id={titleId}>{fileName}</h3></div>
+            {fromDraft ? save : null}
             <button ref={closeButton} type="button" onClick={close} className={styles.control} aria-label={closeLabel} title={closeLabel}>{closeLabel === 'Chiudi' ? <X size={18} aria-hidden /> : closeLabel}</button>
         </header>
-        <DocumentOriginalSave file={file} fileName={fileName} signal={signal} />
+        {fromDraft ? null : save}
         <div className={inline ? `${styles.inlineCanvas} relative` : 'min-h-0 flex-1 relative'} style={{ background: 'var(--lume-surface-field)' }}>
-            <DocumentPreviewBody file={file} fileName={fileName} />
+            {file ? <DocumentPreviewBody file={file} fileName={fileName} fitWidth={fromDraft} /> : pending}
         </div>
+        {fromDraft ? <footer aria-label="Bozza" className={styles.draftStrip}>
+            {draftPreview}
+            <button type="button" className={styles.control} onClick={close}>Riprendi la bozza</button>
+        </footer> : null}
     </div>;
     if (inline) return viewer;
-    return <div className="mf-modal-backdrop p-4 md:p-8" style={{ zIndex: 100 }}>
-        <button type="button" aria-label="Chiudi sfondo" className="absolute inset-0 cursor-default" onClick={close} />
+    const modal = <div className={`mf-modal-backdrop ${fromDraft ? styles.draftBackdrop : 'p-4 md:p-8'}`} style={{ zIndex: 100 }}>
+        <button type="button" tabIndex={fromDraft ? -1 : undefined} aria-label="Chiudi sfondo" className="absolute inset-0 cursor-default" onClick={close} />
         {viewer}
     </div>;
+    return fromDraft ? createPortal(modal, document.body) : modal;
 }
