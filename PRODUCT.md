@@ -22,10 +22,10 @@ i passaggi evitabili per ritrovare un’informazione, registrarla o preparare un
 decisione, rispettando la complessità del caso e mantenendo insieme i dati, la
 loro provenienza, la riservatezza e la responsabilità professionale.
 
-Parto dal lavoro: non è l’AI a determinarlo. Cartelle, strumenti deterministici e documenti devono
-restare utili anche quando tutti i provider sono spenti. Ho scelto una struttura
-modulare per aggiungere funzioni solo dove servono, senza imporre un servizio esterno
-per rendere utilizzabile il gestionale. Questa
+Parto dal lavoro, non dall’AI. Cartelle, strumenti deterministici e documenti
+devono restare utili anche quando tutti i provider sono spenti. Ho scelto una
+struttura modulare per aggiungere funzioni solo dove servono, senza imporre un
+servizio esterno per rendere utilizzabile il gestionale. Questa
 attenzione riguarda anche contesti a risorse limitate, ma non definisce una
 soglia hardware verificata. Il progetto intende rimanere aperto e gratuito,
 così che altri possano studiarlo, discuterlo e contribuire. Hardware e servizi
@@ -42,12 +42,12 @@ Comunità e a domicilio, con due tipi di pazienti:
 - persone senza medico di famiglia, incontrate spesso in una fase acuta su cronica.
 
 Sono pazienti che tornano. La loro storia clinica deve essere durevole, tracciabile, ben codificata
-ed esportabile in un formato comune. Ho fatto il prodotto prima di tutto per questo lavoro e l'ho
-aperto a chiunque faccia lo stesso lavoro altrove.
+ed esportabile in un formato comune. Il prodotto è fatto prima di tutto per questo lavoro ed è aperto a
+chiunque faccia lo stesso lavoro altrove.
 
 MediFlow resta anche un laboratorio intelligente. La codifica dei dati e i percorsi dell'app devono
 permettere sempre un'ampia operabilità automatizzata da parte di agenti e di strumenti futuri. L'app
-funziona anche senza alcun modello. Chi la usa mette a disposizione la propria intelligenza.
+funziona anche senza alcun modello. L'intelligenza la porta chi la usa.
 
 <a id="audience-and-setting"></a>
 ## A chi si rivolge e in quale lavoro
