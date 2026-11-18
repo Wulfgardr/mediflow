@@ -16,7 +16,7 @@ import { ApiConflictError, db } from '@/lib/db';
 import { notifyDbChange } from '@/lib/live-query';
 import { formatMeasureValue, formatUnitForDisplay, searchStaticTerminology } from '@/lib/terminology';
 import { classifyObservationRange, formatReferenceRange } from '@/lib/observation-range';
-import { projectQuadroMeasures } from '@/lib/patient-quadro';
+import { observationSeriesKey, projectQuadroMeasures } from '@/lib/patient-quadro';
 import {
     applyObservationPrefill,
     type ObservationPrefill,
@@ -157,18 +157,18 @@ export default function ObservationManager({
         setFormFocusRequest(request => request + 1);
     }, [loincOptions, prefill]);
 
-    const toggleGroup = (analyteCode: string) =>
+    const toggleGroup = (seriesKey: string) =>
         setOpenGroups((prev) => {
             const next = new Set(prev);
-            if (next.has(analyteCode)) next.delete(analyteCode);
-            else next.add(analyteCode);
+            if (next.has(seriesKey)) next.delete(seriesKey);
+            else next.add(seriesKey);
             return next;
         });
-    const toggleFull = (analyteCode: string) =>
+    const toggleFull = (seriesKey: string) =>
         setFullGroups((prev) => {
             const next = new Set(prev);
-            if (next.has(analyteCode)) next.delete(analyteCode);
-            else next.add(analyteCode);
+            if (next.has(seriesKey)) next.delete(seriesKey);
+            else next.add(seriesKey);
             return next;
         });
     /* Precompila il form con questo analita e porta il focus al primo campo. */
@@ -197,24 +197,25 @@ export default function ObservationManager({
 
     type Observation = NonNullable<typeof observations>[number];
 
-    /* Raggruppamento per analita: una sezione densa per parametro,
-       gruppi ordinati per misura piu recente, codifica mostrata una sola volta. */
     const groups = useMemo(() => {
         if (!observations) return undefined;
-        const byCode = new Map<string, Observation[]>();
+        const bySeries = new Map<string, Observation[]>();
         for (const observation of observations) {
-            const bucket = byCode.get(observation.code);
+            const key = observationSeriesKey(observation);
+            const bucket = bySeries.get(key);
             if (bucket) {
                 bucket.push(observation);
             } else {
-                byCode.set(observation.code, [observation]);
+                bySeries.set(key, [observation]);
             }
         }
-        const result = Array.from(byCode.values()).map((items) => {
+        const result = Array.from(bySeries, ([key, items]) => {
             const sorted = [...items].sort(
                 (a, b) => new Date(b.observedAt).getTime() - new Date(a.observedAt).getTime(),
             );
             return {
+                key,
+                regionId: `param-region-${encodeURIComponent(key)}`,
                 code: sorted[0].code,
                 display: sorted[0].display,
                 unitCode: sorted[0].unitCode,
@@ -231,7 +232,7 @@ export default function ObservationManager({
     useEffect(() => {
         if (!groups || selectionPatient.current === patientId) return;
         selectionPatient.current = patientId;
-        setOpenGroups(new Set(groups[0] ? [groups[0].code] : []));
+        setOpenGroups(new Set(groups[0] ? [groups[0].key] : []));
         setFullGroups(new Set());
     }, [groups, patientId]);
 
@@ -516,12 +517,13 @@ export default function ObservationManager({
             </section>) : <div className={styles.split}>
                 <div><table className={`${styles.table} ${styles.observationTable}`}><thead><tr><th>Misura</th><th className={styles.value}>Valore</th><th>Data</th><th className={styles.secondaryColumn}>Variazione</th></tr></thead><tbody>
                     {groups.map(group => {
-                        const latest = group.items[0]; const previous = group.items[1];
+                        const latest = group.items[0];
+                        const previous = group.items.find(item => new Date(item.observedAt).getTime() < new Date(latest.observedAt).getTime());
                         const latestNum = toNumeric(latest.value); const previousNum = previous ? toNumeric(previous.value) : null;
                         const delta = latestNum !== null && previousNum !== null ? latestNum - previousNum : null;
                         const flag = classifyObservationRange(latest.value, latest.refLow, latest.refHigh);
-                        return <tr key={group.code} className={openGroups.has(group.code) ? styles.selected : undefined}>
-                            <td><DisclosureControl onToggle={() => toggleGroup(group.code)} expanded={openGroups.has(group.code)} controls={`param-region-${group.code}`}>
+                        return <tr key={group.key} className={openGroups.has(group.key) ? styles.selected : undefined}>
+                            <td><DisclosureControl onToggle={() => toggleGroup(group.key)} expanded={openGroups.has(group.key)} controls={group.regionId}>
                                 {italianLoincLabel(group.code, group.display)}
                             </DisclosureControl></td>
                             <td className={`${styles.value} ${flag ? styles.critical : ''}`}>{latest.value} <span className={styles.muted}>{formatUnitForDisplay(group.unitCode)}</span>{flag && <small>{flag === 'alto' ? '▲ Alto' : '▼ Basso'}</small>}</td>
@@ -531,13 +533,13 @@ export default function ObservationManager({
                     })}
                 </tbody></table></div>
                 <aside className={styles.detail} aria-label="Andamento e storia delle misure">
-                    {groups.every(group => !openGroups.has(group.code)) && <p className={styles.empty}>Scegli una misura per leggere l’andamento e le registrazioni precedenti. Puoi confrontare più parametri.</p>}
+                    {groups.every(group => !openGroups.has(group.key)) && <p className={styles.empty}>Scegli una misura per leggere l’andamento e le registrazioni precedenti. Puoi confrontare più parametri.</p>}
                     {groups.map(group => {
-                        const isOpen = openGroups.has(group.code); const isFull = fullGroups.has(group.code);
+                        const isOpen = openGroups.has(group.key); const isFull = fullGroups.has(group.key);
                         const label = italianLoincLabel(group.code, group.display);
                         const chartValues = group.items.slice(0,12).reverse().map(item => toNumeric(item.value)).filter((n): n is number => n !== null);
                         const visibleItems = isFull ? group.items : group.items.slice(0,5);
-                        return <section key={group.code} id={`param-region-${group.code}`} hidden={!isOpen}>
+                        return <section key={group.key} id={group.regionId} hidden={!isOpen}>
                             {isOpen && <>
                                 <header className={styles.sectionHead}><h3>{label}</h3><span>{formatUnitForDisplay(group.unitCode)}</span></header>
                                 <p className={`${styles.muted} lume-code`}>{group.codeSystem} {group.code}</p>
@@ -552,7 +554,7 @@ export default function ObservationManager({
                                         </PatientSheetMenu></td>
                                     </tr>;
                                 })}</tbody></table>
-                                <div className={`${styles.controls} mt-3`}><button type="button" onClick={() => prefillGroup(group.code, group.unitCode)}>Registra nuova misura</button>{group.items.length > 5 && <button type="button" onClick={() => toggleFull(group.code)}>{isFull ? 'Ultime 5' : `Tutte (${group.items.length})`}</button>}</div>
+                                <div className={`${styles.controls} mt-3`}><button type="button" onClick={() => prefillGroup(group.code, group.unitCode)}>Registra nuova misura</button>{group.items.length > 5 && <button type="button" onClick={() => toggleFull(group.key)}>{isFull ? 'Ultime 5' : `Tutte (${group.items.length})`}</button>}</div>
                             </>}
                         </section>;
                     })}

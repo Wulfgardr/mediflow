@@ -1,5 +1,6 @@
 import type { ClinicalEntry, Observation } from '@/lib/db';
 import { classifyObservationRange, toNumericValue } from './observation-range';
+import { observationSeriesKey } from './patient-quadro';
 import { recordDate } from './patient-therapy-changes';
 import { formatMeasureValue, resolveStaticTerminology } from './terminology';
 
@@ -35,7 +36,7 @@ export function outOfRangeAfter(observations: readonly Observation[], reference:
     const live = observations.filter(item => !item.deletedAt);
     const series = new Map<string, Observation[]>();
     for (const observation of live) {
-        const key = JSON.stringify([observation.codeSystem, observation.code, observation.unitSystem, observation.unitCode]);
+        const key = observationSeriesKey(observation);
         const values = series.get(key) ?? [];
         values.push(observation);
         series.set(key, values);
