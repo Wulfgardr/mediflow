@@ -13,6 +13,7 @@ import { subscribeClientAccountAuthority } from '@/lib/security/client-auth-api'
 import { db } from '@/lib/db';
 import { useLiveQueryState } from '@/lib/live-query';
 import { SCALES } from '@/lib/scale-definitions';
+import { scaleDisplayTitle } from '@/lib/scale-history';
 
 function getScaleArea(scaleId: string): string {
     if (scaleId === 'tinetti-poma28-v1') return 'Equilibrio';
@@ -68,7 +69,7 @@ export default function ScalesPage() {
         <div className={styles.screen}><Kree8WorkspaceShell
             eyebrow="Valutazioni"
             title="Scale cliniche"
-            subtitle="Scegli una scala, somministrala nel contesto giusto e salva il risultato come voce del diario del paziente."
+            subtitle="Scegli una scala per avviare una valutazione."
             backHref={`/patients/${id}/modules#scale`}
             backLabel="Torna alla scheda paziente"
             patientLabel={patient ? `${patient.lastName} ${patient.firstName}` : undefined}
@@ -87,7 +88,7 @@ export default function ScalesPage() {
                             <Link key={scale.id} href={`/patients/${id}/scales/${scale.id}`} onClick={event => { if (!currentRead?.isCurrent()) event.preventDefault(); }} className={styles.catalogLink}>
                                 <Icon size={20} aria-hidden="true" />
                                 <span>
-                                    <span className={styles.catalogTitle}>{scale.title}</span>
+                                    <span className={styles.catalogTitle}>{scaleDisplayTitle(scale)}</span>
                                     <span className={styles.catalogDescription}>{getScaleArea(scale.id)} · {scale.questions.length} domande</span>
                                 </span>
                                 <ArrowRight size={18} aria-hidden="true" />

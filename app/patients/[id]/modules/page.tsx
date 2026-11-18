@@ -815,7 +815,7 @@ export default function PatientDetailPage() {
                             <h4 className="text-base font-semibold text-[color:var(--lume-ink)]">Nuova valutazione</h4>
                             <div className={scaleStyles.catalog}>
                                 {[
-                                    ['tinetti-poma28-v1', 'Tinetti POMA-28 (v1)'],
+                                    ['tinetti-poma28-v1', 'Tinetti POMA-28'],
                                     ['mmse', 'MMSE'], ['adl', 'ADL (Katz)'], ['gds', 'GDS'],
                                 ].map(([scaleId, label]) => (
                                     <Link key={scaleId} href={`/patients/${id}/scales/${scaleId}`} className={scaleStyles.catalogLink}>

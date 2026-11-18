@@ -1,5 +1,5 @@
 import { format } from 'date-fns';
-import { scaleHistoryNotice } from '@/lib/scale-history'; // MF085-002
+import { presentTinettiResult, scaleHistoryNotice } from '@/lib/scale-history';
 
 import { it } from 'date-fns/locale';
 import { ClinicalEntry, Attachment, db } from '@/lib/db';
@@ -9,6 +9,7 @@ import { PatientSheetMenu } from '@/components/patient-sheet-menu';
 import { InkState } from '@/components/ui/ink-state';
 import { PATIENT_DIARY_WORKFLOW_LABELS, patientDiarySource, patientDiaryWorkflowState, patientDiaryRegistration, readPatientDiaryMetadata } from '@/lib/patient-diary-metadata';
 import { ClinicalRichTextContent } from '@/components/clinical-rich-text-content';
+import { Disclosure } from '@/components/disclosure';
 import PrivacyBlur from '@/components/privacy-blur';
 import { useLiveQuery } from '@/lib/live-query';
 import { LumeFilo, LumeFiloNodo } from '@/components/ui/lume-filo';
@@ -140,6 +141,8 @@ export function TimelineEntryCard({
     const presentation = { ...basePresentation,
         source: metadataUnreadable ? 'Non leggibile' : basePresentation.source,
     };
+    const tinetti = entry.type === 'scale' ? presentTinettiResult(entry.metadata, entry.title) : null;
+    const scaleNotice = entry.type === 'scale' && !tinetti ? scaleHistoryNotice(entry.metadata, entry.title) : null;
 
     return (
         <article
@@ -197,8 +200,8 @@ export function TimelineEntryCard({
 
                     {diaryPresentation ? <div className="shrink-0">
                         {isDeleted ? onRestore && <Button variant="text" onClick={() => onRestore(entry)} aria-label="Ripristina voce clinica"><Undo size={16} aria-hidden />Ripristina</Button>
-                            : onDelete && <PatientSheetMenu label={`Azioni voce ${entry.title || 'clinica'}`}
-                                trigger={props => <Button {...props} variant="icon" aria-label={`Azioni voce ${entry.title || 'clinica'}`}><MoreHorizontal size={16} aria-hidden /></Button>}>
+                            : onDelete && <PatientSheetMenu label={`Azioni voce ${tinetti?.title || entry.title || 'clinica'}`}
+                                trigger={props => <Button {...props} variant="icon" aria-label={`Azioni voce ${tinetti?.title || entry.title || 'clinica'}`}><MoreHorizontal size={16} aria-hidden /></Button>}>
                                 <button type="button" role="menuitem" onClick={() => onDelete(entry)}>Elimina voce clinica con motivazione</button>
                             </PatientSheetMenu>}
                     </div> : <>
@@ -247,14 +250,24 @@ export function TimelineEntryCard({
                     </div>
                 )}
 
-                {diaryPresentation && entry.title ? <h4 className={twin.entryTitle}><PrivacyBlur>{entry.title}</PrivacyBlur></h4> : null}
-
-                {/* Main Text Content */}
-                <div style={{ color: presentation.draft ? 'var(--lume-ink-muted)' : 'var(--lume-ink)' }}>
-                    <PrivacyBlur>
-                        <ClinicalRichTextContent content={entry.content} className="prose prose-sm max-w-none prose-p:leading-relaxed dark:prose-invert" />
-                    </PrivacyBlur>
-                </div>
+                {tinetti ? <>
+                    <h4 className="font-semibold"><PrivacyBlur>{tinetti.title}</PrivacyBlur></h4>
+                    <p className="text-lg font-semibold">Punteggio <PrivacyBlur>{tinetti.score}</PrivacyBlur></p>
+                    {tinetti.interpretation && <p><PrivacyBlur>{tinetti.interpretation}</PrivacyBlur></p>}
+                    <p className="text-sm">{tinetti.notice}</p>
+                    <Disclosure title="Dettagli della valutazione" className="mt-3">
+                        {tinetti.source && <p data-testid="scale-provenance-notice">Fonte: {tinetti.source}</p>}
+                        {tinetti.version && !entry.content.includes(tinetti.version) && <p>{tinetti.version}</p>}
+                        <PrivacyBlur><ClinicalRichTextContent content={entry.content} /></PrivacyBlur>
+                    </Disclosure>
+                </> : <>
+                    {diaryPresentation && entry.title ? <h4 className={twin.entryTitle}><PrivacyBlur>{entry.title}</PrivacyBlur></h4> : null}
+                    <div style={{ color: presentation.draft ? 'var(--lume-ink-muted)' : 'var(--lume-ink)' }}>
+                        <PrivacyBlur>
+                            <ClinicalRichTextContent content={entry.content} className="prose prose-sm max-w-none prose-p:leading-relaxed dark:prose-invert" />
+                        </PrivacyBlur>
+                    </div>
+                </>}
 
                 {diaryPresentation ? <div className={twin.registration}>
                     {stateKnown ? <InkState state={presentation.draft ? 'fresh' : 'dry'}>{presentation.stateLabel === 'Registrata' ? patientDiaryRegistration(entry) : `${presentation.stateLabel}${presentation.author ? ` da ${presentation.author}` : ''}`}</InkState> : <span>{presentation.stateLabel}{presentation.author ? ` · Autore: ${presentation.author}` : ''}</span>}
@@ -267,15 +280,14 @@ export function TimelineEntryCard({
                     <EntryAttachments attachmentIds={entry.attachments} onView={onViewAttachment} />
                 )}
 
-                {/* MF085-002: descriptive provenance; never recompute a recorded score. */}
-                {entry.type === 'scale' && scaleHistoryNotice(entry.metadata, entry.title) && (
+                {scaleNotice && (
                     <p className="mt-3 text-xs text-[color:var(--lume-ink-muted)]" data-testid="scale-provenance-notice">
-                        {scaleHistoryNotice(entry.metadata, entry.title)}
+                        {scaleNotice}
                     </p>
                 )}
 
                 {/* Scale Metadata Viz */}
-                {entry.metadata?.score !== undefined && (
+                {!tinetti && entry.metadata?.score !== undefined && (
                     <div className="mf-alert mf-alert-info mt-3 !flex items-center justify-between">
                         <div>
                             <p className="text-xs font-semibold uppercase">{entry.metadata.title as string}</p>

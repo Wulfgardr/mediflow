@@ -148,6 +148,65 @@ test('duplicate identity requires the explicit separate choice and never merges'
     assert.deepEqual(effects(), before.map(n => n + 1));
 });
 
+test('Web requires a declared absence and one valid birth representation, and empty identifiers do not collide', async () => {
+    state.session = operator('no-identifier');
+    const common = (lastName: string) => ({ firstName: { action: 'correct', value: 'Lucia' },
+        lastName: { action: 'correct', value: lastName }, duplicate: 'none' });
+    const before = effects();
+    const { view } = await staged();
+    const preview = (review: unknown) => call({ operation: 'preview', commandId: view.commandId, viewId: view.viewId, review });
+    const birthDate = { action: 'correct', value: '1980-02-03' };
+    const names = common('Esatta');
+    for (const invalid of [
+        { ...names, birthDate },
+        { ...names, identifierType: 'cf', birthDate },
+        { ...names, identifierType: 'none' },
+        { ...names, identifierType: 'none', birthDate, taxCode: { action: 'correct', value: syntheticTaxCode() } },
+        { ...names, identifierType: 'none', birthYear: '1980' },
+        { ...names, identifierType: 'none', birthYear: 1850.5 },
+        { ...names, identifierType: 'none', birthYear: 9999 },
+        { ...names, identifierType: 'none', birthYear: 1980, birthDate },
+        { ...names, identifierType: 'none', birthDate: { ...birthDate, value: '1980-02-31' } },
+        { ...names, identifierType: 'none', birthDate: { ...birthDate, action: 'approve' } },
+        { ...names, firstName: undefined, identifierType: 'none', birthDate },
+    ]) assert.equal((await preview(invalid)).status, 403, JSON.stringify(invalid));
+    assert.deepEqual(effects(), before);
+
+    assert.equal((await preview({ ...names, identifierType: 'none', birthDate })).status, 200);
+    assert.deepEqual(effects(), before);
+    const first = await call({ operation: 'execute', commandId: view.commandId, pin });
+    assert.equal(first.body.outcome, 'applied');
+    const second = await staged();
+    assert.equal((await call({ operation: 'preview', commandId: second.view.commandId, viewId: second.view.viewId,
+        review: { ...common('Stimata'), identifierType: 'none', birthYear: 1974 } })).status, 200);
+    const applied = await call({ operation: 'execute', commandId: second.view.commandId, pin });
+    assert.equal(applied.body.outcome, 'applied');
+    assert.deepEqual(effects(), before.map(n => n + 2));
+    const row = dbServer.$client.prepare('SELECT tax_code, identifier_type, birth_date, birth_date_precision, birth_year FROM patients WHERE id = ?');
+    assert.deepEqual(row.get(first.body.patientId), { tax_code: '', identifier_type: 'none', birth_date: Date.parse(birthDate.value) / 1000, birth_date_precision: 'exact', birth_year: null });
+    assert.deepEqual(row.get(applied.body.patientId), { tax_code: '', identifier_type: 'none', birth_date: null, birth_date_precision: 'estimated', birth_year: 1974 });
+
+    const wrong = await staged();
+    assert.equal((await call({ operation: 'preview', commandId: wrong.view.commandId, viewId: wrong.view.viewId,
+        review: { ...common('Ritirata'), identifierType: 'none', birthYear: 1975 } })).status, 200);
+    assert.equal((await call({ operation: 'execute', commandId: wrong.view.commandId, pin: wrongPin })).status, 403);
+    assert.deepEqual((await call({ operation: 'receipt', commandId: wrong.view.commandId })).body, { outcome: 'retired' });
+    assert.deepEqual(effects(), before.map(n => n + 2));
+});
+
+test('Web preserves legacy CF payloads and validates CF when the type is declared', async () => {
+    state.session = operator('legacy-identifier');
+    const { view } = await staged();
+    const legacy = { ...review('Storica'), taxCode: { action: 'correct', value: 'LEGACY-INVENTATO' } };
+    const preview = (review: unknown) => call({ operation: 'preview', commandId: view.commandId, viewId: view.viewId, review });
+    assert.equal((await preview({ ...legacy, identifierType: 'cf' })).status, 403);
+    assert.equal((await preview(legacy)).status, 200);
+    const applied = await call({ operation: 'execute', commandId: view.commandId, pin });
+    assert.equal(applied.body.outcome, 'applied');
+    assert.deepEqual(dbServer.$client.prepare('SELECT tax_code, identifier_type FROM patients WHERE id = ?').get(applied.body.patientId),
+        { tax_code: legacy.taxCode.value, identifier_type: 'cf' });
+});
+
 test('a second document while the session still holds one is refused as work in progress, not as a lock', async () => {
     state.session = operator('in-progress');
     const first = await staged();
