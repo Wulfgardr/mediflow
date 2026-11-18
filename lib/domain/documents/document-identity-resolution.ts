@@ -44,7 +44,7 @@ const ROLE_PATTERNS: Array<{
     },
     {
         role: 'physician_cf',
-        high: /\b(?:codice\s+fiscale|cf)\s+(?:medico|dott(?:\.|ore|oressa)?)\b|\b(?:medico|dott(?:\.|ore|oressa)?)\s+(?:codice\s+fiscale|cf)\b/i,
+        high: /\b(?:codice\s+fiscale|cf)\s+(?:del\s+)?(?:medico|dott(?:\.|ore|oressa)?)\b|\b(?:medico|dott(?:\.|ore|oressa)?)\s+(?:codice\s+fiscale|cf)\b/i,
         medium: /\b(?:medico|dott(?:\.|ore|oressa)?)\b/i,
     },
     {

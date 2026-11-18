@@ -210,3 +210,11 @@ export async function resumeAgentVisit(directory: string, agentRef: string, visi
     if (!visitPlan(plan) || plan.agentRef !== agentRef) throw new AgentClientError('AGENT_STATE_INVALID');
     return depositAgentVisit(directory, plan, signal);
 }
+
+export function resumeAgentReference(directory: string, visitId: string): string | undefined {
+    const file = statePath(directory, 'visit', visitId);
+    if (!fs.existsSync(file)) return undefined;
+    const plan = readState(directory, 'visit', visitId);
+    if (!visitPlan(plan)) throw new AgentClientError('AGENT_STATE_INVALID');
+    return plan.agentRef;
+}

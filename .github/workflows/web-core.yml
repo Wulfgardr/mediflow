@@ -93,6 +93,8 @@ jobs:
           if probe; then echo 'sandboxed Chromium starts with the runner defaults'; else echo 'sandboxed Chromium does not start with the runner defaults'; fi
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           probe
+      - name: Install the Ambulatorio PDF reader
+        run: sudo apt-get install -y poppler-utils
       - name: Unit tests
         timeout-minutes: 40
         run: npm run test:unit

@@ -5,7 +5,9 @@ import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
 import { createHash, randomUUID } from 'node:crypto';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
+import { PDFDocument, StandardFonts } from 'pdf-lib';
+import { configureAmbulatorio } from './ambulatorio.ts';
 import { agentCassetteFixture } from '../../../lib/test-fixtures/agent-cassette';
 import { saveAgentCredential } from './credentials';
 import { agentRequest, prepareAgentVisit, prepareAndDepositAgentVisit, resumeAgentVisit, AgentClientError } from './visit-client';
@@ -14,8 +16,8 @@ import { agentBytes, openAgentItem } from '../../../lib/agent-cassette-crypto';
 import { decryptData } from '../../../lib/security/security';
 
 const cf = 'RSSMRA80A01H501U', sentinel = 'SYNTHETIC_CLI_VISIT_ONLY_6742';
-async function fixture() {
-    const f = await agentCassetteFixture(), root = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-agent-command-'));
+async function fixture(model: 'local' | 'openai' = 'local') {
+    const f = await agentCassetteFixture(undefined, model), root = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-agent-command-'));
     const files = path.join(root, 'input'), credentials = path.join(root, 'private'); fs.mkdirSync(files); fs.mkdirSync(credentials, { mode: 0o700 });
     const pdf = Buffer.from('%PDF-1.4\nCodice fiscale paziente: ' + cf + '\n' + sentinel);
     fs.writeFileSync(path.join(files, 'nota-visita.pdf'), pdf);
@@ -317,4 +319,89 @@ test('oversized or empty stdin is refused without depositing or echoing its cont
         assert.equal(f.rows().length, 0);
         assert.deepEqual(f.events, []);
     } finally { await f.cleanup(); }
+});
+
+test('Ambulatorio admits only a verified visit and retries the same encrypted deposit', {
+    skip: process.platform === 'win32',
+}, async () => {
+    const f = await fixture('openai');
+    const home = path.join(f.root, 'ambulatorio');
+    const repository = process.cwd();
+    const physician = 'RSSMRA80A01F205X', foreign = 'RSSMRA85T10A562S';
+    configureAmbulatorio(home, path.join(home, 'config.json'), { repository, origin: f.origin, downloads: f.files, physicianCodes: [] });
+    const credentials = path.join(home, 'credenziali');
+    saveAgentCredential(credentials, { ...JSON.parse(fs.readFileSync(path.join(f.credentials, f.principal.agentRef + '.json'), 'utf8')) });
+    const pdf = async (name: string, lines: string[]) => {
+        const document = await PDFDocument.create(), font = await document.embedFont(StandardFonts.Helvetica);
+        const page = document.addPage();
+        lines.forEach((text, i) => page.drawText(text, { x: 50, y: 780 - 22 * i, font, size: 11 }));
+        fs.writeFileSync(path.join(f.files, name), await document.save());
+    };
+    const quote = 'Assume Paracetamolo 500 mg al bisogno.';
+    await pdf('sintetico.pdf', ['Codice fiscale paziente: ' + cf, 'CODICE FISCALE DEL MEDICO: ' + physician, 'Documento sintetico consentito']);
+    await pdf('discordante.pdf', ['Codice fiscale paziente: ' + cf, 'Altro paziente codice fiscale: ' + foreign, 'DOCUMENTO_DA_ESCLUDERE']);
+    const dettato = 'Visita sintetica senza codice fiscale. ' + quote;
+    const start = path.resolve('plugins/mediflow-ambulatorio/start.mjs');
+    const child = spawn(process.execPath, [start], { env: { ...process.env, MEDIFLOW_AMBULATORIO_HOME: home } });
+    const closed = new Promise<void>(resolve => child.once('close', () => resolve()));
+    const { createInterface } = await import('node:readline');
+    const lines = createInterface(child.stdout);
+    const replies = lines[Symbol.asyncIterator]();
+    let sequence = 0;
+    const send = async (name: string, args: Record<string, unknown>) => {
+        const id = ++sequence;
+        child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method: 'tools/call', params: { name, arguments: args, _meta: {
+            'io.modelcontextprotocol/protocolVersion': '2026-07-28', 'io.modelcontextprotocol/clientCapabilities': {},
+            'io.modelcontextprotocol/clientInfo': { name: 'synthetic-ambulatorio-test', version: '1' },
+        } } }) + '\n');
+        const { value } = await replies.next();
+        const response = JSON.parse(value);
+        assert.equal(response.id, id);
+        assert.ok(response.result, value);
+        const { result } = response;
+        return result.isError ? JSON.parse(result.content[0].text) : result.structuredContent;
+    };
+    const deadline = setTimeout(() => child.kill('SIGTERM'), 30000);
+    try {
+        assert.equal(spawnSync('pdftotext', ['-v']).status, 0, 'Install poppler-utils for the Ambulatorio acceptance test');
+        const acquired = await send('mediflow_acquisisci_visita', { dettato, inizio: new Date(Date.now() - 60000).toISOString() });
+        const { visitId } = acquired;
+        assert.equal(acquired.stato, 'CF da confermare');
+        assert.deepEqual(acquired.pdf_accettati, []);
+        assert.equal((await send('mediflow_acquisisci_visita', { dettato })).visitId, visitId);
+        const scheda = '## Nota clinica\nS: Riferisce dolore sintetico.\nO: Rilievi non riportati.\nA: Valutazione non esplicitata.\nP: Assume Paracetamolo 500 mg al bisogno.';
+        const therapy = { file: 'nota-visita.pdf', kind: 'therapy', values: { drugName: 'Paracetamolo', dosage: '500 mg al bisogno', status: 'active' }, quote };
+        assert.deepEqual(await send('mediflow_prepara_dossier', { visitId, scheda, fatti: [] }), { error: 'CF_DA_CONFERMARE' });
+        assert.deepEqual(await send('mediflow_aggiorna_visita', { visitId, conferma: physician }), { error: 'CF_CONFERMATO_NON_VALIDO_O_DISCORDANTE' });
+        const confirmed = await send('mediflow_aggiorna_visita', { visitId, conferma: cf });
+        assert.equal(confirmed.pdf_accettati.length, 1);
+        assert.match(confirmed.pdf_accettati[0].testo, /Documento sintetico consentito/);
+        assert.doesNotMatch(JSON.stringify(confirmed), /DOCUMENTO_DA_ESCLUDERE/);
+        assert.deepEqual(await send('mediflow_aggiorna_visita', { visitId, conferma: foreign }), { error: 'CF_CONFERMATO_NON_VALIDO_O_DISCORDANTE' });
+        assert.deepEqual(await send('mediflow_deposita_visita', { visitId }), { error: 'DOSSIER_NON_VERIFICATO' });
+        assert.deepEqual(await send('mediflow_prepara_dossier', { visitId, scheda, fatti: [{ ...therapy, quote: 'Citazione inventata per la prova.' }] }), { error: 'CITAZIONE_NON_PRESENTE' });
+        assert.equal(f.rows().length, 0);
+        const dossier = await send('mediflow_prepara_dossier', { visitId, scheda, fatti: [therapy] });
+        assert.equal(dossier.stato, 'verificato', JSON.stringify(dossier));
+        assert.equal(dossier.rifiutati, 0);
+        f.drop();
+        const interrupted = await send('mediflow_deposita_visita', { visitId });
+        assert.equal(interrupted.error, 'AGENT_HTTP_UNAVAILABLE');
+        assert.equal(f.rows()[0].status, 'open');
+        const receipt = await send('mediflow_riprendi_visita', { visitId });
+        assert.equal(receipt.status, 'closed', JSON.stringify(receipt));
+        assert.deepEqual(receipt.proposteInArrivo, { stato: 'da_verificare_in_mediflow', elementi: [{ tipo: 'terapia', fonte: 'nota-visita.pdf' }] });
+        assert.deepEqual(await send('mediflow_deposita_visita', { visitId }), receipt);
+        assert.equal(f.rows().length, 1);
+        assert.equal(receipt.itemCount, 5);
+        assert.ok(f.bodies.every(body => ![dettato, cf, quote, f.token].some(secret => body.includes(secret))));
+        assert.deepEqual(await send('mediflow_aggiorna_visita', { visitId }), { error: 'DEPOSITO_GIA_AVVIATO' });
+        assert.equal(fs.statSync(path.join(home, 'visite', visitId, 'trascrizione.txt')).mode & 0o777, 0o600);
+    } finally {
+        clearTimeout(deadline);
+        child.stdin.end();
+        if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
+        await closed;
+        await f.cleanup();
+    }
 });

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "mediflow-visit-agent": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${PLUGIN_ROOT}/start.mjs"],
+      "cwd": "${PLUGIN_ROOT}",
+      "tool_timeout_sec": 240
+    }
+  }
+}
