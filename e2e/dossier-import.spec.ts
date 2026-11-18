@@ -7,9 +7,57 @@ import path from 'node:path';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 
 import { bootstrapUnlockedSession } from './utils';
+import { test as isolatedTest } from './fixtures/isolated-runtime';
 import { randomSyntheticTaxCode as syntheticTaxCode } from '../lib/patient-identity.test-support.ts';
 
 const PIN = process.env.E2E_PIN || '1234';
+
+isolatedTest('Dossier senza CF: crea dalla fonte e richiede la conferma al collegamento', async ({ page }) => {
+    isolatedTest.setTimeout(120_000);
+    const pin = '314159';
+    await bootstrapUnlockedSession(page, pin);
+    const root = mkdtempSync(path.join(tmpdir(), 'mediflow-dossier-no-identifier-'));
+    const fileName = 'referto-senza-identificativo.pdf';
+    try {
+        writeFileSync(path.join(root, fileName), await textPdf(['Referto sintetico', 'Cognome: Inventata', 'Nome: Lucia', 'Data di nascita: 03/02/1980']));
+        await page.goto('/patients/import/dossier');
+        const panel = page.getByTestId('dossier-import');
+        await panel.getByTestId('dossier-folder').setInputFiles(root);
+        const group = panel.getByTestId('dossier-group');
+        await expect(group).toHaveAttribute('data-identity', 'no_document_cf', { timeout: 60_000 });
+        const destination = group.getByLabel('Scheda di destinazione');
+        await expect(destination).toHaveValue('');
+        await group.getByRole('button', { name: 'Crea la scheda da questo documento' }).click();
+        const create = group.getByTestId('patient-document-create');
+        await create.getByRole('button', { name: 'Avvia la revisione del documento' }).click();
+        await expect(create.getByRole('heading', { name: 'Revisione dei dati' })).toBeVisible({ timeout: 60_000 });
+        await expect(create.getByLabel('Nome', { exact: true })).toHaveValue('');
+        await create.getByLabel('Nome', { exact: true }).fill('Lucia');
+        await create.getByLabel('Cognome', { exact: true }).fill('Inventata');
+        await create.getByLabel('Data di nascita', { exact: true }).fill('1980-02-03');
+        await create.getByLabel('Identificativo', { exact: true }).selectOption('none');
+        await create.getByRole('button', { name: 'Prosegui alla conferma' }).click();
+        await create.getByLabel('PIN di conferma').fill(pin);
+        await create.getByRole('button', { name: 'Conferma creazione con PIN' }).click();
+        await expect(create.getByRole('heading', { name: 'Scheda creata', exact: true })).toBeVisible({ timeout: 30_000 });
+        await expect(destination).not.toHaveValue('');
+        const patientId = await destination.inputValue();
+        await expect(group).toHaveAttribute('data-identity', 'no_document_cf');
+        const save = group.getByRole('button', { name: 'Salva 1 originale nella scheda', exact: true });
+        await expect(save).toBeDisabled();
+        expect(await attachmentCount(page, patientId)).toBe(1);
+        await group.getByLabel('Ho controllato le fonti e confermo che appartengono alla scheda scelta.').check();
+        await save.click();
+        await expect(group.getByTestId('dossier-acquire-outcome')).toHaveText('Già in MediFlow: riusato, non duplicato', { timeout: 60_000 });
+        expect(await attachmentCount(page, patientId)).toBe(1);
+        await page.reload();
+        await panel.getByTestId('dossier-folder').setInputFiles(root);
+        await expect(group).toHaveAttribute('data-identity', 'no_document_cf', { timeout: 60_000 });
+        await expect(destination).toHaveValue('');
+    } finally {
+        rmSync(root, { recursive: true, force: true });
+    }
+});
 
 const CF_A = syntheticTaxCode();
 let CF_B = syntheticTaxCode();

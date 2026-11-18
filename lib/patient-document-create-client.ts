@@ -4,11 +4,6 @@ import { fitImageForLocalOcr } from './patient-document-image-geometry';
 export const PATIENT_DOCUMENT_MAX_BYTES = 10 * 1024 * 1024;
 export const PATIENT_DOCUMENT_ACCEPT = 'application/pdf,image/jpeg,image/png';
 
-export type PatientDocumentField = Readonly<{ action: 'correct'; value: string }>;
-export type PatientDocumentReview = Readonly<{
-    firstName: PatientDocumentField; lastName: PatientDocumentField; taxCode: PatientDocumentField;
-    birthDate?: PatientDocumentField; duplicate: 'none' | 'create-separate';
-}>;
 export type PatientDocumentView = Readonly<{
     commandId: string; viewId: string; text: string; identity: 'labelled' | 'ambiguous'; quality: 'ready' | 'uncertain' | 'ocr_error';
 }>;
