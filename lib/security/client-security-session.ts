@@ -1,14 +1,18 @@
 const SESSION_KEY_STORAGE_KEY = 'mediflow_session_key';
 const SESSION_USER_STORAGE_KEY = 'mediflow_user';
 
+export type SessionKeyWrapping = { encryptedMasterKey: string; salt: string };
+
 type RestoredSecuritySession<T> = {
     key: CryptoKey;
     userData: T;
+    wrapping: SessionKeyWrapping | null;
 };
+type StoredSessionKey = JsonWebKey | { jwk: JsonWebKey; wrapping: SessionKeyWrapping };
 
-export async function persistSecuritySession<T>(key: CryptoKey, userData: T): Promise<void> {
+export async function persistSecuritySession<T>(key: CryptoKey, userData: T, wrapping: SessionKeyWrapping): Promise<void> {
     const jwk = await window.crypto.subtle.exportKey('jwk', key);
-    sessionStorage.setItem(SESSION_KEY_STORAGE_KEY, JSON.stringify(jwk));
+    sessionStorage.setItem(SESSION_KEY_STORAGE_KEY, JSON.stringify({ jwk, wrapping }));
     sessionStorage.setItem(SESSION_USER_STORAGE_KEY, JSON.stringify(userData));
 }
 
@@ -18,7 +22,8 @@ export async function restoreSecuritySession<T>(): Promise<RestoredSecuritySessi
 
     if (!jwkStr || !userStr) return null;
 
-    const jwk = JSON.parse(jwkStr);
+    const stored = JSON.parse(jwkStr) as StoredSessionKey;
+    const { jwk, wrapping } = 'jwk' in stored ? stored : { jwk: stored, wrapping: null };
     const key = await window.crypto.subtle.importKey(
         'jwk',
         jwk,
@@ -30,6 +35,7 @@ export async function restoreSecuritySession<T>(): Promise<RestoredSecuritySessi
     return {
         key,
         userData: JSON.parse(userStr) as T,
+        wrapping: typeof wrapping?.encryptedMasterKey === 'string' && typeof wrapping.salt === 'string' ? wrapping : null,
     };
 }
 
