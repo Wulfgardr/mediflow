@@ -186,6 +186,8 @@ where
         .filter(|(when, _)| *when < observed)
         .max_by_key(|(when, _)| *when);
     let unit = |value: &str| crate::clinical_units::value(value, &row.unit_code);
+    let measured =
+        |other: &Observation| crate::clinical_units::value(&other.value, &other.unit_code);
     let short = |when: DateTime<Utc>| {
         day_in_zone(when, zone)
             .get(..5)
@@ -214,13 +216,18 @@ where
                     )
                 },
                 |(when, other)| {
-                    format!(
+                    let comparison = format!(
                         "{} ({}) → {} ({})",
-                        unit(&other.value),
+                        measured(other),
                         short(when),
-                        unit(&row.value),
+                        measured(row),
                         short(observed)
-                    )
+                    );
+                    if other.unit_code == row.unit_code {
+                        comparison
+                    } else {
+                        format!("{comparison} · unità diverse, valori non convertiti")
+                    }
                 },
             ),
             format!("{range} · misura del {}", day_in_zone(observed, zone)),
@@ -466,6 +473,33 @@ mod tests {
         assert_eq!(
             alone[0].detail[0],
             "5,6 mmol/L (10/11) · Nessuna misura precedente"
+        );
+    }
+
+    #[test]
+    fn a_previous_measure_in_another_unit_keeps_its_own_unit_and_is_not_converted() {
+        let anchor = VisitAnchor {
+            at: instant("2026-11-04T09:00:00Z").unwrap(),
+            visit_day: "04/11/2026".into(),
+            recorded_by: None,
+        };
+        let mut before = observation("k1", "19", Some("14"), Some("20"), "2026-10-02T08:00:00Z");
+        before.unit_code = "mg/dL".into();
+        let after = observation(
+            "k2",
+            "5,6",
+            Some("3.5"),
+            Some("5.0"),
+            "2026-11-10T08:00:00Z",
+        );
+        let changes = changes_since(&anchor, &[], &[before, after], &Utc);
+        assert_eq!(
+            changes[0].detail[0],
+            "19 mg/dL (02/10) → 5,6 mmol/L (10/11) · unità diverse, valori non convertiti"
+        );
+        assert_eq!(
+            changes[0].detail[1],
+            "Riferimento 3,5 mmol/L–5,0 mmol/L · misura del 10/11/2026"
         );
     }
 
