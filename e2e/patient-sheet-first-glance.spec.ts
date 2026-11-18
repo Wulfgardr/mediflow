@@ -53,11 +53,11 @@ test('Riepilogo: identità, problemi, terapie attive e Quadro paziente senza una
   const proposals = page.getByTestId('patient-proposals-summary');
   await expect(proposals).toHaveCount(1);
   await expect(proposals).toContainText('Nessuna proposta da rivedere');
-  const quadro = proposals.getByRole('link', { name: 'Quadro paziente', exact: true });
+  const quadro = proposals.getByRole('link', { name: 'Apri il Quadro e le fonti', exact: true });
   expect(await insideWorkArea(quadro)).toBe(true);
   const problems = page.locator('#quadro').getByRole('table', { name: 'Problemi' });
   await expect(problems).toBeVisible();
-  await expect(page.getByText('Nessuna visita precedente disponibile per il confronto.', { exact: true })).toBeVisible();
+  await expect(page.getByText('Nessuna visita registrata.', { exact: true })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Variazioni di terapia', exact: true })).toHaveCount(0);
   const active = page.locator('#quadro').getByRole('table', { name: 'Terapie attive' });
   await expect(active.getByRole('row')).toHaveCount(2);

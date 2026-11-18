@@ -201,7 +201,7 @@ for (const area of ['turno', 'diario'] as const) test(`Agenda and global diary: 
     await shot('first-read-error', surface.getByRole('alert'));
     f.state[endpoint] = 200; await surface.getByRole('button', { name: 'Riprova', exact: true }).click(); await ready();
     const sections = surface.locator('h2');
-    for (const heading of await sections.all()) await expect(heading).toHaveCSS('font-size', '14px');
+    for (const heading of await sections.all()) await expect(heading).toHaveCSS('font-size', '15px');
     const refresh = surface.getByRole('button', { name: 'Aggiorna', exact: true });
     const retry = surface.getByRole('button', { name: 'Riprova', exact: true });
     f.state.hold = new Promise<void>(resolve => release = resolve); f.state[endpoint] = 503;

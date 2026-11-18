@@ -5,10 +5,12 @@ import Link from 'next/link';
 import type { AgentRegistration } from '@/lib/agent-registration-store';
 import type { AgentPairingRequest } from '@/lib/agent-pairing-store';
 import { AGENT_OPERATIONS, type AgentMandate, type AgentMandateInput } from '@/lib/agent-mandate-contract';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import { generateMandateKeys } from '@/lib/agent-mandate-client';
 import { SETTINGS_INPUT_CLASS, SETTINGS_PRIMARY_BUTTON_CLASS, SETTINGS_SECONDARY_BUTTON_CLASS } from '@/components/settings/settings-ui';
 
 export default function AgentSettingsPage() {
+    const confirm = useConfirm();
     const [mandates, setMandates] = useState<AgentMandate[]>([]);
     const [pairings, setPairings] = useState<AgentPairingRequest[]>([]);
     const [selectedMandates, setSelectedMandates] = useState<Record<string, string>>({});
@@ -38,11 +40,22 @@ export default function AgentSettingsPage() {
         setRegistrations(await clients.json());
         setReadAt(Date.now());
     }
-    return <main className="mx-auto max-w-3xl space-y-8 p-6">
-        <h1 className="type-page-title">Agenti</h1>
-        <Link href="/in-arrivo" className={SETTINGS_SECONDARY_BUTTON_CLASS}>In arrivo</Link>
-        <button className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy} onClick={() => { void run(refresh); }}>Aggiorna</button>
-        <form className="space-y-4" onSubmit={event => { event.preventDefault(); void run(async () => {
+    return <section aria-labelledby="agenti-title" className="mx-auto max-w-3xl space-y-6">
+        <header className="space-y-3">
+            <h2 id="agenti-title" className="[font:var(--type-section-heading)]">Agenti</h2>
+            <div className="flex flex-wrap gap-2">
+                <Link href="/in-arrivo" className={SETTINGS_SECONDARY_BUTTON_CLASS}>In arrivo</Link>
+                <button className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy} onClick={() => { void run(refresh); }}>Aggiorna</button>
+            </div>
+        </header>
+        <nav aria-label="In questa pagina" className="flex flex-wrap gap-x-4 gap-y-2">
+            <span>In questa pagina</span>
+            <a href="#mandato-nuovo" className="font-semibold">Nuovo mandato</a>
+            <a href="#abbinamenti" className="font-semibold">Richieste di abbinamento</a>
+            {registrations.length > 0 ? <a href="#client" className="font-semibold">Client registrati</a> : null}
+            <a href="#mandati" className="font-semibold">Mandati</a>
+        </nav>
+        <form id="mandato-nuovo" aria-labelledby="mandato-nuovo-title" className="space-y-4" onSubmit={event => { event.preventDefault(); void run(async () => {
             const keys = await generateMandateKeys();
             const response = await fetch('/api/agent-mandates', { method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ pin, mandate: { id: crypto.randomUUID(), durationMs: Number(hours) * 3600000,
@@ -50,7 +63,7 @@ export default function AgentSettingsPage() {
             if (!response.ok) throw new Error('denied');
             await refresh();
         }); }}>
-            <h2 className="text-lg font-semibold">Nuovo mandato</h2>
+            <h3 id="mandato-nuovo-title" className="[font:var(--type-section-heading)]">Nuovo mandato</h3>
             <label className="block">Durata in ore<input className={SETTINGS_INPUT_CLASS} type="number" min="1" max="12" required value={hours} onChange={event => setHours(event.target.value)} /></label>
             <label className="block">Fornitore<select className={SETTINGS_INPUT_CLASS} value={provider} onChange={event => { setProvider(event.target.value as typeof provider); setEgress(false); }}>
                 <option value="openai">OpenAI (Codex)</option><option value="anthropic">Anthropic</option><option value="local">Locale</option>
@@ -64,7 +77,7 @@ export default function AgentSettingsPage() {
             <button className={SETTINGS_PRIMARY_BUTTON_CLASS} disabled={busy || !operations.length}>Crea mandato</button>
         </form>
         {error && <p role="alert">{error}</p>}
-        <section className="space-y-3"><h2 className="text-lg font-semibold">Richieste di abbinamento</h2>
+        <section id="abbinamenti" className="space-y-3"><h3 className="[font:var(--type-section-heading)]">Richieste di abbinamento</h3>
             <p>Confronta il codice con quello mostrato dall’agente prima di approvare.</p>
             <ul>{pairings.map(pairing => {
                 const compatible = mandates.filter(mandate => mandate.revokedAt === null && mandate.expiresAt > readAt
@@ -89,7 +102,7 @@ export default function AgentSettingsPage() {
                         <label className="block">PIN per {pairing.name}<input className={SETTINGS_INPUT_CLASS} type="password"
                             inputMode="numeric" autoComplete="off" value={approvalPin} onChange={event => setApprovalPin(event.target.value)} /></label>
                     </>}
-                    <button className={SETTINGS_PRIMARY_BUTTON_CLASS} disabled={busy || !selected || (renewOnUnlock && !/^[0-9]{4,8}$/u.test(approvalPin))} onClick={() => { void run(async () => {
+                    <button className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy || !selected || (renewOnUnlock && !/^[0-9]{4,8}$/u.test(approvalPin))} onClick={() => { void run(async () => {
                         const response = await fetch('/api/agent-mandates/pairings', { method: 'POST', headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ requestId: pairing.id, code: pairing.code, mandateRef: selected, ...(renewOnUnlock ? { renewOnUnlock, pin: approvalPin } : {}) }) });
                         if (!response.ok) throw new Error('denied'); await refresh();
@@ -97,7 +110,7 @@ export default function AgentSettingsPage() {
                 </li>;
             })}</ul>
         </section>
-        {registrations.length > 0 && <section className="space-y-3"><h2 className="text-lg font-semibold">Client registrati</h2>
+        {registrations.length > 0 && <section id="client" className="space-y-3"><h3 className="[font:var(--type-section-heading)]">Client registrati</h3>
             <ul>{registrations.map(registration => <li key={registration.id} className="flex items-center justify-between gap-4 py-2">
                 <div>
                     <p>{registration.name}</p>
@@ -105,21 +118,27 @@ export default function AgentSettingsPage() {
                         : `Ultimo rinnovo · ${new Date(registration.lastRenewalAt).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' })}`}</p>
                 </div>
                 {registration.revokedAt === null && <button className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy}
-                    aria-label={`Revoca ${registration.name}`} onClick={() => { void run(async () => {
+                    aria-label={`Revoca ${registration.name}`} onClick={async () => {
+                        const answer = await confirm({ title: 'Revocare l’accesso del client?', message: registration.name, confirmLabel: 'Conferma revoca', tone: 'danger' });
+                        if (!answer.confirmed) return;
+                        await run(async () => {
                         const response = await fetch('/api/agent-mandates/registrations', { method: 'DELETE',
                             headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: registration.id }) });
                         if (!response.ok) throw new Error('denied'); await refresh();
                     }); }}>Revoca</button>}
             </li>)}</ul>
         </section>}
-        <section className="space-y-3"><h2 className="text-lg font-semibold">Mandati</h2>
+        <section id="mandati" className="space-y-3"><h3 className="[font:var(--type-section-heading)]">Mandati</h3>
             <ul>{mandates.map(mandate => <li key={mandate.id} className="flex items-center justify-between gap-4 py-2">
                 <span>{mandate.provider} · {mandate.revokedAt !== null ? 'Revocato' : mandate.expiresAt <= readAt ? 'Scaduto' : `Fino alle ${new Date(mandate.expiresAt).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`}</span>
-                {mandate.revokedAt === null && <button className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy} onClick={() => { void run(async () => {
+                {mandate.revokedAt === null && <button className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy} onClick={async () => {
+                    const answer = await confirm({ title: 'Revocare il mandato?', message: mandate.provider, confirmLabel: 'Conferma revoca', tone: 'danger' });
+                    if (!answer.confirmed) return;
+                    await run(async () => {
                     const response = await fetch('/api/agent-mandates', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: mandate.id }) });
                     if (!response.ok) throw new Error('denied'); await refresh();
                 }); }}>Revoca</button>}
             </li>)}</ul>
         </section>
-    </main>;
+    </section>;
 }

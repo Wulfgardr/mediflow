@@ -57,6 +57,7 @@ test('doctor creates, reloads and revokes a mandate; inactivity preserves it and
     expect(read()).toEqual({ revoked_at: null, wrapped_private_key: mandate.wrappedPrivateKey });
     const revocation = page.waitForResponse(response => response.url().endsWith('/api/agent-mandates') && response.request().method() === 'DELETE');
     await page.getByRole('button', { name: 'Revoca', exact: true }).click();
+    await page.getByRole('button', { name: 'Conferma revoca', exact: true }).click();
     expect((await revocation).status()).toBe(200);
     await expect(page.getByText('openai · Revocato', { exact: true })).toBeVisible();
     expect(read().revoked_at).not.toBeNull();

@@ -4,7 +4,6 @@ import type { ReactNode } from 'react';
 import type { Checkup, Diagnosis, Observation, Therapy } from '@/lib/db';
 import { formatCountLabel } from '@/lib/format-count';
 import { projectQuadroMeasures } from '@/lib/patient-quadro';
-import type { projectTherapyDatesSinceVisit } from '@/lib/patient-therapy-changes';
 import PrivacyBlur from './privacy-blur';
 import { InkSectionHeading } from '@/components/ui/ink-state';
 import register from './clinical-register.module.css';
@@ -24,8 +23,7 @@ export interface PatientSynopticSheetProps {
     diary?: ReactNode;
     composer?: ReactNode;
     sources?: ReactNode;
-    comparison?: ReturnType<typeof projectTherapyDatesSinceVisit>;
-    comparisonUnavailable?: boolean;
+    activity?: ReactNode;
     measures: QuadroRead<Observation>;
     checkups: QuadroRead<Checkup>;
 }
@@ -51,7 +49,7 @@ function DateCell({ date }: { date?: Date }) {
     return <time dateTime={new Date(date).toISOString()}>{new Date(date).toLocaleDateString('it-IT')}</time>;
 }
 
-export function PatientSynopticSheet({ clinicalSupport, notesContent, problems, therapies, measures, checkups, diary, composer, sources, comparison, comparisonUnavailable }: PatientSynopticSheetProps) {
+export function PatientSynopticSheet({ clinicalSupport, notesContent, problems, therapies, measures, checkups, diary, composer, sources, activity }: PatientSynopticSheetProps) {
     const measureRows = projectQuadroMeasures(measures.data ?? []);
     const stable = <>
         <Section name="Problemi" read={problems} count={formatCountLabel(problems.data?.length ?? 0, 'problema', 'problemi')} empty="Nessun problema registrato.">
@@ -72,8 +70,6 @@ export function PatientSynopticSheet({ clinicalSupport, notesContent, problems, 
         </Section>
     </>;
     const context = <>
-        {clinicalSupport}
-        {sources}
         <Section name="Parametri recenti" read={{ ...measures, data: measures.data === undefined ? undefined : measureRows }} count={formatCountLabel(measureRows.length, 'parametro', 'parametri')} empty="Nessuna misura registrata.">
             <table className={`${register.table} ${reading.measures}`} aria-label="Parametri recenti">
                 <thead><tr><th scope="col">Nome</th><th scope="col" className={reading.value}>Valore</th><th scope="col">Data</th><th scope="col" className={`${register.secondaryColumn} ${reading.secondaryColumn}`}>Variazione</th></tr></thead>
@@ -89,51 +85,23 @@ export function PatientSynopticSheet({ clinicalSupport, notesContent, problems, 
                 <tbody>{checkups.data?.map(checkup => <tr key={checkup.id}><td>{checkup.title}</td><td><DateCell date={checkup.date} /></td></tr>)}</tbody>
             </table>
         </Section>
-        {notesContent ? <div className={reading.notes}>{notesContent}</div> : null}
     </>;
+    const stableWithNotes = <>{stable}{notesContent ? <div className={reading.notes}>{notesContent}</div> : null}</>;
     return <section id="quadro" aria-label="Riepilogo clinico" className={`${register.register} ${reading.sheet}`} data-overview={diary ? 'true' : undefined} data-writing={composer ? 'true' : undefined}>
         {diary ? <>
-            <div className={reading.stable}>{stable}</div>
             <div className={reading.middle}>
-                {comparison === undefined ? null : <TherapyComparison comparison={comparison} unavailable={comparisonUnavailable} showLinks={!composer} />}
+                <div className={reading.activity}>{activity}</div>
                 {diary}
+                <a href="#diario" className={`mf-button-text ${reading.fullDiary}`}>Tutto il diario</a>
             </div>
-            <aside aria-label={composer ? 'Scrittura e fonti' : 'Contesto della cartella'} className={reading.context}>
-                {composer ?? context}
-            </aside>
-        </> : <>{stable}{context}</>}
-    </section>;
-}
-
-function TherapyComparison({ comparison, unavailable, showLinks }: {
-    comparison: ReturnType<typeof projectTherapyDatesSinceVisit>;
-    unavailable?: boolean;
-    showLinks: boolean;
-}) {
-    if (!comparison) return <p className={reading.noComparison}>
-        {unavailable ? 'Confronto con la visita precedente non disponibile.' : 'Nessuna visita precedente disponibile per il confronto.'}
-    </p>;
-
-    const renderRows = (changes: typeof comparison.changes) => <ul className={reading.changeList}>{changes.map(change =>
-        <li key={`${change.therapyId}:${change.kind}`}>
-            <DateCell date={change.date} />
-            <strong><PrivacyBlur>{change.drugName}</PrivacyBlur></strong>
-            <span>{change.kind === 'start' ? 'Inizio' : 'Conclusione'}</span>
-        </li>
-    )}</ul>;
-
-    return <section aria-label="Variazioni di terapia" className={reading.comparison}>
-        <h2>Variazioni di terapia</h2>
-        <p className={reading.readState}>Dopo la visita del <DateCell date={comparison.visitDate} /></p>
-        {comparison.changes.length ? renderRows(comparison.changes.slice(0, 2)) : <p className={reading.readState}>Nessun inizio o conclusione con data successiva.</p>}
-        <details className={reading.changeDetails}>
-            <summary>{comparison.changes.length > 2 ? 'Altre variazioni e fonti' : 'Fonti del confronto'}</summary>
-            {comparison.changes.length > 2 ? renderRows(comparison.changes.slice(2)) : null}
-            <p>Il confronto usa le date di inizio e conclusione riportate nelle schede terapia. Lo storico di sospensioni e posologie non è disponibile qui.</p>
-            {showLinks ? <div>
-                <a href="#terapie" className="mf-button-text">Apri Terapie</a>
-                <a href="#diario" className="mf-button-text">Apri il diario</a>
-            </div> : null}
-        </details>
+            <div className={reading.side}>
+                <div className={reading.stable}>{stableWithNotes}</div>
+                <aside aria-label="Contesto della cartella" className={reading.context}>
+                    {composer ? <div className={reading.composer}>{composer}</div> : null}
+                    <div className={reading.support}>{clinicalSupport}</div>
+                    <div className={reading.contextRows}>{context}{composer ? null : sources}</div>
+                </aside>
+            </div>
+        </> : <>{stableWithNotes}{context}</>}
     </section>;
 }

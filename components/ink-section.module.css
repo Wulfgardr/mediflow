@@ -5,7 +5,7 @@
 :global(:root) .sections :global(section > [data-section-header] > :is(h2, h3, h4)),
 :global(:root) .sections :global(section > :is(h2, h3, h4) [data-disclosure-control]),
 :global(:root) .sections :global(section > header > :is(h2, h3, h4) [data-disclosure-control]) {
-  font: var(--type-strong);
+  font: var(--type-section-heading);
   letter-spacing: normal;
   text-transform: none;
 }

@@ -7,8 +7,9 @@ import { projectFollowupReadState } from '@/lib/followup-read-state';
 import { ViewState } from '@/components/ui/view-state';
 import Link from 'next/link';
 import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
+import { useEntryDraftOnOpen } from '@/lib/hooks/effects/use-entry-draft-on-open';
 import { useParams, useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, ArrowLeft, ChevronRight, Plus } from 'lucide-react';
 
 import { PluginLocalUiNavigation, PluginPrescribingGuide } from '@/components/plugin-local-ui-navigation';
@@ -17,8 +18,9 @@ import { AttentionGroup } from '@/components/attention-group';
 import { ClinicalRiverTimeline } from '@/components/clinical-river-timeline';
 import { PatientEntryComposer } from '@/components/patient-entry-composer';
 import { PatientSynopticSheet } from '@/components/patient-synoptic-sheet';
-import { PatientSheetSources } from '@/components/patient-sheet-sources';
-import { projectTherapyDatesSinceVisit } from '@/lib/patient-therapy-changes';
+import { PatientSheetSources, type SheetSource } from '@/components/patient-sheet-sources';
+import { projectVisitReference } from '@/lib/patient-therapy-changes';
+import { PatientSheetActivity } from '@/components/patient-sheet-activity';
 import { CollapsibleSection } from '@/components/kree8/collapsible-section';
 import DocumentInsightsPanel from '@/components/document-insights-panel';
 import DocumentUpload from '@/components/document-upload';
@@ -87,8 +89,23 @@ export default function PatientDetailPage() {
     return <PatientDetail key={id} id={id} writing={writing} />;
 }
 
-function PatientDetail({ id, writing }: { id: string; writing: boolean }) {
+function PatientDetail({ id, writing: requested }: { id: string; writing: boolean }) {
     const { proposal } = useRuntimeTwinDesign();
+    const [draftOnOpen, setDraftOnOpen] = useEntryDraftOnOpen(id, proposal);
+    const writing = requested || draftOnOpen;
+    const [openSource, setOpenSource] = useState<SheetSource | null>(null);
+    const sourceTrigger = useRef<HTMLElement | null>(null);
+    const sourceSelection = {
+        source: openSource,
+        select(source: SheetSource) {
+            sourceTrigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+            setOpenSource(source);
+        },
+        close() {
+            setOpenSource(null);
+            if (!writing) requestAnimationFrame(() => sourceTrigger.current?.focus());
+        },
+    };
     const [smartImportProposalCapture, setSmartImportProposalCapture] = useState<PatientSmartImportProjectionCaptureInput | null>(null);
     const [insightProposalKey, setInsightProposalKey] = useState<string | null>(null);
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -113,7 +130,7 @@ function PatientDetail({ id, writing }: { id: string; writing: boolean }) {
     const { data: patient, loading: patientLoading, error: patientError, refresh: refreshPatient } = useLiveQueryState(() => db.patients.get(id), [id], undefined, ['patients']);
     const { data: diarySnapshot, loading: entriesLoading, error: entriesError, refresh: refreshEntries } = useLiveQueryState(
         async () => {
-            const items = await db.entries.query({ patientId: id, includeDeleted: true }).toArray();
+            const items = await db.entries.query({ patientId: id, includeDeleted: true }).toArray({ rejectAuthUnavailable: true });
             const entries = items.sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime());
             return { entries, readAt: new Date() };
         },
@@ -122,6 +139,11 @@ function PatientDetail({ id, writing }: { id: string; writing: boolean }) {
         ['entries'],
     );
     const entries = diarySnapshot?.entries;
+    const [visitReference, setVisitReference] = useState<ReturnType<typeof projectVisitReference>>();
+    if (!visitReference && diarySnapshot && !entriesLoading && !entriesError) {
+        setVisitReference(projectVisitReference(id, diarySnapshot.entries, diarySnapshot.readAt));
+    }
+
     /* WUL-UIUX Fase 7: stesso filtro del builder (ne completati ne
        annullati): cosi nextCheckup, la sezione Follow-up e i conteggi condivisi
        raccontano lo stesso insieme, e un appuntamento annullato non compare piu
@@ -140,7 +162,7 @@ function PatientDetail({ id, writing }: { id: string; writing: boolean }) {
     const followupRead = projectFollowupReadState({ data: checkups, loading: checkupsLoading, error: checkupsError });
     /* The sheet consumes metadata and stored summaries, not original file bytes. */
     const { data: attachments, loading: attachmentsLoading, error: attachmentsError, refresh: refreshAttachments } = useLiveQueryState(
-        async () => db.attachments.query({ patientId: id, metadataOnly: true }).toArray({ signal: db.getSessionReadSignal() }),
+        async () => db.attachments.query({ patientId: id, metadataOnly: true }).toArray({ signal: db.getSessionReadSignal(), rejectAuthUnavailable: true }),
         [id],
         undefined,
         ['attachments'],
@@ -148,12 +170,13 @@ function PatientDetail({ id, writing }: { id: string; writing: boolean }) {
     /* WUL-UIUX Fase 7: array completi per buildPatientWorkspaceFromRecords,
        le stesse letture che il cockpit fa per il Quadro (tutte le terapie e tutte
        le osservazioni del paziente, senza filtri). */
-    const { data: therapies, loading: therapiesLoading, error: therapiesError } = useLiveQueryState(
-        async () => db.therapies.query({ patientId: id }).toArray({ rejectAuthUnavailable: true }),
+    const { data: therapySnapshot, loading: therapiesLoading, error: therapiesError } = useLiveQueryState(
+        async () => ({ records: await db.therapies.query({ patientId: id }).toArray({ rejectAuthUnavailable: true }), readAt: new Date() }),
         [id],
         undefined,
         ['therapies'],
     );
+    const therapies = therapySnapshot?.records;
     // La sintesi usa la stessa lettura, mantenendo solo le terapie attive
     // e l'ordine per inizio terapia; il workspace riceve l'insieme completo.
     const activeTherapies = useMemo(
@@ -608,7 +631,7 @@ function PatientDetail({ id, writing }: { id: string; writing: boolean }) {
             primaryAction={writing ? undefined : { href: `/patients/${id}/modules?voce=nuova`, label: 'Nuova voce', icon: Plus }}
             headerActions={(
                 <>
-                {writing ? <Link href={`/patients/${id}/modules`} className="mf-button-secondary" aria-label="Torna alla scheda" title="Torna alla scheda"><ArrowLeft size={16} aria-hidden="true" /><span>Torna alla scheda</span></Link> : null}
+                {writing ? <Link href={`/patients/${id}/modules`} className="mf-button-secondary" onClick={() => { setDraftOnOpen(false); setOpenSource(null); }} aria-label="Chiudi la voce" title="Chiudi la voce"><ArrowLeft size={16} aria-hidden="true" /><span>Chiudi la voce</span></Link> : null}
                 {!writing ? <PatientHeaderActions key={`${patient.id}:${patient.ambulatoryId ?? ''}`}
                     patientId={patient.id} ambulatoryId={patient.ambulatoryId ?? null} checkups={checkups ?? []}
                     editHref={`/patients/${id}/edit`}
@@ -696,13 +719,17 @@ function PatientDetail({ id, writing }: { id: string; writing: boolean }) {
                         surfaceClassName: workspaceStyles.clinicalSection,
                         keepMounted: true,
                     }} />}
-                    composer={writing ? <PatientEntryComposer key={id} embedded /> : undefined}
-                    sources={<PatientSheetSources patientId={id} data={attachments} loading={attachmentsLoading} error={attachmentsError}
+                    composer={writing ? <PatientEntryComposer key={id} embedded sheetSource={sourceSelection} /> : undefined}
+                    sources={<PatientSheetSources patientId={id} selection={sourceSelection} entries={entriesError ? undefined : entries} data={attachments} loading={attachmentsLoading} error={attachmentsError}
                         onRefresh={refreshAttachments} archiveLink />}
-                    comparison={entriesError || therapiesError ? null : diarySnapshot && therapies && !entriesLoading && !therapiesLoading
-                        ? projectTherapyDatesSinceVisit(id, diarySnapshot.entries, therapies, diarySnapshot.readAt)
-                        : undefined}
-                    comparisonUnavailable={Boolean(entriesError || therapiesError)}
+                    activity={<PatientSheetActivity patientId={id} reference={visitReference} now={new Date(Math.max(currentTimestampMs, diarySnapshot?.readAt.getTime() ?? 0, therapySnapshot?.readAt.getTime() ?? 0))}
+                        entries={entriesError ? undefined : entries} therapies={therapiesError ? undefined : therapies}
+                        measures={observationsError ? undefined : observations} attachments={attachmentsError ? undefined : attachments}
+                        unavailable={Boolean(entriesError || therapiesError || observationsError || attachmentsError
+                            || !therapies || !observations || !attachments)}
+                        openDiary={entryId => sourceSelection.select({ kind: 'entry', id: entryId })}
+                        openDocument={attachmentId => sourceSelection.select({ kind: 'document', id: attachmentId })}
+                        proposalDate={patient.aiSummary?.trim() ? patient.aiSummaryGeneratedAt : undefined} />}
                     measures={{ data: observations, loading: observationsLoading, error: observationsError }}
                     checkups={{ data: checkups, loading: checkupsLoading, error: checkupsError }}
                 />

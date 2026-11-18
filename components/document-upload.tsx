@@ -51,8 +51,8 @@ function rejectionMessages(rejected: FileRejection[]): string[] {
 type OriginalResult = Readonly<{ metadata: Attachment; signal: AbortSignal }> &
     (Readonly<{ file: Attachment }> | Readonly<{ error: string; refreshList?: boolean }>);
 
-export function DocumentOriginal({ patientId, attachment, onClose, onRefreshList, inline = true }: {
-    patientId: string; attachment: Attachment; onClose: () => void; onRefreshList: () => void; inline?: boolean;
+export function DocumentOriginal({ patientId, attachment, onClose, onRefreshList, inline = true, closeLabel }: {
+    patientId: string; attachment: Attachment; onClose: () => void; onRefreshList: () => void; inline?: boolean; closeLabel?: string;
 }) {
     const [result, setResult] = useState<OriginalResult | null>(null);
     const [attempt, setAttempt] = useState(0);
@@ -97,14 +97,14 @@ export function DocumentOriginal({ patientId, attachment, onClose, onRefreshList
     // A list refresh unmounts this view; it never promotes old bytes to new metadata.
     const current = result?.metadata === attachment && !result.signal.aborted ? result : null;
     if (current && 'file' in current)
-        return <DocumentViewer inline={inline} file={current.file.data!} fileName={current.file.name} signal={current.signal} onClose={onClose} />;
+        return <DocumentViewer inline={inline} closeLabel={closeLabel} file={current.file.data!} fileName={current.file.name} signal={current.signal} onClose={onClose} />;
     return <>
         <p role={current ? 'alert' : 'status'} className={styles.empty}>{current?.error ?? 'Caricamento originale…'}</p>
         {current && <button type="button" className={disclosure.documentAction} data-lume-action="quiet"
             onClick={() => { setResult(null); setAttempt(value => value + 1); }}>Riprova originale</button>}
         {current?.refreshList && <button type="button" className={disclosure.documentAction} data-lume-action="quiet"
             onClick={onRefreshList}>Rileggi elenco</button>}
-        <button type="button" className={disclosure.documentAction} data-lume-action="quiet" onClick={onClose}>Chiudi</button>
+        <button type="button" className={disclosure.documentAction} data-lume-action="quiet" onClick={onClose}>{closeLabel ?? 'Chiudi'}</button>
     </>;
 }
 

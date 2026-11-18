@@ -14,6 +14,7 @@ interface DocumentViewerProps {
     fileName: string;
     onClose: () => void;
     inline?: boolean;
+    closeLabel?: string;
     signal?: AbortSignal;
 }
 
@@ -78,7 +79,7 @@ function DocumentPreviewBody({ file, fileName }: Pick<DocumentViewerProps, 'file
         : <DocumentPreviewCanvas source={current.preview} signal={current.signal} />;
 }
 
-export default function DocumentViewer({ file, fileName, onClose, inline = false, signal }: DocumentViewerProps) {
+export default function DocumentViewer({ file, fileName, onClose, inline = false, signal, closeLabel = 'Chiudi' }: DocumentViewerProps) {
 
     const source = useMemo(() => ({ file, fileName, signal, token: Symbol('document-view') }), [file, fileName, signal]);
     const [closedView, setClosedView] = useState<symbol | null>(null);
@@ -124,7 +125,7 @@ export default function DocumentViewer({ file, fileName, onClose, inline = false
         className={inline ? styles.inlineViewer : `${ink.surface} ${ink.viewer} mf-modal-shell lume-overlay-shadow relative w-full h-full max-w-6xl flex flex-col overflow-hidden`}>
         <header className={inline ? undefined : 'flex items-center justify-between gap-3 p-4 graphite-divider'}>
             <div className="flex min-w-0 items-center gap-3"><FileText size={18} aria-hidden /><h3 id={titleId}>{fileName}</h3></div>
-            <button ref={closeButton} type="button" onClick={close} className={styles.control} aria-label="Chiudi" title="Chiudi"><X size={18} aria-hidden /></button>
+            <button ref={closeButton} type="button" onClick={close} className={styles.control} aria-label={closeLabel} title={closeLabel}>{closeLabel === 'Chiudi' ? <X size={18} aria-hidden /> : closeLabel}</button>
         </header>
         <DocumentOriginalSave file={file} fileName={fileName} signal={signal} />
         <div className={inline ? `${styles.inlineCanvas} relative` : 'min-h-0 flex-1 relative'} style={{ background: 'var(--lume-surface-field)' }}>

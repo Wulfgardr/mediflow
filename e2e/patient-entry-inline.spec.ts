@@ -56,14 +56,18 @@ test('la voce nella scheda conserva la bozza dopo un rifiuto e registra sul pazi
   await page.route('**/api/entries', route => route.request().method() === 'POST'
     ? route.fulfill({ status: 400, json: { error: 'Rifiuto sintetico della voce' } })
     : route.continue());
-  await page.getByRole('button', { name: 'Registra nel diario', exact: true }).click();
+  await page.getByRole('button', { name: 'Rivedi', exact: true }).click();
+  await page.getByRole('button', { name: 'Conferma e registra', exact: true }).click();
   await expect(page.getByText('Errore durante il salvataggio', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Torna alla bozza', exact: true }).click();
   await expect(editor).toHaveText('Resoconto sintetico scritto nella scheda.');
   const read = () => page.evaluate(async id => (await fetch(`/api/entries?patientId=${id}`)).json(), patient.id);
   expect(await read()).toEqual([]);
   await page.unroute('**/api/entries');
-  await page.getByRole('button', { name: 'Registra nel diario', exact: true }).click();
-  await expect(page).toHaveURL(new RegExp(`/patients/${patient.id}/modules#diario$`));
+  await page.getByRole('button', { name: 'Rivedi', exact: true }).click();
+  await page.getByRole('button', { name: 'Conferma e registra', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Esito della registrazione' })).toContainText('Registrata alle');
+  await page.getByRole('link', { name: 'Chiudi la voce', exact: true }).click();
   await expect(page.locator('#diario article')).toBeVisible();
   await expect(page.locator('#diario article')).toContainText('Resoconto sintetico scritto nella scheda.');
   const saved = await read();
@@ -71,8 +75,10 @@ test('la voce nella scheda conserva la bozza dopo un rifiuto e registra sul pazi
   expect(saved[0]).toMatchObject({ patientId: patient.id, version: 1, type: 'visit', setting: 'ambulatory' });
   await page.getByRole('link', { name: 'Nuova voce', exact: true }).click();
   await editor.fill('Seconda voce sintetica nella stessa scheda.');
-  await page.getByRole('button', { name: 'Registra nel diario', exact: true }).click();
-  await expect(page).toHaveURL(new RegExp(`/patients/${patient.id}/modules#diario$`));
+  await page.getByRole('button', { name: 'Rivedi', exact: true }).click();
+  await page.getByRole('button', { name: 'Conferma e registra', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Esito della registrazione' })).toContainText('Registrata alle');
+  await page.getByRole('link', { name: 'Chiudi la voce', exact: true }).click();
   await expect(page.locator('#diario article').filter({ hasText: 'Seconda voce sintetica nella stessa scheda.' })).toBeVisible();
   expect(await read()).toHaveLength(2);
 });

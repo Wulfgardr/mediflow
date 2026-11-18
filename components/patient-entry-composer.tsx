@@ -15,7 +15,7 @@ import { InkState } from '@/components/ui/ink-state';
 import { ViewState } from '@/components/ui/view-state';
 import { ClinicalRichTextEditor, type ClinicalEditorFocus } from '@/components/clinical-rich-text-editor';
 import { ClinicalRichTextContent } from '@/components/clinical-rich-text-content';
-import { PatientSheetSources } from '@/components/patient-sheet-sources';
+import { PatientSheetSources, type SheetSourceSelection } from '@/components/patient-sheet-sources';
 import { patientAllergiesForHeader } from '@/lib/patient-allergies';
 import { PatientHeaderAllergies } from '@/components/patient-header-identity';
 import { Kree8WorkspaceShell, type Kree8WorkspaceNavItem } from '@/components/kree8/kree8-workspace-shell';
@@ -74,7 +74,7 @@ function formatEntryDate(value: Date | string | number | null | undefined): stri
 /* WUL-421 */
 type VisitSessionUiState = VisitSessionState | 'processing' | 'processed';
 
-export function PatientEntryComposer({ embedded = false }: { embedded?: boolean }) {
+export function PatientEntryComposer({ embedded = false, sheetSource }: { embedded?: boolean; sheetSource?: SheetSourceSelection }) {
     const params = useParams();
     const router = useRouter();
     const { showToast } = useToast();
@@ -106,18 +106,36 @@ export function PatientEntryComposer({ embedded = false }: { embedded?: boolean 
     const [visitMedicationCandidates, setVisitMedicationCandidates] = useState<VisitMedicationCandidate[]>([]);
     const [isContextOpen, setIsContextOpen] = useState(false);
     const [isReadingQuadro, setIsReadingQuadro] = useState(false);
-    const draftValue = useMemo(() => ({ editState, dateSource, type, content, setting, entryDate, dictatedDraft }), [editState, dateSource, type, content, setting, entryDate, dictatedDraft]);
+    const editorFocus = useRef<ClinicalEditorFocus>(null);
+    const reviewHeading = useRef<HTMLHeadingElement>(null);
+    const [reviewing, setReviewing] = useState(false);
+    const [savedId, setSavedId] = useState<string | null>(null);
+    const [registered, setRegistered] = useState<ClinicalEntry | null>(null);
+    const [readbackFailed, setReadbackFailed] = useState(false);
+    const [writeFailed, setWriteFailed] = useState(false);
+    const inlineSheet = embedded && proposal;
+    const mayResumeReview = inlineSheet && reviewing && files.length === 0 && visitSessionEvents.length === 0;
+    const draftValue = useMemo<EntryLocalDraft>(() => ({ editState, dateSource, type, content, setting, entryDate, dictatedDraft,
+        sheetStep: mayResumeReview ? 'review' : undefined }), [editState, dateSource, type, content, setting, entryDate, dictatedDraft, mayResumeReview]);
     const localDraft = useEntryLocalDraft(id, draftValue, draft => {
         setType(draft.type); setContent(draft.content); setSetting(draft.setting);
         setEditState('dirty'); setDateSource(draft.dateSource);
         setEntryDate(restoreEntryDraftDate(draft, defaultDate)); setDictatedDraft(draft.dictatedDraft); setIsDictatedDraftReviewed(false);
+        if (inlineSheet && draft.sheetStep === 'review' && !isClinicalRichTextBlank(draft.content)) setReviewing(true);
     });
-    const editorFocus = useRef<ClinicalEditorFocus>(null);
-    const reviewHeading = useRef<HTMLHeadingElement>(null);
-    const [reviewing, setReviewing] = useState(false);
-    const inlineSheet = embedded && proposal;
-    const openReview = (event: React.MouseEvent<HTMLButtonElement>) => {
-        if (!event.currentTarget.form?.reportValidity()) return;
+    const readBack = async (entryId: string) => {
+        setReadbackFailed(false);
+        try {
+            const entries = await db.entries.query({ patientId: id }).toArray({ rejectAuthUnavailable: true });
+            const entry = entries.find(value => value.id === entryId);
+            if (!entry || entry.patientId !== id || entry.deletedAt) throw new Error('Entry reread unavailable');
+            setRegistered(entry);
+        } catch {
+            setReadbackFailed(true);
+        }
+    };
+    const openReview = () => {
+        setWriteFailed(false);
         setReviewing(true);
         requestAnimationFrame(() => reviewHeading.current?.focus());
     };
@@ -143,7 +161,8 @@ export function PatientEntryComposer({ embedded = false }: { embedded?: boolean 
         || visitSessionEvents.length > 0;
 
     /* WUL-676: keep the workspace guard active during pending saves. */
-    useRuntimeTwinPendingForm(hasUnsavedChanges, localDraft.clear);
+    const recoverable = inlineSheet && localDraft.saved && files.length === 0 && visitSessionEvents.length === 0;
+    useRuntimeTwinPendingForm(!savedId && (isSubmitting || (hasUnsavedChanges && !recoverable)), localDraft.clear);
     const patientRead = useLiveQueryState(() => db.patients.get(id), [id], undefined, ['patients']);
     const patient = patientRead.data;
     /* WUL-420 */
@@ -302,13 +321,19 @@ export function PatientEntryComposer({ embedded = false }: { embedded?: boolean 
 
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
-        if (localDraft.state === 'loading') return;
+        if (localDraft.state === 'loading' || isSubmitting || savedId) return;
         const normalizedContent = sanitizeClinicalRichTextHtml(content);
 
         if (isClinicalRichTextBlank(normalizedContent)) {
             showToast({ tone: 'warning', title: 'Resoconto clinico mancante', description: 'Inserisci un resoconto clinico prima di registrare la voce.' });
             return;
         }
+
+        if (inlineSheet && !reviewing) {
+            openReview();
+            return;
+        }
+        setWriteFailed(false);
 
         // New files join the documents listed in this page: a list not yet read cannot be the precondition.
         let attachmentCollection: AttachmentCollectionView | undefined;
@@ -360,8 +385,9 @@ export function PatientEntryComposer({ embedded = false }: { embedded?: boolean 
                 note: 'Nota clinica',
             };
 
+            const entryId = uuidv4();
             await db.entries.add({
-                id: uuidv4(),
+                id: entryId,
                 patientId: id,
                 type,
                 title: typeLabels[type] || 'Nuova Voce',
@@ -375,10 +401,15 @@ export function PatientEntryComposer({ embedded = false }: { embedded?: boolean 
 
             /* WUL-676: successful programmatic navigation is not
                intercepted by the workspace's link guard. */
+            if (inlineSheet) setSavedId(entryId);
             await localDraft.clear().catch(() => showToast({ tone: 'warning', title: 'Voce registrata', description: 'La copia della bozza non è stata rimossa. Non registrarla di nuovo.' }));
-            if (embedded) window.history.replaceState(null, '', `/patients/${id}/modules#diario`);
-            else router.push(`/patients/${id}/modules`);
+            if (inlineSheet) {
+                await readBack(entryId);
+            } else if (embedded) {
+                window.history.replaceState(null, '', `/patients/${id}/modules#diario`);
+            } else router.push(`/patients/${id}/modules`);
         } catch (error) {
+            if (inlineSheet) setWriteFailed(true);
             if (error instanceof AttachmentCollectionChangedError) {
                 attachmentsRead.refresh();
                 showToast({ tone: 'warning', title: 'Documenti in cartella cambiati', description: confirmedUploads.current.size
@@ -916,10 +947,17 @@ export function PatientEntryComposer({ embedded = false }: { embedded?: boolean 
             data-lume-elevated={proposal ? undefined : "true"}
             data-testid="lume-editor-workflow"
         >
-            <form onSubmit={handleSubmit} className={proposal ? composerStyles.form : "space-y-0"} aria-label="Nuova voce clinica">
+            <form onSubmit={handleSubmit} className={proposal ? composerStyles.form : "space-y-0"} aria-label="Nuova voce clinica" onKeyDown={event => {
+                if (inlineSheet && reviewing && event.key === 'Escape') { event.stopPropagation(); resumeEditor(); }
+            }}>
+                {inlineSheet ? <ol className={composerStyles.steps} aria-label="Passi della voce">
+                    <li aria-current={!reviewing ? 'step' : undefined}>1 · Scrivi</li>
+                    <li aria-current={reviewing ? 'step' : undefined}>2 · Rivedi</li>
+                    <li>3 · Registrata</li>
+                </ol> : null}
                 {inlineSheet ? <div hidden={reviewing}>{fields}</div> : fields}
                 {reviewing ? <section className={composerStyles.review} aria-label="Riepilogo della voce">
-                    <h2 tabIndex={-1} ref={reviewHeading}>Rivedi la voce</h2>
+                    <h2 tabIndex={-1} ref={reviewHeading}>Che cosa verrà registrato</h2>
                     <dl>
                         <dt>Paziente</dt><dd><PrivacyBlur>{patient ? `${patient.lastName} ${patient.firstName}` : 'Paziente non disponibile'}</PrivacyBlur></dd>
                         <dt>Tipo e luogo</dt><dd>{types.find(item => item.id === type)?.label} · {setting === 'home' ? 'Domicilio' : 'Ambulatorio'}</dd>
@@ -928,8 +966,9 @@ export function PatientEntryComposer({ embedded = false }: { embedded?: boolean 
                     </dl>
                     <PrivacyBlur><ClinicalRichTextContent content={content} /></PrivacyBlur>
                 </section> : null}
-                {inlineSheet ? <PatientSheetSources patientId={id} data={attachmentsRead.data}
+                {inlineSheet && sheetSource ? <PatientSheetSources patientId={id} selection={sheetSource} entries={entriesRead.error ? undefined : patientEntries} data={attachmentsRead.data}
                     loading={attachmentsRead.loading} error={attachmentsRead.error} onRefresh={attachmentsRead.refresh}
+                    closeLabel="Torna alla bozza"
                     onCloseSource={() => requestAnimationFrame(() => reviewing ? reviewHeading.current?.focus() : editorFocus.current?.resume())} /> : null}
                 {proposal && !inlineSheet ? (
                     <details
@@ -981,8 +1020,9 @@ export function PatientEntryComposer({ embedded = false }: { embedded?: boolean 
                 ) : null}
                 <div className={proposal ? composerStyles.actions : "flex justify-end border-t border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] pt-4"}>
                     {proposal ? <div className={composerStyles.saveSummary} role="status"><InkState state="fresh">{isSubmitting ? 'Registrazione in corso' : 'Bozza non registrata'}</InkState><p>{patient ? <PrivacyBlur>{`${patient.lastName} ${patient.firstName}`}</PrivacyBlur> : patientRead.loading ? 'Caricamento paziente…' : 'Paziente non disponibile.'} · 1 voce di diario{files.length ? ` · ${files.length} allegati` : ''}</p></div> : null}
-                    {inlineSheet && acceptedNoteHasContent ? <button type="button" className="mf-button-text" disabled={isSubmitting}
-                        onClick={reviewing ? resumeEditor : openReview}>{reviewing ? 'Torna a scrivere' : 'Rivedi'}</button> : null}
+                    {writeFailed && inlineSheet ? <p role="alert">Voce non registrata. La bozza è ancora aperta.</p> : null}
+                    {inlineSheet && reviewing ? <button type="button" className="mf-button-text" disabled={isSubmitting}
+                        onClick={resumeEditor}>Torna alla bozza</button> : null}
                     <button
                         type="submit"
                         disabled={isSubmitting}
@@ -997,7 +1037,7 @@ export function PatientEntryComposer({ embedded = false }: { embedded?: boolean 
                         ) : (
                             <>
                                 <Save className="h-5 w-5" />
-                                <span>Registra nel diario</span>
+                                <span>{inlineSheet ? reviewing ? 'Conferma e registra' : 'Rivedi' : 'Registra nel diario'}</span>
                             </>
                         )}
                     </button>
@@ -1008,7 +1048,22 @@ export function PatientEntryComposer({ embedded = false }: { embedded?: boolean 
 
     if (localDraft.state === 'loading') return <p role="status">Recupero della bozza…</p>;
 
-    if (embedded) return <>{entryForm}{entriesRead.error ? entriesReadError : null}</>;
+    if (embedded) {
+        if (savedId && inlineSheet) return <section aria-label="Esito della registrazione" className={composerStyles.receipt}>
+            <ol className={composerStyles.steps} aria-label="Passi della voce">
+                <li>1 · Scrivi</li><li>2 · Rivedi</li><li aria-current={registered ? 'step' : undefined}>3 · Registrata</li>
+            </ol>
+            {registered ? <>
+                <p role="status"><InkState state="dry">Registrata alle {new Date(registered.createdAt).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</InkState></p>
+                <PrivacyBlur><ClinicalRichTextContent content={registered.content} /></PrivacyBlur>
+                <Link href="/analytics#audit" className="mf-button-text">Registro delle operazioni</Link>
+            </> : readbackFailed ? <>
+                <p role="alert">Voce inviata. La rilettura non è riuscita.</p>
+                <button type="button" className="mf-button-secondary" onClick={() => void readBack(savedId)}>Rileggi voce</button>
+            </> : <p role="status">Rilettura della voce…</p>}
+        </section>;
+        return <>{entryForm}{entriesRead.error ? entriesReadError : null}</>;
+    }
 
     if (proposal) {
         return (

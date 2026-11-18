@@ -17,9 +17,10 @@ export function PatientProposalsSummary({ hasInsightProposal, hasSmartImportProp
 }) {
     const count = Number(hasInsightProposal) + Number(hasSmartImportProposal);
     return <div className={styles.summary} data-testid="patient-proposals-summary">
+        <h2 className="type-section-heading">Quadro paziente</h2>
         <InkState state="pencil">{count === 0 ? 'Nessuna proposta da rivedere' : `${count} ${count === 1 ? 'proposta' : 'proposte'} da rivedere`}</InkState>
         <span className={styles.links}>
-            <a href="#patient-insight" className="mf-button-secondary"><Sparkles size={16} aria-hidden="true" />Quadro paziente</a>
+            <a href="#patient-insight" className="mf-button-secondary"><Sparkles size={16} aria-hidden="true" />Apri il Quadro e le fonti</a>
             {smartImportAvailable ? <a href="#smart-import" className="mf-button-text">Smart Import</a> : null}
         </span>
     </div>;

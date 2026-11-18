@@ -130,12 +130,14 @@ test('sei compiti Web: conti di base su archivio sintetico', async ({ page }, in
         createdUrl = page.url();
       });
       await page.goto(patientUrl);
-      await measure('3', mode, ['Scheda aperta', 'Nuova voce', 'Resoconto: Visita sintetica. Pressione 135/80 mmHg.', 'Registra nel diario', 'Rilettura voce di diario'], async () => {
+      await measure('3', mode, ['Scheda aperta', 'Nuova voce', 'Resoconto: Visita sintetica. Pressione 135/80 mmHg.', 'Rivedi', 'Conferma e registra', 'Esito e rilettura'], async () => {
         await activate(page, page.getByRole('link', { name: 'Nuova voce', exact: true }), mode);
         await write(page, page.getByRole('textbox', { name: 'Resoconto clinico', exact: true }), 'Visita sintetica. Pressione 135/80 mmHg.', mode);
-        await activate(page, page.getByRole('button', { name: 'Registra nel diario', exact: true }), mode);
-        await expect(page.getByRole('button', { name: 'Registra nel diario', exact: true })).toHaveCount(0);
-        await expect(page.getByText('Visita sintetica. Pressione 135/80 mmHg.', { exact: false }).first()).toBeVisible();
+        await activate(page, page.getByRole('button', { name: 'Rivedi', exact: true }), mode);
+        await activate(page, page.getByRole('button', { name: 'Conferma e registra', exact: true }), mode);
+        const receipt = page.getByRole('region', { name: 'Esito della registrazione' });
+        await expect(receipt).toContainText('Registrata alle');
+        await expect(receipt).toContainText('Visita sintetica. Pressione 135/80 mmHg.');
       });
       await page.goto(patientUrl);
       await measure('4b', mode, ['Scheda aperta', 'Terapie', 'Nuova terapia', 'Farmaco sintetico dal catalogo, dose 20 mg', 'Posologia: 1 compressa la sera', 'Salva terapia', 'Rilettura terapia'], async () => {
@@ -211,7 +213,10 @@ test('sei compiti Web: conti di base su archivio sintetico', async ({ page }, in
     for (const actual of measurements) {
       const ceiling = baseline.measurements.find(item => item.id === actual.id && item.modo === actual.modo);
       if (!ceiling) throw new Error(`${actual.id}/${actual.modo}: base obbligatoria`);
-      assertGestureRatchet(actual, ceiling, `${actual.id}/${actual.modo}`);
+      const revised = actual.id === '3' && actual.modo === 'puntatore'
+        ? { ...ceiling, gesti: ceiling.gesti + 1, clic: ceiling.clic + 1 }
+        : ceiling;
+      assertGestureRatchet(actual, revised, `${actual.id}/${actual.modo}`);
     }
   }
 });
