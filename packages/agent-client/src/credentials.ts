@@ -39,7 +39,8 @@ export function agentPrivateDirectory(value: string): string {
     const suffix: string[] = [];
     while (!fs.existsSync(existing)) { suffix.unshift(path.basename(existing)); const parent = path.dirname(existing); if (parent === existing) throw unavailable(); existing = parent; }
     const physical = path.join(fs.realpathSync(existing), ...suffix);
-    if (blocked.some(root => inside(root, physical))) throw unavailable();
+    const physicalBlocked = blocked.map(root => fs.existsSync(root) ? fs.realpathSync(root) : root);
+    if (physicalBlocked.some(root => inside(root, physical))) throw unavailable();
     if (fs.existsSync(value) && fs.lstatSync(value).isSymbolicLink()) throw unavailable();
     fs.mkdirSync(physical, { recursive: true, mode: 0o700 });
     const stat = fs.lstatSync(physical);

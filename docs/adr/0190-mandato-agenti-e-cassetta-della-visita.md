@@ -56,9 +56,14 @@ emette un mandato di 12 ore per ciascun client registrato, con il perimetro
 approvato. Riusa la chiave pubblica e l’involucro registrati. La conferma
 trasporta solo il ticket di login o l’identificativo del gesto, legato
 alla stessa sessione e alla stessa generazione di archivio.
+Il client Web ottiene la presenza di registrazioni attive dalla risposta
+del login o dal controllo di sessione già in uso. Senza registrazioni
+attive, lo sblocco non invia la richiesta di rinnovo.
 
 La credenziale di registrazione consente al client di ritirare il token
-di deposito del mandato corrente sul loopback. Blocco della sessione,
+di deposito del mandato corrente sul loopback. CLI e MCP, incluso il plugin
+Ambulatorio, usano il client condiviso per il ritiro esplicito o automatico
+quando il deposito richiede un mandato corrente. Blocco della sessione,
 scadenza, nuova emissione e revoca negano richieste con il token precedente.
 La revoca della registrazione in Agenti impedisce anche le emissioni
 successive. Il ripristino automatico della scheda e il recupero col kit

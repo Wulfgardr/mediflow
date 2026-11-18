@@ -116,9 +116,9 @@ export async function completeAgentPairing(directory: string, requestId: string,
     saveAgentCredential(directory, { agentRef: requestId, mandateRef: receipt.mandateRef, token: issued.token, expiresAt: Number(issued.expiresAt), origin: state.origin });
     return { agentRef: requestId, mandateRef: receipt.mandateRef, status: 'approved' as const, expiresAt: issued.expiresAt };
 }
-async function retrieveMandate(directory: string, agentRef: string, signal?: AbortSignal) {
+async function retrieveMandate(directory: string, agentRef: string, signal?: AbortSignal, origin?: string) {
     const registration = readAgentRegistration(directory, agentRef);
-    if (!registration) throw new AgentClientError('AGENT_ACCESS_DENIED', 401);
+    if (!registration || origin && registration.origin !== origin) throw new AgentClientError('AGENT_ACCESS_DENIED', 401);
     const value = await agentRequest(registration.origin, '/api/agent/v1/mandate', 'Bearer ' + registration.token, undefined, signal);
     const receipt = value.receipt, issued = value.credential;
     if (!record(receipt) || receipt.agentRef !== agentRef || !isAgentId(receipt.mandateRef)
@@ -131,8 +131,8 @@ async function retrieveMandate(directory: string, agentRef: string, signal?: Abo
     saveAgentCredential(directory, access);
     return { access, receipt: { agentRef, mandateRef: access.mandateRef, issuedAt: receipt.issuedAt, expiresAt: access.expiresAt } };
 }
-export async function retrieveAgentMandate(directory: string, agentRef: string, signal?: AbortSignal) {
-    return (await retrieveMandate(directory, agentRef, signal)).receipt;
+export async function retrieveAgentMandate(directory: string, agentRef: string, signal?: AbortSignal, origin?: string) {
+    return (await retrieveMandate(directory, agentRef, signal, origin)).receipt;
 }
 
 export type AgentVisitPlan = { version: 1; inputFingerprint: string; agentRef: string; mandateRef: string; visitId: string; anchor: AgentEnvelope; items: AgentCassetteItem[] };
@@ -214,20 +214,26 @@ async function depositAgentVisit(access: AgentCredential, plan: AgentVisitPlan, 
     for (const item of plan.items) receipt = await call({ operation: AGENT_ITEM_OPERATION[item.kind], visitId: plan.visitId, expectedRevision: receipt.revision, item });
     return call({ operation: 'visita.chiudi', visitId: plan.visitId, expectedRevision: receipt.revision });
 }
-export async function prepareAndDepositAgentVisit(directory: string, agentRef: string, extraction: string, fiscalCode: string, transcription?: string, visitId?: string, signal?: AbortSignal) {
+export async function loadAgentVisitContext(directory: string, agentRef: string, signal?: AbortSignal, origin?: string) {
     const readContext = (access: AgentCredential) => agentRequest(access.origin, '/api/agent/v1/context', 'Bearer ' + access.token, undefined, signal);
     const cached = readAgentCredential(directory, agentRef);
-    let access = cached ?? (await retrieveMandate(directory, agentRef, signal)).access;
+    if (cached && origin && cached.origin !== origin) throw new AgentClientError('AGENT_ACCESS_DENIED', 401);
+    let access = cached ?? (await retrieveMandate(directory, agentRef, signal, origin)).access;
     let context;
     try { context = await readContext(access); }
     catch (error) {
         if (!cached || !(error instanceof AgentClientError) || error.status !== 401 || !readAgentRegistration(directory, agentRef)) throw error;
-        access = (await retrieveMandate(directory, agentRef, signal)).access;
+        access = (await retrieveMandate(directory, agentRef, signal, origin)).access;
         context = await readContext(access);
     }
     if (context.agentRef !== agentRef || context.mandateRef !== access.mandateRef || typeof context.publicKey !== 'string' || !Array.isArray(context.operations)) throw new AgentClientError('AGENT_HTTP_UNAVAILABLE');
-    let plan = prepareAgentVisit(context.publicKey, agentRef, access.mandateRef, extraction, fiscalCode, transcription, visitId);
-    if (!['visita.apri', 'visita.chiudi', ...plan.items.map(item => AGENT_ITEM_OPERATION[item.kind])].every(operation => (context.operations as unknown[]).includes(operation))) throw new AgentClientError('AGENT_ACCESS_DENIED', 403);
+    return { access, publicKey: context.publicKey, operations: context.operations as unknown[],
+        modelProvider: context.modelProvider, allowsClinicalEgress: context.allowsClinicalEgress };
+}
+export async function prepareAndDepositAgentVisit(directory: string, agentRef: string, extraction: string, fiscalCode: string, transcription?: string, visitId?: string, signal?: AbortSignal) {
+    const { access, publicKey, operations } = await loadAgentVisitContext(directory, agentRef, signal);
+    let plan = prepareAgentVisit(publicKey, agentRef, access.mandateRef, extraction, fiscalCode, transcription, visitId);
+    if (!['visita.apri', 'visita.chiudi', ...plan.items.map(item => AGENT_ITEM_OPERATION[item.kind])].every(operation => operations.includes(operation))) throw new AgentClientError('AGENT_ACCESS_DENIED', 403);
     try { createState(directory, 'visit', plan.visitId, plan); }
     catch (error) {
         const existing = readState(directory, 'visit', plan.visitId);
@@ -242,4 +248,12 @@ export async function resumeAgentVisit(directory: string, agentRef: string, visi
     const plan = readState(directory, 'visit', visitId);
     if (!visitPlan(plan) || plan.agentRef !== agentRef) throw new AgentClientError('AGENT_STATE_INVALID');
     return depositAgentVisit(credential(directory, agentRef), plan, signal);
+}
+
+export function resumeAgentReference(directory: string, visitId: string): string | undefined {
+    const file = statePath(directory, 'visit', visitId);
+    if (!fs.existsSync(file)) return undefined;
+    const plan = readState(directory, 'visit', visitId);
+    if (!visitPlan(plan)) throw new AgentClientError('AGENT_STATE_INVALID');
+    return plan.agentRef;
 }
