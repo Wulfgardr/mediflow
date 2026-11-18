@@ -18,7 +18,7 @@ Nella scheda trovi identità ed allergie, oltre al diario con autore e storico d
 
 Ho previsto agenda e moduli territoriali per organizzare l’attività. Il modulo Lombardia serve per SISS, portali e PRREG, mentre la dettatura usa whisper sul computer, con modello installabile dalle Impostazioni.
 
-Per leggere la cartella puoi chiedere un quadro del paziente oppure una sintesi dei documenti. C’è anche l’import assistito: tutte e tre preparano proposte con fonti e ricevuta, previo consenso. Puoi aprire funzioni MediFlow da Claude e Codex oppure scegliere ChatGPT, con consenso e controlli sui dati. Le copie complete comprendono documenti incorporati ed allegati. Se manca già un originale conservato fuori, la copia non lo recupera.
+Per leggere la cartella puoi chiedere un quadro del paziente oppure una sintesi dei documenti. C’è anche l’import assistito: tutte e tre preparano proposte con fonti e ricevuta, con il tuo consenso. Puoi aprire funzioni MediFlow da Claude e Codex oppure scegliere ChatGPT, con consenso e controlli sui dati. Le copie complete comprendono documenti incorporati ed allegati. Se manca già un originale conservato fuori, la copia non lo recupera.
 
 ### Perché esiste MediFlow
 
