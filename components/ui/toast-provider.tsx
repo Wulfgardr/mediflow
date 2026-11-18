@@ -61,7 +61,7 @@ function ToastCard({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
     return (
         <div
             role={toast.tone === 'error' || toast.tone === 'warning' ? 'alert' : 'status'}
-            className="lume-overlay-shadow lume-toast-confirmation pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-focal)] px-4 py-3 shadow-none dark:border-white/10"
+            className="lume-overlay-shadow lume-toast-confirmation pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-[var(--lume-radius-control)] border border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] bg-[color:var(--lume-surface-focal)] px-4 py-3 shadow-none dark:border-white/10"
         >
             <span className="mt-0.5 shrink-0 rounded-full p-1" style={{ background: tint, color }}>
                 <Icon className="h-4 w-4" />

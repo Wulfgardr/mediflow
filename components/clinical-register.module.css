@@ -1,6 +1,6 @@
 .register { min-width: 0; container-type: inline-size; color: var(--lume-ink); font: 0.875rem/1.5 var(--lume-font-sans); }
 .toolbar { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
-.toolbar h2, .sectionHead h3 { margin: 0; font: 600 0.75rem/1.5 var(--lume-font-sans); text-transform: uppercase; letter-spacing: .05em; }
+.toolbar h2, .sectionHead h3 { margin: 0; font: var(--type-strong); }
 .sectionHead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 28px 0 0; padding-bottom: 8px; border-bottom: 1px solid var(--lume-rule-strong); }
 .sectionHead span, .muted { color: var(--lume-ink-muted); font-size: 0.8125rem; }
 .table { width: 100%; border-collapse: collapse; table-layout: fixed; }
@@ -11,7 +11,7 @@
 .table strong { font-weight: 600; }
 .table small { display: block; color: var(--lume-ink-muted); font-size: 0.8125rem; margin-top: 4px; }
 .table time, .value { font-variant-numeric: tabular-nums; }
-.compactOnly { display: none; }
+.compactOnly, .prescriptionDateLabel { display: none; }
 .value { font-weight: 600; text-align: right; }
 .selected { background: var(--lume-surface-selected); }
 .rowButton { display: block; width: 100%; min-height: 40px; padding: 8px 4px; text-align: left; font-weight: 600; }
@@ -35,7 +35,7 @@
 .form { min-width: 0; padding: 20px 0; border-block: 1px solid var(--lume-rule-strong); border-inline: 0; border-radius: 0; background: transparent; box-shadow: none; margin-block: 16px 28px; }
 .register pre { font-family: var(--lume-font-sans); line-height: 1.5; }
 .review input:global(.lume-code), .form input:global(.lume-code) { font: var(--type-code); }
-.form :is(input:not([type='checkbox']):not([type='radio']),select,textarea) { min-width: 0; width: 100%; min-height: 40px; height: auto; padding: 8px 10px; border: 1px solid var(--lume-rule-strong); border-radius: 10px; background: var(--lume-surface-field); color: var(--lume-ink); font: 0.875rem/1.5 var(--lume-font-sans); box-shadow: none; }
+.form :is(input:not([type='checkbox']):not([type='radio']),select,textarea) { min-width: 0; width: 100%; min-height: 40px; height: auto; padding: 8px 10px; border: 1px solid var(--lume-ink-muted); border-radius: 10px; background: var(--lume-surface-field); color: var(--lume-ink); font: 0.875rem/1.5 var(--lume-font-sans); box-shadow: none; }
 .form textarea { min-height: 80px; }
 .form label { min-width: 0; font-size: 0.8125rem; }
 .form fieldset { min-width: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
@@ -118,7 +118,11 @@
  .detail, .patientSummary { position: static; border-left: 0; border-top: 1px solid var(--lume-rule); padding: 24px 0 0; }
  .documentOriginal { position: static; }
 }
+@media (min-width: 701px) and (max-width: 1000px) {
+ .therapyTable .secondaryColumn, .observationTable .secondaryColumn { display: table-cell; }
+}
 @media (max-width: 700px) {
+ .prescriptionDateLabel { display: inline; }
  .reviewRow { grid-template-columns: minmax(0,1fr); }
  .reviewRow > :nth-child(n+3) { grid-column: 1; }
  .review :is(input:not([type='checkbox']):not([type='radio']),select,textarea) { min-height: 44px; }
@@ -129,7 +133,7 @@
  .therapyTable, .therapyTable tbody, .therapyTable tr, .therapyTable td { display: block; width: 100%; }
  .therapyTable tr { padding-block: 12px; border-bottom: 1px solid var(--lume-rule); }
  .therapyTable td { padding: 4px 0; border: 0; }
- .therapyTable .secondaryColumn { display: none; }
+ .therapyTable td.secondaryColumn { display: block; }
  .controls > :is(button,a), .control, .rowButton { min-height: 44px; }
  .form :is(input:not([type='checkbox']):not([type='radio']),select,textarea) { min-height: 44px; }
 }
@@ -181,6 +185,7 @@
  .observationTable tr { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); column-gap: 16px; padding-block: 12px; border-bottom: 1px solid var(--lume-rule); }
  .observationTable td { min-width: 0; padding: 4px 0; border: 0; }
  .observationTable td:first-child { grid-column: 1 / -1; }
+ .observationTable td.secondaryColumn { display: block; }
 }
 
 .register[data-clinical-register='observations'] .form :is(input:not([type='checkbox']):not([type='radio']),select,textarea):focus-visible { outline: 2px solid var(--lume-ink-fresh); outline-offset: 2px; }

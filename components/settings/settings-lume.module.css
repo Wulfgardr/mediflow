@@ -258,7 +258,7 @@
 .settingInput {
     width: 100%;
     min-height: 2.75rem;
-    border: 1px solid var(--lume-rule-strong);
+    border: 1px solid var(--lume-ink-muted);
     border-radius: var(--lume-radius-control);
     background: var(--lume-surface-field);
     color: var(--lume-ink);

@@ -1,19 +1,11 @@
-import type { Therapy } from '@/lib/db';
+import type { ClinicalEntry, Therapy } from '@/lib/db';
+import { patientDiaryWorkflowState } from './patient-diary-metadata';
 
-export type TherapyChangeKind = 'started' | 'updated' | 'suspended' | 'completed';
-
-export interface TherapyChange {
-    id: string;
+export type DatedTherapyChange = {
+    therapyId: string;
     drugName: string;
-    kind: TherapyChangeKind;
+    kind: 'start' | 'end';
     date: Date;
-}
-
-export const THERAPY_CHANGE_LABELS: Record<TherapyChangeKind, string> = {
-    started: 'Avviata',
-    updated: 'Aggiornata',
-    suspended: 'Sospesa',
-    completed: 'Conclusa',
 };
 
 function validDate(value: Date | null | undefined): Date | null {
@@ -22,21 +14,35 @@ function validDate(value: Date | null | undefined): Date | null {
     return Number.isFinite(date.getTime()) ? date : null;
 }
 
-function lastRecordedChange(therapy: Therapy): { kind: TherapyChangeKind; date: Date | null } {
-    const recorded = validDate(therapy.updatedAt) ?? validDate(therapy.createdAt);
-    if (therapy.status === 'completed') return { kind: 'completed', date: validDate(therapy.endDate) ?? recorded };
-    if (therapy.status === 'suspended') return { kind: 'suspended', date: recorded };
-    if ((therapy.version ?? 1) > 1 && validDate(therapy.updatedAt)) return { kind: 'updated', date: validDate(therapy.updatedAt) };
-    return { kind: 'started', date: validDate(therapy.startDate) };
-}
+export function projectTherapyDatesSinceVisit(
+    patientId: string,
+    entries: readonly ClinicalEntry[],
+    therapies: readonly Therapy[],
+    now: Date,
+) {
+    let visitDate: Date | null = null;
+    for (const entry of entries) {
+        if (entry.patientId !== patientId || entry.type !== 'visit' || entry.deletedAt) continue;
+        const state = patientDiaryWorkflowState(entry.metadata);
+        if (state !== 'recorded' && state !== 'signed') continue;
+        const date = validDate(entry.date);
+        if (date && date <= now && (!visitDate || date > visitDate)) visitDate = date;
+    }
 
-export function projectLastRecordedTherapyChanges(therapies: readonly Therapy[], limit = 4): TherapyChange[] {
-    return therapies
-        .filter((therapy) => !therapy.deletedAt)
-        .flatMap((therapy) => {
-            const { kind, date } = lastRecordedChange(therapy);
-            return date ? [{ id: therapy.id, drugName: therapy.drugName, kind, date }] : [];
-        })
-        .sort((left, right) => right.date.getTime() - left.date.getTime())
-        .slice(0, limit);
+    if (!visitDate) return null;
+    const visitDayEnd = new Date(visitDate);
+    visitDayEnd.setHours(23, 59, 59, 999);
+
+    const changes = therapies.flatMap((therapy): DatedTherapyChange[] => {
+        if (therapy.patientId !== patientId || therapy.deletedAt) return [];
+        const start = validDate(therapy.startDate);
+        const end = therapy.status === 'completed' ? validDate(therapy.endDate) : null;
+        const row = { therapyId: therapy.id, drugName: therapy.drugName };
+        return [
+            ...(start && start > visitDayEnd && start <= now ? [{ ...row, kind: 'start' as const, date: start }] : []),
+            ...(end && end > visitDayEnd && end <= now ? [{ ...row, kind: 'end' as const, date: end }] : []),
+        ];
+    }).sort((left, right) => right.date.getTime() - left.date.getTime());
+
+    return { visitDate, changes };
 }

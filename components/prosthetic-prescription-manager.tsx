@@ -345,10 +345,11 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
                                     <ProstheticsOriginalLinks documents={item.catalogSnapshot.documents} />
                                 </div>}
                                 {item.source === 'document_review' && <small>Da documento</small>}
-                                <Disclosure className={styles.recordDetails} title="Misure, collaudo e documenti">
-                                    <p>Prescritta il {new Date(item.prescribedAt).toLocaleDateString('it-IT')}</p>
+                                {item.isoCode ? <small className="lume-code">ISO {item.isoCode}</small> : null}
+                                {item.regionalPrescriptionId || item.measures || item.clinicalReason || item.supplier || item.collaudoAt
+                                    || item.collaudoOutcome || refs.length || item.notes
+                                    ? <Disclosure className={styles.recordDetails} title="Misure, collaudo e documenti">
                                         <div className="mt-2 grid gap-2 text-sm text-[color:var(--lume-ink-muted)] md:grid-cols-2">
-                                            {item.isoCode && <p><span className="font-semibold text-[color:var(--lume-ink)]">ISO:</span> <span className="lume-code">{item.isoCode}</span></p>}
                                             {item.regionalPrescriptionId && <p><span className="font-semibold text-[color:var(--lume-ink)]">Pratica:</span> <span className="lume-code">{item.regionalPrescriptionId}</span></p>}
                                             {item.measures && <p><span className="font-semibold text-[color:var(--lume-ink)]">Misure:</span> {item.measures}</p>}
                                             {item.clinicalReason && <p><span className="font-semibold text-[color:var(--lume-ink)]">Motivo:</span> {item.clinicalReason}</p>}
@@ -359,9 +360,9 @@ export default function ProstheticPrescriptionManager({ patientId, embedded = fa
                                         <DocumentReferenceChip references={refs} />
                                         {item.notes && <p className="mt-3 text-sm leading-6 text-[color:var(--lume-ink-muted)]">{item.notes}</p>}
 
-                                </Disclosure>
+                                </Disclosure> : null}
                             </td>
-                            <td className={`${styles.secondaryColumn} lume-registro`}>{new Date(item.prescribedAt).toLocaleDateString('it-IT')}</td>
+                            <td className={`${styles.secondaryColumn} lume-registro`}><span className={styles.prescriptionDateLabel}>Prescritta il </span>{new Date(item.prescribedAt).toLocaleDateString('it-IT')}</td>
                             <td><Badge tone={prostheticStatusSignal(item.status)} size="xs" className={styles.status}>{statusLabel(item.status)}</Badge></td>
                             <td>
                                 <div className={styles.therapyActions}>

@@ -5,12 +5,9 @@
 :global(:root) .sections :global(section > [data-section-header] > :is(h2, h3, h4)),
 :global(:root) .sections :global(section > :is(h2, h3, h4) [data-disclosure-control]),
 :global(:root) .sections :global(section > header > :is(h2, h3, h4) [data-disclosure-control]) {
-  font-family: var(--lume-font-sans, system-ui, sans-serif);
-  font-size: 0.75rem;
-  font-weight: 600;
-  line-height: 1.5;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  font: var(--type-strong);
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 .count {

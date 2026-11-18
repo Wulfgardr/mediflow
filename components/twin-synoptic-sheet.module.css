@@ -11,10 +11,79 @@
 .changes th:first-child { width: 6.5rem; }
 .changes th:nth-child(3) { width: 6.5rem; }
 .notes { min-width: 0; }
-.notes h3 { font: var(--type-section); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; }
+.notes h3 { font: var(--type-strong); margin-bottom: 8px; }
 .notes p { font: var(--type-prose); white-space: pre-line; }
 @media (max-width: 1000px) {
  .measures th:first-child { width: 38%; }
  .measures th:nth-child(2) { width: 32%; }
 }
 @media (pointer: coarse) { .sheet td { height: 44px; } }
+
+.sheet[data-overview] {
+    container-type: normal;
+    grid-template-columns: minmax(0, .8fr) minmax(0, 1.45fr) minmax(0, 1fr);
+    gap: clamp(14px, 2.1vw, 28px);
+    align-items: start;
+}
+.sheet[data-overview][data-writing='true'] {
+    grid-template-columns: minmax(0, .75fr) minmax(0, 1fr) minmax(0, 1.42fr);
+}
+.stable, .middle, .context { display: grid; gap: 18px; min-width: 0; }
+.stable > section, .context > section { min-width: 0; }
+.stable > section {
+    padding: 0 12px 6px;
+    background: var(--lume-surface-field);
+    border: 1px solid var(--lume-rule);
+    border-radius: var(--lume-radius-control);
+}
+.sheet[data-overview] :global(.lume-section-heading) { column-gap: 6px; flex-wrap: wrap; }
+.sheet[data-overview] :global(.lume-section-heading > span) { font: var(--type-meta); }
+.sheet[data-overview] .stable :is(th, td) { height: auto; }
+.sheet[data-overview] .stable td { padding-block: 7px; }
+.sheet[data-overview] :is(.stable, .context) :is(th, td):global(.lume-code) { overflow-wrap: anywhere; }
+.sheet[data-overview] :is(.stable, .context) :is(th, td):is(.secondaryColumn) { display: none; }
+.sheet[data-overview] .problems th:first-child { width: 3.5rem; }
+.sheet[data-overview] .therapies th:first-child { width: 57%; }
+.sheet[data-overview] .measures th:first-child { width: 36%; }
+.sheet[data-overview] .measures th:nth-child(2) { width: 29%; }
+.context > :global([data-testid='patient-proposals-summary']) { flex-wrap: wrap; gap: 6px; }
+.comparison, .noComparison {
+    border: 1px solid var(--lume-rule-strong);
+    border-inline-start: 3px solid var(--lume-accent);
+    border-radius: var(--lume-radius-control);
+    background: var(--lume-surface-selected);
+    padding: 10px 12px;
+}
+.comparison > h2 { margin: 0; font: 600 0.9375rem/1.4 var(--lume-font-sans); }
+.noComparison { background: transparent; color: var(--lume-ink-muted); border-inline-start-color: var(--lume-rule-strong); }
+.changeList, .sourceList { margin: 0; padding: 0; list-style: none; }
+.changeList > li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; border-top: 1px solid var(--lume-rule); padding-block: 8px; align-items: baseline; overflow-wrap: anywhere; }
+.changeList time, .changeList li > span { font: var(--type-meta); font-variant-numeric: tabular-nums; }
+.changeList strong { font-weight: 600; }
+.readState, .changeDetails { color: var(--lume-ink-muted); font: var(--type-meta); }
+.readState { margin-block: 6px; }
+.changeDetails summary { cursor: pointer; padding-block: 6px; }
+.changeDetails p { margin-block: 6px; }
+.sourceButton { display: flex; gap: 8px; align-items: center; text-align: start; width: 100%; min-height: 40px; padding: 4px 2px; border-bottom: 1px solid var(--lume-rule); overflow-wrap: anywhere; }
+.sourceButton svg { flex: none; }
+.sourceButton:hover { color: var(--lume-accent); }
+@container patient-canvas (max-width: 850px) {
+    .sheet[data-overview], .sheet[data-overview][data-writing='true'] { grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr); }
+    .context { grid-column: 1 / -1; }
+    .sheet[data-overview][data-writing='true'] .context { grid-row: 1; }
+}
+:global([data-folder-section='quadro']) .middle :global(#diario > [data-section-header] > h3) { flex-basis: auto; }
+:global([data-folder-section='quadro']) .middle :global(#diario [role='feed'] > article) {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+}
+:global([data-folder-section='quadro']) .middle :global(#diario [role='feed'] > article > time) {
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+@container patient-canvas (max-width: 560px) {
+    .sheet[data-overview], .sheet[data-overview][data-writing='true'] { grid-template-columns: minmax(0, 1fr); }
+    :global([data-folder-section='quadro']) .middle { display: contents; }
+    .comparison, .noComparison { grid-row: 1; }
+    .sheet[data-writing='true'] :is(.comparison, .noComparison) { grid-row: 2; }
+}

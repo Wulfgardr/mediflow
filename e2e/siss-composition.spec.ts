@@ -74,8 +74,8 @@ test('SISS: diario locale, pre-controllo ed esportazione senza servizi regionali
         if (!baseline) {
             await expect(create).toHaveClass(/mf-button-text/u);
             const title = diaryToggle;
-            await expect(title).toHaveCSS('font-size', '12px');
-            await expect(title).toHaveCSS('text-transform', 'uppercase');
+            await expect(title).toHaveCSS('font-size', '14px');
+            await expect(title).toHaveCSS('text-transform', 'none');
             await expect(pane.locator('[data-section-header]').getByRole('button', { name: 'Registra passaggio', exact: true })).toHaveCount(1);
         }
         await create.focus(); await page.keyboard.press('Enter');
