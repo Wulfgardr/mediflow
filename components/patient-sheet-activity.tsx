@@ -73,7 +73,7 @@ export function PatientSheetActivity({ patientId, reference, now, entries, thera
                 <summary><strong><PrivacyBlur>{row.display} · {row.value}</PrivacyBlur></strong><span className={styles.outOfRange}>▲ Fuori intervallo<ChevronDown aria-hidden="true" size={14} /></span></summary>
                 <p>{row.previous ? <><PrivacyBlur>{row.previous.value}</PrivacyBlur> (<SheetDate date={row.previous.date} />) → </> : null}<PrivacyBlur>{row.value}</PrivacyBlur> · Misura del <SheetDate date={row.observed} /></p>
                 <p>Riferimento {row.low !== null ? `da ${row.low.toLocaleString('it-IT')}` : ''}{row.high !== null ? ` fino a ${row.high.toLocaleString('it-IT')}` : ''}</p>
-                {!row.previous ? <p>Nessuna misura precedente.</p> : null}
+                {!row.previous ? <p>Nessuna misura precedente nella stessa unità.</p> : null}
             </details>,
         })),
         ...(showDocuments ? docs.map(({ file, date }) => ({ id: `document:${file.id}`, date,

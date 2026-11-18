@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { join } from 'node:path';
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { assertNoHorizontalOverflow, bootstrapUnlockedSession } from './utils';
+import { assertNoHorizontalOverflow, bootstrapUnlockedSession, openPatientSection } from './utils';
 
 test.describe.configure({ retries: 0 });
 
@@ -14,6 +14,12 @@ test.beforeEach(({ baseURL }) => {
 const original = 'Testo originale del referto sintetico D.';
 const draft = 'Voce sintetica da rivedere.';
 const sourceName = 'referto-sintetico-d.txt';
+
+function updateSyntheticArchive(update: (database: Database.Database) => void) {
+    const database = new Database(join(process.env.MEDIFLOW_DATA_DIR!, 'medical.db'), { fileMustExist: true });
+    try { database.transaction(update)(database); }
+    finally { database.close(); }
+}
 
 async function seed(page: Page, crowded = false, twin = false) {
     const fixture = await page.evaluate(async ({ original, sourceName, crowded, twin }) => {
@@ -64,24 +70,19 @@ async function seed(page: Page, crowded = false, twin = false) {
             path: `uploads/${sourceName}`, data: `data:text/plain;base64,${btoa(original)}` });
         return { patient, other, returning, first, source, visit, active, activeName, changed, suspendedName, observationId, previousObservationId };
     }, { original, sourceName, crowded, twin });
-    const database = new Database(join(process.env.MEDIFLOW_DATA_DIR!, 'medical.db'), { fileMustExist: true });
     const at = (day: number) => Date.UTC(2026, 1, day, 12) / 1000;
-    try {
-        const offset = twin ? 2 : 0;
-        database.transaction(() => {
-            database.prepare('UPDATE entries SET created_at = ?, recorded_by = ? WHERE id = ?').run(at(6 + offset), 'Operatrice sintetica', fixture.visit.id);
-            database.prepare('UPDATE entries SET created_at = ? WHERE patient_id = ? AND id != ?').run(at(24), fixture.patient.id, fixture.visit.id);
-            database.prepare("UPDATE entries SET created_at = ? WHERE patient_id = ? AND type = 'phone'").run(at(22 + offset), fixture.patient.id);
-            database.prepare('UPDATE therapies SET created_at = ?, updated_at = ? WHERE patient_id = ?').run(at(1), at(1), fixture.patient.id);
-            database.prepare("UPDATE therapies SET updated_at = ? WHERE patient_id = ? AND status != 'active'").run(at(13), fixture.patient.id);
-            database.prepare('UPDATE therapies SET updated_at = ? WHERE id = ?').run(at(22 + offset), fixture.changed.id);
-            if (fixture.observationId) database.prepare('UPDATE observations SET created_at = ? WHERE id = ?').run(at(23 + offset), fixture.observationId);
-            if (fixture.previousObservationId) database.prepare('UPDATE observations SET created_at = ? WHERE id = ?').run(at(1), fixture.previousObservationId);
-            if (crowded) database.prepare('UPDATE therapies SET updated_at = ?, version = 2 WHERE id = ?').run(at(22 + offset), fixture.active.id);
-        })();
-    } finally {
-        database.close();
-    }
+    const offset = twin ? 2 : 0;
+    updateSyntheticArchive(database => {
+        database.prepare('UPDATE entries SET created_at = ?, recorded_by = ? WHERE id = ?').run(at(6 + offset), 'Operatrice sintetica', fixture.visit.id);
+        database.prepare('UPDATE entries SET created_at = ? WHERE patient_id = ? AND id != ?').run(at(24), fixture.patient.id, fixture.visit.id);
+        database.prepare("UPDATE entries SET created_at = ? WHERE patient_id = ? AND type = 'phone'").run(at(22 + offset), fixture.patient.id);
+        database.prepare('UPDATE therapies SET created_at = ?, updated_at = ? WHERE patient_id = ?').run(at(1), at(1), fixture.patient.id);
+        database.prepare("UPDATE therapies SET updated_at = ? WHERE patient_id = ? AND status != 'active'").run(at(13), fixture.patient.id);
+        database.prepare('UPDATE therapies SET updated_at = ? WHERE id = ?').run(at(22 + offset), fixture.changed.id);
+        if (fixture.observationId) database.prepare('UPDATE observations SET created_at = ? WHERE id = ?').run(at(23 + offset), fixture.observationId);
+        if (fixture.previousObservationId) database.prepare('UPDATE observations SET created_at = ? WHERE id = ?').run(at(1), fixture.previousObservationId);
+        if (crowded) database.prepare('UPDATE therapies SET updated_at = ?, version = 2 WHERE id = ?').run(at(22 + offset), fixture.active.id);
+    });
     return fixture;
 }
 
@@ -301,4 +302,67 @@ test('D gemella: un contatto nello stesso giorno si legge come voce, e una lettu
     await page.reload();
     await expect(changes).toContainText('Confronto incompleto. Alcuni dati non sono disponibili.');
     await expect(changes).not.toContainText('nessuna variazione');
+});
+
+
+test('D: due misure dello stesso codice in unità diverse restano distinte nella fascia e nel registro', async ({ page }) => {
+    await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+    const { patient, returning } = await seed(page);
+    await page.evaluate(async patientId => {
+        for (const row of [
+            { value: 68_600, unitCode: 'g', refHigh: '65000', observedAt: '2026-02-18T12:00:00Z' },
+            { value: 72, unitCode: 'kg', refHigh: '70', observedAt: '2026-02-19T12:00:00Z' },
+        ]) {
+            const response = await fetch('/api/observations', {
+                method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({
+                    patientId, codeSystem: 'LOINC', code: '29463-7', display: 'Peso', unitSystem: 'UCUM', source: 'manual', ...row,
+                }),
+            });
+            if (!response.ok) throw new Error(`Misura sintetica ${response.status}`);
+        }
+    }, patient.id);
+    await page.reload();
+    await openFromPatients(page, returning.lastName, returning.firstName, patient.id);
+    const changes = page.getByRole('region', { name: 'Variazioni dall’ultima visita', exact: true });
+    const grams = /Peso.*68[.]?600 g/u;
+    const kilograms = /Peso.*72 kg/u;
+    await changes.getByText(grams).click();
+    await changes.getByText(kilograms).click();
+    await expect(changes.getByText('Nessuna misura precedente nella stessa unità.', { exact: true })).toHaveCount(2);
+    await expect(changes).not.toContainText(/→|68[.,]?600 kg|72 g\b/u);
+    const recent = page.getByRole('table', { name: 'Parametri recenti', exact: true });
+    await expect(recent.getByRole('row').filter({ hasText: grams })).toHaveCount(1);
+    await expect(recent.getByRole('row').filter({ hasText: kilograms })).toHaveCount(1);
+    await openPatientSection(page, 'parametri');
+    const records = page.locator('#parametri');
+    for (const reading of [grams, kilograms]) {
+        const row = records.getByRole('table').first().getByRole('row').filter({ hasText: reading });
+        await expect(row).toBeVisible();
+        await expect(row.getByRole('cell').last()).toHaveText('—');
+    }
+    await expect(records).not.toContainText(/68[.,]?600 kg|72 g\b/u);
+});
+
+test('D: il solo referto aggiunto dopo la visita è raggiungibile e apre l’originale', async ({ page }) => {
+    await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+    const { patient, returning, visit } = await seed(page);
+    updateSyntheticArchive(database => {
+        const old = Date.UTC(2026, 1, 4, 12) / 1000;
+        database.prepare('UPDATE therapies SET created_at = ?, updated_at = ? WHERE patient_id = ?').run(old, old, patient.id);
+        database.prepare('UPDATE entries SET created_at = ? WHERE patient_id = ? AND id != ?').run(old, patient.id, visit.id);
+    });
+    await page.reload();
+    await openFromPatients(page, returning.lastName, returning.firstName, patient.id);
+    const changes = page.getByRole('region', { name: 'Variazioni dall’ultima visita', exact: true });
+    await expect(changes.locator('li')).toHaveCount(0);
+    const disclosure = changes.getByRole('checkbox', { name: 'Mostra anche documenti e proposte' });
+    await disclosure.check();
+    await expect(changes.locator('li')).toHaveCount(1);
+    const document = changes.getByRole('button', { name: `Documento aggiunto · ${sourceName}` });
+    await document.click();
+    await expect(page.getByTestId('document-preview-text')).toHaveText(original);
+    await page.getByTestId('document-viewer').getByRole('button', { name: 'Chiudi', exact: true }).click();
+    await expect(document).toBeFocused();
+    await disclosure.uncheck();
+    await expect(changes.locator('li')).toHaveCount(0);
 });

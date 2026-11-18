@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { bootstrapUnlockedSession } from './utils';
+import { fetchInterceptedRequest } from './fixtures/trusted-web-request';
 
 for (const width of [1440, 390]) test(`le allergie strutturate restano nella testata durante la scrittura inline a ${width}`, async ({ page }) => {
   await page.setViewportSize({ width, height: 960 });
@@ -118,7 +119,7 @@ test('una risposta persa dopo la scrittura rilegge la stessa voce senza un secon
   await page.route('**/api/entries', async route => {
     if (route.request().method() !== 'POST') { await route.continue(); return; }
     posts += 1;
-    const committed = await route.fetch();
+    const committed = await fetchInterceptedRequest(route);
     expect(committed.status()).toBe(201);
     await route.abort('connectionreset');
   });

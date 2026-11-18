@@ -72,10 +72,16 @@ test('Parametri recenti conta i parametri e conserva lo storico completo in Para
     await openPatientSection(page, 'parametri');
     const history = page.getByRole('complementary', { name: 'Andamento e storia delle misure' });
     await expect(history).toBeVisible();
-    await history.getByRole('button', { name: 'Tutte (24)', exact: true }).click();
-    await expect(history.locator('tbody tr')).toHaveCount(24);
-    await expect(history.getByRole('cell', { name: '70 kg', exact: true })).toBeVisible();
-    await expect(history.getByRole('cell', { name: '70000 g', exact: true })).toBeVisible();
+    const measureRegister = page.locator('#parametri').getByRole('table').first();
+    for (const [latest, oldest] of [['81 kg', '70 kg'], ['81000 g', '70000 g']]) {
+        const row = measureRegister.getByRole('row').filter({ has: page.getByRole('cell', { name: latest, exact: true }) });
+        const open = row.getByRole('button');
+        if (await open.getAttribute('aria-expanded') === 'false') await open.click();
+        const table = history.locator('section').filter({ has: page.getByRole('cell', { name: latest, exact: true }) });
+        await table.getByRole('button', { name: 'Tutte (12)', exact: true }).click();
+        await expect(table.locator('tbody tr')).toHaveCount(12);
+        await expect(table.getByRole('cell', { name: oldest, exact: true })).toBeVisible();
+    }
 });
 
 for (const [route, sectionName] of [['therapies', 'Terapie attive'], ['observations', 'Parametri recenti'], ['checkups', 'Controlli aperti']]) test(`errore ${route} distinto dal vuoto`, async ({ page }) => {
