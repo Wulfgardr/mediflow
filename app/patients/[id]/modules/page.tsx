@@ -6,7 +6,6 @@ import { formatCountLabel } from '@/lib/format-count';
 import { projectFollowupReadState } from '@/lib/followup-read-state';
 import { ViewState } from '@/components/ui/view-state';
 import Link from 'next/link';
-import { differenceInYears } from 'date-fns';
 import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -592,10 +591,11 @@ export default function PatientDetailPage() {
             ]}
             patientDetails={{
                 ...patientAllergiesForHeader(patient.allergies),
-                birthDateLabel: patient.birthDate ? birthDateLabel : undefined,
-                ageLabel: patient.birthDate ? formatCountLabel(differenceInYears(new Date(currentTimestampMs), new Date(patient.birthDate)), 'anno', 'anni') : undefined,
+                birthDateLabel: patient.birthDate ? birthDateLabel : patient.birthYear ? `anno stimato ${patient.birthYear}` : undefined,
+                ageLabel: patientAgeLabel(patient, new Date(currentTimestampMs)) ?? undefined,
                 taxCode: patient.taxCode || undefined,
                 identifierLabel: patientIdentifierLabel(patient.taxCode, patient.identifierType),
+                identifierAbsent: !patient.taxCode,
             }}
             navGroups={workspaceNavGroups}
             primaryAction={writing ? undefined : { href: `/patients/${id}/modules?voce=nuova`, label: 'Nuova voce', icon: Plus }}
@@ -683,6 +683,7 @@ export default function PatientDetailPage() {
                     notesContent={<PatientProfileNotes patientId={id} patientVersion={patient.version} />}
                     problems={{ data: diagnosisItems, loading: patientLoading, error: patientError }}
                     therapies={{ data: activeTherapies, loading: therapiesLoading, error: therapiesError }}
+                    therapyRecords={{ data: therapies, loading: therapiesLoading, error: therapiesError }}
                     measures={{ data: observations, loading: observationsLoading, error: observationsError }}
                     checkups={{ data: checkups, loading: checkupsLoading, error: checkupsError }}
                 />
