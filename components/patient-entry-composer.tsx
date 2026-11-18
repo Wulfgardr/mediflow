@@ -22,6 +22,7 @@ import { Kree8WorkspaceShell, type Kree8WorkspaceNavItem } from '@/components/kr
 import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css';
 import { AttachmentCollectionChangedError, AttachmentCollectionView, uploadFilesOnce } from '@/lib/attachment-collection-client';
 import { db, type Attachment, type ClinicalEntry, type Therapy, type Observation, type Checkup } from '@/lib/db';
+import { isEncryptedFieldValue, LOCKED_DATA_PLACEHOLDER } from '@/lib/locked-field-guard';
 import { clinicalRichTextToPlainText, isClinicalRichTextBlank, sanitizeClinicalRichTextHtml } from '@/lib/clinical-rich-text';
 import { notifyDbChange, useLiveQueryState } from '@/lib/live-query';
 import { cn } from '@/lib/utils';
@@ -979,6 +980,17 @@ export function PatientEntryComposer({ embedded = false, sheetSource, focusRef }
         {proposal ? [clinicalEditor, attachmentPicker, visitSession] : [visitSession, clinicalEditor, attachmentPicker]}
     </>;
 
+    const documentSummaryRows = patientAttachments.length ? (
+        <div className={composerStyles.contextList}>
+            {patientAttachments.map(attachment => <details key={attachment.id} className={composerStyles.contextSource}>
+                <summary><PrivacyBlur>{attachment.name}</PrivacyBlur></summary>
+                <p>{formatEntryDate(attachment.createdAt)} · Allegato</p>
+                <p><PrivacyBlur>{isEncryptedFieldValue(attachment.summarySnapshot) ? LOCKED_DATA_PLACEHOLDER
+                    : attachment.summarySnapshot?.trim() ? attachment.summarySnapshot : 'Sintesi non disponibile.'}</PrivacyBlur></p>
+            </details>)}
+        </div>
+    ) : <p>Nessun documento disponibile.</p>;
+
     const entryForm = (
         <div
             className={proposal ? `${composerStyles.sheet} ${embedded ? composerStyles.embedded : ''}` : "patient-detail-section lume-panel border p-6 md:p-7"}
@@ -1016,7 +1028,17 @@ export function PatientEntryComposer({ embedded = false, sheetSource, focusRef }
                             }{sourceExcerpt.after}</PrivacyBlur>
                         </p> : null}
                     </div>}
-                    onCloseSource={() => requestAnimationFrame(() => reviewing ? reviewHeading.current?.focus() : editorFocus.current?.resume())} /> : null}
+                    onCloseSource={() => requestAnimationFrame(() => reviewing ? reviewHeading.current?.focus() : editorFocus.current?.resume())}>
+                    {!attachmentsRead.loading && !attachmentsRead.error && patientAttachments.length > 0 ? (
+                        <details className={composerStyles.context}>
+                            <summary className={composerStyles.sessionSummary}>
+                                <span>Sintesi dei documenti</span>
+                                <ChevronDown className={composerStyles.disclosureIcon} aria-hidden="true" />
+                            </summary>
+                            <section aria-label="Documenti in cartella" className={composerStyles.contextBody}>{documentSummaryRows}</section>
+                        </details>
+                    ) : null}
+                </PatientSheetSources> : null}
                 {proposal && !inlineSheet ? (
                     <details
                         className={composerStyles.context}
@@ -1050,17 +1072,7 @@ export function PatientEntryComposer({ embedded = false, sheetSource, focusRef }
                             </section>
                             <section aria-label="Documenti in cartella">
                                 <h3>Documenti in cartella</h3>
-                                {patientAttachments.length ? (
-                                    <div className={composerStyles.contextList}>
-                                        {patientAttachments.map((attachment) => (
-                                            <details key={attachment.id} className={composerStyles.contextSource}>
-                                                <summary><PrivacyBlur>{attachment.name}</PrivacyBlur></summary>
-                                                <p>{formatEntryDate(attachment.createdAt)} · Sintesi registrata</p>
-                                                <p><PrivacyBlur>{attachment.summarySnapshot || 'Sintesi non disponibile.'}</PrivacyBlur></p>
-                                            </details>
-                                        ))}
-                                    </div>
-                                ) : <p>Nessun documento disponibile.</p>}
+                                {documentSummaryRows}
                             </section>
                         </div>
                     </details>
