@@ -37,22 +37,23 @@ function UnlockedIncoming() {
             const { visit } = review;
             const pending = visit.items.filter(item => !review.appliedItemIds.includes(item.id));
             return <section key={visit.cassette.id} className="space-y-4 rounded-lg border p-4" aria-label={'Visita ' + visit.cassette.id}>
-                <h2 className="text-lg font-semibold">{typeof visit.anchor.fiscalCode === 'string' ? visit.anchor.fiscalCode : 'Identità da confermare'}</h2>
+                <h2 className="[font:var(--type-section-heading)]">{typeof visit.anchor.fiscalCode === 'string' ? visit.anchor.fiscalCode : 'Identità da confermare'}</h2>
                 {review.patient && <p>{review.patient.lastName} {review.patient.firstName}</p>}
                 <p>{visit.cassette.status === 'closed' ? 'Visita chiusa' : 'Deposito in corso'}</p>
+                {pending.some(item => !automaticAgentKind(item.kind)) ? <p className="type-meta">◇ Proposte da rivedere</p> : null}
                 {[...review.blockers, ...review.proposalBlockers].map((message, index) => <p role="alert" key={index}>{message}</p>)}
                 <div className="flex flex-wrap gap-3">{visit.items.filter(item => item.kind === 'pdf').map(item =>
                     typeof item.value.name === 'string' && <button key={item.id} className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={openingPdf}
                         onClick={() => { void showPdf(visit.cassette.id, visit.cassette.revision, item.id); }}>{item.value.name}</button>)}</div>
-                {pending.map(item => <article key={item.id} className="space-y-2 whitespace-pre-wrap border-t pt-3">
+                {pending.map(item => <article key={item.id} className="min-w-0 space-y-2 whitespace-pre-wrap break-words border-t pt-3">
                     <h3 className="font-semibold">{agentReviewItemLabels[item.kind]}</h3>
                     {typeof item.value.text === 'string' && <p>{item.value.text}</p>}
                     {review.currentSummary.has(item.id) && <p>In scheda: {review.currentSummary.get(item.id)}</p>}
-                    {typeof item.value.values === 'object' && item.value.values !== null && <dl>{Object.entries(item.value.values).map(([field, value]) => <div key={field} className="grid grid-cols-[minmax(8rem,1fr)_3fr] gap-3"><dt>{fieldLabels[field] ?? 'Dato'}</dt><dd>{fieldValues[field]?.[String(value)] ?? String(value)}</dd></div>)}</dl>}
+                    {typeof item.value.values === 'object' && item.value.values !== null && <dl>{Object.entries(item.value.values).map(([field, value]) => <div key={field} className="grid gap-1 sm:grid-cols-[minmax(7rem,1fr)_minmax(0,3fr)] sm:gap-3"><dt>{fieldLabels[field] ?? 'Dato'}</dt><dd>{fieldValues[field]?.[String(value)] ?? String(value)}</dd></div>)}</dl>}
                     {typeof item.value.quote === 'string' && <blockquote className="border-l-2 pl-3">{item.value.quote}</blockquote>}
                     {Boolean(item.value.source) && typeof item.value.source === 'object' && item.value.source !== null && 'fileName' in item.value.source && <p>{String(item.value.source.fileName)}</p>}
                 </article>)}
-                <button className={SETTINGS_PRIMARY_BUTTON_CLASS} disabled={busy || !applicable.includes(review)} onClick={() => { void applyReviewedAgentVisits([visit.cassette.id]); }}>Applica la visita</button>
+                <button className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy || !applicable.includes(review)} onClick={() => { void applyReviewedAgentVisits([visit.cassette.id]); }}>Applica la visita</button>
             </section>;
         })}
         {pdf && <DocumentViewer file={'data:application/pdf;base64,' + pdf.base64} fileName={pdf.name} onClose={() => setPdf(null)} />}

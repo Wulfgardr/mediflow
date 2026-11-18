@@ -94,3 +94,7 @@
  .patientCanvas[data-writing='true'] .actions > a { min-width: 44px; }
  .patientCanvas[data-writing='true'] .actions > a > span { display: none; }
 }
+
+@media (min-width: 1280px) {
+ :global(html[data-twin-composition='stream']) .patientCanvas .patientBody[data-folder-section='quadro'] { max-width: 1180px; }
+}

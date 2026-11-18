@@ -1,3 +1,5 @@
+import Database from 'better-sqlite3';
+import { join } from 'node:path';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { assertNoHorizontalOverflow, bootstrapUnlockedSession } from './utils';
 
@@ -13,8 +15,8 @@ const original = 'Testo originale del referto sintetico D.';
 const draft = 'Voce sintetica da rivedere.';
 const sourceName = 'referto-sintetico-d.txt';
 
-async function seed(page: Page, crowded = false) {
-    return page.evaluate(async ({ original, sourceName, crowded }) => {
+async function seed(page: Page, crowded = false, twin = false) {
+    const fixture = await page.evaluate(async ({ original, sourceName, crowded, twin }) => {
         async function post(entity: string, body: object) {
             const response = await fetch(`/api/${entity}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
             if (!response.ok) throw new Error(`Fixture ${entity}: ${response.status}`);
@@ -27,12 +29,17 @@ async function seed(page: Page, crowded = false) {
             diagnoses: [{ code: 'J45.9', description: 'Problema del primo accesso', system: 'ICD-10' }] };
         const patient = await post('patients', returning);
         const other = await post('patients', first);
-        await post('entries', { patientId: patient.id, type: 'visit', date: '2026-02-05T10:00:00Z', title: 'Visita sintetica di riferimento', content: 'Resoconto della visita precedente.' });
+        const visit = await post('entries', { patientId: patient.id, type: 'visit', date: '2026-02-05T10:00:00Z', title: 'Visita sintetica di riferimento', content: 'Resoconto della visita precedente.' });
         await post('entries', { patientId: patient.id, type: 'note', date: '2026-02-24T10:00:00Z', title: 'Nota successiva', content: 'Nota sintetica del diario.' });
-        await post('therapies', { patientId: patient.id, drugName: 'Terapia corrente sintetica', dosage: '1 al mattino', status: 'active', startDate: '2026-01-12T12:00:00Z' });
-        await post('therapies', { patientId: patient.id, drugName: 'Terapia conclusa sintetica', dosage: '1 la sera', status: 'completed', startDate: '2026-01-15T12:00:00Z', endDate: '2026-02-20T12:00:00Z' });
+        const activeName = twin ? 'Terapia attiva gemella' : 'Terapia corrente sintetica';
+        const suspendedName = twin ? 'Terapia sospesa gemella' : 'Terapia sospesa sintetica';
+        const active = await post('therapies', { patientId: patient.id, drugName: activeName, dosage: twin ? '2 alla sera' : '1 al mattino', status: 'active', startDate: '2026-01-12T12:00:00Z' });
+        const changed = await post('therapies', { patientId: patient.id, drugName: suspendedName, dosage: '1 la sera', status: 'suspended', startDate: '2026-01-15T12:00:00Z' });
+        await post('entries', { patientId: patient.id, type: 'phone', date: '2026-02-24T10:00:00Z', title: 'Telefonata sintetica', content: twin ? 'Contatto sintetico su un orario.' : 'Telefonata di archivio.' });
+        let observationId: string | undefined;
+        let previousObservationId: string | undefined;
         if (crowded) {
-            for (let index = 9; index < 20; index++) {
+            for (let index = 9; index < 19; index++) {
                 await post('therapies', {
                     patientId: patient.id, drugName: `Altra terapia sintetica ${index}`, dosage: '1 ogni sera', status: 'completed',
                     startDate: '2026-01-15T12:00:00Z', endDate: `2026-02-${String(index).padStart(2, '0')}T12:00:00Z`,
@@ -42,8 +49,12 @@ async function seed(page: Page, crowded = false) {
                 await post('entries', { patientId: patient.id, type: 'note', date: `2026-02-${index}T10:00:00Z`,
                     title: `Nota di archivio ${index}`, content: 'Testo sintetico della voce precedente.' });
             }
-            await post('observations', { patientId: patient.id, codeSystem: 'LOINC', code: '2823-3', display: 'Potassio',
-                unitSystem: 'UCUM', unitCode: 'mmol/L', value: 5.6, refHigh: '5.1', observedAt: '2026-02-18T12:00:00Z', source: 'manual' });
+            const observation = await post('observations', { patientId: patient.id, codeSystem: 'LOINC', code: '2823-3', display: 'Potassio',
+                unitSystem: 'UCUM', unitCode: 'mmol/L', value: twin ? 5.8 : 5.6, refHigh: '5.1', observedAt: '2026-02-18T12:00:00Z', source: 'manual' });
+            observationId = observation.id;
+            const previous = await post('observations', { patientId: patient.id, codeSystem: 'LOINC', code: '2823-3', display: 'Potassio',
+                unitSystem: 'UCUM', unitCode: 'mmol/L', value: twin ? 4.6 : 4.8, refHigh: '5.1', observedAt: '2026-01-29T12:00:00Z', source: 'manual' });
+            previousObservationId = previous.id;
             for (const name of ['referto-sintetico-precedente.txt', 'lettera-sintetica-precedente.txt']) {
                 await post('attachments', { id: crypto.randomUUID(), patientId: patient.id, name, type: 'text/plain', size: original.length,
                     path: `uploads/${name}`, data: `data:text/plain;base64,${btoa(original)}` });
@@ -51,8 +62,27 @@ async function seed(page: Page, crowded = false) {
         }
         const source = await post('attachments', { id: crypto.randomUUID(), patientId: patient.id, name: sourceName, type: 'text/plain', size: original.length,
             path: `uploads/${sourceName}`, data: `data:text/plain;base64,${btoa(original)}` });
-        return { patient, other, returning, first, source };
-    }, { original, sourceName, crowded });
+        return { patient, other, returning, first, source, visit, active, activeName, changed, suspendedName, observationId, previousObservationId };
+    }, { original, sourceName, crowded, twin });
+    const database = new Database(join(process.env.MEDIFLOW_DATA_DIR!, 'medical.db'), { fileMustExist: true });
+    const at = (day: number) => Date.UTC(2026, 1, day, 12) / 1000;
+    try {
+        const offset = twin ? 2 : 0;
+        database.transaction(() => {
+            database.prepare('UPDATE entries SET created_at = ?, recorded_by = ? WHERE id = ?').run(at(6 + offset), 'Operatrice sintetica', fixture.visit.id);
+            database.prepare('UPDATE entries SET created_at = ? WHERE patient_id = ? AND id != ?').run(at(24), fixture.patient.id, fixture.visit.id);
+            database.prepare("UPDATE entries SET created_at = ? WHERE patient_id = ? AND type = 'phone'").run(at(22 + offset), fixture.patient.id);
+            database.prepare('UPDATE therapies SET created_at = ?, updated_at = ? WHERE patient_id = ?').run(at(1), at(1), fixture.patient.id);
+            database.prepare("UPDATE therapies SET updated_at = ? WHERE patient_id = ? AND status != 'active'").run(at(13), fixture.patient.id);
+            database.prepare('UPDATE therapies SET updated_at = ? WHERE id = ?').run(at(22 + offset), fixture.changed.id);
+            if (fixture.observationId) database.prepare('UPDATE observations SET created_at = ? WHERE id = ?').run(at(23 + offset), fixture.observationId);
+            if (fixture.previousObservationId) database.prepare('UPDATE observations SET created_at = ? WHERE id = ?').run(at(1), fixture.previousObservationId);
+            if (crowded) database.prepare('UPDATE therapies SET updated_at = ?, version = 2 WHERE id = ?').run(at(22 + offset), fixture.active.id);
+        })();
+    } finally {
+        database.close();
+    }
+    return fixture;
 }
 
 async function openFromPatients(page: Page, lastName: string, firstName: string, id: string) {
@@ -63,7 +93,7 @@ async function openFromPatients(page: Page, lastName: string, firstName: string,
 }
 
 async function themes(page: Page, suffix: string) {
-    for (const width of [1440, 1180, 768, 390, 320]) for (const theme of ['light', 'dark']) {
+    for (const width of [1440, 1280, 1180, 1000, 999, 768, 390, 320]) for (const theme of ['light', 'dark']) {
         await page.setViewportSize({ width, height: 660 });
         await page.evaluate(value => {
             localStorage.setItem('mediflow-theme', value);
@@ -74,6 +104,8 @@ async function themes(page: Page, suffix: string) {
         const dir = process.env.MEDIFLOW_STABLE_CHANGED_SCREENSHOTS;
         if (dir) await page.screenshot({ path: `${dir}/${suffix}-${width}-${theme}.png`, animations: 'disabled' });
         await assertNoHorizontalOverflow(page, [{ label: 'Scheda', selector: '#quadro' }]);
+        const tracks = await page.locator('#quadro[data-overview]').evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length);
+        expect(tracks).toBe(width >= 1280 ? 3 : width >= 1000 ? 2 : 1);
     }
     await page.setViewportSize({ width: 1180, height: 660 });
 }
@@ -89,20 +121,20 @@ test('D: dalla lista, primo sguardo al ritorno e cartella senza storico al cambi
     await expect(problems).toContainText('Problema stabile sintetico');
     await expect(page.getByRole('table', { name: 'Terapie attive', exact: true })).toContainText('Terapia corrente sintetica');
     await themes(page, 'ritorno');
-    const changes = page.getByRole('region', { name: 'Variazioni di terapia', exact: true });
-    await expect(changes).toContainText('Dopo la visita del 05/02/2026');
-    await expect(changes).toContainText('20/02/2026');
-    await expect(changes).toContainText('Terapia conclusa sintetica');
+    const changes = page.getByRole('region', { name: 'Variazioni dall’ultima visita', exact: true });
+    await expect(changes).toContainText('06/02/2026');
+    await expect(changes).toContainText('22/02/2026');
+    await expect(changes).toContainText('Terapia sospesa sintetica');
     await expect(changes).not.toContainText('Terapia corrente sintetica');
-    const items = await Promise.all([problems.getByText('Problema stabile sintetico').boundingBox(), changes.getByText('Terapia conclusa sintetica').boundingBox(),
-        page.getByRole('link', { name: 'Quadro paziente', exact: true }).boundingBox()]);
-    const [stable, changed, context] = items.map(item => {
+    const items = await Promise.all([problems.getByText('Problema stabile sintetico').boundingBox(), changes.getByText('Terapia sospesa sintetica').boundingBox(),
+        page.getByRole('link', { name: 'Apri il Quadro e le fonti', exact: true }).boundingBox()]);
+    const [stable, changed, context] = items.map((item, index) => {
         expect(item).not.toBeNull();
         expect(item!.y).toBeGreaterThan(0);
-        expect(item!.y + item!.height).toBeLessThanOrEqual(660);
+        if (index < 2) expect(item!.y + item!.height).toBeLessThanOrEqual(660);
         return item!;
     });
-    expect(stable.x).toBeLessThan(changed.x);
+    expect(changed.x).toBeLessThan(stable.x);
     expect(changed.x).toBeLessThan(context.x);
     await test.info().attach('primo-sguardo-1180x660', {
         body: JSON.stringify({ problema: stable, variazione: changed, quadro: context }, null, 2), contentType: 'application/json',
@@ -110,15 +142,25 @@ test('D: dalla lista, primo sguardo al ritorno e cartella senza storico al cambi
     const diary = page.locator('#diario');
     await expect(diary).toContainText('Nota sintetica del diario.');
     expect((await diary.boundingBox())!.y).toBeGreaterThan(changed.y);
-    await changes.getByText('Fonti del confronto').click();
-    await expect(changes.getByRole('link', { name: 'Apri Terapie' })).toBeVisible();
+    await expect(changes).toContainText('Operatrice sintetica');
+    await expect(changes.getByRole('link', { name: /1 telefonata/ })).toHaveAttribute('href', '#diario');
+    await changes.getByText('Terapia sospesa sintetica', { exact: true }).click();
+    await expect(changes).toContainText('Stato attuale: Sospesa');
+    await expect(changes).toContainText('Valore precedente non conservato.');
+    await changes.getByRole('button', { name: /Diario del.*Telefonata/ }).click();
+    await expect(page.getByRole('region', { name: 'Voce del diario' })).toContainText('Telefonata di archivio.');
+    await page.getByRole('button', { name: 'Chiudi', exact: true }).click();
+    await expect(page.getByRole('table', { name: 'Terapie attive', exact: true })).not.toContainText('Terapia sospesa sintetica');
+    await expect(changes).not.toContainText(sourceName);
+    await changes.getByRole('checkbox', { name: 'Mostra anche documenti e proposte' }).check();
+    await expect(changes.getByRole('button', { name: /Documento aggiunto/ })).toContainText(sourceName);
 
     await openFromPatients(page, first.lastName, first.firstName, other.id);
     await expect(page.getByTestId('lume-scheda-header')).toContainText('Nessun identificativo per ora');
     await expect(page.getByRole('table', { name: 'Problemi', exact: true })).toContainText('Problema del primo accesso');
-    await expect(page.getByText('Nessuna visita precedente disponibile per il confronto.')).toBeVisible();
+    await expect(page.getByText('Nessuna visita registrata.')).toBeVisible();
     await expect(changes).toHaveCount(0);
-    await expect(page.locator('#quadro')).not.toContainText('Terapia conclusa sintetica');
+    await expect(page.locator('#quadro')).not.toContainText('Terapia sospesa sintetica');
     await expect(page.locator('#quadro')).not.toContainText(sourceName);
     await themes(page, 'primo');
 });
@@ -126,17 +168,18 @@ test('D: dalla lista, primo sguardo al ritorno e cartella senza storico al cambi
 test('D affollata: 12 variazioni, referto durante la bozza e voce registrata e riletta', async ({ page }) => {
     await page.setViewportSize({ width: 1180, height: 660 });
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-    const { patient, returning } = await seed(page, true);
+    const { patient, returning, other, first } = await seed(page, true);
     await page.reload();
     const openingStarted = performance.now();
     await openFromPatients(page, returning.lastName, returning.firstName, patient.id);
-    const changes = page.getByRole('region', { name: 'Variazioni di terapia', exact: true });
+    const changes = page.getByRole('region', { name: 'Variazioni dall’ultima visita', exact: true });
     const note = page.locator('#diario article').filter({ hasText: 'Nota sintetica del diario.' });
-    const potassium = page.getByRole('region', { name: 'Parametri recenti', exact: true }).getByRole('row').filter({ hasText: '5,6' });
+    const potassium = changes.getByText(/Potassio.*5,6/);
     const sourceButton = page.getByRole('button', { name: `Apri originale: ${sourceName}` });
     const newEntry = page.getByRole('link', { name: 'Nuova voce', exact: true });
     await expect(note).toBeVisible();
-    await expect(potassium).toContainText('alto');
+    await expect(changes).toContainText('Fuori intervallo');
+    await expect(changes.getByText('Terapia corrente sintetica', { exact: true })).toBeVisible();
     await expect(sourceButton).toBeVisible();
     const openingMs = Math.round(performance.now() - openingStarted);
     const directory = process.env.MEDIFLOW_STABLE_CHANGED_SCREENSHOTS;
@@ -153,15 +196,11 @@ test('D affollata: 12 variazioni, referto durante la bozza e voce registrata e r
             bottomBeyondBottomPx: Math.max(0, Math.round(box.bottom - workAreaBottom)) };
     });
     const frame = await Promise.all([
-        geometry(changes.getByText('Terapia conclusa sintetica', { exact: true })), geometry(note), geometry(potassium),
+        geometry(changes.getByText('Terapia sospesa sintetica', { exact: true })), geometry(note), geometry(potassium),
         geometry(sourceButton), geometry(newEntry),
     ]);
     if (directory) await page.screenshot({ path: `${directory}/affollata-1180.png`, animations: 'disabled' });
-    await expect(changes.locator('li:visible')).toHaveCount(2);
-    await changes.getByText('Altre variazioni e fonti', { exact: true }).click();
-    await expect(changes.locator('li:visible')).toHaveCount(12);
-    const openedComparisonNote = await geometry(note);
-    await changes.getByText('Altre variazioni e fonti', { exact: true }).click();
+    await expect(changes.locator('li:visible')).toHaveCount(13);
     if (frame[2].bottomBeyondBottomPx > 0) await potassium.scrollIntoViewIfNeeded();
     const potassiumAfterScroll = await geometry(potassium);
     expect(potassiumAfterScroll.bottomBeyondBottomPx).toBe(0);
@@ -178,10 +217,11 @@ test('D affollata: 12 variazioni, referto durante la bozza e voce registrata e r
     expect(before[0]).toBe(2);
     const sourceStarted = performance.now();
     await sourceButton.click();
-    await expect(page.getByRole('dialog').getByTestId('document-preview-text')).toHaveText(original);
+    await expect(page.getByTestId('document-preview-text')).toHaveText(original);
+    await expect(editor).toHaveText(draft);
     const sourceMs = Math.round(performance.now() - sourceStarted);
     const resumeStarted = performance.now();
-    await page.getByRole('dialog').getByRole('button', { name: 'Chiudi', exact: true }).click();
+    await page.getByRole('button', { name: 'Torna alla bozza', exact: true }).click();
     await expect(editor).toBeFocused();
     const resumeMs = Math.round(performance.now() - resumeStarted);
     expect(await selection()).toEqual(before);
@@ -190,24 +230,35 @@ test('D affollata: 12 variazioni, referto durante la bozza e voce registrata e r
     await expect(review).toContainText(returning.lastName);
     await expect(review).toContainText(draft);
     if (directory) await page.screenshot({ path: `${directory}/revisione-1180.png`, animations: 'disabled' });
-    await page.getByRole('button', { name: 'Torna a scrivere', exact: true }).click();
+    await page.getByRole('button', { name: 'Torna alla bozza', exact: true }).click();
     await expect(editor).toBeFocused();
     expect(await selection()).toEqual(before);
     await page.getByRole('button', { name: 'Rivedi', exact: true }).click();
 
+    const tab = page.getByRole('navigation', { name: 'Cartelle aperte' }).getByRole('link', { name: new RegExp(`${returning.lastName} ${returning.firstName}`) });
+    await expect(tab.getByLabel('Bozza conservata')).toBeVisible();
+    await openFromPatients(page, first.lastName, first.firstName, other.id);
+    await expect(page.getByText('Nessuna visita registrata.')).toBeVisible();
+    await expect(page.locator('#quadro')).not.toContainText(draft);
+    await tab.click();
+    await expect(review).toContainText(draft);
+
     const saveStarted = performance.now();
     const saved = page.waitForResponse(response => new URL(response.url()).pathname === '/api/entries' && response.request().method() === 'POST');
-    await page.getByRole('button', { name: 'Registra nel diario', exact: true }).click();
+    await page.getByRole('button', { name: 'Conferma e registra', exact: true }).click();
     const savedResponse = await saved;
     const responseMs = Math.round(performance.now() - saveStarted);
     expect(savedResponse.status()).toBe(201);
     const { id: entryId } = await savedResponse.json() as { id: string };
-    await expect(page).toHaveURL(/#diario$/);
-    const registered = page.locator('#diario article').filter({ hasText: draft });
-    await expect(registered).toBeVisible();
-    await expect(registered).toContainText('Registrata da');
+    const receipt = page.getByRole('region', { name: 'Esito della registrazione' });
+    await expect(receipt).toContainText('Registrata alle');
+    await expect(receipt).toContainText(draft);
+    await expect(changes).toContainText('06/02/2026');
+    if (directory) await page.screenshot({ path: `${directory}/rilettura-1180.png`, animations: 'disabled' });
     const readbackMs = Math.round(performance.now() - saveStarted);
+    await page.getByRole('link', { name: 'Chiudi la voce', exact: true }).click();
     await page.reload();
+    await expect(page.getByText(/nessuna variazione registrata/)).toBeVisible();
     await expect(page.locator('#diario article').filter({ hasText: draft })).toHaveCount(1);
     const audit = await page.evaluate(async () => {
         const response = await fetch('/api/system/audit?eventType=entry.created');
@@ -216,13 +267,38 @@ test('D affollata: 12 variazioni, referto durante la bozza e voce registrata e r
     });
     expect(audit.filter(event => event.subjectRef === entryId)).toEqual([expect.objectContaining({ outcome: 'success' })]);
     await test.info().attach('ritorno-affollato', {
-        body: JSON.stringify({ viewport: [1180, 660], total: 12, visibleChanges: 2,
-            geometry: { change: frame[0], latestNote: frame[1], potassium: frame[2], source: frame[3], write: frame[4], openedComparisonNote, potassiumAfterScroll },
-            actions: ['Pazienti', 'Seleziona paziente', 'Apri scheda paziente', 'Altre variazioni e fonti', 'Richiudi variazioni',
-                'Nuova voce', 'Scrivi il testo', 'Apri originale', 'Chiudi originale', 'Rivedi', 'Torna a scrivere', 'Rivedi', 'Registra nel diario', 'Ricarica'],
+        body: JSON.stringify({ viewport: [1180, 660], therapyUpdates: 12, outOfRange: 1,
+            geometry: { change: frame[0], latestNote: frame[1], potassium: frame[2], source: frame[3], write: frame[4], potassiumAfterScroll },
+            actions: ['Pazienti', 'Seleziona paziente', 'Apri scheda paziente', 'Scorri le variazioni',
+                'Nuova voce', 'Scrivi il testo', 'Apri originale', 'Torna alla bozza', 'Rivedi', 'Torna alla bozza', 'Rivedi', 'Conferma e registra', 'Esito', 'Ricarica'],
             cursor: { before, afterReview: before, restored: true },
             browserMs: { openingMs, sourceMs, resumeMs, responseMs, readbackMs } }, null, 2),
         contentType: 'application/json',
     });
     await expect(page.locator('#diario article').filter({ hasText: draft })).toBeVisible();
+});
+
+test('D gemella: un contatto nello stesso giorno si legge come voce, e una lettura fallita resta esplicita', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 780 });
+    await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+    const { patient, returning, activeName, suspendedName } = await seed(page, true, true);
+    await page.reload();
+    await openFromPatients(page, returning.lastName, returning.firstName, patient.id);
+    const changes = page.getByRole('region', { name: 'Variazioni dall’ultima visita', exact: true });
+    const stable = page.getByRole('table', { name: 'Terapie attive', exact: true });
+    await expect(changes).toContainText('08/02/2026');
+    await expect(stable.getByRole('row').filter({ hasText: activeName })).toContainText('2 alla sera');
+    await expect(stable).not.toContainText(suspendedName);
+    await changes.getByText(/Potassio.*5,8/).click();
+    await expect(changes).toContainText('4,6 mmol/L');
+    await changes.getByText(suspendedName, { exact: true }).click();
+    await changes.getByRole('button', { name: /Diario del.*Telefonata/ }).click();
+    await expect(page.getByRole('region', { name: 'Voce del diario' })).toContainText('Contatto sintetico su un orario.');
+    await page.getByRole('button', { name: 'Chiudi', exact: true }).click();
+    await expect(changes).not.toContainText('Contatto sintetico su un orario.');
+
+    await page.route('**/api/observations?**', route => route.fulfill({ status: 503, json: { error: 'Lettura sintetica non disponibile' } }));
+    await page.reload();
+    await expect(changes).toContainText('Confronto incompleto. Alcuni dati non sono disponibili.');
+    await expect(changes).not.toContainText('nessuna variazione');
 });

@@ -226,3 +226,10 @@
     .metadata { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .metadataField:last-child { grid-column: 1 / -1; }
 }
+.embedded .form { display: flex; flex-direction: column; }
+.embedded .form > :global([data-source-open='true']) { order: -1; }
+.embedded .actions { position: sticky; bottom: 0; }
+.steps { display: flex; flex-wrap: wrap; gap: 6px 12px; margin: 0 0 12px; padding: 0; list-style: none; color: var(--lume-ink-muted); font: var(--type-meta); }
+.steps [aria-current='step'] { color: var(--lume-ink); font-weight: 600; }
+.receipt { padding: 14px; background: var(--lume-surface-field); border-radius: var(--lume-radius-control); }
+.receipt > p { margin-block: 10px; }

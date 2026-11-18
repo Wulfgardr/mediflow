@@ -113,7 +113,7 @@ test('Nuova voce: Quadro, bozza unica, uscita protetta e registrazione con fonte
         await page.getByTestId('document-viewer').getByRole('button', { name: 'Chiudi', exact: true }).click();
         await page.getByRole('link', { name: 'Nuova voce', exact: true }).click();
         await editor.fill('Bozza inventata da abbandonare senza scrivere W16.');
-        await page.getByRole('link', { name: 'Torna alla scheda', exact: true }).click();
+        await page.getByRole('link', { name: 'Chiudi la voce', exact: true }).click();
         await zoom.setZoom(4);
         await expect.poll(() => page.getByRole('dialog').evaluate(element => { const box = element.getBoundingClientRect(); return box.top >= -1 && box.bottom <= innerHeight + 1; })).toBe(true);
         const leave = page.getByRole('button', { name: 'Esci senza salvare', exact: true });
