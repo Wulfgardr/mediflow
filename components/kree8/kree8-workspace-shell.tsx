@@ -60,6 +60,15 @@ type Kree8WorkspaceShellProps = {
   children: ReactNode;
 };
 
+function samePageLinkHash(event: MouseEvent): string | null {
+  if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return null;
+  const link = event.target instanceof Element ? event.target.closest('a') : null;
+  if (!link || (link.target && link.target !== '_self') || link.hasAttribute('download')) return null;
+  const url = new URL(link.href, window.location.href);
+  if (url.origin !== window.location.origin || url.pathname !== window.location.pathname || url.search !== window.location.search) return null;
+  return url.hash;
+}
+
 export function Kree8WorkspaceShell({
   variant = 'default',
   writing = false,
@@ -181,11 +190,8 @@ export function Kree8WorkspaceShell({
     const selectFromHash = () => select(window.location.hash);
     // Reopening a closed disclosure must also work when the URL hash is unchanged.
     const selectFromLink = (event: MouseEvent) => {
-      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-      const link = event.target instanceof Element ? event.target.closest('a') : null;
-      if (!link || link.target === '_blank' || link.hasAttribute('download')) return;
-      const url = new URL(link.href, window.location.href);
-      if (url.origin === window.location.origin && url.pathname === window.location.pathname && url.search === window.location.search) select(url.hash);
+      const hash = samePageLinkHash(event);
+      if (hash) select(hash);
     };
     selectFromHash();
     window.addEventListener('hashchange', selectFromHash);
@@ -220,6 +226,10 @@ export function Kree8WorkspaceShell({
        non scrivono piu lo stato. */
     let cancelled = false;
     const visible = new Set<HTMLElement>();
+    const followsChosenDestination = !isClinical;
+    let chosenHref: string | null = null;
+    let arrivedHash: string | null = null;
+    let holdsChosenPosition = false;
 
     /* Unico punto che muta lo stato posseduto: sposta il filo focale sul nodo
        vivo (mai un nodo staccato) e allinea la rail. */
@@ -264,6 +274,11 @@ export function Kree8WorkspaceShell({
     /* Sezione attiva = quella piu in alto tra le visibili, cosi l'evidenziazione
        segue l'ordine visivo anche con le due colonne (DOM e rail divergono). */
     const pickActive = () => {
+      const chosen = chosenHref ? targets.find((target) => target.href === chosenHref) : undefined;
+      if (chosen && isInWorkspaceViewport(chosen.el)) {
+        commit(chosen.href, chosen.el);
+        return;
+      }
       const observed = targets.filter((target) => visible.has(target.el) && isInWorkspaceViewport(target.el));
       /* The observer margin is intentionally narrower than the scrollable
          workspace. If a responsive rail moves every target outside that margin,
@@ -319,9 +334,51 @@ export function Kree8WorkspaceShell({
            replaces it through pickActive(). */
         commit(next[0].href, next[0].el);
       }
+      const hash = window.location.hash;
+      if (hash !== arrivedHash && next.some((entry) => entry.href === hash)) chooseDestination(hash);
+      const held = holdsChosenPosition ? next.find((entry) => entry.href === chosenHref) : undefined;
+      if (held) {
+        held.el.scrollIntoView({ block: 'start' });
+        pickActive();
+      }
+    };
+    const chooseDestination = (hash: string) => {
+      if (!followsChosenDestination || !hashHrefs.includes(hash)) return false;
+      arrivedHash = hash;
+      chosenHref = hash;
+      holdsChosenPosition = true;
+      return true;
+    };
+    const releaseChosenDestination = () => { chosenHref = null; holdsChosenPosition = false; };
+    const onHashChange = () => {
+      if (!followsChosenDestination) return;
+      if (!chooseDestination(window.location.hash)) {
+        arrivedHash = null;
+        releaseChosenDestination();
+      }
+      pickActive();
+    };
+    const onDestinationClick = (event: MouseEvent) => {
+      const hash = samePageLinkHash(event);
+      if (hash && chooseDestination(hash)) requestAnimationFrame(() => { if (!cancelled) pickActive(); });
+    };
+    const onKey = (event: KeyboardEvent) => {
+      holdsChosenPosition = false;
+      if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(event.key)) releaseChosenDestination();
+    };
+    const onPress = (event: PointerEvent) => {
+      holdsChosenPosition = false;
+      const target = event.target;
+      if (target instanceof HTMLElement && target.scrollHeight > target.clientHeight && event.offsetX >= target.clientWidth) releaseChosenDestination();
     };
 
     bind();
+    window.addEventListener('hashchange', onHashChange);
+    root.addEventListener('click', onDestinationClick);
+    window.addEventListener('wheel', releaseChosenDestination, { passive: true, capture: true });
+    window.addEventListener('touchmove', releaseChosenDestination, { passive: true, capture: true });
+    window.addEventListener('keydown', onKey, true);
+    window.addEventListener('pointerdown', onPress, true);
     /* Scroll does not always cross the observer's reduced root margin. Capture
        the scroll phase so a section returned to the visible workspace can regain
        the focal locus without a timeout or layout-specific threshold. */
@@ -337,6 +394,12 @@ export function Kree8WorkspaceShell({
       cancelled = true;
       mo.disconnect();
       window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('hashchange', onHashChange);
+      root.removeEventListener('click', onDestinationClick);
+      window.removeEventListener('wheel', releaseChosenDestination, true);
+      window.removeEventListener('touchmove', releaseChosenDestination, true);
+      window.removeEventListener('keydown', onKey, true);
+      window.removeEventListener('pointerdown', onPress, true);
       if (observer) observer.disconnect();
       if (focusEl) {
         focusEl.removeAttribute('data-lume-focus');
