@@ -25,7 +25,7 @@ export function buildExtractionPrompt(
         `  "schemaVersion": "${AI_TASK_EXTRACTION_SCHEMA_VERSION}",`,
         `  "task": "${task}",`,
         task === 'patient_insight'
-            ? '  "summary": "stringa breve in plain text con [Sx] o [DATI-INCOMPLETI]",'
+            ? '  "summary": "una frase breve in plain text con [S2] o [DATI-INCOMPLETI]",'
             : '  "summary": "stringa breve in plain text, oppure vuota",',
         `  "data": ${dataShape}`,
         '}',
@@ -53,10 +53,10 @@ export function buildPatientInsightExtractionPlan(contextPlan: EmissionPlan): Em
             'Obiettivo: estrarre un insight clinico breve, concreto, neutro e orientato al follow-up attuale, senza produrre markdown finale.',
         ].join('\n'),
         `{
-    "currentState": ["frase breve con [Sx] o [DATI-INCOMPLETI]"],
-    "alerts": ["bullet breve con [Sx] o [DATI-INCOMPLETI]"],
-    "nextSteps": ["bullet operativo con [Sx] o [DATI-INCOMPLETI]"],
-    "gaps": ["bullet breve con [Sx] o [DATI-INCOMPLETI]"]
+    "currentState": ["frase breve con [S2] o [DATI-INCOMPLETI]"],
+    "alerts": ["bullet breve con [S2] o [DATI-INCOMPLETI]"],
+    "nextSteps": ["bullet operativo con [S2] o [DATI-INCOMPLETI]"],
+    "gaps": ["bullet breve con [S2] o [DATI-INCOMPLETI]"]
   }`,
         [
             'currentState massimo 2 frasi brevi',
@@ -85,13 +85,15 @@ export function buildPatientInsightExtractionPlan(contextPlan: EmissionPlan): Em
             'lascia gaps vuoto se il caso e gia interpretabile e i prossimi passi sono gia chiari con i dati presenti',
             'in gaps privilegia aderenza, risposta a terapia, andamento funzionale, sintomi non rivalutati o dati che mancano per leggere il problema attuale; evita gap generici che ripetono semplicemente esami gia programmati',
             'non usare gaps per duplicare nextSteps, per elencare dati mancanti ovvi o per riempire spazio',
-            'ogni stringa deve gia includere [Sx] o [DATI-INCOMPLETI]',
+            'nello schema [S2] e solo un esempio: scrivi il numero della fonte che citi davvero, come compare nei DATI PAZIENTE',
+            'ogni stringa deve gia includere il marker di almeno una fonte o [DATI-INCOMPLETI]',
             `ogni stringa, summary compreso, al massimo ${PATIENT_INSIGHT_CLAIM_MAX_LENGTH} caratteri compresi i marker: frasi brevi, una sola idea per stringa`,
-            'hard fail interno: se anche una sola stringa non contiene [Sx] o [DATI-INCOMPLETI], correggi il JSON prima di rispondere',
-            'mantieni sempre i marker [Sx] anche quando riassumi piu fatti clinici nella stessa stringa',
-            'usa solo riferimenti [Sx] presenti nel contesto',
-            'non usare placeholder come [Sx], [S?] o riferimenti generici: ogni citation deve corrispondere a un id reale presente nel contesto',
-            'non usare markdown nelle stringhe oltre ai marker [Sx] o [DATI-INCOMPLETI]',
+            'hard fail interno: se anche una sola stringa non contiene il marker di una fonte o [DATI-INCOMPLETI], correggi il JSON prima di rispondere',
+            'in currentState, alerts, nextSteps e gaps un secondo fatto va in un altro elemento della stessa lista, con il suo marker, non nella stessa stringa',
+            'non ripetere in piu stringhe o sezioni lo stesso elenco di terapie o di eventi: citalo una volta, con i suoi marker, dove serve di piu',
+            'usa solo riferimenti a fonti presenti nel contesto',
+            'non usare segnaposto o riferimenti generici: ogni citation deve corrispondere a un id reale presente nel contesto',
+            'non usare markdown nelle stringhe oltre ai marker delle fonti o [DATI-INCOMPLETI]',
             'non inventare diagnosi, esami, terapie o fonti',
             PATIENT_INSIGHT_DECISION_FIDELITY_RULE,
             'non scrivere frasi rassicuranti o boilerplate come nessuna criticita se il contesto contiene episodio acuto recente, valore anomalo, stop terapeutico, limitazione funzionale o ausilio clinicamente rilevante',
