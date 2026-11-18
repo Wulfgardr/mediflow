@@ -1372,7 +1372,7 @@ html:root[data-lume] .mf-button-destructive:disabled {
 
 /* Popover Lume: opaco e in fuoco, senza filtro strutturale. */
 .mf-popover {
-  border-radius: var(--lume-radius-card);
+  border-radius: var(--lume-radius-control);
   border: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent);
   background-color: var(--lume-surface-focal);
   box-shadow: 0 22px 44px color-mix(in srgb, var(--lume-giorno-ink-primary) 14%, transparent);
@@ -1391,7 +1391,7 @@ html:root[data-lume] .mf-button-destructive:disabled {
   align-items: center;
   gap: 0.65rem;
   padding: 0.6rem 0.7rem;
-  border-radius: var(--lume-radius-control);
+  border-radius: calc(var(--lume-radius-control) - 4px);
   font-size: 0.875rem;
   color: var(--lume-ink);
   cursor: pointer;

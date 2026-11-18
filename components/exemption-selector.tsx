@@ -185,7 +185,7 @@ export default function ExemptionSelector({ value, onChange }: ExemptionSelector
 
                 {isOpen && (
                     <div
-                        className="absolute z-30 mt-2 max-h-72 w-full overflow-auto rounded-[var(--lume-radius-card)] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-1 shadow-[0_2px_8px_color-mix(in_srgb,var(--lume-ink)_10%,transparent)]"
+                        className="absolute z-30 mt-2 max-h-72 w-full overflow-auto rounded-[var(--lume-radius-control)] border border-[color:color-mix(in_srgb,var(--lume-ink)_14%,transparent)] bg-[color:var(--lume-surface-field)] p-1 shadow-[0_2px_8px_color-mix(in_srgb,var(--lume-ink)_10%,transparent)]"
                         role="listbox"
                         id={listboxId}
                         aria-label="Risultati catalogo esenzioni"
