@@ -1,4 +1,6 @@
-export type SharedTabKey<T> = { key: CryptoKey; user: T; wrapping: { encryptedMasterKey: string; salt: string } | null };
+import type { SessionKeyWrapping } from './client-security-session';
+
+export type SharedTabKey<T> = { key: CryptoKey; user: T; wrapping: SessionKeyWrapping | null };
 type Packet<T> = { type: 'request' | 'key'; requestId: string; binding: string; value?: SharedTabKey<T> };
 type Channel = Pick<BroadcastChannel, 'postMessage' | 'close' | 'addEventListener' | 'removeEventListener'>;
 

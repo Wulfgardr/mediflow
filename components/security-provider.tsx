@@ -27,6 +27,7 @@ import {
     clearSecuritySession,
     persistSecuritySession,
     restoreSecuritySession,
+    type SessionKeyWrapping,
 } from '@/lib/security/client-security-session';
 import { createTabKeyShare } from '@/lib/security/tab-key-share';
 import { notifyDbChange } from '@/lib/live-query';
@@ -166,7 +167,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     };
     const masterKeyRef = useRef<CryptoKey | null>(null);
     const tabKeyShareRef = useRef<ReturnType<typeof createTabKeyShare<User>> | null>(null);
-    const wrappingRef = useRef<{ encryptedMasterKey: string; salt: string } | null>(null);
+    const wrappingRef = useRef<SessionKeyWrapping | null>(null);
     const preparedAccessRef = useRef<{ generation: number; commit: () => Promise<AccessResult> } | null>(null);
     const [preparedKit, setPreparedKit] = useState<PreparedRecoveryKit | null>(null);
     const accessCommitPending = useRef(false);
@@ -422,9 +423,10 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             if (!session) return false;
             if (authorityAttemptGenerationRef.current !== attemptGeneration) return false;
 
+            wrappingRef.current = session.wrapping;
             setActiveMasterKey(session.key);
             setUser(session.userData);
-            void tabKeyShareRef.current?.publish({ key: session.key, user: session.userData, wrapping: null });
+            void tabKeyShareRef.current?.publish({ key: session.key, user: session.userData, wrapping: session.wrapping });
             setIsAuthenticated(true);
             setIsLocked(false);
             updateAuthRecoveryState('ready');
@@ -579,7 +581,8 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             }
             unacceptedServerAuthority = false;
 
-            wrappingRef.current = { encryptedMasterKey, salt: btoa(String.fromCharCode(...saltBytes)) };
+            const wrapping = { encryptedMasterKey, salt: btoa(String.fromCharCode(...saltBytes)) };
+            wrappingRef.current = wrapping;
             setActiveMasterKey(material ? await residentKey(masterKey) : masterKey);
             if (authorityAttemptGenerationRef.current !== attemptGeneration) { clearClientAuthority(); return false; }
             setUser(userData);
@@ -591,7 +594,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
             // Persist session
             try {
-                if (!material) await persistSecuritySession(masterKey, userData);
+                if (!material) await persistSecuritySession(masterKey, userData, wrapping);
                 else clearSecuritySession();
             } catch (e) {
                 console.error("Failed to save session", e);
@@ -646,15 +649,28 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             return { ok: false, message: validationError };
         }
 
+        const generation = authorityAttemptGenerationRef.current;
+        let rotationKey = masterKey;
+        if (!masterKey.extractable) {
+            const wrapping = wrappingRef.current;
+            if (!wrapping) return { ok: false, message: 'Per cambiare il PIN, blocca le schede e accedi con il PIN attuale.' };
+            try {
+                const salt = Uint8Array.from(atob(wrapping.salt), character => character.charCodeAt(0));
+                rotationKey = await unwrapMasterKeyVersioned(wrapping.encryptedMasterKey, currentPin, salt);
+                const iv = crypto.getRandomValues(new Uint8Array(12));
+                const params = { name: 'AES-GCM', iv };
+                const challenge = await crypto.subtle.encrypt(params, masterKey, new Uint8Array(0));
+                await crypto.subtle.decrypt(params, rotationKey, challenge);
+            } catch {
+                return { ok: false, message: 'PIN attuale non valido o chiave non verificabile.' };
+            }
+        }
         let pinMutationDispatched = false;
         try {
-            const rotation = await createPinRotationBundle(masterKey, newPin);
-            pinMutationDispatched = true;
-            const { response: res, payload } = await changePinRequest({
-                currentPin,
-                newPin,
-                encryptedMasterKey: rotation.encryptedMasterKey,
-                salt: rotation.salt,
+            const rotation = await createPinRotationBundle(rotationKey, newPin);
+            const { response: res, payload } = await runPreparedAccessRequest(generation, () => {
+                pinMutationDispatched = true;
+                return changePinRequest({ currentPin, newPin, encryptedMasterKey: rotation.encryptedMasterKey, salt: rotation.salt });
             });
 
             if (!res.ok) {

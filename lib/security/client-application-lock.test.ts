@@ -419,7 +419,7 @@ test('security provider clears stale persisted authority and fences stale auth p
         /runAuthorityNetworkRequest\(async \(\) => \{\s*if \(authorityAttemptGenerationRef\.current !== attemptGeneration\) return null;[\s\S]{0,160}?return material \? loginWithVerifierRequest\(material\.verifier\) : loginWithPinRequest\(pin\);/,
         /runAuthorityNetworkRequest\(async \(\) => \{\s*if \(generation !== authorityAttemptGenerationRef\.current\) throw new Error/,
         /preparedAccessRef\.current = \{ generation, commit:/,
-        /await persistSecuritySession\(masterKey, userData\);[\s\S]*?clearClientAuthority\(\);/,
+        /await persistSecuritySession\(masterKey, userData, wrapping\);[\s\S]*?clearClientAuthority\(\);/,
         /finishAccessMutation = async[\s\S]*?generation !== authorityAttemptGenerationRef\.current[\s\S]*?clearClientAuthority\(\);/,
         /handleApiAuthUnavailable[\s\S]*?\+\+authorityAttemptGenerationRef\.current[\s\S]*?clearClientAuthority\(\);/,
         /checkAuthStatus[\s\S]*?controlState === 'stale'\) return;[\s\S]*?controlState === 'invalid'[\s\S]*?clearClientAuthority\(\);/,
@@ -469,11 +469,15 @@ test('restored PIN authority reconciles a concurrent recovery check without bypa
         const authorityAttemptGenerationRef = { current: 0 };
         const authRecoveryStateRef = { current: 'ready' };
         const masterKeyRef = { current: null as object | null };
-        const publishedKeys: Array<{ key: object; user: { id: string }; wrapping: null }> = [];
-        let release!: (session: { key: object; userData: { id: string } } | null) => void;
-        const restored = new Promise<{ key: object; userData: { id: string } } | null>(resolve => { release = resolve; });
+        type Wrapping = { encryptedMasterKey: string; salt: string };
+        type Session = { key: object; userData: { id: string }; wrapping: Wrapping | null };
+        const wrapping = leaseRequired ? { encryptedMasterKey: 'synthetic-wrapping', salt: 'synthetic-salt' } : null;
+        const wrappingRef = { current: null as Wrapping | null };
+        const publishedKeys: Array<{ key: object; user: { id: string }; wrapping: Wrapping | null }> = [];
+        let release!: (session: Session | null) => void;
+        const restored = new Promise<Session | null>(resolve => { release = resolve; });
         const callbacks = runInNewContext(output, {
-            authorityAttemptGenerationRef, authRecoveryStateRef, masterKeyRef,
+            authorityAttemptGenerationRef, authRecoveryStateRef, masterKeyRef, wrappingRef,
             tabKeyShareRef: { current: { publish: async (value: (typeof publishedKeys)[number]) => { publishedKeys.push(value); } } },
             askUnlockParameters: async () => ({ credential: outcome === 'passphrase' ? 'passphrase' : 'pin' }),
             restoreSecuritySession: () => restored,
@@ -501,7 +505,7 @@ test('restored PIN authority reconciles a concurrent recovery check without bypa
             authRecoveryStateRef.current = 'pending';
         }
         const key = {};
-        release(outcome === 'missing' ? null : { key, userData: { id: 'synthetic-operator' } });
+        release(outcome === 'missing' ? null : { key, userData: { id: 'synthetic-operator' }, wrapping });
         assert.equal(await restoring, outcome === 'restored');
         if (outcome === 'restored') {
             assert.deepEqual(state, { authenticated: true, locked: false, user: { id: 'synthetic-operator' } });
@@ -510,12 +514,14 @@ test('restored PIN authority reconciles a concurrent recovery check without bypa
             assert.equal(publishedKeys.length, 1);
             assert.equal(publishedKeys[0].key, key);
             assert.equal(publishedKeys[0].user, state.user);
-            assert.equal(publishedKeys[0].wrapping, null);
+            assert.equal(publishedKeys[0].wrapping, wrapping);
+            assert.equal(wrappingRef.current, wrapping);
         } else {
             assert.deepEqual(state, { authenticated: false, locked: true, user: null });
             assert.equal(masterKeyRef.current, null);
             assert.equal(authRecoveryStateRef.current, outcome === 'locked' ? 'pending' : 'required');
             assert.equal(publishedKeys.length, 0);
+            assert.equal(wrappingRef.current, null);
         }
     }
 });
