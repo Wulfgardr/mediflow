@@ -406,6 +406,18 @@ con un host Web: stesse operazioni chiuse `stage`, `preview`, `execute`,
 `receipt`, `revoke`, stesso limite di 10 MiB, stessa verifica ENC2 dei byte
 prima di AnyDoc e OCR locale, stessi esiti `applied`, `retired`, `unknown`.
 
+La revisione Web, anche quando parte dal Dossier, applica l’identità di ADR
+0179. L’operatore inserisce tipo e valore dell’identificativo o sceglie
+esplicitamente che la persona non ha un identificativo. In questo caso
+servono nome, cognome e data di nascita esatta o anno stimato. Il CF vuoto
+nel documento non equivale a quella scelta. La revisione passa `identifierType`
+e, quando stimato, `birthYear` a `preview`. I client che inviano ancora il
+campo `taxCode` revisionato senza dichiarare il tipo conservano il contratto
+precedente. I duplicati di identificativo nell’ambulatorio bloccano la
+creazione. Gli omonimi richiedono una scelta esplicita e le schede rimangono
+distinte. Nel Dossier il collegamento senza CF richiede ancora la conferma
+dell’operatore.
+
 L'host Web richiede una sessione Web autentica di amministratore, la richiesta
 locale e la generazione d'archivio corrente (`archiveWriteRequestDenial`, come
 gli altri comandi Web) e l'ambulatorio selezionato, o quello predefinito, come
