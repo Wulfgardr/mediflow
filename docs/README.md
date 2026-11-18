@@ -49,11 +49,16 @@ e pilota chiuso non attestano il completamento della release.
 La [prima analisi I-3b](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/analysis/2026-10-26-athena-method.md) ricostruisce
 metodo, fonti e runner ATHENA con REA e prove locali. Resta come base per la
 ripresa dopo la 0.9.1 secondo l'ADR 0166 Proposed.
-Il [censimento GPUI G-0](./analysis/2026-10-23-gpui-census.md) è riallineato al
-candidato `e964e4382` del 12 novembre 2026: 66 righe di parità, route Web,
-consumer nativi, scritture e specifica Punto d’inchiostro. Distingue test di
-trasporto e servizi dall’uso del bundle installato. Le nuove proposte di
-esclusione aspettano una mia decisione e mantengono aperti i relativi obblighi.
+Il [censimento GPUI G-0](./analysis/2026-10-23-gpui-census.md) documenta il
+candidato `e964e4382` del 12 novembre 2026. Copre 66 righe di parità, route Web,
+consumer nativi, scritture e specifica Punto d’inchiostro. Distingue i test
+di trasporto e dei servizi dalle prove d’uso del bundle installato.
+
+Nel censimento le esclusioni da X01 a X16 figurano come proposte. Il
+13 novembre 2026 le ho approvate per il client GPUI, come
+riporta la nota di rilascio Q-10. Il Web resta disponibile per le
+funzioni previste.
+
 Il [filone CU](./analysis/2026-10-23-computer-use-procedures.md), aggiunto in coda il 23 ottobre, propone procedure clinico-amministrative con identità locale: [contratti](./analysis/2026-10-23-computer-use-procedure-contracts.md), [fonti verificate e limiti](./analysis/2026-10-23-computer-use-sources.md), [ADR 0162 Proposed](./adr/0162-local-computer-use-executor.md). Il [nucleo CU-1a](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/local-operation-core.md) implementa il protocollo e il servizio locale con adapter simulato. CU-1b deve completare la verticale PRREG sintetica. CU-1 resta incompleta fino all'accettazione di entrambe e nessun servizio istituzionale è qualificato.
 
 L’[elenco dei writer audit](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/audit-writers.md) classifica obblighi, stato corrente
@@ -203,7 +208,6 @@ Gli approfondimenti seguenti mantengono nomi e riferimenti tecnici per
 rendere reperibili i contratti. «Proposto», «candidato» e «storico» qualificano
 il documento o la prova nominati, non l’intero prodotto.
 
-<!-- @Codex MF085-002/003 -->
 - Scale cliniche source-bound e invio completo: [ADR 0118](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/adr/0118-tinetti-poma28-source-bound-submission.md) (candidato, con storico preservato e nessuna classificazione automatica del rischio per la nuova Tinetti).
 
 - Contratto prodotto: [PRODUCT.md](../PRODUCT.md)

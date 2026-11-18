@@ -532,7 +532,7 @@ barriere sincrone. Non attesta modifiche esterne mutate e ripristinate senza
 incrementare le revisioni tra due letture. Nessun test locale concede readiness.
 
 
-@Codex — Nel raccordo Treatment Reasoning l'acquisizione e lo snapshot del lease port
+Nel raccordo Treatment Reasoning l'acquisizione e lo snapshot del lease port
 non rientrano nella sezione critica dell'owner. Il servizio legge la selezione, esce
 dalla sezione, acquisisce il port autentico e riconferma coppia, epoche e revisione
 prima di registrare l'handle. In caso di errore elimina il solo nuovo record e
