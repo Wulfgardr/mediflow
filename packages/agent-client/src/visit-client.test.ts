@@ -34,7 +34,7 @@ async function fixture(model: 'local' | 'openai' = 'local') {
     const bodies: string[] = [], events: string[] = [];
     let afterNote: (() => void) | undefined;
     let drop = false, denied = false, operations = f.principal.operations, pulls = 0;
-    const longToken = 'mfr_' + 'X'.repeat(43);
+    const longToken = 'mfr_' + 'X'.repeat(43), confirmationRef = randomUUID();
     const server = http.createServer(async (request, response) => {
         if (request.url?.startsWith('/api/agent/v1/pairings')) {
             try {
@@ -62,6 +62,20 @@ async function fixture(model: 'local' | 'openai' = 'local') {
             return;
         }
         if (request.headers.authorization !== 'Bearer ' + f.token) { response.writeHead(401, { 'Content-Type': 'application/json' }).end(JSON.stringify({ secret: f.token })); return; }
+        if (request.url === '/api/agent/v1/confirmation' && request.method === 'POST') {
+            const chunks: Buffer[] = [];
+            for await (const chunk of request) chunks.push(chunk);
+            const body = JSON.parse(Buffer.concat(chunks).toString());
+            const row = f.rows().find(item => item.id === body.visitId);
+            response.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({
+                reference: confirmationRef, status: row?.status === 'closed' ? 'waiting' : 'not_applied', ignored: sentinel,
+            }));
+            return;
+        }
+        if (request.url === '/api/agent/v1/confirmation?reference=' + confirmationRef && request.method === 'GET') {
+            response.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ reference: confirmationRef, status: 'waiting' }));
+            return;
+        }
         if (request.url === '/api/agent/v1/context') { response.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ ...f.principal, operations, actorRef: undefined, wrappedPrivateKey: undefined })); return; }
         const chunks: Buffer[] = []; for await (const chunk of request) chunks.push(chunk);
         const raw = Buffer.concat(chunks).toString(); bodies.push(raw);
@@ -223,7 +237,8 @@ test('MCP stdio uses the same deposit contract and opens no clinical database, m
         const listed = await send('tools/list');
         assert.ok(listed.result, JSON.stringify(listed));
         assert.deepEqual((listed.result as { tools: { name: string }[] }).tools.map(tool => tool.name).sort(),
-            ['mediflow_collega', 'mediflow_completa_collegamento', 'mediflow_deposita_visita', 'mediflow_riprendi_visita', 'mediflow_ritira_mandato'].sort());
+            ['mediflow_collega', 'mediflow_completa_collegamento', 'mediflow_deposita_visita', 'mediflow_riprendi_visita',
+                'mediflow_ritira_mandato', 'mediflow_apri_conferma_visita', 'mediflow_esito_conferma_visita'].sort());
         assert.doesNotMatch(await descriptors(), /\.db(?:-wal|-shm)?(?:\n|$)/u);
         const cliResult = await cli(['deposita', '--credenziali', f.credentials, '--agente', f.principal.agentRef, '--estrazione', f.file, '--cf', cf, '--visita', randomUUID(), '--trascrizione', f.transcription], f.root);
         assert.equal(cliResult.code, 0, cliResult.stderr); const cliReceipt = JSON.parse(cliResult.stdout);
@@ -242,6 +257,20 @@ test('MCP stdio uses the same deposit contract and opens no clinical database, m
         for (const operation of ['visita.apri', 'visita.allega', 'visita.trascrizione', 'visita.proponi.terapia', 'visita.chiudi']) assert.ok(f.events.includes(operation));
         const replay = await send('tools/call', { name: 'mediflow_riprendi_visita', arguments: { agentRef: f.principal.agentRef, visitId } });
         assert.deepEqual((replay.result as { structuredContent: unknown }).structuredContent, result.structuredContent);
+        saveAgentCredential(f.credentials, { agentRef: f.principal.agentRef, mandateRef: f.mandate.id,
+            origin: f.origin, token: 'mfa_' + 'Y'.repeat(43), expiresAt: Date.now() + 3600000 });
+        const confirmation = await send('tools/call', { name: 'mediflow_apri_conferma_visita', arguments: { agentRef: f.principal.agentRef, visitId } });
+        const minimal = (confirmation.result as { structuredContent: { reference: string; status: string } }).structuredContent;
+        assert.deepEqual(minimal, { reference: minimal.reference, status: 'waiting' });
+        assert.equal(f.pulls(), 2);
+        saveAgentCredential(f.credentials, { agentRef: f.principal.agentRef, mandateRef: f.mandate.id,
+            origin: f.origin, token: f.token, expiresAt: Date.now() - 1000 });
+        const read = await send('tools/call', { name: 'mediflow_esito_conferma_visita', arguments: { agentRef: f.principal.agentRef, reference: minimal.reference } });
+        assert.deepEqual((read.result as { structuredContent: unknown }).structuredContent, minimal);
+        assert.equal(f.pulls(), 3);
+        const rejected = await send('tools/call', { name: 'mediflow_apri_conferma_visita',
+            arguments: { agentRef: f.principal.agentRef, visitId, proof: 'forged' } });
+        assert.equal((rejected.result as { isError?: boolean })?.isError ?? Boolean(rejected.error), true);
         assert.doesNotMatch(await descriptors(), /\.db(?:-wal|-shm)?(?:\n|$)/u);
         assert.ok(!JSON.stringify(output).includes(f.token)); assert.ok(!JSON.stringify(output).includes(sentinel)); assert.ok(!JSON.stringify(output).includes(cf));
         assert.ok(!stderr.includes(f.token)); assert.ok(!fs.existsSync(path.join(f.root, 'mcp-unused-data', 'medical.db')));
@@ -436,6 +465,7 @@ test('Ambulatorio admits only a verified visit and retries the same encrypted de
         assert.equal(spawnSync('pdftotext', ['-v']).status, 0, 'Install poppler-utils for the Ambulatorio acceptance test');
         const acquired = await send('mediflow_acquisisci_visita', { dettato, inizio: new Date(Date.now() - 60000).toISOString() });
         const { visitId } = acquired;
+        assert.deepEqual(await send('mediflow_apri_conferma_visita', { visitId }), { error: 'DEPOSITO_NON_AVVIATO' });
         assert.equal(acquired.stato, 'CF da confermare');
         assert.deepEqual(acquired.pdf_accettati, []);
         assert.equal(acquired.cf_proposto, cf);
@@ -468,6 +498,13 @@ test('Ambulatorio admits only a verified visit and retries the same encrypted de
         assert.deepEqual(await send('mediflow_deposita_visita', { visitId }), receipt);
         assert.equal(f.rows().length, 1);
         assert.equal(receipt.itemCount, 6);
+        saveAgentRegistration(f.credentials, { agentRef: f.principal.agentRef, origin: f.origin, token: f.longToken });
+        fs.unlinkSync(path.join(f.credentials, f.principal.agentRef + '.json'));
+        const opened = await send('mediflow_apri_conferma_visita', { visitId });
+        assert.ok(/^[a-f0-9-]{36}$/u.test(opened.reference));
+        assert.deepEqual(opened, { reference: opened.reference, status: 'waiting' });
+        assert.deepEqual(await send('mediflow_esito_conferma_visita', { visitId, reference: opened.reference }), opened);
+        assert.equal(f.pulls(), 1);
         assert.ok(f.bodies.every(body => ![dettato, cf, quote, f.token].some(secret => body.includes(secret))));
         assert.deepEqual(await send('mediflow_aggiorna_visita', { visitId }), { error: 'DEPOSITO_GIA_AVVIATO' });
         assert.equal(fs.statSync(path.join(home, 'visite', visitId, 'trascrizione.txt')).mode & 0o777, 0o600);

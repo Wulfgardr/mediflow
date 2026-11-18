@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { randomUUID } from 'node:crypto';
+import { generateKeyPairSync, randomUUID, sign } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -9,7 +9,7 @@ import { agentBase64 } from './agent-cassette-crypto';
 import { sealAgentItemNode } from '../packages/agent-client/src/cassette-crypto';
 import { encryptData, generateMasterKey } from './security/security';
 import { sealPatientDocumentFile } from './security/attachment-file-envelope';
-import type { AgentApplicationInput } from './agent-visit-application-contract';
+import { agentApplicationSchema, type AgentApplicationInput } from './agent-visit-application-contract';
 
 const directory = mkdtempSync(join(tmpdir(), 'mediflow-agent-application-'));
 process.env.MEDIFLOW_DATA_DIR = directory;
@@ -21,7 +21,7 @@ fixture.seedComposition();
 const { createAgentMandateStore } = await import('./agent-mandate-store.ts');
 const { createAgentPairingStore } = await import('./agent-pairing-store.ts');
 const { createAgentCassetteStore, readAgentCassette, readAgentCassetteIndex } = await import('./agent-cassette-store.ts');
-const { applyAgentVisit, agentAppliedItemIds } = await import('./agent-visit-application.ts');
+const { applyAgentVisit, agentAppliedItemIds, applyConfirmedAgentVisit, agentConfirmationPatientState, hasAgentVisitConfirmationReceipt } = await import('./agent-visit-application.ts');
 const { archiveGenerationForSession } = await import('./security/archive-session-generation.ts');
 const { readBackupAuditRows, canonicalizeBackupAuditRows } = await import('./backup-audit.ts');
 const database = dbServer.$client;
@@ -140,4 +140,53 @@ test('automatic mode cannot consume or relabel a structured proposal', async () 
     assert.throws(() => applyAgentVisit(request, fixture.session, { ...input, items: [proposal] }));
     assert.throws(() => applyAgentVisit(request, fixture.session, { ...input, items: input.items.map((item, index) => index ? item : { ...item, id: proposal.id }) }));
     assert.deepEqual(snapshot(), before);
+});
+
+
+test('native approval commits and audits exactly one plan, and a valid proof cannot be reused or moved', async () => {
+    assert.equal(typeof applyConfirmedAgentVisit, 'function');
+    const { createVisitConfirmationChallenge } = await import('./agent-visit-confirmation-proof');
+    const f = await visit();
+    applyAgentVisit(request, fixture.session, f.input('automatic'));
+    const plan = agentApplicationSchema.parse(f.input('review'));
+    const reference = randomUUID();
+    const keys = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+    const jwk = keys.publicKey.export({ format: 'jwk' });
+    const publicKey = Buffer.concat([Buffer.of(4), Buffer.from(jwk.x!, 'base64url'), Buffer.from(jwk.y!, 'base64url')]).toString('base64');
+    const binding = { reference, ...f.principal, sessionId: fixture.session.id, visitId: plan.visitId, revision: plan.cassetteRevision,
+        patientId: plan.patientId, patientVersion: plan.expectedVersion, patientState: agentConfirmationPatientState(plan.patientId, plan.expectedVersion),
+        expiresAt: Date.now() + 60_000 };
+    const presentation = Buffer.from('synthetic ciphertext representation').toString('base64');
+    const challenge = createVisitConfirmationChallenge(binding, plan, presentation, publicKey);
+    const policy = 'biometrics-or-companion' as const;
+    const proof = { policy, signature: sign('sha256', Buffer.from(challenge.bytes + '\n' + policy),
+        { key: keys.privateKey, dsaEncoding: 'ieee-p1363' }).toString('base64') };
+    const before = snapshot();
+    const grant = { challenge, proof, assertLive() {} };
+    assert.throws(() => applyConfirmedAgentVisit(request, fixture.session, plan, { ...grant, proof: { policy, signature: '' } }));
+    assert.throws(() => applyConfirmedAgentVisit(request, fixture.session, { ...plan, items: plan.items.toReversed() }, grant));
+    assert.throws(() => applyConfirmedAgentVisit(request, fixture.session, plan, { ...grant,
+        challenge: createVisitConfirmationChallenge({ ...binding, reference: randomUUID() }, plan, presentation, publicKey) }));
+    assert.throws(() => applyConfirmedAgentVisit(request, fixture.session, plan, { ...grant,
+        assertLive() { throw new Error('DISCONNECTED_SYNTHETIC_PEER'); } }), /DISCONNECTED_SYNTHETIC_PEER/);
+    assert.deepEqual(snapshot(), before);
+    assert.equal(hasAgentVisitConfirmationReceipt(reference, f.principal), false);
+
+    const result = applyConfirmedAgentVisit(request, fixture.session, plan, grant);
+    const after = snapshot();
+    assert.deepEqual(after.slice(0, 6).map((rows, index) => rows.length - before[index].length), [0, 0, 1, 1, 2, 1]);
+    assert.equal(hasAgentVisitConfirmationReceipt(reference, f.principal), true);
+    assert.equal(hasAgentVisitConfirmationReceipt(reference, { ...f.principal, agentRef: randomUUID() }), false);
+    const record = database.prepare('SELECT * FROM audit_events WHERE event_id=?').get(result.eventId) as Record<string, string>;
+    assert.equal(record.actor_type, 'user');
+    assert.equal(record.actor_ref, fixture.session.userId);
+    assert.equal(record.proposer_ref, f.principal.agentRef);
+    assert.equal(record.mandate_ref, f.mandate.id);
+    assert.equal(record.model_provider, f.principal.modelProvider);
+    assert.equal(record.request_id, reference);
+    assert.ok(JSON.parse(record.redacted_metadata).flags.includes('confirmation:codex-macos'));
+    assert.ok(JSON.parse(record.redacted_metadata).flags.includes('policy:biometrics-or-companion'));
+    assert.ok(!record.redacted_metadata.includes(proof.signature));
+    assert.throws(() => applyConfirmedAgentVisit(request, fixture.session, plan, grant));
+    assert.deepEqual(snapshot(), after);
 });

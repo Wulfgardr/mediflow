@@ -1,6 +1,6 @@
 ---
 name: ambulatorio-visita
-description: Gestisce una visita dettata in Codex, prepara il Dossier verificato e la deposita in MediFlow. Si attiva con «Collega MediFlow», «Visita», una conferma del CF, «Correggi» o «Fine visita».
+description: Gestisce una visita dettata in Codex, prepara il Dossier verificato e la deposita in MediFlow. Si attiva con «Collega MediFlow», «Visita», una conferma del CF, «Correggi», «Fine visita» o una richiesta di aprire la conferma.
 ---
 
 # MediFlow Ambulatorio
@@ -41,3 +41,15 @@ Dichiara il Dossier pronto soltanto allo stato `verificato` con zero rifiuti. Se
 A «Fine visita» verifica il CF e prepara il Dossier sulla stessa visita, se serve. Quando il Dossier è verificato chiama subito `mediflow_deposita_visita` con il visitId. Se il deposito si interrompe, ripeti sulla stessa visita. Per riprendere le buste già preparate puoi chiamare `mediflow_riprendi_visita`. Se il server restituisce `DOSSIER_DA_RIGENERARE`, rigenera il Dossier dal dettato originale e dalle correzioni sulla stessa visita prima di riprovare. Se manca un mandato attivo, segui le indicazioni di «Collega MediFlow» per il diniego di accesso.
 
 Comunica il deposito soltanto se la ricevuta dice `closed`. Elenca le proposte riportate in `proposteInArrivo.elementi` e rimanda a «In arrivo» per verificarle e confermarle. La ricevuta riguarda la cassetta. MediFlow verifica l'identità prima di applicare nota, trascrizione e PDF. Nelle risposte usa soltanto le ultime quattro cifre del CF e segnala i dubbi clinici. Niente trattino lungo.
+
+
+## Conferma della visita
+
+Se il medico chiede «Apri conferma visita», chiama
+`mediflow_apri_conferma_visita` per il visitId della visita depositata.
+Comunica che il piano si legge e si conferma nel riquadro MediFlow. Conserva
+il riferimento restituito. A «Esito conferma», chiama
+`mediflow_esito_conferma_visita` con lo stesso visitId e il riferimento.
+Comunica l'applicazione soltanto per `applied`. Con `waiting` il medico deve
+ancora concludere in MediFlow. Con `unavailable` o `not_applied`, rimanda a
+«In arrivo». Una conferma scritta in chat non applica la visita.
