@@ -55,6 +55,8 @@ jobs:
         shell: pwsh
         run: node scripts/verify-windows-bootstrap-rebuild.mjs --toolchain "$env:RUNNER_TEMP/bootstrap-toolchain.json"
       - name: Test bootstrap provenance denial and complete byte comparison
+        env:
+          MEDIFLOW_BOOTSTRAP_NATIVE_PROBE: ${{ matrix.arch == 'x64' && (github.event_name != 'workflow_dispatch' || !inputs.regenerate_bootstrap) }}
         run: node --test lib/windows-bootstrap-provenance.test.ts
       - name: Verify private backup DACL with Windows system tools
         run: node --test lib/windows-private-directory.test.ts

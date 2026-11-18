@@ -1,0 +1,32 @@
+[
+  {
+    "toolchain": {
+      "architecture": "x64",
+      "compiler": "19.51.36260.0",
+      "linker": "14.51.36260.0",
+      "msvc": "14.51.36231",
+      "windowsSdk": "10.0.26100.0"
+    },
+    "sha256": "bdacc6372dc221e94bfd1d9a13e650d53398d48575ead751a1ee0c762f55384f",
+    "provenance": {
+      "run": "https://github.com/Wulfgardr/mediflow/actions/runs/43619347879",
+      "job": "https://github.com/Wulfgardr/mediflow/actions/runs/43619347879/job/132521259230",
+      "image": "20261103.298.1"
+    }
+  },
+  {
+    "toolchain": {
+      "architecture": "x64",
+      "compiler": "19.52.37029.0",
+      "linker": "14.52.37029.0",
+      "msvc": "14.52.37025",
+      "windowsSdk": "10.0.26100.0"
+    },
+    "sha256": "ec8104b2e0cf67f25dcf55296734d3716c4b660c8c487aa403b458c038c9e67e",
+    "provenance": {
+      "run": "https://github.com/Wulfgardr/mediflow/actions/runs/44377677866",
+      "job": "https://github.com/Wulfgardr/mediflow/actions/runs/44377677866/job/135061089954",
+      "image": "20261116.315.1"
+    }
+  }
+]
