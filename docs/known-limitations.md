@@ -57,7 +57,7 @@ Una prova con Codex reale ha osservato le due chiamate dell'agente dopo una
 selezione esplicita del plugin. In Codex reale non sono stati verificati il
 riconoscimento automatico del plugin, i pannelli dell'app desktop o l'aggiunta
 del testo al contesto tramite l'interfaccia. I risultati dei tool arrivano
-comunque al contesto dell'agente, ma il server locale non garantisce che il modello
+comunque al contesto dell'agente. Il server locale non garantisce che il modello
 elabori i dati localmente. Non è una prova di funzionamento in ChatGPT classico.
 Vedi la [prova Codex del prototipo](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/plugins/mediflow-synthetic/README.md#prova-opzionale-dellagente-codex-reale).
 
@@ -79,7 +79,7 @@ Per gli ingressi del sorgente corrente serve Node 24 installato. Non sono
 installer. Linux può richiedere il permesso eseguibile e un file manager che
 avvii gli script nel terminale. Il comando `install-desktop-entry` aggiunge
 un ingresso nel menu. La voce App per Mac richiede un bundle locale costruito
-con Xcode per la stessa revisione, perché non compila implicitamente l'app nativa.
+con Xcode per la stessa revisione. Non compila implicitamente l'app nativa.
 
 Le modifiche non committate impediscono la build di produzione e richiedono
 la scelta esplicita per sviluppo. Il riuso di un processo richiede la ricevuta
@@ -387,7 +387,7 @@ viene rifiutato.
 
 - Import diretto XLSX non disponibile: esportare in CSV UTF-8, con virgola o punto e virgola e mappatura esplicita.
 - Nessuna estrazione AI, attestazione normativa o aggiornamento clinico automatico.
-- Le fonti derivano da nome, versione e ambito. Una versione differente crea una fonte distinta. La migrazione non recupera collisioni già avvenute nelle versioni precedenti.
+- Fonti derivate da nome, versione e ambito. Una versione differente crea una fonte distinta. La migrazione non recupera collisioni già avvenute nelle versioni precedenti.
 - Originali aggiuntivi nel database locale, in chiaro, fino a 25 MiB ciascuno e 100 MiB totali (massimo 1.000). Nessuna cancellazione o sostituzione dalla UI.
 - Lo snapshot di provenienza è in chiaro e additivo nei DTO web/network, senza provenienza automatica per prescrizioni esistenti. Il client Apple attuale ignora lo snapshot di provenienza: non lo visualizza e non offre la gestione delle fonti.
 - Il collegamento all’originale richiede una sessione web autenticata e scarica il documento, senza un visualizzatore integrato. Il riferimento a pagina è dichiarato dall’operatore e non validato contro il contenuto.
