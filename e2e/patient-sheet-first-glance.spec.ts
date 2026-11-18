@@ -75,6 +75,27 @@ test('Riepilogo: il primo sguardo mostra identità, problemi, variazioni di tera
   await expect(page.locator('#patient-insight')).toBeVisible();
 });
 
+test('Riepilogo: tre zone affiancate in lettura, Quadro accanto alla voce in scrittura', async ({ page }) => {
+  const id = await syntheticPatient(page, { taxCode: `FZ${crypto.randomUUID().replaceAll('-', '').slice(0, 14).toUpperCase()}`, birthDate: '1950-05-05T00:00:00.000Z' });
+  await openSheet(page, id);
+  const edges = () => page.evaluate(() => {
+    const edge = (selector: string) => { const box = document.querySelector(selector)!.getBoundingClientRect(); return { left: box.left, right: box.right }; };
+    return { facts: edge('#quadro [data-zone="facts"]'), care: edge('#quadro [data-zone="care"]'), diary: edge('#diario'), sheet: edge('#quadro') };
+  });
+  const reading = await edges();
+  expect(reading.facts.right).toBeLessThanOrEqual(reading.diary.left);
+  expect(reading.diary.right).toBeLessThanOrEqual(reading.care.left);
+
+  await page.goto(`/patients/${id}/modules?voce=nuova`);
+  await unlockIfNeeded(page, pin);
+  await expect(page.locator('#diario')).toBeVisible();
+  await expect(page.locator('#quadro').getByRole('table', { name: 'Problemi' })).toBeVisible();
+  const writing = await edges();
+  expect(writing.sheet.right).toBeLessThanOrEqual(writing.diary.left);
+  expect(writing.facts.right).toBeLessThanOrEqual(writing.diary.left);
+  expect(writing.care.right).toBeLessThanOrEqual(writing.diary.left);
+});
+
 test('Terapie: indicazione, periodo e codici si leggono nella riga, e le sezioni restano raggiungibili', async ({ page }) => {
   const id = await syntheticPatient(page, { taxCode: `FG${crypto.randomUUID().replaceAll('-', '').slice(0, 14).toUpperCase()}`, birthDate: '1950-05-05T00:00:00.000Z' });
   await openSheet(page, id);
