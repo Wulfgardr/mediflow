@@ -204,7 +204,7 @@ rendere reperibili i contratti. «Proposto», «candidato» e «storico» qualif
 il documento o la prova nominati, non l’intero prodotto.
 
 <!-- @Codex MF085-002/003 -->
-- Scale cliniche source-bound e invio completo: [ADR 0118](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/adr/0118-tinetti-poma28-source-bound-submission.md) (candidato. Storico preservato, nessuna classificazione automatica del rischio per la nuova Tinetti).
+- Scale cliniche source-bound e invio completo: [ADR 0118](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/adr/0118-tinetti-poma28-source-bound-submission.md) (candidato, con storico preservato e nessuna classificazione automatica del rischio per la nuova Tinetti).
 
 - Contratto prodotto: [PRODUCT.md](../PRODUCT.md)
 - Contratto design multipiattaforma: [DESIGN.md](../DESIGN.md)
