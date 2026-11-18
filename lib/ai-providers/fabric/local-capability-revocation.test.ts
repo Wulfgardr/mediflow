@@ -1,8 +1,6 @@
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { createRequire } from 'node:module';
-import path from 'node:path';
 import test, { type TestContext } from 'node:test';
 import type { SmartImportProjection } from '../../smart-import-projection';
 import type { ProviderLifecycleRead } from './provider-lifecycle-service';
@@ -13,8 +11,7 @@ import { localProviderRegistry } from '../registry';
 import { createFunctionModelDispatch, functionModelBindingSettings, guardFunctionModelResolution, holdFunctionModelSession } from './function-model-dispatch';
 import { FUNCTION_SWITCH_KEYS, functionModelDigest, type FunctionModelId, type FunctionModelSources } from './function-model-preferences';
 
-const nodeRequire = createRequire(import.meta.url);
-const { createOwner } = nodeRequire(path.join(path.dirname(nodeRequire.resolve('@mediflow/web-auth-lifecycle-owner')), 'internal/owner.cjs'));
+import * as owner from '@mediflow/web-auth-lifecycle-owner';
 
 const at = '2026-10-26T10:00:00.000Z';
 const currentness = { selectionEpoch: 1, patientRevision: 1, projectionDigest: `sha256_${'a'.repeat(64)}`, capturedAt: at, verifiedAt: at };
@@ -70,17 +67,22 @@ async function syntheticOllama(t: TestContext, id: FunctionModelId) {
 }
 
 function session() {
-    const owner = createOwner();
     const control = owner.bootstrapControl();
+    assert.ok(control);
     const attempt = owner.begin('login', { controlId: control.controlId, ifMatch: control.etag, idempotencyKey: 'synthetic-idempotency-login-revocation' });
     const issued = owner.issue(attempt, { id: 'user.synthetic.revocation', username: ['clinician', 'synthetic', 'revocation'].join('.'), role: 'clinician' });
-    const current = () => owner.resolve(issued.sessionId, control.controlId);
-    const projection = current().projection;
+    assert.ok(issued);
+    const active = () => {
+        const resolution = owner.resolve(issued.sessionId, control.controlId);
+        return resolution.status === 'active' ? resolution.projection : null;
+    };
+    const projection = active();
+    assert.ok(projection);
     const digest = functionModelDigest(projection);
     return {
         owner, projection,
-        authenticate: async () => current().status === 'active' ? digest : null,
-        holdSession: async () => current().status === 'active' ? holdFunctionModelSession(owner, current().projection, digest) : null,
+        authenticate: async () => active() ? digest : null,
+        holdSession: async () => { const current = active(); return current ? holdFunctionModelSession(owner, current, digest) : null; },
         lock: () => owner.retire(projection, 'lock', { controlId: control.controlId, ifMatch: issued.etag, idempotencyKey: 'synthetic-idempotency-lock-revocation' }),
     };
 }
