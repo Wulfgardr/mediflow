@@ -90,3 +90,35 @@ Il processo comunica su standard input/output. Espone `mediflow_collega`,
 `mediflow_completa_collegamento`, `mediflow_ritira_mandato`, `mediflow_deposita_visita` e
 `mediflow_riprendi_visita`. CLI e MCP chiamano lo stesso client, con gli stessi
 permessi e ricevute. Standard output contiene soltanto il protocollo MCP.
+
+
+## Conferma di una singola visita su macOS
+
+Nel profilo Mac di prova, l'istanza locale va avviata con il riquadro nativo
+firmato e con una scheda Web sbloccata sullo stesso archivio. Il componente
+si compila da `native/AgentVisitConfirmation`. Chi prepara la distribuzione
+firma l'eseguibile con Hardened Runtime e identificatore
+`com.mediflow.agent-visit-confirmation`, poi configura nel runtime proprietario
+`MEDIFLOW_VISIT_CONFIRMATION_HELPER` con il percorso assoluto e
+`MEDIFLOW_VISIT_CONFIRMATION_HELPER_SHA256` con lo SHA-256 successivo alla firma
+e `MEDIFLOW_VISIT_CONFIRMATION_HELPER_CDHASH` con il valore `CDHash` della firma
+macOS. Il proprietario della scrittura verifica la firma del processo
+all'apertura del canale e quando riceve la conferma.
+
+Dalla chat, `mediflow_apri_conferma_visita` riceve il `visitId`.
+Quando MediFlow mostra il piano, controlla il paziente e le proposte, poi
+seleziona «Conferma la visita» per Touch ID o Apple Watch. «Usa la password
+del Mac» apre il dialogo di sistema con un vincolo sulla password dell'account.
+MediFlow valuta il vincolo `devicePasscode` con LocalAuthentication e riceve l'esito.
+Il server MCP del plugin usa il collegamento della visita depositata.
+`mediflow_esito_conferma_visita` riceve il visitId e il `reference` restituito
+dalla prima chiamata. Il server generico e la CLI usano l'identificativo
+dell'agente. Gli esiti sono `waiting`, `applied`, `not_applied`
+e `unavailable`. Se il riquadro è indisponibile, riprendi da «In arrivo».
+
+CLI equivalenti:
+
+```sh
+npm run agent:visita -- apri-conferma --agente UUID-AGENTE --visita UUID-VISITA
+npm run agent:visita -- esito-conferma --agente UUID-AGENTE --riferimento UUID-CONFERMA
+```

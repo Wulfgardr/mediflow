@@ -2008,6 +2008,28 @@
       ],
       "count": 1,
       "classification": "agent-visit-application"
+    },
+    {
+      "file": "app/api/agent/v1/confirmation/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "openDbServer"
+      ],
+      "count": 1,
+      "classification": "agent-pairing-host"
+    },
+    {
+      "file": "lib/agent-visit-confirmation.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "openDbServer"
+      ],
+      "count": 1,
+      "classification": "agent-visit-application"
     }
   ],
   "opaqueLoaders": [

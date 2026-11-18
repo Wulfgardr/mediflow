@@ -37,5 +37,13 @@ export function createAgentVisitMcpServer(directory?: string) {
         title: 'Riprendi un deposito', description: 'Ritenta le stesse buste cifrate della visita dopo un’interruzione.',
         inputSchema: z.object({ agentRef: z.string().uuid(), visitId: z.string().uuid() }).strict(), annotations: { ...annotations, idempotentHint: true },
     }, (args, context) => run({ command: 'riprendi', ...args }, context.mcpReq.signal));
+    server.registerTool('mediflow_apri_conferma_visita', {
+        title: 'Apri la conferma in MediFlow', description: 'Chiede a MediFlow di aprire il riquadro di una visita depositata. Il medico conferma nel riquadro.',
+        inputSchema: z.object({ agentRef: z.string().uuid(), visitId: z.string().uuid() }).strict(), annotations: { ...annotations, idempotentHint: true },
+    }, (args, context) => run({ command: 'apri-conferma', ...args }, context.mcpReq.signal));
+    server.registerTool('mediflow_esito_conferma_visita', {
+        title: 'Leggi l’esito della conferma', description: 'Legge lo stato usando il riferimento restituito da MediFlow.',
+        inputSchema: z.object({ agentRef: z.string().uuid(), reference: z.string().uuid() }).strict(), annotations: { ...annotations, readOnlyHint: true, idempotentHint: true },
+    }, (args, context) => run({ command: 'esito-conferma', ...args }, context.mcpReq.signal));
     return server;
 }
