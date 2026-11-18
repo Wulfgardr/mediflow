@@ -6,6 +6,7 @@ const pin = process.env.E2E_PIN || '1234';
 const authPath = (request: Request) => new URL(request.url()).pathname;
 const navigation = (page: Page) => page.getByRole('navigation', { name: 'Navigazione principale', exact: true });
 const renewButton = (page: Page) => page.getByRole('button', { name: 'Rinnova accesso', exact: true });
+const lockAll = (page: Page) => page.getByRole('button', { name: 'Blocca tutte le schede', exact: true });
 const pinField = (page: Page) => page.getByLabel('PIN operatore', { exact: true });
 
 function deferred() {
@@ -48,7 +49,7 @@ test('a restored PIN session can open and reload patient import without another 
   expect(authMutations).toEqual([]);
 });
 
-test('an active session without the tab key needs explicit renewal and waits for its real lock receipt', async ({ page }) => {
+test('an explicit lock of all tabs waits for its real receipt before PIN entry', async ({ page }) => {
   const { sibling, mutations, errors } = await openSibling(page);
   const consoleErrors: string[] = [];
   sibling.on('console', message => { if (message.type() === 'error') consoleErrors.push(message.text()); });
@@ -77,13 +78,14 @@ test('an active session without the tab key needs explicit renewal and waits for
     expect((await page.request.get('/api/patients')).status()).toBe(200);
     await expect(navigation(page)).toBeVisible();
 
-    await renewButton(sibling).click();
+    await lockAll(sibling).click();
     await received.promise;
-    await expect(sibling.getByRole('status')).toHaveText('Sto chiudendo la sessione precedente…');
+    await expect(sibling.getByRole('status')).toHaveText('Verifica dell’accesso…');
     await expect(sibling.locator('form')).toHaveAttribute('aria-busy', 'true');
     await expect(pinField(sibling)).toBeDisabled();
     await expect(sibling.locator('button[type="submit"]')).toBeDisabled();
     await expect(renewButton(sibling)).toBeDisabled();
+    await expect(lockAll(sibling)).toBeDisabled();
     await sibling.keyboard.press('Enter');
     expect(mutations.map(authPath)).toEqual(['/api/auth/lock']);
 
@@ -108,24 +110,24 @@ test('an active session without the tab key needs explicit renewal and waits for
   }
 });
 
-test('failed renewal keeps the PIN disabled and requires another explicit successful recovery', async ({ page }) => {
+test('a failed explicit lock keeps the PIN disabled until a confirmed lock', async ({ page }) => {
   const { sibling, mutations, errors } = await openSibling(page);
   const failedPaths: string[] = [];
   sibling.on('requestfailed', request => failedPaths.push(authPath(request)));
   await sibling.route('**/api/auth/lock', route => route.abort('failed'));
   try {
-    await renewButton(sibling).click();
+    await lockAll(sibling).click();
     await expect(sibling.getByRole('status')).toContainText('Chiusura della sessione non confermata');
     await expect(sibling.locator('form')).toHaveAttribute('aria-busy', 'false');
     await expect(pinField(sibling)).toBeDisabled();
     await expect(sibling.locator('button[type="submit"]')).toBeDisabled();
-    await expect(renewButton(sibling)).toBeEnabled();
+    await expect(lockAll(sibling)).toBeEnabled();
     expect(mutations.map(authPath)).toEqual(['/api/auth/lock', '/api/auth/lock']);
     expect(failedPaths).toEqual(['/api/auth/lock', '/api/auth/lock']);
     expect((await page.request.get('/api/patients')).status()).toBe(200);
 
     await sibling.unrouteAll({ behavior: 'wait' });
-    await renewButton(sibling).click();
+    await lockAll(sibling).click();
     await expect(pinField(sibling)).toBeEnabled();
     expect(mutations.filter(request => authPath(request) === '/api/auth/login')).toHaveLength(0);
     await unlockIfNeeded(sibling, pin);

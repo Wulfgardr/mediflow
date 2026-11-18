@@ -140,7 +140,7 @@ async function holdRealResponse(
   }
 }
 
-test('real renewal: required/pending, short and wrong PIN, loading and focus recovery', async ({ page, browserName }) => {
+test('explicit lock and PIN recovery: required/pending, short and wrong PIN, loading and focus recovery', async ({ page, browserName }) => {
   expect(browserName, 'Response-gated negative case requires Chromium/CDP; it must not silently skip').toBe('chromium');
   const key = await openLegacyPinArchive(page, ALPHANUMERIC_PIN);
   const context = page.context();
@@ -158,6 +158,7 @@ test('real renewal: required/pending, short and wrong PIN, loading and focus rec
     const form = shell.locator('form');
     const input = reopened.getByLabel('PIN operatore', { exact: true });
     const renew = reopened.getByRole('button', { name: 'Rinnova accesso', exact: true });
+    const lockAll = reopened.getByRole('button', { name: 'Blocca tutte le schede', exact: true });
     const submit = shell.locator('button[type="submit"]');
     await expect(reopened.getByText('Una sessione è già attiva. Rinnova l’accesso per usare questa scheda.', { exact: true })).toBeVisible();
     await expect(input).toBeDisabled();
@@ -165,14 +166,18 @@ test('real renewal: required/pending, short and wrong PIN, loading and focus rec
     await expect(renew).toBeEnabled();
     await form.evaluate((element: HTMLFormElement) => element.requestSubmit());
     expect(loginRequests).toEqual([]);
+    await renew.click();
+    await expect(reopened.getByText('Apri una scheda già sbloccata oppure blocca tutte le schede per accedere di nuovo.', { exact: true })).toBeVisible();
+    await expect(input).toBeDisabled();
 
     const receipt = await holdRealResponse(reopened, '/api/auth/lock', 200,
-      () => renew.click(), async () => {
+      () => lockAll.click(), async () => {
         await expect(form).toHaveAttribute('aria-busy', 'true');
         await expect(input).toBeDisabled();
         await expect(submit).toBeDisabled();
         await expect(renew).toBeDisabled();
-        await expect(reopened.getByText('Sto chiudendo la sessione precedente…', { exact: true })).toBeVisible();
+        await expect(lockAll).toBeDisabled();
+        await expect(reopened.getByText('Verifica dell’accesso…', { exact: true })).toBeVisible();
         await reopened.keyboard.press('Enter');
         await form.evaluate((element: HTMLFormElement) => element.requestSubmit());
         expect(loginRequests).toEqual([]);

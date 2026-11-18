@@ -233,7 +233,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             if (lockReceiptGenerationRef.current !== receiptGeneration) return;
             updateAuthRecoveryState(confirmed ? 'ready' : 'failed');
             if (!confirmed && authorityAttemptGenerationRef.current === attemptGeneration) {
-                setAuthErrorMessage('Chiusura della sessione non confermata. Rinnova di nuovo l’accesso.');
+                setAuthErrorMessage('Chiusura della sessione non confermata. Riprova il blocco.');
             }
         };
         // The revocation fence must overtake any in-flight or queued login/setup request.
@@ -348,12 +348,17 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         updateAuthRecoveryState('pending');
         setAuthErrorMessage(null);
         let health;
-        try { health = await checkAuthHealthRequest({ fresh: true }); } catch {
-            if (authorityAttemptGenerationRef.current === attempt) updateAuthRecoveryState('failed');
+        try {
+            health = await checkAuthHealthRequest({ fresh: true });
+            if (!health.response.ok || health.controlState !== 'accepted' || health.payload?.status !== 'ok') throw new Error('AUTH_CHECK_FAILED');
+        } catch {
+            if (authorityAttemptGenerationRef.current === attempt) {
+                updateAuthRecoveryState('required');
+                setAuthErrorMessage('Verifica dell’accesso non riuscita. Riprova.');
+            }
             return;
         }
         if (authorityAttemptGenerationRef.current !== attempt) return;
-        if (!health.response.ok || health.controlState !== 'accepted' || health.payload?.status !== 'ok') { updateAuthRecoveryState('failed'); return; }
         if (health.payload.hasSession === false) { updateAuthRecoveryState('ready'); return; }
         const shared = await tabKeyShareRef.current?.request();
         if (authorityAttemptGenerationRef.current !== attempt) return;
