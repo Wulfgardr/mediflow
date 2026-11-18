@@ -16,20 +16,19 @@ read_when:
 <a id="purpose"></a>
 ## Finalità
 
-MediFlow è uno spazio di lavoro clinico aperto e gratuito, nato dalle
-difficoltà operative che i medici incontrano ogni giorno. Il suo scopo è
-ridurre i passaggi evitabili per ritrovare un’informazione, registrarla o
-preparare una decisione, senza cancellare la complessità del caso e senza
-separare i dati dalla provenienza, dalla riservatezza o dalla responsabilità
-professionale.
+Ho creato MediFlow come spazio di lavoro clinico aperto e gratuito, a partire
+dalle difficoltà operative che i medici incontrano ogni giorno. Vorrei ridurre
+i passaggi evitabili per ritrovare un’informazione, registrarla o preparare una
+decisione, rispettando la complessità del caso e mantenendo insieme i dati, la
+loro provenienza, la riservatezza e la responsabilità professionale.
 
-Si parte dunque dal lavoro, non dall’AI. Cartelle, strumenti deterministici e
-documenti devono restare utili anche quando tutti i provider siano spenti.
-La scelta modulare permette di aggiungere funzioni solo dove servano, senza
-imporre un servizio esterno per rendere utilizzabile il gestionale. Questa
+Parto dal lavoro: non è l’AI a determinarlo. Cartelle, strumenti deterministici e documenti devono
+restare utili anche quando tutti i provider sono spenti. Ho scelto una struttura
+modulare per aggiungere funzioni solo dove servono, senza imporre un servizio esterno
+per rendere utilizzabile il gestionale. Questa
 attenzione riguarda anche contesti a risorse limitate, ma non definisce una
 soglia hardware verificata. Il progetto intende rimanere aperto e gratuito,
-così che altri possano studiarlo, discuterlo e contribuire; hardware e servizi
+così che altri possano studiarlo, discuterlo e contribuire. Hardware e servizi
 opzionali di terzi mantengono costi e condizioni propri.
 
 <a id="center-and-laboratory"></a>
@@ -39,21 +38,21 @@ Dall'8 novembre 2026 ([ADR 0185](./docs/adr/0185-rotta-di-mediflow.md)) MediFlow
 cartella dei pazienti che il sistema non vede**. Il riferimento è la medicina territoriale nelle Case di
 Comunità e a domicilio, con due tipi di pazienti:
 
-- persone senza documenti o senza codice fiscale, a volte senza STP o ENI;
+- persone senza documenti o senza codice fiscale, a volte senza STP o ENI
 - persone senza medico di famiglia, incontrate spesso in una fase acuta su cronica.
 
 Sono pazienti che tornano. La loro storia clinica deve essere durevole, tracciabile, ben codificata
-ed esportabile in un formato comune. Il prodotto è fatto prima di tutto per questo lavoro ed è aperto a
-chiunque faccia lo stesso lavoro altrove.
+ed esportabile in un formato comune. Ho fatto il prodotto prima di tutto per questo lavoro e l'ho
+aperto a chiunque faccia lo stesso lavoro altrove.
 
 MediFlow resta anche un laboratorio intelligente. La codifica dei dati e i percorsi dell'app devono
 permettere sempre un'ampia operabilità automatizzata da parte di agenti e di strumenti futuri. L'app
-funziona anche senza alcun modello. L'intelligenza la porta chi la usa.
+funziona anche senza alcun modello. Chi la usa mette a disposizione la propria intelligenza.
 
 <a id="audience-and-setting"></a>
 ## A chi si rivolge e in quale lavoro
 
-Il riferimento principale sono i medici della sanità territoriale italiana.
+Mi rivolgo soprattutto ai medici della sanità territoriale italiana.
 In un’attività interrotta di frequente e condizionata dal tempo disponibile,
 occorre recuperare fatti, aggiungere informazioni e preparare il seguito
 senza perdere la fonte clinica o confondere il contesto di un paziente con
@@ -63,15 +62,15 @@ quello di un altro.
 ## Compiti essenziali
 
 Il lavoro segue tre passaggi: **ritrovare** il paziente e l’informazione che
-risponde alla domanda presente; **registrare** fatti strutturati, note,
+risponde alla domanda presente, **registrare** fatti strutturati, note,
 documenti, terapie, osservazioni e attività pendenti con una provenienza
-chiara; **preparare** gli elementi per la decisione del medico. Quest’ultimo
+chiara, **preparare** gli elementi per la decisione del medico. Quest’ultimo
 passaggio non significa prescrivere, diagnosticare autonomamente o inventare
 un’azione che non abbia riscontro nelle fonti.
 
 Ricerca, tocco, tastiera, controlli strutturati e voce possono essere ingressi
-diversi nella stessa funzione. Non occorre che le interfacce siano identiche;
-devono invece conservare significato clinico, evidenze, autorità e azioni
+diversi nella stessa funzione. Non occorre che le interfacce siano identiche.
+Devono conservare significato clinico, evidenze, autorità e azioni
 consentite.
 
 <a id="platform-roles-in-the-08-line"></a>
@@ -79,7 +78,7 @@ consentite.
 
 Questi sono i ruoli del disegno di prodotto, non un elenco di applicazioni
 complete distribuite. La release sorgente 0.8.6 riguarda il runtime locale e
-headless sul Mac, con interfaccia browser localhost; il client nativo segue
+headless sul Mac, con interfaccia browser localhost. Il client nativo segue
 un percorso separato.
 
 | Superficie | Ruolo |
@@ -91,7 +90,7 @@ un percorso separato.
 
 iOS e iPadOS condividono un’app universale nel disegno Apple, adattando layout,
 multitasking, tastiera, puntatore e densità al dispositivo. macOS adotta le
-convenzioni desktop native; localhost quelle del Web. La parità riguarda
+convenzioni desktop native. Localhost segue quelle del Web. La parità riguarda
 funzioni equivalenti e significato clinico entro il ruolo dichiarato, non
 l’identità dei pixel. Non ne deriva una qualifica delle app mobili o della
 distribuzione nativa della 0.8.6.
@@ -100,7 +99,7 @@ distribuzione nativa della 0.8.6.
 ## Come il prodotto parla a chi lo usa
 
 L’interfaccia deve essere calma, precisa e diretta. Le etichette nominano il
-fatto clinico o l’azione; quando un contenuto manca, è in caricamento, non è
+fatto clinico o l’azione. Quando un contenuto manca, è in caricamento, non è
 raggiungibile, è superato, entra in conflitto o viene negato, il messaggio deve
 spiegare che cosa sia accaduto e che cosa si possa fare.
 
@@ -115,7 +114,7 @@ ma non ne attenua le condizioni.
 
 Il funzionamento locale è l’impostazione iniziale: nessun cloud, telemetria o
 invio di dati è attivo per default. Il Mac è il nodo autorevole, la
-`home-base`; i client mobili vi accedono tramite pairing esplicito e API locale
+`home-base`. I client mobili vi accedono tramite pairing esplicito e API locale
 versionata. Cartella, terminologie, dati di riferimento e flussi deterministici
 non dipendono dall’AI. Per lo stato delle singole funzioni prevale la matrice
 di parità, letta con le date e le revisioni delle sue evidenze.
@@ -149,7 +148,7 @@ I servizi esterni restano disattivati per default.
 
 **Il percorso documentale** inizia con AnyDoc, prima estrazione automatica
 locale degli allegati. Sul Mac Apple Vision elabora soltanto le pagine PDF
-supportate contrassegnate `needsOcr`; il risultato resta legato alla fonte,
+supportate contrassegnate `needsOcr`. Il risultato resta legato alla fonte,
 da rivedere e bloccato in caso di controlli non superati. Immagini dirette e
 input non supportati richiedono revisione manuale. La capability Fabric `ocr`
 separata resta indisponibile, e le vecchie route OCR autenticate rispondono
@@ -158,7 +157,7 @@ separata resta indisponibile, e le vecchie route OCR autenticate rispondono
 
 **L’accesso senza interfaccia grafica** passa dai servizi applicativi nominati
 di MediFlow. Nel percorso locale introdotto con la 0.8.5, un Supervisor Node
-fidato avvia Web e MCP come figli separati; MCP usa il canale AIP RPC ereditato
+fidato avvia Web e MCP come figli separati. MCP usa il canale AIP RPC ereditato
 e non accede direttamente a SQLite. Mini aveva allora catalogo tipizzato e
 base CLI, senza avvio di produzione dal Supervisor e senza permessi in assenza
 di un canale AIP parent. Il raccordo successivo WUL-696 aggiunge quella sessione
@@ -178,7 +177,7 @@ Su macOS 26 o successivo, il percorso di registrazione visita usa acquisizione
 e trascrizione Apple sul dispositivo, consenso esplicito, audio limitato in
 RAM e revisione del testo. Non ha uno scrittore clinico automatico. Le prove
 con microfono reale e la validazione clinica restano fuori dall’affermazione
-storica 0.8.5; qui non vengono promosse alla 0.8.6.
+storica 0.8.5. Qui non vengono promosse alla 0.8.6.
 
 SISS e FSE restano passaggi assistiti documentati: MediFlow non dichiara
 sincronizzazione regionale nativa o writeback. Il comportamento mobile offline
@@ -191,7 +190,7 @@ coordinamento generale in WUL-669.
 <a id="anti-goals"></a>
 ## Ciò che MediFlow non deve fare
 
-MediFlow non sostituisce il giudizio o la responsabilità del medico; non
+MediFlow non sostituisce il giudizio o la responsabilità del medico. Non
 prescrive, non formula diagnosi autonome, non esegue triage e non interpreta
 in modo conclusivo le immagini. Non deve nascondere incertezza, provenienza,
 conflitti o informazioni mancanti, né richiedere un provider AI per il lavoro
@@ -209,7 +208,7 @@ si dichiarano senza evidenze specifiche.
 Il progetto riesce nel suo intento quando un medico raggiunge le informazioni
 pertinenti con meno passaggi evitabili, continuando a vederne fonte e attualità.
 I controlli devono rendere comprensibile il proprio scopo e attivare il servizio
-e lo stato documentati; gli adattamenti fra piattaforme devono conservare il
+e lo stato documentati. Gli adattamenti fra piattaforme devono conservare il
 medesimo significato clinico.
 
 L’interfaccia deve restare utilizzabile alle dimensioni e con le impostazioni
@@ -222,10 +221,10 @@ verificare con test sintetici, senza usare dati di pazienti reali.
 
 Il sorgente 0.8.5 comprendeva un’implementazione circoscritta della Fabric
 per quattro funzioni `proposal_only`. Non attestava un’interfaccia generale
-per agenti o disponibilità cloud; i risultati non potevano applicarsi
+per agenti o disponibilità cloud. I risultati non potevano applicarsi
 automaticamente alla cartella. Il modello
 provider v2 separa tipo, istanza, autenticazione, modello, capability, gruppi,
-binding e allowlist delle funzioni; distingue inoltre modelli locali, chiavi
+binding e allowlist delle funzioni. Distingue inoltre modelli locali, chiavi
 API, OAuth ufficiale del provider e abbonamenti dell’host. Gli adapter OpenAI
 e Anthropic restano `default OFF`: il codice non prova credenziali live,
 politiche dell’account, conservazione o disponibilità del servizio.
@@ -237,7 +236,7 @@ ricomposizione che si blocchi se non sicura e prova che i dati rimangano nel
 processo locale. La sua assenza non blocca la 0.8.5.
 
 Restano due modalità distinte: un provider può lavorare dentro la Fabric,
-sotto il governo di MediFlow; oppure un host intelligente può invocare,
+sotto il governo di MediFlow. Un host intelligente può invece invocare,
 tramite MCP e Supervisor, soltanto i servizi MediFlow nominati. La base Mini
 della 0.8.5 e il successivo raccordo WUL-696 vanno letti nelle rispettive
 revisioni, non come una promessa di compatibilità universale o autorità
