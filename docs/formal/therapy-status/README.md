@@ -10,6 +10,16 @@ sono una prova TLA né un'estensione implicita degli invarianti legacy sottostan
 
 Il recovery cifrato supporta lo schema corrente 16 e i predecessori canonici 3, 4, 5, 6, 9, 10, 11, 12, 13, 14 e 15; le prove di compatibilità sono esterne a TLC, che non copre schema, migrazione, cifratura o ricevute. Restano aperte la verifica verticale Rust-host e quella della GUI.
 
+## Raccordo del 18 novembre 2026: riga della tabella Terapie
+
+La tabella mostra indicazione, diagnosi collegata, periodo e codici nella
+riga, senza la disclosure «Dettagli terapia». Nel form, «Principio attivo» e
+«Collegamento clinico» sono associati ai loro campi. Cambia solo la
+presentazione: comandi di riga, conferma, controller del cambio di stato,
+CAS e ricevute sono gli stessi. Il conflitto fra due sessioni è stato
+riprovato a mano prima e dopo, con lo stesso esito. Le transizioni della
+terapia restano quelle del modello esistente.
+
 ## Raccordo schema 16 del 18 novembre 2026
 
 Le due tabelle di ADR 0190 registrano client e mandati emessi allo sblocco.
