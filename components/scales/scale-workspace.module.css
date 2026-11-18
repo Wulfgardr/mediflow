@@ -91,16 +91,14 @@
 .draftSummary { min-width: 0; padding-left: 24px; border-left: 1px solid var(--lume-rule); font-size: 0.8125rem; }
 .draftSummary h3 { margin: 0; font: 600 0.875rem/1.5 var(--lume-font-sans); }
 .draftSummary > p { margin: 12px 0; }
-.draftState { color: var(--lume-ink-fresh); }
 .draftSummary .score { color: var(--lume-ink-fresh); font: var(--type-threshold); font-variant-numeric: tabular-nums; }
 .draftSummary dl { margin: 20px 0; }
 .draftSummary dl > div { padding: 10px 0; border-top: 1px solid var(--lume-rule); }
 .draftSummary dt { color: var(--lume-ink-muted); }
 .draftSummary dd { margin: 4px 0 0; color: var(--lume-ink-fresh); }
-.source { color: var(--lume-ink-muted); }
+.shortcuts { margin: 12px 0 0; color: var(--lume-ink-muted); font-size: 0.8125rem; }
 .actions { position: sticky; bottom: 0; z-index: 2; background: var(--lume-surface-focal); padding: 16px 0; }
 .thresholdContext { display: grid; gap: 3px; margin-right: auto; font-size: 0.8125rem; }
-.thresholdContext > span { color: var(--lume-ink-muted); }
 @media(max-width:700px) { .formColumns { grid-template-columns: minmax(0,1fr); gap: 28px; } .draftSummary { border-left: 0; border-top: 1px solid var(--lume-rule); padding: 20px 0 0; } .thresholdContext { flex-basis: 100%; } }
 
 .answerDetails summary { min-height: 44px; padding: 12px 0; cursor: pointer; }

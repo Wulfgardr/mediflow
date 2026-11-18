@@ -3,6 +3,9 @@ import test from 'node:test';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import * as metadata from '../lib/patient-diary-metadata.ts';
+import * as scaleHistory from '../lib/scale-history.ts';
+import { prepareScaleSubmission } from '../lib/scale-submission.ts';
+import { TINETTI_POMA28 } from '../lib/scales/tinetti-poma28-v1.ts';
 import { element, find, mountContract, text } from './settings/settings-presentation.test-support.ts';
 
 const createdAt = new Date('2026-11-07T14:35:00Z');
@@ -12,7 +15,7 @@ function render(recordedBy?: string | null, extra: Record<string, unknown> = {})
             type: 'visit', title: 'Controllo sintetico', content: 'Testo clinico sintetico',
             date: new Date('2020-01-01T08:00:00Z'), createdAt, recordedBy, ...extra } },
         imports: {
-            'date-fns': { format }, 'date-fns/locale': { it }, '@/lib/scale-history': { scaleHistoryNotice: () => null },
+            'date-fns': { format }, 'date-fns/locale': { it }, '@/lib/scale-history': scaleHistory,
             '@/lib/db': {}, '@/components/ui/button': { Button: (props: Record<string, unknown>) => element('button', props) },
             '@/components/patient-sheet-menu': {}, '@/components/ui/lume-filo': {},
             '@/components/ui/ink-state': { InkState: (props: Record<string, unknown>) =>
@@ -25,6 +28,28 @@ function render(recordedBy?: string | null, extra: Record<string, unknown> = {})
     }).render();
 }
 const timestamp = `il ${format(createdAt, 'dd MMMM yyyy', { locale: it })} alle ${format(createdAt, 'HH:mm', { locale: it })}`;
+
+test('la scheda riassume il POMA-28 registrato e conserva testo e versione nei dettagli', () => {
+    const stored = prepareScaleSubmission(TINETTI_POMA28.id, Object.fromEntries(
+        TINETTI_POMA28.questions.map(question => [question.id, 0]),
+    ));
+    const tree = render(undefined, { type: 'scale', ...stored, content: `${stored.content}\nOsservazione sintetica registrata.` });
+    const ordinaryView = text(tree, false);
+    assert.match(ordinaryView, /Tinetti POMA-28\s+Punteggio\s+0\/28/u);
+    assert.equal((ordinaryView.match(/Tinetti POMA-28/gu) ?? []).length, 1);
+    assert.doesNotMatch(ordinaryView, /Osservazione sintetica|\(v1\)|mediflow\.poma28|Valutazione Tinetti/u);
+    assert.match(text(tree), /mediflow\.poma28\.nonclassification\.v1\s+Osservazione sintetica registrata\./u);
+});
+
+test('la scheda storica mostra la valutazione registrata senza attribuirle il denominatore POMA-28', () => {
+    const tree = render(undefined, { type: 'scale', title: 'Tinetti', content: 'Punteggio registrato: 17',
+        metadata: { scaleId: 'tinetti', score: 17, interpretation: 'Interpretazione storica sintetica' } });
+    const ordinaryView = text(tree, false);
+    assert.match(ordinaryView, /Punteggio\s+17\s+Interpretazione storica sintetica/u);
+    assert.match(ordinaryView, /Provenienza non verificabile/u);
+    assert.doesNotMatch(ordinaryView, /17\/28|Punteggio registrato/u);
+    assert.match(text(tree), /Punteggio registrato: 17/u);
+});
 
 test('la voce registrata mostra autore del server e orario di registrazione con punto asciutto', () => {
     const tree = render('Ada Sintetica', { metadata: { authorName: 'Nome nei metadati' } });
