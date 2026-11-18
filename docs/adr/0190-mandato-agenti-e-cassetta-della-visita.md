@@ -45,6 +45,26 @@ canale loopback, senza fidarsi di indirizzi dichiarati dal chiamante. Il
 proxy LAN non le inoltra. CLI e futuro MCP usano lo stesso contratto, senza
 accesso diretto a SQLite, cookie, PIN o master key.
 
+### Rinnovo allo sblocco
+
+Il medico può scegliere «Rinnova allo sblocco» quando approva il codice di
+un client, confermando col PIN il perimetro, il fornitore e l’eventuale
+passaggio di documenti e trascrizioni già scelti. Dal successivo sblocco
+con passphrase, la scheda che ha aperto la chiave conferma il gesto nella
+sessione Web che lo ha autorizzato. Per ogni registrazione attiva il
+server emette un mandato di 12 ore con le operazioni approvate per quel
+client. Riusa la chiave pubblica e l’involucro registrati. Alla conferma
+dello sblocco viaggia soltanto una ricevuta opaca legata alla sessione.
+
+La credenziale di registrazione consente al client di ritirare il token
+di deposito del mandato corrente sul loopback. Blocco della sessione,
+scadenza, nuova emissione e revoca negano richieste con il token precedente.
+La revoca della registrazione in Agenti impedisce anche le emissioni
+successive. Il trasferimento della chiave fra schede e il ripristino
+di una sessione non prolungano il mandato. L’audit lega registrazione,
+medico, mandato e fornitore al rinnovo. Le regole di applicazione
+della cassetta descritte qui sotto valgono anche per questi mandati.
+
 ## Deposito e identità
 
 Ogni visita ha una cassetta separata con identità durevole e revisione.

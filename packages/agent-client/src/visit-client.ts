@@ -2,9 +2,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
 import { createHash, randomUUID } from 'node:crypto';
-import { agentPrivateDirectory, readAgentCredential, saveAgentCredential, type AgentCredential } from './credentials';
+import { agentPrivateDirectory, readAgentCredential, readAgentRegistration, saveAgentCredential, saveAgentRegistration, type AgentCredential } from './credentials';
 import { sealAgentItemNode } from './cassette-crypto';
-import { AGENT_OPERATIONS, type AgentOperation } from '../../../lib/agent-mandate-contract';
+import { AGENT_OPERATIONS, MANDATE_MAX_DURATION_MS, type AgentOperation } from '../../../lib/agent-mandate-contract';
 import { AGENT_ITEM_OPERATION, cassetteItems, type AgentCassetteItem } from '../../../lib/agent-cassette-contract';
 import { AGENT_MAX_ITEM_BYTES, isAgentId, validAgentEnvelope, type AgentEnvelope } from '../../../lib/agent-cassette-crypto';
 import { parsePreparedExtraction, DOSSIER_PREPARED_MAX_BYTES } from '../../../lib/domain/documents/dossier-prepared';
@@ -23,10 +23,10 @@ export function agentOrigin(value: string): string {
         return url.origin;
     } catch { throw invalid(); }
 }
-export function agentRequest(origin: string, endpoint: '/api/agent/v1/context' | '/api/agent/v1/visits' | '/api/agent/v1/pairings' | `/api/agent/v1/pairings?requestId=${string}`, authorization?: string, body?: unknown, signal?: AbortSignal): Promise<Record<string, unknown>> {
+export function agentRequest(origin: string, endpoint: '/api/agent/v1/context' | '/api/agent/v1/mandate' | '/api/agent/v1/visits' | '/api/agent/v1/pairings' | `/api/agent/v1/pairings?requestId=${string}`, authorization?: string, body?: unknown, signal?: AbortSignal): Promise<Record<string, unknown>> {
     if (signal?.aborted) throw new AgentClientError('AGENT_CANCELLED');
     agentOrigin(origin);
-    if (!/^\/api\/agent\/v1\/(?:context|visits|pairings(?:\?requestId=[a-f0-9-]{36})?)$/u.test(endpoint)) throw invalid();
+    if (!/^\/api\/agent\/v1\/(?:context|mandate|visits|pairings(?:\?requestId=[a-f0-9-]{36})?)$/u.test(endpoint)) throw invalid();
     const payload = body === undefined ? null : Buffer.from(JSON.stringify(body));
     if (payload && payload.length > 24 * 1024 * 1024) throw invalid();
     return new Promise((resolve, reject) => {
@@ -104,11 +104,37 @@ export async function completeAgentPairing(directory: string, requestId: string,
     const receipt = value.receipt, issued = value.credential;
     if (!record(receipt) || receipt.requestId !== requestId) throw new AgentClientError('AGENT_HTTP_UNAVAILABLE');
     if (receipt.status === 'pending' && issued === null) return { requestId, status: 'pending' as const };
+    if (receipt.status === 'registered' && receipt.agentRef === requestId && issued === null) {
+        const registration = value.registrationCredential;
+        if (!record(registration) || typeof registration.token !== 'string' || !/^mfr_[A-Za-z0-9_-]{43}$/u.test(registration.token))
+            throw new AgentClientError('AGENT_HTTP_UNAVAILABLE');
+        saveAgentRegistration(directory, { agentRef: requestId, token: registration.token, origin: state.origin });
+        return { agentRef: requestId, status: 'registered' as const };
+    }
     if (receipt.status !== 'approved' || receipt.agentRef !== requestId || !isAgentId(receipt.mandateRef) || !record(issued)
         || typeof issued.token !== 'string' || !Number.isSafeInteger(issued.expiresAt)) throw new AgentClientError('AGENT_HTTP_UNAVAILABLE');
     saveAgentCredential(directory, { agentRef: requestId, mandateRef: receipt.mandateRef, token: issued.token, expiresAt: Number(issued.expiresAt), origin: state.origin });
     return { agentRef: requestId, mandateRef: receipt.mandateRef, status: 'approved' as const, expiresAt: issued.expiresAt };
 }
+async function retrieveMandate(directory: string, agentRef: string, signal?: AbortSignal) {
+    const registration = readAgentRegistration(directory, agentRef);
+    if (!registration) throw new AgentClientError('AGENT_ACCESS_DENIED', 401);
+    const value = await agentRequest(registration.origin, '/api/agent/v1/mandate', 'Bearer ' + registration.token, undefined, signal);
+    const receipt = value.receipt, issued = value.credential;
+    if (!record(receipt) || receipt.agentRef !== agentRef || !isAgentId(receipt.mandateRef)
+        || typeof receipt.issuedAt !== 'number' || typeof receipt.expiresAt !== 'number' || !Number.isSafeInteger(receipt.issuedAt)
+        || !Number.isSafeInteger(receipt.expiresAt) || receipt.expiresAt <= Date.now()
+        || receipt.expiresAt - receipt.issuedAt !== MANDATE_MAX_DURATION_MS
+        || !record(issued) || typeof issued.token !== 'string' || !/^mfa_[A-Za-z0-9_-]{43}$/u.test(issued.token))
+        throw new AgentClientError('AGENT_HTTP_UNAVAILABLE');
+    const access = { agentRef, mandateRef: receipt.mandateRef, expiresAt: receipt.expiresAt, token: issued.token, origin: registration.origin };
+    saveAgentCredential(directory, access);
+    return { access, receipt: { agentRef, mandateRef: access.mandateRef, issuedAt: receipt.issuedAt, expiresAt: access.expiresAt } };
+}
+export async function retrieveAgentMandate(directory: string, agentRef: string, signal?: AbortSignal) {
+    return (await retrieveMandate(directory, agentRef, signal)).receipt;
+}
+
 export type AgentVisitPlan = { version: 1; inputFingerprint: string; agentRef: string; mandateRef: string; visitId: string; anchor: AgentEnvelope; items: AgentCassetteItem[] };
 function readSource(file: string, max: number): Buffer {
     let fd: number | undefined;
@@ -172,9 +198,8 @@ function visitPlan(value: unknown): value is AgentVisitPlan {
         || ![value.agentRef, value.mandateRef, value.visitId].every(isAgentId) || !validAgentEnvelope(value.anchor) || !Array.isArray(value.items)) return false;
     try { cassetteItems({ itemsCiphertext: JSON.stringify(value.items) }); return true; } catch { return false; }
 }
-async function depositAgentVisit(directory: string, plan: AgentVisitPlan, signal?: AbortSignal) {
-    if (!visitPlan(plan)) throw new AgentClientError('AGENT_STATE_INVALID');
-    const access = credential(directory, plan.agentRef);
+async function depositAgentVisit(access: AgentCredential, plan: AgentVisitPlan, signal?: AbortSignal) {
+    if (!visitPlan(plan) || access.agentRef !== plan.agentRef) throw new AgentClientError('AGENT_STATE_INVALID');
     if (access.mandateRef !== plan.mandateRef) throw new AgentClientError('AGENT_STATE_INVALID');
     const call = async (body: unknown) => {
         const value = await agentRequest(access.origin, '/api/agent/v1/visits', 'Bearer ' + access.token, body, signal);
@@ -190,8 +215,16 @@ async function depositAgentVisit(directory: string, plan: AgentVisitPlan, signal
     return call({ operation: 'visita.chiudi', visitId: plan.visitId, expectedRevision: receipt.revision });
 }
 export async function prepareAndDepositAgentVisit(directory: string, agentRef: string, extraction: string, fiscalCode: string, transcription?: string, visitId?: string, signal?: AbortSignal) {
-    const access = credential(directory, agentRef);
-    const context = await agentRequest(access.origin, '/api/agent/v1/context', 'Bearer ' + access.token, undefined, signal);
+    const readContext = (access: AgentCredential) => agentRequest(access.origin, '/api/agent/v1/context', 'Bearer ' + access.token, undefined, signal);
+    const cached = readAgentCredential(directory, agentRef);
+    let access = cached ?? (await retrieveMandate(directory, agentRef, signal)).access;
+    let context;
+    try { context = await readContext(access); }
+    catch (error) {
+        if (!cached || !(error instanceof AgentClientError) || error.status !== 401 || !readAgentRegistration(directory, agentRef)) throw error;
+        access = (await retrieveMandate(directory, agentRef, signal)).access;
+        context = await readContext(access);
+    }
     if (context.agentRef !== agentRef || context.mandateRef !== access.mandateRef || typeof context.publicKey !== 'string' || !Array.isArray(context.operations)) throw new AgentClientError('AGENT_HTTP_UNAVAILABLE');
     let plan = prepareAgentVisit(context.publicKey, agentRef, access.mandateRef, extraction, fiscalCode, transcription, visitId);
     if (!['visita.apri', 'visita.chiudi', ...plan.items.map(item => AGENT_ITEM_OPERATION[item.kind])].every(operation => (context.operations as unknown[]).includes(operation))) throw new AgentClientError('AGENT_ACCESS_DENIED', 403);
@@ -201,12 +234,12 @@ export async function prepareAndDepositAgentVisit(directory: string, agentRef: s
         if (!visitPlan(existing) || existing.inputFingerprint !== plan.inputFingerprint) throw error;
         plan = existing;
     }
-    return depositAgentVisit(directory, plan, signal).catch(error => {
+    return depositAgentVisit(access, plan, signal).catch(error => {
         throw new AgentClientError(error instanceof AgentClientError ? error.code : 'AGENT_HTTP_UNAVAILABLE', error instanceof AgentClientError ? error.status : undefined, plan.visitId);
     });
 }
 export async function resumeAgentVisit(directory: string, agentRef: string, visitId: string, signal?: AbortSignal) {
     const plan = readState(directory, 'visit', visitId);
     if (!visitPlan(plan) || plan.agentRef !== agentRef) throw new AgentClientError('AGENT_STATE_INVALID');
-    return depositAgentVisit(directory, plan, signal);
+    return depositAgentVisit(credential(directory, agentRef), plan, signal);
 }

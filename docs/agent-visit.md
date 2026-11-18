@@ -27,7 +27,18 @@ e `code`. Confrontare il codice nella pagina Agenti ed approvarlo, poi eseguire:
 npm run agent:visita -- completa --richiesta UUID-DELLA-RICHIESTA
 ```
 
-Conservare `agentRef` dalla ricevuta. Il token rimane in un file privato 0600,
+Conservare `agentRef` dalla ricevuta. Dal prossimo sblocco con passphrase il
+client registrato può ritirare il mandato di 12 ore. Il blocco, la scadenza
+della sessione o la revoca in Agenti interrompono l’accesso.
+
+```sh
+npm run agent:visita -- ritira --agente UUID-AGENTE
+```
+
+`deposita` ritira il mandato da sé se quello in uso è scaduto o il server lo
+rifiuta. In MCP, il comando esplicito è `mediflow_ritira_mandato`.
+
+Il token rimane in un file privato 0600,
 fuori dalle cartelle sincronizzate. Il client usa soltanto HTTP loopback,
 senza cookie, PIN o accesso diretto al database. La scadenza del token non
 supera quella del mandato. Revoca e blocco manuale impediscono nuovi depositi.
@@ -76,6 +87,6 @@ npm run agent:mcp -- --credenziali /percorso/privato
 ```
 
 Il processo comunica su standard input/output. Espone `mediflow_collega`,
-`mediflow_completa_collegamento`, `mediflow_deposita_visita` e
+`mediflow_completa_collegamento`, `mediflow_ritira_mandato`, `mediflow_deposita_visita` e
 `mediflow_riprendi_visita`. CLI e MCP chiamano lo stesso client, con gli stessi
 permessi e ricevute. Standard output contiene soltanto il protocollo MCP.

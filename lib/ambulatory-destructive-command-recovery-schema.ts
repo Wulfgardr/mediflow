@@ -4,6 +4,7 @@ import { initializeSqliteSchema } from './sqlite-schema';
 import { schemaSnapshot, schemaDifferences } from './sqlite-schema-shape';
 
 const PREDECESSORS = new Map([
+    [15, 'bec9309e8ae86ea150f291ec74cb58bcbb5e55ed49bab11e5fd67d7665a135cc'],
     [14, 'c05471c3d46b79eaf06e6ffbf92596e0398cd489a35a01dc1337949c4522fe60'],
     [3, 'f7a926813c169edfd7c75ce5e6a1d1b9f5b1e9201c7a20456dc557b943bbaac5'],
     [4, 'a998dad7b46c831f283032144f43cd690f68e962b199256ecd68c11736f867ed'],
@@ -39,7 +40,8 @@ export function assertAmbulatoryCommandPredecessorRecoverySchema(probe: Database
     const canonical = new Database(':memory:');
     try {
         initializeSqliteSchema(canonical);
-        canonical.exec('DROP TABLE agent_cassettes');
+        canonical.exec('DROP TABLE agent_unlock_grants; DROP TABLE agent_registrations');
+        if (version < 15) canonical.exec('DROP TABLE agent_cassettes');
         if (version < 14) canonical.exec('DROP TABLE agent_clients; DROP TABLE agent_pairing_requests');
         if (version < 13) canonical.exec('DROP TABLE agent_mandates');
         if (version < 12) for (const column of ['proposer_ref', 'mandate_ref', 'model_provider']) canonical.exec(`ALTER TABLE audit_events DROP COLUMN ${column}`);
