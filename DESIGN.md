@@ -13,21 +13,21 @@ read_when:
 
 ## Intento progettuale
 
-MediFlow si rivolge a medici impegnati in un lavoro clinico denso di
+Ho progettato MediFlow per medici impegnati in un lavoro clinico denso di
 informazioni. L'interfaccia deve renderlo leggibile senza aggiungere rumore:
-calma, precisione, affidabilità percepita e rapidità di consultazione sono
+calma, precisione, affidabilità percepita e rapidità di consultazione restano
 qualità della stessa esperienza.
 
-La gerarchia delle informazioni prevale sulla decorazione. Materiali,
-movimento e funzioni intelligenti devono aiutare a svolgere il compito,
-non diventare ciò di cui il medico debba occuparsi.
+Do priorità alla gerarchia delle informazioni rispetto alla decorazione.
+Materiali, movimento e funzioni intelligenti devono aiutare a svolgere il
+compito, senza diventare ciò di cui il medico deve occuparsi.
 
 <a id="plain-language-for-physicians"></a>
 
 ## Un linguaggio comprensibile per i medici
 
-Ogni interfaccia MediFlow deve essere utilizzabile da un medico che non
-conosca codice, infrastruttura, intelligenza artificiale o convenzioni delle
+Un medico deve poter usare ogni interfaccia MediFlow anche senza conoscere
+codice, infrastruttura, intelligenza artificiale o convenzioni delle
 interfacce. Il requisito riguarda web/localhost, macOS, iPhone e iPad e
 comprende impostazioni, configurazione iniziale, descrizioni dei campi,
 pulsanti, suggerimenti, notifiche, errori, conferme ed etichette di accessibilità.
@@ -40,15 +40,15 @@ pulsanti, suggerimenti, notifiche, errori, conferme ed etichette di accessibilit
   Conservare la terminologia clinica appropriata senza richiedere competenze
   tecniche.
 - Non esporre host, MCP, payload, receipt o gate come normali etichette di
-  prodotto. Spiegare nella lingua comune i concetti tecnici necessari;
-  i dettagli diagnostici opzionali appartengono a una vista di supporto
+  prodotto. Spiegare nella lingua comune i concetti tecnici necessari.
+  I dettagli diagnostici opzionali appartengono a una vista di supporto
   separata e non devono mai essere necessari per completare il lavoro ordinario.
 - Descrivere le impostazioni attraverso il loro effetto pratico. Quando si
   condividono dati, dichiarare in termini comprensibili che cosa viene inviato,
   a chi e quando: la semplicità non deve nascondere consenso, limiti, rischi
   o distinzione fra proposta e azione già eseguita.
 - Gli errori spiegano che cosa è accaduto e quale azione sia ancora disponibile.
-  Anche un'etichetta breve deve avere senso; un suggerimento a comparsa non
+  Anche un'etichetta breve deve avere senso. Un suggerimento a comparsa non
   rimedia a un comando incomprensibile.
 
 L'accettazione richiede di leggere il percorso sull'interfaccia effettiva,
@@ -56,7 +56,7 @@ compresi gli stati secondari pertinenti, e verificare che un medico senza
 conoscenze tecniche possa capire significato, dati da inserire o scelta da
 compiere e conseguenze, senza la spiegazione di uno sviluppatore. Gergo non
 spiegato e azioni ambigue impediscono l'accettazione anche con test automatici
-superati. Il requisito vale per interfacce esistenti e future; formularlo
+superati. Il requisito vale per interfacce esistenti e future. Formularlo
 non certifica che tutti i testi correnti lo rispettino già.
 
 <a id="shared-language"></a>
@@ -66,14 +66,14 @@ non certifica che tutti i testi correnti lo rispettino già.
 Punto d'inchiostro è l'evoluzione attiva di Lume (ADR 0186). Web e implementazioni Apple condividono
 il significato dei controlli, pur adattandone la forma alla piattaforma:
 
-- terminologia clinica e significato dei controlli;
-- gerarchia informativa e ritmo tipografico;
-- ruoli semantici del colore;
-- principi di spaziatura e raggruppamento;
-- gerarchia di bordi e materiali;
-- vocabolario delle icone;
+- terminologia clinica e significato dei controlli
+- gerarchia informativa e ritmo tipografico
+- ruoli semantici del colore
+- principi di spaziatura e raggruppamento
+- gerarchia di bordi e materiali
+- vocabolario delle icone
 - significato degli stati di caricamento, vuoto, offline, dato non più attuale,
-  conflitto, accesso negato ed errore;
+  conflitto, accesso negato ed errore
 - identificatori di accessibilità stabili per i controlli sottoposti a test.
 
 Condividere questa lingua non impone la stessa navigazione né la stessa
@@ -85,14 +85,14 @@ densità di contenuti.
 
 Il [dossier Punto d'inchiostro](./docs/design/punto-inchiostro/README.md) definisce
 misure, componenti e adattamenti. Newsreader locale accompagna titoli, nomi
-in testata e prosa clinica; il carattere di sistema serve controlli, tabelle,
-date e valori; IBM Plex Mono resta riservato ai codici. Voce e registro
+in testata e prosa clinica. Il carattere di sistema serve controlli, tabelle,
+date e valori. IBM Plex Mono resta riservato ai codici. Voce e registro
 mantengono due funzioni:
 
 - **Voce** identifica la domanda, il paziente, il compito o l'azione corrente.
 - **Registro** raccoglie dati densi, provenienza, stato e storia.
 
-I titoli stabiliscono il contesto; le etichette restano vicine al valore
+I titoli stabiliscono il contesto. Le etichette restano vicine al valore
 o al controllo che descrivono. Nomi clinici lunghi e dati con più codifiche
 devono andare a capo senza tagli e senza nascondere l'azione principale.
 
@@ -103,7 +103,7 @@ con «Registrata» dopo una rilettura dello stato salvato. I segnali clinici
 conservano forma e parola proprie. Il componente non certifica un salvataggio:
 il chiamante deve possedere la prova dello stato che espone.
 
-I gesti ripetuti non animano spostamenti o scale; la riduzione del movimento
+I gesti ripetuti non animano spostamenti o scale. La riduzione del movimento
 elimina ogni transizione non necessaria. Palette Giorno e Grafite, alias di
 compatibilità e controlli di contrasto vivono in `docs/design/lume/tokens/lume.tokens.json`.
 
@@ -116,7 +116,7 @@ e focus. Deve accompagnarne il significato, non esserne l'unico veicolo.
 
 I contenuti clinici richiedono superfici stabili, leggibili e chiaramente
 raggruppate. I materiali nativi Apple possono seguire la semantica corrente
-del sistema quando chiariscano gerarchia o funzione; la traslucenza resta
+del sistema quando chiariscano gerarchia o funzione. La traslucenza resta
 limitata agli elementi di navigazione e comando e alle superfici di privacy,
 senza sovrapporsi fra schede cliniche.
 
@@ -139,7 +139,7 @@ stesso contenuto. Il vincolo riguarda cornici ridondanti e geometrie in
 conflitto, non vieta controlli arrotondati dentro una pagina rettangolare.
 
 Riesaminare la superficie nelle dimensioni e negli aspetti supportati.
-Gli angoli annidati devono essere coerenti e le distanze uniformi; eliminare
+Gli angoli annidati devono essere coerenti e le distanze uniformi. Eliminare
 cornici ridondanti non deve compromettere raggruppamento comprensibile,
 indicatori di focus o comportamento.
 
@@ -204,8 +204,8 @@ piattaforma. Tastiera e puntatore mantengono uno stato di focus visibile.
 
 ## Accessibilità
 
-L'accessibilità vincola il prodotto fin dall'inizio: non è una rifinitura
-da demandare alla fine.
+Considero l'accessibilità un vincolo del prodotto fin dall'inizio, non una
+rifinitura da demandare alla fine.
 
 - Supportare Dynamic Type fino ad AX5 dove dichiarato.
 - Preferire una sola colonna leggibile quando le dimensioni di accessibilità
@@ -225,7 +225,7 @@ da demandare alla fine.
 
 ## Movimento e privacy
 
-Il movimento comunica stato, gerarchia o continuità; quando è attiva
+Il movimento comunica stato, gerarchia o continuità. Quando è attiva
 la riduzione del movimento, si ferma o si semplifica.
 
 Le schermature per la privacy e gli stati di visualizzazione discreta
@@ -238,10 +238,10 @@ l'azione per tornare al lavoro o lo stato corrente di sicurezza.
 
 Una differenza intenzionale fra piattaforme deve dichiarare:
 
-- il ruolo della piattaforma che la richiede;
-- la funzione condivisa e il significato clinico;
-- la ragione della diversa struttura o modalità di input;
-- la superficie di test o revisione;
+- il ruolo della piattaforma che la richiede
+- la funzione condivisa e il significato clinico
+- la ragione della diversa struttura o modalità di input
+- la superficie di test o revisione
 - il responsabile e il seguito, se l'eccezione è temporanea.
 
 Residui di colori letterali, certificazione incompleta degli stati secondari,
@@ -255,9 +255,9 @@ riprogettazione senza limiti del candidato 0.8.
 
 Per le decisioni native Apple, l'ordine di riferimento è:
 
-1. indicazioni correnti della piattaforma Apple e disponibilità delle API;
-2. architettura della repository, Lume e ADR accettati;
-3. prove runtime sul candidato esatto;
+1. indicazioni correnti della piattaforma Apple e disponibilità delle API
+2. architettura della repository, Lume e ADR accettati
+3. prove runtime sul candidato esatto
 4. indicazioni secondarie di buona realizzazione.
 
 Per le affermazioni pubbliche prevalgono la matrice di parità e il verbale
