@@ -226,6 +226,8 @@ jobs:
         run: |
           set -o pipefail
           scripts/native-test.sh 2>&1 | tee "${RUNNER_TEMP}/swiftpm-tests.log"
+      - name: Visit confirmation LocalAuthentication adapter
+        run: bash native/AgentVisitConfirmation/test.sh
       - name: macOS installability launcher contracts
         run: node scripts/local-test-selection.mjs test:installability-v0
 
