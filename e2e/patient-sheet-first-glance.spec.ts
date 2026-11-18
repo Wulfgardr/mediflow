@@ -56,7 +56,12 @@ test('Riepilogo: il primo sguardo mostra identità, problemi, ultime modifiche d
   const quadro = proposals.getByRole('link', { name: 'Quadro paziente', exact: true });
   expect(await insideWorkArea(quadro)).toBe(true);
   const problems = page.locator('#quadro').getByRole('table', { name: 'Problemi' });
-  expect((await proposals.boundingBox())!.y).toBeLessThan((await problems.boundingBox())!.y);
+  await expect(problems).toBeVisible();
+  await expect.poll(() => page.evaluate(() => {
+    const summary = document.querySelector('[data-testid="patient-proposals-summary"]');
+    const table = document.querySelector('#quadro table[aria-label="Problemi"]');
+    return summary && table ? summary.getBoundingClientRect().bottom <= table.getBoundingClientRect().top : null;
+  })).toBe(true);
 
   const changes = page.locator('#quadro').getByRole('table', { name: 'Ultime modifiche di terapia' });
   expect(await insideWorkArea(changes.getByRole('row').nth(1))).toBe(true);
