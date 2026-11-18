@@ -5,7 +5,8 @@ import { settings } from '../../schema';
 import { requireSession } from '../../security/server-auth';
 import { createHostProviderLifecycleService } from './provider-lifecycle-service';
 import { createFunctionModelPreferencesService, FUNCTION_MODEL_SETTING_KEYS, FUNCTION_PREFERENCES_KEY, FUNCTION_SWITCH_KEYS, FunctionModelError, functionModelDigest, type FunctionModelSources } from './function-model-preferences';
-import { createFunctionModelDispatch } from './function-model-dispatch';
+import { createFunctionModelDispatch, holdFunctionModelSession } from './function-model-dispatch';
+import * as webAuthOwner from '../../security/web-auth-lifecycle-owner-adapter';
 import { FUNCTION_MODEL_CONFIGURATION_GENERATION_KEY } from './function-model-configuration-generation';
 
 const ollama = createHostProviderLifecycleService().service;
@@ -25,6 +26,7 @@ export const functionModelPreferencesService = createFunctionModelPreferencesSer
 });
 const withLocalFunctionModelDispatch = createFunctionModelDispatch({ readSources: readProductionFunctionModelSources,
     async authenticate() { const session = await requireSession(); return session ? functionModelDigest(session) : null; },
+    async holdSession() { const session = await requireSession(); return session ? holdFunctionModelSession(webAuthOwner, session, functionModelDigest(session)) : null; },
 });
 
 /** Four named routes only. An OpenAI channel choice is NOT a model option or
