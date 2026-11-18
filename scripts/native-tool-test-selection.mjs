@@ -319,8 +319,29 @@ export function collectXcodeUiSelection(root) {
     ipadOnlyTesting: filters.map(filter => filter.slice('-only-testing:'.length)),
   } };
 }
+const visitConfirmationDirectory = 'native/AgentVisitConfirmation';
+function collectVisitConfirmationTests(root) {
+  const runner = visitConfirmationDirectory + '/test.sh';
+  const tests = ['AuthenticationTests', 'ProtocolTests'];
+  const compile = '"${compiler[@]}" "$source_dir"/{Authentication,Protocol,' + tests.join(',') + '}.swift -o "$test_dir/tests"';
+  const lines = read(root, runner).split(/\r?\n/u);
+  if (!lines.includes(compile) || !lines.includes('"$test_dir/tests"')) throw new Error('Visit confirmation test compile or execution changed');
+  const files = tests.map(name => visitConfirmationDirectory + '/' + name + '.swift');
+  for (const file of files) read(root, file);
+  const binding = collectLiteralCiBinding(root, { script: 'swift:visit-confirmation', workflow, job: 'native-build-test',
+    stepIf: null, ciCall: 'bash ' + runner });
+  if (binding.runsOn !== 'macos-15' || !binding.jobIf?.includes("needs.changes.outputs.apple == 'true'")) {
+    throw new Error('Visit confirmation macOS test binding changed');
+  }
+  return { files, errors: [], mode: 'conditional', conditional: true, binding };
+}
+
 export function collectNativeToolSelections(root) {
   const result = {};
+  if (fs.existsSync(path.join(root, visitConfirmationDirectory))) {
+    try { result['swift:visit-confirmation'] = collectVisitConfirmationTests(root); }
+    catch (error) { result['swift:visit-confirmation'] = { files: [], errors: [error.message], mode: 'conditional', conditional: true }; }
+  }
   if (fs.existsSync(path.join(root, cargoManifest))) {
     try { const command = cargoTestCommand(root); result['cargo:boundary:local'] = { files: command.files, errors: [], mode: 'local', binding: { command: [command.executable, ...command.args], prerequisites: 'Rust/Cargo and dependencies; synthetic research, no CI or product qualification' } }; }
     catch (error) { result['cargo:boundary:local'] = { files: [], errors: [error.message], mode: 'local' }; }
