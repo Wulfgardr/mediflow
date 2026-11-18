@@ -239,7 +239,11 @@ function IncaricoArea({
 
     const focusRenderedRow = (attempts: number) => {
       rowFocusFrame.current = null;
-      if (rowFocusRequest.current !== request || document.activeElement !== list) return;
+      if (rowFocusRequest.current !== request) return;
+      if (document.activeElement !== list) {
+        pendingRowPatientId.current = null;
+        return;
+      }
       const row = list.querySelector<HTMLButtonElement>(
         `[data-patient-id="${CSS.escape(patient.id)}"]`,
       );
@@ -268,7 +272,8 @@ function IncaricoArea({
       : null;
     const parsed = focusedRow ? Number(focusedRow.dataset.patientIndex) : Number.NaN;
     if (Number.isInteger(parsed)) return parsed;
-    const selectedIndex = visible.findIndex((patient) => patient.id === (pendingRowPatientId.current ?? selectedPatientId));
+    const pending = target === patientListParentRef.current ? pendingRowPatientId.current : null;
+    const selectedIndex = visible.findIndex((patient) => patient.id === (pending ?? selectedPatientId));
     return selectedIndex >= 0 ? selectedIndex : 0;
   }, [selectedPatientId, visible]);
 
