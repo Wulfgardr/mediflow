@@ -58,7 +58,7 @@ test('Riepilogo: identità, problemi, terapie attive e Quadro paziente senza una
   const problems = page.locator('#quadro').getByRole('table', { name: 'Problemi' });
   await expect(problems).toBeVisible();
   await expect(page.getByText('Nessuna visita registrata.', { exact: true })).toBeVisible();
-  await expect(page.getByRole('region', { name: 'Variazioni di terapia', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Variazioni dall’ultima visita', exact: true })).toHaveCount(0);
   const active = page.locator('#quadro').getByRole('table', { name: 'Terapie attive' });
   await expect(active.getByRole('row')).toHaveCount(2);
   await expect(active).not.toContainText('Farmaco sintetico sospeso');
@@ -105,14 +105,31 @@ test('Terapie: indicazione, periodo e codici si leggono nella riga, e le sezioni
   await expect(pane.getByRole('textbox', { name: 'Principio attivo', exact: true })).toHaveValue('Principio sintetico');
   await expect(pane.getByRole('group', { name: 'Collegamento clinico', exact: true })).toBeVisible();
   await expect(pane.getByRole('combobox', { name: 'Collegamento clinico', exact: true })).toBeVisible();
-  const boundary = await pane.getByRole('textbox', { name: 'Posologia', exact: true }).evaluate(element => {
+  const boundary = () => pane.getByRole('textbox', { name: 'Posologia', exact: true }).evaluate(element => {
     const channel = (value: number) => { const unit = value / 255; return unit <= 0.03928 ? unit / 12.92 : ((unit + 0.055) / 1.055) ** 2.4; };
     const luminance = (color: string) => { const [red, green, blue] = color.match(/[\d.]+/gu)!.map(Number); return 0.2126 * channel(red) + 0.7152 * channel(green) + 0.0722 * channel(blue); };
     const style = getComputedStyle(element);
-    const [light, dark] = [luminance(style.borderTopColor), luminance(style.backgroundColor)].sort((left, right) => right - left);
-    return (light + 0.05) / (dark + 0.05);
+    const border = luminance(style.borderTopColor);
+    const surrounding = getComputedStyle(element.closest('main')!).getPropertyValue('--lume-surface-focal').trim();
+    const sample = document.createElement('span');
+    sample.style.color = surrounding;
+    element.parentElement!.append(sample);
+    const outside = luminance(getComputedStyle(sample).color);
+    sample.remove();
+    return [luminance(style.backgroundColor), outside].map(background => (
+      (Math.max(border, background) + 0.05) / (Math.min(border, background) + 0.05)
+    ));
   });
-  expect(boundary).toBeGreaterThanOrEqual(3);
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate(value => {
+      localStorage.setItem('mediflow-theme', value);
+      document.documentElement.classList.toggle('light', value === 'light');
+      document.documentElement.classList.toggle('dark', value === 'dark');
+    }, theme);
+    const ratios = await boundary();
+    expect(Math.min(...ratios)).toBeGreaterThanOrEqual(3);
+    await test.info().attach(`contrasto-campo-${theme}`, { body: JSON.stringify(ratios), contentType: 'application/json' });
+  }
   await page.setViewportSize({ width: 768, height: 900 });
   await expect(start).toBeVisible();
   await expect(end).toBeVisible();

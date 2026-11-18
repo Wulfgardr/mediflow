@@ -58,6 +58,9 @@
     cursor: pointer;
     padding-block: 6px;
 }
+.changeDetails summary > span { display: inline-flex; gap: 5px; align-items: center; }
+.changeDetails summary svg { flex: none; }
+.changeDetails[open] summary svg { transform: rotate(180deg); }
 .changeDetails summary > strong { color: var(--lume-ink); }
 .changeDetails[open] p { margin-block: 5px; }
 .outOfRange { color: var(--lume-signal-critical); }

@@ -113,6 +113,9 @@ test('Nuova voce: Quadro, bozza unica, uscita protetta e registrazione con fonte
         await page.getByTestId('document-viewer').getByRole('button', { name: 'Chiudi', exact: true }).click();
         await page.getByRole('link', { name: 'Nuova voce', exact: true }).click();
         await editor.fill('Bozza inventata da abbandonare senza scrivere W16.');
+        await page.getByRole('form', { name: 'Nuova voce clinica', exact: true }).locator('input[type="file"]').setInputFiles({
+            name: 'allegato-non-inviato-W16.txt', mimeType: 'text/plain', buffer: Buffer.from('Allegato sintetico da abbandonare.'),
+        });
         await page.getByRole('link', { name: 'Chiudi la voce', exact: true }).click();
         await zoom.setZoom(4);
         await expect.poll(() => page.getByRole('dialog').evaluate(element => { const box = element.getBoundingClientRect(); return box.top >= -1 && box.bottom <= innerHeight + 1; })).toBe(true);
