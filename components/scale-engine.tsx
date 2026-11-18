@@ -2,7 +2,7 @@
 
 /* native exclusive choices preserve the canonical answer values. */
 import { Disclosure } from '@/components/disclosure';
-import { useState, useRef, useEffect, useId } from 'react';
+import { useCallback, useState, useRef, useId, type KeyboardEvent } from 'react';
 import styles from '@/components/scales/scale-workspace.module.css';
 /* keep answered scales within the prototype navigation guard. */
 import { useRuntimeTwinPendingForm } from '@/components/runtime-twin-design';
@@ -11,6 +11,9 @@ import { useConfirm } from '@/components/ui/confirm-dialog';
 
 // MF085-003: neutral types keep validators executable without React.
 import { calculateScaleResult, isScaleAnswerValid, type ScaleDefinition } from '@/lib/scale-validation';
+import { scaleDisplayTitle, tinettiScoreLabel, TINETTI_CLINICAL_NOTICE } from '@/lib/scale-history';
+import { TINETTI_POMA28_ID } from '@/lib/scales/tinetti-poma28-v1';
+import { formatCountLabel } from '@/lib/format-count';
 export type { ScaleQuestion, ScaleDefinition } from '@/lib/scale-validation';
 
 interface ScaleEngineProps {
@@ -33,9 +36,7 @@ export default function ScaleEngine({ scale, onComplete, onCancel, showHeading =
     /* WUL-UIUX: il ref blocca anche il doppio click nello stesso tick,
        prima che lo stato isSubmitting si propaghi al disabled del bottone. */
     const submittingRef = useRef(false);
-    /* orient keyboard users on each question without changing answers. */
-    const questionRef = useRef<HTMLHeadingElement>(null);
-    useEffect(() => { questionRef.current?.focus(); }, [currentStep]);
+    const focusQuestion = useCallback((heading: HTMLHeadingElement | null) => { heading?.focus(); }, []);
 
     const handleAnswer = (questionId: string, value: string | number) => {
         if (submittingRef.current || answersLocked) return;
@@ -61,7 +62,7 @@ export default function ScaleEngine({ scale, onComplete, onCancel, showHeading =
     const handleNext = () => {
         if (submittingRef.current || isSubmitting || !currentAnswerValid) return;
         if (currentStep < scale.questions.length - 1) {
-            setCurrentStep(prev => prev + 1);
+            setCurrentStep(currentStep + 1);
         } else {
             void finish();
         }
@@ -90,6 +91,31 @@ export default function ScaleEngine({ scale, onComplete, onCancel, showHeading =
     );
     if (!currentQuestion || scale.retired) return <p role="alert">Scala non disponibile per nuove valutazioni.</p>;
 
+    const isLastQuestion = currentStep === scale.questions.length - 1;
+    const options = currentQuestion.type === 'boolean'
+        ? [{ label: 'Sì / corretto', value: 1 }, { label: 'No / non corretto', value: 0 }]
+        : currentQuestion.type === 'choice' ? currentQuestion.options ?? [] : [];
+    const digits = options.map(option => String(option.value)).filter(value => /^[0-9]$/.test(value));
+    const handleChoiceKey = (event: KeyboardEvent<HTMLFieldSetElement>) => {
+        if (event.defaultPrevented || event.nativeEvent.isComposing || event.repeat
+            || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey
+            || answersLocked || submittingRef.current || event.currentTarget.matches(':disabled')
+            || !(event.target instanceof HTMLElement) || !event.target.matches('h3, input[type="radio"]')) return;
+        if (event.key === 'Enter' && currentAnswerValid && !isLastQuestion) {
+            event.preventDefault();
+            setCurrentStep(currentStep + 1);
+        } else if (digits.includes(event.key)) {
+            event.preventDefault();
+            handleAnswer(currentQuestion.id, Number(event.key));
+            if (isLastQuestion) {
+                event.currentTarget.querySelector<HTMLInputElement>(`input[value="${event.key}"]`)?.focus();
+            } else {
+                setCurrentStep(currentStep + 1);
+            }
+        }
+    };
+
+    const tinetti = scale.id === TINETTI_POMA28_ID;
     const answeredQuestions = scale.questions.filter(question => Object.prototype.hasOwnProperty.call(answers, question.id));
     let draftResult: ReturnType<typeof calculateScaleResult> | null = null;
     if (scale.questions.every(question => isScaleAnswerValid(question, answers[question.id], Object.prototype.hasOwnProperty.call(answers, question.id)))) {
@@ -99,22 +125,18 @@ export default function ScaleEngine({ scale, onComplete, onCancel, showHeading =
     return (
         /* WUL-678: one readable question on the workspace plane. */
         <div className={`${styles.workspace} ${styles.engine}`} aria-busy={isSubmitting}>
-            {showHeading && <header><h2>{scale.title}</h2><p>{scale.description}</p></header>}
+            {showHeading && <header><h2>{scaleDisplayTitle(scale)}</h2><p>{scale.description}</p></header>}
             {validationError && <p role="alert">{validationError}</p>}
             <div className={styles.formColumns}>
             <div>
             <p className={styles.progress} aria-live="polite">Domanda {currentStep + 1} di {scale.questions.length}</p>
-            <fieldset className={styles.questionGroup} disabled={isSubmitting || answersLocked}>
+            <fieldset className={styles.questionGroup} disabled={isSubmitting || answersLocked}
+                onKeyDown={options.length ? handleChoiceKey : undefined}>
                 <legend className={styles.legend}>
-                    <h3 ref={questionRef} tabIndex={-1} className={styles.question}>{currentQuestion.text}</h3>
+                    <h3 key={currentQuestion.id} ref={focusQuestion} tabIndex={-1} className={styles.question}>{currentQuestion.text}</h3>
                 </legend>
                 <div key={currentQuestion.id} className={styles.answers}>
-                    {/* Tab enters the group; arrow keys select one exact answer. */}
-                    {(currentQuestion.type === 'choice' || currentQuestion.type === 'boolean') && (
-                        currentQuestion.type === 'boolean'
-                            ? [{ label: 'Sì / corretto', value: 1 }, { label: 'No / non corretto', value: 0 }]
-                            : currentQuestion.options ?? []
-                    ).map(option => (
+                    {options.map(option => (
                         <label
                             key={option.label}
                             className={styles.choice}
@@ -125,6 +147,7 @@ export default function ScaleEngine({ scale, onComplete, onCancel, showHeading =
                                 name={`${answerGroupId}-${currentQuestion.id}`}
                                 value={option.value}
                                 checked={answers[currentQuestion.id] === option.value}
+                                aria-keyshortcuts={digits.includes(String(option.value)) ? String(option.value) : undefined}
                                 onChange={() => handleAnswer(currentQuestion.id, option.value)}
                             />
                             <span>{option.label}</span>
@@ -156,19 +179,20 @@ export default function ScaleEngine({ scale, onComplete, onCancel, showHeading =
                         />
                     )}
                 </div>
+                {digits.length > 0 && <p className={styles.shortcuts}>
+                    {isLastQuestion ? 'Cifre per scegliere. Premi Completa per registrare.' : 'Cifre per scegliere e avanzare. Invio per avanzare dopo la scelta.'}
+                </p>}
             </fieldset>
 
             </div>
             <aside className={styles.draftSummary} aria-label="Risultato in bozza">
                 <h3>Risultato in bozza</h3>
-                <p className={styles.draftState}>● Bozza non registrata</p>
-                {draftResult ? <><p className={styles.score}>{draftResult.score}</p><p>{draftResult.interpretation}</p></> : <p>{answeredQuestions.length} risposte su {scale.questions.length}. Il punteggio sarà disponibile a compilazione completa.</p>}
+                {draftResult ? <><p className={styles.score}>{tinetti ? tinettiScoreLabel(draftResult.score) : draftResult.score}</p><p>{tinetti ? TINETTI_CLINICAL_NOTICE : draftResult.interpretation}</p></> : <p>{formatCountLabel(answeredQuestions.length, 'risposta', 'risposte')} su {scale.questions.length}</p>}
                 <Disclosure className={styles.answerDetails} title={<>Risposte compilate · {answeredQuestions.length}</>}><dl>{answeredQuestions.map(question => <div key={question.id}><dt>{question.text}</dt><dd>{question.options?.find(option => option.value === answers[question.id])?.label ?? String(answers[question.id])}</dd></div>)}</dl></Disclosure>
-                {scale.instrument && <p className={styles.source}>Fonte: {scale.instrument.sourceId} · {scale.instrument.instrumentVersion}</p>}
             </aside>
             </div>
             <div className={styles.actions}>
-                <span className={styles.thresholdContext}>{patientLabel && <strong>{patientLabel}</strong>}<span>{scale.title} · risultato da registrare</span></span>
+                {patientLabel && <strong className={styles.thresholdContext}>{patientLabel}</strong>}
                 <button
                     type="button"
                     disabled={isSubmitting}
@@ -183,7 +207,7 @@ export default function ScaleEngine({ scale, onComplete, onCancel, showHeading =
                         <button
                             type="button"
                             disabled={isSubmitting}
-                            onClick={() => { if (!submittingRef.current) setCurrentStep(prev => prev - 1); }}
+                            onClick={() => { if (!submittingRef.current) setCurrentStep(currentStep - 1); }}
                             className={styles.control}
                         >
                             Indietro
@@ -195,7 +219,7 @@ export default function ScaleEngine({ scale, onComplete, onCancel, showHeading =
                         disabled={!currentAnswerValid || isSubmitting}
                         className={`${styles.control} ${styles.primary}`}
                     >
-                        {currentStep === scale.questions.length - 1
+                        {isLastQuestion
                             ? isSubmitting
                                 ? 'Salvataggio...'
                                 : 'Completa'

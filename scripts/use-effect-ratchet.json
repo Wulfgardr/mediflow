@@ -55,7 +55,6 @@
     "components/prosthetics-source-documents.tsx": 1,
     "components/runtime-twin-design.tsx": 4,
     "components/runtime-twin-workspace.tsx": 4,
-    "components/scale-engine.tsx": 1,
     "components/security-provider.tsx": 4,
     "components/service-architecture-panel.tsx": 1,
     "components/service-prescription-manager.tsx": 1,

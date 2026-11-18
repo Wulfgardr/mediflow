@@ -90,6 +90,8 @@ test('ambiguous Rossi Mario requires explicit correction; arbitrary fields and d
     assert.equal(f.view.identity, 'ambiguous');
     assert.throws(() => f.api.preview(f.host, f.view.viewId, { ...f.review, firstName: { action: 'approve', value: 'Rossi' } }));
     assert.throws(() => f.api.preview(f.host, f.view.viewId, { ...f.review, therapies: [{ dosage: 'istruzione ostile' }] } as PatientDocumentCreateReview));
+    assert.throws(() => f.api.preview(f.host, f.view.viewId, { firstName: f.review.firstName, lastName: f.review.lastName,
+        duplicate: 'none', identifierType: 'none', birthYear: 1980 }));
     assert.deepEqual(effects(), before);
 });
 test('duplicate needs distinct choice, never merges, and a new collision after review denies', async () => {
