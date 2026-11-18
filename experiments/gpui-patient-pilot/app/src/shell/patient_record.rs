@@ -16,6 +16,8 @@ pub(super) struct RecordState {
     pub(super) documents: bool,
     pub(super) quadro: bool,
     pub(super) registered: Option<(FormKind, String)>,
+    pub(super) composer_column: gpui::ScrollHandle,
+    pub(super) diary_all: bool,
 }
 
 impl RecordState {
@@ -431,6 +433,7 @@ impl ClinicalApp {
                 )
                 .child(
                     zone("clinical-record-context")
+                        .track_scroll(&self.patient.record.composer_column)
                         .w(px(340.))
                         .flex_none()
                         .pl(px(20.))
@@ -454,6 +457,7 @@ impl ClinicalApp {
                 )
                 .child(
                     zone("clinical-record-side")
+                        .track_scroll(&self.patient.record.composer_column)
                         .w(px(340.))
                         .flex_none()
                         .pl(px(20.))
@@ -699,6 +703,7 @@ impl ClinicalApp {
                             editable,
                         )
                         .aria_label("Modifica note")
+                        .debug_selector(|| "clinical-workspace-edit-notes".into())
                         .when(editable, |el| {
                             el.on_click(cx.listener(|this, _, window, cx| {
                                 this.open_form(FormKind::Notes, window, cx)
@@ -928,18 +933,14 @@ impl ClinicalApp {
                         .pt(px(8.))
                         .flex()
                         .child(
-                            button(
-                                "clinical-record-band-diary",
-                                line,
-                                theme,
-                                false,
-                                self.form.is_none(),
-                            )
-                            .when(self.form.is_none(), |el| {
-                                el.on_click(cx.listener(|this, _, _, cx| {
-                                    this.section_selected(PatientSection::Diary, cx)
-                                }))
-                            }),
+                            button("clinical-record-band-diary", line, theme, false, true)
+                                .on_click(cx.listener(|this, _, _, cx| {
+                                    if this.form.is_some() {
+                                        this.read_whole_diary(cx)
+                                    } else {
+                                        this.section_selected(PatientSection::Diary, cx)
+                                    }
+                                })),
                         ),
                 )
             })
@@ -1389,6 +1390,16 @@ impl ClinicalApp {
             .entries
             .ready()
             .map(|rows| rows.iter().filter(|row| row.deleted_at.is_none()).count());
+        let drafting = self.form.is_some();
+        let reading_all = self.reading_whole_diary();
+        let (label, action): (&'static str, fn(&mut Self, &mut Context<Self>)) =
+            match (drafting, reading_all) {
+                (true, true) => ("Torna alla bozza", Self::close_diary_reading),
+                (true, false) => ("Tutto il diario", Self::read_whole_diary),
+                (false, _) => ("Tutto il diario", |this, cx| {
+                    this.section_selected(PatientSection::Diary, cx)
+                }),
+            };
         div()
             .min_w_0()
             .flex()
@@ -1400,25 +1411,37 @@ impl ClinicalApp {
                 total.map(|total| total.to_string()),
                 theme,
             ))
-            .child(self.diary_list(Some(BAND_ROWS), cx))
-            .when(total.is_some_and(|total| total > BAND_ROWS), |el| {
-                el.child(
-                    div().flex().child(
-                        button(
-                            "clinical-record-diary-all",
-                            "Tutto il diario",
-                            theme,
-                            false,
-                            self.form.is_none(),
-                        )
-                        .when(self.form.is_none(), |el| {
-                            el.on_click(cx.listener(|this, _, _, cx| {
-                                this.section_selected(PatientSection::Diary, cx)
-                            }))
-                        }),
-                    ),
-                )
-            })
+            .child(self.diary_list(Some(if reading_all { usize::MAX } else { BAND_ROWS }), cx))
+            .when(
+                reading_all || total.is_some_and(|total| total > BAND_ROWS),
+                |el| {
+                    el.child(
+                        div().flex().child(
+                            button("clinical-record-diary-all", label, theme, false, true)
+                                .debug_selector(|| "clinical-record-diary-all".into())
+                                .on_click(cx.listener(move |this, _, _, cx| action(this, cx))),
+                        ),
+                    )
+                },
+            )
+    }
+
+    fn reading_whole_diary(&self) -> bool {
+        self.form.is_some() && self.patient.record.diary_all
+    }
+
+    pub(super) fn read_whole_diary(&mut self, cx: &mut Context<Self>) {
+        self.patient.record.diary_all = true;
+        cx.notify();
+    }
+
+    pub(super) fn close_diary_reading(&mut self, cx: &mut Context<Self>) {
+        self.patient.record.diary_all = false;
+        if self.form.is_some() {
+            self.focus_after_render = true;
+            self.focus_first_field = true;
+        }
+        cx.notify();
     }
 
     pub(super) fn record_quadro(&self, cx: &Context<Self>) -> Div {
@@ -2088,6 +2111,192 @@ mod tests {
                 .any(|id| id == "clinical-record-band-documents"),
             "nothing new: no command"
         );
+    }
+
+    fn opened_at_1180<'a>(
+        host: &notes_recovery_tests::Host,
+        cx: &'a mut gpui::TestAppContext,
+    ) -> (Entity<ClinicalApp>, &'a mut gpui::VisualTestContext) {
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        cx.simulate_resize(gpui::size(px(1180.), px(660.)));
+        view.update(cx, |app, cx| {
+            app.session = Some(host.session.clone());
+            app.scope = Some("scope-a".into());
+            app.select_patient("patient-a", true, cx);
+        });
+        cx.run_until_parked();
+        view.update(cx, |app, _| {
+            app.patient.therapies = ReadLoad::Ready(
+                (0..7)
+                    .map(|index| {
+                        serde_json::from_value(json!({"id":format!("t{index}"),"patientId":"patient-a",
+                            "drugName":format!("Farmaco sintetico {index} 25 mg cpr"),"dosage":"1 cp al mattino",
+                            "status":"active","startDate":"2026-01-01","version":1}))
+                        .unwrap()
+                    })
+                    .collect(),
+            );
+            app.patient.attachments = ReadLoad::Ready(
+                (0..6)
+                    .map(|index| {
+                        serde_json::from_value(json!({"id":format!("d{index}"),"patientId":"patient-a",
+                            "name":format!("Referto sintetico {index}.pdf"),"path":"r.pdf","type":"application/pdf","size":4}))
+                        .unwrap()
+                    })
+                    .collect(),
+            );
+        });
+        notes_recovery_tests::draw(cx);
+        (view, cx)
+    }
+
+    #[gpui::test]
+    fn pressing_modifica_after_scrolling_the_side_column_shows_and_focuses_the_field(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let host = notes_recovery_tests::Host::new();
+        let (view, cx) = opened_at_1180(&host, cx);
+        let side = cx
+            .debug_bounds("clinical-record-side")
+            .expect("two zones at 1180");
+        let start = cx.debug_bounds("clinical-workspace-edit-notes").unwrap();
+        assert!(
+            start.top() > side.bottom(),
+            "Modifica starts below the fold: {start:?}"
+        );
+        let mut edit = start;
+        for _ in 0..40 {
+            if edit.top() > side.top() + px(20.) && edit.bottom() < side.bottom() - px(20.) {
+                break;
+            }
+            cx.simulate_event(gpui::ScrollWheelEvent {
+                position: side.center(),
+                delta: gpui::ScrollDelta::Pixels(gpui::point(px(0.), px(-60.))),
+                ..Default::default()
+            });
+            notes_recovery_tests::draw(cx);
+            edit = cx.debug_bounds("clinical-workspace-edit-notes").unwrap();
+        }
+        assert!(
+            edit.top() > side.top() && edit.bottom() < side.bottom(),
+            "{edit:?} in {side:?}"
+        );
+        cx.simulate_click(edit.center(), gpui::Modifiers::default());
+        notes_recovery_tests::draw(cx);
+        let composer = cx
+            .debug_bounds("clinical-record-composer")
+            .expect("composer drawn");
+        let side = cx.debug_bounds("clinical-record-side").unwrap();
+        assert!(
+            composer.top() >= side.top() && composer.top() < side.bottom() - px(120.),
+            "the composer opens in view: {composer:?} in {side:?}"
+        );
+        cx.update_window_entity(&view, |app, window, cx| {
+            let editor = app.form.as_ref().expect("notes open").fields[0]
+                .editor
+                .clone();
+            assert!(gpui::Focusable::focus_handle(editor.read(cx), cx).is_focused(window));
+        });
+        view.update(cx, |app, cx| app.disconnect(cx));
+    }
+
+    fn click_in_view(cx: &mut gpui::VisualTestContext, zone: &'static str, target: &'static str) {
+        let area = cx.debug_bounds(zone).unwrap();
+        for _ in 0..80 {
+            let bounds = cx.debug_bounds(target).unwrap();
+            if bounds.top() >= area.top() && bounds.bottom() <= area.bottom() + px(1.) {
+                cx.simulate_click(bounds.center(), gpui::Modifiers::default());
+                notes_recovery_tests::draw(cx);
+                return;
+            }
+            let down = bounds.top() > area.top();
+            cx.simulate_event(gpui::ScrollWheelEvent {
+                position: area.center(),
+                delta: gpui::ScrollDelta::Pixels(gpui::point(
+                    px(0.),
+                    px(if down { -60. } else { 60. }),
+                )),
+                ..Default::default()
+            });
+            notes_recovery_tests::draw(cx);
+        }
+        panic!(
+            "{target} never came into view in {zone}: {:?} in {area:?}",
+            cx.debug_bounds(target)
+        );
+    }
+
+    #[gpui::test]
+    fn the_sixth_diary_entry_is_readable_while_drafting_and_the_draft_comes_back(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        use gpui::EntityInputHandler;
+        let host = notes_recovery_tests::Host::new();
+        let (view, cx) = opened_at_1180(&host, cx);
+        view.update(cx, |app, _| {
+            app.patient.entries = ReadLoad::Ready(
+                (0..6)
+                    .map(|index| {
+                        serde_json::from_value(json!({"id":format!("e{index}"),"patientId":"patient-a",
+                            "type":"remote","title":format!("Contatto sintetico {index}"),
+                            "date":format!("2026-11-{:02}T09:00:00Z", 12 - index),
+                            "content":format!("Testo sintetico del contatto {index}."),"version":1}))
+                        .unwrap()
+                    })
+                    .collect(),
+            );
+        });
+        notes_recovery_tests::draw(cx);
+        click_in_view(cx, "clinical-record-side", "clinical-workspace-edit-notes");
+        cx.simulate_input(" Rivalutare.");
+        cx.run_until_parked();
+        let caret = |view: &Entity<ClinicalApp>, cx: &mut gpui::VisualTestContext| {
+            cx.update_window_entity(view, |app, window, cx| {
+                let editor = app.form.as_ref().unwrap().fields[0].editor.clone();
+                let focused = gpui::Focusable::focus_handle(editor.read(cx), cx).is_focused(window);
+                editor.update(cx, |input, cx| {
+                    (
+                        input
+                            .selected_text_range(false, window, cx)
+                            .unwrap()
+                            .range
+                            .end,
+                        input.value().to_owned(),
+                        focused,
+                    )
+                })
+            })
+        };
+        let typed = caret(&view, cx);
+        assert!(
+            typed.2 && typed.1 == " Rivalutare.A: note iniziali",
+            "{typed:?}"
+        );
+        assert!(cx.debug_bounds("clinical-workspace-entry-e5").is_none());
+        let before = host.routes().len();
+        click_in_view(cx, "clinical-record-changed", "clinical-record-diary-all");
+        assert!(
+            cx.debug_bounds("clinical-workspace-entry-e5").is_some(),
+            "the sixth entry is listed while drafting"
+        );
+        view.read_with(cx, |app, _| {
+            assert!(app.form.is_some());
+            assert!(
+                !app.can_edit_record(editing::Kind::Entry),
+                "no concurrent write"
+            );
+        });
+        click_in_view(cx, "clinical-record-changed", "clinical-record-diary-all");
+        assert!(cx.debug_bounds("clinical-workspace-entry-e5").is_none());
+        assert_eq!(caret(&view, cx), typed, "text, caret and focus come back");
+        assert!(
+            host.routes()[before..]
+                .iter()
+                .all(|route| route.starts_with("GET ")),
+            "reading writes nothing"
+        );
+        view.update(cx, |app, cx| app.disconnect(cx));
     }
 
     #[test]

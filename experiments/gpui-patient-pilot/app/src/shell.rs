@@ -2234,9 +2234,14 @@ impl ClinicalApp {
             return;
         }
         self.profile_scroll.set_offset(gpui::point(px(0.), px(0.)));
+        self.patient
+            .record
+            .composer_column
+            .set_offset(gpui::point(px(0.), px(0.)));
         if self.form.is_some() {
             return;
         }
+        self.patient.record.diary_all = false;
         let Some(patient) = self.patient.detail.ready() else {
             return;
         };
