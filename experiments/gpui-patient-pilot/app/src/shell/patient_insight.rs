@@ -107,6 +107,7 @@ impl ClinicalApp {
         if self.patient.insight.phase.is_busy() {
             return;
         }
+        self.patient.record.quadro = true;
         let Some(access) = self.local_host.access() else {
             self.patient.insight.end(InsightPhase::Unavailable(
                 "Accesso locale chiuso. Il Quadro paziente si genera sul Mac che ospita l’archivio: apri Gestione locale in Impostazioni e conferma l’accesso.".into(),
