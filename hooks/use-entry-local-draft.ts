@@ -62,6 +62,15 @@ export function useEntryLocalDraft(patient: string, value: EntryLocalDraft, rest
         })
             .catch(() => { if (current === revision.current) setError('Bozza automatica non conservata. Mantieni aperta questa schermata e registra il resoconto.'); });
     }, [owner, value, state]);
+    const preserveAttempt = async (entryAttempt: string) => {
+        if (!owner || state === 'failed' || state === 'loading') return;
+        try {
+            await owner.save({ ...value, entryAttempt });
+            window.dispatchEvent(new Event(draftChanged));
+        } catch {
+            setError('Bozza automatica non conservata. Mantieni aperta questa schermata e verifica il diario.');
+        }
+    };
     const clear = async () => {
         if (owner) {
             await owner.discard();
@@ -69,5 +78,5 @@ export function useEntryLocalDraft(patient: string, value: EntryLocalDraft, rest
         }
     };
     const hasDraft = entryDraftToPersist(value) !== null;
-    return { state, saved: hasDraft && savedValue === value && !error, error, clear, hasDraft };
+    return { state, saved: hasDraft && savedValue === value && !error, error, clear, hasDraft, preserveAttempt };
 }

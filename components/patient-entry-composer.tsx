@@ -23,7 +23,7 @@ import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css
 import { AttachmentCollectionChangedError, AttachmentCollectionView, uploadFilesOnce } from '@/lib/attachment-collection-client';
 import { db, type Attachment, type ClinicalEntry, type Therapy, type Observation, type Checkup } from '@/lib/db';
 import { clinicalRichTextToPlainText, isClinicalRichTextBlank, sanitizeClinicalRichTextHtml } from '@/lib/clinical-rich-text';
-import { useLiveQueryState } from '@/lib/live-query';
+import { notifyDbChange, useLiveQueryState } from '@/lib/live-query';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/components/ui/toast-provider';
 import type { VisitMedicationCandidate, VisitSessionEvent, VisitSessionState } from '@/lib/visit-transcript-draft';
@@ -113,29 +113,52 @@ export function PatientEntryComposer({ embedded = false, sheetSource }: { embedd
     const [registered, setRegistered] = useState<ClinicalEntry | null>(null);
     const [readbackFailed, setReadbackFailed] = useState(false);
     const [writeFailed, setWriteFailed] = useState(false);
+    const [entryAttempt, setEntryAttempt] = useState<string>();
     const inlineSheet = embedded && proposal;
     const mayResumeReview = inlineSheet && reviewing && files.length === 0 && visitSessionEvents.length === 0;
     const draftValue = useMemo<EntryLocalDraft>(() => ({ editState, dateSource, type, content, setting, entryDate, dictatedDraft,
-        sheetStep: mayResumeReview ? 'review' : undefined }), [editState, dateSource, type, content, setting, entryDate, dictatedDraft, mayResumeReview]);
+        sheetStep: mayResumeReview ? 'review' : undefined, entryAttempt }),
+        [editState, dateSource, type, content, setting, entryDate, dictatedDraft, mayResumeReview, entryAttempt]);
     const localDraft = useEntryLocalDraft(id, draftValue, draft => {
         setType(draft.type); setContent(draft.content); setSetting(draft.setting);
         setEditState('dirty'); setDateSource(draft.dateSource);
         setEntryDate(restoreEntryDraftDate(draft, defaultDate)); setDictatedDraft(draft.dictatedDraft); setIsDictatedDraftReviewed(false);
+        if (inlineSheet && draft.entryAttempt && /^[a-f0-9-]{36}$/iu.test(draft.entryAttempt)) {
+            setEntryAttempt(draft.entryAttempt);
+            setWriteFailed(true);
+        }
         if (inlineSheet && draft.sheetStep === 'review' && !isClinicalRichTextBlank(draft.content)) setReviewing(true);
     });
+    const readSavedEntry = async (entryId: string) => {
+        const entries = await db.entries.query({ patientId: id }).toArray({ rejectAuthUnavailable: true });
+        return entries.find(value => value.id === entryId && value.patientId === id && !value.deletedAt);
+    };
+    const clearAfterCommit = () => localDraft.clear().catch(() => showToast({ tone: 'warning', title: 'Voce registrata', description: 'La copia della bozza non è stata rimossa. Non registrarla di nuovo.' }));
     const readBack = async (entryId: string) => {
         setReadbackFailed(false);
         try {
-            const entries = await db.entries.query({ patientId: id }).toArray({ rejectAuthUnavailable: true });
-            const entry = entries.find(value => value.id === entryId);
-            if (!entry || entry.patientId !== id || entry.deletedAt) throw new Error('Entry reread unavailable');
+            const entry = await readSavedEntry(entryId);
+            if (!entry) throw new Error('Entry reread unavailable');
             setRegistered(entry);
         } catch {
             setReadbackFailed(true);
         }
     };
+    const verifyAttempt = async (entryId: string) => {
+        try {
+            const entry = await readSavedEntry(entryId);
+            if (!entry) return false;
+            setSavedId(entryId);
+            setRegistered(entry);
+            notifyDbChange('entries');
+            await clearAfterCommit();
+            return true;
+        } catch {
+            return false;
+        }
+    };
     const openReview = () => {
-        setWriteFailed(false);
+        if (!entryAttempt) setWriteFailed(false);
         setReviewing(true);
         requestAnimationFrame(() => reviewHeading.current?.focus());
     };
@@ -351,6 +374,7 @@ export function PatientEntryComposer({ embedded = false, sheetSource }: { embedd
         setIsSubmitting(true);
         setUploadProgress('Salvataggio allegati...');
 
+        let postedEntryId: string | undefined;
         try {
             const attachmentIds = await uploadFilesOnce(files, confirmedUploads.current, async (file) => {
                 const summary = 'Allegato alla voce clinica · revisione documentale richiesta';
@@ -385,7 +409,12 @@ export function PatientEntryComposer({ embedded = false, sheetSource }: { embedd
                 note: 'Nota clinica',
             };
 
-            const entryId = uuidv4();
+            const entryId = (inlineSheet && entryAttempt) || uuidv4();
+            postedEntryId = entryId;
+            if (inlineSheet && !entryAttempt) {
+                setEntryAttempt(entryId);
+                await localDraft.preserveAttempt(entryId);
+            }
             await db.entries.add({
                 id: entryId,
                 patientId: id,
@@ -402,13 +431,14 @@ export function PatientEntryComposer({ embedded = false, sheetSource }: { embedd
             /* WUL-676: successful programmatic navigation is not
                intercepted by the workspace's link guard. */
             if (inlineSheet) setSavedId(entryId);
-            await localDraft.clear().catch(() => showToast({ tone: 'warning', title: 'Voce registrata', description: 'La copia della bozza non è stata rimossa. Non registrarla di nuovo.' }));
+            await clearAfterCommit();
             if (inlineSheet) {
                 await readBack(entryId);
             } else if (embedded) {
                 window.history.replaceState(null, '', `/patients/${id}/modules#diario`);
             } else router.push(`/patients/${id}/modules`);
         } catch (error) {
+            if (inlineSheet && postedEntryId && await verifyAttempt(postedEntryId)) return;
             if (inlineSheet) setWriteFailed(true);
             if (error instanceof AttachmentCollectionChangedError) {
                 attachmentsRead.refresh();
@@ -813,7 +843,7 @@ export function PatientEntryComposer({ embedded = false, sheetSource }: { embedd
                 <div className={composerStyles.editorHeading}>
                     <h2>Resoconto clinico</h2>
                     <p data-testid="lume-entry-draft-state" role="status">
-                        <InkState state="fresh">{acceptedNoteHasContent ? 'Bozza non registrata' : 'Bozza vuota'}</InkState>
+                        <InkState state="fresh">{writeFailed && entryAttempt ? 'Registrazione da verificare' : acceptedNoteHasContent ? 'Bozza non registrata' : 'Bozza vuota'}</InkState>
                     </p>
                 </div>
             ) : (
@@ -1020,7 +1050,16 @@ export function PatientEntryComposer({ embedded = false, sheetSource }: { embedd
                 ) : null}
                 <div className={proposal ? composerStyles.actions : "flex justify-end border-t border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] pt-4"}>
                     {proposal && !inlineSheet ? <div className={composerStyles.saveSummary} role="status"><InkState state="fresh">{isSubmitting ? 'Registrazione in corso' : 'Bozza non registrata'}</InkState><p>{patient ? <PrivacyBlur>{`${patient.lastName} ${patient.firstName}`}</PrivacyBlur> : patientRead.loading ? 'Caricamento paziente…' : 'Paziente non disponibile.'} · 1 voce di diario{files.length ? ` · ${files.length} allegati` : ''}</p></div> : null}
-                    {writeFailed && inlineSheet ? <p role="alert">Voce non registrata. La bozza è ancora aperta.</p> : null}
+                    {writeFailed && inlineSheet ? <>
+                        <p role="alert">Registrazione non confermata. La bozza è ancora aperta.</p>
+                        {entryAttempt ? <button type="button" className="mf-button-text" disabled={isSubmitting}
+                            onClick={async () => {
+                                setIsSubmitting(true);
+                                setUploadProgress('Rilettura della voce…');
+                                try { await verifyAttempt(entryAttempt); }
+                                finally { setIsSubmitting(false); setUploadProgress(''); }
+                            }}>Rileggi nel diario</button> : null}
+                    </> : null}
                     {inlineSheet && reviewing ? <button type="button" className="mf-button-text" disabled={isSubmitting}
                         onClick={resumeEditor}>Torna alla bozza</button> : null}
                     <button
