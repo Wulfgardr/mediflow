@@ -469,10 +469,12 @@ test('restored PIN authority reconciles a concurrent recovery check without bypa
         const authorityAttemptGenerationRef = { current: 0 };
         const authRecoveryStateRef = { current: 'ready' };
         const masterKeyRef = { current: null as object | null };
+        const publishedKeys: Array<{ key: object; user: { id: string }; wrapping: null }> = [];
         let release!: (session: { key: object; userData: { id: string } } | null) => void;
         const restored = new Promise<{ key: object; userData: { id: string } } | null>(resolve => { release = resolve; });
         const callbacks = runInNewContext(output, {
             authorityAttemptGenerationRef, authRecoveryStateRef, masterKeyRef,
+            tabKeyShareRef: { current: { publish: async (value: (typeof publishedKeys)[number]) => { publishedKeys.push(value); } } },
             askUnlockParameters: async () => ({ credential: outcome === 'passphrase' ? 'passphrase' : 'pin' }),
             restoreSecuritySession: () => restored,
             clearSecuritySession: () => undefined,
@@ -505,10 +507,15 @@ test('restored PIN authority reconciles a concurrent recovery check without bypa
             assert.deepEqual(state, { authenticated: true, locked: false, user: { id: 'synthetic-operator' } });
             assert.equal(masterKeyRef.current, key);
             assert.equal(authRecoveryStateRef.current, 'ready');
+            assert.equal(publishedKeys.length, 1);
+            assert.equal(publishedKeys[0].key, key);
+            assert.equal(publishedKeys[0].user, state.user);
+            assert.equal(publishedKeys[0].wrapping, null);
         } else {
             assert.deepEqual(state, { authenticated: false, locked: true, user: null });
             assert.equal(masterKeyRef.current, null);
             assert.equal(authRecoveryStateRef.current, outcome === 'locked' ? 'pending' : 'required');
+            assert.equal(publishedKeys.length, 0);
         }
     }
 });
