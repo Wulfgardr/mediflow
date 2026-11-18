@@ -179,6 +179,30 @@ for (const credentialKind of ['passphrase', 'pin'] as const) test(`a registered 
                 return [repeated.status, stale.status];
             }, { body: confirmed.request().postData()!, etag: confirmed.request().headers()['if-match'] });
             expect(replay).toEqual([204, 403]);
+            if (credentialKind === 'pin') {
+                const future = await agent.post('/api/agent/v1/pairings', { data: { name: 'Client sintetico successivo', operations } });
+                expect(future.status()).toBe(201);
+                const pending = await future.json();
+                await page.getByLabel('PIN di conferma', { exact: true }).fill(agentVisitPin);
+                const templateResponse = page.waitForResponse(response => response.url().endsWith('/api/agent-mandates') && response.request().method() === 'POST');
+                await page.getByRole('button', { name: 'Crea mandato', exact: true }).click();
+                expect((await templateResponse).status()).toBe(201);
+                await page.getByLabel('Rinnova allo sblocco', { exact: true }).check();
+                await page.getByLabel('PIN per Client sintetico successivo', { exact: true }).fill(agentVisitPin);
+                const approval = page.waitForResponse(response => response.url().endsWith('/api/agent-mandates/pairings') && response.request().method() === 'POST');
+                await page.getByRole('button', { name: 'Approva ' + pending.receipt.code, exact: true }).click();
+                expect((await approval).status()).toBe(200);
+                const approved = await agent.get('/api/agent/v1/pairings?requestId=' + pending.receipt.id,
+                    { headers: { Authorization: 'Pairing ' + pending.pairingCredential.claim } });
+                expect(approved.status()).toBe(200);
+                const futureToken = (await approved.json()).registrationCredential.token;
+                expect((await retrieve(futureToken)).status()).toBe(401);
+                const duplicate = await secondTab.evaluate(async ({ body, etag }) => (await fetch('/api/agent-mandates/unlock', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json', 'If-Match': etag }, body,
+                })).status, { body: confirmed.request().postData()!, etag: confirmed.request().headers()['if-match'] });
+                expect(duplicate).toBe(204);
+                expect((await retrieve(futureToken)).status()).toBe(401);
+            }
             expect((await (await retrieve()).json()).receipt.mandateRef).toBe(shared.receipt.mandateRef);
             expect((await deposit(latest.credential.token)).status()).toBe(401);
             expect((await (await page.request.get('/api/auth/check')).json()).hasSession).toBe(true);

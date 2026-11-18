@@ -35,5 +35,5 @@ Con `IgnoreLock = TRUE`, ci si aspetta che fallisca
 raggiungere il ritiro dopo «Rinnova accesso». La prova browser esercita lo stesso
 ordine di ritiro, blocco e rifiuto su route reali.
 
-Al 18 novembre 2026, 2.114 stati distinti senza violazioni. Il mutante viola
+Al 18 novembre 2026, 2.792 stati distinti senza violazioni. Il mutante viola
 `NoUnauthorizedDeposit`. Il testimone raggiunge il ritiro.
