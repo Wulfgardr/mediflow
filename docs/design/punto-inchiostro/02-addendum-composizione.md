@@ -219,7 +219,11 @@ equivalente. Le righe possono restare in gruppi attive, sospese e concluse;
 «1 attiva» non va presentato come totale di tutti i gruppi. Il caso con form
 è visibile in `054-dialogo-nuova-terapia-giorno-1440.png`.
 
-Vietato eliminare il maiuscoletto prescritto, lasciare sottogruppi vuoti,
+Per la 0.9.1 misura e maiuscolo del titolo seguono D24 del documento
+[04](./04-primo-sguardo-e-controlli.md): 15 px, peso 600, senza maiuscolo.
+Il maiuscoletto a 12 px resta alle intestazioni di colonna.
+
+Vietato lasciare sottogruppi vuoti,
 mostrare un numero senza significato o moltiplicare icone e titoli per
 costruire una gerarchia già espressa dalla sezione.
 
