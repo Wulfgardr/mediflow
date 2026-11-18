@@ -163,6 +163,15 @@ export async function unlockIfNeeded(page: Page, pin: string): Promise<void> {
   }
 }
 
+export async function signInAfterSharedLock(page: Page, pin: string): Promise<void> {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Blocca tutte le schede', exact: true }).click();
+  const login = page.waitForResponse(response => new URL(response.url()).pathname === '/api/auth/login'
+    && response.request().method() === 'POST');
+  await unlockIfNeeded(page, pin);
+  expect((await login).status()).toBe(200);
+}
+
 export async function setupPinLegacyIfNeeded(page: Page, pin: string): Promise<void> {
   const setupHeading = page.getByRole('heading', { name: 'Crea il tuo PIN' });
   if (!(await isVisible(setupHeading))) return;

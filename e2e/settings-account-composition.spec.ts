@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
-import { bootstrapUnlockedSession, unlockIfNeeded, assertNoHorizontalOverflow } from './utils';
+import { bootstrapUnlockedSession, unlockIfNeeded, assertNoHorizontalOverflow, signInAfterSharedLock } from './utils';
 import { fetchInterceptedRequest } from './fixtures/trusted-web-request';
 
 function requireSynthetic(baseURL?: string) {
@@ -168,7 +168,7 @@ test('access and profile settings preserve form drafts and denied outcomes', asy
             const siblingGoto = sibling.goto.bind(sibling);
             sibling.goto = (url, options) => siblingGoto(new URL(url, baseURL!).href, options);
             await protect(sibling, baseURL!);
-            await bootstrapUnlockedSession(sibling, '1234'); await page.bringToFront();
+            await signInAfterSharedLock(sibling, '1234'); await page.bringToFront();
             await page.evaluate(() => window.dispatchEvent(new Event('focus')));
             await expect(profile.getByRole('status')).toContainText('La sessione è cambiata');
             await expect(save).toBeDisabled(); await keepDraft();
