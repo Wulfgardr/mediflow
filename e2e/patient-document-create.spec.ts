@@ -7,6 +7,8 @@ import { fetchInterceptedRequest } from './fixtures/trusted-web-request';
 
 test.describe.configure({ retries: 0 });
 const PIN = process.env.E2E_PIN || '1234';
+const isolatedTest = test.extend({ baseURL: async ({ isolatedRuntime }, use) => use(isolatedRuntime.url) });
+const isolatedPin = '314159';
 
 async function syntheticPdf(lastName: string): Promise<Buffer> {
     const pdf = await PDFDocument.create(), font = await pdf.embedFont(StandardFonts.Helvetica);
@@ -43,6 +45,22 @@ async function fillAndConfirm(page: Page, lastName: string) {
     await panel.getByRole('button', { name: 'Conferma creazione con PIN' }).click();
     return panel;
 }
+
+isolatedTest('nuova scheda da documento senza identificativo, con data di nascita esatta', async ({ page }) => {
+    isolatedTest.setTimeout(90_000);
+    await bootstrapUnlockedSession(page, isolatedPin);
+    const panel = await stage(page, `SenzaCodice${randomUUID().slice(0, 6)}`);
+    await panel.getByLabel('Nome', { exact: true }).fill('Lucia');
+    await panel.getByLabel('Cognome', { exact: true }).fill('Inventata');
+    await panel.locator('input[type="date"]').fill('1980-02-03');
+    const proceed = panel.getByRole('button', { name: 'Prosegui alla conferma' });
+    const identifier = panel.getByLabel('Identificativo', { exact: true });
+    if (await identifier.count()) {
+        await expect(proceed).toBeDisabled();
+        await identifier.selectOption('none');
+    }
+    await expect(proceed, 'Nome, cognome e nascita devono permettere di proseguire dopo aver dichiarato l’assenza dell’identificativo').toBeEnabled();
+});
 
 test('nuova scheda da documento: revisione, PIN, allegato riletto e aperto', async ({ page, baseURL }) => {
     test.skip(process.env.E2E_DOCUMENTS_SYNTHETIC_ONLY !== '1', 'Requires explicit isolated synthetic data');
