@@ -2,13 +2,12 @@
 
 # Politica di sicurezza di MediFlow
 
-MediFlow tratta **dati sanitari**: la possibilità di lavorare in locale serve a
-mantenerne il controllo, ma non elimina i rischi legati all’accesso, alla
-conservazione o all’uso delle informazioni. Sicurezza e privacy orientano quindi
-le scelte del progetto, non sono funzioni da aggiungere a valle.
+MediFlow tratta **dati sanitari**. Ho scelto di permettere il lavoro in locale
+per mantenere il controllo delle informazioni, sapendo che questo non elimina i
+rischi legati all’accesso, alla conservazione e all’uso dei dati. Sicurezza e
+privacy orientano le scelte del progetto fin dall’inizio.
 
-Questo documento stabilisce quali confini non debbano essere superati e quali
-requisiti minimi debba rispettare chi contribuisce.
+Qui descrivo i confini da rispettare e i requisiti minimi per chi contribuisce.
 
 ---
 
@@ -19,17 +18,17 @@ requisiti minimi debba rispettare chi contribuisce.
 - [docs/topologia-dati-flussi.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/topologia-dati-flussi.md) (percorsi dei dati e confini di fiducia)
 - [docs/walkthrough.md](https://github.com/Wulfgardr/mediflow/blob/0652419dac144340a9340ee0d75ce89130941cec/docs/walkthrough.md) (flussi operativi end-to-end)
 - [docs/adr/](./docs/adr/README.md) (decisioni con impatto sicurezza)
-- [docs/security-audits/](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/security-audits/README.md) (rapporti pubblici sanitizzati, legati a revisioni esatte; non sostituiscono questa policy)
+- [docs/security-audits/](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/security-audits/README.md) (rapporti pubblici sanitizzati, legati a revisioni esatte, non sostituiscono questa policy)
 - [docs/README.md](./docs/README.md) e [docs/markdown-index.md](./docs/markdown-index.md) (mappa e indice completo documentazione)
 
 ---
 
 ## 🔒 Principi di sicurezza fondamentali
 
-Il punto di partenza è l’uso locale: nessuna uscita verso il cloud è ammessa se
-non sia stata implementata e documentata esplicitamente. Da questa scelta
-discendono quattro vincoli, che restano validi anche quando una funzione sia
-facoltativa o accessibile soltanto dalla macchina dell’operatore.
+Parto dall’uso locale: un’uscita verso il cloud è ammessa solo se è stata
+implementata e documentata esplicitamente. Da questa scelta derivano quattro
+vincoli, validi anche per le funzioni facoltative o accessibili soltanto dalla
+macchina dell’operatore.
 
 - **Local-first di default**: i percorsi cloud non si attivano implicitamente.
 - **Cifratura a riposo**: i campi clinici sensibili devono restare cifrati lato client. Non presentare l’intero file SQLite come completamente zero-knowledge finché identificativi, metadati e backup non siano coperti dallo stesso perimetro documentato.
@@ -43,13 +42,12 @@ facoltativa o accessibile soltanto dalla macchina dell’operatore.
 
 ## ⚠️ Minacce e limiti della protezione
 
-La protezione deve considerare non soltanto l’accesso dall’applicazione, ma anche
-ciò che potrebbe essere sottratto o letto al di fuori di essa. Assumiamo che un
-attaccante possa ottenere il file SQLite (`medical.db`) attraverso il furto del
-disco, una perdita di dati dai backup o l’accesso al filesystem; assumiamo inoltre
-che possa leggere log, crash report e screenshot.
+La protezione deve considerare sia l’accesso dall’applicazione sia ciò
+che può essere sottratto o letto fuori da essa. Assumo che un attaccante possa ottenere il file SQLite
+(`medical.db`) rubando il disco, attraverso una perdita dai backup o accedendo
+al filesystem. Assumo anche che possa leggere log, crash report e screenshot.
 
-Anche il traffico localhost resta sensibile: per i client nativi evitare HTTP
+Anche il traffico localhost resta sensibile: per i client nativi evita HTTP
 in chiaro quando possibile. Una pagina di un altro sito che ridiriga il proprio
 dominio su 127.0.0.1 (DNS rebinding) non raggiunge le API: al confine del socket
 una richiesta diretta in loopback con un `Host` diverso da `localhost`,
@@ -98,9 +96,9 @@ clinico cifrato con il segnaposto, né con una sua nuova cifratura.
 
 Il DELETE operativo rende reversibile la rimozione del paziente: registra un
 contrassegno di cancellazione, o tombstone, controllando la versione, senza
-eliminare fisicamente i dati. L’erasure GDPR segue invece una procedura
+eliminare fisicamente i dati. Per l’erasure GDPR ho previsto una procedura
 amministrata dedicata, con dry-run ed esecuzione, accessibile solo da una
-sessione admin web. Questa procedura registra `patient.purged`; il ripristino
+sessione admin web. La procedura registra `patient.purged`. Il ripristino
 esplicito registra `patient.restored`.
 
 Poiché i pazienti rimossi logicamente restano nei backup, una richiesta di
@@ -137,16 +135,16 @@ separati, non una conseguenza della password.
 
 ## 🔌 API locali
 
-Le API separano l’accesso della UI web da quello dei client nativi e dei
-dispositivi abbinati all’host. MediFlow espone tre superfici:
+Ho separato l’accesso della UI web da quello dei client nativi e dei
+dispositivi abbinati all’host. MediFlow espone tre superfici API:
 
 - `/api/*` (web UI): protetta da sessione
 - `/api/v1/*` (client native): protetta da token, versionata
-- `/api/v1/network/*` (home-base opt-in): richiede un dispositivo abbinato, o paired, e parte dalla sola lettura. Le scritture sono limitate a profilo/status paziente, diario, terapie, checkup e osservazioni; la protezione richiede credenziale del dispositivo e sessione dell’operatore
+- `/api/v1/network/*` (home-base opt-in): richiede un dispositivo abbinato, o paired, e parte dalla sola lettura. Le scritture sono limitate a profilo/status paziente, diario, terapie, checkup e osservazioni. La protezione richiede credenziale del dispositivo e sessione dell’operatore
 
 Regole minime:
-- Mai esporre endpoint sensibili senza autenticazione.
-- Mantenere `/api/v1/*` stabile e retrocompatibile.
+- Non esporre endpoint sensibili senza autenticazione.
+- Mantieni `/api/v1/*` stabile e retrocompatibile.
 - Il bearer token locale non equivale a una sessione amministrativa umana:
   route di sistema distruttive o amministrative richiedono session cookie con
   admin web. In particolare audit, backup export/restore, backup scheduler,
@@ -182,16 +180,16 @@ non un accesso remoto generale. Restano valide le seguenti condizioni:
 - `PUT /api/v1/network/patients/{id}` richiede inoltre capability
   `network.replica.write-patient-profile` e `version`
 - `/api/v1/network/patients/{id}/entries*` richiede capability diary dedicate,
-  sessione operatore e `entries.version`; abilita solo create/update/soft-delete
+  sessione operatore e `entries.version`. Abilita solo create/update/soft-delete
   del diario clinico
 - `/api/v1/network/patients/{id}/therapies*` richiede capability terapia
-  dedicate, sessione operatore e `therapies.version`; abilita solo
+  dedicate, sessione operatore e `therapies.version`. Abilita solo
   create/update/soft-delete delle terapie
 - `/api/v1/network/patients/{id}/checkups*` richiede capability checkup
-  dedicate, sessione operatore e `checkups.version`; abilita solo
+  dedicate, sessione operatore e `checkups.version`. Abilita solo
   create/update/soft-delete dei checkup
 - `/api/v1/network/patients/{id}/observations*` richiede capability osservazioni
-  dedicate, sessione operatore e `observations.version`; abilita solo
+  dedicate, sessione operatore e `observations.version`. Abilita solo
   create/update/soft-delete delle osservazioni LOINC/UCUM
 - restano esclusi cancellazione fisica remota, scritture remote di allegati/documenti, cataloghi, sincronizzazione per record, campi AI/documentali e ripieghi automatici su percorsi alternativi
 
@@ -202,7 +200,7 @@ La policy canonica è definita in [docs/adr/0017-auth-lockout-policy.md](./docs/
 - Si applica a `/api/auth/login`, condiviso tra lock screen web e unlock macOS.
 - Soglia: `5` tentativi falliti nella stessa finestra di `15 minuti`.
 - Durata lockout: `15 minuti`.
-- Reset completo su login valido; se la finestra precedente scade, il conteggio riparte da `1`.
+- Reset completo su login valido. Se la finestra precedente scade, il conteggio riparte da `1`.
 - Contratto risposta:
   - `401 AUTH_INVALID_CREDENTIALS` finché il lockout non è attivo
   - `423 AUTH_LOCKED` quando il lockout è attivo, con header `Retry-After`
@@ -222,7 +220,7 @@ pubblicare la sessione né il titolare della proiezione, il projection owner.
 
 Resta un rischio per la disponibilità. Una mutazione persistente e concorrente
 di `Object.prototype.then`, durante la risoluzione della Promise nativa di
-`cookies()`, può impedire l’acquisizione; non deve però produrre un contesto
+`cookies()`, può impedire l’acquisizione. Non deve però produrre un contesto
 autenticato, un’autorità recuperabile o lavoro successivo al diniego. Il rischio
 va riprovato sul tree integrato H1b e nell’audit di sicurezza dell’esatto
 candidato di release.
@@ -235,24 +233,23 @@ autenticazione né la sicurezza generale del prodotto.
 
 ## 🧱 Proxy verso servizi locali (sicurezza SSRF)
 
-Alcuni endpoint inoltrano richieste a servizi locali, per esempio Ollama. Perché
-questa funzione non diventi un accesso a destinazioni arbitrarie, il proxy deve
-rispettare tre regole minime:
+Alcuni endpoint inoltrano richieste a servizi locali, per esempio Ollama. Per
+evitare l’accesso a destinazioni arbitrarie, prevedo tre regole minime che il proxy deve rispettare:
 
-- Permettere solo target **localhost / 127.0.0.1**.
-- Permettere solo porte previste.
-- Trattare ogni risposta come input non fidato.
+- Permetti solo target **localhost / 127.0.0.1**.
+- Permetti solo le porte previste.
+- Tratta ogni risposta come input non fidato.
 
 ## 🤖 Fabric locale e import clinico guidato
 
-MediFlow deve poter essere usato anche senza AI. La Fabric organizza le funzioni
-intelligenti facoltative e i relativi controlli; non trasferisce al modello la
-responsabilità di modificare la cartella. I quattro percorsi della 0.8.5 sono
+MediFlow deve poter essere usato anche senza AI. Ho affidato alla Fabric l’organizzazione
+delle funzioni intelligenti facoltative e dei relativi controlli. La responsabilità
+di modificare la cartella non passa al modello. I quattro percorsi della 0.8.5 sono
 Patient Insight, Smart Import, Document Synthesis e Treatment Reasoning. Quando
 leggono note del paziente, diario clinico o documenti analizzati, devono
 rispettare anche queste regole:
 
-- usare solo provider risolti dal punto di composizione di produzione sotto il controllo dell’host, il production root; i provider remoti richiedono un ciclo di vita attivo e una scelta esplicita
+- usare solo provider risolti dal punto di composizione di produzione sotto il controllo dell’host, il production root. I provider remoti richiedono un ciclo di vita attivo e una scelta esplicita
 - trattare l'output del modello come **non fidato** finché un operatore non lo conferma
 - non eseguire import silenziosi da testo libero verso diagnosi o terapie
 - mantenere review esplicita prima di scrivere nuovi dati strutturati in scheda
@@ -266,7 +263,7 @@ Anche quando un documento riporti un codice ICD esplicito, la diagnosi estratta
 resta una proposta da rivedere. Per questo il payload automatico della sintesi
 non include `patients.diagnoses` (vedi ADR 0084).
 
-Quando siano configurati, Ollama serve Patient Insight, Smart Import e Document
+Quando sono configurati, Ollama serve Patient Insight, Smart Import e Document
 Synthesis, mentre ATHENA su MLX serve soltanto Treatment Reasoning. L’host governa
 separatamente i due cicli di vita: stato, revoca, autorizzazioni o percorsi
 alternativi di un provider non valgono per l’altro. Gli adapter OpenAI e
@@ -312,15 +309,15 @@ lettura delle Open Loops del paziente selezionato, proposta di follow-up
 Il pilota profilo aggiunge soltanto `patient-profile.read.v1`, con consenso
 esplicito nella UI Web sul paziente selezionato e proiezione massima `profile`
 o `notes`. Senza tale concessione la connessione non riceve l'operazione né
-il relativo owner AIP. La porta specifica ritorna al proprietario Web corrente;
-non basta il mirror del Supervisor. La vista contiene soltanto i quindici
+il relativo owner AIP. La porta specifica ritorna al proprietario Web corrente.
+Non basta il mirror del Supervisor. La vista contiene soltanto i quindici
 campi di dominio enumerati in ADR 0146, oppure le sole note, senza identificativi
 di riga, ambulatori, blob AI/documentali, SQL o percorsi. I riferimenti opachi
 non concedono autorità: richiedono ancora sessione, selezione, ruolo, scope,
-revisione e durata correnti. Il riuso è ammesso nella lease; replay dopo revoca
+revisione e durata correnti. Il riuso è ammesso nella lease. Replay dopo revoca
 o in altri contesti e RequestId RPC duplicati sono negati. Il budget comune
 del JSON UTF-8 è 32 KiB: il superamento restituisce `output_too_large`, senza
-dati parziali o troncamenti. La query non muta dati clinici o audit; il wrapper
+dati parziali o troncamenti. La query non muta dati clinici o audit. Il wrapper
 AIP conserva il proprio audit obbligatorio. Mini può usarla senza MCP o provider.
 Il planner semantico e le capability intelligenti non si ampliano.
 
@@ -333,7 +330,7 @@ F10 espone via MCP soltanto l’anteprima `pending -> completed|cancelled`. Prim
 di confermare la scrittura, la UI web fidata rilegge la risorsa e richiede ruolo
 medico attivo, verifica aggiuntiva dell’identità e gesto riferito a quella
 specifica operazione. Il commit mantiene CAS, idempotenza, audit e ricevuta
-atomici. Né la prova autorizzativa né il commit attraversano MCP; replay,
+atomici. Né la prova autorizzativa né il commit attraversano MCP. Replay,
 revoca, logout o cambio di selezione negano l’operazione.
 
 Il planner semantico, collegato al Supervisor, resta in sola lettura. Può
@@ -344,22 +341,22 @@ del contesto stabiliti dall’host.
 
 Su macOS 26 o successivo, la registrazione usa API Apple sul dispositivo, con
 consenso e permessi espliciti. L’audio resta entro limiti definiti e soltanto in
-RAM; la trascrizione entra nella bozza solo dopo la revisione. Non esiste una
+RAM. La trascrizione entra nella bozza solo dopo la revisione. Non esiste una
 scrittura clinica automatica. Le verifiche con microfono reale e la validazione
 clinica restano fuori da quanto attestato dal candidato.
 
 Questa distinzione chiarisce anche i due modelli architetturali. In
 provider-in-MediFlow, la Fabric governa un provider al servizio di una funzione
-applicativa; in MediFlow-in-intelligent-host, MCP/Mini raggiungono gli
+applicativa. In MediFlow-in-intelligent-host, MCP/Mini raggiungono gli
 Application Services governati attraverso RPC AIP ereditato. Il secondo modello
 resta candidato e non autorizza installer, onboarding, sessioni agentiche
 generali, listener o accesso diretto a SQLite.
 
 ### Modello provider F7
 
-Scegliere un provider non significa avergli già assegnato un modello, una
+La scelta di un provider non gli assegna di per sé un modello, una
 credenziale e il permesso di svolgere ogni funzione. Il modello provider v2
-separa perciò tipo di provider, istanza, autenticazione, modello, capacità,
+separa tipo di provider, istanza, autenticazione, modello, capacità,
 gruppi, associazioni e insieme delle funzioni ammesse. Anche le classi di
 credenziale restano distinte: `local_model`, `api_key`, `provider_oauth`
 ufficiale e `host_subscription`. Nessuna implica le altre.
@@ -384,7 +381,7 @@ simulano il trasporto: il candidato non prova credenziali né connessioni reali.
 l'annotazione `available_unqualified` per i percorsi Ollama correnti.
 
 L’annotazione descrive ciò che si sa sulla disponibilità e sulle relative
-prove; non è uno stato operativo e non sostituisce `runtime`. Il fatto che un
+prove. Non è uno stato operativo e non sostituisce `runtime`. Il fatto che un
 modello sia locale, abbia un nome o presenti un determinato digest non dimostra
 che sappia svolgere una funzione. Il confronto del digest prima e dopo
 l’inferenza rileva alcune variazioni, ma non impedisce una sostituzione ABA,
@@ -422,7 +419,7 @@ capability 0.8.5, le venue, i production root e l'assenza di authority caller.
 
 Gli adapter ufficiali OpenAI e Anthropic dispongono di una prova amministrativa
 con revisione del risultato. Per usarla servono sessione admin e intento
-esatto; provider e uscita dei dati restano OFF se l’host non abbia autorizzato
+esatto. Provider e uscita dei dati restano OFF se l’host non abbia autorizzato
 esplicitamente entrambi. Quando è disabilitata, la factory non legge le
 credenziali. Il trasporto simulato dei test non prova connessioni reali,
 account, politiche di conservazione o idoneità al trattamento di dati clinici:
@@ -442,9 +439,9 @@ Regole minime:
 
 ## 🔒 Log e oscuramento dei dati identificativi
 
-I log servono a capire che cosa sia accaduto, non a ricostruire il contenuto
-clinico: i dati sanitari non devono trapelare attraverso di essi. Gli
-identificativi vanno oscurati secondo il contesto d’uso.
+Uso i log per capire cosa è accaduto, non per ricostruire il contenuto clinico.
+I dati sanitari non devono trapelare attraverso di essi. Oscura gli identificativi
+secondo il contesto d’uso.
 
 Il catalogo di riferimento per gli eventi di audit è definito in
 [docs/adr/0015-audit-taxonomy-minimum-catalog.md](./docs/adr/0015-audit-taxonomy-minimum-catalog.md).
@@ -507,8 +504,7 @@ ed evita di richiedere segreti per l’uso locale predefinito.
 
 ## 🧪 Controlli sulle dipendenze e sulla sicurezza
 
-Prima di una release o di un merge rilevante, si consigliano i seguenti
-controlli:
+Prima di una release o di un merge rilevante, consiglio questi controlli:
 
 ```bash
 npm run lint
@@ -543,8 +539,8 @@ una correzione non ancora distribuita.
 ### Profilo plugin con sola navigazione
 
 Il candidato `plugin_local_ui` (ADR 0159, WUL-757) compone soltanto navigazione
-finita sul Web privato. Non compone owner/lease, servizi o porte cliniche;
-nomi tool nascosti e RPC dirette rimangono negati. Il modello riceve soltanto
+finita sul Web privato. Non compone owner/lease, servizi o porte cliniche.
+I nomi tool nascosti e le RPC dirette rimangono negati. Il modello riceve soltanto
 `continue_in_mediflow`, indipendente dal paziente. Dati e conferme restano
 nella UI locale. Readiness tecnica non è autorità clinica. Altri tool
-dell'host restano fuori dal confine; il plugin non promette isolamento OS.
+dell'host restano fuori dal confine. Il plugin non promette isolamento OS.
