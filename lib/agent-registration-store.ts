@@ -74,6 +74,11 @@ export function createAgentRegistrationStore(database: Database.Database, now = 
                 .run(storedToken(token), id, storedToken(token)).changes !== 1) throw new AgentMandateDenied();
             return { token };
         },
+        hasActiveRegistration(actorRef: string, archiveGeneration: string): boolean {
+            return Boolean(database.prepare(`SELECT 1 ${registrations}
+                WHERE template.actor_ref=? AND template.archive_generation=? AND registration.revoked_at IS NULL LIMIT 1`)
+                .get(actorRef, archiveGeneration));
+        },
         list(actorRef: string): AgentRegistration[] {
             return database.prepare(`SELECT registration.id,pairing.name,registration.revoked_at AS revokedAt,current.created_at AS lastRenewalAt
                 ${registrations} LEFT JOIN agent_mandates AS current ON current.id=registration.current_mandate_ref

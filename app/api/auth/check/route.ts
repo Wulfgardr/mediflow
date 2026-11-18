@@ -7,6 +7,8 @@ import os from 'node:os';
 import { resolveDataPath } from '@/lib/data-dir';
 import { classifyAuthHealthError } from '@/lib/security/auth-health-classifier';
 import { parseWrappedMasterKey } from '@/lib/security/security';
+import type { WebSessionProjection } from '@/lib/security/web-auth-lifecycle-owner-adapter';
+import { createAgentRegistrationStore } from '@/lib/agent-registration-store';
 import { currentArchiveGeneration } from '@/lib/security/archive-session-generation';
 import {
     bootstrapWebAuthControl,
@@ -119,7 +121,8 @@ export async function GET(request: Request) {
     }
     const sessionId = webAuthSessionIdFromRequest(request);
     const resolution = sessionId && hasAttestedLoopbackIngress(request) ? resolveWebAuthControlSession(sessionId, control.controlId) : null;
-    const hasSession = resolution?.status === 'active';
+    const session = resolution?.status === 'active' ? resolution.projection as WebSessionProjection : null;
+    const hasSession = session !== null;
     if (!dbHealth) {
         const response = NextResponse.json({
             status: 'error',
@@ -163,10 +166,13 @@ export async function GET(request: Request) {
         const accounts = await dbServer.select({
             encryptedMasterKey: users.encryptedMasterKey, salt: users.salt, unlockVerifierHash: users.unlockVerifierHash,
         }).from(users).limit(2);
+        const archiveGeneration = currentArchiveGeneration();
+        const hasRenewableAgents = session?.role === 'admin'
+            && createAgentRegistrationStore(dbServer.$client).hasActiveRegistration(session.userId, archiveGeneration);
         const response = NextResponse.json({
             status: 'ok',
             localUiLeaseRequired: requiresLocalUiDocumentLease(),
-            archiveGeneration: currentArchiveGeneration(),
+            archiveGeneration,
             archiveMaintenance: process.env.MEDIFLOW_ARCHIVE_MAINTENANCE_RESULT
                 ? JSON.parse(process.env.MEDIFLOW_ARCHIVE_MAINTENANCE_RESULT) : undefined,
             isSetup: accounts.length > 0,
@@ -174,6 +180,7 @@ export async function GET(request: Request) {
             ...(accounts.length > 0 ? { unlock: unlockParameters(accounts) } : {}),
             db: buildPublicDbState('ready')
         });
+        if (hasRenewableAgents) response.headers.set('x-mediflow-agent-renewal', '1');
         return finalizeControlResponse(response, request, presentedControlId, control);
     } catch (error) {
         const classification = classifyAuthHealthError(error);
