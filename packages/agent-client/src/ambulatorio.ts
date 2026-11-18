@@ -7,11 +7,12 @@ import { McpServer } from '@modelcontextprotocol/server';
 import { serveStdio, StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 import { z } from 'zod';
 import { isValidItalianTaxCode } from '../../../lib/patient-identity';
-import { agentPrivateDirectory, readAgentCredential } from './credentials.ts';
+import { agentPrivateDirectory, readAgentCredential, readAgentRegistration } from './credentials.ts';
 import { agentCommandFailure } from './commands.ts';
+import { registerAgentMandateTool } from './mcp.ts';
 import {
-    AgentClientError, agentOrigin, agentRequest, completeAgentPairing,
-    prepareAndDepositAgentVisit, requestAgentPairing, resumeAgentReference, resumeAgentVisit,
+    AgentClientError, agentOrigin, completeAgentPairing, loadAgentVisitContext,
+    prepareAndDepositAgentVisit, requestAgentPairing, resumeAgentReference, resumeAgentVisit, retrieveAgentMandate,
 } from './visit-client.ts';
 
 const settingsSchema = z.object({
@@ -74,17 +75,17 @@ export function createAmbulatorioServer(home: string, value: unknown, plugin: st
         return result;
     };
     const active = async (signal: AbortSignal, agentRef?: string) => {
-        const references = agentRef ? [agentRef] : fs.readdirSync(credentials)
-            .filter(file => /^[a-f0-9-]{36}\.json$/u.test(file)).map(file => file.slice(0, -5));
-        const access = references.map(ref => readAgentCredential(credentials, ref))
-            .filter(item => item !== null).filter(item => item.origin === config.origin).sort((a, b) => b.expiresAt - a.expiresAt)[0];
-        if (!access) throw new AmbulatorioError('COLLEGA_MEDIFLOW');
-        const context = await agentRequest(config.origin, '/api/agent/v1/context', 'Bearer ' + access.token, undefined, signal);
-        if (context.agentRef !== access.agentRef || context.mandateRef !== access.mandateRef
-            || context.modelProvider !== 'openai' || context.allowsClinicalEgress !== true) {
+        const references = agentRef ? [agentRef] : new Set(fs.readdirSync(credentials)
+            .filter(file => /^[a-f0-9-]{36}(?:\.registration)?\.json$/u.test(file)).map(file => file.slice(0, 36)));
+        const candidates = Array.from(references, ref => ({ ref, cached: readAgentCredential(credentials, ref), registration: readAgentRegistration(credentials, ref) }));
+        const candidate = candidates.filter(({ cached, registration }) => (cached ?? registration)?.origin === config.origin)
+            .sort((a, b) => (b.cached?.expiresAt ?? 0) - (a.cached?.expiresAt ?? 0))[0];
+        if (!candidate) throw new AmbulatorioError('COLLEGA_MEDIFLOW');
+        const context = await loadAgentVisitContext(credentials, candidate.ref, signal, config.origin);
+        if (context.modelProvider !== 'openai' || context.allowsClinicalEgress !== true) {
             throw new AmbulatorioError('MANDATO_CODEX_NON_AUTORIZZATO');
         }
-        return access.agentRef;
+        return candidate.ref;
     };
     const run = async (action: () => Promise<Record<string, unknown>>) => {
         try {
@@ -108,6 +109,7 @@ export function createAmbulatorioServer(home: string, value: unknown, plugin: st
         if (result.status === 'approved') await active(mcpReq.signal, result.agentRef);
         return result;
     }));
+    registerAgentMandateTool(server, (agentRef, signal) => run(() => retrieveAgentMandate(credentials, agentRef, signal, config.origin)));
     server.registerTool('mediflow_acquisisci_visita', {
         description: 'Conserva il dettato integrale e individua i PDF per il CF dettato. Un CF proposto dai PDF richiede conferma del medico.',
         inputSchema: z.object({ dettato: z.string().min(1).max(60000).refine(value => Boolean(value.trim())), inizio: z.iso.datetime({ offset: true }).optional() }).strict(), annotations,

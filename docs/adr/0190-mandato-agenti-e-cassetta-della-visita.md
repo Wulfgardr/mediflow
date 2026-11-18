@@ -16,8 +16,8 @@ visita confermata. L'orario non identifica il paziente.
 
 ## Mandato e credenziali
 
-Il medico crea un mandato nella UI fidata dopo lo sblocco con passphrase e
-la conferma con PIN. Sceglie durata, operazioni consentite e fornitore del
+Il medico crea un mandato nella UI fidata dopo lo sblocco con la credenziale
+dell’account e la conferma con PIN. Sceglie durata, operazioni consentite e fornitore del
 modello. La durata massima è 12 ore. Il fornitore attuale è OpenAI tramite
 Codex. Il mandato deve dichiarare l'eventuale passaggio di trascrizione e
 documenti a quel fornitore e le ricevute devono registrarlo. Un abbonamento
@@ -44,6 +44,33 @@ chiusura della cassetta. Le route `/api/agent/v1/*` accettano soltanto il
 canale loopback, senza fidarsi di indirizzi dichiarati dal chiamante. Il
 proxy LAN non le inoltra. CLI e futuro MCP usano lo stesso contratto, senza
 accesso diretto a SQLite, cookie, PIN o master key.
+
+### Rinnovo allo sblocco
+
+Il medico può scegliere «Rinnova allo sblocco» quando approva il codice di
+un client, confermando col PIN il perimetro, il fornitore e l’eventuale
+passaggio di documenti e trascrizioni già scelti. Ogni sblocco riuscito
+con PIN o passphrase e ogni «Rinnova accesso» che ottiene la chiave da
+un’altra scheda confermano il gesto nella sessione Web corrente. Il server
+emette un mandato di 12 ore per ciascun client registrato, con il perimetro
+approvato. Riusa la chiave pubblica e l’involucro registrati. La conferma
+trasporta solo il ticket di login o l’identificativo del gesto, legato
+alla stessa sessione e alla stessa generazione di archivio.
+Il client Web ottiene la presenza di registrazioni attive dalla risposta
+del login o dal controllo di sessione già in uso. Senza registrazioni
+attive, lo sblocco non invia la richiesta di rinnovo.
+
+La credenziale di registrazione consente al client di ritirare il token
+di deposito del mandato corrente sul loopback. CLI e MCP, incluso il plugin
+Ambulatorio, usano il client condiviso per il ritiro esplicito o automatico
+quando il deposito richiede un mandato corrente. Blocco della sessione,
+scadenza, nuova emissione e revoca negano richieste con il token precedente.
+La revoca della registrazione in Agenti impedisce anche le emissioni
+successive. Il ripristino automatico della scheda e il recupero col kit
+non emettono mandati. Dopo il recupero, il rinnovo riparte al primo sblocco
+normale riuscito. L’audit lega registrazione, medico, mandato e fornitore
+al rinnovo. Le regole di applicazione della cassetta descritte qui sotto
+valgono anche per questi mandati.
 
 ## Deposito e identità
 
