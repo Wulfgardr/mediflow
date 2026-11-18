@@ -78,7 +78,7 @@ async function openSyntheticQuadro(page: Page, quadroCase: QuadroCase): Promise<
   await setRegister(page, quadroCase.register);
   const quadro = page.getByRole('region', { name: 'Riepilogo clinico', exact: true });
   await expect(quadro).toBeVisible();
-  await expect(quadro.getByText('Ramipril sintetico', { exact: true })).toBeVisible();
+  await expect(quadro.getByRole('table', { name: 'Terapie attive', exact: true }).getByText('Ramipril sintetico', { exact: true })).toBeVisible();
   await expect(quadro.getByText('Controllo sintetico programmato', { exact: true })).toBeVisible();
   return { quadro, patient };
 }
@@ -114,7 +114,7 @@ async function assertQuadroContract(page: Page, quadro: Locator, patient: LivePa
   await expect(value).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   await expect(value).toHaveCSS('border-left-width', '0px');
   await expect(value).toHaveCSS('border-radius', '0px');
-  await expect(quadro.getByText('Ramipril sintetico', { exact: true }))
+  await expect(quadro.getByRole('table', { name: 'Terapie attive', exact: true }).getByText('Ramipril sintetico', { exact: true }))
     .toHaveCSS('color', await resolveColor(page, '--lume-ink'));
 
   const hierarchy = await measure.evaluate(element => {
@@ -157,7 +157,7 @@ async function assertReflowStack(quadro: Locator): Promise<void> {
     };
     return [...element.querySelectorAll(':scope > section')].map(box);
   });
-  expect(geometry).toHaveLength(4);
+  expect(geometry).toHaveLength(5);
   for (let index = 1; index < geometry.length; index++) {
     expect(geometry[index].top).toBeGreaterThanOrEqual(geometry[index - 1].bottom);
     expect(Math.abs(geometry[index].left - geometry[index - 1].left)).toBeLessThanOrEqual(1);
