@@ -1,18 +1,20 @@
 'use client';
 /* source/job identity gates all publications, including successful late jobs. */
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { clearPreviewCanvas, PreviewError, previewFailure, type PreviewFailure } from './document-viewer-policy.ts';
 import type { DocumentPreview } from './document-viewer-preview.ts';
 import { renderPdfPreview } from './document-viewer-pdf';
 import { renderRasterPreview } from './document-viewer-raster.ts';
+import styles from './clinical-register.module.css';
 
 type CanvasPreview = Exclude<DocumentPreview, { kind: 'text' }>;
 type Job = { source: CanvasPreview; page: number; attempt: number };
 type Snapshot = { job: Job; state: 'ready' } | { job: Job; state: 'error'; error: PreviewFailure };
 
-type CanvasProps = { source: CanvasPreview; signal: AbortSignal };
+type CanvasProps = { source: CanvasPreview; signal: AbortSignal; fitWidth?: boolean };
 
-export default function DocumentPreviewCanvas({ source, signal }: CanvasProps) {
+export default function DocumentPreviewCanvas({ source, signal, fitWidth }: CanvasProps) {
     const [owner, setOwner] = useState(() => ({ source, signal, revision: 0 }));
     if (owner.source !== source || owner.signal !== signal) {
         // A new source owns page 1, retry state, canvas and jobs together. Reset
@@ -21,13 +23,15 @@ export default function DocumentPreviewCanvas({ source, signal }: CanvasProps) {
         setOwner({ source, signal, revision: owner.revision + 1 });
         return null;
     }
-    return <OwnedDocumentPreviewCanvas key={owner.revision} source={source} signal={signal} />;
+    return <OwnedDocumentPreviewCanvas key={owner.revision} source={source} signal={signal} fitWidth={fitWidth} />;
 }
 
-function OwnedDocumentPreviewCanvas({ source, signal }: CanvasProps) {
+function OwnedDocumentPreviewCanvas({ source, signal, fitWidth }: CanvasProps) {
     const canvas = useRef<HTMLCanvasElement>(null);
+    const scrollport = useRef<HTMLDivElement>(null);
     const active = useRef<AbortController | null>(null);
     const [page, setPage] = useState(1);
+    const [zoom, setZoom] = useState(100);
     const [attempt, setAttempt] = useState(0);
     const job = useMemo(() => ({ source, page, attempt }), [source, page, attempt]);
     const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
@@ -74,15 +78,29 @@ function OwnedDocumentPreviewCanvas({ source, signal }: CanvasProps) {
         if (canvas.current) clearPreviewCanvas(canvas.current);
         setSnapshot({ job, state: 'error', error: previewFailure(new PreviewError('cancelled')) });
     };
+    const wide = isPdf && fitWidth;
+    const movePage = (step: number) => {
+        if (wide) {
+            scrollport.current?.scrollTo({ top: 0, left: 0 });
+            scrollport.current?.focus({ preventScroll: true });
+        }
+        setPage(value => value + step);
+    };
     return (
         <section data-testid={isPdf ? 'document-preview-pdf' : 'document-preview-image'} data-state={status}
             className="absolute inset-0 flex min-h-0 flex-col" aria-busy={status === 'loading'}>
-            {isPdf && <nav aria-label="Pagine PDF" className="flex flex-wrap items-center justify-center gap-3 p-3">
-                <button type="button" className="mf-btn-secondary" disabled={!navigable || page <= 1}
-                    onClick={() => setPage((value) => value - 1)}>Pagina precedente</button>
+            {isPdf && <nav aria-label="Pagine PDF" className={wide ? styles.draftPdfTools : 'flex flex-wrap items-center justify-center gap-3 p-3'}>
+                <button type="button" className={wide ? styles.control : 'mf-btn-secondary'} disabled={!navigable || page <= 1}
+                    aria-label={wide ? 'Pagina precedente' : undefined} title={wide ? 'Pagina precedente' : undefined}
+                    onClick={() => movePage(-1)}>{wide ? <ChevronLeft size={16} aria-hidden /> : 'Pagina precedente'}</button>
                 <span aria-live="polite" data-testid="document-preview-page-number">Pagina {page} di {count ?? '…'}</span>
-                <button type="button" className="mf-btn-secondary" disabled={!navigable || !count || page >= count}
-                    onClick={() => setPage((value) => value + 1)}>Pagina successiva</button>
+                <button type="button" className={wide ? styles.control : 'mf-btn-secondary'} disabled={!navigable || !count || page >= count}
+                    aria-label={wide ? 'Pagina successiva' : undefined} title={wide ? 'Pagina successiva' : undefined}
+                    onClick={() => movePage(1)}>{wide ? <ChevronRight size={16} aria-hidden /> : 'Pagina successiva'}</button>
+                {wide ? <select className={styles.control} aria-label="Zoom PDF" value={zoom} onChange={event => setZoom(Number(event.target.value))}>
+                    <option value={100}>Adatta</option>
+                    {[125, 150, 200, 250, 300].map(value => <option key={value} value={value}>{value}%</option>)}
+                </select> : null}
             </nav>}
             {status === 'loading' && <div className="p-3 text-center">
                 <p role="status" data-testid="document-preview-loading">{isPdf ? 'Caricamento pagina PDF…' : 'Caricamento immagine…'}</p>
@@ -92,10 +110,11 @@ function OwnedDocumentPreviewCanvas({ source, signal }: CanvasProps) {
                 <p role="alert" data-testid="document-preview-error" data-error-code={current.error.code}>{current.error.message}</p>
                 <button type="button" className="mf-btn-secondary mt-3" onClick={() => setAttempt((value) => value + 1)}>Riprova anteprima</button>
             </div>}
-            <div className="min-h-0 flex-1 overflow-auto p-2" tabIndex={0} aria-label={isPdf ? 'Pagina PDF' : 'Immagine locale'}>
+            <div ref={scrollport} className="min-h-0 flex-1 overflow-auto p-2" tabIndex={0} aria-label={isPdf ? 'Pagina PDF' : 'Immagine locale'}>
                 <canvas ref={canvas} data-testid={isPdf ? 'document-preview-pdf-page' : 'document-preview-image-canvas'}
                     role="img" aria-label={isPdf ? `Anteprima grafica, pagina ${page}` : 'Anteprima grafica dell’immagine'}
-                    style={{ display: status === 'ready' ? 'block' : 'none', maxWidth: '100%', height: 'auto', margin: 'auto' }} />
+                    style={{ display: status === 'ready' ? 'block' : 'none', width: wide ? `${zoom}%` : undefined,
+                        maxWidth: wide ? 'none' : '100%', height: 'auto', margin: 'auto' }} />
             </div>
             {isPdf && <p className="px-3 py-2 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
                 Anteprima grafica locale, senza moduli o collegamenti attivi. Il tipo di carattere può differire dall’originale.

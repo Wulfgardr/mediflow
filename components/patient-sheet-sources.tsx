@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, type ReactNode } from 'react';
 import { FileText } from 'lucide-react';
 import { DocumentOriginal } from './document-upload';
 import { InkSectionHeading } from './ui/ink-state';
@@ -16,7 +16,7 @@ import styles from './twin-synoptic-sheet.module.css';
 export type SheetSource = { kind: 'entry' | 'document'; id: string };
 export type SheetSourceSelection = { source: SheetSource | null; select: (source: SheetSource) => void; close: () => void };
 
-export function PatientSheetSources({ patientId, selection, entries, data, loading, error, onRefresh, onCloseSource, archiveLink, closeLabel }: {
+export function PatientSheetSources({ patientId, selection, entries, data, loading, error, onRefresh, onCloseSource, archiveLink, closeLabel, draftPreview }: {
     patientId: string;
     selection: SheetSourceSelection;
     entries?: ClinicalEntry[];
@@ -27,6 +27,7 @@ export function PatientSheetSources({ patientId, selection, entries, data, loadi
     onCloseSource?: () => void;
     archiveLink?: boolean;
     closeLabel?: string;
+    draftPreview?: ReactNode;
 }) {
     const { isPrivacyMode } = usePrivacy();
     const { source, select, close } = selection;
@@ -35,11 +36,13 @@ export function PatientSheetSources({ patientId, selection, entries, data, loadi
     const file = !loading && !error && source?.kind === 'document' ? files?.find(item => item.id === source.id) : undefined;
     const entry = source?.kind === 'entry' ? entries?.find(item => item.id === source.id && item.patientId === patientId && !item.deletedAt) : undefined;
     const registered = recordDate(entry?.createdAt);
-    const pane = useCallback((element: HTMLDivElement | null) => { if (source) element?.focus(); }, [source]);
+    const widePdf = Boolean(draftPreview && file?.type === 'application/pdf');
+    const pane = useCallback((element: HTMLDivElement | null) => { if (source && !widePdf) element?.focus(); }, [source, widePdf]);
     const closePane = () => { close(); onCloseSource?.(); };
-    return <section aria-label="Documenti recenti" data-source-open={Boolean(source)}>
+    return <section aria-label="Documenti recenti" data-source-open={Boolean(source) && !widePdf}>
         {source ? <div ref={pane} tabIndex={-1} className={styles.sourcePane}>
-            {file ? <DocumentOriginal key={file.id} patientId={patientId} attachment={file} closeLabel={closeLabel}
+            {file ? <DocumentOriginal key={file.id} patientId={patientId} attachment={file}
+                inline={!widePdf} closeLabel={widePdf ? undefined : closeLabel} draftPreview={widePdf ? draftPreview : undefined}
                 onClose={closePane} onRefreshList={() => { closePane(); onRefresh(); }} />
                 : <>
                     <button type="button" className="mf-button-secondary" onClick={closePane}>{closeLabel ?? 'Chiudi'}</button>

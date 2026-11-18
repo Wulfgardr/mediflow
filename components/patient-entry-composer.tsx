@@ -13,7 +13,7 @@ import { AlertTriangle, ArrowLeft, Building2, Calendar, CheckCircle2, ChevronDow
 import { PatientSynopticSheet } from '@/components/patient-synoptic-sheet';
 import { InkState } from '@/components/ui/ink-state';
 import { ViewState } from '@/components/ui/view-state';
-import { ClinicalRichTextEditor, type ClinicalEditorFocus } from '@/components/clinical-rich-text-editor';
+import { ClinicalRichTextEditor, type ClinicalEditorFocus, type ClinicalSelectionExcerpt } from '@/components/clinical-rich-text-editor';
 import { ClinicalRichTextContent } from '@/components/clinical-rich-text-content';
 import { PatientSheetSources, type SheetSourceSelection } from '@/components/patient-sheet-sources';
 import { patientAllergiesForHeader } from '@/lib/patient-allergies';
@@ -107,6 +107,7 @@ export function PatientEntryComposer({ embedded = false, sheetSource, focusRef }
     const [isContextOpen, setIsContextOpen] = useState(false);
     const [isReadingQuadro, setIsReadingQuadro] = useState(false);
     const editorFocus = useRef<ClinicalEditorFocus>(null);
+    const [sourceExcerpt, setSourceExcerpt] = useState<ClinicalSelectionExcerpt | null>(null);
     const reviewHeading = useRef<HTMLHeadingElement>(null);
     const [reviewing, setReviewing] = useState(false);
     useImperativeHandle(focusRef, () => ({
@@ -876,6 +877,7 @@ export function PatientEntryComposer({ embedded = false, sheetSource, focusRef }
                 description={proposal ? "Tab passa al controllo successivo." : undefined}
                 value={content}
                 onChange={value => { setEditState('dirty'); setContent(value); }}
+                onLeaveSelection={inlineSheet ? setSourceExcerpt : undefined}
                 placeholder={'S: Sintomi e motivo della visita\nO: Parametri, esame obiettivo, dati oggettivi\nA: Valutazione clinica e ipotesi\nP: Piano, follow-up, indicazioni'}
             />
             <p className="type-meta mt-3" role="status" data-testid="local-draft-status">{localDraft.error || (!localDraft.hasDraft ? '' : localDraft.state === 'recovered'
@@ -1005,6 +1007,15 @@ export function PatientEntryComposer({ embedded = false, sheetSource, focusRef }
                 {inlineSheet && sheetSource ? <PatientSheetSources patientId={id} selection={sheetSource} entries={entriesRead.error ? undefined : patientEntries} data={attachmentsRead.data}
                     loading={attachmentsRead.loading} error={attachmentsRead.error} onRefresh={attachmentsRead.refresh}
                     closeLabel="Torna alla bozza"
+                    draftPreview={<div className={composerStyles.sourceExcerpt}>
+                        <strong>{writeFailed && entryAttempt ? 'Registrazione da verificare' : 'Bozza non registrata'}</strong>
+                        {sourceExcerpt && (sourceExcerpt.before || sourceExcerpt.after || sourceExcerpt.selected) ? <p>
+                            <PrivacyBlur>{sourceExcerpt.before}{sourceExcerpt.selected
+                                ? <mark>{sourceExcerpt.selected}</mark>
+                                : <span className={composerStyles.sourceCaret} aria-hidden="true" />
+                            }{sourceExcerpt.after}</PrivacyBlur>
+                        </p> : null}
+                    </div>}
                     onCloseSource={() => requestAnimationFrame(() => reviewing ? reviewHeading.current?.focus() : editorFocus.current?.resume())} /> : null}
                 {proposal && !inlineSheet ? (
                     <details

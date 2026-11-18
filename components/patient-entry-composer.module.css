@@ -228,6 +228,17 @@
 }
 .embedded .form { display: flex; flex-direction: column; }
 .embedded .form > :global([data-source-open='true']) { order: -1; }
+.sourceExcerpt {
+    flex: 1 1 14rem;
+    min-width: 0;
+    font-size: 0.875rem;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+.sourceExcerpt strong { font-weight: 600; color: var(--lume-ink-fresh); }
+.sourceExcerpt p { margin: 2px 0 0; white-space: pre-wrap; }
+.sourceExcerpt mark { background: var(--lume-surface-selected); color: inherit; }
+.sourceCaret { display: inline; border-inline-start: 2px solid var(--lume-ink-fresh); }
 .embedded .actions { position: sticky; bottom: 0; }
 .steps { display: flex; flex-wrap: wrap; gap: 6px 12px; margin: 0 0 12px; padding: 0; list-style: none; color: var(--lume-ink-muted); font: var(--type-meta); }
 .steps [aria-current='step'] { color: var(--lume-ink); font-weight: 600; }

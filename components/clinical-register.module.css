@@ -105,6 +105,43 @@
 .inlineViewer header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 12px; border-bottom: 1px solid var(--lume-rule); }
 .inlineViewer h3 { margin: 0; font: 600 0.875rem/1.5 var(--lume-font-sans); overflow-wrap: anywhere; }
 .inlineCanvas { height: clamp(300px, calc(100dvh - 270px), 900px); overflow: auto; }
+.draftBackdrop:global(.mf-modal-backdrop) { padding: clamp(8px, 1.5vw, 20px); }
+.draftViewer { max-width: 80rem; min-height: 0; min-width: 0; }
+.draftViewerHeader {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--lume-rule);
+}
+.draftViewerHeader h3 { margin: 0; overflow-wrap: anywhere; font: 600 0.9375rem/1.35 var(--lume-font-sans); }
+.draftViewerHeader > div > svg { flex: none; }
+.draftViewerHeader > section { padding: 0; grid-column: 2; grid-row: 1; }
+.draftViewerHeader > section:has(p) { grid-column: 1 / -1; grid-row: 2; }
+.draftViewerHeader > button { grid-column: 3; grid-row: 1; padding-inline: 10px; }
+.draftPdfTools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px;
+    font-size: 0.875rem;
+}
+.draftPdfTools .control { padding: 4px 8px; }
+.draftPdfTools .control:disabled { opacity: .5; }
+.draftViewer .control:focus-visible { outline: 2px solid var(--lume-ink-fresh); outline-offset: -3px; }
+.draftStrip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px 14px;
+    padding: 8px 12px;
+    border-top: 1px solid var(--lume-rule);
+    background: var(--lume-surface-canvas);
+}
 @media (max-width: 1000px) {
  .secondaryColumn { display: none; }
  .compactOnly { display: block; }
