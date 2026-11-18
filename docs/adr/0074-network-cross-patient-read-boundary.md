@@ -1,4 +1,3 @@
-<!-- @Codex -->
 # ADR 0074: network cross-patient read boundary
 
 Date: 2026-07-09
