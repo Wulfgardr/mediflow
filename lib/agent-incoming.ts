@@ -5,6 +5,9 @@ import { db } from './db';
 import { notifyDbChange } from './live-query';
 import { openAgentVisit } from './agent-cassette-client';
 import { inspectAgentVisit, prepareAgentApplication, type AgentVisitReview } from './agent-visit-review';
+import { automaticAgentKind } from './agent-visit-application-contract';
+import { agentVisitPresentation, sealVisitConfirmationPresentation } from './agent-visit-confirmation-browser';
+import type { VisitConfirmationTicket } from './agent-visit-confirmation-contract';
 import type { AgentApplicationReceipt, AgentCassetteIndexPage, IncomingAgentCassette } from './agent-visit-application-contract';
 
 const empty = { visits: [] as AgentVisitReview[], busy: false, error: null as string | null };
@@ -48,6 +51,43 @@ async function apply(review: AgentVisitReview, phase: 'automatic' | 'review', si
     return { ...review, patient: review.patient ? { ...review.patient, version: receipt.patientVersion } : null,
         appliedItemIds: [...new Set([...review.appliedItemIds, ...input.items.map(item => item.id)])] };
 }
+async function attemptNativeConfirmation(signal: AbortSignal) {
+    const endpoint = '/api/agent-mandates/confirmation';
+    const offer = await fetch(endpoint, { cache: 'no-store', signal });
+    if (!offer.ok) return;
+    const ticket: VisitConfirmationTicket | null = await offer.json();
+    if (!ticket) return;
+    const existing = snapshot.visits.find(review => review.visit.cassette.id === ticket.visitId && review.visit.cassette.revision === ticket.revision);
+    if (!existing?.patient?.version || existing.blockers.length || existing.proposalBlockers.length) return;
+    const send = (input: unknown) => fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        signal, body: JSON.stringify(input) });
+    const reference = ticket.reference;
+    const prepare = await send({ action: 'prepare', reference, patientId: existing.patient.id, patientVersion: existing.patient.version });
+    if (!prepare.ok) return;
+    try {
+        const { agreementPublicKey } = await prepare.json();
+        const [row, patients, profile, exemptions] = await Promise.all([
+            fetchIncoming<IncomingAgentCassette>('?visit=' + ticket.visitId, signal),
+            db.patients.toArray({ signal, rejectAuthUnavailable: true }),
+            fetch('/api/auth/profile', { cache: 'no-store', signal }),
+            db.exemptions.toArray({ signal, rejectAuthUnavailable: true }),
+        ]);
+        if (!profile.ok || row.id !== ticket.visitId || row.revision !== ticket.revision || row.archiveGeneration !== clientArchiveGeneration()
+            || row.status !== 'closed') return;
+        const { doctorTaxCode } = await profile.json();
+        const review = await inspectAgentVisit(row, patients, doctorTaxCode ?? null, signal, undefined, new Set(exemptions.map(value => value.code)));
+        if (review.visit.items.some(item => automaticAgentKind(item.kind) && !row.appliedItemIds.includes(item.id))) return;
+        const plan = await prepareAgentApplication(review, 'review', signal);
+        if (!plan || plan.patientId !== existing.patient.id || plan.expectedVersion !== existing.patient.version) return;
+        const presentation = await sealVisitConfirmationPresentation(reference, agreementPublicKey, agentVisitPresentation(review, plan));
+        signal.throwIfAborted();
+        const shown = await send({ action: 'show', reference, plan, presentation });
+        if (shown.ok) notifyDbChange();
+    } finally {
+        if (!signal.aborted) await send({ action: 'dismiss', reference }).catch(() => undefined);
+    }
+}
+
 export async function refreshAgentIncoming(signal = db.getSessionReadSignal()): Promise<void> {
     if (inFlight) return inFlight;
     const task = (async () => {
@@ -109,6 +149,7 @@ export function startAgentIncoming(): () => void {
     const run = async () => {
         if (signal.aborted) return;
         await refreshAgentIncoming(signal);
+        if (!signal.aborted) await attemptNativeConfirmation(signal).catch(() => undefined);
         if (!signal.aborted) timer = setTimeout(() => { void run(); }, 5000);
     };
     void run();

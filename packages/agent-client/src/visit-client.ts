@@ -8,6 +8,7 @@ import { AGENT_OPERATIONS, MANDATE_MAX_DURATION_MS, type AgentOperation } from '
 import { AGENT_ITEM_OPERATION, cassetteItems, type AgentCassetteItem } from '../../../lib/agent-cassette-contract';
 import { AGENT_MAX_ITEM_BYTES, isAgentId, validAgentEnvelope, type AgentEnvelope } from '../../../lib/agent-cassette-crypto';
 import { parsePreparedExtraction, DOSSIER_PREPARED_MAX_BYTES } from '../../../lib/domain/documents/dossier-prepared';
+import type { VisitConfirmationReceipt } from '../../../lib/agent-visit-confirmation-contract';
 import { isValidItalianTaxCode } from '../../../lib/patient-identity';
 
 export class AgentClientError extends Error {
@@ -23,10 +24,10 @@ export function agentOrigin(value: string): string {
         return url.origin;
     } catch { throw invalid(); }
 }
-export function agentRequest(origin: string, endpoint: '/api/agent/v1/context' | '/api/agent/v1/mandate' | '/api/agent/v1/visits' | '/api/agent/v1/pairings' | `/api/agent/v1/pairings?requestId=${string}`, authorization?: string, body?: unknown, signal?: AbortSignal): Promise<Record<string, unknown>> {
+export function agentRequest(origin: string, endpoint: '/api/agent/v1/confirmation' | `/api/agent/v1/confirmation?reference=${string}` | '/api/agent/v1/context' | '/api/agent/v1/mandate' | '/api/agent/v1/visits' | '/api/agent/v1/pairings' | `/api/agent/v1/pairings?requestId=${string}`, authorization?: string, body?: unknown, signal?: AbortSignal): Promise<Record<string, unknown>> {
     if (signal?.aborted) throw new AgentClientError('AGENT_CANCELLED');
     agentOrigin(origin);
-    if (!/^\/api\/agent\/v1\/(?:context|mandate|visits|pairings(?:\?requestId=[a-f0-9-]{36})?)$/u.test(endpoint)) throw invalid();
+    if (!/^\/api\/agent\/v1\/(?:context|mandate|visits|pairings(?:\?requestId=[a-f0-9-]{36})?|confirmation(?:\?reference=[a-f0-9-]{36})?)$/u.test(endpoint)) throw invalid();
     const payload = body === undefined ? null : Buffer.from(JSON.stringify(body));
     if (payload && payload.length > 24 * 1024 * 1024) throw invalid();
     return new Promise((resolve, reject) => {
@@ -214,18 +215,22 @@ async function depositAgentVisit(access: AgentCredential, plan: AgentVisitPlan, 
     for (const item of plan.items) receipt = await call({ operation: AGENT_ITEM_OPERATION[item.kind], visitId: plan.visitId, expectedRevision: receipt.revision, item });
     return call({ operation: 'visita.chiudi', visitId: plan.visitId, expectedRevision: receipt.revision });
 }
-export async function loadAgentVisitContext(directory: string, agentRef: string, signal?: AbortSignal, origin?: string) {
-    const readContext = (access: AgentCredential) => agentRequest(access.origin, '/api/agent/v1/context', 'Bearer ' + access.token, undefined, signal);
+async function withCurrentAgentCredential<T>(directory: string, agentRef: string, signal: AbortSignal | undefined,
+    origin: string | undefined, perform: (access: AgentCredential) => Promise<T>) {
     const cached = readAgentCredential(directory, agentRef);
     if (cached && origin && cached.origin !== origin) throw new AgentClientError('AGENT_ACCESS_DENIED', 401);
-    let access = cached ?? (await retrieveMandate(directory, agentRef, signal, origin)).access;
-    let context;
-    try { context = await readContext(access); }
-    catch (error) {
-        if (!cached || !(error instanceof AgentClientError) || error.status !== 401 || !readAgentRegistration(directory, agentRef)) throw error;
-        access = (await retrieveMandate(directory, agentRef, signal, origin)).access;
-        context = await readContext(access);
+    if (cached) {
+        try { return { access: cached, result: await perform(cached) }; }
+        catch (error) {
+            if (!(error instanceof AgentClientError) || error.status !== 401 || !readAgentRegistration(directory, agentRef)) throw error;
+        }
     }
+    const { access } = await retrieveMandate(directory, agentRef, signal, origin);
+    return { access, result: await perform(access) };
+}
+export async function loadAgentVisitContext(directory: string, agentRef: string, signal?: AbortSignal, origin?: string) {
+    const { access, result: context } = await withCurrentAgentCredential(directory, agentRef, signal, origin,
+        current => agentRequest(current.origin, '/api/agent/v1/context', 'Bearer ' + current.token, undefined, signal));
     if (context.agentRef !== agentRef || context.mandateRef !== access.mandateRef || typeof context.publicKey !== 'string' || !Array.isArray(context.operations)) throw new AgentClientError('AGENT_HTTP_UNAVAILABLE');
     return { access, publicKey: context.publicKey, operations: context.operations as unknown[],
         modelProvider: context.modelProvider, allowsClinicalEgress: context.allowsClinicalEgress };
@@ -256,4 +261,16 @@ export function resumeAgentReference(directory: string, visitId: string): string
     const plan = readState(directory, 'visit', visitId);
     if (!visitPlan(plan)) throw new AgentClientError('AGENT_STATE_INVALID');
     return plan.agentRef;
+}
+
+export async function requestAgentVisitConfirmation(directory: string, agentRef: string,
+    operation: { visitId: string } | { reference: string }, signal?: AbortSignal, origin?: string): Promise<VisitConfirmationReceipt> {
+    const id = 'visitId' in operation ? operation.visitId : operation.reference;
+    if (!isAgentId(id)) throw invalid();
+    const { result } = await withCurrentAgentCredential(directory, agentRef, signal, origin, access => 'visitId' in operation
+        ? agentRequest(access.origin, '/api/agent/v1/confirmation', 'Bearer ' + access.token, { visitId: id }, signal)
+        : agentRequest(access.origin, `/api/agent/v1/confirmation?reference=${id}`, 'Bearer ' + access.token, undefined, signal));
+    if (!isAgentId(result.reference) || typeof result.status !== 'string' || !['waiting', 'applied', 'not_applied', 'unavailable'].includes(result.status)
+        || ('reference' in operation && id !== result.reference)) throw new AgentClientError('AGENT_HTTP_UNAVAILABLE');
+    return { reference: result.reference, status: result.status as VisitConfirmationReceipt['status'] };
 }
