@@ -463,6 +463,15 @@ impl Run<'_> {
         panic!("original preview did not settle")
     }
 
+    fn open_first_access(&mut self, bench: &Bench) {
+        self.app(|app, _, cx| {
+            app.form = None;
+            app.patient.record.diary_all = false;
+            cx.notify();
+        });
+        self.open(&bench.first);
+    }
+
     fn caret_and_text(&mut self) -> (usize, String) {
         self.app(|app, window, cx| {
             let editor = app.form.as_ref().unwrap().fields[0].editor.clone();
@@ -487,6 +496,17 @@ fn open_window(
     width: f32,
     height: f32,
 ) -> AnyWindowHandle {
+    open_scaled_window(cx, bench, dark, width, height, 1.)
+}
+
+fn open_scaled_window(
+    cx: &mut HeadlessAppContext,
+    bench: &Bench,
+    dark: bool,
+    width: f32,
+    height: f32,
+    text_scale: f32,
+) -> AnyWindowHandle {
     let session = login(&bench.pairing);
     session.list_ambulatories().unwrap();
     let scope = bench.scope.clone();
@@ -495,7 +515,7 @@ fn open_window(
             cx.new(|cx| {
                 let mut app = ClinicalApp::new(String::new(), window, cx);
                 app.dark_override = Some(dark);
-                app.text_scale = 1.;
+                app.text_scale = text_scale;
                 app.session = Some(session);
                 app.scope = Some(scope);
                 app.area = Area::Patients;
@@ -505,6 +525,74 @@ fn open_window(
         })
         .unwrap();
     handle.into()
+}
+
+const LONG_NOTE: &str = "\nPrimo accesso: riferisce affanno da sforzo da circa tre settimane, peggiorato dopo la sospensione autonoma del diuretico; nessun dolore toracico; caviglie gonfie la sera; chiede indicazioni sul controllo del peso a domicilio e sulla dieta iposodica.";
+
+fn direction_f(run: &mut Run, bench: &Bench, prefix: &str) -> Value {
+    run.open(&bench.crowded);
+    run.shot(
+        &format!("{prefix}-30-affollata-senza-bozza"),
+        "Dodici variazioni per tipo dentro il giorno, bozza chiusa",
+    );
+    run.app(|app, window, cx| app.open_form(FormKind::Notes, window, cx));
+    let typed = run.type_at_end("\nControllare il potassio.");
+    run.shot(
+        &format!("{prefix}-31-affollata-con-bozza"),
+        "Bozza aperta: terapie attive subito sotto il compositore",
+    );
+    let suspended = run.app(|app, _, _| {
+        let anchor = app.patient.record.anchor.clone().flatten()?;
+        record_changes::changes_since(
+            &anchor,
+            app.patient.therapies.ready()?,
+            app.patient.observations.ready()?,
+            &chrono::Local,
+        )
+        .into_iter()
+        .find(|change| change.subject.starts_with("Spironolattone"))
+        .map(|change| change.key)
+    });
+    run.app(move |app, _, cx| {
+        app.patient.record.open = suspended;
+        cx.notify();
+    });
+    run.shot(
+        &format!("{prefix}-32-nome-aperto"),
+        "Un nome aperto: dettaglio e data della variazione",
+    );
+    run.app(|app, _, cx| app.read_whole_diary(cx));
+    let sixth = run.app(|app, _, _| {
+        let mut rows: Vec<_> = app
+            .patient
+            .entries
+            .ready()?
+            .iter()
+            .filter(|row| row.deleted_at.is_none())
+            .collect();
+        rows.sort_by(|a, b| b.date.cmp(&a.date));
+        rows.get(5).map(|row| row.title.clone())
+    });
+    run.shot(
+        &format!("{prefix}-33-diario-intero"),
+        "Bozza aperta: il diario si estende in lettura",
+    );
+    run.app(|app, _, cx| app.close_diary_reading(cx));
+    let back = run.caret_and_text();
+    assert_eq!(back, typed, "text and caret come back after the diary");
+    run.open_first_access(bench);
+    run.shot(
+        &format!("{prefix}-34-primo-accesso"),
+        "Primo accesso, senza visite",
+    );
+    run.app(|app, window, cx| app.open_form(FormKind::Notes, window, cx));
+    let long = run.type_at_end(LONG_NOTE);
+    run.shot(
+        &format!("{prefix}-35-primo-accesso-testo-lungo"),
+        "Primo accesso con una nota lunga in bozza",
+    );
+    serde_json::json!({"sixthDiaryEntry": sixth, "caretAfterTyping": typed.0, "caretAfterDiary": back.0,
+        "longNoteLength": long.1.chars().count()})
 }
 
 fn gesture(run: &mut Run, bench: &Bench, patient: &str, prefix: &str) -> Value {
@@ -816,12 +904,33 @@ fn capture_record_d_on_the_synthetic_bench() {
             crowded_and_interrupted(&mut run, &bench, &format!("{theme}-1180"))
         };
         let pdf = pdf_while_drafting(&mut run, &bench, &format!("{theme}-1180"));
+        let direction = {
+            let mut cx = context();
+            let window = open_window(&mut cx, &bench, dark, 1180., 660.);
+            let mut run = Run {
+                cx: &mut cx,
+                window,
+                directory: directory.clone(),
+                log: vec![],
+            };
+            let result = direction_f(&mut run, &bench, &format!("{theme}-1180-f"));
+            let mut cx = context();
+            let window = open_scaled_window(&mut cx, &bench, dark, 1440., 900., 2.);
+            let mut scaled = Run {
+                cx: &mut cx,
+                window,
+                directory: directory.clone(),
+                log: vec![],
+            };
+            let enlarged = direction_f(&mut scaled, &bench, &format!("{theme}-1440-testo-200"));
+            serde_json::json!({"f": result, "enlarged": enlarged, "shots": run.log, "enlargedShots": scaled.log})
+        };
         run.open(&bench.first);
         run.shot(
             &format!("{theme}-1180-10-primo-accesso"),
             "Primo accesso, senza identificativo e senza visite",
         );
-        summary.push(serde_json::json!({"theme": theme, "gesture": result, "crowded": crowded, "pdf": pdf, "shots": run.log}));
+        summary.push(serde_json::json!({"theme": theme, "gesture": result, "crowded": crowded, "pdf": pdf, "direction": direction, "shots": run.log}));
         for (width, height, label) in [
             (1440., 900., "1440"),
             (820., 660., "820"),

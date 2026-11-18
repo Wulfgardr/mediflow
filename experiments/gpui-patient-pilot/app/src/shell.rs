@@ -3859,7 +3859,6 @@ impl ClinicalApp {
                     .flex_wrap()
                     .flex_shrink_0()
                     .px(px(if layout.compact { 16. } else { layout.margin }))
-                    .py(px(8.))
                     .gap(px(4.))
                     .bg(theme.shade)
                     .children(PatientSection::ALL.into_iter().map(|patient_section| {
@@ -3915,7 +3914,7 @@ impl ClinicalApp {
     #[cfg(test)]
     fn overview(&self, patient: &PatientDetail, cx: &Context<Self>) -> Div {
         div()
-            .child(self.record_stable(patient, cx))
+            .child(self.record_stable(patient, true, cx))
             .child(self.record_checkups(cx))
     }
 

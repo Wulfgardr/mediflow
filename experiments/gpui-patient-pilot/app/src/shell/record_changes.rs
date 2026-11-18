@@ -21,6 +21,27 @@ pub(super) enum ChangeKind {
 }
 
 impl ChangeKind {
+    const READING_ORDER: [Self; 6] = [
+        Self::Started,
+        Self::Updated,
+        Self::Suspended,
+        Self::Concluded,
+        Self::OutOfRange,
+        Self::DocumentAdded,
+    ];
+
+    pub(super) fn counted(self, count: usize) -> String {
+        let (one, many) = match self {
+            Self::Started => ("avviata", "avviate"),
+            Self::Updated => ("aggiornata", "aggiornate"),
+            Self::Suspended => ("sospesa", "sospese"),
+            Self::Concluded => ("conclusa", "concluse"),
+            Self::OutOfRange => ("▲ fuori intervallo", "▲ fuori intervallo"),
+            Self::DocumentAdded => ("documento aggiunto", "documenti aggiunti"),
+        };
+        format!("{count} {}", if count == 1 { one } else { many })
+    }
+
     pub(super) fn label(self) -> &'static str {
         match self {
             Self::Started => "Avviata",
@@ -245,6 +266,41 @@ fn document_change(row: &Attachment, after: DateTime<Utc>) -> Option<Change> {
         at,
         detail: vec![],
     })
+}
+
+pub(super) type KindGroup = (ChangeKind, Vec<Change>);
+
+pub(super) fn by_day_and_kind<T: TimeZone>(
+    changes: Vec<Change>,
+    zone: &T,
+) -> Vec<(String, Vec<KindGroup>)>
+where
+    T::Offset: std::fmt::Display,
+{
+    let mut days: Vec<(String, Vec<Change>)> = vec![];
+    for change in changes {
+        let day = day_in_zone(change.at, zone);
+        match days.last_mut() {
+            Some((current, rows)) if *current == day => rows.push(change),
+            _ => days.push((day, vec![change])),
+        }
+    }
+    days.into_iter()
+        .map(|(day, rows)| {
+            let groups = ChangeKind::READING_ORDER
+                .into_iter()
+                .filter_map(|kind| {
+                    let named: Vec<_> = rows
+                        .iter()
+                        .filter(|row| row.kind == kind)
+                        .cloned()
+                        .collect();
+                    (!named.is_empty()).then_some((kind, named))
+                })
+                .collect();
+            (day, groups)
+        })
+        .collect()
 }
 
 pub(super) fn documents_since(anchor: &VisitAnchor, rows: &[Attachment]) -> Vec<Change> {
@@ -501,6 +557,53 @@ mod tests {
             changes[0].detail[1],
             "Riferimento 3,5 mmol/L–5,0 mmol/L · misura del 10/11/2026"
         );
+    }
+
+    #[test]
+    fn twelve_changes_of_one_day_group_by_kind_and_keep_every_name() {
+        let at = instant("2026-11-18T08:00:00Z").unwrap();
+        let change = |subject: &str, kind| Change {
+            key: subject.into(),
+            source: ChangeSource::Therapy,
+            kind,
+            subject: subject.into(),
+            at,
+            detail: vec![],
+        };
+        let mut rows: Vec<_> = (0..7)
+            .map(|index| change(&format!("Farmaco {index}"), ChangeKind::Started))
+            .collect();
+        rows.push(change("Allopurinolo", ChangeKind::Concluded));
+        rows.push(change("Spironolattone", ChangeKind::Suspended));
+        for name in ["Creatinina", "Emoglobina glicata", "Potassio"] {
+            rows.push(change(name, ChangeKind::OutOfRange));
+        }
+        let days = by_day_and_kind(rows.clone(), &Utc);
+        assert_eq!(days.len(), 1);
+        assert_eq!(days[0].0, "18/11/2026");
+        let lines: Vec<_> = days[0]
+            .1
+            .iter()
+            .map(|(kind, named)| (kind.counted(named.len()), named.len()))
+            .collect();
+        assert_eq!(
+            lines,
+            [
+                ("7 avviate".to_owned(), 7),
+                ("1 sospesa".to_owned(), 1),
+                ("1 conclusa".to_owned(), 1),
+                ("3 ▲ fuori intervallo".to_owned(), 3),
+            ]
+        );
+        let mut seen: Vec<_> = days[0]
+            .1
+            .iter()
+            .flat_map(|(_, named)| named.iter().map(|row| row.subject.clone()))
+            .collect();
+        let mut expected: Vec<_> = rows.into_iter().map(|row| row.subject).collect();
+        seen.sort();
+        expected.sort();
+        assert_eq!(seen, expected, "every name, no cap");
     }
 
     #[test]
