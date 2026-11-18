@@ -13,7 +13,9 @@ import { AlertTriangle, ArrowLeft, Building2, Calendar, CheckCircle2, ChevronDow
 import { PatientSynopticSheet } from '@/components/patient-synoptic-sheet';
 import { InkState } from '@/components/ui/ink-state';
 import { ViewState } from '@/components/ui/view-state';
-import { ClinicalRichTextEditor } from '@/components/clinical-rich-text-editor';
+import { ClinicalRichTextEditor, type ClinicalEditorFocus } from '@/components/clinical-rich-text-editor';
+import { ClinicalRichTextContent } from '@/components/clinical-rich-text-content';
+import { PatientSheetSources } from '@/components/patient-sheet-sources';
 import { patientAllergiesForHeader } from '@/lib/patient-allergies';
 import { PatientHeaderAllergies } from '@/components/patient-header-identity';
 import { Kree8WorkspaceShell, type Kree8WorkspaceNavItem } from '@/components/kree8/kree8-workspace-shell';
@@ -110,7 +112,19 @@ export function PatientEntryComposer({ embedded = false }: { embedded?: boolean 
         setEditState('dirty'); setDateSource(draft.dateSource);
         setEntryDate(restoreEntryDraftDate(draft, defaultDate)); setDictatedDraft(draft.dictatedDraft); setIsDictatedDraftReviewed(false);
     });
-    const writingRef = useRef<HTMLDivElement>(null);
+    const editorFocus = useRef<ClinicalEditorFocus>(null);
+    const reviewHeading = useRef<HTMLHeadingElement>(null);
+    const [reviewing, setReviewing] = useState(false);
+    const inlineSheet = embedded && proposal;
+    const openReview = (event: React.MouseEvent<HTMLButtonElement>) => {
+        if (!event.currentTarget.form?.reportValidity()) return;
+        setReviewing(true);
+        requestAnimationFrame(() => reviewHeading.current?.focus());
+    };
+    const resumeEditor = () => {
+        setReviewing(false);
+        requestAnimationFrame(() => editorFocus.current?.resume());
+    };
     const quadroHeadingRef = useRef<HTMLHeadingElement>(null);
     const consultQuadro = () => {
         setIsReadingQuadro(true);
@@ -118,7 +132,7 @@ export function PatientEntryComposer({ embedded = false }: { embedded?: boolean 
     };
     const resumeDraft = () => {
         setIsReadingQuadro(false);
-        requestAnimationFrame(() => writingRef.current?.querySelector<HTMLElement>('[contenteditable="true"]')?.focus());
+        requestAnimationFrame(() => editorFocus.current?.resume());
     };
     const hasUnsavedChanges = !isClinicalRichTextBlank(content)
         || type !== 'visit'
@@ -142,7 +156,7 @@ export function PatientEntryComposer({ embedded = false }: { embedded?: boolean 
     const patientEntries = useMemo(() => entriesRead.data ?? [], [entriesRead.data]);
     /* WUL-420 */
     const attachmentsRead = useLiveQueryState<Attachment[]>(
-        async () => db.attachments.query({ patientId: id }).toArray({ signal: db.getSessionReadSignal() }),
+        async () => db.attachments.query({ patientId: id, metadataOnly: true }).toArray({ signal: db.getSessionReadSignal() }),
         [id],
         undefined,
         ['attachments'],
@@ -428,7 +442,7 @@ export function PatientEntryComposer({ embedded = false }: { embedded?: boolean 
         <div id="dati" className={composerStyles.metadata}>
             <label className={composerStyles.metadataField}>
                 <span>Tipo</span>
-                <select value={type} onChange={(event) => { setEditState('dirty'); setType(event.target.value as typeof type); }} aria-label="Tipo di voce">
+                <select autoFocus={inlineSheet} value={type} onChange={(event) => { setEditState('dirty'); setType(event.target.value as typeof type); }} aria-label="Tipo di voce">
                     {types.map((entryType) => <option key={entryType.id} value={entryType.id}>{entryType.label}</option>)}
                 </select>
             </label>
@@ -790,6 +804,7 @@ export function PatientEntryComposer({ embedded = false }: { embedded?: boolean 
             )}
 
             <ClinicalRichTextEditor
+                ref={editorFocus}
                 className={proposal ? composerStyles.editor : undefined}
                 description={proposal ? "Tab passa al controllo successivo." : undefined}
                 value={content}
@@ -890,6 +905,11 @@ export function PatientEntryComposer({ embedded = false }: { embedded?: boolean 
         </section>
     );
 
+    const fields = <>
+        {metadataFields}
+        {proposal ? [clinicalEditor, attachmentPicker, visitSession] : [visitSession, clinicalEditor, attachmentPicker]}
+    </>;
+
     const entryForm = (
         <div
             className={proposal ? `${composerStyles.sheet} ${embedded ? composerStyles.embedded : ''}` : "patient-detail-section lume-panel border p-6 md:p-7"}
@@ -897,11 +917,21 @@ export function PatientEntryComposer({ embedded = false }: { embedded?: boolean 
             data-testid="lume-editor-workflow"
         >
             <form onSubmit={handleSubmit} className={proposal ? composerStyles.form : "space-y-0"} aria-label="Nuova voce clinica">
-                {metadataFields}
-                {proposal
-                    ? [clinicalEditor, attachmentPicker, visitSession]
-                    : [visitSession, clinicalEditor, attachmentPicker]}
-                {proposal ? (
+                {inlineSheet ? <div hidden={reviewing}>{fields}</div> : fields}
+                {reviewing ? <section className={composerStyles.review} aria-label="Riepilogo della voce">
+                    <h2 tabIndex={-1} ref={reviewHeading}>Rivedi la voce</h2>
+                    <dl>
+                        <dt>Paziente</dt><dd><PrivacyBlur>{patient ? `${patient.lastName} ${patient.firstName}` : 'Paziente non disponibile'}</PrivacyBlur></dd>
+                        <dt>Tipo e luogo</dt><dd>{types.find(item => item.id === type)?.label} · {setting === 'home' ? 'Domicilio' : 'Ambulatorio'}</dd>
+                        <dt>Data e ora</dt><dd>{formatEntryDate(entryDate)} · {entryDate.slice(11, 16)}</dd>
+                        {files.length > 0 ? <><dt>Allegati</dt><dd><PrivacyBlur>{files.map(file => file.name).join(', ')}</PrivacyBlur></dd></> : null}
+                    </dl>
+                    <PrivacyBlur><ClinicalRichTextContent content={content} /></PrivacyBlur>
+                </section> : null}
+                {inlineSheet ? <PatientSheetSources patientId={id} data={attachmentsRead.data}
+                    loading={attachmentsRead.loading} error={attachmentsRead.error} onRefresh={attachmentsRead.refresh}
+                    onCloseSource={() => requestAnimationFrame(() => reviewing ? reviewHeading.current?.focus() : editorFocus.current?.resume())} /> : null}
+                {proposal && !inlineSheet ? (
                     <details
                         className={composerStyles.context}
                         open={isContextOpen}
@@ -951,6 +981,8 @@ export function PatientEntryComposer({ embedded = false }: { embedded?: boolean 
                 ) : null}
                 <div className={proposal ? composerStyles.actions : "flex justify-end border-t border-[color:color-mix(in_srgb,var(--lume-ink)_12%,transparent)] pt-4"}>
                     {proposal ? <div className={composerStyles.saveSummary} role="status"><InkState state="fresh">{isSubmitting ? 'Registrazione in corso' : 'Bozza non registrata'}</InkState><p>{patient ? <PrivacyBlur>{`${patient.lastName} ${patient.firstName}`}</PrivacyBlur> : patientRead.loading ? 'Caricamento paziente…' : 'Paziente non disponibile.'} · 1 voce di diario{files.length ? ` · ${files.length} allegati` : ''}</p></div> : null}
+                    {inlineSheet && acceptedNoteHasContent ? <button type="button" className="mf-button-text" disabled={isSubmitting}
+                        onClick={reviewing ? resumeEditor : openReview}>{reviewing ? 'Torna a scrivere' : 'Rivedi'}</button> : null}
                     <button
                         type="submit"
                         disabled={isSubmitting}
@@ -1008,7 +1040,7 @@ export function PatientEntryComposer({ embedded = false }: { embedded?: boolean 
                                         checkups={checkupsRead}
                                     />}
                     </aside>
-                    <div className={composerStyles.writingColumn} ref={writingRef}>
+                    <div className={composerStyles.writingColumn} >
                         <div className={composerStyles.columnHeading}>
                             <h2>Diario</h2>
                             <button type="button" className={`mf-button-text ${composerStyles.consultQuadro}`} onClick={consultQuadro}>Consulta il Quadro</button>

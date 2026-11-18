@@ -348,7 +348,7 @@
 }
 
 .timelineSection.timelineSection .sectionTitle, .timelineSection.timelineSection .month {
-  font: var(--type-section);
-  font-variant-caps: all-small-caps;
+  font: var(--type-strong);
+  font-variant-caps: normal;
 }
 .timelineSection .month { text-transform: none; }

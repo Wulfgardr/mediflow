@@ -17,6 +17,8 @@ import { AttentionGroup } from '@/components/attention-group';
 import { ClinicalRiverTimeline } from '@/components/clinical-river-timeline';
 import { PatientEntryComposer } from '@/components/patient-entry-composer';
 import { PatientSynopticSheet } from '@/components/patient-synoptic-sheet';
+import { PatientSheetSources } from '@/components/patient-sheet-sources';
+import { projectTherapyDatesSinceVisit } from '@/lib/patient-therapy-changes';
 import { CollapsibleSection } from '@/components/kree8/collapsible-section';
 import DocumentInsightsPanel from '@/components/document-insights-panel';
 import DocumentUpload from '@/components/document-upload';
@@ -80,10 +82,13 @@ function navigateToObservationForm(): void {
 }
 
 export default function PatientDetailPage() {
-    const { proposal } = useRuntimeTwinDesign();
-    const params = useParams();
+    const { id } = useParams<{ id: string }>();
     const writing = useSearchParams().get('voce') === 'nuova';
-    const id = params.id as string;
+    return <PatientDetail key={id} id={id} writing={writing} />;
+}
+
+function PatientDetail({ id, writing }: { id: string; writing: boolean }) {
+    const { proposal } = useRuntimeTwinDesign();
     const [smartImportProposalCapture, setSmartImportProposalCapture] = useState<PatientSmartImportProjectionCaptureInput | null>(null);
     const [insightProposalKey, setInsightProposalKey] = useState<string | null>(null);
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -106,15 +111,17 @@ export default function PatientDetailPage() {
     const { showToast } = useToast();
 
     const { data: patient, loading: patientLoading, error: patientError, refresh: refreshPatient } = useLiveQueryState(() => db.patients.get(id), [id], undefined, ['patients']);
-    const { data: entries, error: entriesError, refresh: refreshEntries } = useLiveQueryState(
+    const { data: diarySnapshot, loading: entriesLoading, error: entriesError, refresh: refreshEntries } = useLiveQueryState(
         async () => {
             const items = await db.entries.query({ patientId: id, includeDeleted: true }).toArray();
-            return items.sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime());
+            const entries = items.sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime());
+            return { entries, readAt: new Date() };
         },
         [id],
         undefined,
         ['entries'],
     );
+    const entries = diarySnapshot?.entries;
     /* WUL-UIUX Fase 7: stesso filtro del builder (ne completati ne
        annullati): cosi nextCheckup, la sezione Follow-up e i conteggi condivisi
        raccontano lo stesso insieme, e un appuntamento annullato non compare piu
@@ -132,7 +139,7 @@ export default function PatientDetailPage() {
     );
     const followupRead = projectFollowupReadState({ data: checkups, loading: checkupsLoading, error: checkupsError });
     /* The sheet consumes metadata and stored summaries, not original file bytes. */
-    const { data: attachments, error: attachmentsError } = useLiveQueryState(
+    const { data: attachments, loading: attachmentsLoading, error: attachmentsError, refresh: refreshAttachments } = useLiveQueryState(
         async () => db.attachments.query({ patientId: id, metadataOnly: true }).toArray({ signal: db.getSessionReadSignal() }),
         [id],
         undefined,
@@ -461,7 +468,7 @@ export default function PatientDetailPage() {
         { href: '#prestazioni', label: 'Prestazioni', meta: prestazioniCount !== undefined ? formatCountLabel(prestazioniCount, 'prestazione totale', 'prestazioni totali') : undefined },
         { href: '#protesica', label: 'Protesica', meta: protesicaCount !== undefined ? formatCountLabel(protesicaCount, 'prescrizione', 'prescrizioni') : undefined },
         { href: '#scale', label: 'Scale', meta: entries !== undefined ? formatCountLabel(scaleEntries.length, 'valutazione', 'valutazioni') : undefined },
-        { href: '#documenti', label: 'Documenti', meta: String(attachmentItems.length) },
+        { href: '#documenti', label: 'Documenti', meta: attachments === undefined || attachmentsError ? undefined : String(attachmentItems.length) },
         { href: '#siss', label: 'SISS e FSE', meta: sissHandoffCount !== undefined && sissHandoffCount > 0 ? formatCountLabel(sissHandoffCount, 'passaggio registrato', 'passaggi registrati') : undefined },
         { href: '#timeline', label: 'Timeline', meta: entries !== undefined && checkups !== undefined ? formatCountLabel(nonScaleEntries.length + checkups.length + documentInsights.length, 'evento', 'eventi') : undefined },
         { href: '#diario', label: 'Diario', meta: entries !== undefined ? formatCountLabel(nonScaleEntries.length, 'voce', 'voci') : undefined },
@@ -675,15 +682,27 @@ export default function PatientDetailPage() {
 
                 <PluginLocalUiNavigation key={id} patientId={id} patientVersion={patient.version} patientLabel={`${patient.firstName} ${patient.lastName}`} />
                 <PatientSynopticSheet
-                    clinicalSupport={<>
-                        <PatientProposalsSummary hasInsightProposal={hasInsightProposal}
+                    clinicalSupport={<PatientProposalsSummary hasInsightProposal={hasInsightProposal}
                             hasSmartImportProposal={smartImportProposalCapture !== null && smartImportProposalCapture === smartImportFabricCaptureInput}
-                            smartImportAvailable={smartImportSourceCount > 0} />
-                    </>}
+                            smartImportAvailable={smartImportSourceCount > 0} />}
                     notesContent={<PatientProfileNotes patientId={id} patientVersion={patient.version} />}
                     problems={{ data: diagnosisItems, loading: patientLoading, error: patientError }}
                     therapies={{ data: activeTherapies, loading: therapiesLoading, error: therapiesError }}
-                    therapyRecords={{ data: therapies, loading: therapiesLoading, error: therapiesError }}
+                    diary={<Timeline entries={timelineEntries} readFailed={Boolean(entriesError)} onRetry={refreshEntries} patientDiary section={{
+                        id: 'diario',
+                        title: 'Diario clinico',
+                        count: entries !== undefined ? formatCountLabel(nonScaleEntries.length, 'voce', 'voci') : undefined,
+                        defaultOpen: true,
+                        surfaceClassName: workspaceStyles.clinicalSection,
+                        keepMounted: true,
+                    }} />}
+                    composer={writing ? <PatientEntryComposer key={id} embedded /> : undefined}
+                    sources={<PatientSheetSources patientId={id} data={attachments} loading={attachmentsLoading} error={attachmentsError}
+                        onRefresh={refreshAttachments} archiveLink />}
+                    comparison={entriesError || therapiesError ? null : diarySnapshot && therapies && !entriesLoading && !therapiesLoading
+                        ? projectTherapyDatesSinceVisit(id, diarySnapshot.entries, therapies, diarySnapshot.readAt)
+                        : undefined}
+                    comparisonUnavailable={Boolean(entriesError || therapiesError)}
                     measures={{ data: observations, loading: observationsLoading, error: observationsError }}
                     checkups={{ data: checkups, loading: checkupsLoading, error: checkupsError }}
                 />
@@ -701,7 +720,6 @@ export default function PatientDetailPage() {
 
                 <CollapsibleSection
                     id="timeline"
-                    kicker="Timeline"
                     title="Timeline clinica"
                     count={entries !== undefined && checkups !== undefined ? formatCountLabel(nonScaleEntries.length + checkups.length + documentInsights.length, 'evento', 'eventi') : undefined}
                     summary="Diario, controlli e referti in ordine cronologico."
@@ -711,16 +729,6 @@ export default function PatientDetailPage() {
                         checkupsUnavailable={Boolean(checkupsError) && checkups === undefined}
                         entriesUnavailable={Boolean(entriesError) && entries === undefined} documentInsights={documentInsights} />
                 </CollapsibleSection>
-
-                <Timeline entries={timelineEntries} readFailed={Boolean(entriesError)} onRetry={refreshEntries} patientDiary composer={writing ? <PatientEntryComposer key={id} embedded /> : undefined} section={{
-                    id: 'diario',
-                    kicker: 'Diario',
-                    title: 'Diario clinico',
-                    count: entries !== undefined ? formatCountLabel(nonScaleEntries.length, 'voce', 'voci') : undefined,
-                    summary: entries !== undefined ? nonScaleEntries.length === 0 ? 'Nessuna voce clinica registrata.' : undefined : undefined,
-                    surfaceClassName: workspaceStyles.clinicalSection,
-                    keepMounted: true,
-                }} />
 
                     <TherapyManager patientId={id} embedded surfaceClassName={workspaceStyles.clinicalSection}
                         before={<PluginPrescribingGuide />}>
@@ -737,7 +745,6 @@ export default function PatientDetailPage() {
 
                     {territorialPacks.lombardy && <CollapsibleSection
                         id="siss"
-                        kicker="SISS / FSE"
                         title="SISS e FSE"
                         count={sissHandoffCount !== undefined && sissHandoffCount > 0 ? formatCountLabel(sissHandoffCount, 'passaggio registrato', 'passaggi registrati') : undefined}
                         summary="Apertura assistita dei portali regionali e diario dei passaggi."
@@ -756,7 +763,6 @@ export default function PatientDetailPage() {
                 <CollapsibleSection
                     id="documenti"
                     keepMounted
-                    kicker="Documenti"
                     title="Archivio documenti ed evidenze"
                     count={attachmentsError || attachments === undefined ? undefined : `${attachments.length} file`}
                     summary={attachmentsError ? 'Conteggio non disponibile.'

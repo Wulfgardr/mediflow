@@ -99,7 +99,7 @@ async function assertQuadroContract(page: Page, quadro: Locator, patient: LivePa
   await expect(quadro.getByRole('heading', { name: /^Problemi/ })).toBeVisible();
   await expect(quadro.getByText('Controllo sintetico del Quadro', { exact: true })).toBeVisible();
   await expect(quadro.getByText('5 mg · 1-0-0', { exact: true })).toBeVisible();
-  await expect(quadro.locator('[aria-pressed]')).toHaveCount(0);
+  await expect(quadro.locator('table [aria-pressed]')).toHaveCount(0);
   const elevations = await quadro.evaluate((element) => [element, ...element.querySelectorAll('*')]
     .filter(node => (node as HTMLElement).offsetParent !== null && getComputedStyle(node).boxShadow !== 'none')
     .map(node => node.tagName));
@@ -129,15 +129,15 @@ async function assertQuadroContract(page: Page, quadro: Locator, patient: LivePa
 
   const diary = page.locator('#diario');
   await expect(diary).toBeVisible();
-  const overview = await quadro.boundingBox();
-  const diaryBox = await diary.boundingBox();
-  expect(overview).not.toBeNull();
-  expect(diaryBox).not.toBeNull();
+  const problemsBox = (await quadro.getByRole('region', { name: 'Problemi', exact: true }).boundingBox())!;
+  const diaryBox = (await diary.boundingBox())!;
+  const contextBox = (await quadro.getByRole('complementary', { name: 'Contesto della cartella' }).boundingBox())!;
   if (page.viewportSize()!.width > 1000) {
-    expect(diaryBox!.x).toBeGreaterThanOrEqual(overview!.x + overview!.width);
-    expect(Math.abs(diaryBox!.y - overview!.y)).toBeLessThanOrEqual(1);
-  } else {
-    expect(diaryBox!.y).toBeGreaterThanOrEqual(overview!.y + overview!.height);
+    expect(diaryBox.x).toBeGreaterThanOrEqual(problemsBox.x + problemsBox.width);
+    expect(contextBox.x).toBeGreaterThanOrEqual(diaryBox.x + diaryBox.width);
+  } else if (page.viewportSize()!.width <= 390) {
+    expect(diaryBox.y).toBeGreaterThanOrEqual(problemsBox.y + problemsBox.height);
+    expect(contextBox.y).toBeGreaterThanOrEqual(diaryBox.y + diaryBox.height);
   }
 
   const primary = page.getByTestId('lume-scheda-header').getByRole('link', { name: 'Nuova voce', exact: true });
@@ -155,9 +155,10 @@ async function assertReflowStack(quadro: Locator): Promise<void> {
       const rect = node.getBoundingClientRect();
       return { top: rect.top, bottom: rect.bottom, left: rect.left };
     };
-    return [...element.querySelectorAll(':scope > section')].map(box);
+    return [...element.querySelectorAll('[aria-label="Problemi"], [aria-label="Terapie attive"], #diario, aside')]
+      .filter(node => node.matches('section, aside')).map(box);
   });
-  expect(geometry).toHaveLength(5);
+  expect(geometry).toHaveLength(4);
   for (let index = 1; index < geometry.length; index++) {
     expect(geometry[index].top).toBeGreaterThanOrEqual(geometry[index - 1].bottom);
     expect(Math.abs(geometry[index].left - geometry[index - 1].left)).toBeLessThanOrEqual(1);

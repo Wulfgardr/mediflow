@@ -89,7 +89,7 @@
     min-width: 0;
     min-height: 2.75rem;
     padding: 0.65rem 0.75rem;
-    border: 1px solid var(--lume-rule-strong);
+    border: 1px solid var(--lume-ink-muted);
     border-radius: var(--lume-radius-control);
     background: var(--lume-surface-field);
     color: var(--lume-ink);

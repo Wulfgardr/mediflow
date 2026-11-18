@@ -4,7 +4,8 @@ import type { ReactNode } from 'react';
 import type { Checkup, Diagnosis, Observation, Therapy } from '@/lib/db';
 import { formatCountLabel } from '@/lib/format-count';
 import { projectQuadroMeasures } from '@/lib/patient-quadro';
-import { projectLastRecordedTherapyChanges, THERAPY_CHANGE_LABELS } from '@/lib/patient-therapy-changes';
+import type { projectTherapyDatesSinceVisit } from '@/lib/patient-therapy-changes';
+import PrivacyBlur from './privacy-blur';
 import { InkSectionHeading } from '@/components/ui/ink-state';
 import register from './clinical-register.module.css';
 import reading from './twin-synoptic-sheet.module.css';
@@ -20,7 +21,11 @@ export interface PatientSynopticSheetProps {
     notesContent?: ReactNode;
     problems: QuadroRead<Diagnosis>;
     therapies: QuadroRead<Therapy>;
-    therapyRecords?: QuadroRead<Therapy>;
+    diary?: ReactNode;
+    composer?: ReactNode;
+    sources?: ReactNode;
+    comparison?: ReturnType<typeof projectTherapyDatesSinceVisit>;
+    comparisonUnavailable?: boolean;
     measures: QuadroRead<Observation>;
     checkups: QuadroRead<Checkup>;
 }
@@ -46,41 +51,35 @@ function DateCell({ date }: { date?: Date }) {
     return <time dateTime={new Date(date).toISOString()}>{new Date(date).toLocaleDateString('it-IT')}</time>;
 }
 
-export function PatientSynopticSheet({ clinicalSupport, notesContent, problems, therapies, therapyRecords, measures, checkups }: PatientSynopticSheetProps) {
+export function PatientSynopticSheet({ clinicalSupport, notesContent, problems, therapies, measures, checkups, diary, composer, sources, comparison, comparisonUnavailable }: PatientSynopticSheetProps) {
     const measureRows = projectQuadroMeasures(measures.data ?? []);
-    const therapyChanges = projectLastRecordedTherapyChanges(therapyRecords?.data ?? [], 3);
-    return <section id="quadro" aria-label="Riepilogo clinico" className={`${register.register} ${reading.sheet}`}>
-        {clinicalSupport}
+    const stable = <>
         <Section name="Problemi" read={problems} count={formatCountLabel(problems.data?.length ?? 0, 'problema', 'problemi')} empty="Nessun problema registrato.">
             <table className={`${register.table} ${reading.problems}`} aria-label="Problemi">
-                <thead><tr><th scope="col">Codice</th><th scope="col">Descrizione</th><th scope="col" className={register.secondaryColumn}>Da quando</th></tr></thead>
+                <thead><tr><th scope="col">Codice</th><th scope="col">Descrizione</th><th scope="col" className={`${register.secondaryColumn} ${reading.secondaryColumn}`}>Da quando</th></tr></thead>
                 <tbody>{problems.data?.map((problem, index) => <tr key={`${problem.system}-${problem.code}-${index}`}>
-                    <td className="lume-code">{problem.code}</td><td>{problem.description}</td><td className={register.secondaryColumn}><DateCell date={problem.date} /></td>
+                    <td className="lume-code">{problem.code}</td><td><PrivacyBlur>{problem.description}</PrivacyBlur>{diary && problem.date ? <small><DateCell date={problem.date} /></small> : null}</td><td className={`${register.secondaryColumn} ${reading.secondaryColumn}`}><DateCell date={problem.date} /></td>
                 </tr>)}</tbody>
             </table>
         </Section>
-        {therapyRecords ? <Section name="Ultime modifiche di terapia" read={{ ...therapyRecords, data: therapyRecords.data === undefined ? undefined : therapyChanges }} count={formatCountLabel(therapyChanges.length, 'evento registrato', 'eventi registrati')} empty="Nessuna modifica di terapia registrata.">
-            <table className={`${register.table} ${reading.changes}`} aria-label="Ultime modifiche di terapia">
-                <thead><tr><th scope="col">Data</th><th scope="col">Farmaco</th><th scope="col">Evento</th></tr></thead>
-                <tbody>{therapyChanges.map(change => <tr key={change.id}>
-                    <td><DateCell date={change.date} /></td><td>{change.drugName}</td><td>{THERAPY_CHANGE_LABELS[change.kind]}</td>
-                </tr>)}</tbody>
-            </table>
-        </Section> : null}
         <Section name="Terapie attive" read={therapies} count={formatCountLabel(therapies.data?.length ?? 0, 'attiva', 'attive')} empty="Nessuna terapia attiva.">
             <table className={`${register.table} ${reading.therapies}`} aria-label="Terapie attive">
-                <thead><tr><th scope="col">Nome e dose</th><th scope="col">Posologia</th><th scope="col" className={register.secondaryColumn}>ATC</th></tr></thead>
+                <thead><tr><th scope="col">Nome e dose</th><th scope="col">Posologia</th><th scope="col" className={`${register.secondaryColumn} ${reading.secondaryColumn}`}>ATC</th></tr></thead>
                 <tbody>{therapies.data?.map(therapy => <tr key={therapy.id}>
-                    <td>{therapy.drugName}</td><td>{therapy.dosage}</td><td className={`${register.secondaryColumn} lume-code`}>{therapy.atc}</td>
+                    <td><PrivacyBlur>{therapy.drugName}</PrivacyBlur>{diary && therapy.atc ? <small className="lume-code">{therapy.atc}</small> : null}</td><td><PrivacyBlur>{therapy.dosage}</PrivacyBlur></td><td className={`${register.secondaryColumn} ${reading.secondaryColumn} lume-code`}>{therapy.atc}</td>
                 </tr>)}</tbody>
             </table>
         </Section>
+    </>;
+    const context = <>
+        {clinicalSupport}
+        {sources}
         <Section name="Parametri recenti" read={{ ...measures, data: measures.data === undefined ? undefined : measureRows }} count={formatCountLabel(measureRows.length, 'parametro', 'parametri')} empty="Nessuna misura registrata.">
             <table className={`${register.table} ${reading.measures}`} aria-label="Parametri recenti">
-                <thead><tr><th scope="col">Nome</th><th scope="col" className={reading.value}>Valore</th><th scope="col">Data</th><th scope="col" className={register.secondaryColumn}>Variazione</th></tr></thead>
+                <thead><tr><th scope="col">Nome</th><th scope="col" className={reading.value}>Valore</th><th scope="col">Data</th><th scope="col" className={`${register.secondaryColumn} ${reading.secondaryColumn}`}>Variazione</th></tr></thead>
                 <tbody>{measureRows.map(measure => <tr key={measure.id}>
-                    <td>{measure.display}</td><td className={`${reading.value} ${measure.outOfRange ? register.critical : ''}`}>{measure.valueLabel}{measure.outOfRange ? ` · ${measure.outOfRange}` : ''}</td>
-                    <td><DateCell date={measure.date} /></td><td className={register.secondaryColumn}>{measure.delta}</td>
+                    <td>{measure.display}</td><td className={`${reading.value} ${measure.outOfRange ? register.critical : ''}`}>{measure.valueLabel}{measure.outOfRange ? ` · ${measure.outOfRange}` : ''}{diary && measure.delta ? <small>{measure.delta}</small> : null}</td>
+                    <td><DateCell date={measure.date} /></td><td className={`${register.secondaryColumn} ${reading.secondaryColumn}`}>{measure.delta}</td>
                 </tr>)}</tbody>
             </table>
         </Section>
@@ -91,5 +90,50 @@ export function PatientSynopticSheet({ clinicalSupport, notesContent, problems, 
             </table>
         </Section>
         {notesContent ? <div className={reading.notes}>{notesContent}</div> : null}
+    </>;
+    return <section id="quadro" aria-label="Riepilogo clinico" className={`${register.register} ${reading.sheet}`} data-overview={diary ? 'true' : undefined} data-writing={composer ? 'true' : undefined}>
+        {diary ? <>
+            <div className={reading.stable}>{stable}</div>
+            <div className={reading.middle}>
+                {comparison === undefined ? null : <TherapyComparison comparison={comparison} unavailable={comparisonUnavailable} showLinks={!composer} />}
+                {diary}
+            </div>
+            <aside aria-label={composer ? 'Scrittura e fonti' : 'Contesto della cartella'} className={reading.context}>
+                {composer ?? context}
+            </aside>
+        </> : <>{stable}{context}</>}
+    </section>;
+}
+
+function TherapyComparison({ comparison, unavailable, showLinks }: {
+    comparison: ReturnType<typeof projectTherapyDatesSinceVisit>;
+    unavailable?: boolean;
+    showLinks: boolean;
+}) {
+    if (!comparison) return <p className={reading.noComparison}>
+        {unavailable ? 'Confronto con la visita precedente non disponibile.' : 'Nessuna visita precedente disponibile per il confronto.'}
+    </p>;
+
+    const renderRows = (changes: typeof comparison.changes) => <ul className={reading.changeList}>{changes.map(change =>
+        <li key={`${change.therapyId}:${change.kind}`}>
+            <DateCell date={change.date} />
+            <strong><PrivacyBlur>{change.drugName}</PrivacyBlur></strong>
+            <span>{change.kind === 'start' ? 'Inizio' : 'Conclusione'}</span>
+        </li>
+    )}</ul>;
+
+    return <section aria-label="Variazioni di terapia" className={reading.comparison}>
+        <h2>Variazioni di terapia</h2>
+        <p className={reading.readState}>Dopo la visita del <DateCell date={comparison.visitDate} /></p>
+        {comparison.changes.length ? renderRows(comparison.changes.slice(0, 2)) : <p className={reading.readState}>Nessun inizio o conclusione con data successiva.</p>}
+        <details className={reading.changeDetails}>
+            <summary>{comparison.changes.length > 2 ? 'Altre variazioni e fonti' : 'Fonti del confronto'}</summary>
+            {comparison.changes.length > 2 ? renderRows(comparison.changes.slice(2)) : null}
+            <p>Il confronto usa le date di inizio e conclusione riportate nelle schede terapia. Lo storico di sospensioni e posologie non è disponibile qui.</p>
+            {showLinks ? <div>
+                <a href="#terapie" className="mf-button-text">Apri Terapie</a>
+                <a href="#diario" className="mf-button-text">Apri il diario</a>
+            </div> : null}
+        </details>
     </section>;
 }

@@ -58,7 +58,7 @@
 .actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding-top: 24px; border-top: 1px solid color-mix(in srgb, var(--lume-ink) 16%, transparent); }
 .navigation { display: flex; flex-wrap: wrap; gap: 12px; }
 .context { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 16px; }
-.context select, .input { box-sizing: border-box; min-width: 0; min-height: 44px; max-width: 100%; padding: 10px 12px; border: 1px solid var(--lume-rule-strong); border-radius: var(--scale-control-radius, 12px); background: var(--lume-surface-field); color: var(--lume-ink); font: inherit; }
+.context select, .input { box-sizing: border-box; min-width: 0; min-height: 44px; max-width: 100%; padding: 10px 12px; border: 1px solid var(--lume-ink-muted); border-radius: var(--scale-control-radius, 12px); background: var(--lume-surface-field); color: var(--lume-ink); font: inherit; }
 .details { margin-bottom: 24px; color: var(--lume-ink-muted); line-height: 1.6; }
 .details summary { display: list-item; width: fit-content; min-height: 44px; padding-block: 10px; cursor: pointer; color: var(--lume-ink); }
 .details p { margin: 8px 0; }

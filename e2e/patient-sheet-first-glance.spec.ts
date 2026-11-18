@@ -41,7 +41,7 @@ test.beforeEach(async ({ page }) => {
   await bootstrapUnlockedSession(page, pin);
 });
 
-test('Riepilogo: il primo sguardo mostra identità, problemi, ultime modifiche di terapia e l’ingresso al Quadro paziente', async ({ page }) => {
+test('Riepilogo: identità, problemi, terapie attive e Quadro paziente senza una visita di riferimento', async ({ page }) => {
   const id = await syntheticPatient(page, { taxCode: '', identifierType: 'none', birthDatePrecision: 'estimated', birthYear: 1984 });
   await openSheet(page, id);
 
@@ -57,18 +57,8 @@ test('Riepilogo: il primo sguardo mostra identità, problemi, ultime modifiche d
   expect(await insideWorkArea(quadro)).toBe(true);
   const problems = page.locator('#quadro').getByRole('table', { name: 'Problemi' });
   await expect(problems).toBeVisible();
-  await expect.poll(() => page.evaluate(() => {
-    const summary = document.querySelector('[data-testid="patient-proposals-summary"]');
-    const table = document.querySelector('#quadro table[aria-label="Problemi"]');
-    return summary && table ? summary.getBoundingClientRect().bottom <= table.getBoundingClientRect().top : null;
-  })).toBe(true);
-
-  const changes = page.locator('#quadro').getByRole('table', { name: 'Ultime modifiche di terapia' });
-  expect(await insideWorkArea(changes.getByRole('row').nth(1))).toBe(true);
-  await expect(changes.getByRole('row').filter({ hasText: 'Farmaco sintetico concluso' })).toContainText('20/09/2026');
-  await expect(changes.getByRole('row').filter({ hasText: 'Farmaco sintetico concluso' })).toContainText('Conclusa');
-  await expect(changes.getByRole('row').filter({ hasText: 'Farmaco sintetico sospeso' })).toContainText('Sospesa');
-  await expect(changes.getByRole('row').filter({ hasText: 'Farmaco sintetico attivo' })).toContainText('Avviata');
+  await expect(page.getByText('Nessuna visita precedente disponibile per il confronto.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Variazioni di terapia', exact: true })).toHaveCount(0);
   const active = page.locator('#quadro').getByRole('table', { name: 'Terapie attive' });
   await expect(active.getByRole('row')).toHaveCount(2);
   await expect(active).not.toContainText('Farmaco sintetico sospeso');

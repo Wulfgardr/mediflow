@@ -50,8 +50,7 @@ test('Protesica: bozza, provenienza e azioni nei due temi e allo zoom reale', as
             await post('commit', { ...body, proof: preview.proof, acceptSubset: true });
             const sources = await (await fetch('/api/prosthetics/catalog/sources')).json();
             const source = sources.sources.find((row: { name: string }) => row.name === sourceName);
-            const status = await (await fetch('/api/prosthetics/catalog/status')).json();
-            const document = await post('documents', { sourceId: source.id, revision: status.revision, name: 'originale-w14b-sintetico.txt', base64: btoa(original), page: '1' });
+            const document = await post('documents', { sourceId: source.id, revision: sources.revision, name: 'originale-w14b-sintetico.txt', base64: btoa(original), page: '1' });
             return { id: source.id as string, name: sourceName, sha256: source.sha256 as string, document: { id: document.id as string, name: document.name as string, sha256: document.sha256 as string } };
         }, { name: NAME, original });
         await page.goto(`/patients/${patientId}/modules`); await openPatientSection(page, 'protesica');

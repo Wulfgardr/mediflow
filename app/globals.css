@@ -148,7 +148,7 @@ body {
 .lume-point { display: inline-block; flex: none; width: 0.44em; height: 0.44em; border: 1.5px solid currentColor; border-radius: 50%; background: currentColor; }
 [data-ink='pencil'] > .lume-point { background: transparent; }
 [data-ink='pencil'] > .lume-ink-copy { text-decoration: underline dashed; text-underline-offset: 4px; }
-.lume-section-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-block: 8px; border-bottom: 1px solid var(--lume-rule-strong); font: 600 0.75rem/1.5 var(--lume-font-sans); letter-spacing: 0.05em; text-transform: uppercase; }
+.lume-section-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-block: 8px; border-bottom: 1px solid var(--lume-rule-strong); font: var(--type-strong); }
 .lume-section-heading > span { font-weight: 400; color: var(--lume-ink-muted); }
 .lume-rule-table { width: 100%; border-collapse: collapse; font: 0.875rem/1.5 var(--lume-font-sans); font-variant-numeric: tabular-nums; }
 .lume-rule-table :is(th, td) { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--lume-rule); }
@@ -1065,7 +1065,7 @@ input::placeholder, textarea::placeholder { color: var(--lume-ink-secondary); op
   min-height: var(--lume-control-height);
   width: 100%;
   border-radius: var(--lume-radius-control);
-  border: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent);
+  border: 1px solid var(--lume-ink-muted);
   background-color: var(--lume-surface-field);
   color: var(--lume-ink);
   padding: 0.7rem 0.95rem;
@@ -1082,7 +1082,7 @@ input::placeholder, textarea::placeholder { color: var(--lume-ink-secondary); op
 
 .mf-input:hover:not(:disabled),
 .input-field:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--lume-ink) 22%, transparent);
+  border-color: var(--lume-ink);
 }
 
 .mf-input:focus,
@@ -1143,7 +1143,7 @@ html:root[data-lume] .mf-input.mf-search-input {
 .mf-textarea {
   width: 100%;
   border-radius: var(--lume-radius-control);
-  border: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent);
+  border: 1px solid var(--lume-ink-muted);
   background-color: var(--lume-surface-field);
   color: var(--lume-ink);
   padding: 0.7rem 0.95rem;
@@ -1157,7 +1157,7 @@ html:root[data-lume] .mf-input.mf-search-input {
 
 :root.dark .mf-input,
 :root.dark .input-field {
-  border-color: color-mix(in srgb, var(--lume-ink) 14%, transparent);
+  border-color: var(--lume-ink-muted);
   background-color: var(--lume-surface-field);
   color: var(--lume-ink);
   box-shadow: none;
