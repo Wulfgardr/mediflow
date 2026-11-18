@@ -2,7 +2,9 @@
 
 Data: 2026-11-18
 
-Stato: **Proposto**. Le due decisioni sono sottoposte separatamente a Leonardo.
+Stato: **Accettato** da Leonardo il 18/11/2026. L'accettazione riguarda
+il contratto. Le prove di implementazione e la pubblicazione del testo
+aggiornato sulla cifratura seguono le condizioni di questo ADR.
 
 ## Punto di partenza
 
@@ -26,12 +28,13 @@ separatamente se la chiave può restare nel servizio senza una finestra aperta.
 
 ## 1. Confermare una visita da Codex
 
-### Raccomandazione
+### Decisione
 
 Nel plugin «MediFlow Ambulatorio» il medico apre la conferma della singola
 visita. MediFlow presenta un riquadro nativo di propria competenza, con
 paziente, fonti, differenze rispetto alla scheda ed operazioni da registrare.
-Il medico conferma lì con un Touch ID fresco. Dopo l'esito torna alla chat.
+Il medico conferma lì con un nuovo gesto di autenticazione macOS.
+Dopo l'esito torna alla chat.
 Il percorso parte da Codex e conserva un punto di controllo che il modello
 non può impersonare. Basta il riquadro temporaneo sul Mac, anche senza una
 finestra principale quando è attiva la modalità del punto 2.
@@ -61,14 +64,16 @@ va provata. Se manca il percorso fidato, il medico conclude in «In arrivo».
    sua versione. Lega la prova anche all'impronta di una rappresentazione
    canonica del piano e delle fonti mostrate. La prova vale per quella
    singola operazione.
-3. Una chiave di firma del dispositivo, dedicata e registrata per
-   l'account MediFlow, firma la richiesta solo dopo il gesto nel riquadro.
-   L'uso della chiave richiede il set biometrico corrente, con contesto
-   fresco e senza riuso dello sblocco mattutino. L'account macOS deve essere
-   riservato al medico, con sole impronte autorizzate: Touch ID verifica
-   un'impronta registrata sul Mac. L'identità clinica viene dalla sessione
-   MediFlow. Annullamento, timeout o Touch ID indisponibile chiudono il
-   tentativo. [Apple: criteri biometrici](https://developer.apple.com/documentation/localauthentication/lapolicy/deviceownerauthenticationwithbiometrics).
+3. Il componente nativo verifica il gesto nel riquadro tramite
+   LocalAuthentication. Solo dopo l'esito positivo fa firmare la richiesta
+   alla chiave del dispositivo, dedicata e registrata per l'account
+   MediFlow. La firma attesta la decisione del componente MediFlow sul
+   piano mostrato. La chiave di firma rimane riservata al componente
+   firmato. Usa una protezione distinta dall'involucro biometrico del
+   punto 2, altrimenti Apple Watch e password non potrebbero completare
+   la conferma. L'account macOS è riservato al medico. L'identità clinica
+   viene dalla sessione MediFlow e l'autenticazione macOS prova il gesto
+   per quella richiesta.
 4. La prova arriva direttamente al proprietario della scrittura sul canale
    locale privato. Il writer rilegge ammissione, mandato, pairing, sessione,
    versioni e piano. Una differenza richiede un nuovo riquadro. Il writer
@@ -91,14 +96,67 @@ automatico nelle cassette miste. La UI Web mantiene il suo percorso fidato.
 Il nuovo ingresso non accetta direttamente `phase: review`, cookie Web o
 identità fornite dal modello come prova.
 
+### Autenticazione a coperchio aperto o chiuso
+
+MediFlow usa un nuovo `LAContext` per ciascuna valutazione, con riuso
+di Touch ID disattivato. `canEvaluatePolicy` rileva la disponibilità.
+Solo un esito positivo di `evaluatePolicy` vale per la conferma.
+Al termine il contesto è invalidato. Su macOS 15 e successivi chiede prima
+`.deviceOwnerAuthenticationWithBiometricsOrCompanion`. Su macOS 10.15
+fino a 14 l'equivalente dell'API è
+`.deviceOwnerAuthenticationWithBiometricsOrWatch`, deprecata da macOS 15.
+Sono versioni delle API, mentre il supporto MediFlow dipende dalle
+configurazioni provate. `.deviceOwnerAuthenticationWithBiometrics`,
+disponibile da macOS 10.12.2, copre il solo Touch ID e da sola lascerebbe
+scoperto il caso Apple Watch. Disponibilità verificata in `LAContext.h`
+dell'SDK macOS 27.3.
+[Apple: policy LocalAuthentication](https://developer.apple.com/documentation/localauthentication/lapolicy),
+[Apple: biometria o companion](https://developer.apple.com/documentation/localauthentication/lapolicy/deviceownerauthenticationwithbiometricsorcompanion),
+[Apple: biometria o Watch](https://developer.apple.com/documentation/localauthentication/lapolicy/deviceownerauthenticationwithbiometricsorwatch).
+
+- **Touch ID.** Vale il sensore integrato del Mac oppure quello di una
+  Magic Keyboard con Touch ID abbinata. Per la tastiera esterna Apple
+  richiede Apple silicon. Il modello con porta USB-C richiede almeno
+  macOS 15.1, quello con porta Lightning almeno macOS 11.4.
+  A coperchio chiuso il sensore da provare è quello della tastiera esterna.
+  [Apple: requisiti Touch ID](https://support.apple.com/en-us/102356).
+- **Apple Watch.** È un dispositivo associato, con approvazione tramite
+  doppio clic del tasto laterale. Il Watch deve avere watchOS 6 o
+  successivo per approvare richieste, essere indossato, sbloccato,
+  abbinato e vicino. Serve abilitare l'approvazione sul Mac. Apple
+  richiede lo stesso Apple Account con autenticazione a due fattori,
+  codice sul Watch e Wi-Fi e Bluetooth attivi sul Mac. La sola
+  prossimità o lo sblocco del Mac col Watch non valgono come conferma.
+  macOS può offrire Watch e Touch ID in parallelo.
+  [Apple: approvare richieste con Apple Watch](https://support.apple.com/en-md/guide/mac-help/mchl4f800a42/mac),
+  [Apple: policy Watch](https://developer.apple.com/documentation/localauthentication/lapolicy/deviceownerauthenticationwithwatch).
+- **Password dell'account macOS.** Ultimo ripiego se il primo percorso
+  è indisponibile, bloccato o il medico sceglie esplicitamente il ripiego.
+  Il riquadro invoca `.deviceOwnerAuthentication`, disponibile da
+  macOS 10.11. Il sistema può offrire anche Touch ID o Watch e governa
+  il proprio dialogo per la password. MediFlow riceve solo l'esito,
+  senza leggere la password o chiedere il PIN MediFlow. Chat, frame
+  e strumenti dell'agente non hanno campi per credenziali né possono
+  scegliere il ripiego.
+  [Apple: policy con password di sistema](https://developer.apple.com/documentation/localauthentication/lapolicy/deviceownerauthentication).
+
+Il ripiego resta nello stesso riquadro e vale solo finché il piano e la
+richiesta corrente sono validi. Un annullamento chiude il tentativo senza
+aprire un altro dialogo. Se macOS non può mostrare un dialogo fidato, nessun
+metodo riesce o la richiesta scade, la cassetta resta in attesa. Il medico
+può riprendere da «In arrivo» in MediFlow. Nessuna prova viene emessa.
+
 ### Audit e ricevuta
 
 L'audit conserva il medico come autore (`actorType=user` e `recorded_by`
 secondo l'[ADR 0183](0183-autore-delle-voci-di-diario.md)), il proponente,
 il mandato, il provider dichiarato e l'indicazione di egress del mandato.
-Distingue conferma «In arrivo», conferma avviata da Codex con Touch ID e
-applicazione automatica autorizzata dal mandato. Registra riferimento opaco
-della conferma e del dispositivo, revisione, fase, esito e conteggio.
+Distingue conferma «In arrivo», conferma avviata da Codex con autenticazione
+macOS ed applicazione automatica autorizzata dal mandato. Registra riferimento
+opaco della conferma e del dispositivo, revisione, fase, esito e conteggio.
+Registra la policy invocata. Le policy combinate restituiscono un esito
+senza indicare il sensore o il metodo usato. L'audit quindi non attribuisce
+un'impronta, un Watch o una password a quel successo.
 I rifiuti rilevanti e le revoche hanno eventi locali con motivo codificato,
 distinti dagli eventi di applicazione. Niente CF, dettagli clinici, token,
 firma, credenziali o dati biometrici nei nuovi eventi. La ricevuta in chat
@@ -119,20 +177,27 @@ provider abbia effettivamente ricevuto.
   una superficie locale verificabile, con gesto umano isolato dal modello
   e prova legata al piano. Una firma generica del dispositivo non
   documenta quel gesto.
-- **Riquadro MediFlow e Touch ID.** Raccomandato per un pilota macOS.
+- **Riquadro MediFlow con LocalAuthentication.** Scelto per il pilota macOS.
   Consente di vedere il piano autorevole sul dispositivo ed usare la
   firma solo dopo un gesto dedicato.
 
-Stima: **8–12 giorni di lavoro**. Due o tre per verificare il raccordo con
-Codex ed il riquadro, tre o quattro per prova, writer ed audit, tre o cinque
-per modello formale e prove sul Mac. La stima presuppone un trasporto locale
-adatto. Se manca, il pilota si ferma alla prova di fattibilità.
+La stima è di **10–15 giorni di lavoro**. Due o tre per verificare il
+raccordo con Codex ed il riquadro, tre o quattro per prova, writer ed audit,
+da cinque ad otto per il modello formale e le prove dei quattro percorsi sul Mac.
+La stima presuppone un trasporto locale adatto. Se manca, il pilota si ferma alla prova di fattibilità.
 
 ### Prove per accettare l'implementazione
 
-- **Empiriche.** Nel vero Codex desktop, su un archivio sintetico, il
-  medico confronta fonti e differenze, annulla una volta ed applica una
-  visita con Touch ID. Si controllano dati, audit e ricevuta. Lo stesso
+- **Empiriche.** Nel vero Codex desktop, su un archivio sintetico,
+  provare separatamente il Touch ID integrato a coperchio aperto, il
+  Touch ID della Magic Keyboard a coperchio chiuso con monitor esterno,
+  il doppio clic sul Watch a coperchio chiuso e senza tastiera
+  biometrica, la password nel dialogo di sistema a coperchio chiuso
+  con Touch ID e Watch indisponibili. Per ogni percorso registrare configurazione, gesto
+  osservato, dati, audit e ricevuta. Senza doppio clic sul Watch e
+  senza un altro gesto la visita resta in attesa. Provare anche
+  annullamento del dialogo, password errata, nessun metodo disponibile
+  e chiusura del riquadro durante il ripiego. Lo stesso
   flusso senza gesto, con testo «Confermo», con l'identità del solo agente,
   con una revisione cambiata, con CF ambiguo o PDF discordante deve lasciare
   invariati i registri. Verificare biometria non disponibile, approvazione
@@ -140,29 +205,30 @@ adatto. Se manca, il pilota si ferma alla prova di fattibilità.
   risposta persa e rollback di un writer. Le prove del nuovo ingresso
   partono dalla base senza quel percorso e conservano i positivi di
   «In arrivo» e del solo deposito.
-- **Formali.** Modellare anteprima, prova pendente, approvazione, consumo,
-  scadenza, revoca e commit concorrente. Verificare che ogni applicazione
+- **Formali.** Modellare anteprima, prova pendente, esito macOS, ripiego
+  esplicito, approvazione, consumo, scadenza, revoca e commit concorrente. Verificare che ogni applicazione
   strutturata dal plugin corrisponda a un solo gesto sullo stesso piano e
-  alla stessa generazione. Una variazione di piano, paziente o generazione,
-  anche dopo il gesto, invalida la prova. Nessuna scrittura senza consumo,
-  audit e ricevuta nello stesso commit. Controllare che, togliendo il
+  alla stessa generazione. Annullamento o diniego macOS non consentono
+  consumo, anche con una risposta tardiva. Una variazione di piano, paziente
+  o generazione, anche dopo il gesto, invalida la prova. Nessuna scrittura
+  senza consumo, audit e ricevuta nello stesso commit. Controllare che, togliendo il
   vincolo di revisione o di consumo, il modello trovi un controesempio.
 
 ## 2. Applicare la cassetta senza finestra aperta
 
-### Raccomandazione
+### Decisione
 
 Offrire una modalità macOS facoltativa, spenta al primo avvio e disponibile
 per un account v3. Dopo l'abilitazione, il medico avvia la sessione di lavoro
 con un Touch ID fresco in MediFlow. Il servizio locale firmato conserva la
-master key aperta nella propria memoria per al massimo 12 ore, e solo finché
+master key aperta nella propria memoria per al massimo 8 ore, finché
 valgono le condizioni sotto. Chiudere la finestra o il browser lascia
 lavorare il servizio. Il mandato resta distinto: si apre come oggi e
 definisce operazioni e fornitore. Il servizio può applicare nota,
 trascrizione e PDF verificati per un mandato corrente autorizzato. Per le
 voci strutturate attende la conferma del punto 1 o il percorso Web già
-previsto. Senza conferma in chat approvata, la modalità senza finestra
-riguarda il solo passaggio automatico.
+previsto. Finché la conferma da chat non è implementata e provata, la
+modalità senza finestra riguarda il solo passaggio automatico.
 
 L'abilitazione iniziale richiede passphrase v3 e Touch ID nella superficie
 nativa firmata. Il servizio apre l'involucro v3 con la passphrase in memoria
@@ -170,7 +236,9 @@ e crea un secondo involucro legato a dispositivo, account ed archivio.
 Autentica l'account con il verificatore v3 e registra l'abilitazione presso
 il proprietario dell'archivio, con la generazione corrente e la versione
 della credenziale. Anche il successivo avvio con Touch ID verifica quel
-legame.
+legame. A coperchio chiuso si può usare la Magic Keyboard compatibile.
+Apple Watch e password di sistema valgono per la conferma della visita,
+senza aprire l'involucro della master key.
 La passphrase e la master key aperta non transitano da browser, shell,
 MCP o route HTTP verso il servizio. Il Portachiavi locale conserva
 l'involucro, vincolato a una chiave privata P-256 generata nella Secure
@@ -199,7 +267,7 @@ tutti i campi protetti da quella chiave.
 
 ### Durata, blocco e revoca
 
-- **Scadenza.** Le 12 ore decorrono dal gesto MediFlow su un orologio
+- **Scadenza.** Le 8 ore decorrono dal gesto MediFlow su un orologio
   monotono che comprende la sospensione. Mandato ed agente possono scadere
   prima. Verificare la validità della sessione all'ammissione ed al commit.
   L'attività o la riapertura della finestra non la rinnovano. Ora civile e
@@ -210,8 +278,17 @@ tutti i campi protetti da quella chiave.
   l'uscita esplicita da MediFlow terminano la sessione del servizio.
   Al risveglio o dopo un crash o riavvio serve un nuovo gesto MediFlow.
   Lo sblocco di macOS da solo lascia il servizio fermo.
-- **Revoca.** Il medico può fermare la sessione, revocare mandato o
-  pairing e disabilitare il dispositivo. Cambio di passphrase, recupero,
+- **Coperchio chiuso.** Se il Mac resta sveglio e sbloccato con monitor
+  esterno, chiudere il coperchio lascia attiva la sessione e non rinnova
+  il termine delle 8 ore. Il servizio segue lo stato effettivo del Mac.
+  Se chiudere il coperchio o scollegare il monitor causa blocco dello
+  schermo o sospensione, la sessione termina. Vale la stessa regola per
+  uscita, scadenza e revoca a coperchio aperto o chiuso.
+  [Apple: uso del monitor esterno a coperchio chiuso](https://support.apple.com/en-us/102501),
+  [Apple: sospendere o riattivare il Mac](https://support.apple.com/en-euro/guide/mac-help/mh10330/27/mac/27).
+- **Revoca.** Revocare la sessione o disabilitare il dispositivo ritira
+  la chiave aperta. Revocare un mandato o il pairing impedisce di
+  applicare i relativi depositi. Cambio di passphrase, recupero,
   sostituzione dell'archivio o cambio del set biometrico fanno decadere
   l'abilitazione e richiedono nuova registrazione. Alla chiusura della
   sessione il servizio ritira l'autorità, invalida il contesto biometrico,
@@ -238,7 +315,7 @@ tutti i campi protetti da quella chiave.
 | Altro utente o processo locale | La chiave aperta vive in un processo in più e più a lungo, anche dopo la chiusura del browser. Permessi, firma del peer, Hardened Runtime senza diritto di debug nella build distribuita ed accesso ristretto al Portachiavi riducono la superficie. Il token di deposito non apre il servizio. |
 | Dump di memoria, swap o crash | Un dump del processo che decifra può contenere chiave e contenuti. Ridurre copie e vita dei buffer, escludere core dump del servizio e diagnostica con payload, evitare file temporanei in chiaro nel nuovo percorso, richiedere volume cifrato e provare crash e residui. La pulizia dei buffer posseduti non garantisce la cancellazione da ogni copia del sistema. |
 | Malware con utente loggato | Un processo ordinario deve essere respinto dal confine IPC. Un malware che controlla il servizio, un processo fidato o il sistema operativo può osservare dati ed usare la chiave aperta. La Secure Enclave protegge il proprio segreto, non la RAM del servizio. |
-| Mac rubato acceso | Se è sbloccato con servizio attivo, il passaggio automatico già autorizzato può operare. Un nuovo atto clinico strutturato dal plugin richiede ancora Touch ID. Il blocco dello schermo chiude la sessione, entro il confine OS verificato sopra. Autolock e FileVault riducono l'esposizione. |
+| Mac rubato acceso | Se è sbloccato con servizio attivo, il passaggio automatico già autorizzato può operare. Un nuovo atto clinico strutturato dal plugin richiede ancora un'autenticazione macOS sul piano mostrato. Chi conosce la password dell'account può usare il ripiego. Il blocco dello schermo chiude la sessione, entro il confine OS descritto sopra. Autolock e FileVault riducono l'esposizione. |
 
 ### Backup, recupero ed altre piattaforme
 
@@ -264,7 +341,7 @@ decisione e prove. Evitare ripieghi con file di chiavi o sblocco con PIN.
 
 ### Claim WUL-342/354
 
-L'eccezione proposta riguarda l'ADR 0190 e la custodia dell'[ADR
+L'eccezione approvata riguarda l'ADR 0190 e la custodia dell'[ADR
 0143](0143-strong-unlock-credential.md). Cambia la condizione del claim
 «master key aperta solo nella memoria del client» ammesso dall'[ADR
 0065](0065-intended-purpose-and-claims-guard.md). Per la modalità macOS
@@ -276,27 +353,29 @@ v3 già in memoria di un'altra scheda autorizzata. Riferimenti:
 [`tab-key-share.ts`](../../lib/security/tab-key-share.ts),
 [`unlock-credential.ts`](../../lib/security/unlock-credential.ts).
 
-Testo proposto per l'eventuale rilascio, dopo le prove:
+Leonardo ha approvato la formulazione seguente per il solo profilo Mac.
+Si applica dopo le prove di implementazione.
 
 > MediFlow cifra con AES-256-GCM i campi indicati nella matrice dei dati a riposo prima
 > della scrittura. Identificativi, alcuni metadati ed alcuni export possono
 > essere leggibili. Con lo sblocco v3 l'applicazione usa la chiave aperta in
 > memoria. Se attivi la cassetta senza finestra su un Mac compatibile, anche
 > il servizio locale MediFlow può usare quella chiave per un massimo di
-> 12 ore dopo Touch ID, fino al blocco o alla fine della sessione.
+> 8 ore dopo Touch ID. La sessione termina con blocco dello schermo,
+> sospensione, uscita o revoca.
 > Il Portachiavi conserva una copia avvolta, vincolata a quel Mac. La
 > chiusura della finestra lascia attiva la sessione del servizio.
 
 Restano esclusi la cifratura integrale di SQLite, lo zero-knowledge
 sull'intero archivio, la protezione da un sistema compromesso e l'accesso
-ininterrotto per 12 ore. Restano da descrivere separatamente il profilo PIN
+ininterrotto per 8 ore. Restano da descrivere separatamente il profilo PIN
 transitorio, gli export, il recupero completo ed il mandato che autorizza
 l'eventuale egress. Il servizio non estende l'egress né concede nuove
 autorità al provider.
 
-Prima di pubblicare la modalità occorre approvare il delta al testo
-congelato in ADR 0065, SECURITY, architettura, matrice ed avviso di
-abilitazione. `check:claims` ed il suo self-test bloccano claim pubblici
+Prima di pubblicare la modalità, a prove concluse, allineare ADR 0065,
+SECURITY, architettura, matrice ed avviso di abilitazione.
+`check:claims` ed il suo self-test bloccano claim pubblici
 fuorvianti. `check:never-regress` verifica invarianti minime di trasporto,
 avvolgimento, primitive e mancata persistenza di PIN/password nel browser.
 Servono inoltre prove sul nuovo confine, perché quei controlli non
@@ -314,13 +393,13 @@ attestano la vita della chiave nel servizio.
 - **Segreto di cassetta separato.** Potrebbe ridurre l'impatto della
   cattura della chiave. Per popolare i campi protetti occorre comunque
   cambiare il modello delle chiavi o aspettare uno sblocco ordinario.
-- **Servizio a tempo con involucro hardware.** Raccomandato solo come
+- **Servizio a tempo con involucro hardware.** Scelto come
   opzione macOS. Riusando la cifratura corrente evita una migrazione dei
   campi, al costo di una finestra di esposizione aggiuntiva. Se questa
   esposizione è inaccettabile, scegliere il browser e lasciare i depositi
   in attesa.
 
-Stima: **15–22 giorni di lavoro**, aggiuntivi al punto 1. Da tre a cinque
+La stima resta di **15–22 giorni di lavoro**, aggiuntivi al punto 1. Da tre a cinque
 per custodia e ciclo di vita, cinque a sette per composizione ed autorità
 del writer, sette a dieci per prove sul Mac, recupero, modello formale e
 testi. La stima esclude porting, redistribuzione delle chiavi e qualifica
@@ -332,8 +411,13 @@ clinica.
   con Touch ID, chiudere finestra e browser, applicare una cassetta
   sintetica mista. Verificare che entrino solo gli elementi ammessi,
   che il doppio consumer non duplichi e che CF discordante o assente
-  blocchi l'applicazione. Provare scadenza, spostamento dell'ora, lock OS,
-  sospensione, uscita, cambio utente, riavvio, revoca e perdita del
+  blocchi l'applicazione. Sul Mac a monitor esterno provare la chiusura
+  del coperchio con sistema sveglio e sbloccato. La stessa sessione
+  deve poter applicare il deposito e conservare il suo termine.
+  A coperchio chiuso provare blocco dello schermo e sospensione effettiva,
+  quindi verificare che il servizio resti fermo dopo risveglio o sblocco.
+  Provare la scadenza esatta a 8 ore, spostamento dell'ora, uscita,
+  cambio utente, riavvio, revoca e perdita del
   servizio durante preparazione e commit. Misurare la barriera del
   writer al lock. Provare che un peer estraneo è respinto e che tracce,
   buste, file temporanei, dump applicativi e backup controllati non
@@ -344,21 +428,13 @@ clinica.
   senza servizio e su Windows e Linux.
 - **Formali.** Comporre gli stati del punto 1 con sessione del servizio
   inattiva, attiva o terminata, due consumer ed una barriera di commit.
-  Modellare perdita di eventi, deadline, revoca e generazione nuova
-  dopo restore, anche in presenza di retry. Verificare che una
+  Modellare il passaggio a coperchio chiuso con Mac sveglio separato
+  dalla sospensione. Verificare che il primo lasci attiva la sessione
+  con lo stesso termine e che la sospensione la ritiri. Modellare perdita
+  di eventi, termine a 8 ore, revoca e generazione nuova dopo restore,
+  anche in presenza di retry. Verificare che una
   sessione ritirata non rientri in uso senza un nuovo gesto, che
   l'ammissione viva fino al commit e che applicazione ed audit abbiano la
   stessa sorte. Il modello deve trovare controesempi togliendo il
   controllo di generazione o il ritiro al blocco. Le assunzioni sugli
   eventi OS si provano sul bundle, fuori dal modello.
-
-## Chiedere a Leonardo
-
-- Va bene iniziare da Codex e confermare una singola visita in un
-  riquadro MediFlow con Touch ID? Questa scelta determina dove compare
-  la prova umana e che cosa resta visibile nella chat.
-- Autorizzi il profilo macOS facoltativo con chiave in RAM fuori dalla
-  scheda, tetto di 12 ore e nuovo Touch ID dopo ogni blocco o
-  sospensione? Vuoi un tetto più breve per il pilota?
-- Approvi la formulazione proposta per WUL-342/354 per il solo profilo
-  provato? I testi di prodotto cambierebbero dopo la qualifica tecnica.
