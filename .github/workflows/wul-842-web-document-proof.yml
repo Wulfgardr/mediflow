@@ -6,39 +6,49 @@ permissions:
   contents: read
 jobs:
   proof:
-    name: Web document identity ${{ matrix.verdict }}
-    runs-on: ubuntu-24.04
+    name: Web document identity ${{ matrix.proof.verdict }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        include:
+        os: [ubuntu-24.04, macos-latest]
+        proof:
           - verdict: base
             revision: 8abbef40c
           - verdict: diff
             revision: b357222d6
+        include:
+          - os: ubuntu-24.04
+            channel: chrome
+          - os: macos-latest
+            channel: chromium
     env:
       MEDIFLOW_NEXT_DIST_DIR: .next-e2e
       E2E_DOCUMENTS_SYNTHETIC_ONLY: '1'
       FORCE_COLOR: '0'
+      PLAYWRIGHT_HTML_OPEN: never
+      E2E_BROWSER_CHANNEL: ${{ matrix.channel }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           fetch-depth: 0
-      - run: git switch --detach ${{ matrix.revision }}
+      - run: git switch --detach ${{ matrix.proof.revision }}
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 24
           cache: npm
       - run: npm ci && npm run prepare:dependencies
-      - name: Install Chromium and verify sandbox
+      - name: Verify browser sandbox
         run: |
-          npx --no-install playwright install chromium
-          check_browser='import { chromium } from "@playwright/test"; const browser = await chromium.launch({ chromiumSandbox: true }); await browser.close();'
-          if ! node --input-type=module -e "$check_browser"; then
-            npx --no-install playwright install-deps chromium
-            node --input-type=module -e "$check_browser"
-          fi
+          if [ "$E2E_BROWSER_CHANNEL" = chromium ]; then npx --no-install playwright install chromium; fi
+          node --input-type=module <<'NODE'
+          import { chromium } from '@playwright/test'
+          const browser = await chromium.launch({ channel: process.env.E2E_BROWSER_CHANNEL, chromiumSandbox: true,
+            args: ['--proxy-server=http://127.0.0.1:1', '--proxy-bypass-list=<-loopback>;localhost;127.0.0.1;[::1]'] })
+          console.log(browser.version())
+          await browser.close()
+          NODE
       - name: Build synthetic isolated runtime
         run: |
           test -z "$(git status --porcelain)"
@@ -70,23 +80,23 @@ jobs:
           })) console.log(`${key}=${value}`);
           NODE
       - name: Check the base fails at Prosegui
-        if: matrix.verdict == 'base'
+        if: matrix.proof.verdict == 'base'
         run: |
           set +e
-          npm run test:e2e -- e2e/patient-document-create.spec.ts --grep 'data di nascita esatta' --reporter=list,html 2>&1 | tee red.log
+          CI= npm run test:e2e -- e2e/patient-document-create.spec.ts --grep 'data di nascita esatta' --reporter=list,html 2>&1 | tee red.log
           playwright_exit=${PIPESTATUS[0]}
           set -e
           test "$playwright_exit" = 1
-          rg 'Expected:\s+enabled' red.log
-          rg 'Received:\s+disabled' red.log
-          rg -F 'Nome, cognome e nascita devono permettere di proseguire' red.log
+          grep -E 'Expected:[[:space:]]+enabled' red.log
+          grep -E 'Received:[[:space:]]+disabled' red.log
+          grep -F 'Nome, cognome e nascita devono permettere di proseguire' red.log
       - name: Run the corrected Web and Dossier gestures
-        if: matrix.verdict == 'diff'
-        run: npm run test:e2e -- e2e/patient-document-create.spec.ts e2e/dossier-import.spec.ts --grep 'nuova scheda da documento|nuova scheda senza identificativo|Dossier senza CF|risposta persa|annullamento' --reporter=list,html
+        if: matrix.proof.verdict == 'diff'
+        run: CI= npm run test:e2e -- e2e/patient-document-create.spec.ts e2e/dossier-import.spec.ts --grep 'nuova scheda da documento|nuova scheda senza identificativo|Dossier senza CF|risposta persa|annullamento' --reporter=list,html
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: web-document-identity-${{ matrix.verdict }}
+          name: web-document-identity-${{ matrix.proof.verdict }}-${{ matrix.os }}
           path: |
             red.log
             playwright-report
