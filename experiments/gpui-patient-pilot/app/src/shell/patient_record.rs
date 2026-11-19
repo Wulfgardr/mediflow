@@ -40,6 +40,64 @@ pub(super) enum Source {
     Document(String),
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(super) enum Sheet {
+    Stacked,
+    Wide,
+}
+
+const POINT_BEFORE: usize = 160;
+const POINT_AFTER: usize = 60;
+const CARET: &str = "▏";
+
+#[derive(Debug, PartialEq)]
+pub(super) struct DraftPoint {
+    pub(super) text: String,
+    pub(super) caret: std::ops::Range<usize>,
+    pub(super) selected: std::ops::Range<usize>,
+    pub(super) spoken: String,
+}
+
+impl DraftPoint {
+    pub(super) fn of(value: &str, selection: std::ops::Range<usize>) -> Self {
+        let clamp = |at: usize| {
+            let mut at = at.min(value.len());
+            while !value.is_char_boundary(at) {
+                at -= 1;
+            }
+            at
+        };
+        let (start, end) = (
+            clamp(selection.start),
+            clamp(selection.end.max(selection.start)),
+        );
+        let line_start = value[..start].rfind('\n').map_or(0, |at| at + 1);
+        let line_end = value[end..].find('\n').map_or(value.len(), |at| end + at);
+        let from = value[line_start..start]
+            .char_indices()
+            .rev()
+            .nth(POINT_BEFORE - 1)
+            .map_or(line_start, |(at, _)| line_start + at);
+        let to = value[end..line_end]
+            .char_indices()
+            .nth(POINT_AFTER)
+            .map_or(line_end, |(at, _)| end + at);
+        let lead = if from > line_start { "…" } else { "" };
+        let tail = if to < line_end { "…" } else { "" };
+        let before = &value[from..start];
+        let selected = &value[start..end];
+        let after = &value[end..to];
+        let selected_at = lead.len() + before.len();
+        let caret_at = selected_at + selected.len();
+        Self {
+            text: format!("{lead}{before}{selected}{CARET}{after}{tail}"),
+            caret: caret_at..caret_at + CARET.len(),
+            selected: selected_at..caret_at,
+            spoken: format!("{before}{selected}{after}"),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Zones {
     Three,
@@ -386,13 +444,6 @@ impl ClinicalApp {
         let zones = Zones::for_width(layout.width / self.effective_text_scale());
         let writing = self.form.is_some().then(|| self.record_composer(cx));
         let done = self.record_registered_step();
-        let beside = zones != Zones::One && self.reading_document();
-        let reading = self.record_reading(beside, cx);
-        let (wide_reading, reading) = if beside {
-            (reading, None)
-        } else {
-            (None, reading)
-        };
         let drafting = self.form.is_some();
         let chrome = if !layout.compact && self.quiet_record() {
             QUIET_CHROME
@@ -400,6 +451,16 @@ impl ClinicalApp {
             WRITING_CHROME
         };
         let zone_height = (self.viewport_height - chrome * self.theme.scale).max(280.);
+        let reviewing = self
+            .form
+            .as_ref()
+            .is_some_and(|form| form.state != FormState::Draft);
+        if zones != Zones::One && self.reading_document() && !reviewing {
+            return div()
+                .min_w_0()
+                .children(self.record_reading(Sheet::Wide, cx));
+        }
+        let reading = self.record_reading(Sheet::Stacked, cx);
         let column = |id: &'static str| {
             div()
                 .id(id)
@@ -431,10 +492,8 @@ impl ClinicalApp {
                         .border_l_1()
                         .border_r_1()
                         .border_color(theme.rule)
-                        .map(|el| match wide_reading {
-                            Some(reading) => el.child(reading),
-                            None => el.child(self.record_band(cx)).child(self.record_diary(cx)),
-                        }),
+                        .child(self.record_band(cx))
+                        .child(self.record_diary(cx)),
                 )
                 .child(
                     zone("clinical-record-context")
@@ -453,12 +512,11 @@ impl ClinicalApp {
                 .flex()
                 .items_start()
                 .child(
-                    zone("clinical-record-changed").flex_1().pr(px(20.)).map(
-                        |el| match wide_reading {
-                            Some(reading) => el.child(reading),
-                            None => el.child(self.record_band(cx)).child(self.record_diary(cx)),
-                        },
-                    ),
+                    zone("clinical-record-changed")
+                        .flex_1()
+                        .pr(px(20.))
+                        .child(self.record_band(cx))
+                        .child(self.record_diary(cx)),
                 )
                 .child(
                     zone("clinical-record-side")
@@ -1283,6 +1341,7 @@ impl ClinicalApp {
 
     pub(super) fn read_record_document(&mut self, id: &str, cx: &mut Context<Self>) {
         self.patient.record.reading = Some(Source::Document(id.to_owned()));
+        self.profile_scroll.set_offset(gpui::point(px(0.), px(0.)));
         if !self
             .patient
             .document_original
@@ -1301,10 +1360,21 @@ impl ClinicalApp {
         cx.notify();
     }
 
-    pub(super) fn close_record_reading(&mut self, cx: &mut Context<Self>) {
+    pub(super) fn close_record_reading(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let wide = self.reading_document();
         self.patient.record.reading = None;
         self.patient.document_original = None;
-        if self.form.is_some() {
+        if wide {
+            self.profile_scroll.set_offset(gpui::point(px(0.), px(0.)));
+            if let Some(editor) = self
+                .form
+                .as_ref()
+                .and_then(|form| first_text_editor(&form.fields))
+                .map(|field| field.editor.clone())
+            {
+                editor.update(cx, |input, cx| input.focus_in_place(window, cx));
+            }
+        } else if self.form.is_some() {
             self.focus_after_render = true;
             self.focus_first_field = true;
         }
@@ -1315,7 +1385,7 @@ impl ClinicalApp {
         matches!(self.patient.record.reading, Some(Source::Document(_)))
     }
 
-    pub(super) fn record_reading(&self, beside: bool, cx: &Context<Self>) -> Option<Stateful<Div>> {
+    pub(super) fn record_reading(&self, sheet: Sheet, cx: &Context<Self>) -> Option<Stateful<Div>> {
         let theme = self.theme;
         let writing = self.form.is_some();
         let (title, body, registration): (String, AnyElement, String) =
@@ -1417,8 +1487,8 @@ impl ClinicalApp {
                                             true,
                                         )
                                         .on_click(
-                                            cx.listener(|this, _, _, cx| {
-                                                this.close_record_reading(cx);
+                                            cx.listener(|this, _, window, cx| {
+                                                this.close_record_reading(window, cx);
                                                 this.section_selected(PatientSection::Documents, cx)
                                             }),
                                         ),
@@ -1437,6 +1507,7 @@ impl ClinicalApp {
             div()
                 .id("clinical-record-reading")
                 .accessibility_id("clinical-record-reading")
+                .debug_selector(|| "clinical-record-reading-sheet".into())
                 .role(Role::Region)
                 .aria_label(SharedString::from(title.clone()))
                 .min_w_0()
@@ -1473,24 +1544,94 @@ impl ClinicalApp {
                                 false,
                                 true,
                             )
-                            .on_click(cx.listener(|this, _, _, cx| this.close_record_reading(cx))),
+                            .on_click(cx.listener(
+                                |this, _, window, cx| this.close_record_reading(window, cx),
+                            )),
                         ),
                 )
-                .child(body)
-                .child(
-                    div()
+                .map(|el| {
+                    let registration = div()
                         .type_role(theme, crate::theme::TextRole::Meta)
                         .text_color(theme.secondary)
-                        .child(text!(registration)),
-                )
-                .when(writing && !beside, |el| {
-                    el.child(
-                        div()
-                            .type_role(theme, crate::theme::TextRole::Meta)
-                            .text_color(theme.fresh)
-                            .child(text!("La bozza resta aperta qui sotto.")),
-                    )
+                        .child(text!(registration));
+                    match sheet {
+                        Sheet::Stacked => el.child(body).child(registration).when(writing, |el| {
+                            el.child(
+                                div()
+                                    .type_role(theme, crate::theme::TextRole::Meta)
+                                    .text_color(theme.fresh)
+                                    .child(text!("La bozza resta aperta qui sotto.")),
+                            )
+                        }),
+                        Sheet::Wide => el.child(body).child(registration),
+                    }
                 }),
+        )
+    }
+
+    pub(super) fn draft_folded(&self, layout: Layout) -> bool {
+        Zones::for_width(layout.width / self.effective_text_scale()) != Zones::One
+            && self.reading_document()
+            && self
+                .form
+                .as_ref()
+                .is_some_and(|form| form.state == FormState::Draft)
+    }
+
+    pub(super) fn draft_point(&self, cx: &Context<Self>) -> Option<Stateful<Div>> {
+        let theme = self.theme;
+        let form = self.form.as_ref()?;
+        let editor = first_text_editor(&form.fields)?.editor.read(cx);
+        let point = DraftPoint::of(editor.value(), editor.selection());
+        let mut highlights = vec![];
+        if !point.selected.is_empty() {
+            highlights.push((
+                point.selected.clone(),
+                gpui::HighlightStyle {
+                    background_color: Some(theme.selected),
+                    ..Default::default()
+                },
+            ));
+        }
+        highlights.push((
+            point.caret.clone(),
+            gpui::HighlightStyle {
+                color: Some(theme.fresh),
+                font_weight: Some(gpui::FontWeight::BOLD),
+                ..Default::default()
+            },
+        ));
+        Some(
+            div()
+                .id("clinical-record-draft-point")
+                .accessibility_id("clinical-record-draft-point")
+                .debug_selector(|| "clinical-record-draft-point".into())
+                .role(Role::Button)
+                .aria_label(SharedString::from(format!(
+                    "Torna alla bozza: {}",
+                    point.spoken
+                )))
+                .focusable()
+                .tab_stop(true)
+                .cursor_pointer()
+                .flex_none()
+                .min_w_0()
+                .px(px(12.))
+                .py(px(8.))
+                .bg(theme.draft)
+                .border_1()
+                .border_dashed()
+                .border_color(theme.fresh)
+                .rounded(px(Theme::nested(
+                    theme.around_control(READING_INSET),
+                    READING_INSET,
+                )))
+                .type_role(theme, crate::theme::TextRole::Prose)
+                .text_color(theme.fresh)
+                .hover(move |style| style.bg(theme.hover))
+                .focus(move |style| style.shadow(vec![theme.focus_ring(false)]))
+                .child(gpui::StyledText::new(point.text).with_highlights(highlights))
+                .on_click(cx.listener(|this, _, window, cx| this.close_record_reading(window, cx))),
         )
     }
 
@@ -2406,6 +2547,183 @@ mod tests {
                 .iter()
                 .all(|route| route.starts_with("GET ")),
             "reading writes nothing"
+        );
+        view.update(cx, |app, cx| app.disconnect(cx));
+    }
+
+    #[test]
+    fn the_draft_point_shows_the_line_around_the_caret_and_the_selection() {
+        let value = "Prima riga.\nIniziata il bisoprololo alla dose di  e da rivalutare.\nTerza.";
+        let caret = value.find("di  e").unwrap() + 3;
+        let point = DraftPoint::of(value, caret..caret);
+        assert_eq!(
+            point.text,
+            "Iniziata il bisoprololo alla dose di ▏ e da rivalutare."
+        );
+        assert_eq!(&point.text[point.caret.clone()], "▏");
+        assert!(point.selected.is_empty());
+        let word = value.find("rivalutare").unwrap();
+        let point = DraftPoint::of(value, word..word + "rivalutare".len());
+        assert_eq!(&point.text[point.selected.clone()], "rivalutare");
+        assert_eq!(&point.text[point.caret.clone()], "▏");
+        let long = format!("{}è{}", "à".repeat(400), "ù".repeat(400));
+        let at = long.find('è').unwrap();
+        let point = DraftPoint::of(&long, at..at);
+        assert!(point.text.starts_with('…') && point.text.ends_with('…'));
+        assert_eq!(
+            point.text.chars().filter(|c| *c == 'à').count(),
+            POINT_BEFORE
+        );
+        assert_eq!(
+            point.text.chars().filter(|c| *c == 'ù').count(),
+            POINT_AFTER - 1
+        );
+        let inside_a_character = "aè".len() - 1;
+        assert_eq!(
+            DraftPoint::of("aè", inside_a_character..inside_a_character).text,
+            "a▏è"
+        );
+    }
+
+    #[gpui::test]
+    fn a_report_opened_from_the_draft_takes_the_width_and_the_strip_brings_the_draft_back(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        use base64::Engine;
+        use gpui::EntityInputHandler;
+        let host = notes_recovery_tests::Host::new();
+        let (view, cx) = opened_at_1180(&host, cx);
+        cx.update(|_, cx| {
+            bind_keys(cx);
+            crate::text_input::bind_keys(cx);
+        });
+        let report = "Bisoprololo: alla dimissione 1,25 mg al mattino.";
+        view.update(cx, |app, _| {
+            app.patient.attachments = ReadLoad::Ready(vec![
+                serde_json::from_value(json!({
+                "id":"r","patientId":"patient-a","name":"Lettera sintetica.txt","path":"l.txt",
+                "type":"text/plain","size":report.len()}))
+                .unwrap(),
+            ]);
+        });
+        click_in_view(cx, "clinical-record-side", "clinical-workspace-edit-notes");
+        cx.simulate_input("Iniziato il bisoprololo alla dose di  e da rivalutare.");
+        let state = |view: &Entity<ClinicalApp>, cx: &mut gpui::VisualTestContext| {
+            cx.update_window_entity(view, |app, window, cx| {
+                let editor = app.form.as_ref().unwrap().fields[0].editor.clone();
+                let focused = gpui::Focusable::focus_handle(editor.read(cx), cx).is_focused(window);
+                editor.update(cx, |input, cx| {
+                    (
+                        input.selected_text_range(false, window, cx).unwrap().range,
+                        input.value().to_owned(),
+                        focused,
+                    )
+                })
+            })
+        };
+        let word = cx.update_window_entity(&view, |app, window, cx| {
+            let editor = app.form.as_ref().unwrap().fields[0].editor.clone();
+            editor.update(cx, |input, cx| {
+                let value = input.value().to_owned();
+                let start = value.encode_utf16().count()
+                    - " e da rivalutare.A: note iniziali".encode_utf16().count();
+                input.set_selected_text_range(start..start + 1, window, cx);
+                start..start + 1
+            })
+        });
+        let before = state(&view, cx);
+        assert_eq!(before.0, word);
+        assert!(before.2);
+        let routes = host.routes().len();
+        host.plan("GET /api/v1/network/patients/patient-a/attachments/r")
+            .send((200, json!({"id":"r","patientId":"patient-a","name":"Lettera sintetica.txt","path":"l.txt",
+                "type":"text/plain","size":report.len(),
+                "data":format!("data:text/plain;base64,{}", base64::engine::general_purpose::STANDARD.encode(report))})))
+            .unwrap();
+        view.update(cx, |app, cx| app.read_record_document("r", cx));
+        cx.run_until_parked();
+        notes_recovery_tests::draw(cx);
+        assert!(cx.debug_bounds("clinical-record-composer").is_none());
+        assert!(cx.debug_bounds("clinical-record-side").is_none());
+        let sheet = cx.debug_bounds("clinical-record-reading-sheet").unwrap();
+        let strip = cx.debug_bounds("clinical-record-draft-point").unwrap();
+        let bar = cx.debug_bounds("threshold-bar").unwrap();
+        assert!(
+            sheet.size.width > px(800.),
+            "the report takes the width: {sheet:?}"
+        );
+        assert!(
+            bar.contains(&strip.center()),
+            "the note point sits in the draft bar"
+        );
+        assert!(strip.top() >= sheet.top(), "under the report");
+        view.update(cx, |app, cx| {
+            let editor = app.form.as_ref().unwrap().fields[0].editor.read(cx);
+            let point = DraftPoint::of(editor.value(), editor.selection());
+            assert!(
+                point.text.contains("alla dose di  ▏e da rivalutare."),
+                "{}",
+                point.text
+            );
+            let _ = cx;
+        });
+        view.update(cx, |app, _| {
+            app.profile_scroll
+                .set_offset(gpui::point(px(0.), px(-400.)))
+        });
+        notes_recovery_tests::draw(cx);
+        let strip = cx.debug_bounds("clinical-record-draft-point").unwrap();
+        cx.simulate_click(strip.center(), gpui::Modifiers::default());
+        notes_recovery_tests::draw(cx);
+        assert_eq!(
+            view.read_with(cx, |app, _| app.profile_scroll.offset().y),
+            px(0.),
+            "the identity header is back in view"
+        );
+        assert!(cx.debug_bounds("clinical-record-draft-point").is_none());
+        assert!(cx.debug_bounds("clinical-record-composer").is_some());
+        assert_eq!(state(&view, cx), before, "selection, caret, text and focus");
+        cx.simulate_input("1,25 mg ");
+        let typed = state(&view, cx);
+        assert!(
+            typed.1.contains("alla dose di 1,25 mg e da rivalutare."),
+            "{}",
+            typed.1
+        );
+        for _ in "1,25 mg ".chars() {
+            cx.simulate_keystrokes("cmd-z");
+        }
+        assert_eq!(
+            state(&view, cx).1,
+            before.1,
+            "undo goes back to the text before"
+        );
+        cx.simulate_keystrokes("cmd-z");
+        assert_eq!(
+            state(&view, cx).1,
+            before.1.replacen("rivalutare.", "rivalutare", 1),
+            "the history from before the report is still there"
+        );
+        for _ in 0..9 {
+            cx.simulate_keystrokes("cmd-shift-z");
+        }
+        assert_eq!(state(&view, cx).1, typed.1);
+        let consulted = &host.routes()[routes..];
+        assert!(
+            consulted.iter().all(|route| route.starts_with("GET ")),
+            "{consulted:?}"
+        );
+        cx.update_window_entity(&view, |app, window, cx| app.review_form(window, cx));
+        notes_recovery_tests::draw(cx);
+        let before_confirm = host.routes().len();
+        view.update(cx, |app, cx| app.confirm_form(cx));
+        cx.run_until_parked();
+        assert_eq!(
+            host.routes()[before_confirm..]
+                .iter()
+                .filter(|route| !route.starts_with("GET ") && !route.ends_with("/profile-query"))
+                .collect::<Vec<_>>(),
+            ["PUT /api/v1/network/patients/patient-a"]
         );
         view.update(cx, |app, cx| app.disconnect(cx));
     }

@@ -21,6 +21,29 @@ pub struct Preview {
     pub source: Arc<Zeroizing<Vec<u8>>>,
     pub image: Arc<gpui::RenderImage>,
     pub pages: usize,
+    pub ink: std::ops::Range<u32>,
+}
+
+const INK_MARGIN: u32 = 12;
+
+pub fn ink_columns(pixels: &image::RgbaImage) -> std::ops::Range<u32> {
+    let width = pixels.width();
+    let inked = |x: u32| {
+        (0..pixels.height()).any(|y| {
+            pixels.get_pixel(x, y).0[..3]
+                .iter()
+                .any(|channel| *channel < 245)
+        })
+    };
+    match (
+        (0..width).find(|x| inked(*x)),
+        (0..width).rev().find(|x| inked(*x)),
+    ) {
+        (Some(left), Some(right)) => {
+            left.saturating_sub(INK_MARGIN)..(right + 1 + INK_MARGIN).min(width)
+        }
+        _ => 0..width,
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -253,10 +276,12 @@ fn parse_output(
     }
     let pixels = image::RgbaImage::from_raw(width as u32, height as u32, output[at + 1..].to_vec())
         .ok_or(Error::Engine)?;
+    let ink = ink_columns(&pixels);
     Ok(Preview {
         source,
         image: Arc::new(gpui::RenderImage::new([image::Frame::new(pixels)])),
         pages,
+        ink,
     })
 }
 
@@ -297,6 +322,19 @@ pub fn worker(page: usize) -> Result<(), std::io::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn ink_columns_keep_every_inked_column_and_trim_only_blank_paper() {
+        let mut page = image::RgbaImage::from_pixel(200, 50, image::Rgba([255, 255, 255, 255]));
+        page.put_pixel(40, 10, image::Rgba([0, 0, 0, 255]));
+        page.put_pixel(150, 49, image::Rgba([240, 255, 255, 255]));
+        assert_eq!(ink_columns(&page), 40 - INK_MARGIN..151 + INK_MARGIN);
+        page.put_pixel(0, 0, image::Rgba([0, 0, 0, 255]));
+        page.put_pixel(199, 0, image::Rgba([0, 0, 0, 255]));
+        assert_eq!(ink_columns(&page), 0..200);
+        let blank = image::RgbaImage::from_pixel(30, 30, image::Rgba([255, 255, 255, 255]));
+        assert_eq!(ink_columns(&blank), 0..30);
+    }
+
     #[test]
     fn raster_metadata_and_truncated_payload_cannot_reach_the_view() {
         let source = Arc::new(Zeroizing::new(b"%PDF-synthetic".to_vec()));
