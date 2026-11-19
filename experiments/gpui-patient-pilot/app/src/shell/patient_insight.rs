@@ -80,7 +80,10 @@ pub(super) fn without_citations(text: &str) -> String {
     while let Some(start) = rest.find('[') {
         let (before, after) = rest.split_at(start);
         match after.find(']') {
-            Some(end) if !cited_sources(&after[..=end]).is_empty() || after[1..end].starts_with("DATI-INCOMPLETI") => {
+            Some(end)
+                if !cited_sources(&after[..=end]).is_empty()
+                    || after[1..end].starts_with("DATI-INCOMPLETI") =>
+            {
                 out.push_str(before.trim_end());
                 rest = &after[end + 1..];
             }

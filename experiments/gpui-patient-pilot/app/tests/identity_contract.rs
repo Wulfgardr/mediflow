@@ -30,7 +30,7 @@ fn overview_has_four_counted_tables_including_observations() {
     for title in [
         "\"Problemi\"",
         "\"Terapieattive\"",
-        "\"Parametrirecenti\"",
+        "\"Parametri\"",
         "\"Controlliaperti\"",
     ] {
         assert!(s.contains(title), "Missing {title}");

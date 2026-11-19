@@ -113,7 +113,9 @@
       "island-rule": { "$value": "#e7e8eb" },
       "change": { "$value": "#e3ebfa" },
       "change-rule": { "$value": "#bccbe8" },
-      "proposal-rule": { "$value": "#2b8098" }
+      "proposal-rule": { "$value": "#2b8098" },
+      "panel": { "$value": "#ffffff" },
+      "rail": { "$value": "#f2f4f7" }
     },
     "grafite": {
       "tray": { "$value": "#101216" },
@@ -125,7 +127,9 @@
       "island-rule": { "$value": "#2f3238" },
       "change": { "$value": "#1c273d" },
       "change-rule": { "$value": "#364566" },
-      "proposal-rule": { "$value": "#4a97ad" }
+      "proposal-rule": { "$value": "#4a97ad" },
+      "panel": { "$value": "#17191e" },
+      "rail": { "$value": "#16191d" }
     }
   },
   "signal": {

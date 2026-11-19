@@ -7,8 +7,9 @@ macro_rules! text {
 use super::*;
 
 pub(super) const READING_INSET: f32 = 12.;
-const QUIET_CHROME: f32 = 242.;
-const WRITING_CHROME: f32 = 307.;
+const QUIET_CHROME: f32 = 221.;
+const WRITING_CHROME: f32 = 286.;
+pub(super) const TRAY_INSET: f32 = 10.;
 const ISLAND_RADIUS: f32 = 14.;
 const ZONE_GAP: f32 = 12.;
 
@@ -24,6 +25,8 @@ pub(super) struct RecordState {
     pub(super) diary_all: bool,
     pub(super) menu: bool,
     pub(super) more: Option<String>,
+    pub(super) stable_column: gpui::ScrollHandle,
+    pub(super) changed_column: gpui::ScrollHandle,
 }
 
 impl RecordState {
@@ -239,7 +242,11 @@ fn record_heading(
 }
 
 fn zone_label(id: &'static str, label: &'static str, changed: bool, theme: Theme) -> Stateful<Div> {
-    let color = if changed { theme.fresh } else { theme.secondary };
+    let color = if changed {
+        theme.fresh
+    } else {
+        theme.secondary
+    };
     div()
         .id(id)
         .accessibility_id(id)
@@ -257,12 +264,58 @@ fn zone_label(id: &'static str, label: &'static str, changed: bool, theme: Theme
         .child(text!(label))
 }
 
+fn zone_title(id: &'static str, label: &'static str, changed: bool, theme: Theme) -> Stateful<Div> {
+    div()
+        .id(id)
+        .accessibility_id(id)
+        .min_w_0()
+        .px(px(8.))
+        .pt(px(8.))
+        .pb(px(2.))
+        .flex()
+        .items_center()
+        .gap(px(8.))
+        .role(Role::Heading)
+        .aria_label(label)
+        .text_color(theme.ink)
+        .child(crate::title::title(label, theme).with_role(crate::theme::TitleRole::RecordZone))
+        .when(changed, |el| {
+            el.child(
+                div()
+                    .size(px(8.))
+                    .flex_none()
+                    .rounded_full()
+                    .bg(theme.fresh),
+            )
+        })
+}
+
+fn tray(theme: Theme) -> Div {
+    block(theme)
+        .gap(px(TRAY_INSET))
+        .p(px(TRAY_INSET))
+        .bg(theme.record.tray)
+        .border_1()
+        .border_color(theme.record.tray_rule)
+        .rounded_t(px(ISLAND_RADIUS + TRAY_INSET))
+        .rounded_b(px(ISLAND_RADIUS - 4.))
+        .shadow(vec![
+            gpui::BoxShadow::new(px(0.), px(1.), theme.record.tray_light).inset(),
+            gpui::BoxShadow::new(px(0.), px(-1.), theme.record.tray_shadow)
+                .blur_radius(px(2.))
+                .inset(),
+        ])
+}
+
 fn island(theme: Theme, compact: bool) -> Div {
-    let _ = compact;
     block(theme)
         .gap(px(10.))
         .p(px(16.))
-        .bg(theme.record.compact_island)
+        .bg(if compact {
+            theme.record.compact_island
+        } else {
+            theme.record.island
+        })
         .border_1()
         .border_color(theme.record.island_rule)
         .rounded(px(ISLAND_RADIUS))
@@ -320,7 +373,11 @@ fn card_title(
         .children(action)
 }
 
-fn link(id: impl Into<SharedString>, label: impl Into<SharedString>, theme: Theme) -> Stateful<Div> {
+fn link(
+    id: impl Into<SharedString>,
+    label: impl Into<SharedString>,
+    theme: Theme,
+) -> Stateful<Div> {
     link_enabled(id, label, theme, true)
 }
 
@@ -341,7 +398,11 @@ fn link_enabled(
         .py(px(2.))
         .border_color(gpui::transparent_black())
         .bg(gpui::transparent_black())
-        .text_color(if enabled { theme.fresh } else { theme.secondary })
+        .text_color(if enabled {
+            theme.fresh
+        } else {
+            theme.secondary
+        })
         .type_role(theme, crate::theme::TextRole::Meta)
         .font_weight(gpui::FontWeight::SEMIBOLD)
 }
@@ -352,11 +413,24 @@ fn tag(text: impl Into<SharedString>, color: Hsla, theme: Theme) -> Div {
         .px(px(8.))
         .py(px(1.))
         .rounded(px(6.))
-        .bg(Theme::tint(color, 0.13))
+        .bg(theme.sheet.blend(Theme::tint(color, 0.14)))
         .text_color(color)
         .type_role(theme, crate::theme::TextRole::Meta)
         .font_weight(gpui::FontWeight::MEDIUM)
         .child(text!(text.into()))
+}
+
+fn given_name_first(patient: &PatientDetail) -> mediflow_patient_client::PersonName {
+    let name = [patient.first_name.trim(), patient.last_name.trim()]
+        .into_iter()
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ");
+    if name.is_empty() {
+        patient.display_name()
+    } else {
+        name.into()
+    }
 }
 
 pub(super) fn exemption_codes(value: &str) -> Option<String> {
@@ -432,8 +506,18 @@ fn named_with_dose(name: &str, theme: Theme) -> Div {
 }
 
 const MONTHS: [&str; 12] = [
-    "gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto",
-    "settembre", "ottobre", "novembre", "dicembre",
+    "gennaio",
+    "febbraio",
+    "marzo",
+    "aprile",
+    "maggio",
+    "giugno",
+    "luglio",
+    "agosto",
+    "settembre",
+    "ottobre",
+    "novembre",
+    "dicembre",
 ];
 
 fn spoken_day(day: &str) -> String {
@@ -586,7 +670,9 @@ impl ClinicalApp {
                                             false,
                                             self.form.is_none(),
                                         )
-                                        .debug_selector(|| "clinical-workspace-back-directory".into())
+                                        .debug_selector(|| {
+                                            "clinical-workspace-back-directory".into()
+                                        })
                                         .min_h(px(18.))
                                         .px(px(2.))
                                         .py(px(0.))
@@ -594,19 +680,23 @@ impl ClinicalApp {
                                         .bg(gpui::transparent_black())
                                         .type_role(theme, crate::theme::TextRole::Meta)
                                         .text_color(theme.secondary)
-                                        .when(self.form.is_none(), |el| {
-                                            el.on_click(cx.listener(|this, _, _, cx| {
-                                                this.back_from_patient(cx)
-                                            }))
-                                        }),
+                                        .when(
+                                            self.form.is_none(),
+                                            |el| {
+                                                el.on_click(cx.listener(|this, _, _, cx| {
+                                                    this.back_from_patient(cx)
+                                                }))
+                                            },
+                                        ),
                                     )
-                                    .children(self.record_return().map(|line| {
-                                        div().child(text!(format!("· {line}")))
-                                    })),
+                                    .children(
+                                        self.record_return()
+                                            .map(|line| div().child(text!(format!("· {line}")))),
+                                    ),
                             )
                             .child(crate::components::heading_with_role(
                                 "clinical-workspace-patient-name",
-                                crate::title::TitleText::name(patient.display_name()),
+                                crate::title::TitleText::name(given_name_first(patient)),
                                 theme,
                                 crate::theme::TitleRole::RecordPerson,
                             ))
@@ -642,7 +732,9 @@ impl ClinicalApp {
                                             .border_color(theme.rule)
                                             .child(allergy_label(None, theme)),
                                     )
-                                    .when(adi, |el| el.child(tag("ADI attiva", theme.success, theme)))
+                                    .when(adi, |el| {
+                                        el.child(tag("ADI attiva", theme.success, theme))
+                                    })
                                     .when(archived, |el| {
                                         el.child(tag("Scheda archiviata", theme.secondary, theme))
                                     }),
@@ -678,7 +770,11 @@ impl ClinicalApp {
                                         .gap(px(6.))
                                         .child(icon(
                                             Icon::Plus,
-                                            if enabled { theme.paper } else { theme.secondary },
+                                            if enabled {
+                                                theme.paper
+                                            } else {
+                                                theme.secondary
+                                            },
                                             15.,
                                         ))
                                         .child(text!("Nuova voce"))
@@ -691,21 +787,27 @@ impl ClinicalApp {
                                 }
                             })
                             .child(
-                                button("clinical-workspace-record-menu", "", theme, false, self.form.is_none())
-                                    .debug_selector(|| "clinical-workspace-record-menu".into())
-                                    .aria_label("Altre azioni della scheda")
-                                    .aria_expanded(menu)
-                                    .min_h(px(36.))
-                                    .size(px(36.))
-                                    .px(px(0.))
-                                    .py(px(0.))
-                                    .child(icon(Icon::Ellipsis, theme.ink, 16.))
-                                    .when(self.form.is_none(), |el| {
-                                        el.on_click(cx.listener(|this, _, _, cx| {
-                                            this.patient.record.menu = !this.patient.record.menu;
-                                            cx.notify();
-                                        }))
-                                    }),
+                                button(
+                                    "clinical-workspace-record-menu",
+                                    "",
+                                    theme,
+                                    false,
+                                    self.form.is_none(),
+                                )
+                                .debug_selector(|| "clinical-workspace-record-menu".into())
+                                .aria_label("Altre azioni della scheda")
+                                .aria_expanded(menu)
+                                .min_h(px(36.))
+                                .size(px(36.))
+                                .px(px(0.))
+                                .py(px(0.))
+                                .child(icon(Icon::Ellipsis, theme.ink, 16.))
+                                .when(self.form.is_none(), |el| {
+                                    el.on_click(cx.listener(|this, _, _, cx| {
+                                        this.patient.record.menu = !this.patient.record.menu;
+                                        cx.notify();
+                                    }))
+                                }),
                             )
                             .when(menu, |el| {
                                 el.child(gpui::deferred(
@@ -726,36 +828,55 @@ impl ClinicalApp {
                                         .border_1()
                                         .border_color(theme.rule)
                                         .rounded(px(14.))
-                                        .shadow(vec![gpui::BoxShadow::new(
-                                            px(0.),
-                                            px(8.),
-                                            Theme::tint(theme.ink, 0.14),
+                                        .shadow(vec![
+                                            gpui::BoxShadow::new(
+                                                px(0.),
+                                                px(8.),
+                                                Theme::tint(theme.ink, 0.14),
+                                            )
+                                            .blur_radius(px(24.)),
+                                        ])
+                                        .child(
+                                            menu_item(
+                                                "clinical-workspace-refresh",
+                                                "Rileggi",
+                                                true,
+                                            )
+                                            .on_click(
+                                                cx.listener(|this, _, _, cx| {
+                                                    this.patient.record.menu = false;
+                                                    this.request_discard(Discard::Reload, cx)
+                                                }),
+                                            ),
                                         )
-                                        .blur_radius(px(24.))])
-                                        .child(menu_item("clinical-workspace-refresh", "Rileggi", true).on_click(
-                                            cx.listener(|this, _, _, cx| {
-                                                this.patient.record.menu = false;
-                                                this.request_discard(Discard::Reload, cx)
-                                            }),
-                                        ))
-                                        .child(menu_item("clinical-workspace-copy-profile", "Copia scheda", true).on_click(
-                                            cx.listener(|this, _, _, cx| {
-                                                this.patient.record.menu = false;
-                                                this.copy_profile(cx)
-                                            }),
-                                        ))
+                                        .child(
+                                            menu_item(
+                                                "clinical-workspace-copy-profile",
+                                                "Copia scheda",
+                                                true,
+                                            )
+                                            .on_click(
+                                                cx.listener(|this, _, _, cx| {
+                                                    this.patient.record.menu = false;
+                                                    this.copy_profile(cx)
+                                                }),
+                                            ),
+                                        )
                                         .child(
                                             menu_item(
                                                 "clinical-workspace-edit-profile",
                                                 "Modifica anagrafica",
                                                 profile_editable,
                                             )
-                                            .when(profile_editable, |el| {
-                                                el.on_click(cx.listener(|this, _, _, cx| {
-                                                    this.patient.record.menu = false;
-                                                    this.edit_patient_profile(cx)
-                                                }))
-                                            }),
+                                            .when(
+                                                profile_editable,
+                                                |el| {
+                                                    el.on_click(cx.listener(|this, _, _, cx| {
+                                                        this.patient.record.menu = false;
+                                                        this.edit_patient_profile(cx)
+                                                    }))
+                                                },
+                                            ),
                                         )
                                         .child(
                                             menu_item(
@@ -763,12 +884,16 @@ impl ClinicalApp {
                                                 "Altri dati della scheda…",
                                                 true,
                                             )
-                                            .on_click(cx.listener(|this, _, _, cx| {
-                                                this.patient.record.menu = false;
-                                                if let Some(path) = this.current_patient_path("edit") {
-                                                    this.open_current(&path, cx);
-                                                }
-                                            })),
+                                            .on_click(
+                                                cx.listener(|this, _, _, cx| {
+                                                    this.patient.record.menu = false;
+                                                    if let Some(path) =
+                                                        this.current_patient_path("edit")
+                                                    {
+                                                        this.open_current(&path, cx);
+                                                    }
+                                                }),
+                                            ),
                                         ),
                                 ))
                             }),
@@ -799,22 +924,16 @@ impl ClinicalApp {
                 }),
             }
         };
-        let last_visit = self
-            .patient
-            .record
-            .anchor
-            .clone()
-            .flatten()
-            .map(|anchor| {
-                let mut line = format!(
-                    "Ultima visita {}",
-                    record_changes::day_in_zone(anchor.at, &chrono::Local)
-                );
-                if let Some(author) = anchor.recorded_by {
-                    line.push_str(&format!(" · {author}"));
-                }
-                line
-            });
+        let last_visit = self.patient.record.anchor.clone().flatten().map(|anchor| {
+            let mut line = format!(
+                "Ultima visita {}",
+                record_changes::day_in_zone(anchor.at, &chrono::Local)
+            );
+            if let Some(author) = anchor.recorded_by {
+                line.push_str(&format!(" · {author}"));
+            }
+            line
+        });
         div()
             .flex_shrink_0()
             .px(px(layout.margin))
@@ -863,8 +982,12 @@ impl ClinicalApp {
                             })
                             .when(selected, |el| {
                                 el.bg(theme.paper).shadow(vec![
-                                    gpui::BoxShadow::new(px(0.), px(1.), Theme::tint(theme.ink, 0.08))
-                                        .blur_radius(px(2.)),
+                                    gpui::BoxShadow::new(
+                                        px(0.),
+                                        px(1.),
+                                        Theme::tint(theme.ink, 0.08),
+                                    )
+                                    .blur_radius(px(2.)),
                                 ])
                             })
                             .type_role(
@@ -887,9 +1010,11 @@ impl ClinicalApp {
                                     .text_color(theme.secondary)
                                     .child(text!(count.to_string()))
                             }))
-                            .on_click(cx.listener(move |this, _, _, cx| {
-                                this.section_selected(section, cx)
-                            }))
+                            .on_click(
+                                cx.listener(move |this, _, _, cx| {
+                                    this.section_selected(section, cx)
+                                }),
+                            )
                     })),
             )
             .children(last_visit.map(|line| {
@@ -934,18 +1059,28 @@ impl ClinicalApp {
             .anchor
             .as_ref()
             .is_some_and(Option::is_some);
-        let changed_column = |column: Div| {
+        let changed_column = |column: Div, wide: bool| {
             column
-                .child(zone_label(
-                    "clinical-record-zone-changed",
-                    if changed {
-                        "Cambiato dall’ultima visita"
-                    } else {
-                        "Cambiato"
-                    },
-                    changed,
-                    theme,
-                ))
+                .when(wide, |el| {
+                    el.child(zone_title(
+                        "clinical-record-zone-changed",
+                        "Cambiato",
+                        changed,
+                        theme,
+                    ))
+                })
+                .when(!wide, |el| {
+                    el.child(zone_label(
+                        "clinical-record-zone-changed",
+                        if changed {
+                            "Cambiato dall’ultima visita"
+                        } else {
+                            "Cambiato"
+                        },
+                        changed,
+                        theme,
+                    ))
+                })
                 .child(
                     island(theme, compact)
                         .bg(theme.record.change)
@@ -955,7 +1090,7 @@ impl ClinicalApp {
         };
         let work = (reading.is_some() || writing.is_some() || done.is_some()).then(|| {
             block(theme)
-                .gap(px(ZONE_GAP))
+                .gap(px(TRAY_INSET))
                 .children(reading)
                 .children(writing)
                 .when(drafting, |el| {
@@ -963,55 +1098,121 @@ impl ClinicalApp {
                 })
                 .children(done)
         });
-        let context_column = |column: Div| {
+        let context_column = |column: Div, wide: bool| {
             column
-                .child(zone_label("clinical-record-zone-context", "Contesto", false, theme))
+                .when(wide, |el| {
+                    el.child(zone_title(
+                        "clinical-record-zone-context",
+                        "Contesto",
+                        false,
+                        theme,
+                    ))
+                })
+                .when(!wide, |el| {
+                    el.child(zone_label(
+                        "clinical-record-zone-context",
+                        "Contesto",
+                        false,
+                        theme,
+                    ))
+                })
                 .child(self.record_context(patient, cx))
         };
-        let stable_label = || zone_label("clinical-record-zone-stable", "Stabile", false, theme);
         let column = || block(theme).gap(px(ZONE_GAP));
         let zone = |column: Div, id: &'static str| {
             column
                 .id(id)
                 .debug_selector(move || id.into())
-                .max_h(px(zone_height))
+                .h(px(zone_height))
                 .overflow_y_scroll()
         };
+        let framed = |id: &'static str,
+                      scroll: &'static str,
+                      title: Stateful<Div>,
+                      body: Div,
+                      handle: &gpui::ScrollHandle| {
+            tray(theme)
+                .id(id)
+                .debug_selector(move || id.into())
+                .h(px(zone_height))
+                .min_h_0()
+                .child(title)
+                .child(
+                    body.id(scroll)
+                        .flex_1()
+                        .min_h_0()
+                        .overflow_y_scroll()
+                        .track_scroll(handle),
+                )
+        };
+        let band = || {
+            island(theme, false)
+                .bg(theme.record.change)
+                .border_color(theme.record.change_rule)
+                .child(self.record_band(cx))
+        };
+        let changed_title =
+            || zone_title("clinical-record-zone-changed", "Cambiato", changed, theme);
+        let body = || block(theme).gap(px(TRAY_INSET));
         match zones {
             Zones::Three => div()
                 .min_w_0()
                 .flex()
-                .gap(px(ZONE_GAP + 4.))
+                .gap(px(ZONE_GAP))
                 .items_start()
                 .child(
-                    zone(column(), "clinical-record-stable")
-                        .flex_1()
-                        .child(stable_label())
-                        .child(self.record_stable(patient, true, cx)),
-                )
-                .child(
-                    zone(changed_column(column()), "clinical-record-changed")
-                        .flex_1()
-                        .flex_grow(1.22)
-                        .child(island(theme, false).bg(theme.paper).child(self.record_diary(cx))),
-                )
-                .child(
-                    zone(
-                        column().children(work).child(context_column(column())),
-                        "clinical-record-context",
+                    framed(
+                        "clinical-record-stable",
+                        "clinical-record-stable-scroll",
+                        zone_title("clinical-record-zone-stable", "Stabile", false, theme),
+                        body().child(self.record_stable(patient, true, cx)),
+                        &self.patient.record.stable_column,
                     )
-                    .track_scroll(&self.patient.record.composer_column)
-                    .flex_1(),
+                    .flex_basis(px(0.))
+                    .flex_grow(326.1 - 2. * (TRAY_INSET + 1.)),
+                )
+                .child(
+                    framed(
+                        "clinical-record-changed",
+                        "clinical-record-changed-scroll",
+                        changed_title(),
+                        body()
+                            .child(band())
+                            .child(island(theme, false).child(self.record_diary(cx))),
+                        &self.patient.record.changed_column,
+                    )
+                    .flex_basis(px(0.))
+                    .flex_grow(376.3 - 2. * (TRAY_INSET + 1.)),
+                )
+                .child(
+                    framed(
+                        "clinical-record-context",
+                        "clinical-record-context-scroll",
+                        zone_title("clinical-record-zone-context", "Contesto", false, theme),
+                        body()
+                            .children(work)
+                            .child(self.record_context(patient, cx)),
+                        &self.patient.record.composer_column,
+                    )
+                    .flex_basis(px(0.))
+                    .flex_grow(313.6 - 2. * (TRAY_INSET + 1.)),
                 ),
             Zones::Two => div()
                 .min_w_0()
                 .flex()
-                .gap(px(ZONE_GAP + 4.))
+                .gap(px(ZONE_GAP))
                 .items_start()
                 .child(
-                    zone(changed_column(column()), "clinical-record-changed")
-                        .flex_1()
-                        .child(island(theme, false).bg(theme.paper).child(self.record_diary(cx))),
+                    framed(
+                        "clinical-record-changed",
+                        "clinical-record-changed-scroll",
+                        changed_title(),
+                        body()
+                            .child(band())
+                            .child(island(theme, false).child(self.record_diary(cx))),
+                        &self.patient.record.changed_column,
+                    )
+                    .flex_1(),
                 )
                 .child(
                     zone(column(), "clinical-record-side")
@@ -1020,19 +1221,29 @@ impl ClinicalApp {
                         .flex_none()
                         .children(work)
                         .child(
-                            column()
-                                .child(stable_label())
+                            tray(theme)
+                                .child(zone_title(
+                                    "clinical-record-zone-stable",
+                                    "Stabile",
+                                    false,
+                                    theme,
+                                ))
                                 .child(self.record_stable(patient, true, cx)),
                         )
-                        .child(context_column(column())),
+                        .child(context_column(tray(theme), true)),
                 ),
             Zones::One => {
-                let context = context_column(column());
+                let context = context_column(column(), false);
                 let content = column()
                     .id("clinical-record-single")
                     .debug_selector(|| "clinical-record-single".into())
-                    .child(changed_column(column()))
-                    .child(stable_label())
+                    .child(changed_column(column(), false))
+                    .child(zone_label(
+                        "clinical-record-zone-stable",
+                        "Stabile",
+                        false,
+                        theme,
+                    ))
                     .child(self.record_stable(patient, true, cx))
                     .child(island(theme, true).child(self.record_diary(cx)));
                 column().children(work).child(content).child(context)
@@ -1062,14 +1273,14 @@ impl ClinicalApp {
             .min_w_0()
             .flex()
             .flex_col()
-            .gap(px(ZONE_GAP))
+            .gap(px(TRAY_INSET))
             .child(
                 div()
                     .min_w_0()
                     .flex()
                     .when(!paired, |el| el.flex_col())
                     .when(paired, |el| el.items_start())
-                    .gap(px(ZONE_GAP))
+                    .gap(px(TRAY_INSET))
                     .when(therapies_first, |el| {
                         el.child(self.record_active_therapies(cx))
                     })
@@ -1202,11 +1413,9 @@ impl ClinicalApp {
                         .map_or_else(|| "Non disponibile".into(), |_| active.len().to_string()),
                 ),
                 self.form.is_none().then(|| {
-                    link("clinical-overview-therapies-open", "Tutte", theme).on_click(
-                        cx.listener(|this, _, _, cx| {
-                            this.section_selected(PatientSection::Therapies, cx)
-                        }),
-                    )
+                    link("clinical-overview-therapies-open", "Tutte", theme).on_click(cx.listener(
+                        |this, _, _, cx| this.section_selected(PatientSection::Therapies, cx),
+                    ))
                 }),
                 theme,
             ))
@@ -1233,7 +1442,10 @@ impl ClinicalApp {
             )
             .children(active.into_iter().map(|therapy| {
                 let key = format!("therapy-{}", therapy.id);
-                let change = changes.iter().find(|change| change.key == key).map(|change| change.kind);
+                let change = changes
+                    .iter()
+                    .find(|change| change.key == key)
+                    .map(|change| change.kind);
                 row(theme)
                     .id(SharedString::from(format!(
                         "clinical-overview-therapy-{}",
@@ -1249,12 +1461,17 @@ impl ClinicalApp {
                             .child(named_with_dose(&therapy.drug_name, theme).flex_1())
                             .children(change.map(|kind| tag(kind.label(), theme.warning, theme))),
                     )
-                    .child(div().min_w_0().type_role(theme, crate::theme::TextRole::Body).child({
-                        let text = text!(therapy.dosage.clone());
-                        #[cfg(test)]
-                        let text = crate::shell::rendered_command::observe_text(text);
-                        text
-                    }))
+                    .child(
+                        div()
+                            .min_w_0()
+                            .type_role(theme, crate::theme::TextRole::Body)
+                            .child({
+                                let text = text!(therapy.dosage.clone());
+                                #[cfg(test)]
+                                let text = crate::shell::rendered_command::observe_text(text);
+                                text
+                            }),
+                    )
             }))
     }
 
@@ -1445,7 +1662,11 @@ impl ClinicalApp {
             changes.sort_by(|a, b| b.at.cmp(&a.at).then_with(|| a.subject.cmp(&b.subject)));
         }
         let diary = record_changes::diary_after(&anchor, entries);
-        let short_day = anchor.visit_day.get(..5).unwrap_or(&anchor.visit_day).to_owned();
+        let short_day = anchor
+            .visit_day
+            .get(..5)
+            .unwrap_or(&anchor.visit_day)
+            .to_owned();
         let mut title = format!("Dall’ultima visita · {short_day}");
         if let Some(author) = anchor.recorded_by.as_deref() {
             title.push_str(&format!(" · {author}"));
@@ -1533,11 +1754,19 @@ impl ClinicalApp {
                     .items_center()
                     .gap(px(6.))
                     .when(therapy_changes > 0, |el| {
-                        el.child(tag(plural(therapy_changes, "terapia", "terapie"), theme.warning, theme))
+                        el.child(tag(
+                            plural(therapy_changes, "terapia", "terapie"),
+                            theme.warning,
+                            theme,
+                        ))
                     })
                     .when(out_of_range > 0, |el| {
                         el.child(tag(
-                            plural(out_of_range, "valore fuori intervallo", "valori fuori intervallo"),
+                            plural(
+                                out_of_range,
+                                "valore fuori intervallo",
+                                "valori fuori intervallo",
+                            ),
                             theme.critical,
                             theme,
                         ))
@@ -1644,7 +1873,11 @@ impl ClinicalApp {
                     )
                     .child(tag(change.kind.label(), color, theme))
                     .child(icon(
-                        if open { Icon::ChevronDown } else { Icon::ChevronRight },
+                        if open {
+                            Icon::ChevronDown
+                        } else {
+                            Icon::ChevronRight
+                        },
                         theme.secondary,
                         14.,
                     ))
@@ -1658,7 +1891,9 @@ impl ClinicalApp {
                         cx.notify();
                     })),
             )
-            .when(open, |el| el.child(self.change_detail(&change, entries, 0., cx)))
+            .when(open, |el| {
+                el.child(self.change_detail(&change, entries, 0., cx))
+            })
     }
 
     fn record_latest_therapy(
@@ -1793,12 +2028,7 @@ impl ClinicalApp {
         let same_day: Vec<(String, String)> = if change.source == ChangeSource::Therapy {
             record_changes::entries_on_day(change.at, entries, &chrono::Local)
                 .into_iter()
-                .map(|entry| {
-                    (
-                        entry.id.clone(),
-                        entry_type_label(&entry.entry_type),
-                    )
-                })
+                .map(|entry| (entry.id.clone(), entry_type_label(&entry.entry_type)))
                 .collect()
         } else {
             vec![]
@@ -1863,7 +2093,11 @@ impl ClinicalApp {
                         .flex()
                         .items_center()
                         .gap(px(10.))
-                        .child(term(if document.is_some() { "Documento" } else { "Stesso giorno" }))
+                        .child(term(if document.is_some() {
+                            "Documento"
+                        } else {
+                            "Stesso giorno"
+                        }))
                         .child(
                             div()
                                 .flex_1()
@@ -1874,13 +2108,17 @@ impl ClinicalApp {
                                 .children(same_day.into_iter().map(|(id, label)| {
                                     let entry = id.clone();
                                     chip(
-                                        SharedString::from(format!("clinical-record-read-entry-{id}")),
+                                        SharedString::from(format!(
+                                            "clinical-record-read-entry-{id}"
+                                        )),
                                         label.clone(),
                                     )
-                                    .aria_label(SharedString::from(format!("Diario del {day} · {label}")))
-                                    .on_click(cx.listener(move |this, _, _, cx| {
-                                        this.read_record_entry(&entry, cx)
-                                    }))
+                                    .aria_label(SharedString::from(format!(
+                                        "Diario del {day} · {label}"
+                                    )))
+                                    .on_click(cx.listener(
+                                        move |this, _, _, cx| this.read_record_entry(&entry, cx),
+                                    ))
                                 }))
                                 .when_some(document, |el, id| {
                                     el.child(
@@ -1890,19 +2128,22 @@ impl ClinicalApp {
                                             )),
                                             "Apri il documento".into(),
                                         )
-                                        .on_click(cx.listener(move |this, _, _, cx| {
-                                            this.read_record_document(&id, cx)
-                                        })),
+                                        .on_click(
+                                            cx.listener(move |this, _, _, cx| {
+                                                this.read_record_document(&id, cx)
+                                            }),
+                                        ),
                                     )
                                 }),
                         ),
                 )
             })
             .when(more, |el| {
-                el.children(change.more.iter().map(fact)).child(fact(&record_changes::Detail {
-                    term: "Nella scheda",
-                    value: day.clone(),
-                }))
+                el.children(change.more.iter().map(fact))
+                    .child(fact(&record_changes::Detail {
+                        term: "Nella scheda",
+                        value: day.clone(),
+                    }))
             })
             .child(
                 div()
@@ -1914,8 +2155,15 @@ impl ClinicalApp {
                     .gap(px(8.))
                     .child(
                         link(
-                            SharedString::from(format!("clinical-record-change-more-{}", change.key)),
-                            if more { "Meno dettagli" } else { "Altri dettagli" },
+                            SharedString::from(format!(
+                                "clinical-record-change-more-{}",
+                                change.key
+                            )),
+                            if more {
+                                "Meno dettagli"
+                            } else {
+                                "Altri dettagli"
+                            },
                             theme,
                         )
                         .min_h(px(24.))
@@ -1943,9 +2191,11 @@ impl ClinicalApp {
                         )
                         .min_h(px(24.))
                         .when(self.form.is_none(), |el| {
-                            el.on_click(cx.listener(move |this, _, _, cx| {
-                                this.section_selected(section, cx)
-                            }))
+                            el.on_click(
+                                cx.listener(move |this, _, _, cx| {
+                                    this.section_selected(section, cx)
+                                }),
+                            )
                         }),
                     ),
             )
@@ -2310,21 +2560,27 @@ impl ClinicalApp {
             .min_w_0()
             .flex()
             .flex_col()
-            .when(self.patient.entries.state(ReadObject::Diario).is_some(), |el| {
-                el.child(self.patient_read_hint(
-                    "clinical-workspace-entries-state",
-                    &self.patient.entries,
-                    ReadObject::Diario,
-                    cx,
-                ))
-            })
-            .when(self.patient.entries.ready().is_some() && rows.is_empty(), |el| {
-                el.child(self.empty_read_state(
-                    "clinical-workspace-entries-empty",
-                    ReadObject::Diario,
-                    cx,
-                ))
-            })
+            .when(
+                self.patient.entries.state(ReadObject::Diario).is_some(),
+                |el| {
+                    el.child(self.patient_read_hint(
+                        "clinical-workspace-entries-state",
+                        &self.patient.entries,
+                        ReadObject::Diario,
+                        cx,
+                    ))
+                },
+            )
+            .when(
+                self.patient.entries.ready().is_some() && rows.is_empty(),
+                |el| {
+                    el.child(self.empty_read_state(
+                        "clinical-workspace-entries-empty",
+                        ReadObject::Diario,
+                        cx,
+                    ))
+                },
+            )
             .children(rows.into_iter().enumerate().map(|(index, entry)| {
                 let id = entry.id.clone();
                 let locked_title = entry.locked_fields.iter().any(|field| field == "title");
@@ -2335,7 +2591,12 @@ impl ClinicalApp {
                     entry.title.clone()
                 };
                 let date = display_instant_date(&entry.date);
-                let kind = match entry.recorded_by.as_deref().map(str::trim).filter(|name| !name.is_empty()) {
+                let kind = match entry
+                    .recorded_by
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|name| !name.is_empty())
+                {
                     Some(author) => format!("{} · {author}", entry_type_label(&entry.entry_type)),
                     None => entry_type_label(&entry.entry_type).to_owned(),
                 };
@@ -2386,7 +2647,8 @@ impl ClinicalApp {
                                     .text_color(theme.ink)
                                     .line_clamp(2)
                                     .child(text!(if locked_content {
-                                        "Il testo cifrato non è leggibile con questo accesso.".to_owned()
+                                        "Il testo cifrato non è leggibile con questo accesso."
+                                            .to_owned()
                                     } else {
                                         plain_text(&entry.content)
                                     })),
@@ -2395,9 +2657,18 @@ impl ClinicalApp {
                                 div()
                                     .type_role(theme, crate::theme::TextRole::Meta)
                                     .text_color(theme.secondary)
-                                    .child(text!(match entry.recorded_by.as_deref().map(str::trim).filter(|name| !name.is_empty()) {
+                                    .child(text!(match entry
+                                        .recorded_by
+                                        .as_deref()
+                                        .map(str::trim)
+                                        .filter(|name| !name.is_empty())
+                                    {
                                         Some(author) => format!("Registrata da {author}"),
-                                        None => diary_registration(None, entry.created_at.as_deref(), &chrono::Local),
+                                        None => diary_registration(
+                                            None,
+                                            entry.created_at.as_deref(),
+                                            &chrono::Local
+                                        ),
                                     })),
                             ),
                     )
@@ -2444,7 +2715,11 @@ impl ClinicalApp {
                     .flex()
                     .items_center()
                     .gap(px(10.))
-                    .child(glyph(Icon::Proposal, Some(theme.record.proposal_rule), theme))
+                    .child(glyph(
+                        Icon::Proposal,
+                        Some(theme.record.proposal_rule),
+                        theme,
+                    ))
                     .child(
                         div().flex_1().min_w_0().text_color(theme.ink).child(
                             crate::title::title("Quadro paziente", theme)
@@ -2474,11 +2749,15 @@ impl ClinicalApp {
                     div()
                         .type_role(theme, crate::theme::TextRole::Meta)
                         .text_color(theme.secondary)
-                        .child(text!(mediflow_runtime_client::PATIENT_INSIGHT_REVIEW_NOTICE)),
+                        .child(text!(
+                            mediflow_runtime_client::PATIENT_INSIGHT_REVIEW_NOTICE
+                        )),
                 )
                 .children(lines.into_iter().take(4).enumerate().map(|(index, line)| {
                     div()
-                        .id(SharedString::from(format!("clinical-record-quadro-line-{index}")))
+                        .id(SharedString::from(format!(
+                            "clinical-record-quadro-line-{index}"
+                        )))
                         .min_w_0()
                         .flex()
                         .gap(px(10.))
@@ -2498,7 +2777,9 @@ impl ClinicalApp {
                                     div()
                                         .type_role(theme, crate::theme::TextRole::Body)
                                         .text_color(theme.ink)
-                                        .child(text!(patient_insight::without_citations(&line.text))),
+                                        .child(text!(patient_insight::without_citations(
+                                            &line.text
+                                        ))),
                                 )
                                 .when(!line.sources.is_empty(), |el| {
                                     el.child(div().flex().flex_wrap().gap(px(4.)).children(
@@ -2519,7 +2800,10 @@ impl ClinicalApp {
                                                 .py(px(1.))
                                                 .rounded(px(999.))
                                                 .border_1()
-                                                .border_color(Theme::tint(theme.record.proposal_rule, 0.45))
+                                                .border_color(Theme::tint(
+                                                    theme.record.proposal_rule,
+                                                    0.45,
+                                                ))
                                                 .type_role(theme, crate::theme::TextRole::Meta)
                                                 .text_color(theme.record.proposal_rule)
                                                 .child(text!(short))
@@ -2591,7 +2875,8 @@ impl ClinicalApp {
             values.sort_by(|a, b| a.observed_at.cmp(&b.observed_at));
         }
         series.sort_by(|a, b| {
-            let last = |values: &Vec<&Observation>| values.last().map(|row| row.observed_at.clone());
+            let last =
+                |values: &Vec<&Observation>| values.last().map(|row| row.observed_at.clone());
             last(&b.1).cmp(&last(&a.1))
         });
         let number = |value: &str| value.trim().replace(',', ".").parse::<f64>().ok();
@@ -2601,7 +2886,10 @@ impl ClinicalApp {
                 "clinical-overview-observations",
                 Icon::Activity,
                 "Parametri",
-                None,
+                self.patient
+                    .observations
+                    .ready()
+                    .map(|_| series.len().to_string()),
                 self.form.is_none().then(|| {
                     link("clinical-overview-observations-open", "Andamento", theme).on_click(
                         cx.listener(|this, _, _, cx| {
@@ -2645,7 +2933,11 @@ impl ClinicalApp {
                     Some(value) if low.is_some_and(|low| value < low) => Some("↓"),
                     _ => None,
                 };
-                let color = if arrow.is_some() { theme.critical } else { theme.ink };
+                let color = if arrow.is_some() {
+                    theme.critical
+                } else {
+                    theme.ink
+                };
                 let trend: Vec<f64> = values.iter().filter_map(|row| number(&row.value)).collect();
                 let shown = crate::clinical_units::value(&latest.value, &latest.unit_code);
                 let (amount, unit) = shown
@@ -2674,15 +2966,21 @@ impl ClinicalApp {
                                 div()
                                     .type_role(theme, crate::theme::TextRole::Meta)
                                     .text_color(theme.secondary)
-                                    .child(text!(display_instant_date(&latest.observed_at)
-                                        .get(..5)
-                                        .unwrap_or_default()
-                                        .to_owned())),
+                                    .child(text!(
+                                        display_instant_date(&latest.observed_at)
+                                            .get(..5)
+                                            .unwrap_or_default()
+                                            .to_owned()
+                                    )),
                             ),
                     )
                     .child(sparkline(
                         trend,
-                        if arrow.is_some() { theme.critical } else { theme.secondary },
+                        if arrow.is_some() {
+                            theme.critical
+                        } else {
+                            theme.secondary
+                        },
                     ))
                     .child(
                         div()
@@ -2778,9 +3076,9 @@ impl ClinicalApp {
                             theme,
                         )
                         .aria_label("Apri il documento")
-                        .on_click(cx.listener(move |this, _, _, cx| {
-                            this.read_record_document(&id, cx)
-                        })),
+                        .on_click(
+                            cx.listener(move |this, _, _, cx| this.read_record_document(&id, cx)),
+                        ),
                     )
             }))
     }
@@ -2806,11 +3104,9 @@ impl ClinicalApp {
                     .ready()
                     .map(|_| pending.len().to_string()),
                 self.form.is_none().then(|| {
-                    link("clinical-workspace-open-checkups", "Tutti", theme).on_click(
-                        cx.listener(|this, _, _, cx| {
-                            this.section_selected(PatientSection::Checkups, cx)
-                        }),
-                    )
+                    link("clinical-workspace-open-checkups", "Tutti", theme).on_click(cx.listener(
+                        |this, _, _, cx| this.section_selected(PatientSection::Checkups, cx),
+                    ))
                 }),
                 theme,
             ))
@@ -2885,7 +3181,7 @@ impl ClinicalApp {
             .min_w_0()
             .flex()
             .flex_col()
-            .gap(px(ZONE_GAP))
+            .gap(px(TRAY_INSET))
             .child(self.record_quadro(cx))
             .child(island(theme, self.record_compact()).child(self.record_measures(cx)))
             .child(island(theme, self.record_compact()).child(self.record_checkups(cx)))
@@ -3282,7 +3578,7 @@ mod tests {
                     let context = cx.debug_bounds("clinical-record-context").unwrap();
                     assert!(stable.right() < changed.left() && changed.right() < context.left());
                     assert!(changed.size.width > stable.size.width);
-                    assert_eq!(therapies.left(), stable.left());
+                    assert_eq!(therapies.left() - stable.left(), px(TRAY_INSET + 1.));
                 } else {
                     let column = cx.debug_bounds("clinical-record-single").unwrap();
                     assert!(cx.debug_bounds("clinical-record-stable").is_none());
@@ -3296,26 +3592,45 @@ mod tests {
 
     #[test]
     fn concept_fields_read_only_what_the_record_holds() {
-        assert_eq!(exemption_codes(r#"["013","021"]"#).as_deref(), Some("013, 021"));
-        assert_eq!(exemption_codes(r#"[{"code":"048"}]"#).as_deref(), Some("048"));
+        assert_eq!(
+            exemption_codes(r#"["013","021"]"#).as_deref(),
+            Some("013, 021")
+        );
+        assert_eq!(
+            exemption_codes(r#"[{"code":"048"}]"#).as_deref(),
+            Some("048")
+        );
         assert_eq!(exemption_codes("013, 021").as_deref(), Some("013, 021"));
         assert_eq!(exemption_codes("[]"), None);
         assert_eq!(
-            diagnosis_dates(Some(r#"[{"code":"I50.9","date":"2019-09-03"},{"code":"E11.9"},"Testo"]"#)),
+            diagnosis_dates(Some(
+                r#"[{"code":"I50.9","date":"2019-09-03"},{"code":"E11.9"},"Testo"]"#
+            )),
             vec![Some("Registrata il 03/09/2019".to_owned()), None, None]
         );
         assert_eq!(
             drug_parts("Bisoprololo 2,5 mg cpr"),
             ("Bisoprololo".to_owned(), "2,5 mg cpr".to_owned())
         );
-        assert_eq!(drug_parts("Acido acetilsalicilico"), ("Acido acetilsalicilico".to_owned(), String::new()));
-        assert_eq!(drug_parts("5-fluorouracile"), ("5-fluorouracile".to_owned(), String::new()));
+        assert_eq!(
+            drug_parts("Acido acetilsalicilico"),
+            ("Acido acetilsalicilico".to_owned(), String::new())
+        );
+        assert_eq!(
+            drug_parts("5-fluorouracile"),
+            ("5-fluorouracile".to_owned(), String::new())
+        );
         assert_eq!(spoken_day("12/11/2026"), "12 novembre");
         assert_eq!(
-            patient_insight::without_citations("Potassio 5,6 [S10] da ricontrollare [S2, DATI-INCOMPLETI]."),
+            patient_insight::without_citations(
+                "Potassio 5,6 [S10] da ricontrollare [S2, DATI-INCOMPLETI]."
+            ),
             "Potassio 5,6 da ricontrollare."
         );
-        assert_eq!(patient_insight::without_citations("Valore [alto] stabile"), "Valore [alto] stabile");
+        assert_eq!(
+            patient_insight::without_citations("Valore [alto] stabile"),
+            "Valore [alto] stabile"
+        );
         assert_eq!(entry_type_label("phone"), "Telefonata");
         assert_eq!(entry_type_label("access"), "Accesso");
         assert_eq!(entry_type_label("sconosciuto"), "Voce");

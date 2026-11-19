@@ -244,36 +244,41 @@ where
         measure: Some(unit(&row.value)),
         at,
         detail: vec![previous.map_or_else(
-                || {
-                    detail(
-                        "Valore",
-                        format!(
-                            "{} ({}) · Nessuna misura precedente",
-                            unit(&row.value),
-                            short(observed)
-                        ),
-                    )
-                },
-                |(when, other)| {
-                    let comparison = format!(
-                        "{} ({}) → {} ({})",
-                        measured(other),
-                        short(when),
-                        measured(row),
+            || {
+                detail(
+                    "Valore",
+                    format!(
+                        "{} ({}) · Nessuna misura precedente",
+                        unit(&row.value),
                         short(observed)
-                    );
-                    detail(
-                        "Valori",
-                        if other.unit_code == row.unit_code {
-                            comparison
-                        } else {
-                            format!("{comparison} · unità diverse, valori non convertiti")
-                        },
-                    )
-                },
-            )],
+                    ),
+                )
+            },
+            |(when, other)| {
+                let comparison = format!(
+                    "{} ({}) → {} ({})",
+                    measured(other),
+                    short(when),
+                    measured(row),
+                    short(observed)
+                );
+                detail(
+                    "Valori",
+                    if other.unit_code == row.unit_code {
+                        comparison
+                    } else {
+                        format!("{comparison} · unità diverse, valori non convertiti")
+                    },
+                )
+            },
+        )],
         more: [
-            (!range.is_empty()).then(|| detail("Riferimento", range.trim_start_matches("Riferimento ").to_owned())),
+            (!range.is_empty()).then(|| {
+                detail(
+                    "Riferimento",
+                    range.trim_start_matches("Riferimento ").to_owned(),
+                )
+            }),
             Some(detail("Misura del", day_in_zone(observed, zone))),
         ]
         .into_iter()
@@ -420,7 +425,10 @@ pub(super) fn diary_after(anchor: &VisitAnchor, entries: &[Entry]) -> Option<Str
     }
     let others: usize = counts.into_values().sum();
     if others > 0 {
-        parts.push(format!("{others} {}", if others == 1 { "voce" } else { "voci" }));
+        parts.push(format!(
+            "{others} {}",
+            if others == 1 { "voce" } else { "voci" }
+        ));
     }
     (!parts.is_empty()).then(|| parts.join(" · "))
 }
