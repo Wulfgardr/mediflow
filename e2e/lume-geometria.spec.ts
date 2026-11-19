@@ -61,7 +61,6 @@ async function offScaleRadii(page: Page): Promise<string[]> {
         const radius = Math.round(Number.parseFloat(raw) * 10) / 10;
         if (radius >= Math.min(box.width, box.height) / 2 - 0.5) continue;
         if (allowed.has(radius)) continue;
-        if (element.matches('#quadro[data-overview] [data-record-tray]') && radius === 24) continue;
         if (element.closest('#quadro[data-overview]') && overview.includes(radius)) continue;
         const name = typeof element.className === 'string' ? element.className.trim().split(/\s+/)[0] : '';
         found.add(`${element.tagName.toLowerCase()}${name ? `.${name}` : ''} ${raw}`);
