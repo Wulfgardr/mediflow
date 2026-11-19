@@ -17,7 +17,7 @@ mockOrdinaryModule(import.meta.url, '../gliner-redaction-runner', { namedExports
         async close() {},
     }),
 } });
-const { createOrdinaryPreparation, readPreparedOrdinaryProfile } = await import('./ordinary-preparation');
+const { createOrdinaryPreparation, readPreparedOrdinaryProfile, DATE_OFFSET_NOTE } = await import('./ordinary-preparation');
 const { createRedactionSession } = await import('../ai-redaction-session');
 
 const configuration = { pythonExecutable: '/synthetic/python', workerPath: '/synthetic/worker', modelDirectory: '/synthetic/model' };
@@ -33,7 +33,8 @@ function projection(content = SENTINEL) {
 }
 const profile = (content?: string) => { const value = projection(content); return createSmartImportOrdinaryTaskProfile({ projection: value, generatedAt: value.capturedAt }); };
 function token(payload: string, before: string, role: string): string {
-    const found = payload.match(new RegExp(`${before.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\[\\[MF_${role}[1-9][0-9]*_[a-z2-7]{8}\\]\\])`, 'u'))?.[1];
+    const shape = role === 'GG' ? 'GG(?:\\+0|[+-][1-9][0-9]*)' : `${role}[1-9][0-9]*`;
+    const found = payload.match(new RegExp(`${before.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\[\\[MF_${shape}_[a-z2-7]{8}\\]\\])`, 'u'))?.[1];
     assert.ok(found, `${role} after ${before}`);
     return found;
 }
@@ -61,6 +62,9 @@ test('I1 and I2: exact payload bytes carry no identity and every placeholder nam
         token(read.payload, ', ', 'EML');
         token(read.payload, 'indirizzo: ', 'IND');
         token(read.payload, 'presso ', 'ORG');
+        token(read.payload, 'nata il ', 'NAS');
+        token(read.payload, 'Visita del ', 'GG');
+        assert.ok(read.content.input[0].text.endsWith(DATE_OFFSET_NOTE));
         const nonces = new Set([...read.payload.matchAll(/\[\[MF_[A-Z]+[0-9+-]+_([a-z2-7]{8})\]\]/gu)].map(match => match[1]));
         assert.equal(nonces.size, 1);
         assert.ok(!/\{\{|MF_PII/u.test(read.payload));
@@ -108,15 +112,51 @@ test('I5: a role outside the field contract, a forged or a keyed placeholder rej
     try {
         const patient = token(read.payload, '', 'PAZ');
         const relative = token(read.payload, 'dalla figlia ', 'PER');
-        const date = token(read.payload, 'ecografia prescritta il ', 'DAT');
+        const date = token(read.payload, 'ecografia prescritta il ', 'GG');
+        const birth = token(read.payload, 'nata il ', 'NAS');
         const fiscal = token(read.payload, 'CF ', 'CF');
         const accepted = read.parseOutput(output(date, `${patient} con ${relative}`));
         assert.equal(accepted.summary, 'Ada Sintetica con Bea Riva');
         assert.equal((accepted as unknown as { servicePrescriptions: { prescribedAt?: string }[] }).servicePrescriptions[0].prescribedAt, '02/03/2026');
         for (const wire of [
-            output(patient), output(`il ${relative}`), output(date, 'Sintesi', { requestReference: fiscal }),
+            output(patient), output(`il ${relative}`), output(birth), output(date, 'Sintesi', { requestReference: fiscal }),
             output(date, `${patient.replace(/PAZ1/u, 'PAZ9')}`), output(date, patient.replace(/_[a-z2-7]{8}\]\]$/u, '_aaaaaaaa]]')),
             output(date, patient.replace('[[', '[')), output(date).replace('"summary":', `"${patient}":`),
         ]) assert.throws(() => read.parseOutput(wire), wire);
     } finally { await job.close(); }
+});
+
+const offsetOf = (placeholder: string) => Number(/MF_GG([+-][0-9]+)_/u.exec(placeholder)![1]);
+const withOffset = (placeholder: string, offset: number) => placeholder.replace(/GG[+-][0-9]+_/u, `GG${offset < 0 ? '-' : '+'}${Math.abs(offset)}_`);
+
+test('I6: clinical dates leave as offsets that keep intervals, and the model can return a new one', async () => {
+    const { job, read } = await prepared();
+    try {
+        const visit = token(read.payload, 'Visita del ', 'GG'), prescription = token(read.payload, 'ecografia prescritta il ', 'GG');
+        assert.equal(offsetOf(visit) - offsetOf(prescription), 10);
+        assert.ok(read.content.input[0].text.endsWith(DATE_OFFSET_NOTE));
+        const restored = (placeholder: string) => (read.parseOutput(output(placeholder)) as unknown as { servicePrescriptions: { prescribedAt: string }[] }).servicePrescriptions[0].prescribedAt;
+        assert.equal(restored(prescription), '02/03/2026');
+        assert.equal(restored(withOffset(visit, offsetOf(visit) + 30)), '11/04/2026');
+        assert.equal(read.parseOutput(output(prescription, `Controllo il ${withOffset(visit, offsetOf(visit) - 365)}`)).summary, 'Controllo il 12/03/2025');
+        for (const bad of [visit.replace(/GG([+-])/u, 'GG$10'), withOffset(visit, 36_526), withOffset(visit, offsetOf(visit) + 30_000),
+            visit.replace(/_[a-z2-7]{8}\]\]$/u, '_aaaaaaaa]]'), visit.replace('GG', 'GG '), visit.replace(/[+-]/u, '±')]) {
+            assert.throws(() => read.parseOutput(output(bad)), bad);
+        }
+        assert.throws(() => read.parseOutput(output(prescription, 'Sintesi', { requestReference: visit })));
+    } finally { await job.close(); }
+});
+
+test('I6: the anchor does not follow from the payload bytes and the birth date never leaves as an offset', async () => {
+    const offsets = new Set<number>();
+    for (let index = 0; index < 8; index++) {
+        const { job, read } = await prepared();
+        try {
+            const visit = offsetOf(token(read.payload, 'Visita del ', 'GG'));
+            assert.equal(visit - offsetOf(token(read.payload, 'ecografia prescritta il ', 'GG')), 10);
+            assert.ok(!/nata il \[\[MF_GG/u.test(read.payload));
+            offsets.add(visit);
+        } finally { await job.close(); }
+    }
+    assert.ok(offsets.size > 1);
 });

@@ -238,7 +238,7 @@ export function ordinaryTextPath(profile: OrdinaryTaskProfile, path: readonly (s
     return schema?.type === 'string' && schema.enum === undefined && schema.const === undefined;
 }
 
-const DATE_ROLES: ReadonlySet<PlaceholderRole> = new Set<PlaceholderRole>(['DAT']);
+const DATE_ROLES: ReadonlySet<PlaceholderRole> = new Set<PlaceholderRole>(['DAT', 'GG']);
 const REFERENCE_ROLES: ReadonlySet<PlaceholderRole> = new Set<PlaceholderRole>(['ID', 'ALT']);
 const FIELD_ROLES: Readonly<Partial<Record<OrdinaryTaskFunctionId, Readonly<Record<string, ReadonlySet<PlaceholderRole>>>>>> = Object.freeze({
     smart_import: Object.freeze({ prescribedAt: DATE_ROLES, requestReference: REFERENCE_ROLES }),
