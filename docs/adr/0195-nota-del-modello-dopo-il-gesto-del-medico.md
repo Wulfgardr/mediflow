@@ -38,20 +38,27 @@ gesto del medico su quel testo. Per il medico resta un solo gesto per visita.
    (codice fiscale e data) e l'impaginazione a 88 colonne non cambiano
    l'esito. Non contano il nome del file né la fonte dichiarata dal client,
    che il modello può scegliere. Un originale che riporta solo una frase della
-   nota resta automatico.
+   nota resta automatico. Un errore di riconoscimento porta verso la
+   revisione, mai verso l'automatico: se nessun PDF riproduce la nota, tutti
+   i PDF della cassetta aspettano il medico insieme alla nota, e un PDF senza
+   testo leggibile blocca la cassetta intera.
 3. Il server non legge il contenuto delle buste e conosce solo tipo ed hash
    degli elementi. Per questo rifiuta la nota in fase automatica ed ammette la
    trascrizione solo lì, mentre il PDF può stare in entrambe le fasi. La
    revisione deve comprendere tutti gli elementi ancora da applicare, così
-   una visita non entra a metà.
+   una visita non entra a metà. Finché la nota non è applicata, il server
+   rifiuta una fase automatica che prenderebbe tutti i PDF della cassetta:
+   almeno uno deve accompagnare la nota in revisione. Quale dei PDF sia
+   quello giusto lo può dire solo il browser.
 4. La conferma nativa mostra la nota intera come campo «Testo», con il PDF
    che la riproduce come fonte e la dicitura «Scritta dal modello». Il digest
    del piano firmato copre il contenuto cifrato della nota. Una cassetta con
    sola nota, trascrizione e PDF, senza proposte, diventa confermabile. Il
    contratto `VisitConfirmationPresentation` ed il componente Swift non
    cambiano: un campo accetta fino a 16.384 byte e la nota del plugin resta
-   sotto i 12.000 caratteri. Se la presentazione non si può costruire, la
-   conferma non parte e la visita resta in «In arrivo».
+   sotto i 12.000 caratteri. Se la presentazione non si può costruire, per
+   esempio perché nessun PDF riproduce la nota, la conferma non parte e la
+   visita resta in «In arrivo».
 5. Le cassette depositate prima restano come sono: se la nota è già entrata,
    si completano le sole proposte. Quelle non ancora applicate seguono la
    regola nuova. Nessuna migrazione e nessuna riga cancellata. Una cassetta
