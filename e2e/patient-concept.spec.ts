@@ -62,17 +62,23 @@ test('Scheda desktop del concept con identità, tre colonne e ritorno alle sezio
         const stable = await rect('#riepilogo-problemi');
         const changed = await rect('[aria-label="Variazioni dall’ultima visita"]');
         const context = await rect('[data-record-tray="contesto"] > div');
+        const trays = await Promise.all(['stabile', 'cambiato', 'contesto'].map(zone => rect(`[data-record-tray="${zone}"]`)));
         if (out) {
             mkdirSync(out, { recursive: true });
             await page.screenshot({ path: join(out, `scheda-${theme}.png`), animations: 'disabled' });
-            writeFileSync(join(out, `misure-${theme}.json`), JSON.stringify({ rail, main, stable, changed, context }, null, 2));
+            writeFileSync(join(out, `misure-${theme}.json`), JSON.stringify({ rail, main, trays, stable, changed, context }, null, 2));
         }
         expect(Math.abs(rail.width - 232)).toBeLessThanOrEqual(3);
         expect(Math.abs(main.x - 244)).toBeLessThanOrEqual(4);
-        for (const [bounds, left, width] of [[stable, 269, 307], [changed, 592, 374], [context, 982, 307]] as const) {
-            expect(Math.abs(bounds.x - left)).toBeLessThanOrEqual(4);
-            expect(Math.abs(bounds.y - 235)).toBeLessThanOrEqual(5);
-            expect(Math.abs(bounds.width - width)).toBeLessThanOrEqual(4);
+        for (const [tray, left, width] of [[trays[0], 268, 320], [trays[1], 600, 370], [trays[2], 982, 308]] as const) {
+            expect(Math.abs(tray.x - left)).toBeLessThanOrEqual(4);
+            expect(Math.abs(tray.y - trays[0].y)).toBeLessThanOrEqual(1);
+            expect(Math.abs(tray.width - width)).toBeLessThanOrEqual(4);
+        }
+        for (const [island, tray] of [[stable, trays[0]], [changed, trays[1]], [context, trays[2]]] as const) {
+            expect(Math.abs(island.x - tray.x - 10)).toBeLessThanOrEqual(1);
+            expect(Math.abs(island.x + island.width - (tray.x + tray.width - 10))).toBeLessThanOrEqual(1);
+            expect(Math.abs(island.y - tray.y - 50)).toBeLessThanOrEqual(2);
         }
     }
     const proposal = page.getByTestId('patient-proposals-summary');

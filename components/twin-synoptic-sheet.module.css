@@ -23,7 +23,8 @@
 .sheet[data-overview] {
     container: record-sheet / inline-size;
     --record-island-radius: 14px;
-    --record-gap: 16px;
+    --record-tray-inset: 10px;
+    --record-gap: 12px;
     --record-proposal-ink: color-mix(in oklab, var(--lume-record-proposal-rule) 72%, var(--lume-ink));
 }
 .overview { display: grid; align-items: start; gap: var(--record-gap); min-width: 0; min-inline-size: 0; }
@@ -38,20 +39,20 @@
     align-items: center;
     gap: 8px;
     margin: 0;
-    padding: 0 4px;
-    color: var(--lume-ink-muted);
-    font: var(--type-section);
+    padding: 2px 4px;
+    color: var(--lume-ink);
+    font: var(--type-record-zone);
+    letter-spacing: -0.015em;
     scroll-margin-block-start: 20px;
 }
-.overview .zoneTitle::before {
+.overview .middle > .zoneTitle:has(+ .activity .comparison)::after {
     content: '';
     flex: none;
-    width: 6px;
-    height: 6px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
-    background: currentColor;
+    background: var(--lume-accent);
 }
-:global(:root) .overview .middle > .zoneTitle:has(+ .activity .comparison) { color: var(--lume-accent); }
 .visuallyHidden {
     position: absolute;
     width: 1px;
@@ -314,10 +315,25 @@
 .contextRows > [data-source-open='true'] { order: -1; }
 
 @container record-sheet (width >= 44rem) {
-    :global([data-folder-section='quadro']) .overview { grid-template-columns: minmax(0, 1.22fr) minmax(0, 1fr); }
+    :global([data-folder-section='quadro']) .overview { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
     .overviewIndex { display: none; }
+    :global(:root) .overview .zoneTitle { padding: 6px 6px 0; }
+    .overview :is(.stable, .middle, .context) {
+        gap: var(--record-tray-inset);
+        padding: var(--record-tray-inset);
+        border-radius: calc(var(--record-island-radius) + var(--record-tray-inset));
+        background: var(--lume-record-tray);
+        box-shadow: inset 0 0 0 1px var(--lume-record-tray-rule),
+            inset 0 1px 0 var(--lume-record-tray-light),
+            inset 0 -12px 18px -18px var(--lume-record-tray-shadow);
+    }
+    .overview :is(.stable > section, .notes, .contextRows > section, .activity > section, .noComparison, .support),
+    :global([data-folder-section='quadro']) .overview .middle > :global(#diario) { background: var(--lume-record-island); }
+    .overview .activity > .comparison { background: var(--lume-record-change); }
+    .overview .support:has([data-has-proposals='true']) { background: transparent; }
+    .overview .context > .contextRows, .overview .middle > .activity { gap: var(--record-tray-inset); }
     :global([data-folder-section='quadro']) :is(.overview > .middle, .overview > .side) {
-        max-height: max(320px, calc(100dvh - 242px));
+        max-height: max(320px, calc(100dvh - 212px));
         overflow-y: auto;
         scrollbar-width: thin;
     }
@@ -326,13 +342,13 @@
         top: 0;
         z-index: 2;
         padding-inline: 6px;
-        background: var(--lume-surface-focal);
+        background: var(--lume-record-tray);
         border-radius: 8px;
     }
 }
 @container record-sheet (width >= 62rem) {
     :global([data-folder-section='quadro']) .sheet:not([data-writing]) .overview {
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1.22fr) minmax(0, 1fr);
+        grid-template-columns: minmax(0, 1.04fr) minmax(0, 1.2fr) minmax(0, 1fr);
     }
     :global([data-folder-section='quadro']) .sheet:not([data-writing]) .side { display: contents; }
     :global([data-folder-section='quadro']) .sheet:not([data-writing]) .middle { grid-column: 2; grid-row: 1; }

@@ -134,7 +134,7 @@ export function PatientSynopticSheet({ clinicalSupport, notesContent, problems, 
                 <a href="#riepilogo-contesto">Contesto</a>
             </nav>
             <section aria-labelledby="riepilogo-cambiato" data-record-tray="cambiato" className={reading.middle}>
-                <h2 id="riepilogo-cambiato" className={reading.zoneTitle}>Cambiato dall’ultima visita</h2>
+                <h2 id="riepilogo-cambiato" className={reading.zoneTitle}>Cambiato<span className={reading.visuallyHidden}> dall’ultima visita</span></h2>
                 <div className={reading.activity}>{activity}</div>
                 {diaryTools ? <div className={reading.diaryTools} data-reading={diaryTools.full}>
                     <button ref={diaryTools.control} type="button" aria-controls="diario"
