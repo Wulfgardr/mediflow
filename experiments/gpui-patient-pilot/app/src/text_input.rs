@@ -136,11 +136,11 @@ impl TextInput {
     }
 
     #[cfg(test)]
-    #[cfg(test)]
     pub(crate) fn test_accessibility_id(&self) -> &'static str {
         self.id
     }
 
+    #[cfg(test)]
     pub fn accessible_label(&self) -> &'static str {
         self.label
     }
