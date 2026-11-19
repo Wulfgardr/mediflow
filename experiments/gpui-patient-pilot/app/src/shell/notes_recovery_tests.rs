@@ -966,7 +966,7 @@ pub(super) fn assert_minimum_geometry(
         .debug_bounds(if id.ends_with("reconcile") {
             "control-label:Rileggi e verifica"
         } else {
-            "control-label:Registra 1 elemento"
+            "control-label:Rivedi"
         })
         .unwrap();
     eprintln!(

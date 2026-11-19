@@ -1,5 +1,7 @@
 use super::*;
 
+const MENU_INSET: f32 = 4.;
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum Command {
     Review,
@@ -11,7 +13,7 @@ pub(super) enum Command {
 
 pub(super) const PRIMARY_LABELS: &[(Command, Option<FormKind>, &str)] = &[
     (Command::Review, Some(FormKind::Scale), "Prepara e rivedi"),
-    (Command::Review, None, "Registra 1 elemento"),
+    (Command::Review, None, "Rivedi"),
     (Command::Reread, Some(FormKind::Scale), "Rileggi e verifica"),
     (Command::Reread, None, "Rileggi la scheda"),
     (Command::Copy, None, "Copia bozza"),
@@ -120,13 +122,14 @@ impl ClinicalApp {
             .overflow_y_scroll()
             .track_scroll(&self.threshold_menu_scroll)
             .occlude()
-            .p(px(4.))
+            .p(px(MENU_INSET))
             .flex()
             .flex_col()
             .gap(px(8.))
             .bg(theme.paper)
             .border_1()
             .border_color(theme.strong_rule)
+            .rounded(px(theme.control_radius))
             .children(
                 secondary
                     .into_iter()
@@ -286,7 +289,11 @@ impl ClinicalApp {
             .debug_selector(move || id.into())
             .flex_shrink_0();
         let el = if let Some(index) = menu_index {
-            self.threshold_menu_targets[index].attach_enabled(el.role(Role::MenuItem), enabled)
+            self.threshold_menu_targets[index].attach_enabled(
+                el.role(Role::MenuItem)
+                    .rounded(px(Theme::nested(self.theme.control_radius, MENU_INSET))),
+                enabled,
+            )
         } else {
             el.track_focus(&self.form_actions[action].focus.clone().tab_stop(enabled))
         };

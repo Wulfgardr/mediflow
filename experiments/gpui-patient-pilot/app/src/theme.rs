@@ -30,6 +30,7 @@ pub struct Theme {
     pub appearance_selected_text: Hsla,
     pub warning: Hsla,
     pub critical: Hsla,
+    pub success: Hsla,
     pub threshold_text: Hsla,
     pub control_radius: f32,
     pub paper_radius: f32,
@@ -75,6 +76,7 @@ impl Theme {
             },
             warning: color("signal", "warning"),
             critical: color("signal", "critical"),
+            success: color("signal", "success"),
             threshold_text: color("ink", "threshold"),
             control_radius: if cfg!(any(target_os = "ios", target_os = "macos")) {
                 12.
@@ -114,6 +116,14 @@ impl Theme {
         })
     }
 
+    pub fn around_control(self, inset: f32) -> f32 {
+        self.control_radius + inset
+    }
+
+    pub fn nested(outer: f32, inset: f32) -> f32 {
+        (outer - inset).max(0.)
+    }
+
     pub fn focus_ring(self, primary: bool) -> BoxShadow {
         BoxShadow::new(px(0.), px(0.), if primary { self.ink } else { self.fresh })
             .spread_radius(px(1.))
@@ -143,6 +153,7 @@ impl Theme {
             TypeRole::Threshold => (SYSTEM, 15., FontWeight::SEMIBOLD, 1.5, true),
             TypeRole::Meta => (SYSTEM, 13., FontWeight::NORMAL, 1.5, true),
             TypeRole::Section => (SYSTEM, 12., FontWeight::SEMIBOLD, 1.5, true),
+            TypeRole::Title => (SYSTEM, 15., FontWeight::SEMIBOLD, 1.4, true),
             TypeRole::Code => (CODES, 12., FontWeight::NORMAL, 1.5, false),
         };
         let size = self.size(points * if register { native_body / 14. } else { 1. });
@@ -170,6 +181,7 @@ pub enum TypeRole {
     Threshold,
     Meta,
     Section,
+    Title,
     Code,
 }
 
@@ -219,6 +231,7 @@ impl From<TextRole> for TypeRole {
             TextRole::Body => Self::Body,
             TextRole::Strong => Self::Strong,
             TextRole::Meta => Self::Meta,
+
             TextRole::Code => Self::Code,
         }
     }
@@ -230,6 +243,7 @@ pub enum TitleRole {
     PageTitle,
     PersonPreview,
     Section,
+    SectionTitle,
     Threshold,
 }
 impl From<TitleRole> for TypeRole {
@@ -240,6 +254,7 @@ impl From<TitleRole> for TypeRole {
             TitleRole::PageTitle => Self::PageTitle,
             TitleRole::PersonPreview => Self::PersonPreview,
             TitleRole::Section => Self::Section,
+            TitleRole::SectionTitle => Self::Title,
             TitleRole::Threshold => Self::Threshold,
         }
     }
@@ -274,6 +289,21 @@ impl<T: Styled> TypeStyle for T {}
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_frame_around_a_control_keeps_its_corners_concentric() {
+        for dark in [false, true] {
+            let theme = Theme::for_dark(dark);
+            for inset in [0., 8., 12.] {
+                let outer = theme.around_control(inset);
+                assert_eq!(Theme::nested(outer, inset), theme.control_radius);
+                assert_eq!(
+                    Theme::nested(theme.control_radius, inset + theme.control_radius),
+                    0.
+                );
+            }
+        }
+    }
 
     fn check(
         role: TypeRole,

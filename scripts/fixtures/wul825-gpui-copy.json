@@ -35,7 +35,6 @@
     ],
     "added": [
       "Ho verificato le sessioni dell’home-base",
-      "Parametri recenti",
       "Salvataggio delle preferenze IA non verificato. {}",
       "Sessione bloccata. Un salvataggio IA era in corso: rileggi le preferenze dopo l’accesso."
     ]
@@ -348,6 +347,15 @@
       "Un riepilogo temporaneo dal modello locale dell’home-base, da confrontare con la scheda. Nessun aggiornamento automatico.",
       "Verifica della funzione sull’home-base…",
       "Verranno inviati al modello locale dell’home-base: {} condizioni, {} terapie attive, {} voci recenti del diario. Nome, codice fiscale e recapiti non vengono inviati."
+    ]
+  },
+  {
+    "file": "experiments/gpui-patient-pilot/app/src/shell/patient_record.rs",
+    "removed": [
+      "Misure recenti"
+    ],
+    "added": [
+      "Parametri recenti"
     ]
   },
   {

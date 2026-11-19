@@ -148,7 +148,6 @@ static void checkDictionary(CGPDFDictionaryRef d, size_t depth) {
         }
     }
     if (present(d, "SMask") || present(d, "Mask")) { failure = "image_mask"; return; }
-    if (named(d,"Subtype","Form")) { failure = "nested_graphics"; return; }
     if (named(d,"Subtype","Type3")) { failure = "font"; return; }
     if (present(d, "XFA") || present(d, "Pattern")) { failure = "unsupported"; return; }
     CGPDFObjectRef contents;
@@ -220,7 +219,10 @@ struct TextUse {
     CGPDFDictionaryRef font;
     __unsafe_unretained NSMutableArray<NSValue *> *stack;
     __unsafe_unretained NSMutableDictionary<NSValue *, NSValue *> *fonts;
+    __unsafe_unretained NSMutableArray<NSValue *> *forms;
+    CGPDFOperatorTableRef table;
 };
+static const NSUInteger formDepthLimit = 8;
 static struct FontUse *fontUse(CGPDFDictionaryRef font, struct TextUse *text) {
     NSValue *key = [NSValue valueWithPointer:font];
     struct FontUse *use = [text->fonts[key] pointerValue];
@@ -340,10 +342,41 @@ static void graphicsTextState(CGPDFScannerRef scanner, void *info) {
     if (!object || !CGPDFObjectGetValue(object, kCGPDFObjectTypeDictionary, &state)) { failure = "invalid"; return; }
     if (present(state, "Font") && (!CGPDFDictionaryGetArray(state, "Font", &font) || CGPDFArrayGetCount(font) != 2 || !CGPDFArrayGetDictionary(font, 0, &text->font) || !CGPDFArrayGetNumber(font, 1, &size) || !isfinite(size))) failure = "invalid";
 }
+static void qualifyForm(CGPDFStreamRef stream, CGPDFContentStreamRef parent, struct TextUse *text) {
+    CGPDFDictionaryRef d = CGPDFStreamGetDictionary(stream);
+    CGPDFArrayRef box = NULL;
+    NSValue *key = [NSValue valueWithPointer:stream];
+    if (!CGPDFDictionaryGetArray(d, "BBox", &box) || CGPDFArrayGetCount(box) != 4 ||
+        text->forms.count >= formDepthLimit || [text->forms containsObject:key]) {
+        failure = "nested_graphics"; return;
+    }
+    CGPDFDataFormat format;
+    CFDataRef bytes = copyStream(stream, &format);
+    if (!bytes) return;
+    CFRelease(bytes);
+    CGPDFDictionaryRef resources = NULL;
+    CGPDFDictionaryGetDictionary(d, "Resources", &resources);
+    CGPDFContentStreamRef content = CGPDFContentStreamCreateWithStream(stream, resources, parent);
+    CGPDFScannerRef scanner = CGPDFScannerCreate(content, text->table, text);
+    CGPDFDictionaryRef font = text->font;
+    NSUInteger saved = text->stack.count;
+    [text->forms addObject:key];
+    if (!CGPDFScannerScan(scanner) && !failure) failure = "invalid";
+    [text->forms removeLastObject];
+    if (text->stack.count != saved && !failure) failure = "invalid";
+    text->font = font;
+    CGPDFScannerRelease(scanner);
+    CGPDFContentStreamRelease(content);
+}
 static void paintObject(CGPDFScannerRef scanner, void *info) {
     countOperator(scanner, info);
     const char *name;
-    if (!CGPDFScannerPopName(scanner, &name) || !CGPDFContentStreamGetResource(CGPDFScannerGetContentStream(scanner), "XObject", name)) failure = "invalid";
+    CGPDFContentStreamRef parent = CGPDFScannerGetContentStream(scanner);
+    CGPDFObjectRef object = NULL;
+    CGPDFStreamRef stream = NULL;
+    if (!CGPDFScannerPopName(scanner, &name) || !(object = CGPDFContentStreamGetResource(parent, "XObject", name)) ||
+        !CGPDFObjectGetValue(object, kCGPDFObjectTypeStream, &stream)) { failure = "invalid"; return; }
+    if (named(CGPDFStreamGetDictionary(stream), "Subtype", "Form")) qualifyForm(stream, parent, info);
 }
 static void inlineImage(CGPDFScannerRef scanner, void *info) {
     countOperator(scanner, info);
@@ -351,10 +384,11 @@ static void inlineImage(CGPDFScannerRef scanner, void *info) {
     if (!CGPDFScannerPopStream(scanner, &stream)) failure = "invalid";
     else checkImage(stream);
 }
+static double scaleLimit = 1.5;
 static bool canvas(CGRect box, size_t *w, size_t *h) {
     double x = box.size.width, y = box.size.height;
     if (!isfinite(x) || !isfinite(y) || x <= 0 || y <= 0 || x > 14400 || y > 14400) return false;
-    double scale = MIN(1.5, MIN(2048/x, MIN(2048/y, sqrt(4000000/(x*y)))));
+    double scale = MIN(scaleLimit, MIN(2048/x, MIN(2048/y, sqrt(4000000/(x*y)))));
     *w = MAX(1, (size_t)floor(x*scale)); *h = MAX(1, (size_t)floor(y*scale));
     return true;
 }
@@ -363,7 +397,8 @@ static bool writeBytes(const void *bytes, size_t size) {
     while (size) { ssize_t n = write(STDOUT_FILENO, p, size); if (n <= 0) return false; p += n; size -= n; }
     return true;
 }
-int MFDocumentPreviewWorker(size_t page) {
+int MFDocumentPreviewWorker(size_t page, int screen) {
+    scaleLimit = screen ? 3.0 : 1.5;
     // Framework diagnostics are uncontrolled; never send document text to logs.
     int quiet = open("/dev/null", O_WRONLY);
     if (quiet < 0 || dup2(quiet, STDERR_FILENO) < 0) return 2;
@@ -451,7 +486,8 @@ int MFDocumentPreviewWorker(size_t page) {
                 CGPDFOperatorTableSetCallback(table, "gs", graphicsTextState);
                 __attribute__((objc_precise_lifetime)) NSMutableArray<NSValue *> *stack = [NSMutableArray new];
                 __attribute__((objc_precise_lifetime)) NSMutableDictionary<NSValue *, NSValue *> *fonts = [NSMutableDictionary new];
-                struct TextUse text = {.stack = stack, .fonts = fonts};
+                __attribute__((objc_precise_lifetime)) NSMutableArray<NSValue *> *forms = [NSMutableArray new];
+                struct TextUse text = {.stack = stack, .fonts = fonts, .forms = forms, .table = table};
                 CGPDFScannerRef scanner = CGPDFScannerCreate(content, table, &text);
                 if (!failure && !CGPDFScannerScan(scanner)) failure = "invalid";
                 for (NSValue *value in fonts.allValues) {
@@ -493,5 +529,5 @@ int MFDocumentPreviewWorker(size_t page) {
     }
 }
 #ifdef MF_PDF_TEST_MAIN
-int main(int argc, char **argv) { return MFDocumentPreviewWorker(argc > 1 ? strtoul(argv[1],NULL,10) : 1); }
+int main(int argc, char **argv) { return MFDocumentPreviewWorker(argc > 1 ? strtoul(argv[1],NULL,10) : 1, 0); }
 #endif

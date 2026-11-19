@@ -600,7 +600,10 @@ fn prose_lines(block: Block) -> Vec<Block> {
     let mut start = 0;
     while start < graphemes.len() {
         let limit = (start + 64).min(graphemes.len());
-        let end = if limit < graphemes.len() {
+        let hard_break = (start..limit).find(|&index| graphemes[index].0 == "\n");
+        let end = if let Some(index) = hard_break {
+            index
+        } else if limit < graphemes.len() {
             (start..limit)
                 .rfind(|&index| graphemes[index].0.chars().all(char::is_whitespace))
                 .map_or(limit, |index| index + 1)
@@ -624,7 +627,7 @@ fn prose_lines(block: Block) -> Vec<Block> {
             }
         }
         lines.push(line);
-        start = end;
+        start = end + usize::from(hard_break.is_some());
     }
     if lines.is_empty() {
         lines.push(block);
@@ -737,6 +740,26 @@ mod tests {
                 .collect();
             assert_eq!(actual, expected);
         }
+    }
+
+    #[test]
+    fn a_line_break_starts_a_new_line_even_before_the_chunk_limit() {
+        let document = parse(
+            "Nota clinica sintetica ripetibile per il benchmark locale.\nQ7 0.9.1: rilettura completata.",
+        );
+        let lines: Vec<String> = document
+            .blocks
+            .into_iter()
+            .flat_map(prose_lines)
+            .map(|line| line.runs.iter().map(|run| run.text.as_str()).collect())
+            .collect();
+        assert_eq!(
+            lines,
+            [
+                "Nota clinica sintetica ripetibile per il benchmark locale.",
+                "Q7 0.9.1: rilettura completata."
+            ]
+        );
     }
 
     #[test]

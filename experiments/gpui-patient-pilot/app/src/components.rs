@@ -258,7 +258,8 @@ pub fn tab(id: &'static str, label: &'static str, selected: bool, theme: Theme) 
         .max_w_full()
         .min_h(px(44.))
         .px(px(12.))
-        .py(px(8.))
+        .pt(px(8.))
+        .pb(px(6.))
         .flex()
         .items_center()
         .justify_center()
@@ -270,31 +271,20 @@ pub fn tab(id: &'static str, label: &'static str, selected: bool, theme: Theme) 
                 crate::theme::TextRole::Body
             },
         )
-        .rounded(px(theme.control_radius))
+        .rounded_t(px(theme.control_radius))
         .text_color(if selected {
             theme.fresh
         } else {
             theme.secondary
         })
-        .bg(if selected {
-            theme.selected
-        } else {
-            theme.shade
-        })
-        .border_2()
+        .border_b_2()
         .border_color(if selected {
-            theme.selected
+            theme.fresh
         } else {
-            theme.shade
+            gpui::transparent_black()
         })
-        .hover(move |style| {
-            style.bg(if selected {
-                theme.selected
-            } else {
-                theme.hover
-            })
-        })
-        .focus(move |style| style.border_color(theme.fresh).bg(theme.selected))
+        .hover(move |style| style.bg(theme.hover).text_color(theme.ink))
+        .focus(move |style| style.shadow(vec![theme.focus_ring(false)]))
         .child(control_label(label.into()))
 }
 

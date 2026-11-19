@@ -1,3 +1,7 @@
+#[cfg(test)]
+macro_rules! text {
+    ($($args:tt)*) => { crate::shell::rendered_command::observe_ink(gpui::text!($($args)*)) };
+}
 use super::*;
 use serde_json::Value;
 
@@ -5,11 +9,59 @@ const SOURCE_SCHEMA: &str = "mediflow.document_parse_evidence_artifact.v1";
 const DISPLAY_CHARS: usize = 12_000;
 const PDF_FIDELITY_NOTICE: &str = "Alcuni caratteri possono mancare o differire: per un valore clinico controlla il documento originale.";
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum OriginalPlace {
+    Documents,
+    Record { save: bool },
+}
+
+fn inked_page(pdf: &documents::pdf::Preview, fitted: bool, theme: Theme) -> Stateful<Div> {
+    let size = pdf.image.size(0);
+    let (width, height) = (size.width.0.max(1) as f32, size.height.0.max(1) as f32);
+    let ink = if fitted {
+        pdf.ink.start as f32..pdf.ink.end.max(pdf.ink.start + 1) as f32
+    } else {
+        0.0..width
+    };
+    let shown = ink.end - ink.start;
+    div()
+        .id("document-original-page")
+        .debug_selector(|| "document-original-page".into())
+        .relative()
+        .w_full()
+        .flex_none()
+        .aspect_ratio(shown / height)
+        .overflow_hidden()
+        .bg(gpui::white())
+        .rounded(px(Theme::nested(
+            theme.around_control(patient_record::READING_INSET),
+            patient_record::READING_INSET,
+        )))
+        .child(
+            gpui::img(pdf.image.clone())
+                .absolute()
+                .top_0()
+                .h_full()
+                .w(gpui::relative(width / shown))
+                .left(gpui::relative(-ink.start / shown))
+                .object_fit(gpui::ObjectFit::Fill),
+        )
+}
+
 pub(super) struct DocumentOriginal {
     pub(super) id: String,
-    state: ReadLoad<Result<documents::OriginalPreview, String>>,
-    page: usize,
+    pub(super) state: ReadLoad<Result<documents::OriginalPreview, String>>,
+    pub(super) page: usize,
+    pub(super) text_width: Option<bool>,
     context: RequestContext,
+}
+
+const DEFAULT_TEXT_WIDTH_GAIN: f32 = 1.3;
+const USEFUL_TEXT_WIDTH_GAIN: f32 = 1.1;
+
+pub(super) fn text_width_gain(pdf: &documents::pdf::Preview) -> f32 {
+    let width = pdf.image.size(0).width.0.max(1) as f32;
+    width / pdf.ink.end.saturating_sub(pdf.ink.start).max(1) as f32
 }
 
 impl Drop for DocumentOriginal {
@@ -20,10 +72,7 @@ impl Drop for DocumentOriginal {
 
 impl ClinicalApp {
     pub(super) fn toggle_document_original(&mut self, id: &str, cx: &mut Context<Self>) {
-        if self.form.is_some()
-            || self.document_operation != DocumentOperation::Idle
-            || self.local_work_pending()
-        {
+        if self.form.is_some() {
             return;
         }
         if self
@@ -34,6 +83,18 @@ impl ClinicalApp {
         {
             self.patient.document_original = None;
             cx.notify();
+            return;
+        }
+        self.open_document_original(id, documents::pdf::Resolution::Page, cx);
+    }
+
+    pub(super) fn open_document_original(
+        &mut self,
+        id: &str,
+        resolution: documents::pdf::Resolution,
+        cx: &mut Context<Self>,
+    ) {
+        if self.document_operation != DocumentOperation::Idle || self.local_work_pending() {
             return;
         }
         if !self.patient.attachments.ready().is_some_and(|rows| {
@@ -56,6 +117,7 @@ impl ClinicalApp {
             id: id.clone(),
             state: ReadLoad::loading(),
             page: 0,
+            text_width: None,
             context: context.clone(),
         });
         let requested = id.clone();
@@ -67,6 +129,7 @@ impl ClinicalApp {
                 let row = session.read_attachment(&scope, &patient, &requested)?;
                 Ok(documents::original_preview_with_context(
                     &row,
+                    resolution,
                     &work_context,
                 ))
             },
@@ -95,7 +158,7 @@ impl ClinicalApp {
         cx.notify();
     }
 
-    fn turn_document_original(&mut self, page: usize, cx: &mut Context<Self>) {
+    pub(super) fn turn_document_original(&mut self, page: usize, cx: &mut Context<Self>) {
         let Some(original) = &mut self.patient.document_original else {
             return;
         };
@@ -107,16 +170,20 @@ impl ClinicalApp {
             }
             ReadLoad::Ready(Ok(documents::OriginalPreview::Pdf(pdf))) if page < pdf.pages => {
                 let source = pdf.source.clone();
+                let resolution = pdf.resolution;
                 let context = original.context.clone();
                 let work_context = context.clone();
                 let id = original.id.clone();
                 original.page = page;
                 original.state = ReadLoad::loading();
+                self.profile_scroll.set_offset(gpui::point(px(0.), px(0.)));
                 self.run(
                     move || {
-                        Ok(documents::pdf::render(source, page + 1, &work_context)
-                            .map(documents::OriginalPreview::Pdf)
-                            .map_err(documents::pdf::Error::message))
+                        Ok(
+                            documents::pdf::render(source, page + 1, resolution, &work_context)
+                                .map(documents::OriginalPreview::Pdf)
+                                .map_err(documents::pdf::Error::message),
+                        )
                     },
                     move |this, result, _| {
                         if context.check().is_ok()
@@ -201,16 +268,38 @@ impl ClinicalApp {
     }
 
     pub(super) fn document_original_view(&self, cx: &Context<Self>) -> Div {
-        let theme = self.theme;
-        let mut view = div()
+        let view = div()
             .min_w_0()
             .max_w_full()
             .flex()
             .flex_col()
             .gap(px(12.))
-            .child(section("document-original-heading", "Originale", theme));
-        let Some(original) = &self.patient.document_original else {
-            return view;
+            .child(section(
+                "document-original-heading",
+                "Originale",
+                self.theme,
+            ));
+        match &self.patient.document_original {
+            Some(original) => {
+                view.child(self.document_original_content(original, OriginalPlace::Documents, cx))
+            }
+            None => view,
+        }
+    }
+
+    pub(super) fn document_original_content(
+        &self,
+        original: &DocumentOriginal,
+        place: OriginalPlace,
+        cx: &Context<Self>,
+    ) -> Div {
+        let theme = self.theme;
+        let mut view = div().min_w_0().max_w_full().flex().flex_col().gap(px(12.));
+        let save = |view: Div| match place {
+            OriginalPlace::Documents | OriginalPlace::Record { save: true } => {
+                view.child(self.document_original_save(&original.id, cx))
+            }
+            OriginalPlace::Record { save: false } => view,
         };
         match &original.state {
             ReadLoad::Ready(Ok(documents::OriginalPreview::Text(text))) => {
@@ -226,19 +315,67 @@ impl ClinicalApp {
                     .child(self.document_original_controls(original.page, count, cx));
             }
             ReadLoad::Ready(Ok(documents::OriginalPreview::Pdf(pdf))) => {
-                view = view
-                    .child(
-                        gpui::img(pdf.image.clone())
-                            .w_full()
-                            .max_h(px(640.))
-                            .object_fit(gpui::ObjectFit::Contain),
-                    )
-                    .child(text!(format!(
-                        "Pagina {} di {}",
-                        original.page + 1,
-                        pdf.pages
-                    )))
-                    .child(self.document_original_controls(original.page, pdf.pages, cx));
+                let page_line = text!(format!("Pagina {} di {}", original.page + 1, pdf.pages));
+                let controls = self.document_original_controls(original.page, pdf.pages, cx);
+                view =
+                    match place {
+                        OriginalPlace::Documents => view
+                            .child(
+                                gpui::img(pdf.image.clone())
+                                    .object_fit(gpui::ObjectFit::Contain)
+                                    .w_full()
+                                    .max_h(px(640.)),
+                            )
+                            .child(page_line)
+                            .child(controls),
+                        OriginalPlace::Record { .. } => view
+                            .when(pdf.pages > 1, |el| {
+                                el.child(
+                                    div()
+                                        .flex()
+                                        .flex_wrap()
+                                        .items_center()
+                                        .justify_between()
+                                        .gap(px(8.))
+                                        .child(page_line)
+                                        .child(controls),
+                                )
+                            })
+                            .map(|el| {
+                                let gain = text_width_gain(pdf);
+                                let fitted = original
+                                    .text_width
+                                    .unwrap_or(gain <= DEFAULT_TEXT_WIDTH_GAIN);
+                                el.child(inked_page(pdf, fitted, theme)).when(
+                                    gain >= USEFUL_TEXT_WIDTH_GAIN,
+                                    |el| {
+                                        el.child(
+                                            div().flex().child(
+                                                button(
+                                                    "document-original-text-width",
+                                                    if fitted {
+                                                        "Pagina intera"
+                                                    } else {
+                                                        "Ingrandisci il testo"
+                                                    },
+                                                    theme,
+                                                    false,
+                                                    true,
+                                                )
+                                                .on_click(cx.listener(move |this, _, _, cx| {
+                                                    if let Some(original) =
+                                                        &mut this.patient.document_original
+                                                    {
+                                                        original.text_width = Some(!fitted);
+                                                    }
+                                                    cx.notify();
+                                                })),
+                                            ),
+                                        )
+                                    },
+                                )
+                            }),
+                    };
                 let warning = notice(
                     "document-pdf-fidelity-notice",
                     PDF_FIDELITY_NOTICE,
@@ -248,15 +385,14 @@ impl ClinicalApp {
                 .flex_1();
                 #[cfg(test)]
                 let warning = rendered_command::observe(warning);
-                view = view.child(
+                view = view.child(save(
                     div()
                         .flex()
                         .flex_wrap()
                         .items_center()
                         .gap(px(12.))
-                        .child(warning)
-                        .child(self.document_original_save(&original.id, cx)),
-                );
+                        .child(warning),
+                ));
             }
             ReadLoad::Ready(Ok(documents::OriginalPreview::Image(image))) => {
                 view = view.child(
@@ -275,8 +411,7 @@ impl ClinicalApp {
                 );
                 #[cfg(test)]
                 let warning = rendered_command::observe(warning);
-                let save = self.document_original_save(&original.id, cx);
-                view = view.child(warning).child(save)
+                view = save(view.child(warning))
             }
             ReadLoad::Failed(error) => {
                 view = view.child(notice(
@@ -1019,6 +1154,256 @@ mod tests {
         )));
     }
 
+    const ONLY_IN_THE_ORIGINAL: &str = "Potassio 5,9 mmol/L, solo nel referto sintetico";
+    const READ: &str = "GET /api/v1/network/patients/patient-a/attachments/synthetic-document";
+
+    fn drafting_with_a_document<'a>(
+        host: &notes_recovery_tests::Host,
+        mime: &str,
+        cx: &'a mut gpui::TestAppContext,
+    ) -> (Entity<ClinicalApp>, &'a mut gpui::VisualTestContext) {
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        cx.simulate_resize(gpui::size(px(1440.), px(1100.)));
+        view.update(cx, |app, cx| {
+            app.session = Some(host.session.clone());
+            app.scope = Some("scope-a".into());
+            app.select_patient("patient-a", true, cx);
+        });
+        cx.run_until_parked();
+        let mut row = attachment();
+        row.patient_id = "patient-a".into();
+        row.mime_type = mime.into();
+        cx.update_window_entity(&view, |app, window, cx| {
+            app.patient.attachments = ReadLoad::Ready(vec![row]);
+            app.open_form(FormKind::Notes, window, cx);
+        });
+        notes_recovery_tests::draw(cx);
+        cx.update_window_entity(&view, |app, window, cx| {
+            let editor = app.form.as_ref().unwrap().fields[0].editor.clone();
+            editor.update(cx, |input, cx| input.focus_and_select(window, cx));
+        });
+        cx.simulate_input("Rivalutare il potassio fra una settimana.");
+        cx.run_until_parked();
+        (view, cx)
+    }
+
+    fn caret_and_draft(
+        view: &Entity<ClinicalApp>,
+        cx: &mut gpui::VisualTestContext,
+    ) -> (usize, String, bool) {
+        use gpui::EntityInputHandler;
+        cx.update_window_entity(view, |app, window, cx| {
+            let editor = app.form.as_ref().unwrap().fields[0].editor.clone();
+            editor.update(cx, |input, cx| {
+                (
+                    input
+                        .selected_text_range(false, window, cx)
+                        .unwrap()
+                        .range
+                        .end,
+                    input.value().to_owned(),
+                    gpui::Focusable::focus_handle(input, cx).is_focused(window),
+                )
+            })
+        })
+    }
+
+    fn painted_texts(cx: &mut gpui::VisualTestContext) -> Vec<String> {
+        notes_recovery_tests::draw(cx);
+        let _probe = rendered_command::begin_inks();
+        cx.update(|window, cx| {
+            window.refresh();
+            window.draw(cx).clear(cx);
+        });
+        rendered_command::take_inks()
+            .into_iter()
+            .map(|sample| sample.label)
+            .collect()
+    }
+
+    fn writes(host: &notes_recovery_tests::Host, from: usize) -> Vec<String> {
+        host.routes()
+            .into_iter()
+            .skip(from)
+            .filter(|route| !route.starts_with("GET ") && !route.ends_with("/profile-query"))
+            .collect()
+    }
+
+    fn confirm_once(
+        view: &Entity<ClinicalApp>,
+        host: &notes_recovery_tests::Host,
+        cx: &mut gpui::VisualTestContext,
+    ) {
+        let before = host.routes().len();
+        cx.update_window_entity(view, |app, window, cx| app.review_form(window, cx));
+        notes_recovery_tests::draw(cx);
+        view.update(cx, |app, cx| app.confirm_form(cx));
+        cx.run_until_parked();
+        assert_eq!(
+            writes(host, before),
+            ["PUT /api/v1/network/patients/patient-a"],
+            "one confirmation, one write"
+        );
+        view.read_with(cx, |app, _| assert!(app.form.is_none()));
+    }
+
+    #[gpui::test]
+    fn draft_reads_the_original_in_the_record_without_writing_and_returns_to_the_same_caret(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        use base64::Engine;
+        let host = notes_recovery_tests::Host::new();
+        let (view, cx) = drafting_with_a_document(&host, "text/plain", cx);
+        let typed = caret_and_draft(&view, cx);
+        assert!(typed.2);
+        assert!(
+            !painted_texts(cx)
+                .iter()
+                .any(|text| text.contains(ONLY_IN_THE_ORIGINAL))
+        );
+        let before = host.routes().len();
+        host.plan(READ)
+            .send((200, json!({"id":"synthetic-document","patientId":"patient-a","name":"Referto.txt","path":"referto.txt","type":"text/plain",
+                "size":ONLY_IN_THE_ORIGINAL.len(),"data":format!("data:text/plain;base64,{}", base64::engine::general_purpose::STANDARD.encode(ONLY_IN_THE_ORIGINAL))})))
+            .unwrap();
+        view.update(cx, |app, cx| {
+            app.read_record_document("synthetic-document", cx)
+        });
+        cx.run_until_parked();
+        let texts = painted_texts(cx);
+        assert!(
+            texts.iter().any(|text| text.contains(ONLY_IN_THE_ORIGINAL)),
+            "the original is readable beside the draft: {texts:?}"
+        );
+        assert_eq!(caret_and_draft(&view, cx).1, typed.1);
+        let context = view.read_with(cx, |app, _| {
+            assert!(app.form.is_some());
+            app.patient
+                .document_original
+                .as_ref()
+                .unwrap()
+                .context
+                .clone()
+        });
+        cx.update_window_entity(&view, |app, window, cx| {
+            app.close_record_reading(window, cx)
+        });
+        notes_recovery_tests::draw(cx);
+        assert!(context.check().is_err(), "closing retires the preview");
+        view.read_with(cx, |app, _| {
+            assert!(app.patient.document_original.is_none())
+        });
+        assert_eq!(caret_and_draft(&view, cx), typed);
+        let consulted = &host.routes()[before..];
+        assert!(
+            consulted.iter().all(|route| route.starts_with("GET ")),
+            "{consulted:?}"
+        );
+        assert_eq!(consulted.iter().filter(|route| *route == READ).count(), 1);
+        assert!(writes(&host, before).is_empty());
+        confirm_once(&view, &host, cx);
+        view.update(cx, |app, cx| app.disconnect(cx));
+    }
+
+    #[gpui::test]
+    fn missing_or_unreadable_original_leaves_the_draft_recoverable(cx: &mut gpui::TestAppContext) {
+        for (status, wire) in [
+            (404, json!({"error":"Not found"})),
+            (
+                200,
+                json!({"id":"synthetic-document","patientId":"patient-a","name":"Referto.pdf","path":"referto.pdf","type":"application/pdf","size":9,"data":"data:application/pdf;base64,bm90IGEgcGRm"}),
+            ),
+        ] {
+            let host = notes_recovery_tests::Host::new();
+            let (view, cx) = drafting_with_a_document(&host, "application/pdf", cx);
+            let typed = caret_and_draft(&view, cx);
+            let before = host.routes().len();
+            host.plan(READ).send((status, wire)).unwrap();
+            view.update(cx, |app, cx| {
+                app.read_record_document("synthetic-document", cx)
+            });
+            cx.run_until_parked();
+            notes_recovery_tests::draw(cx);
+            view.read_with(cx, |app, _| {
+                let original = app.patient.document_original.as_ref().unwrap();
+                assert!(!matches!(
+                    original.state,
+                    ReadLoad::Ready(Ok(_)) | ReadLoad::Loading { .. }
+                ));
+                assert!(app.form.is_some());
+            });
+            assert_eq!(caret_and_draft(&view, cx).1, typed.1);
+            cx.update_window_entity(&view, |app, window, cx| {
+                app.close_record_reading(window, cx)
+            });
+            notes_recovery_tests::draw(cx);
+            assert_eq!(caret_and_draft(&view, cx), typed);
+            assert!(writes(&host, before).is_empty());
+            confirm_once(&view, &host, cx);
+            view.update(cx, |app, cx| app.disconnect(cx));
+        }
+    }
+
+    #[gpui::test]
+    fn the_text_width_is_the_default_only_when_it_enlarges_moderately(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        for (ink, default_label) in [
+            (75..825, Some("Pagina intera")),
+            (300..600, Some("Ingrandisci il testo")),
+            (10..890, None),
+        ] {
+            let original = DocumentOriginal {
+                id: "synthetic-document".into(),
+                state: ReadLoad::Ready(Ok(documents::OriginalPreview::Pdf(
+                    documents::pdf::Preview {
+                        source: std::sync::Arc::new(zeroize::Zeroizing::new(Vec::new())),
+                        image: std::sync::Arc::new(gpui::RenderImage::new([image::Frame::new(
+                            image::RgbaImage::new(900, 1272),
+                        )])),
+                        pages: 1,
+                        ink: ink.clone(),
+                        resolution: documents::pdf::Resolution::Screen,
+                    },
+                ))),
+                page: 0,
+                text_width: None,
+                context: RequestContext::default(),
+            };
+            let labels = view.update(cx, |app, cx| {
+                let mut labels = vec![];
+                let ids = rendered_command::button_ids(|| {
+                    let _ = app.document_original_content(
+                        &original,
+                        OriginalPlace::Record { save: false },
+                        cx,
+                    );
+                });
+                if let ReadLoad::Ready(Ok(documents::OriginalPreview::Pdf(pdf))) = &original.state {
+                    labels.push(text_width_gain(pdf));
+                }
+                (ids, labels)
+            });
+            assert_eq!(
+                labels
+                    .0
+                    .iter()
+                    .any(|id| id == "document-original-text-width"),
+                default_label.is_some(),
+                "{ink:?}"
+            );
+            let gain = labels.1[0];
+            match default_label {
+                Some("Pagina intera") => assert!(gain <= DEFAULT_TEXT_WIDTH_GAIN),
+                Some(_) => assert!(gain > DEFAULT_TEXT_WIDTH_GAIN),
+                None => assert!(gain < USEFUL_TEXT_WIDTH_GAIN),
+            }
+        }
+    }
+
     #[gpui::test]
     fn original_reads_explicitly_and_late_reads_cannot_reopen_the_view(
         cx: &mut gpui::TestAppContext,
@@ -1308,9 +1693,12 @@ mod tests {
                                     image::Frame::new(image::RgbaImage::new(2, 2)),
                                 ])),
                                 pages: 2,
+                                ink: 0..2,
+                                resolution: documents::pdf::Resolution::Page,
                             })),
                         }),
                         page,
+                        text_width: None,
                         context: RequestContext::default(),
                     });
                 });
