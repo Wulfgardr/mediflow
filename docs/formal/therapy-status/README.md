@@ -1137,3 +1137,14 @@ per legare la CryptoKey alla sessione corrente. L'accessor non cambia
 ammissione, conferma, trasporto o commit delle terapie. Il modello resta
 invariato e non qualifica il trasferimento della chiave o l'applicazione
 delle cassette, che hanno prove separate.
+
+## Eliminazione di una prestazione riesaminata il 19 novembre 2026
+
+In `cd8931931` la cancellazione Web di una prestazione invia le versioni
+delle voci che il medico ha visto. Dopo la risposta aggiorna la vista delle
+osservazioni collegate. La modifica riguarda le tabelle delle prestazioni,
+delle rispettive voci e delle osservazioni. Il percorso di cambio di stato
+di una terapia continua a usare il controller e le ricevute dell’ADR 0168.
+Il confronto con l’archivio avviene nella transazione del server. I test
+di `lib/service-prescription-atomic.test.ts` verificano il conflitto, il rollback
+e le scritture nell’audit.
