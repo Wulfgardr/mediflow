@@ -3,7 +3,6 @@
 import { useState, useSyncExternalStore } from 'react';
 import { useSecurity } from '@/components/security-provider';
 import { agentIncomingSnapshot, agentIncomingServerSnapshot, subscribeAgentIncoming, refreshAgentIncoming, applyReviewedAgentVisits, readIncomingAgentPdf } from '@/lib/agent-incoming';
-import { automaticAgentKind } from '@/lib/agent-visit-application-contract';
 import { agentVisitAwaitsReview } from '@/lib/agent-visit-review';
 import { SETTINGS_PRIMARY_BUTTON_CLASS, SETTINGS_SECONDARY_BUTTON_CLASS } from '@/components/settings/settings-ui';
 import DocumentViewer from '@/components/document-viewer';
@@ -39,13 +38,13 @@ function UnlockedIncoming() {
                 <h2 className="[font:var(--type-section-heading)]">{typeof visit.anchor.fiscalCode === 'string' ? visit.anchor.fiscalCode : 'Identità da confermare'}</h2>
                 {review.patient && <p>{review.patient.lastName} {review.patient.firstName}</p>}
                 <p>{visit.cassette.status === 'closed' ? 'Visita chiusa' : 'Deposito in corso'}</p>
-                {pending.some(item => !automaticAgentKind(item.kind)) ? <p className="type-meta">◇ Proposte da rivedere</p> : null}
                 {[...review.blockers, ...review.proposalBlockers].map((message, index) => <p role="alert" key={index}>{message}</p>)}
                 <div className="flex flex-wrap gap-3">{visit.items.filter(item => item.kind === 'pdf').map(item =>
                     typeof item.value.name === 'string' && <button key={item.id} className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={openingPdf}
                         onClick={() => { void showPdf(visit.cassette.id, visit.cassette.revision, item.id); }}>{item.value.name}</button>)}</div>
                 {pending.map(item => <article key={item.id} className="min-w-0 space-y-2 whitespace-pre-wrap break-words border-t pt-3">
                     <h3 className="font-semibold">{agentReviewItemLabels[item.kind]}</h3>
+                    {item.kind === 'pdf' && typeof item.value.name === 'string' && <p>{item.value.name}</p>}
                     {typeof item.value.text === 'string' && <p>{item.value.text}</p>}
                     {review.currentSummary.has(item.id) && <p>In scheda: {review.currentSummary.get(item.id)}</p>}
                     {typeof item.value.values === 'object' && item.value.values !== null && <dl>{Object.entries(item.value.values).map(([field, value]) => <div key={field} className="grid gap-1 sm:grid-cols-[minmax(7rem,1fr)_minmax(0,3fr)] sm:gap-3"><dt>{fieldLabels[field] ?? 'Dato'}</dt><dd>{fieldValues[field]?.[String(value)] ?? String(value)}</dd></div>)}</dl>}
