@@ -1981,10 +1981,11 @@ paths:
         `VERSION_CONFLICT`. A `status` change must follow the allowed
         transition table, otherwise the request returns 409
         `status_transition_not_allowed` before any write. A stale version is
-        accepted with no write only when the item and its prescription are
-        already in the requested `status` and the body carries nothing but
-        `version`, `status` and dates: the change was already applied by the
-        prescription update. This route requires
+        accepted with no write only for the immediately preceding version
+        after an audited implicit prescription cascade from the same paired
+        client and user. Item and prescription must have the requested status.
+        All supplied dates must match the saved values at SQLite timestamp
+        precision. The body may contain only version, status and these dates. This route requires
         `network.replica.write-service-prescriptions`.
       security:
         - pairedClientId: []
