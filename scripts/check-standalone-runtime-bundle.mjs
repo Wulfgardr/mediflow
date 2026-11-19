@@ -10,6 +10,7 @@ import { assertNodeRuntime, readNodeContract, standaloneDirectory } from './node
 import { assertScheduledBackupRuntime } from './scheduled-backup-runtime-contract.mjs';
 import { assertStandaloneSsrChunks } from './standalone-ssr-chunks.mjs';
 import { formatPdfSmokeFailure } from './anydoc-pdf-smoke-diagnostics.mjs';
+import { documentChildLaunch } from './document-child-launcher.mjs';
 
 import http from 'node:http';
 import https from 'node:https';
@@ -87,7 +88,6 @@ const PDFJS_STANDARD_FONT_FILES = Object.freeze([
   'LiberationSans-Bold.ttf', 'LiberationSans-BoldItalic.ttf', 'LiberationSans-Italic.ttf', 'LiberationSans-Regular.ttf',
 ]);
 const ANYDOC_PDF_CHILD_SCHEMA_VERSION = 'mediflow.anydoc_pdf_child_protocol.v1';
-const ANYDOC_PDF_CHILD_MAX_OLD_SPACE_MB = 256;
 const ANYDOC_LOCAL_EXTRACTION_ROUTE_DIRECTORY = path.join(
   'server', 'app', 'api', 'attachments', '[id]', 'local-extraction',
 );
@@ -360,17 +360,9 @@ function syntheticPdfPage() {
 
 function runPdfChild(workerPath, input, { allowAddons = false, args = [] } = {}) {
   const packageRoot = path.dirname(path.dirname(workerPath));
-  const runtimeArguments = [
-    `--max-old-space-size=${ANYDOC_PDF_CHILD_MAX_OLD_SPACE_MB}`,
-    '--permission',
-    '--disable-warning=SecurityWarning',
-    `--allow-fs-read=${packageRoot}`,
-    ...(allowAddons ? ['--allow-addons'] : []),
-    workerPath,
-    ...args,
-  ];
+  const launch = documentChildLaunch(packageRoot, workerPath, { allowAddons, args, networkGuard: false });
   const started = performance.now();
-  const result = spawnSync(process.execPath, runtimeArguments, {
+  const result = spawnSync(launch.command, launch.args, {
     cwd: path.dirname(workerPath),
     env: { NODE_ENV: 'production', NAPI_RS_ENFORCE_VERSION_CHECK: '1' },
     input,
@@ -1304,7 +1296,8 @@ if (!anyDocNativePackage) fail('AnyDoc does not declare a native package for the
 const anyDocNativeManifest = requireFromStandalone.resolve(`${anyDocNativePackage}/package`);
 const anyDocNativeDir = path.dirname(assertRealpathInsideStandalone(anyDocNativeManifest, `${anyDocNativePackage} package`));
 nativeArtifacts(anyDocNativeDir, `${anyDocNativePackage} native binding`, (name) => name.endsWith('.node'));
-const anyDocRun = spawnSync(process.execPath, [anyDocWorkerPath], {
+const anyDocLaunch = documentChildLaunch(standaloneDir, anyDocWorkerPath, { allowAddons: true });
+const anyDocRun = spawnSync(anyDocLaunch.command, anyDocLaunch.args, {
   cwd: path.dirname(anyDocWorkerPath),
   env: { NODE_ENV: 'production', NAPI_RS_ENFORCE_VERSION_CHECK: '1' },
   input: SYNTHETIC_RTF,
@@ -1314,7 +1307,7 @@ const anyDocRun = spawnSync(process.execPath, [anyDocWorkerPath], {
 });
 if (anyDocRun.error || anyDocRun.status !== 0 || !Buffer.isBuffer(anyDocRun.stdout)
     || anyDocRun.stdout.toString('utf8') !== 'Synthetic standalone note.\n') {
-  fail('Standalone runtime AnyDoc worker did not extract the synthetic RTF with its allowlisted environment.');
+  fail(`Standalone runtime AnyDoc worker did not extract the synthetic RTF via ${path.basename(anyDocLaunch.command)}.`);
 }
 
 let databaseEntry;
