@@ -2,7 +2,7 @@
 
 Data: 2026-11-19
 
-Stato: **Proposed**. Decide Leonardo. Riferimenti: WUL-904, WUL-905,
+Stato: **Accettato** da Leonardo il 19/11/2026. Riferimenti: WUL-904, WUL-905,
 [ADR 0077](0077-ai-provider-abstraction-and-egress-anonymization-boundary.md).
 
 ## Punto di partenza
