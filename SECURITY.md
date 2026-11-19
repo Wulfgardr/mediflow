@@ -259,6 +259,11 @@ rispettare anche queste regole:
 - rifiutare provider, modello, endpoint, venue, prompt, fallback o apply forniti
   dal caller
 
+Lo stesso vale per la visita depositata da un client agente: nota,
+trascrizione, PDF e proposte entrano in cartella solo con il gesto del medico,
+perché MediFlow non ha una prova di provenienza indipendente dall'agente
+([ADR 0195](docs/adr/0195-materiale-dell-agente-dopo-il-gesto-del-medico.md)).
+
 Anche quando un documento riporti un codice ICD esplicito, la diagnosi estratta
 resta una proposta da rivedere. Per questo il payload automatico della sintesi
 non include `patients.diagnoses` (vedi ADR 0084).
@@ -319,6 +324,10 @@ o in altri contesti e RequestId RPC duplicati sono negati. Il budget comune
 del JSON UTF-8 è 32 KiB: il superamento restituisce `output_too_large`, senza
 dati parziali o troncamenti. La query non muta dati clinici o audit. Il wrapper
 AIP conserva il proprio audit obbligatorio. Mini può usarla senza MCP o provider.
+Verso MCP `stdio` il profilo esce pseudonimizzato: identità come segnaposto con
+ruolo e testi liberi passati dal rimescolatore, nel proprietario Web prima
+dell'IPC ([ADR 0194](docs/adr/0194-profilo-pseudonimizzato-per-la-chat-esterna.md)).
+Mini riceve i dati veri.
 Il planner semantico e le capability intelligenti non si ampliano.
 
 Gli agenti usano dunque comandi MediFlow mediati: nessun adapter importa il
