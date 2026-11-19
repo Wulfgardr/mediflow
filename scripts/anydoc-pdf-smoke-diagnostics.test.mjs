@@ -12,7 +12,7 @@ import { localImportClosure } from './fixtures/local-import-closure.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const SCHEMA = 'mediflow.anydoc_pdf_child_protocol.v1';
-const WORKER_HASH = '5facb4803373cd1a15c7548813f9a3662107dd0efd5e9cf3739643921e49cedc';
+const WORKER_HASH = '72e7f91ddef9569a9ff0acae8f91893ec7218b4750d0f4886ca162913e1526d9';
 const SENTINEL = 'SYNTHETIC_PRIVATE_FIELD_NOT_FOR_DIAGNOSTICS';
 // Match the production runner's explicit test-data rule before invoking any child.
 if (!process.env.MEDIFLOW_DATA_DIR?.trim()) {
@@ -169,6 +169,7 @@ test('real checker still exits 1 on an intentionally incomplete physical package
   for (const file of localImportClosure(root, [
     'scripts/check-standalone-runtime-bundle.mjs', 'scripts/anydoc-pdf-page-worker.mjs',
     'scripts/anydoc-pdf-renderer-profiles.json', 'scripts/anydoc-tesseract-artifacts.json',
+    'scripts/document-windows-sandbox/launcher-x64.exe',
   ])) {
     fs.mkdirSync(path.dirname(path.join(directory, file)), { recursive: true });
     fs.copyFileSync(path.join(root, file), path.join(directory, file));

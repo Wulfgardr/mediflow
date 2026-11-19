@@ -297,7 +297,7 @@ dipende dal profilo.
 | --- | --- |
 | macOS Apple Silicon | `sandbox-exec` applica la policy Seatbelt che nega `network*`, scritture su file e fork ai worker AnyDoc/PDF. Il launcher non ripiega su Node diretto. Il processo Apple Vision ha una policy Seatbelt separata che nega `network*`. |
 | Omarchy ARM | `prlimit` impone il limite dati. `unshare` avvia il figlio in un namespace di rete distinto, senza interfacce e rotte IP del guest. Il kernel deve consentire la creazione di namespace all'utente ordinario. Se l'avvio fallisce, l'elaborazione resta indisponibile. |
-| Windows 11 ARM, Node x64 emulato | Node parte direttamente con i permessi applicativi previsti. Nessun blocco di rete imposto dal launcher a livello di sistema. |
+| Windows 11 ARM, Node x64 emulato | Il launcher Win32 richiede un AppContainer senza capacità di rete e verifica il token prima di avviare Node x64. Il figlio riceve soltanto le pipe standard e una copia temporanea degli asset documentali. Se il confinamento è indisponibile, l’elaborazione si arresta. |
 
 Il namespace Linux riguarda la rete IP e i socket Unix astratti. I socket
 Unix nel filesystem restano soggetti ai permessi del processo. Sulle altre

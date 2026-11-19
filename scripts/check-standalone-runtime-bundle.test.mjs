@@ -194,11 +194,17 @@ test('standalone checker pins and smokes the isolated PDF page worker', () => {
   assert.match(source, /framedPdfPageWorkerSmokeFailure/u);
   const worker = path.join(root, 'scripts', 'anydoc-pdf-page-worker.mjs');
   for (const allowAddons of [false, true]) {
-    const { args } = documentChildLaunch(root, worker, { allowAddons, networkGuard: false });
-    assert.ok(args.includes('--max-old-space-size=256'));
-    assert.ok(args.includes('--permission'));
-    assert.ok(args.includes(`--allow-fs-read=${root}`));
-    assert.equal(args.includes('--allow-addons'), allowAddons);
+    const launch = documentChildLaunch(root, worker, { allowAddons, networkGuard: false });
+    try {
+      const windows = process.platform === 'win32';
+      const args = windows ? launch.args[3].split('" "') : launch.args;
+      assert.ok(args.includes('--max-old-space-size=256'));
+      assert.ok(args.includes('--permission'));
+      assert.ok(args.includes(`--allow-fs-read=${windows ? launch.args[1] : root}`));
+      assert.equal(args.includes('--allow-addons'), allowAddons);
+    } finally {
+      launch.cleanup?.();
+    }
   }
   assert.match(source, /missing PDF page worker passed/u);
   assert.match(source, /tampered PDF page worker passed/u);
@@ -212,12 +218,21 @@ test('loads the document worker preloader from a package path containing a space
   fs.mkdirSync(scripts);
   const guard = 'document-child-network-guard.mjs';
   fs.copyFileSync(path.join(root, 'scripts', guard), path.join(scripts, guard));
-  const worker = path.join(scripts, 'ready.mjs');
+  const worker = path.join(scripts, 'anydoc-local-extraction-worker.mjs');
   fs.writeFileSync(worker, "process.stdout.write('ready');\n");
+  if (process.platform === 'win32') {
+    const relative = path.join('scripts', 'document-windows-sandbox', 'launcher-x64.exe');
+    fs.mkdirSync(path.dirname(path.join(directory, relative)));
+    fs.copyFileSync(path.join(root, relative), path.join(directory, relative));
+  }
   const launch = documentChildLaunch(directory, worker);
-  const result = spawnSync(launch.command, launch.args, { cwd: directory, encoding: 'utf8' });
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stdout, 'ready');
+  try {
+    const result = spawnSync(launch.command, launch.args, { cwd: directory, encoding: 'utf8', input: '', env: launch.env });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, 'ready');
+  } finally {
+    launch.cleanup?.();
+  }
 });
 
 test('standalone Windows bootstrap check rejects a loader copied as an asset and a missing prebuild', () => {

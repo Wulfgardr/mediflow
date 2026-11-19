@@ -130,6 +130,8 @@ const nextConfig: NextConfig = {
       "./scripts/node-runtime-contract.mjs",
       "./.nvmrc",
       "./scripts/document-child-launcher.mjs",
+      "./scripts/document-windows-sandbox.mjs",
+      ...(process.platform === "win32" ? ["./scripts/document-windows-sandbox/launcher-x64.exe"] : []),
       "./scripts/document-child-network-guard.mjs",
       "./scripts/anydoc-local-extraction-worker.mjs",
       "./scripts/anydoc-pdf-page-worker.mjs",
