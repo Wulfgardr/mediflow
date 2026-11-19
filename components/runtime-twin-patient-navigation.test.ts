@@ -86,17 +86,20 @@ test('patient section menu closes when navigation selects a primary or secondary
         await t.test(`asynchronous counts preserve destinations, menu and focus at ${width}px`, async () => {
             const f = await fixture(width);
             try {
-                const primary = f.navigation.locator(':scope > a');
-                await expect(primary).toHaveText(['Riepilogo', 'Terapie', 'Parametri', 'Documenti']);
+                const primary = f.navigation.getByRole('link');
+                const labels = width === 1280
+                    ? ['Riepilogo', 'Diario', 'Terapie', 'Documenti', 'Parametri', 'Controlli']
+                    : ['Riepilogo', 'Terapie', 'Parametri', 'Documenti'];
+                await expect(primary).toHaveText(labels);
                 await f.summary.click();
                 await expect(f.menu).toBeVisible();
                 const current = f.menu.getByRole('menuitem').nth(3);
                 await current.focus();
                 await f.page.evaluate(() => window.dispatchEvent(new Event('synthetic-counts')));
-                await expect(primary).toHaveText(['Riepilogo', 'Terapie12', 'Parametri', 'Documenti']);
+                await expect(primary).toHaveText(labels.map(label => label === 'Terapie' ? 'Terapie12' : label));
                 await expect(f.menu).toBeVisible();
                 await expect(current).toBeFocused();
-                await f.navigation.locator(':scope > a[href="#terapie"]').click();
+                await f.navigation.getByRole('link', { name: /^Terapie/ }).click();
                 await expect(f.menu).toBeHidden();
                 await f.page.getByText('Farmaco manuale o galenico', { exact: true }).click();
                 await expect(f.page.getByRole('checkbox')).toBeChecked();
@@ -108,7 +111,7 @@ test('patient section menu closes when navigation selects a primary or secondary
             try {
                 await f.summary.click();
                 await expect(f.menu).toBeVisible();
-                await f.navigation.locator(':scope > a[href="#quadro"]').focus();
+                await f.navigation.getByRole('link', { name: 'Riepilogo', exact: true }).focus();
                 await f.page.keyboard.press('Enter');
                 await expect(f.page).toHaveURL(/#quadro$/);
                 await expect(f.menu).toBeHidden({ timeout: 500 });

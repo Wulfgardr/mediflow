@@ -83,11 +83,11 @@ async function openSyntheticQuadro(page: Page, quadroCase: QuadroCase): Promise<
   return { quadro, patient };
 }
 
-async function resolveColor(page: Page, variable: string): Promise<string> {
-  return page.evaluate((name) => {
+async function resolveColor(scope: Locator, variable: string): Promise<string> {
+  return scope.evaluate((element, name) => {
     const probe = document.createElement('span');
     probe.style.color = `var(${name})`;
-    document.body.appendChild(probe);
+    element.appendChild(probe);
     const color = getComputedStyle(probe).color;
     probe.remove();
     return color;
@@ -116,13 +116,13 @@ async function assertQuadroContract(page: Page, quadro: Locator, patient: LivePa
   const measure = quadro.getByRole('region', { name: 'Parametri recenti', exact: true });
   const value = measure.getByRole('cell', { name: /160 mmHg/ });
   await expect(value).toContainText('160 mmHg');
-  await expect(value).toHaveCSS('color', await resolveColor(page, '--lume-signal-critical'));
+  await expect(value).toHaveCSS('color', await resolveColor(quadro, '--lume-signal-critical'));
   await expect(value).toHaveCSS('font-variant-numeric', 'tabular-nums');
   await expect(value).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   await expect(value).toHaveCSS('border-left-width', '0px');
   await expect(value).toHaveCSS('border-radius', '0px');
   await expect(quadro.getByRole('table', { name: 'Terapie attive', exact: true }).getByText('Ramipril sintetico', { exact: true }))
-    .toHaveCSS('color', await resolveColor(page, '--lume-ink'));
+    .toHaveCSS('color', await resolveColor(quadro, '--lume-ink'));
 
   const hierarchy = await measure.evaluate(element => {
     const heading = element.querySelector('th')!;
@@ -147,7 +147,7 @@ async function assertQuadroContract(page: Page, quadro: Locator, patient: LivePa
   const primary = page.getByTestId('lume-scheda-header').getByRole('link', { name: 'Nuova voce', exact: true });
   await expect(primary).toHaveCount(1);
   await expect(primary).toHaveAttribute('href', `/patients/${patient.id}/modules?voce=nuova`);
-  await expect(primary).toHaveCSS('background-color', await resolveColor(page, '--lume-ink-fresh'));
+  await expect(primary).toHaveCSS('background-color', await resolveColor(primary, '--lume-accent'));
   await assertNotClippedInViewport(primary, 'azione primaria quadro');
   await assertKeyboardFocusProgresses(page, primary, 'azione primaria quadro');
   for (const link of await quadro.getByRole('link').all()) await assertNotClippedInViewport(link, await link.innerText());
