@@ -1274,7 +1274,10 @@ impl HostBootstrapSession {
             )
         });
         headers.insert(COOKIE, sensitive_header(&cookie)?);
-        headers.insert(LOCAL_CLIENT_SESSION_PROOF_HEADER, sensitive_header(&self.proof)?);
+        headers.insert(
+            LOCAL_CLIENT_SESSION_PROOF_HEADER,
+            sensitive_header(&self.proof)?,
+        );
         headers.insert(
             "x-mediflow-bootstrap-reference",
             sensitive_header(&self.reference)?,
@@ -1492,7 +1495,9 @@ pub(crate) fn control_cookie(
 pub(crate) fn local_client_session_proof() -> Result<Zeroizing<String>> {
     let mut bytes = Zeroizing::new([0u8; 32]);
     getrandom::fill(&mut *bytes).map_err(|_| RuntimeError::Crypto)?;
-    Ok(Zeroizing::new(bytes.iter().map(|value| format!("{value:02x}")).collect()))
+    Ok(Zeroizing::new(
+        bytes.iter().map(|value| format!("{value:02x}")).collect(),
+    ))
 }
 
 pub(crate) fn operation_uuid() -> Result<String> {

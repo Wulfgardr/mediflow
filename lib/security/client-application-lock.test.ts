@@ -351,7 +351,8 @@ test('lock replays a post-CAS body-read failure with the same logical key', asyn
 });
 
 test('application lock confirmation rejects forbidden Object.prototype keys present before import', () => {
-    const source = readFileSync(new URL('./client-auth-api.ts', import.meta.url), 'utf8');
+    const source = readFileSync(new URL('./client-auth-api.ts', import.meta.url), 'utf8')
+        .replace("'./web-session-proof-header'", JSON.stringify(new URL('./web-session-proof-header.ts', import.meta.url).href));
     for (const key of ['then', 'value', 'schemaVersion', 'state']) {
         const script = `import ts from 'typescript'; const output = ts.transpileModule(${JSON.stringify(source)}, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText; Object.defineProperty(Object.prototype, ${JSON.stringify(key)}, { configurable: true, value: undefined }); globalThis.fetch = async (input) => input === '/api/auth/check' ? new Response('{"status":"ok","archiveGeneration":"00000000-0000-4000-8000-000000000001"}', { status: 200, headers: { ETag: '"fence-poison"' } }) : new Response(${JSON.stringify(JSON.stringify(confirmedReceipt))}, { status: 200, headers: { ETag: '"fence-poison-next"' } }); const api = await import('data:text/javascript;base64,' + Buffer.from(output).toString('base64')); await api.checkAuthHealthRequest(); if (await api.requestApplicationLockConfirmation()) process.exitCode = 1;`;
         execFileSync(process.execPath, ['--input-type=module', '--eval', script]);
@@ -410,7 +411,8 @@ test('application lock bypasses a pending authority barrier and cancels a queued
 
 test('security provider clears stale persisted authority and fences stale auth paths', () => {
     const source = readFileSync(new URL('../../components/security-provider.tsx', import.meta.url), 'utf8');
-    const authApiSource = readFileSync(new URL('./client-auth-api.ts', import.meta.url), 'utf8');
+    const authApiSource = readFileSync(new URL('./client-auth-api.ts', import.meta.url), 'utf8')
+        .replace("'./web-session-proof-header'", JSON.stringify(new URL('./web-session-proof-header.ts', import.meta.url).href));
     const lockStart = source.search(/const lock = \([^)]*\) => \{/u);
     const requestStart = source.indexOf('void requestApplicationLockConfirmation(', lockStart);
     assert.ok(lockStart >= 0 && source.indexOf('clearClientAuthority();', lockStart) < requestStart);
@@ -528,7 +530,8 @@ test('restored PIN authority reconciles a concurrent recovery check without bypa
 
 
 test('one document stays on A after observing B and stamps A even over caller-supplied B', () => {
-    const source = readFileSync(new URL('./client-auth-api.ts', import.meta.url), 'utf8');
+    const source = readFileSync(new URL('./client-auth-api.ts', import.meta.url), 'utf8')
+        .replace("'./web-session-proof-header'", JSON.stringify(new URL('./web-session-proof-header.ts', import.meta.url).href));
     const script = `import assert from 'node:assert/strict'; import ts from 'typescript';
 const output = ts.transpileModule(${JSON.stringify(source)}, {compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText;
 const api = await import('data:text/javascript;base64,' + Buffer.from(output).toString('base64'));
@@ -547,7 +550,8 @@ assert.equal(reloads,2); dispose();`;
 });
 
 test('archive transport fences only the exact scoped epoch GET and rejects archive replacement', () => {
-    const source = readFileSync(new URL('./client-auth-api.ts', import.meta.url), 'utf8');
+    const source = readFileSync(new URL('./client-auth-api.ts', import.meta.url), 'utf8')
+        .replace("'./web-session-proof-header'", JSON.stringify(new URL('./web-session-proof-header.ts', import.meta.url).href));
     const script = `import assert from 'node:assert/strict'; import ts from 'typescript';
 const output=ts.transpileModule(${JSON.stringify(source)},{compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText;
 const api=await import('data:text/javascript;base64,'+Buffer.from(output).toString('base64'));
@@ -564,7 +568,10 @@ for(const url of ['/api/patient-profile/selection-epoch/','/api/patient-profile/
 }
 await window.fetch('/api/patient-profile/selection-epoch',{method:'HEAD'});
 assert.equal(new Headers(calls.at(-1).init?.headers).has('x-mediflow-archive-generation'),false);
-replaced=true;await assert.rejects(window.fetch('/api/patient-profile/selection-epoch',{method:'GET'}),/ARCHIVE_REPLACED/);
+replaced=true;
+assert.equal((await window.fetch('/api/patients')).status,409);
+assert.equal(reloads,0);
+await assert.rejects(window.fetch('/api/patient-profile/selection-epoch',{method:'GET'}),/ARCHIVE_REPLACED/);
 assert.equal(reloads,1);assert.deepEqual(events,['mediflow:archive-replaced']);dispose();`;
     execFileSync(process.execPath, ['--input-type=module', '--eval', script]);
 });

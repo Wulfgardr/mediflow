@@ -218,7 +218,10 @@ impl LocalHostAccess {
         }
         self.client.context.check()?;
         let mut headers = HeaderMap::new();
-        headers.insert(LOCAL_CLIENT_SESSION_PROOF_HEADER, sensitive_header(&self.proof)?);
+        headers.insert(
+            LOCAL_CLIENT_SESSION_PROOF_HEADER,
+            sensitive_header(&self.proof)?,
+        );
         headers.insert(
             COOKIE,
             sensitive_header(&format!(
@@ -407,7 +410,10 @@ impl LocalHostAccess {
         self.record_retirement();
         let client = self.client.with_request_context(RequestContext::default());
         let mut headers = HeaderMap::new();
-        headers.insert(LOCAL_CLIENT_SESSION_PROOF_HEADER, sensitive_header(&self.proof)?);
+        headers.insert(
+            LOCAL_CLIENT_SESSION_PROOF_HEADER,
+            sensitive_header(&self.proof)?,
+        );
         headers.insert(
             COOKIE,
             sensitive_header(&format!(
