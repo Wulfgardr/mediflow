@@ -66,7 +66,8 @@ function TherapyDetails({ update, entries, openDiary, grouped }: {
     const moreId = `altri-dettagli-${useId().replace(/:/g, '')}`;
     return <ChangeRow name={<DrugLabel name={therapy.drugName} />} status={grouped ? undefined : label}>
         <Fact label="Stato attuale">{therapy.status === 'active' ? 'Attiva' : therapy.status === 'suspended' ? 'Sospesa' : 'Conclusa'}{therapy.status === 'active' && therapy.dosage ? <> · <PrivacyBlur>{therapy.dosage}</PrivacyBlur></> : null}</Fact>
-        <Fact label="Prima">Valore precedente non conservato.</Fact>
+        <Fact label="Prima">Non conservato.</Fact>
+        {therapy.motivation ? <Fact label="Nota clinica"><PrivacyBlur>{therapy.motivation}</PrivacyBlur></Fact> : null}
         {sameDay.length ? <Fact label="Stesso giorno"><span className={styles.sameDay}>{sameDay.map(entry => <button key={entry.id} type="button" className={styles.sourceLink}
             aria-label={`Diario del ${date.toLocaleDateString('it-IT')} · ${diaryTypeLabel(entry.type)}`} onClick={() => openDiary(entry.id)}>
             {diaryTypeLabel(entry.type)}
@@ -75,7 +76,6 @@ function TherapyDetails({ update, entries, openDiary, grouped }: {
             <button type="button" aria-expanded={more} aria-controls={moreId} onClick={() => setMore(value => !value)}>{more ? 'Meno dettagli' : 'Altri dettagli'}</button>
             <dl id={moreId} hidden={!more}>
                 {therapy.status !== 'active' && therapy.dosage ? <Fact label="Posologia registrata"><PrivacyBlur>{therapy.dosage}</PrivacyBlur></Fact> : null}
-                {therapy.motivation ? <Fact label="Indicazione"><PrivacyBlur>{therapy.motivation}</PrivacyBlur></Fact> : null}
                 {start ? <Fact label="Inizio"><SheetDate date={start} /></Fact> : null}
                 {end ? <Fact label="Fine"><SheetDate date={end} /></Fact> : null}
                 <Fact label="Nella scheda"><SheetDate date={date} /></Fact>

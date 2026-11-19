@@ -154,8 +154,8 @@ test('isole del riepilogo: ritorno con variazioni, dettaglio, fonte e due temi',
     await spironolattone.getByRole('button', { name: 'Altri dettagli' }).click();
     await expect(spironolattone.locator('dt').filter({ hasText: 'Posologia registrata' }).locator('..')).toContainText('1 cp al mattino');
     await spironolattone.getByRole('button', { name: 'Meno dettagli' }).click();
-    await expect(spironolattone).toContainText('Valore precedente non conservato.');
-    await expect(spironolattone).toContainText('Scompenso cardiaco');
+    await expect(spironolattone.locator('dt').filter({ hasText: 'Prima' }).locator('..')).toContainText('Non conservato.');
+    await expect(spironolattone.getByText('Scompenso cardiaco', { exact: true })).toBeVisible();
     const potassium = changes.locator('details').filter({ hasText: 'Potassio' });
     await potassium.locator('summary').click();
     await expect(potassium).toContainText('4,8 mmol/L');
