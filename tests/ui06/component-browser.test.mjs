@@ -367,34 +367,43 @@ for (const width of [1440, 768, 390]) test(`section header, unique creation and 
     await noHorizontalOverflow(page);
 });
 
-/* A failed diary read must not leave the sheet on «Diario in caricamento.» forever. */
-const diaryReadFailure = /^useLiveQueryState failed/u;
+const diaryReadFailure = /^useLiveQueryState failed Error: (?:Authenticated list unavailable\.|Failed to fetch \/api\/entries)(?:\s|$)/u;
 async function diaryPage(t, reads) {
     return pageFor(t, `/diary?reads=${reads}`, { width: 1280, height: 900 }, diaryReadFailure);
 }
 const diaryCalls = page => page.evaluate(() => window.ui06.diary.calls);
 
-test('diary read failure shows an error with Riprova, never a permanent loading state', async t => {
-    const page = await diaryPage(t, 'fail');
-    const expect = harness.expect;
-    const section = page.locator('#diario');
-    await expect(section.locator('[data-view-state=error]')).toHaveAttribute('role', 'alert');
-    await expect(section.locator('[data-view-state=error]')).toContainText('Impossibile leggere il diario.');
-    await expect(section.getByText('Diario in caricamento.')).toHaveCount(0);
-    await expect(section.getByRole('button', { name: 'Riprova', exact: true })).toBeVisible();
-});
+const diaryEmpty = 'Nessuna voce visibile nel diario clinico.';
 
-test('Riprova re-reads: a successful second read shows the entries', async t => {
-    const page = await diaryPage(t, 'fail,ok');
+test('patient diary shows a successful read and distinguishes a successful empty list', async t => {
+    const page = await diaryPage(t, 'ok,empty');
     const expect = harness.expect;
     const section = page.locator('#diario');
-    await section.getByRole('button', { name: 'Riprova', exact: true }).click();
-    await expect(section.getByText('Visita sintetica UI06')).toBeVisible();
-    await expect(section.locator('[data-view-state=error]')).toHaveCount(0);
+    await expect(section.getByRole('feed', { name: 'Diario clinico del paziente' })).toContainText('Visita sintetica UI06');
+    await expect(section.getByText('Valutazione sintetica UI06')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Rileggi il diario fixture', exact: true }).click();
+    await expect(section.locator('[data-view-state=empty]')).toHaveText(diaryEmpty);
+    await expect(section.getByRole('alert')).toHaveCount(0);
     assert.equal(await diaryCalls(page), 2);
 });
 
-test('Riprova re-reads: a failed second read keeps the error', async t => {
+for (const failure of ['denied', 'fail']) test(`patient diary shows an initial ${failure} as an error and Riprova loads the entries`, async t => {
+    const page = await diaryPage(t, `${failure},ok`);
+    const expect = harness.expect;
+    const section = page.locator('#diario');
+    const error = section.getByRole('alert');
+    const retry = section.getByRole('button', { name: 'Riprova', exact: true });
+    await expect(error).toContainText('Impossibile leggere il diario.');
+    await expect(section.getByText(diaryEmpty, { exact: true })).toHaveCount(0);
+    await expect(section.getByText('Diario in caricamento.', { exact: true })).toHaveCount(0);
+    await expect(retry).toBeVisible();
+    await retry.click();
+    await expect(section.getByText('Visita sintetica UI06')).toBeVisible();
+    await expect(error).toHaveCount(0);
+    assert.equal(await diaryCalls(page), 2);
+});
+
+test('patient diary keeps the error after a failed Riprova', async t => {
     const page = await diaryPage(t, 'fail,fail');
     const expect = harness.expect;
     const section = page.locator('#diario');
@@ -403,9 +412,10 @@ test('Riprova re-reads: a failed second read keeps the error', async t => {
     await expect(section.locator('[data-view-state=error]')).toContainText('Impossibile leggere il diario.');
     await expect(section.getByRole('button', { name: 'Riprova', exact: true })).toBeVisible();
     await expect(section.getByText('Diario in caricamento.')).toHaveCount(0);
+    await expect(section.getByText(diaryEmpty, { exact: true })).toHaveCount(0);
 });
 
-test('a failed refresh keeps the entries already shown and offers Riprova', async t => {
+test('patient diary keeps the entries after a failed refresh and Riprova recovers', async t => {
     const page = await diaryPage(t, 'ok,fail,ok');
     const expect = harness.expect;
     const section = page.locator('#diario');
@@ -413,20 +423,40 @@ test('a failed refresh keeps the entries already shown and offers Riprova', asyn
     await page.getByRole('button', { name: 'Rileggi il diario fixture', exact: true }).click();
     await expect(section.locator('[data-view-state=error]')).toContainText('Impossibile aggiornare il diario.');
     await expect(section.getByText('Visita sintetica UI06')).toBeVisible();
+    await expect(section.getByText(diaryEmpty, { exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Mostra timeline fixture', exact: true }).click();
+    await expect(page.locator('#timeline').getByText('Visita sintetica UI06')).toBeVisible();
+    await page.getByRole('button', { name: 'Mostra scale fixture', exact: true }).click();
+    const scales = page.locator('#scale');
+    await expect(scales.getByRole('alert')).toContainText('Impossibile aggiornare il diario.');
+    await expect(scales.getByText('Valutazione sintetica UI06')).toBeVisible();
     await section.getByRole('button', { name: 'Riprova', exact: true }).click();
     await expect(section.locator('[data-view-state=error]')).toHaveCount(0);
+    await expect(scales.getByRole('alert')).toHaveCount(0);
     await expect(section.getByText('Visita sintetica UI06')).toBeVisible();
     assert.equal(await diaryCalls(page), 3);
 });
 
-test('the patient sheet wires the diary read error and retry into the diary, scales and timeline', async () => {
-    const { readFileSync } = await import('node:fs');
-    const source = readFileSync(new URL('../../app/patients/[id]/modules/page.tsx', import.meta.url), 'utf8');
-    assert.match(source, /const \{ data: entries, error: entriesError, refresh: refreshEntries \} = useLiveQueryState\(\s*async \(\) => \{\s*const items = await db\.entries\.query/u);
-    assert.match(source, /<Timeline entries=\{timelineEntries\} readFailed=\{Boolean\(entriesError\)\} onRetry=\{refreshEntries\}/u);
-    assert.match(source, /entries=\{scaleHistoryEntries\}[\s\S]{0,400}readFailed=\{Boolean\(entriesError\)\}\s*onRetry=\{refreshEntries\}/u);
-    assert.match(source, /entriesError \? <ViewState state="error" title="Impossibile leggere le valutazioni\." action=\{\{ label: 'Riprova', onClick: refreshEntries \}\} \/>/u);
-    assert.match(source, /entriesUnavailable=\{Boolean\(entriesError\) && entries === undefined\}/u);
+test('patient diary read also drives the scale history retry and the clinical timeline', async t => {
+    const page = await diaryPage(t, 'fail,ok,fail,ok');
+    const expect = harness.expect;
+    const timeline = page.locator('#timeline');
+    await page.getByRole('button', { name: 'Mostra timeline fixture', exact: true }).click();
+    await expect(timeline.getByRole('alert')).toHaveText('Impossibile leggere il diario: timeline non disponibile.');
+    await page.getByRole('button', { name: 'Mostra scale fixture', exact: true }).click();
+    const scales = page.locator('#scale');
+    await expect(scales.getByRole('alert')).toContainText('Impossibile leggere le valutazioni.');
+    await scales.getByRole('button', { name: 'Riprova', exact: true }).click();
+    await expect(scales.getByText('Valutazione sintetica UI06')).toBeVisible();
+    await expect(scales.getByRole('alert')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Rileggi il diario fixture', exact: true }).click();
+    await expect(scales.getByRole('alert')).toContainText('Impossibile aggiornare il diario.');
+    await scales.getByRole('button', { name: 'Riprova', exact: true }).click();
+    await expect(scales.getByRole('alert')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Mostra timeline fixture', exact: true }).click();
+    await expect(timeline.getByRole('alert')).toHaveCount(0);
+    await expect(timeline.getByText('Visita sintetica UI06')).toBeVisible();
+    assert.equal(await diaryCalls(page), 4);
 });
 
 /* Same defect in the panels with their own read: a failed read must not stay on the loading state forever. */

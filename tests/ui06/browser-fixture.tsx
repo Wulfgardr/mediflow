@@ -12,13 +12,13 @@ import { PatientClinicalSignals } from '../../components/patient-clinical-signal
 import { PatientIdentityLens } from '../../components/patient-identity-lens';
 import SettingsLayout from '../../app/settings/layout';
 import DocumentSynthesisFabricReviewCard from '../../components/document-synthesis-fabric-review-card';
-import type { Patient } from '../../lib/db';
+import { db, type Patient } from '../../lib/db';
+import { PrivacyProvider } from '../../components/privacy-provider';
 import type { ScaleResult } from '../../lib/scale-validation';
 import { syntheticScale } from './synthetic-scale';
 import { boundaryState } from './browser-boundaries';
-import Timeline from '../../components/timeline';
-import type { TimelineEntryData } from '../../components/timeline-entry-card';
-import { notifyDbChange, useLiveQueryState } from '../../lib/live-query';
+import PatientDetailPage from '../../app/patients/[id]/modules/page';
+import { notifyDbChange } from '../../lib/live-query';
 import ServicePrescriptionManager from '../../components/service-prescription-manager';
 import ProstheticPrescriptionManager from '../../components/prosthetic-prescription-manager';
 import SissHandoffDiary from '../../components/siss-handoff-diary';
@@ -87,20 +87,34 @@ function SectionsFixture() {
         </main>
     </RuntimeTwinFolderContext.Provider></RuntimeTwinDesignProvider>;
 }
-const syntheticDiaryEntry = { id: 'ui06-entry', patientId: 'ui06-patient', type: 'visit', title: 'Visita sintetica UI06',
-    content: '<p>Testo inventato UI06</p>', date: new Date(2026, 0, 1, 12), attachments: [], version: 1 } as unknown as TimelineEntryData;
-/* Same wiring as the patient sheet: useLiveQueryState feeds entries, error and refresh to Timeline. */
+const diaryPatient = { id: 'ui06-patient', firstName: 'Paziente', lastName: 'Inventato', birthDate: '1950-01-01T00:00:00.000Z', version: 1 };
+const syntheticDiaryEntry = { id: 'ui06-entry', patientId: diaryPatient.id, type: 'visit', title: 'Visita sintetica UI06',
+    content: '<p>Testo inventato UI06</p>', date: '2026-01-01T12:00:00.000Z', attachments: [], version: 1 };
+const syntheticDiaryScale = { ...syntheticDiaryEntry, id: 'ui06-scale', type: 'scale', title: 'Scala UI06', content: 'Valutazione sintetica UI06' };
+function installDiaryFetch() {
+    window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, window.location.origin);
+        const method = init?.method ?? (input instanceof Request ? input.method : 'GET');
+        if (method !== 'GET' || url.origin !== window.location.origin) throw new Error(`UI06: unexpected diary request ${method} ${url.href}`);
+        if (url.pathname === '/api/entries' && url.searchParams.get('patientId') === diaryPatient.id && url.searchParams.get('includeDeleted') === 'true') {
+            diaryState.calls += 1;
+            const outcome = diaryState.plan.shift();
+            if (outcome === 'fail' || outcome === 'denied') return Response.json({}, { status: outcome === 'denied' ? 403 : 503 });
+            return Response.json(outcome === 'empty' ? [] : [syntheticDiaryEntry, syntheticDiaryScale]);
+        }
+        if (url.pathname === `/api/patients/${diaryPatient.id}`) return Response.json(diaryPatient);
+        if (url.pathname.startsWith('/api/') && url.pathname !== '/api/entries') return Response.json([]);
+        throw new Error(`UI06: unexpected diary fetch ${url.pathname}${url.search}`);
+    };
+}
 function DiaryFixture() {
-    const { data: entries, error, refresh } = useLiveQueryState(async () => {
-        diaryState.calls += 1;
-        if (diaryState.plan.shift() === 'fail') throw new Error('Lettura sintetica del diario non riuscita');
-        return [syntheticDiaryEntry];
-    }, [], undefined, ['entries']);
-    return <RuntimeTwinDesignProvider><ConfirmProvider>
+    const [section, setSection] = useState('quadro');
+    return <RuntimeTwinDesignProvider><PrivacyProvider><ConfirmProvider>
         <button onClick={() => notifyDbChange('entries')}>Rileggi il diario fixture</button>
-        <Timeline entries={entries} readFailed={Boolean(error)} onRetry={refresh} patientDiary
-            section={{ id: 'diario', kicker: 'Diario', title: 'Diario clinico', keepMounted: true, defaultOpen: true }} />
-    </ConfirmProvider></RuntimeTwinDesignProvider>;
+        <button onClick={() => setSection('scale')}>Mostra scale fixture</button>
+        <button onClick={() => setSection('timeline')}>Mostra timeline fixture</button>
+        <RuntimeTwinFolderContext.Provider value={section}><PatientDetailPage /></RuntimeTwinFolderContext.Provider>
+    </ConfirmProvider></PrivacyProvider></RuntimeTwinDesignProvider>;
 }
 /* The panels below read through the real ApiTable; only window.fetch is replaced.
    Each read of the panel's list takes the next outcome from ?reads=fail,ok,...; once the list is spent, reads succeed. */
@@ -159,4 +173,8 @@ function App() {
 }
 const root = document.getElementById('root');
 if (!root) throw new Error('UI06 fixture root missing');
+if (window.location.pathname === '/diary') {
+    db.setKey(await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']));
+    installDiaryFetch();
+}
 createRoot(root).render(<App />);
