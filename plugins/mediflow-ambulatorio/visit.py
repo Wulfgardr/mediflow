@@ -87,7 +87,7 @@ NOTE_PDF = 'nota-visita.pdf'
 DICTATION_PDF = 'trascrizione-visita.pdf'
 PHYSICIAN = re.compile(r'CODICE\s+FISCALE\s+DEL\s+MEDICO\s*[:-]?\s*(' + CF_RE.pattern + ')')
 PROPOSALS = {
-    'therapy': 'terapia', 'service_prescription': 'prestazione',
+    'document_entry': 'nota', 'therapy': 'terapia', 'service_prescription': 'prestazione',
     'exemption': 'esenzione', 'diagnosis': 'diagnosi',
 }
 
