@@ -343,7 +343,9 @@ test('Proposte combinate: un solo conteggio effettivo e due destinazioni senza r
     await page.goto(`/patients/${patientId}/modules`); await openPatientSection(page, 'quadro');
     const summary = page.getByTestId('patient-proposals-summary');
     await expect(summary).toHaveCount(1); await expect(summary).toContainText('Nessuna proposta da rivedere');
-    await expect(summary.getByRole('link')).toHaveCount(2);
+    const actions = summary.getByRole('navigation', { name: 'Azioni sulle proposte', exact: true });
+    await expect(actions.getByRole('link')).toHaveCount(1);
+    await expect(actions.getByRole('link', { name: 'Smart Import', exact: true })).toHaveCount(0);
     await summary.getByRole('link', { name: 'Apri il Quadro e le fonti', exact: true }).click();
     const insight = page.locator('#patient-insight');
     const insightToggle = insight.locator(':scope > div > [data-disclosure-control]');
@@ -369,6 +371,7 @@ test('Proposte combinate: un solo conteggio effettivo e due destinazioni senza r
     const smartProposal = smart.getByTestId('smart-import-review-proposal');
     await expect(smartProposal).toBeVisible();
     await openPatientSection(page, 'quadro'); await expect(summary).toContainText('2 proposte da rivedere');
+    await expect(actions.getByRole('link')).toHaveCount(2);
     await expect(summary).toHaveCount(1); await expect(insightProposal).not.toBeVisible(); await expect(smartProposal).not.toBeVisible();
     await expect(page.locator('#quadro [data-testid$="review-proposal"]')).toHaveCount(0);
     const directory = process.env.SMART_IMPORT_CAPTURES;
