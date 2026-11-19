@@ -7,6 +7,7 @@ import { formatCountLabel } from '@/lib/format-count';
 import { projectQuadroMeasures } from '@/lib/patient-quadro';
 import PrivacyBlur from './privacy-blur';
 import { DrugLabel } from './drug-label';
+import { SheetDiaryReadingContext } from './sheet-diary-reading';
 import { MeasureTrend, measureSeries } from './measure-trend';
 import { InkSectionHeading } from '@/components/ui/ink-state';
 import register from './clinical-register.module.css';
@@ -142,8 +143,7 @@ export function PatientSynopticSheet({ clinicalSupport, notesContent, problems, 
                         {diaryTools.full ? 'Torna alla bozza' : 'Tutto il diario'}
                     </button>
                 </div> : null}
-                {diary}
-                {diaryTools ? null : <a href="#diario" className={`mf-button-text ${reading.fullDiary}`}>Tutto il diario</a>}
+                <SheetDiaryReadingContext.Provider value={!composer}>{diary}</SheetDiaryReadingContext.Provider>
             </section>
             <div className={reading.side}>
                 {composer ? <div className={reading.composer}>{composer}</div> : null}

@@ -69,6 +69,10 @@ function presentEntry(entry: TimelineEntryData, readableMetadata: unknown = entr
     };
 }
 
+function sameCivilDay(left: Date | string | null | undefined, right: Date | string) {
+    return Boolean(left) && new Date(left!).toDateString() === new Date(right).toDateString();
+}
+
 function EntryAttachments({ attachmentIds, onView }: { attachmentIds: string[], onView: (file: Attachment) => void }) {
     const attachments = useLiveQuery(
         async () => {
@@ -109,6 +113,7 @@ function EntryAttachments({ attachmentIds, onView }: { attachmentIds: string[], 
 interface TimelineEntryCardProps {
     entry: TimelineEntryData;
     patientDiary?: boolean;
+    reading?: boolean;
     active?: boolean;
     position?: number;
     setSize?: number;
@@ -121,6 +126,7 @@ interface TimelineEntryCardProps {
 export function TimelineEntryCard({
     entry,
     patientDiary = false,
+    reading = false,
     active = false,
     position,
     setSize,
@@ -136,6 +142,7 @@ export function TimelineEntryCard({
     const diaryMetadata = diaryPresentation ? readPatientDiaryMetadata(entry.metadata) : null;
     const metadataUnreadable = diaryMetadata?.state === 'unreadable';
     const settingLabel = entry.setting === 'home' ? 'Assistenza domiciliare' : entry.setting === 'hospital' ? 'Ospedale' : entry.setting === 'ambulatory' ? 'Ambulatorio' : undefined;
+    const typeLabel = TYPE_LABELS[entry.type] || (diaryPresentation ? PATIENT_TYPE_LABELS[entry.type] : undefined) || (proposal && entry.type === 'phone' ? 'Telefonata' : entry.type);
     const basePresentation = presentEntry(entry, diaryMetadata ? diaryMetadata.value : entry.metadata);
     const stateKnown = basePresentation.stateKnown;
     const presentation = { ...basePresentation,
@@ -164,7 +171,7 @@ export function TimelineEntryCard({
             />}
 
             {diaryPresentation ? <time className={twin.margin} dateTime={new Date(entry.date).toISOString()}>
-                <span>{format(new Date(entry.date), 'dd MMM yyyy', { locale: it })}</span>
+                <span>{format(new Date(entry.date), reading ? (new Date(entry.date).getFullYear() === new Date().getFullYear() ? 'dd/MM' : 'dd/MM/yyyy') : 'dd MMM yyyy', { locale: it })}</span>
                 <span>{format(new Date(entry.date), 'HH:mm', { locale: it })}</span>
             </time> : null}
 
@@ -177,7 +184,7 @@ export function TimelineEntryCard({
                         </div>}
                         <div className={proposal ? twin.identity : undefined}>
                             <span className="block text-xs font-semibold uppercase" style={{ color: isDeleted ? 'var(--lume-signal-critical)' : 'var(--lume-accent)' }}>
-                                {TYPE_LABELS[entry.type] || (diaryPresentation ? PATIENT_TYPE_LABELS[entry.type] : undefined) || (proposal && entry.type === 'phone' ? 'Telefonata' : entry.type)}
+                                {typeLabel}{reading && presentation.author ? <span className={twin.readingAuthor}> · {presentation.author}</span> : null}
                                 {entry.patientName && <span className="ml-1 font-normal normal-case" style={{ color: 'var(--lume-ink-muted)' }}> - <PrivacyBlur>{entry.patientName}</PrivacyBlur></span>}
                             </span>
                             <div className="lume-registro mt-1 flex flex-wrap items-center gap-2 text-xs" style={{ color: 'var(--lume-ink-muted)' }}>
@@ -185,7 +192,8 @@ export function TimelineEntryCard({
                                     {presentation.stateLabel}
                                 </span> : null}
                                 {!diaryPresentation ? <span className="lume-registro">{format(new Date(entry.date), 'dd MMMM yyyy HH:mm', { locale: it })}</span> : null}
-                                {diaryPresentation ? <span>{settingLabel ?? 'Luogo non registrato'}</span> : null}
+                                {diaryPresentation && !reading ? <span>{settingLabel ?? 'Luogo non registrato'}</span> : null}
+                                {reading && settingLabel ? <span>{settingLabel}</span> : null}
                                 {!diaryPresentation || (presentation.source !== settingLabel && presentation.source !== 'Diario locale') ? <span>{proposal && !diaryPresentation ? '' : 'Fonte: '}{presentation.source}</span> : null}
                                 {presentation.author && !diaryPresentation ? <span>Autore: {presentation.author}</span> : null}
                                 {!proposal && entry.setting && (
@@ -261,8 +269,8 @@ export function TimelineEntryCard({
                         <PrivacyBlur><ClinicalRichTextContent content={entry.content} /></PrivacyBlur>
                     </Disclosure>
                 </> : <>
-                    {diaryPresentation && entry.title ? <h4 className={twin.entryTitle}><PrivacyBlur>{entry.title}</PrivacyBlur></h4> : null}
-                    <div style={{ color: presentation.draft ? 'var(--lume-ink-muted)' : 'var(--lume-ink)' }}>
+                    {diaryPresentation && entry.title && !(reading && entry.title.trim().toLocaleLowerCase('it-IT') === typeLabel.toLocaleLowerCase('it-IT')) ? <h4 className={twin.entryTitle}><PrivacyBlur>{entry.title}</PrivacyBlur></h4> : null}
+                    <div className={reading ? twin.readingText : undefined} style={{ color: presentation.draft ? 'var(--lume-ink-muted)' : 'var(--lume-ink)' }}>
                         <PrivacyBlur>
                             <ClinicalRichTextContent content={entry.content} className="prose prose-sm max-w-none prose-p:leading-relaxed dark:prose-invert" />
                         </PrivacyBlur>
@@ -270,7 +278,7 @@ export function TimelineEntryCard({
                 </>}
 
                 {diaryPresentation ? <div className={twin.registration}>
-                    {stateKnown ? <InkState state={presentation.draft ? 'fresh' : 'dry'}>{presentation.stateLabel === 'Registrata' ? patientDiaryRegistration(entry) : `${presentation.stateLabel}${presentation.author ? ` da ${presentation.author}` : ''}`}</InkState> : <span>{presentation.stateLabel}{presentation.author ? ` · Autore: ${presentation.author}` : ''}</span>}
+                    {stateKnown ? <InkState state={presentation.draft ? 'fresh' : 'dry'}>{presentation.stateLabel === 'Registrata' ? patientDiaryRegistration(reading && sameCivilDay(entry.createdAt, entry.date) ? { recordedBy: entry.recordedBy } : entry) : `${presentation.stateLabel}${presentation.author ? ` da ${presentation.author}` : ''}`}</InkState> : <span>{presentation.stateLabel}{presentation.author ? ` · Autore: ${presentation.author}` : ''}</span>}
                 </div> : null}
 
                 {metadataUnreadable ? <p className={twin.metadataNotice} role="status">Metadati della voce non leggibili. Autore, fonte e stato non verificabili.</p> : null}
