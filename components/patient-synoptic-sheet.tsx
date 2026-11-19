@@ -7,6 +7,7 @@ import { formatCountLabel } from '@/lib/format-count';
 import { projectQuadroMeasures } from '@/lib/patient-quadro';
 import PrivacyBlur from './privacy-blur';
 import { DrugLabel } from './drug-label';
+import { MeasureTrend, measureSeries } from './measure-trend';
 import { InkSectionHeading } from '@/components/ui/ink-state';
 import register from './clinical-register.module.css';
 import reading from './twin-synoptic-sheet.module.css';
@@ -96,7 +97,9 @@ export function PatientSynopticSheet({ clinicalSupport, notesContent, problems, 
         <Section name="Parametri recenti" icon={overview ? Activity : undefined} action={overview && !composer ? <a href="#parametri" className={reading.islandAction}>Andamento</a> : undefined} read={{ ...measures, data: measures.data === undefined ? undefined : measureRows }} count={formatCountLabel(measureRows.length, 'parametro', 'parametri')} empty="Nessuna misura registrata.">
             <table role="table" className={`${register.table} ${reading.measures}`} aria-label="Parametri recenti">
                 <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Nome</th><th role="columnheader" scope="col" className={reading.value}>Valore</th><th role="columnheader" scope="col">Data</th><th role="columnheader" scope="col" className={secondary}>Variazione</th></tr></thead>
-                <tbody role="rowgroup">{measureRows.map(measure => <tr role="row" key={measure.id}>
+                <tbody role="rowgroup">{measureRows.map(measure => {
+                    const series = overview ? measureSeries(measures.data ?? [], measure.id) : [];
+                    return <tr role="row" key={measure.id} data-trend={series.length > 1 ? 'true' : undefined}>
                     <td role="cell">{measure.display}</td>
                     <td role="cell" className={`${reading.value} ${measure.outOfRange ? register.critical : ''}`}>
                         {overview && measure.outOfRange ? <span aria-hidden="true" className={reading.rangeArrow}>{rangeArrow[measure.outOfRange]}</span> : null}
@@ -104,7 +107,9 @@ export function PatientSynopticSheet({ clinicalSupport, notesContent, problems, 
                         {overview && measure.delta ? <small>{measure.delta}</small> : null}
                     </td>
                     <td role="cell"><DateCell date={measure.date} /></td><td role="cell" className={secondary}>{measure.delta}</td>
-                </tr>)}</tbody>
+                    {series.length > 1 ? <td role="presentation" className={reading.trendCell}><MeasureTrend series={series} critical={Boolean(measure.outOfRange)} /></td> : null}
+                </tr>;
+                })}</tbody>
             </table>
         </Section>
         <Section name="Controlli aperti" read={checkups} count={formatCountLabel(checkups.data?.length ?? 0, 'aperto', 'aperti')} empty="Nessun controllo aperto.">

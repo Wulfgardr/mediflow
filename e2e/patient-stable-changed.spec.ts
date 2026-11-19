@@ -198,7 +198,7 @@ test('D: dalla lista, primo sguardo al ritorno e cartella senza storico al cambi
     const diary = page.locator('#diario');
     await expect(diary).toContainText('Nota sintetica del diario.');
     expect((await diary.boundingBox())!.y).toBeGreaterThan(changed.y);
-    await expect(changes).toContainText('Operatrice sintetica');
+    await expect(page.getByRole('region', { name: 'Riepilogo clinico', exact: true })).toContainText('Operatrice sintetica');
     await expect(changes.getByRole('link', { name: /1 telefonata/ })).toHaveAttribute('href', '#diario');
     await changes.getByText('Terapia sospesa sintetica', { exact: true }).click();
     await expect(changes).toContainText('Stato attuale: Sospesa');

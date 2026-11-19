@@ -3,7 +3,7 @@
 import type { Attachment, ClinicalEntry, Observation, Therapy } from '@/lib/db';
 import { diaryContactsAfter, diaryTypeLabel, outOfRangeAfter } from '@/lib/patient-sheet-activity';
 import { projectTherapyRecordUpdates, type projectVisitReference, recordDate } from '@/lib/patient-therapy-changes';
-import { useState, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { ChevronDown, History } from 'lucide-react';
 import PrivacyBlur from './privacy-blur';
 import { DrugLabel } from './drug-label';
@@ -62,16 +62,28 @@ function TherapyDetails({ update, entries, openDiary, grouped }: {
     const start = recordDate(therapy.startDate);
     const end = recordDate(therapy.endDate);
     const sameDay = entries.filter(entry => !entry.deletedAt && recordDate(entry.createdAt)?.toDateString() === date.toDateString());
+    const [more, setMore] = useState(false);
+    const moreId = `altri-dettagli-${useId().replace(/:/g, '')}`;
     return <ChangeRow name={<DrugLabel name={therapy.drugName} />} status={grouped ? undefined : label}>
         <Fact label="Stato attuale">{therapy.status === 'active' ? 'Attiva' : therapy.status === 'suspended' ? 'Sospesa' : 'Conclusa'} · <PrivacyBlur>{therapy.dosage}</PrivacyBlur></Fact>
         <Fact label="Prima">Valore precedente non conservato.</Fact>
-        {therapy.motivation ? <Fact label="Indicazione"><PrivacyBlur>{therapy.motivation}</PrivacyBlur></Fact> : null}
-        <Fact label="Date">{start ? <>Inizio <SheetDate date={start} /> · </> : null}{end ? <>Fine <SheetDate date={end} /> · </> : null}Data della scheda <SheetDate date={date} /></Fact>
-        {sameDay.length ? <Fact label="Fonte">{sameDay.map(entry => <button key={entry.id} type="button" className={styles.sourceLink} onClick={() => openDiary(entry.id)}>
-            Diario del <SheetDate date={date} /> · {diaryTypeLabel(entry.type)}
-        </button>)}</Fact> : null}
+        {sameDay.length ? <Fact label="Stesso giorno"><span className={styles.sameDay}>{sameDay.map(entry => <button key={entry.id} type="button" className={styles.sourceLink}
+            aria-label={`Diario del ${date.toLocaleDateString('it-IT')} · ${diaryTypeLabel(entry.type)}`} onClick={() => openDiary(entry.id)}>
+            {diaryTypeLabel(entry.type)}
+        </button>)}</span></Fact> : null}
+        <div className={styles.moreFacts}>
+            <button type="button" aria-expanded={more} aria-controls={moreId} onClick={() => setMore(value => !value)}>{more ? 'Meno dettagli' : 'Altri dettagli'}</button>
+            <dl id={moreId} hidden={!more}>
+                {therapy.motivation ? <Fact label="Indicazione"><PrivacyBlur>{therapy.motivation}</PrivacyBlur></Fact> : null}
+                {start ? <Fact label="Inizio"><SheetDate date={start} /></Fact> : null}
+                {end ? <Fact label="Fine"><SheetDate date={end} /></Fact> : null}
+                <Fact label="Nella scheda"><SheetDate date={date} /></Fact>
+            </dl>
+        </div>
     </ChangeRow>;
 }
+
+const statusRank: Record<string, number> = { Sospesa: 0, Conclusa: 1, 'Fuori intervallo': 2, Aggiornata: 3, Avviata: 4 };
 
 type ActivityRow = { id: string; date: Date; status: string; tone: 'change' | 'critical' | 'neutral'; content: (grouped: boolean) => ReactNode };
 
@@ -138,7 +150,7 @@ export function PatientSheetActivity({ patientId, reference, now, entries, thera
             content: () => <button type="button" onClick={() => openDocument(file.id)} className={styles.sourceLink}>Documento aggiunto · <PrivacyBlur>{file.name}</PrivacyBlur></button> })) : []),
         ...(showDocuments && datedProposal ? [{ id: 'proposal', date: datedProposal, status: 'Proposte', tone: 'neutral' as const,
             content: () => <a href="#patient-insight" className={styles.sourceLink}>Proposta del Quadro paziente</a> }] : []),
-    ].sort((left, right) => right.date.getTime() - left.date.getTime());
+    ].sort((left, right) => right.date.getTime() - left.date.getTime() || (statusRank[left.status] ?? 9) - (statusRank[right.status] ?? 9));
     const partial = unavailable || reference?.undated || (visit && (
         patientEntries.some(entry => !entry.deletedAt && !recordDate(entry.createdAt))
         || (therapies ?? []).some(therapy => therapy.patientId === patientId && !therapy.deletedAt
@@ -153,7 +165,7 @@ export function PatientSheetActivity({ patientId, reference, now, entries, thera
             <header className={styles.islandHeader}>
                 <span className={styles.islandIcon}><History size={16} aria-hidden="true" /></span>
                 <h2>Dall&apos;ultima visita</h2>
-                <span className={styles.visitDate}><SheetDate date={visit.date} />{visit.author ? <> · <PrivacyBlur>{visit.author}</PrivacyBlur></> : null}</span>
+                <span className={styles.visitDate}><SheetDate date={visit.date} /><span className={styles.visuallyHidden}> a </span><span className={styles.untilToday}>oggi</span></span>
             </header>
             {therapyCount || results.length || contacts.length ? <p className={styles.chips}>
                 {therapyCount ? <span className={styles.chipChange}>{therapyCount} {therapyCount === 1 ? 'terapia' : 'terapie'}</span> : null}

@@ -95,6 +95,7 @@
 }
 .overview .islandHeader { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-bottom: 6px; }
 .islandHeader > h2 { flex: 1 1 auto; justify-content: start; }
+.comparison .islandHeader > h2 { flex: 0 1 auto; }
 .islandIcon, .proposalIcon {
     display: inline-grid;
     width: 28px;
@@ -111,7 +112,7 @@
     background: color-mix(in oklab, var(--lume-record-proposal-rule) 14%, transparent);
     color: var(--record-proposal-ink);
 }
-.visitDate { color: var(--lume-ink-muted); font: var(--type-meta); overflow-wrap: anywhere; }
+.visitDate { color: var(--lume-ink-muted); font: var(--type-meta); white-space: nowrap; }
 .islandAction { display: inline-flex; align-items: center; min-height: 28px; margin-inline-start: auto; color: var(--lume-accent); font: var(--type-body); }
 :global(:root) .overview :is(.islandHeader > h2, .support h2, .activity > section > h2, .contextRows > section > h2) {
     margin: 0;
@@ -151,7 +152,19 @@
 .rowStatus { grid-column: 2; grid-row: 1 / span 2; align-self: start; }
 .overview .measures td:nth-child(1) { grid-column: 1; grid-row: 1; }
 .overview .measures td:nth-child(3) { grid-column: 1; grid-row: 2; color: var(--lume-ink-muted); font: var(--type-meta); }
-.overview .measures td:nth-child(2) { grid-column: 2; grid-row: 1 / span 2; align-self: start; font: var(--type-record-row); font-variant-numeric: tabular-nums; }
+.overview .measures tr { grid-template-columns: minmax(0, 1fr) auto auto; }
+.overview .measures td:nth-child(2) { grid-column: 3; grid-row: 1 / span 2; align-self: start; font: var(--type-record-row); font-variant-numeric: tabular-nums; }
+.overview .measures td.trendCell { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+.overview .measures tr[data-trend] td:nth-child(2) small {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+.trend { display: block; stroke: var(--lume-ink-muted); }
+.trend[data-critical='true'] { stroke: var(--lume-signal-critical); }
 .overview .measures td:nth-child(2) small { font-weight: 400; }
 .rangeArrow { margin-inline-end: 4px; }
 .drugStrength { color: var(--lume-ink-muted); font-weight: 400; }
@@ -175,7 +188,7 @@
 .diaryTools { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
 .diaryTools button { padding: 3px 0; text-align: start; font: var(--type-meta); color: var(--lume-accent); font-weight: 600; }
 .diaryTools button:hover { text-decoration: underline; }
-@media (pointer: coarse) { .changeItems .changeDetails summary, .diaryTools button { min-height: 44px; } }
+@media (pointer: coarse) { .changeItems .changeDetails summary, .diaryTools button, .moreFacts > button, .sameDay .sourceLink { min-height: 44px; } }
 .support > :global([data-testid='patient-proposals-summary']) { flex-wrap: wrap; gap: 6px; }
 .comparison, .noComparison {
     border: 1px solid var(--lume-rule-strong);
@@ -213,11 +226,18 @@
     border-radius: 10px;
     background: var(--lume-record-island);
 }
-.fact { display: grid; grid-template-columns: 6rem minmax(0, 1fr); gap: 8px; }
+.fact { display: grid; grid-template-columns: 5.75rem minmax(0, 1fr); gap: 8px; }
 .fact dt { color: var(--lume-ink-muted); font: var(--type-meta); line-height: 1.6; }
 .fact dd { margin: 0; color: var(--lume-ink); font: var(--type-body); }
 .sourceLink { display: block; padding: 0; color: var(--lume-accent); font: var(--type-body); text-align: start; overflow-wrap: anywhere; }
 .sourceLink:hover { text-decoration: underline; }
+.sameDay { display: flex; flex-wrap: wrap; gap: 2px 12px; }
+.sameDay .sourceLink { display: inline; }
+.untilToday::before { content: ' → ' / ''; }
+.moreFacts { grid-column: 1 / -1; }
+.moreFacts > button { padding: 0; color: var(--lume-accent); font: var(--type-meta); }
+.moreFacts > button:hover { text-decoration: underline; }
+.moreFacts dl:not([hidden]) { display: grid; gap: 4px; margin: 4px 0 0; }
 .changeDateGroup { padding-bottom: 2px; }
 .changeGroup { display: flex; align-items: flex-start; gap: 0 8px; }
 .changeGroup > :is(.chipChange, .chipCritical, .chipNeutralStatic) { flex: none; margin-top: 6px; }
@@ -257,6 +277,9 @@
     color: var(--record-proposal-ink);
     font: var(--type-section);
 }
+.proposalText { margin: 0; color: var(--lume-ink); font: var(--type-record-text); }
+.proposalGaps h3 { margin: 0 0 2px; color: var(--lume-ink-muted); font: var(--type-section); }
+.proposalGaps ul { display: grid; gap: 2px; margin: 0; padding-inline-start: 16px; color: var(--lume-ink); font: var(--type-body); }
 .proposalList { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .proposalList li { display: grid; grid-template-columns: 14px minmax(0, 1fr); gap: 10px; color: var(--lume-ink); font: var(--type-record-text); }
 .proposalList li::before {
