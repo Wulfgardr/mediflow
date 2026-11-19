@@ -1137,3 +1137,18 @@ per legare la CryptoKey alla sessione corrente. L'accessor non cambia
 ammissione, conferma, trasporto o commit delle terapie. Il modello resta
 invariato e non qualifica il trasferimento della chiave o l'applicazione
 delle cassette, che hanno prove separate.
+
+## Raccordo con lo storico del diario
+
+La rettifica aggiunge una tabella figlia del diario, senza modificare il
+controller delle terapie, le sue transizioni o il confronto di versione. Il
+ripristino della collezione usa la stessa transazione di sostituzione
+dell'archivio. Il recupero fisico riconosce v16 e conserva lo schema v17.
+Titoli precedenti, relazioni cliniche, chiavi e comportamento del ripristino
+sono verificati su SQLite sintetico e restano fuori dal modello TLC.
+
+Dopo ogni integrazione di file coperti, calcolare gli SHA-256 dai byte
+dell'albero risultante. `filesSha256` è lo SHA-256 della sequenza
+`percorso<TAB>sha256<LF>` in ordine lessicografico di percorso. Il runner
+verifica l'impronta d'insieme e quella di ogni file. Registrare il commit
+riesaminato e rieseguire le prove sui file risultanti.
