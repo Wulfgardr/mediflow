@@ -1133,3 +1133,70 @@ mod chat {
         }
     }
 }
+
+fn quadro_buttons(bench: &Bench, cx: &mut gpui::VisualTestContext) -> Vec<String> {
+    bench.view.update(cx, |app, cx| {
+        rendered_command::button_ids(|| {
+            let _ = app.record_quadro(cx);
+        })
+    })
+}
+
+#[gpui::test]
+fn the_quadro_closes_and_reopens_without_losing_a_proposal_or_an_error(
+    cx: &mut gpui::TestAppContext,
+) {
+    let (bench, cx) = bench(cx);
+    prepare(&bench, cx);
+    bench.view.read_with(cx, |app, _| {
+        assert!(app.patient.record.quadro, "preparing opens the Quadro")
+    });
+    let answer = bench.answer("response-available");
+    bench.view.update(cx, |app, cx| app.insight_confirm(cx));
+    cx.run_until_parked();
+    assert!(answer.join().unwrap());
+    for phase in ["proposta", "errore"] {
+        if phase == "errore" {
+            bench.view.update(cx, |app, _| {
+                app.patient
+                    .insight
+                    .end(InsightPhase::Error("Errore sintetico del Quadro.".into()))
+            });
+        }
+        let kept = |bench: &Bench, cx: &mut gpui::VisualTestContext| {
+            bench.phase(cx, |current| match phase {
+                "proposta" => matches!(current, InsightPhase::Proposal { .. }),
+                _ => {
+                    matches!(current, InsightPhase::Error(m) if m == "Errore sintetico del Quadro.")
+                }
+            })
+        };
+        bench
+            .view
+            .update(cx, |app, _| app.patient.record.quadro = true);
+        assert!(
+            quadro_buttons(&bench, cx)
+                .iter()
+                .any(|id| id.starts_with("patient-insight-"))
+        );
+        bench
+            .view
+            .update(cx, |app, _| app.patient.record.quadro = false);
+        let closed = quadro_buttons(&bench, cx);
+        assert!(
+            !closed.iter().any(|id| id.starts_with("patient-insight-")),
+            "{phase}: the closed Quadro hides its panel: {closed:?}"
+        );
+        assert!(kept(&bench, cx), "{phase}: closing keeps the state");
+        bench
+            .view
+            .update(cx, |app, _| app.patient.record.quadro = true);
+        assert!(
+            quadro_buttons(&bench, cx)
+                .iter()
+                .any(|id| id.starts_with("patient-insight-"))
+        );
+        assert!(kept(&bench, cx), "{phase}: reopening shows the same state");
+    }
+    bench.assert_no_clinical_write();
+}

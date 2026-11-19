@@ -439,7 +439,150 @@ fn unqualified_form_content_is_refused_before_the_platform_raster() {
     );
     let unused = fixture::stream(b"", b"");
     let output = worker(&fixture::document(b"/Form Do", &[unused, form]), "1");
-    assert_eq!(output.stdout, b"{\"error\":\"nested_graphics\"}\n");
+    assert_eq!(output.stdout, b"{\"error\":\"image_limit\"}\n");
+}
+
+#[test]
+fn forms_that_cannot_be_qualified_stay_refused_as_nested_graphics() {
+    let unused = fixture::stream(b"", b"");
+    let without_box = fixture::stream(b"/Type /XObject /Subtype /Form", b"0 0 1 rg 0 0 10 10 re f");
+    let painting_itself = fixture::stream(
+        b"/Type /XObject /Subtype /Form /BBox [0 0 100 60] /Resources << /XObject << /Self 6 0 R >> >>",
+        b"/Self Do",
+    );
+    for (form, refusal) in [
+        (without_box, "nested_graphics"),
+        (painting_itself, "invalid"),
+    ] {
+        let output = worker(
+            &fixture::document(b"/Form Do", &[unused.clone(), form]),
+            "1",
+        );
+        assert_eq!(
+            output.stdout,
+            format!("{{\"error\":\"{refusal}\"}}\n").as_bytes()
+        );
+    }
+    for (links, refusal) in [(7, None), (8, Some("nested_graphics"))] {
+        let mut chain = vec![unused.clone()];
+        for level in 0..links {
+            let next = 7 + level;
+            chain.push(fixture::stream(
+                format!("/Type /XObject /Subtype /Form /BBox [0 0 100 60] /Resources << /XObject << /Next {next} 0 R >> >>").as_bytes(),
+                b"/Next Do",
+            ));
+        }
+        chain.push(fixture::stream(
+            b"/Type /XObject /Subtype /Form /BBox [0 0 100 60]",
+            b"0 0 1 rg 0 0 10 10 re f",
+        ));
+        let output = worker(&fixture::document(b"/Form Do", &chain), "1");
+        match refusal {
+            Some(refusal) => assert_eq!(
+                output.stdout,
+                format!("{{\"error\":\"{refusal}\"}}\n").as_bytes()
+            ),
+            None => assert!(output.stdout.starts_with(b"{\"width\""), "{links} links"),
+        }
+    }
+}
+
+#[test]
+fn a_qualified_form_is_drawn_with_the_checks_of_the_page() {
+    let unused = fixture::stream(b"", b"");
+    let drawn = fixture::stream(
+        b"/Type /XObject /Subtype /Form /BBox [0 0 100 60] /Group << /Type /Group /S /Transparency /I true >> /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >>",
+        b"q 0 0 1 rg 10 10 80 40 re f Q BT /F1 12 Tf 5 5 Td (Form) Tj ET",
+    );
+    let output = worker(
+        &fixture::document(b"/Form Do", &[unused.clone(), drawn]),
+        "1",
+    );
+    let at = output.stdout.iter().position(|b| *b == b'\n').unwrap();
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&output.stdout[..at]).unwrap(),
+        serde_json::json!({"page":1,"pages":1,"width":150,"height":90})
+    );
+    assert!(
+        output.stdout[at + 1..]
+            .chunks(4)
+            .any(|pixel| pixel[..3] != [255; 3])
+    );
+    let unbalanced = fixture::stream(
+        b"/Type /XObject /Subtype /Form /BBox [0 0 100 60]",
+        b"Q Q 0 0 1 rg 0 0 10 10 re f",
+    );
+    let output = worker(
+        &fixture::document(b"q /Form Do Q", &[unused, unbalanced]),
+        "1",
+    );
+    assert_eq!(output.stdout, b"{\"error\":\"invalid\"}\n");
+}
+
+#[test]
+fn screen_resolution_raises_only_the_scale_within_the_same_canvas_limits() {
+    let header = |source: &[u8], resolution: &str| {
+        let mut child = Command::new(env!("CARGO_BIN_EXE_mediflow-gpui-patient-pilot"))
+            .args(["--document-preview-worker", "1", resolution])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        child.stdin.take().unwrap().write_all(source).unwrap();
+        let output = child.wait_with_output().unwrap();
+        let at = output.stdout.iter().position(|b| *b == b'\n').unwrap();
+        let header: serde_json::Value = serde_json::from_slice(&output.stdout[..at]).unwrap();
+        let width = header["width"].as_u64().unwrap() as usize;
+        let height = header["height"].as_u64().unwrap() as usize;
+        assert_eq!(output.stdout.len() - at - 1, width * height * 4);
+        header
+    };
+    let small = fixture::document(b"0 0 1 rg 10 10 80 40 re f", &[]);
+    assert_eq!(
+        header(&small, "page"),
+        serde_json::json!({"page":1,"pages":1,"width":150,"height":90})
+    );
+    assert_eq!(
+        header(&small, "screen"),
+        serde_json::json!({"page":1,"pages":1,"width":300,"height":180})
+    );
+    let letter = include_bytes!("../test_support/pdf-producers/chrome-lettera-gemello.pdf");
+    assert_eq!(header(letter, "page")["width"], 892);
+    let screen = header(letter, "screen");
+    assert_eq!(
+        (screen["width"].as_u64(), screen["height"].as_u64()),
+        (Some(1447), Some(2048))
+    );
+    assert_eq!(header(letter, "unknown")["width"], 892);
+}
+
+#[test]
+fn chrome_discharge_letters_are_read_from_their_original_bytes() {
+    use sha2::{Digest, Sha256};
+    for (source, sha256) in [
+        (
+            include_bytes!("../test_support/pdf-producers/chrome-lettera-affollato.pdf").as_slice(),
+            "9ca49c8e7d4c34be5edc13fad558ae0006183d3c8bcd402bba3d5c6a912b6313",
+        ),
+        (
+            include_bytes!("../test_support/pdf-producers/chrome-lettera-gemello.pdf").as_slice(),
+            "308d9a6a7b5a50b0ea0c8f99d3e593a15fe2eae74cc55684005c43b616b0a80e",
+        ),
+    ] {
+        assert_eq!(format!("{:x}", Sha256::digest(source)), sha256);
+        for page in ["1", "2"] {
+            let output = worker(source, page);
+            let at = output.stdout.iter().position(|b| *b == b'\n').unwrap();
+            let header: serde_json::Value = serde_json::from_slice(&output.stdout[..at]).unwrap();
+            assert_eq!(header["pages"], 2, "{sha256} {page}: {header}");
+            assert!(
+                output.stdout[at + 1..]
+                    .chunks(4)
+                    .any(|pixel| pixel[..3] != [255; 3])
+            );
+        }
+    }
 }
 
 #[test]

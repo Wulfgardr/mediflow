@@ -107,6 +107,7 @@ impl ClinicalApp {
         if self.patient.insight.phase.is_busy() {
             return;
         }
+        self.patient.record.quadro = true;
         let Some(access) = self.local_host.access() else {
             self.patient.insight.end(InsightPhase::Unavailable(
                 "Accesso locale chiuso. Il Quadro paziente si genera sul Mac che ospita l’archivio: apri Gestione locale in Impostazioni e conferma l’accesso.".into(),
@@ -362,7 +363,7 @@ impl ClinicalApp {
                 }
                 pane = pane
                     .child(muted("Un riepilogo temporaneo dal modello locale dell’home-base, da confrontare con la scheda. Nessun aggiornamento automatico.".into()))
-                    .child(prepare("Genera proposta", true));
+                    .child(prepare("Genera proposta", false));
             }
             InsightPhase::Checking => {
                 pane = pane.child(notice(
@@ -394,7 +395,7 @@ impl ClinicalApp {
                     )))
                     .child(muted("Il testo non lascia il home-base. La cartella non cambia.".into()))
                     .child(
-                        button("patient-insight-confirm", "Genera proposta", theme, true, true)
+                        button("patient-insight-confirm", "Genera proposta", theme, false, true)
                             .on_click(cx.listener(|this, _, _, cx| this.insight_confirm(cx))),
                     )
                     .child(

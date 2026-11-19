@@ -21,6 +21,52 @@ pub struct Preview {
     pub source: Arc<Zeroizing<Vec<u8>>>,
     pub image: Arc<gpui::RenderImage>,
     pub pages: usize,
+    pub ink: std::ops::Range<u32>,
+    pub resolution: Resolution,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Resolution {
+    Page,
+    Screen,
+}
+
+impl Resolution {
+    fn argument(self) -> &'static str {
+        match self {
+            Self::Page => "page",
+            Self::Screen => "screen",
+        }
+    }
+
+    pub fn from_argument(argument: Option<&str>) -> Self {
+        match argument {
+            Some("screen") => Self::Screen,
+            _ => Self::Page,
+        }
+    }
+}
+
+const INK_MARGIN: u32 = 12;
+
+pub fn ink_columns(pixels: &image::RgbaImage) -> std::ops::Range<u32> {
+    let width = pixels.width();
+    let inked = |x: u32| {
+        (0..pixels.height()).any(|y| {
+            pixels.get_pixel(x, y).0[..3]
+                .iter()
+                .any(|channel| *channel < 245)
+        })
+    };
+    match (
+        (0..width).find(|x| inked(*x)),
+        (0..width).rev().find(|x| inked(*x)),
+    ) {
+        (Some(left), Some(right)) => {
+            left.saturating_sub(INK_MARGIN)..(right + 1 + INK_MARGIN).min(width)
+        }
+        _ => 0..width,
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -106,9 +152,33 @@ impl Drop for OwnedChild {
     }
 }
 
+#[cfg(test)]
+pub mod test_worker {
+    static PATH: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+
+    pub fn path() -> Option<std::path::PathBuf> {
+        PATH.get().cloned()
+    }
+
+    #[cfg(target_os = "macos")]
+    pub fn use_built_binary() -> bool {
+        let Some(binary) = std::env::current_exe().ok().and_then(|test| {
+            Some(test.parent()?.parent()?.join(format!(
+                "{}{}",
+                env!("CARGO_PKG_NAME"),
+                std::env::consts::EXE_SUFFIX
+            )))
+        }) else {
+            return false;
+        };
+        binary.is_file() && (PATH.set(binary.clone()).is_ok() || PATH.get() == Some(&binary))
+    }
+}
+
 pub fn render(
     source: Arc<Zeroizing<Vec<u8>>>,
     page: usize,
+    resolution: Resolution,
     context: &RequestContext,
 ) -> Result<Preview, Error> {
     if source.len() > super::MAX_DOCUMENT_BYTES
@@ -122,11 +192,15 @@ pub fn render(
         return Err(Error::Unavailable);
     }
     context.check().map_err(|_| Error::Cancelled)?;
+    #[cfg(test)]
+    let executable = test_worker::path().ok_or(Error::Engine)?;
+    #[cfg(not(test))]
     let executable = std::env::current_exe().map_err(|_| Error::Engine)?;
     let child = OwnedChild(
         Command::new(executable)
             .arg("--document-preview-worker")
             .arg(page.to_string())
+            .arg(resolution.argument())
             .env_clear()
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -134,7 +208,10 @@ pub fn render(
             .spawn()
             .map_err(|_| Error::Engine)?,
     );
-    collect_child(child, source, page, context, TIMEOUT)
+    collect_child(child, source, page, context, TIMEOUT).map(|preview| Preview {
+        resolution,
+        ..preview
+    })
 }
 
 fn collect_child(
@@ -228,16 +305,19 @@ fn parse_output(
     }
     let pixels = image::RgbaImage::from_raw(width as u32, height as u32, output[at + 1..].to_vec())
         .ok_or(Error::Engine)?;
+    let ink = ink_columns(&pixels);
     Ok(Preview {
         source,
         image: Arc::new(gpui::RenderImage::new([image::Frame::new(pixels)])),
         pages,
+        ink,
+        resolution: Resolution::Page,
     })
 }
 
 #[cfg(target_os = "macos")]
 unsafe extern "C" {
-    fn MFDocumentPreviewWorker(page: usize) -> i32;
+    fn MFDocumentPreviewWorker(page: usize, screen: i32) -> i32;
     fn MFDocumentPreviewMemory(pid: i32) -> u64;
 }
 
@@ -248,19 +328,21 @@ fn worker_memory(pid: u32) -> Result<u64, Error> {
     Ok(unsafe { MFDocumentPreviewMemory(pid as i32) })
 }
 
-pub fn worker(page: usize) -> Result<(), std::io::Error> {
+pub fn worker(page: usize, resolution: Resolution) -> Result<(), std::io::Error> {
     #[cfg(target_os = "macos")]
     {
         // This entry runs before GPUI/session initialization, exclusively in the
         // owned child. The bridge installs Seatbelt before reading/parsing bytes.
-        if unsafe { MFDocumentPreviewWorker(page) } != 0 {
+        if unsafe { MFDocumentPreviewWorker(page, i32::from(resolution == Resolution::Screen)) }
+            != 0
+        {
             return Err(std::io::ErrorKind::Other.into());
         }
         Ok(())
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = page;
+        let _ = (page, resolution);
         writeln!(
             std::io::stdout(),
             "{{\"error\":\"{}\"}}",
@@ -272,6 +354,19 @@ pub fn worker(page: usize) -> Result<(), std::io::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn ink_columns_keep_every_inked_column_and_trim_only_blank_paper() {
+        let mut page = image::RgbaImage::from_pixel(200, 50, image::Rgba([255, 255, 255, 255]));
+        page.put_pixel(40, 10, image::Rgba([0, 0, 0, 255]));
+        page.put_pixel(150, 49, image::Rgba([240, 255, 255, 255]));
+        assert_eq!(ink_columns(&page), 40 - INK_MARGIN..151 + INK_MARGIN);
+        page.put_pixel(0, 0, image::Rgba([0, 0, 0, 255]));
+        page.put_pixel(199, 0, image::Rgba([0, 0, 0, 255]));
+        assert_eq!(ink_columns(&page), 0..200);
+        let blank = image::RgbaImage::from_pixel(30, 30, image::Rgba([255, 255, 255, 255]));
+        assert_eq!(ink_columns(&blank), 0..30);
+    }
+
     #[test]
     fn raster_metadata_and_truncated_payload_cannot_reach_the_view() {
         let source = Arc::new(Zeroizing::new(b"%PDF-synthetic".to_vec()));

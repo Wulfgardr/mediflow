@@ -11,14 +11,12 @@ fn source(file: &str) -> String {
 }
 
 #[test]
-fn primary_command_is_in_header_before_allergy_and_is_unique_per_layout() {
-    let s = source("shell.rs");
-    let s = &s[s.find("fnprofile_view(").unwrap()..s.find("fnoverview(").unwrap()];
-    assert!(
-        s.find("clinical-workspace-new-entry").unwrap()
-            < s.find("clinical-workspace-allergies").unwrap()
-    );
-    assert_eq!(s.matches("clinical-workspace-new-entry").count(), 2);
+fn primary_command_is_in_header_and_yields_to_the_open_draft() {
+    let s = source("shell/patient_record.rs");
+    let s = &s[s.find("fnrecord_header(").unwrap()..s.find("fnrecord_overview(").unwrap()];
+    assert_eq!(s.matches("clinical-workspace-new-entry").count(), 1);
+    assert!(s.contains("clinical-workspace-close-draft"));
+    assert!(s.contains("\"Chiudilanota\""));
     assert!(s.contains(".justify_end()"));
     assert!(s.contains(".child(allergy_label(None,theme))"));
     let allergy = &source("shell.rs")[source("shell.rs").find("fnallergy_label(").unwrap()..];
@@ -28,11 +26,15 @@ fn primary_command_is_in_header_before_allergy_and_is_unique_per_layout() {
 
 #[test]
 fn overview_has_four_counted_tables_including_observations() {
-    let s = source("shell.rs");
-    let s = &s[s.find("fnoverview(").unwrap()..s.find("fndiary_view(").unwrap()];
-    assert_eq!(s.matches("overview_heading(").count(), 4);
-    assert!(s.contains("Parametrirecenti"));
-    assert!(s.contains("Controlliaperti"));
+    let s = source("shell/patient_record.rs");
+    for title in [
+        "\"Problemi\"",
+        "\"Terapieattive\"",
+        "\"Parametrirecenti\"",
+        "\"Controlliaperti\"",
+    ] {
+        assert!(s.contains(title), "Missing {title}");
+    }
     assert!(s.contains("self.patient.observations.ready()"));
     assert!(s.contains("ReadObject::Parametri"));
 }
