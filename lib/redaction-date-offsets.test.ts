@@ -31,8 +31,10 @@ test('birth dates, from the registry in any format or after a birth cue, leave a
         assert.match(prepared.redactedText, /^Data \[\[MF_NAS1_[a-z2-7]{8}\]\]\. Il padre, nato il \[\[MF_NAS2_[a-z2-7]{8}\]\], accompagna\. Visita \[\[MF_GG[+-][0-9]+_[a-z2-7]{8}\]\]\.$/u);
         assert.equal(offsets(prepared.redactedText).length, 1);
         assert.equal(prepared.rehydrate(prepared.redactedText), text);
-        session.prepare({ text: 'Controllo 05/05/1950.', entities: [] });
-        assert.throws(() => session.prepare({ text: 'Data di nascita 05/05/1950.', entities: [] }), /birth date already offset/u);
+        assert.match(session.prepare({ text: 'Controllo 05/05/1950.', entities: [] }).redactedText, /^Controllo \[\[MF_DAT1_/u);
+        assert.match(session.prepare({ text: 'Data di nascita 05/05/1950.', entities: [] }).redactedText, /^Data di nascita \[\[MF_DAT1_/u);
+        session.prepare({ text: 'Controllo 05/05/2025.', entities: [] });
+        assert.throws(() => session.prepare({ text: 'Data di nascita 05/05/2025.', entities: [] }), /birth date already offset/u);
     } finally { session.close(); }
 });
 
@@ -76,4 +78,38 @@ test('date arithmetic stays inside the calendar and the supported century', () =
     assert.equal(dayFromOffset(anchor, 36_526), null);
     assert.equal(dayFromOffset(anchor, 0.5), null);
     assert.equal(dayFromOffset(clinicalDateDay('31/12/2099')!, 1), null);
+});
+
+const ROLE_OR_OFFSET = /\[\[MF_(?:([A-Z]+)[0-9]+|GG([+-][0-9]+))_[a-z2-7]{8}\]\]/gu;
+const placeholders = (text: string) => [...text.matchAll(ROLE_OR_OFFSET)].map((match): string | number => (match[1] as string | undefined) ?? Number(match[2]));
+
+test('an uncued birth date without registry never leaves as an offset, and clinical intervals survive', () => {
+    for (const text of [
+        'Paziente nata a Sesto San Giovanni (MI) il 14/02/1948. Visita del 03/11/2026, controllo il 10/11/2026.',
+        'Data di nascita\n14/02/1948\nVisita 03/11/2026, controllo il 10/11/2026.',
+        'Bianchi Lucia 14/02/1948 F. Visita 03/11/2026, controllo il 10/11/2026.',
+    ]) {
+        const session = createRedactionSession();
+        try {
+            const prepared = session.prepare({ text, entities: [] });
+            assert.ok(!prepared.redactedText.includes('14/02/1948'), text);
+            const [birth, visit, control] = placeholders(prepared.redactedText);
+            assert.equal(typeof birth, 'string', text);
+            assert.ok(birth === 'DAT' || birth === 'NAS', text);
+            assert.equal((control as number) - (visit as number), 7, text);
+            assert.equal(prepared.rehydrate(prepared.redactedText), text);
+        } finally { session.close(); }
+    }
+});
+
+test('the clinical window follows the most recent date, not the order of appearance, and later texts outside it stay DAT', () => {
+    const session = createRedactionSession();
+    try {
+        const first = session.prepare({ text: 'Ricovero 20/06/2023, esame 03/11/2026, controllo futuro 03/05/2027, vecchio intervento 01/01/2019.', entities: [] });
+        const [admission, exam, followUp, old] = placeholders(first.redactedText);
+        assert.deepEqual([exam as number - (admission as number), followUp as number - (exam as number), old], [1232, 181, 'DAT']);
+        const later = session.prepare({ text: 'Nota senza richiamo 14/02/1948, visita 10/11/2026, scadenza 01/01/2030.', entities: [] });
+        const [uncued, visit, far] = placeholders(later.redactedText);
+        assert.deepEqual([uncued, visit as number - (exam as number), far], ['DAT', 7, 'DAT']);
+    } finally { session.close(); }
 });
