@@ -1,3 +1,4 @@
+import { diaryEntrySealer } from './fixtures/sealed-diary-entry';
 import { expect, test, type Locator } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
@@ -27,8 +28,8 @@ test('Allegati del Diario: etichetta neutra senza dedurre generazione dalla sint
     ];
     try {
         await bootstrapUnlockedSession(page, '1234');
-        const fixture = await page.evaluate(async sources => {
-            const post = async (path: string, body: unknown) => { const response = await fetch(`/api/${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }); if (!response.ok) throw new Error(`${path}: ${response.status}`); return response.json(); };
+        const fixture = await page.evaluate(async ({ sources, seal }) => {
+            const post = async (path: string, body: Record<string, unknown>) => { const response = await fetch(`/api/${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(path === 'entries' ? await seal(body) : body) }); if (!response.ok) throw new Error(`${path}: ${response.status}`); return response.json(); };
             const patient = await post('patients', { firstName: 'Allegati', lastName: 'Sintetici', taxCode: `AL7${crypto.randomUUID().replaceAll('-', '').slice(0, 13).toUpperCase()}`, birthDate: '1980-01-01', diagnoses: [] });
             const historicalIds: string[] = [];
             for (const source of sources.slice(1)) {
@@ -38,7 +39,7 @@ test('Allegati del Diario: etichetta neutra senza dedurre generazione dalla sint
             }
             const old = await post('entries', { patientId: patient.id, type: 'note', date: '2026-10-01', title: 'Allegati storici inventati', content: 'Voce storica inventata, senza nuove elaborazioni.', attachments: historicalIds });
             return { patientId: patient.id as string, historicalIds, oldEntryId: old.id as string };
-        }, sources);
+        }, { sources, seal: await diaryEntrySealer(page) });
         await page.goto(`/patients/${fixture.patientId}/entries/new`);
         await expect(page.getByTestId('progressive-entry-composer').locator(':scope > header')).toContainText('Sintetici Allegati');
         await page.getByRole('textbox', { name: 'Resoconto clinico', exact: true }).fill('Voce manuale inventata con originale allegato.');

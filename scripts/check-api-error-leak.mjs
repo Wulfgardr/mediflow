@@ -252,6 +252,28 @@ function analizza(file) {
     return reperti;
 }
 
+function routeLogViolations(file, source) {
+    const parsed = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+    const violations = [];
+    function visit(node) {
+        if (ts.isIdentifier(node) && node.text === 'console') {
+            const access = node.parent;
+            const call = access.parent;
+            const staticProgressMessage = ts.isPropertyAccessExpression(access)
+                && access.expression === node && access.name.text === 'log'
+                && ts.isCallExpression(call) && call.expression === access
+                && call.arguments.length === 1 && ts.isStringLiteralLike(call.arguments[0]);
+            if (!staticProgressMessage) {
+                const { line } = parsed.getLineAndCharacterOfPosition(node.getStart(parsed));
+                violations.push({ file, line: line + 1 });
+            }
+        }
+        ts.forEachChild(node, visit);
+    }
+    visit(parsed);
+    return violations;
+}
+
 const selfTest = process.argv.includes('--self-test');
 
 if (selfTest) {
@@ -261,7 +283,7 @@ if (selfTest) {
         { nome: 'template literal', codice: "export async function GET(){try{}catch(error){return NextResponse.json({error:`Fallito: ${error.message}`},{status:500})}}", atteso: true },
         { nome: 'String diretto', codice: "export async function GET(){try{}catch(error){return NextResponse.json({error:String(error)},{status:500})}}", atteso: true },
         { nome: 'String indiretto', codice: "export async function GET(){try{}catch(error){const detail = String(error); return NextResponse.json({error:detail},{status:500})}}", atteso: true },
-        { nome: 'solo log server', codice: "export async function GET(){try{}catch(error){console.error('x', error.message); return NextResponse.json({error:'Errore interno.'},{status:500})}}", atteso: false },
+        { nome: 'solo log server', codice: "export async function GET(){try{}catch(error){logServerError('GET /x', error); return NextResponse.json({error:'Errore interno.'},{status:500})}}", atteso: false },
         { nome: 'messaggio letterale', codice: "export async function GET(){try{}catch(error){return NextResponse.json({error:'Errore interno.',code:'internal_error'},{status:500})}}", atteso: false },
         { nome: 'helper', codice: "export async function GET(){try{}catch(error){return apiInternalError('GET /x', error)}}", atteso: false },
 
@@ -287,12 +309,29 @@ if (selfTest) {
         if (!ok) falliti += 1;
         console.log(`  ${ok ? 'ok  ' : 'FAIL'}  ${caso.nome} (atteso ${caso.atteso ? 'leak' : 'pulito'}, trovato ${trovato ? 'leak' : 'pulito'})`);
     }
+    const logCases = [
+        ['raw exception', "console.error('route', error)", true],
+        ['interpolation', "console.warn(`route: ${error.message}`)", true],
+        ['computed method', "console['error']('route', error)", true],
+        ['alias', "const { error: report } = console; report(error)", true],
+        ['debug payload', "console.log('route', payload)", true],
+        ['static progress', "console.log('Migration complete')", false],
+        ['safe helper', "logServerError('POST /api/resource', error)", false],
+    ];
+    for (const [name, source, expected] of logCases) {
+        const ok = (routeLogViolations('route.ts', source).length > 0) === expected;
+        if (!ok) falliti += 1;
+        console.log(`  ${ok ? 'ok  ' : 'FAIL'}  route log: ${name}`);
+    }
     fs.rmSync(tmp, { force: true });
     if (falliti > 0) { console.error(`\nself-test: ${falliti} caso/i fallito/i`); process.exitCode = 1; }
     else console.log('\nself-test: tutti i casi passano');
 } else {
     const route = elencaRoute(apiRoot);
     const tutti = route.flatMap(analizza);
+    const logViolations = route.flatMap(file => routeLogViolations(
+        path.relative(repoRoot, file).split(path.sep).join('/'), fs.readFileSync(file, 'utf8'),
+    ));
     const consentiti = new Set(ALLOWLIST.map((v) => v.file));
 
     const violazioni = tutti.filter((r) => !consentiti.has(r.file));
@@ -303,13 +342,19 @@ if (selfTest) {
         schemaVersion: 'mediflow.api-error-leak.v1',
         routeAnalizzate: route.length,
         violazioni,
+        logViolations,
         allowlist: ALLOWLIST.map((v) => ({ file: v.file, ancoraNecessaria: usati.has(v.file) })),
     }, null, 2));
 
     if (violazioni.length > 0) {
         console.error('\nLeak di eccezioni grezze verso il client:');
         for (const v of violazioni) console.error(`- ${v.file}:${v.riga} — ${v.via}`);
-        console.error('\nUsare apiInternalError() da lib/api-error-response.ts: logga il dettaglio e restituisce un messaggio stabile.');
+        console.error('\nUsare apiInternalError() da lib/api-error-response.ts per registrare un evento tecnico e restituire un messaggio stabile.');
+        process.exitCode = 1;
+    }
+    if (logViolations.length > 0) {
+        console.error('Nelle route usare logServerError() o logServerWarning() per le registrazioni di errore.');
+        for (const { file, line } of logViolations) console.error(`- ${file}:${line}`);
         process.exitCode = 1;
     }
     if (stantii.length > 0) {

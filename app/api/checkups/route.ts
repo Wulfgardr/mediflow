@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { readCheckupJsonObject } from '@/lib/checkup-json-body';
@@ -129,7 +130,7 @@ export async function POST(request: Request) {
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error("Checkup create error", error);
+        logServerError("Checkup create error", error);
         return NextResponse.json({ error: "Create Failed" }, { status: 500 });
     }
 }

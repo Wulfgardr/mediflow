@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
@@ -72,7 +73,7 @@ export async function GET(request: Request) {
     try {
         return NextResponse.json(await readServiceCatalog(new URL(request.url).searchParams));
     } catch (error) {
-        console.error('API GET /service-catalog error:', error);
+        logServerError('API GET /service-catalog error', error);
         return NextResponse.json({ error: 'Failed to fetch service catalog' }, { status: 500 });
     }
 }
@@ -113,7 +114,7 @@ export async function POST(request: Request) {
 
         return NextResponse.json({ success: true, count: imported });
     } catch (error) {
-        console.error('API POST /service-catalog error:', error);
+        logServerError('API POST /service-catalog error', error);
         return NextResponse.json({ error: 'Failed to import service catalog entries' }, { status: 500 });
     }
 }

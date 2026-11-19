@@ -36,6 +36,8 @@ Per la produzione il lanciatore costruisce la build quando serve. La pagina Avvi
 
 ## Verifica
 
+Per guidare una postazione sintetica dalla riga di comando, vedi il [banco di collaudo dell’interfaccia](./docs/ui-cli.md).
+
 Il job `repository-guards` esegue `npm run check:test-selection`. Per la suite unit, il controllo segue `test:unit` in `package.json` fino a `scripts/run-unit-suite.mjs` e richiede la chiamata `npm run test:unit` nel job `web-core` di `.github/workflows/web-core.yml`, sulle PR e sui push a `main`.
 
 Per i documenti parti da questi comandi:

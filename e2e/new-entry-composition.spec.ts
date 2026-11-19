@@ -1,3 +1,4 @@
+import { diaryEntrySealer } from './fixtures/sealed-diary-entry';
 import { expect, test, type Locator } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
@@ -24,15 +25,15 @@ test('Nuova voce: Quadro, bozza unica, uscita protetta e registrazione con fonte
     });
     try {
         await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-        const fixture = await page.evaluate(async () => {
-            const post = async (path: string, body: unknown) => { const response = await fetch(`/api/${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }); if (!response.ok) throw new Error(`${path}: ${response.status}`); return response.json(); };
+        const fixture = await page.evaluate(async seal => {
+            const post = async (path: string, body: Record<string, unknown>) => { const response = await fetch(`/api/${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(path === 'entries' ? await seal(body) : body) }); if (!response.ok) throw new Error(`${path}: ${response.status}`); return response.json(); };
             const patient = await post('patients', { firstName: 'Voce', lastName: 'Sintetica', taxCode: `N16${crypto.randomUUID().replaceAll('-', '').slice(0, 13).toUpperCase()}`, birthDate: '1980-01-01', diagnoses: [{ code: 'SYN16', system: 'ICD-10', description: 'Problema inventato W16' }] });
             const old = await post('entries', { patientId: patient.id, type: 'note', date: '2026-10-20', title: 'Nota precedente inventata', content: '<p>Testo precedente originale W16.</p>', metadata: { authorName: 'Ada Sintetica', sourceLabel: 'Fonte storica W16' } });
             await post('therapies', { patientId: patient.id, drugName: 'Farmaco inventato W16', dosage: 'Dose inventata', status: 'active', startDate: '2026-10-01' });
             await post('observations', { patientId: patient.id, codeSystem: 'LOINC', code: 'SYN16', display: 'Peso inventato W16', unitSystem: 'UCUM', unitCode: 'kg', value: 70, observedAt: '2026-10-20', source: 'manual' });
             await post('checkups', { patientId: patient.id, title: 'Controllo inventato W16', date: '2026-11-01', status: 'pending' });
             return { patientId: patient.id as string, oldEntryId: old.id as string };
-        });
+        }, await diaryEntrySealer(page));
         writes.length = 0;
         await page.goto(`/patients/${fixture.patientId}/entries/new`);
         const composer = page.getByTestId('progressive-entry-composer'), form = page.locator('form[aria-label="Nuova voce clinica"]');

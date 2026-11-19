@@ -1,5 +1,7 @@
+import { logServerError } from '@/lib/server-error-log';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
+import { reviewedServicePrescriptionItemsSchema } from '@/lib/api-schemas/prescriptions';
 import { readPrescriptionJsonObject } from '@/lib/prescription-json-body';
 import { NextResponse } from 'next/server';
 import {
@@ -27,7 +29,7 @@ export async function PUT(request: Request, context: RouteContext) {
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('API PUT /service-prescriptions/[id] error:', error);
+        logServerError('API PUT /service-prescriptions/[id] error', error);
         return NextResponse.json({ error: 'Failed to update service prescription' }, { status: 500 });
     }
 }
@@ -47,12 +49,14 @@ export async function DELETE(request: Request, context: RouteContext) {
         if (!versionResult.ok) {
             return NextResponse.json(versionResult.value, { status: versionResult.status });
         }
-        const result = await deleteHostServicePrescription({ request, session, id }, versionResult.expectedVersion);
+        const items = reviewedServicePrescriptionItemsSchema.optional().safeParse(body.items);
+        if (!items.success) return NextResponse.json({ error: 'Invalid reviewed items' }, { status: 400 });
+        const result = await deleteHostServicePrescription({ request, session, id }, versionResult.expectedVersion, items.data);
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('API DELETE /service-prescriptions/[id] error:', error);
+        logServerError('API DELETE /service-prescriptions/[id] error', error);
         return NextResponse.json({ error: 'Failed to delete service prescription' }, { status: 500 });
     }
 }

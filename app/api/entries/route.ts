@@ -1,3 +1,5 @@
+import { logServerError } from '@/lib/server-error-log';
+import { rejectUnsealedV1Write } from '@/lib/api/v1/sealed-write';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { NextResponse } from 'next/server';
@@ -69,6 +71,8 @@ export async function POST(request: Request) {
         const patientId = typeof parsed.body.patientId === 'string' ? parsed.body.patientId.trim() : '';
         const prepared = prepareEntryCreate(parsed.body, 'web', patientId);
         if (!prepared.ok) return NextResponse.json({ error: prepared.error }, { status: 400 });
+        const sealedError = rejectUnsealedV1Write('entries', parsed.body);
+        if (sealedError) return sealedError;
         const context = auditContextFromSession(session);
         const result = createEntryOperation({ patientId, id: prepared.id, values: prepared.values,
             changedFields: prepared.changedFields, mode: 'web', audit: {
@@ -79,7 +83,7 @@ export async function POST(request: Request) {
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error("API POST /entries error:", error);
+        logServerError("API POST /entries error", error);
         return NextResponse.json({ error: 'Create Failed' }, { status: 500 });
     }
 }

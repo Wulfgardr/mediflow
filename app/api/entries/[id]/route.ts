@@ -1,3 +1,5 @@
+import { logServerError } from '@/lib/server-error-log';
+import { rejectUnsealedV1Write } from '@/lib/api/v1/sealed-write';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { NextResponse } from 'next/server';
@@ -21,6 +23,8 @@ export async function PUT(
         if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
         const prepared = prepareEntryUpdate(parsed.body, 'web');
         if (!prepared.ok) return NextResponse.json({ error: prepared.error }, { status: prepared.status });
+        const sealedError = rejectUnsealedV1Write('entries', parsed.body);
+        if (sealedError) return sealedError;
         const context = auditContextFromSession(session);
         const result = updateEntryOperation({ entryId: id, expectedVersion: prepared.expectedVersion,
             values: prepared.values, changedFields: prepared.changedFields, mode: 'web', audit: {
@@ -31,7 +35,7 @@ export async function PUT(
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('API PUT /entries/[id] error:', error);
+        logServerError('API PUT /entries/[id] error', error);
         return NextResponse.json({ error: 'Update Failed' }, { status: 500 });
     }
 }
@@ -63,7 +67,7 @@ export async function DELETE(
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('API DELETE /entries/[id] error:', error);
+        logServerError('API DELETE /entries/[id] error', error);
         return NextResponse.json({ error: 'Delete Failed' }, { status: 500 });
     }
 }

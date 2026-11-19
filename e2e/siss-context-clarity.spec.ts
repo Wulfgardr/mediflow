@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { bootstrapUnlockedSession, openPatientSection } from './utils';
 import { fetchInterceptedRequest } from './fixtures/trusted-web-request';
+import { sealDiaryEntry } from './fixtures/sealed-diary-entry';
 
 test('SISS: comandi esterni, stati leggibili, diario e disclosure', async ({ page, baseURL }) => {
     if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL || !['127.0.0.1', 'localhost'].includes(new URL(baseURL).hostname) || new URL(baseURL).port === '3000') throw new Error('Archivio e runtime sintetici isolati richiesti');
@@ -90,20 +91,25 @@ test('SISS: comandi esterni, stati leggibili, diario e disclosure', async ({ pag
 async function readinessPatient(page: import('@playwright/test').Page, scale: boolean) {
     await page.route('**/api/siss/session-status', route => route.fulfill({ json: { sessionHealth: 'none', lastModule: null, lastModuleAt: null, checkpoints: [] } }));
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-    return page.evaluate(async scale => {
+    const id = await page.evaluate(async () => {
         const patient = await fetch('/api/patients', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ firstName: 'Esportazione', lastName: 'Sintetica', taxCode: `HC10${crypto.randomUUID().replaceAll('-', '').slice(0, 12).toUpperCase()}`, birthDate: '1980-01-01T00:00:00Z', diagnoses: [] }) });
         if (!patient.ok) throw new Error(`Paziente sintetico: ${patient.status}`);
-        const { id } = await patient.json();
-        if (scale) {
-            const entry = await fetch('/api/entries', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: crypto.randomUUID(), patientId: id, date: '2026-10-29T10:00:00Z', type: 'scale', title: 'Scala sintetica', content: 'Valutazione inventata', metadata: { title: 'Scala sintetica', score: 1.5 } }) });
+        return (await patient.json()).id as string;
+    });
+    if (scale) {
+        const scaleEntry = await sealDiaryEntry(page, { id: crypto.randomUUID(), patientId: id, date: '2026-10-29T10:00:00Z', type: 'scale', title: 'Scala sintetica', content: 'Valutazione inventata', metadata: { title: 'Scala sintetica', score: 1.5 } });
+        await page.evaluate(async body => {
+            const entry = await fetch('/api/entries', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
             if (!entry.ok) throw new Error(`Scala sintetica: ${entry.status}`);
-        }
+        }, scaleEntry);
+    }
+    return page.evaluate(async id => {
         const validation = await fetch(`/api/fse/validate-patient?patientId=${id}`);
         if (!validation.ok) throw new Error(`Validazione reale: ${validation.status}`);
         const value = await validation.json();
         if (value.hasErrors || value.hasWarnings) throw new Error('La fixture richiede terapie e parametri senza rilievi');
-        return id as string;
-    }, scale);
+        return id;
+    }, id);
 }
 
 for (const first of ['validation', 'bundle'] as const) {

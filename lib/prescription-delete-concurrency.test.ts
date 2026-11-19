@@ -158,14 +158,29 @@ test('host service prescription DELETE requires the matching version before casc
         itemId,
     );
 
-    const ok = await modules.deleteHostServicePrescription(fakeContext(prescriptionId), 3);
+    const reviewed = [{ id: itemId, version: 1 }];
+    const sql = modules.dbServer.$client;
+    sql.exec("CREATE TRIGGER synthetic_unlink_audit BEFORE INSERT ON audit_events WHEN NEW.event_type='observation.updated' BEGIN SELECT RAISE(IGNORE); END");
+    try {
+        await assert.rejects(modules.deleteHostServicePrescription(fakeContext(prescriptionId), 3, reviewed));
+    } finally {
+        sql.exec('DROP TRIGGER synthetic_unlink_audit');
+    }
+    const observation = () => modules.dbServer.select().from(modules.schema.observations).where(eq(modules.schema.observations.id, 'observation-service-delete-parent')).get();
+    assert.equal(observation()?.servicePrescriptionItemId, itemId);
+    assert.equal(observation()?.version, 1);
+    const ok = await modules.deleteHostServicePrescription(fakeContext(prescriptionId), 3, reviewed);
     assert.equal(ok.status, 200);
     assert.equal(modules.dbServer.select().from(modules.schema.servicePrescriptionItems).where(eq(modules.schema.servicePrescriptionItems.id, itemId)).get(), undefined);
     assert.equal(modules.dbServer.select().from(modules.schema.servicePrescriptions).where(eq(modules.schema.servicePrescriptions.id, prescriptionId)).get(), undefined);
-    assert.equal(
-        modules.dbServer.select().from(modules.schema.observations).where(eq(modules.schema.observations.id, 'observation-service-delete-parent')).get()?.servicePrescriptionItemId,
-        null,
-    );
+    assert.equal(observation()?.servicePrescriptionItemId, null);
+    assert.equal(observation()?.version, 2);
+    assert.equal(observation()?.value, 'synthetic');
+    const receipt = sql.prepare("SELECT redacted_metadata FROM audit_events WHERE event_type='observation.updated' AND subject_ref=?").all('observation-service-delete-parent') as Array<{ redacted_metadata: string }>;
+    assert.equal(receipt.length, 1);
+    const metadata = JSON.parse(receipt[0].redacted_metadata);
+    assert.deepEqual(metadata.changedFields, ['servicePrescriptionItemId']);
+    assert.equal(metadata.resourceVersion, 2);
     assert.deepEqual(modules.dbServer.$client.pragma('foreign_key_check'), []);
 });
 

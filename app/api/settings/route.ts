@@ -1,3 +1,4 @@
+import { logServerError, logServerWarning } from '@/lib/server-error-log';
 import { writeSettingWithFunctionModelGeneration } from '@/lib/ai-providers/fabric/function-model-settings-write';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { networkModeWriteDenial } from '@/lib/security/network-mode-write';
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
         const archiveDenial = archiveWriteRequestDenial(request, session);
         if (archiveDenial) return archiveDenial;
         if (decision.unregistered) {
-            console.warn(`[MediFlow] settings write TODO: registra la chiave sconosciuta "${key}" in lib/security/settings-write-policy.ts`);
+            logServerWarning('Settings: unregistered key in batch write');
         }
 
         const persistedValue = normalizeSettingValue(value);
@@ -55,15 +56,11 @@ export async function POST(request: Request) {
                 }),
             });
         } catch (error) {
-            console.error('Audit settings write failed:', error);
+            logServerError('Audit settings write failed', error);
         }
 
         return NextResponse.json({ success: true, key, value: persistedValue });
     } catch (error) {
-        /* WUL-547. Qui il `message` grezzo dell'eccezione usciva verso il client
-           dentro un template literal, e il guard non lo vedeva perche' il cast
-           `(error as any)?` spezzava il match. apiInternalError() logga il
-           dettaglio e restituisce un messaggio stabile con un codice. */
         return apiInternalError('POST /api/settings', error);
     }
 }

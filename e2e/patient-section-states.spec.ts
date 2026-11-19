@@ -1,3 +1,4 @@
+import { sealDiaryEntry } from './fixtures/sealed-diary-entry';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow } from './utils';
 
@@ -36,15 +37,17 @@ for (const section of ['diario', 'prestazioni'] as const) for (const populated o
         const id = await patient(page);
         const endpoint = section === 'diario' ? 'entries' : 'service-prescriptions';
         const title = 'Voce sintetica per continuità del focus';
-        if (populated) await page.evaluate(async ({ id, endpoint, title }) => {
-            const response = await fetch(`/api/${endpoint}`, {
-                method: 'POST', headers: { 'content-type': 'application/json' },
-                body: JSON.stringify(endpoint === 'entries'
-                    ? { patientId: id, type: 'visit', date: '2026-10-01T09:00:00Z', title, content: 'Contenuto sintetico.' }
-                    : { id: crypto.randomUUID(), patientId: id, serviceName: title, prescribedAt: '2026-10-01T09:00:00Z', status: 'cancelled' }),
-            });
-            if (!response.ok) throw new Error(`Synthetic ${endpoint}: ${response.status}`);
-        }, { id, endpoint, title });
+        if (populated) {
+            const body = endpoint === 'entries'
+                ? await sealDiaryEntry(page, { patientId: id, type: 'visit', date: '2026-10-01T09:00:00Z', title, content: 'Contenuto sintetico.' })
+                : { id: crypto.randomUUID(), patientId: id, serviceName: title, prescribedAt: '2026-10-01T09:00:00Z', status: 'cancelled' };
+            await page.evaluate(async ({ endpoint, body }) => {
+                const response = await fetch(`/api/${endpoint}`, {
+                    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+                });
+                if (!response.ok) throw new Error(`Synthetic ${endpoint}: ${response.status}`);
+            }, { endpoint, body });
+        }
         let release!: () => void;
         const pending = new Promise<void>(resolve => { release = resolve; });
         await page.route(new RegExp(`/api/${endpoint}(?:\\?.*)?$`), async route => {

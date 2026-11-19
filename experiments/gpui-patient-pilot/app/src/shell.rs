@@ -43,6 +43,8 @@ mod settings;
 mod smart_import;
 mod therapy_picker;
 mod threshold_actions;
+#[cfg(test)]
+mod ui_cli;
 mod view_state;
 #[cfg(target_os = "macos")]
 mod voice_model;
@@ -504,6 +506,8 @@ pub struct ClinicalApp {
     show_other: bool,
     show_sections: bool,
     section_selector_focus: FocusHandle,
+    #[cfg(test)]
+    ui_cli_section_focus: [FocusHandle; PatientSection::ALL.len()],
     archived: bool,
     query: String,
     search: Entity<TextInput>,
@@ -797,6 +801,8 @@ impl ClinicalApp {
             show_other: false,
             show_sections: false,
             section_selector_focus: cx.focus_handle().tab_stop(true),
+            #[cfg(test)]
+            ui_cli_section_focus: std::array::from_fn(|_| cx.focus_handle().tab_stop(true)),
             archived: false,
             query: String::new(),
             search,
@@ -4011,7 +4017,7 @@ impl ClinicalApp {
                     .gap(px(4.))
                     .bg(theme.shade)
                     .children(PatientSection::ALL.into_iter().map(|patient_section| {
-                        tab(
+                        let section_tab = tab(
                             patient_section.id(),
                             patient_section.title(),
                             self.patient_section == patient_section,
@@ -4019,7 +4025,18 @@ impl ClinicalApp {
                         )
                         .on_click(cx.listener(move |this, _, _, cx| {
                             this.section_selected(patient_section, cx)
-                        }))
+                        }));
+                        #[cfg(test)]
+                        let section_tab = {
+                            let index = PatientSection::ALL
+                                .iter()
+                                .position(|item| *item == patient_section)
+                                .unwrap();
+                            rendered_command::observe(
+                                section_tab.track_focus(&self.ui_cli_section_focus[index]),
+                            )
+                        };
+                        section_tab
                     })),
             );
         }
@@ -8064,6 +8081,49 @@ mod tests {
                 assert_eq!(app.threshold_mode.get(), ThresholdMode::Compact)
             });
         }
+        let region = cx.debug_bounds("threshold-recovery-region").unwrap();
+        cx.simulate_event(gpui::ScrollWheelEvent {
+            position: region.center(),
+            delta: gpui::ScrollDelta::Pixels(gpui::point(px(0.), px(1000.))),
+            modifiers: gpui::Modifiers::default(),
+            touch_phase: gpui::TouchPhase::Moved,
+        });
+        render_clinical_window(cx);
+        let discover = serde_json::json!({"op":"discover"});
+        eprintln!(
+            "MEDIFLOW_MENU_UI_CLI_BEFORE {}",
+            ui_cli::drive(&discover, &app, cx).unwrap()
+        );
+        let other_actions = serde_json::json!({"role":"button", "name":"Altre azioni"});
+        ui_cli::drive(
+            &serde_json::json!({"op":"press", "target":other_actions, "key":"Enter"}),
+            &app,
+            cx,
+        )
+        .unwrap();
+        render_clinical_window(cx);
+        let open = ui_cli::drive(&discover, &app, cx).unwrap();
+        let controls = open["tree"].as_array().unwrap();
+        assert!(
+            controls
+                .iter()
+                .any(|node| node["role"] == "menu" && node["name"] == "Altre azioni")
+        );
+        let item = controls
+            .iter()
+            .find(|node| {
+                node["role"] == "menuitem"
+                    && node["name"]
+                        .as_str()
+                        .is_some_and(|name| name.starts_with("Copia"))
+            })
+            .expect("voce Copia esposta dal menu");
+        let item = serde_json::json!({"role":"menuitem", "name":item["name"]});
+        ui_cli::drive(&serde_json::json!({"op":"click", "target":item}), &app, cx).unwrap();
+        render_clinical_window(cx);
+        let closed = ui_cli::drive(&discover, &app, cx).unwrap();
+        assert!(closed["byRole"].get("menu").is_none());
+        eprintln!("MEDIFLOW_MENU_UI_CLI {open}");
     }
 
     #[gpui::test]

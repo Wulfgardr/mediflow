@@ -4,6 +4,7 @@ import { expect, type Page } from '@playwright/test';
 import { test, closureGallery } from './fixtures/patient-closure-gallery';
 import { bootstrapUnlockedSession, assertNoHorizontalOverflow, openPatientSection } from './utils';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
+import { sealDiaryEntry } from './fixtures/sealed-diary-entry';
 
 const quadro = (page: Page) => page.locator('#quadro');
 const names = ['Problemi', 'Terapie attive', 'Parametri recenti', 'Controlli aperti'];
@@ -21,9 +22,13 @@ async function fixture(page: Page, count = 1) {
             await post('/api/observations', { patientId: patient.id, codeSystem: 'LOINC', code: `SYN${n}`, display: `Misura sintetica ${n + 1}`, unitSystem: 'UCUM', unitCode: 'kg', value: 70 + n, observedAt: '2026-10-01', source: 'manual' });
             await post('/api/checkups', { patientId: patient.id, title: `Controllo sintetico ${n + 1}`, date: '2026-11-01', status: 'pending' });
         }
-        await post('/api/entries', { patientId: patient.id, type: 'visit', title: 'Visita sintetica', content: 'Voce inventata per verificare la lettura simultanea del Diario.', date: '2026-10-01' });
         return patient.id as string;
     }, count);
+    const entry = await sealDiaryEntry(page, { patientId: id, type: 'visit', title: 'Visita sintetica', content: 'Voce inventata per verificare la lettura simultanea del Diario.', date: '2026-10-01' });
+    await page.evaluate(async body => {
+        const response = await fetch('/api/entries', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        if (!response.ok) throw new Error(`/api/entries: ${response.status} ${await response.text()}`);
+    }, entry);
     await page.goto(`/patients/${id}/modules`);
     await expect(quadro(page)).toBeVisible();
     await expect(page.locator('#diario')).toContainText('Voce inventata per verificare la lettura simultanea del Diario.');

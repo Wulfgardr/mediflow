@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { dbServer } from '@/lib/db-server';
@@ -64,7 +65,7 @@ export async function GET() {
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('Migration preview failed:', error);
+        logServerError('Migration preview failed', error);
         return NextResponse.json({ error: 'Migration preview failed' }, { status: 500 });
     }
 }
@@ -119,7 +120,7 @@ export async function POST(request: Request) {
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error("Migration fatal error:", error);
+        logServerError("Migration fatal error", error);
         return NextResponse.json({ error: "Migration failed" }, { status: 500 });
     }
 }
