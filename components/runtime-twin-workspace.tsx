@@ -153,7 +153,7 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
     <header className={styles.workspaceBar}>
           {!wideRecord ? railToggle : null}
           <nav className={styles.openRecords} aria-label="Cartelle aperte">
-            <Link className={styles.directoryTab} href={activeDestination.href} aria-current={!patientId && currentDestinationHref !== null ? 'page' : undefined}>{activeDestination.label}</Link>
+            <Link className={styles.directoryTab} href={activeDestination.href} aria-label={activeDestination.label} aria-current={!patientId && currentDestinationHref !== null ? 'page' : undefined}>{activeDestination.label}</Link>
             {records.map((patient, index) => <span className={styles.recordTab} key={patient.id} data-active={patient.id === patientId}>
               <Link href={`/patients/${patient.id}/modules`} aria-current={patient.id === patientId ? 'page' : undefined}><span className={currentRecord && patient.id === patientId ? styles.recordName : undefined}><PrivacyBlur>{patient.lastName} {patient.firstName}</PrivacyBlur></span>{currentRecord && patient.id === patientId ? <span className={styles.recordWhen} aria-hidden="true">{currentRecord.label}</span> : null}<DraftMarker patientId={patient.id} /></Link>
               {patient.id === patientId ? <Link href="/?area=incarico" aria-label={`Chiudi cartella ${index + 1}`} onClick={() => setOpened(value => value.filter(id => id !== patient.id))}><X size={13} aria-hidden /></Link>
@@ -258,7 +258,7 @@ export function RuntimeTwinPatientNavigation({ items, active, lastVisit }: {
         return <a key={item.href} href={item.href} title={item.meta} aria-current={active === item.href.slice(1) ? 'location' : undefined}>{patientTabLabels[item.href] ?? item.label}{count && count !== '0' ? <span>{count}</span> : null}</a>;
       })}
       <PatientSheetMenu label="Altre sezioni della cartella" className={styles.moreSections}
-        trigger={props => <button {...props} aria-label="Altro" title="Altre sezioni" aria-current={secondary.some(item => item.href === `#${active}`) ? 'location' : undefined}><span>Altro</span><ChevronDown size={14} aria-hidden /></button>}>
+        trigger={props => <button {...props} aria-label="Altro" title="Altre sezioni" aria-current={!props['aria-expanded'] && secondary.some(item => item.href === `#${active}`) ? 'location' : undefined}><span>Altro</span><ChevronDown size={14} aria-hidden /></button>}>
         {secondary.map(item => <a key={item.href} href={item.href} role="menuitem" tabIndex={-1} className="mf-popover-row"
           aria-current={active === item.href.slice(1) ? 'location' : undefined}><span>{item.label}</span>{item.meta !== undefined ? <small>{item.meta}</small> : null}</a>)}
       </PatientSheetMenu>

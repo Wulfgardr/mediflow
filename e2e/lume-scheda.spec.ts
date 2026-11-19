@@ -129,7 +129,8 @@ async function expectPatientHeaderCommands(page: Page, header: Locator, patientI
   await expect(actions).toHaveAttribute('aria-haspopup', 'menu');
   await expect(actions).toHaveAttribute('aria-expanded', 'false');
   await expect(header.getByRole('link')).toHaveCount(1);
-  await expect(header.getByRole('button')).toHaveCount(1);
+  await expect(header.getByRole('button')).toHaveCount(2);
+  await expect(header.getByRole('button', { name: 'Prescrivi', exact: true })).toHaveAttribute('aria-haspopup', 'menu');
   for (const [control, background] of [[primary, '--lume-accent'], [actions, '--lume-surface-field']] as const) {
     const material = await control.evaluate((element, variable) => {
       const probe = document.createElement('span');
@@ -157,7 +158,7 @@ async function expectPatientHeaderCommands(page: Page, header: Locator, patientI
 async function expectCurrentSection(page: Page, id: string): Promise<void> {
   const nav = page.getByRole('navigation', { name: 'Sezioni della vista' });
   const link = nav.locator(`a[href="#${id}"]`);
-  if (['quadro', 'terapie', 'parametri', 'documenti'].includes(id)) {
+  if (await link.isVisible()) {
     await expect(link).toHaveAttribute('aria-current', 'location');
   } else {
     await expect(nav.getByRole('button', { name: 'Altro', exact: true })).toHaveAttribute('aria-current', 'location');
