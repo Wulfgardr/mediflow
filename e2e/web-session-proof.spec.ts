@@ -24,6 +24,16 @@ async function recordNote(page: Page, note: string): Promise<string> {
     return entryId;
 }
 
+async function lockAndWaitForConfirmation(page: Page): Promise<void> {
+    const received = page.waitForResponse(response =>
+        new URL(response.url()).pathname === '/api/auth/lock' && response.request().method() === 'POST');
+    await page.getByRole('button', { name: 'Blocca', exact: true }).click();
+    const response = await received;
+    expect(response.status()).toBe(200);
+    expect(await response.json()).toMatchObject({ state: 'server_invalidation_confirmed' });
+    await expect(page.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeVisible();
+}
+
 standalone('al primo avvio il medico accede, legge una scheda, registra una nota e scarica il backup', async ({ page }) => {
     standalone.setTimeout(120_000);
     const pin = process.env.E2E_PIN || '1234';
@@ -38,8 +48,7 @@ standalone('al primo avvio il medico accede, legge una scheda, registra una nota
         return response.json();
     });
     expect(profile).toMatchObject(operator);
-    await page.getByRole('button', { name: 'Blocca', exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeVisible();
+    await lockAndWaitForConfirmation(page);
     await bootstrapUnlockedSession(page, pin, operator);
 
     const { id: patientId, taxCode } = await page.evaluate(async () => {
@@ -86,6 +95,7 @@ standalone('al primo avvio il medico accede, legge una scheda, registra una nota
 
     const peer = await page.context().newPage();
     await peer.goto(`/patients/${patientId}/modules`);
+    await expect(peer.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeVisible();
     await peer.getByRole('button', { name: 'Rinnova accesso', exact: true }).click();
     await expect(peer.getByTestId('lume-scheda-header')).toContainText('Medica');
     await openPatientSection(peer, 'diario');
@@ -94,8 +104,7 @@ standalone('al primo avvio il medico accede, legge una scheda, registra una nota
     await recordNote(peer, peerNote);
     await openPatientSection(peer, 'diario');
     await expect(peer.locator('#diario')).toContainText(peerNote);
-    await peer.getByRole('button', { name: 'Blocca', exact: true }).click();
-    await expect(peer.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeVisible();
+    await lockAndWaitForConfirmation(peer);
     await expect(page.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeVisible();
 });
 
