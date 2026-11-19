@@ -61,17 +61,22 @@ pub const MAX_PREVIEW_DIMENSION: u32 = 8192;
 
 #[cfg(test)]
 pub fn original_preview(attachment: &Attachment) -> Result<OriginalPreview, String> {
-    original_preview_with_context(attachment, &RequestContext::default())
+    original_preview_with_context(
+        attachment,
+        pdf::Resolution::Page,
+        &RequestContext::default(),
+    )
 }
 
 pub fn original_preview_with_context(
     attachment: &Attachment,
+    resolution: pdf::Resolution,
     context: &RequestContext,
 ) -> Result<OriginalPreview, String> {
     use image::ImageDecoder;
     if attachment.mime_type == "application/pdf" {
         let bytes = decode_attachment(attachment).map_err(|error| error.to_string())?;
-        return pdf::render(Arc::new(bytes), 1, context)
+        return pdf::render(Arc::new(bytes), 1, resolution, context)
             .map(OriginalPreview::Pdf)
             .map_err(pdf::Error::message);
     }

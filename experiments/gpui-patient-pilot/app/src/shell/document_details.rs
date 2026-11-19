@@ -15,10 +15,14 @@ pub(super) enum OriginalPlace {
     Record { save: bool },
 }
 
-fn inked_page(pdf: &documents::pdf::Preview, theme: Theme) -> Stateful<Div> {
+fn inked_page(pdf: &documents::pdf::Preview, fitted: bool, theme: Theme) -> Stateful<Div> {
     let size = pdf.image.size(0);
     let (width, height) = (size.width.0.max(1) as f32, size.height.0.max(1) as f32);
-    let ink = pdf.ink.start as f32..pdf.ink.end.max(pdf.ink.start + 1) as f32;
+    let ink = if fitted {
+        pdf.ink.start as f32..pdf.ink.end.max(pdf.ink.start + 1) as f32
+    } else {
+        0.0..width
+    };
     let shown = ink.end - ink.start;
     div()
         .id("document-original-page")
@@ -48,7 +52,16 @@ pub(super) struct DocumentOriginal {
     pub(super) id: String,
     pub(super) state: ReadLoad<Result<documents::OriginalPreview, String>>,
     pub(super) page: usize,
+    pub(super) text_width: Option<bool>,
     context: RequestContext,
+}
+
+const DEFAULT_TEXT_WIDTH_GAIN: f32 = 1.3;
+const USEFUL_TEXT_WIDTH_GAIN: f32 = 1.1;
+
+pub(super) fn text_width_gain(pdf: &documents::pdf::Preview) -> f32 {
+    let width = pdf.image.size(0).width.0.max(1) as f32;
+    width / pdf.ink.end.saturating_sub(pdf.ink.start).max(1) as f32
 }
 
 impl Drop for DocumentOriginal {
@@ -72,10 +85,15 @@ impl ClinicalApp {
             cx.notify();
             return;
         }
-        self.open_document_original(id, cx);
+        self.open_document_original(id, documents::pdf::Resolution::Page, cx);
     }
 
-    pub(super) fn open_document_original(&mut self, id: &str, cx: &mut Context<Self>) {
+    pub(super) fn open_document_original(
+        &mut self,
+        id: &str,
+        resolution: documents::pdf::Resolution,
+        cx: &mut Context<Self>,
+    ) {
         if self.document_operation != DocumentOperation::Idle || self.local_work_pending() {
             return;
         }
@@ -99,6 +117,7 @@ impl ClinicalApp {
             id: id.clone(),
             state: ReadLoad::loading(),
             page: 0,
+            text_width: None,
             context: context.clone(),
         });
         let requested = id.clone();
@@ -110,6 +129,7 @@ impl ClinicalApp {
                 let row = session.read_attachment(&scope, &patient, &requested)?;
                 Ok(documents::original_preview_with_context(
                     &row,
+                    resolution,
                     &work_context,
                 ))
             },
@@ -150,6 +170,7 @@ impl ClinicalApp {
             }
             ReadLoad::Ready(Ok(documents::OriginalPreview::Pdf(pdf))) if page < pdf.pages => {
                 let source = pdf.source.clone();
+                let resolution = pdf.resolution;
                 let context = original.context.clone();
                 let work_context = context.clone();
                 let id = original.id.clone();
@@ -158,9 +179,11 @@ impl ClinicalApp {
                 self.profile_scroll.set_offset(gpui::point(px(0.), px(0.)));
                 self.run(
                     move || {
-                        Ok(documents::pdf::render(source, page + 1, &work_context)
-                            .map(documents::OriginalPreview::Pdf)
-                            .map_err(documents::pdf::Error::message))
+                        Ok(
+                            documents::pdf::render(source, page + 1, resolution, &work_context)
+                                .map(documents::OriginalPreview::Pdf)
+                                .map_err(documents::pdf::Error::message),
+                        )
                     },
                     move |this, result, _| {
                         if context.check().is_ok()
@@ -294,31 +317,65 @@ impl ClinicalApp {
             ReadLoad::Ready(Ok(documents::OriginalPreview::Pdf(pdf))) => {
                 let page_line = text!(format!("Pagina {} di {}", original.page + 1, pdf.pages));
                 let controls = self.document_original_controls(original.page, pdf.pages, cx);
-                view = match place {
-                    OriginalPlace::Documents => view
-                        .child(
-                            gpui::img(pdf.image.clone())
-                                .object_fit(gpui::ObjectFit::Contain)
-                                .w_full()
-                                .max_h(px(640.)),
-                        )
-                        .child(page_line)
-                        .child(controls),
-                    OriginalPlace::Record { .. } => view
-                        .when(pdf.pages > 1, |el| {
-                            el.child(
-                                div()
-                                    .flex()
-                                    .flex_wrap()
-                                    .items_center()
-                                    .justify_between()
-                                    .gap(px(8.))
-                                    .child(page_line)
-                                    .child(controls),
+                view =
+                    match place {
+                        OriginalPlace::Documents => view
+                            .child(
+                                gpui::img(pdf.image.clone())
+                                    .object_fit(gpui::ObjectFit::Contain)
+                                    .w_full()
+                                    .max_h(px(640.)),
                             )
-                        })
-                        .child(inked_page(pdf, theme)),
-                };
+                            .child(page_line)
+                            .child(controls),
+                        OriginalPlace::Record { .. } => view
+                            .when(pdf.pages > 1, |el| {
+                                el.child(
+                                    div()
+                                        .flex()
+                                        .flex_wrap()
+                                        .items_center()
+                                        .justify_between()
+                                        .gap(px(8.))
+                                        .child(page_line)
+                                        .child(controls),
+                                )
+                            })
+                            .map(|el| {
+                                let gain = text_width_gain(pdf);
+                                let fitted = original
+                                    .text_width
+                                    .unwrap_or(gain <= DEFAULT_TEXT_WIDTH_GAIN);
+                                el.child(inked_page(pdf, fitted, theme)).when(
+                                    gain >= USEFUL_TEXT_WIDTH_GAIN,
+                                    |el| {
+                                        el.child(
+                                            div().flex().child(
+                                                button(
+                                                    "document-original-text-width",
+                                                    if fitted {
+                                                        "Pagina intera"
+                                                    } else {
+                                                        "Ingrandisci il testo"
+                                                    },
+                                                    theme,
+                                                    false,
+                                                    true,
+                                                )
+                                                .on_click(cx.listener(move |this, _, _, cx| {
+                                                    if let Some(original) =
+                                                        &mut this.patient.document_original
+                                                    {
+                                                        original.text_width = Some(!fitted);
+                                                    }
+                                                    cx.notify();
+                                                })),
+                                            ),
+                                        )
+                                    },
+                                )
+                            }),
+                    };
                 let warning = notice(
                     "document-pdf-fidelity-notice",
                     PDF_FIDELITY_NOTICE,
@@ -1289,6 +1346,65 @@ mod tests {
     }
 
     #[gpui::test]
+    fn the_text_width_is_the_default_only_when_it_enlarges_moderately(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        for (ink, default_label) in [
+            (75..825, Some("Pagina intera")),
+            (300..600, Some("Ingrandisci il testo")),
+            (10..890, None),
+        ] {
+            let original = DocumentOriginal {
+                id: "synthetic-document".into(),
+                state: ReadLoad::Ready(Ok(documents::OriginalPreview::Pdf(
+                    documents::pdf::Preview {
+                        source: std::sync::Arc::new(zeroize::Zeroizing::new(Vec::new())),
+                        image: std::sync::Arc::new(gpui::RenderImage::new([image::Frame::new(
+                            image::RgbaImage::new(900, 1272),
+                        )])),
+                        pages: 1,
+                        ink: ink.clone(),
+                        resolution: documents::pdf::Resolution::Screen,
+                    },
+                ))),
+                page: 0,
+                text_width: None,
+                context: RequestContext::default(),
+            };
+            let labels = view.update(cx, |app, cx| {
+                let mut labels = vec![];
+                let ids = rendered_command::button_ids(|| {
+                    let _ = app.document_original_content(
+                        &original,
+                        OriginalPlace::Record { save: false },
+                        cx,
+                    );
+                });
+                if let ReadLoad::Ready(Ok(documents::OriginalPreview::Pdf(pdf))) = &original.state {
+                    labels.push(text_width_gain(pdf));
+                }
+                (ids, labels)
+            });
+            assert_eq!(
+                labels
+                    .0
+                    .iter()
+                    .any(|id| id == "document-original-text-width"),
+                default_label.is_some(),
+                "{ink:?}"
+            );
+            let gain = labels.1[0];
+            match default_label {
+                Some("Pagina intera") => assert!(gain <= DEFAULT_TEXT_WIDTH_GAIN),
+                Some(_) => assert!(gain > DEFAULT_TEXT_WIDTH_GAIN),
+                None => assert!(gain < USEFUL_TEXT_WIDTH_GAIN),
+            }
+        }
+    }
+
+    #[gpui::test]
     fn original_reads_explicitly_and_late_reads_cannot_reopen_the_view(
         cx: &mut gpui::TestAppContext,
     ) {
@@ -1578,9 +1694,11 @@ mod tests {
                                 ])),
                                 pages: 2,
                                 ink: 0..2,
+                                resolution: documents::pdf::Resolution::Page,
                             })),
                         }),
                         page,
+                        text_width: None,
                         context: RequestContext::default(),
                     });
                 });

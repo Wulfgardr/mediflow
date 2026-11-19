@@ -102,7 +102,9 @@ fn main() {
             .nth(2)
             .and_then(|s| s.parse().ok())
             .unwrap_or(0);
-        if documents::pdf::worker(page).is_err() {
+        let resolution =
+            documents::pdf::Resolution::from_argument(std::env::args().nth(3).as_deref());
+        if documents::pdf::worker(page, resolution).is_err() {
             std::process::exit(2);
         }
         return;
