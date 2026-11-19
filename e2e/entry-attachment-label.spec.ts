@@ -90,7 +90,20 @@ test('Allegati del Diario: etichetta neutra senza dedurre generazione dalla sint
         const form = page.getByRole('form', { name: 'Nuova voce clinica', exact: true });
         const recent = form.getByRole('region', { name: 'Documenti recenti', exact: true });
         for (const source of sources) await expect(recent.getByRole('button', { name: `Apri originale: ${source.name}`, exact: true })).toBeVisible();
-        await recent.locator('summary').filter({ hasText: /^Sintesi dei documenti$/u }).press('Enter');
+        const review = form.getByRole('button', { name: 'Rivedi', exact: true });
+        const originals = recent.getByRole('button', { name: /^Apri originale:/u });
+        const summaries = recent.locator('summary').filter({ hasText: /^Sintesi dei documenti$/u });
+        await review.focus();
+        const reviewBox = await review.boundingBox();
+        const firstOriginalBox = await originals.first().boundingBox();
+        expect(reviewBox!.y + reviewBox!.height).toBeLessThanOrEqual(firstOriginalBox!.y);
+        for (const original of await originals.all()) {
+            await page.keyboard.press('Tab');
+            await expect(original).toBeFocused();
+        }
+        await page.keyboard.press('Tab');
+        await expect(summaries).toBeFocused();
+        await page.keyboard.press('Enter');
         await verifySummaries(recent, 'scheda');
         await page.goto(`/patients/${fixture.patientId}/entries/new`);
         await form.locator('summary').filter({ hasText: 'Consulta cartella' }).press('Enter');

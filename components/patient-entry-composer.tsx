@@ -1017,29 +1017,6 @@ export function PatientEntryComposer({ embedded = false, sheetSource, focusRef }
                     </dl>
                     <PrivacyBlur><ClinicalRichTextContent content={content} /></PrivacyBlur>
                 </section> : null}
-                {inlineSheet && sheetSource ? <PatientSheetSources patientId={id} selection={sheetSource} entries={entriesRead.error ? undefined : patientEntries} data={attachmentsRead.data}
-                    loading={attachmentsRead.loading} error={attachmentsRead.error} onRefresh={attachmentsRead.refresh}
-                    closeLabel="Torna alla bozza"
-                    draftPreview={<div className={composerStyles.sourceExcerpt}>
-                        <strong>{writeFailed && entryAttempt ? 'Registrazione da verificare' : 'Bozza non registrata'}</strong>
-                        {sourceExcerpt && (sourceExcerpt.before || sourceExcerpt.after || sourceExcerpt.selected) ? <p>
-                            <PrivacyBlur>{sourceExcerpt.before}{sourceExcerpt.selected
-                                ? <mark>{sourceExcerpt.selected}</mark>
-                                : <span className={composerStyles.sourceCaret} aria-hidden="true" />
-                            }{sourceExcerpt.after}</PrivacyBlur>
-                        </p> : null}
-                    </div>}
-                    onCloseSource={() => requestAnimationFrame(() => reviewing ? reviewHeading.current?.focus() : editorFocus.current?.resume())}>
-                    {!attachmentsRead.loading && !attachmentsRead.error && patientAttachments.length > 0 ? (
-                        <details className={composerStyles.context}>
-                            <summary className={composerStyles.sessionSummary}>
-                                <span>Sintesi dei documenti</span>
-                                <ChevronDown className={composerStyles.disclosureIcon} aria-hidden="true" />
-                            </summary>
-                            <section aria-label="Documenti in cartella" className={composerStyles.contextBody}>{documentSummaryRows}</section>
-                        </details>
-                    ) : null}
-                </PatientSheetSources> : null}
                 {proposal && !inlineSheet ? (
                     <details
                         className={composerStyles.context}
@@ -1111,6 +1088,29 @@ export function PatientEntryComposer({ embedded = false, sheetSource, focusRef }
                         )}
                     </button>
                 </div>
+                {inlineSheet && sheetSource ? <PatientSheetSources patientId={id} selection={sheetSource} entries={entriesRead.error ? undefined : patientEntries} data={attachmentsRead.data}
+                    loading={attachmentsRead.loading} error={attachmentsRead.error} onRefresh={attachmentsRead.refresh}
+                    closeLabel="Torna alla bozza"
+                    draftPreview={<div className={composerStyles.sourceExcerpt}>
+                        <strong>{writeFailed && entryAttempt ? 'Registrazione da verificare' : 'Bozza non registrata'}</strong>
+                        {sourceExcerpt && (sourceExcerpt.before || sourceExcerpt.after || sourceExcerpt.selected) ? <p>
+                            <PrivacyBlur>{sourceExcerpt.before}{sourceExcerpt.selected
+                                ? <mark>{sourceExcerpt.selected}</mark>
+                                : <span className={composerStyles.sourceCaret} aria-hidden="true" />
+                            }{sourceExcerpt.after}</PrivacyBlur>
+                        </p> : null}
+                    </div>}
+                    onCloseSource={() => requestAnimationFrame(() => reviewing ? reviewHeading.current?.focus() : editorFocus.current?.resume())}>
+                    {!attachmentsRead.loading && !attachmentsRead.error && patientAttachments.length > 0 ? (
+                        <details className={composerStyles.context}>
+                            <summary className={composerStyles.sessionSummary}>
+                                <span>Sintesi dei documenti</span>
+                                <ChevronDown className={composerStyles.disclosureIcon} aria-hidden="true" />
+                            </summary>
+                            <section aria-label="Documenti in cartella" className={composerStyles.contextBody}>{documentSummaryRows}</section>
+                        </details>
+                    ) : null}
+                </PatientSheetSources> : null}
             </form>
         </div>
     );

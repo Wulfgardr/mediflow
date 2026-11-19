@@ -52,6 +52,20 @@ test('sei compiti Web: conti di base su archivio sintetico', async ({ page }, in
     return created;
   }, name);
   const patientUrl = `/patients/${patients[0]}/modules`;
+  await page.evaluate(async patientId => {
+    for (const [name, summarySnapshot] of [
+      ['sintesi-storica.txt', 'Sintesi storica inventata.'],
+      ['senza-sintesi.txt', null],
+    ] as const) {
+      const content = 'Allegato sintetico per misurare il percorso di scrittura.';
+      const response = await fetch('/api/attachments', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: crypto.randomUUID(), patientId, name, summarySnapshot, type: 'text/plain',
+          size: content.length, path: `uploads/${name}`, data: `data:text/plain;base64,${btoa(content)}` }),
+      });
+      if (!response.ok) throw new Error(`Fixture allegato: ${response.status}`);
+    }
+  }, patients[0]);
   const measurements: Measurement[] = [];
   const writes: Array<{ path: string; method: string; status: number }> = [];
   page.on('response', response => {
@@ -131,9 +145,15 @@ test('sei compiti Web: conti di base su archivio sintetico', async ({ page }, in
       });
       await page.goto(patientUrl);
       await measure('3', mode, ['Scheda aperta', 'Nuova voce', 'Resoconto: Visita sintetica. Pressione 135/80 mmHg.', 'Rivedi', 'Conferma e registra', 'Esito e rilettura'], async () => {
+        const writesBeforeReview = writes.length;
         await activate(page, page.getByRole('link', { name: 'Nuova voce', exact: true }), mode);
         await write(page, page.getByRole('textbox', { name: 'Resoconto clinico', exact: true }), 'Visita sintetica. Pressione 135/80 mmHg.', mode);
+        const sources = page.getByRole('form', { name: 'Nuova voce clinica' }).getByRole('region', { name: 'Documenti recenti' });
+        for (const name of ['sintesi-storica.txt', 'senza-sintesi.txt'])
+          await expect(sources.getByRole('button', { name: `Apri originale: ${name}`, exact: true })).toBeVisible();
         await activate(page, page.getByRole('button', { name: 'Rivedi', exact: true }), mode);
+        await expect(page.getByRole('region', { name: 'Riepilogo della voce', exact: true })).toContainText('Visita sintetica. Pressione 135/80 mmHg.');
+        expect(writes).toHaveLength(writesBeforeReview);
         await activate(page, page.getByRole('button', { name: 'Conferma e registra', exact: true }), mode);
         const receipt = page.getByRole('region', { name: 'Esito della registrazione' });
         await expect(receipt).toContainText('Registrata alle');
