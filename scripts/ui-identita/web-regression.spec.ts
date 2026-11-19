@@ -1,13 +1,10 @@
 import { test, expect, type Page } from '@playwright/test';
-import fs from 'node:fs';
+import { readBancoReference } from './banco-paths.mjs';
 import { openPatientSection, unlockIfNeeded, isVisible } from '../../e2e/utils';
 import { fetchInterceptedRequest } from '../../e2e/fixtures/trusted-web-request';
 
-const data = process.env.MEDIFLOW_DATA_DIR!;
 function reference() {
-  const scratch = process.env.MF_BANCO_SCRATCH || '/Volumes/Vision/mf-ui-identita-20261107-scratch';
-  if (!data?.startsWith(`${scratch}/`) || !fs.existsSync(`${data}/SYNTHETIC_ONLY`)) throw new Error('Solo archivio sintetico');
-  return JSON.parse(fs.readFileSync(`${data}/reference.json`, 'utf8')).referenceId as string;
+  return readBancoReference().referenceId as string;
 }
 async function navigate(page: Page, path: string) {
   await page.goto(path);
@@ -102,7 +99,7 @@ test('Nuova voce dalla scheda conserva identità quadro e diario', async ({ page
   await page.getByRole('link', { name: 'Nuova voce', exact: true }).first().click();
   await expect(page).toHaveURL(new RegExp(`/patients/${id}/modules\\?voce=nuova`));
   await expect(page.getByTestId('lume-scheda-header')).toContainText('Rossi Sintetica Maria');
-  const editor = page.locator('#diario [contenteditable="true"]');
+  const editor = page.getByRole('textbox', { name: 'Resoconto clinico', exact: true });
   await expect(editor).toBeVisible();
   await editor.fill('Nota sintetica non registrata.');
   await expect(page.locator('#diario')).toContainText('Pressione 132/78');
