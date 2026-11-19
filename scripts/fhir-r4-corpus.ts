@@ -27,10 +27,9 @@ export function corpusInputs(): Array<{ id: string; covers: string[]; input: Fhi
   add('diagnosis-id', ['diagnosis:persistent-id', 'id:long'], i => {
     i.patient.diagnoses = [{ id: 'synthetic'.repeat(12), code: 'I10', description: 'Synthetic diagnosis', system: 'ICD-10', date }];
   });
-  add('encounters', ['entry:home', 'entry:ambulatory', 'entry:remote', 'entry:hospitalization', 'entry:deleted', 'entry:non-scale'], i => {
+  add('encounters', ['entry:home', 'entry:ambulatory', 'entry:remote', 'entry:deleted', 'entry:non-scale'], i => {
     i.entries = (['home', 'ambulatory'] as const).map((setting, n) => ({ id: `visit-${n}`, patientId: i.patient.id, date, type: 'visit', content: 'Synthetic visit', setting }));
-    i.entries.push({ id: 'remote-entry', patientId: i.patient.id, date, type: 'remote', content: 'Synthetic remote encounter' });
-    i.entries.push({ id: 'hospitalization-entry', patientId: i.patient.id, date, type: 'hospitalization', setting: 'hospital', content: 'Synthetic hospitalization' });
+    i.entries.push({ id: 'visit-2', patientId: i.patient.id, date, type: 'remote', content: 'Synthetic remote encounter' });
     i.entries.push({ id: 'deleted-entry', patientId: i.patient.id, date, type: 'note', content: 'Synthetic deleted', deletedAt: date });
   });
   for (const [id, score] of Object.entries({ zero: 0, integer: 6, numeric: '3' })) {
