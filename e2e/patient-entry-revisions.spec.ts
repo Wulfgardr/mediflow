@@ -1,18 +1,26 @@
 import { expect, test } from '@playwright/test';
-import { assertNoHorizontalOverflow, bootstrapUnlockedSession } from './utils';
+import { assertNoHorizontalOverflow, bootstrapUnlockedSession, openPatientSection } from './utils';
 
 test('due rettifiche e rilettura selettiva nella scheda del paziente', async ({ page }, info) => {
     test.setTimeout(150_000);
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
     const patient = await page.evaluate(async () => {
+        const taxCode = crypto.randomUUID();
         const response = await fetch('/api/patients', {
             method: 'POST', headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ firstName: 'Rettifiche', lastName: 'Paziente sintetico', birthDate: '1980-01-01', taxCode: crypto.randomUUID() }),
+            body: JSON.stringify({ firstName: 'Rettifiche', lastName: 'Paziente sintetico', birthDate: '1980-01-01', taxCode }),
         });
         if (!response.ok) throw new Error(`Synthetic patient: ${response.status}`);
-        return response.json() as Promise<{ id: string }>;
+        return { id: (await response.json()).id as string, taxCode };
     });
-    await page.goto(`/patients/${patient.id}/modules#diario`);
+    const navigation = page.getByRole('navigation', { name: 'Navigazione principale', exact: true });
+    await navigation.getByRole('link', { name: 'Agenda', exact: true }).click();
+    await navigation.getByRole('link', { name: 'Pazienti', exact: true }).click();
+    await page.getByRole('searchbox', { name: 'Cerca nella lista pazienti' }).fill(patient.taxCode);
+    await page.getByRole('option').filter({ hasText: 'Rettifiche' }).click();
+    await page.getByRole('link', { name: 'Apri scheda paziente', exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`/patients/${patient.id}/modules$`));
+    await openPatientSection(page, 'diario');
     await page.getByRole('link', { name: 'Nuova voce', exact: true }).click();
     const original = 'Inizio della nota sintetica. ' + 'Riga clinica inventata per verificare la rilettura. '.repeat(90) + 'Fine prima versione.';
     await page.getByRole('textbox', { name: 'Resoconto clinico', exact: true }).fill(original);
