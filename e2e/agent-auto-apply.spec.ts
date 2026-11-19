@@ -16,7 +16,7 @@ const fiscalCode = 'RSSMRA80A01F205X';
 const sentinel = 'SYNTHETIC_AUTO_VISIT_20261117';
 test.describe.configure({ retries: 0 });
 
-for (const reviewed of process.env.MEDIFLOW_VISIT_MAC_TRIAL ? [false] : [false, true]) test(reviewed ? 'the physician explicitly applies the verified clinical proposals after reading the original PDF' : 'a CLI paired for twelve hours deposits a visit and the unlocked tab automatically accepts only note and PDF', async ({ page, isolatedRuntime }, info) => {
+for (const reviewed of process.env.MEDIFLOW_VISIT_MAC_TRIAL ? [false] : [false, true]) test(reviewed ? 'the physician explicitly applies the verified clinical proposals after reading the original PDF' : 'a CLI paired for twelve hours deposits a visit and the unlocked tab automatically accepts only the original PDF', async ({ page, isolatedRuntime }, info) => {
     test.setTimeout(150000);
     await createSyntheticAgentMandate(page);
     const credentials = info.outputPath('private-agent');
@@ -72,31 +72,39 @@ for (const reviewed of process.env.MEDIFLOW_VISIT_MAC_TRIAL ? [false] : [false, 
     const service = 'Prestazione Sintetica prescritta 2026-11-17';
     const diagnosis = 'Diagnosi sintetica E11.9 ICD-10 2026-11-17';
     const exemption = 'Esenzione 013';
-    const makePdf = async (taxCode: string) => {
+    const note = ['S: Controllo sintetico ' + sentinel + '.', 'O: Rilievi non riportati.', 'A: Valutazione sintetica.', 'P: Ricontrollo programmato.'];
+    const makePdf = async (lines: string[]) => {
         const pdf = await PDFDocument.create(), font = await pdf.embedFont(StandardFonts.Helvetica), sheet = pdf.addPage();
-        ['Paziente CF ' + taxCode, sentinel, therapy, service, diagnosis, exemption].forEach((line, index) => sheet.drawText(line, { x: 40, y: 780 - index * 24, font, size: 11 }));
+        lines.forEach((line, index) => sheet.drawText(line, { x: 40, y: 780 - index * 24, font, size: 11 }));
         return Buffer.from(await pdf.save());
     };
-    const bytes = await makePdf(fiscalCode);
-    writeFileSync(path.join(source, 'nota-visita.pdf'), bytes, { mode: 0o600 });
-    const extraction = { schema: 'mediflow.dossier_prepared_extraction.v1', preparedAt: new Date().toISOString(), preparedBy: 'synthetic-cli-trial', sources: [{
-        sha256: createHash('sha256').update(bytes).digest('hex'), fileName: 'nota-visita.pdf', patient: { taxCode: fiscalCode }, documentDate: '2026-11-17', documentType: 'visita', summary: null,
-        coverage: { pages: 1, unreadablePages: [], complete: true, note: '' }, facts: [
-            { kind: 'document_entry', values: { text: sentinel, date: '2026-11-17' }, quote: sentinel },
-            { kind: 'therapy', values: { drugName: 'Farmaco Sintetico', dosage: '1 compressa al giorno', status: 'active', startDate: '2026-11-17' }, quote: therapy },
-            { kind: 'service_prescription', values: { serviceName: 'Prestazione Sintetica', prescribedAt: '2026-11-17', category: 'other' }, quote: service },
-            { kind: 'diagnosis', values: { description: 'Diagnosi sintetica', code: 'E11.9', system: 'ICD-10', date: '2026-11-17' }, quote: diagnosis },
-            { kind: 'exemption', values: { code: '013' }, quote: exemption },
-        ],
-    }] };
-    const extractionFile = path.join(source, 'estrazione-preparata.json');
-    writeFileSync(extractionFile, JSON.stringify(extraction), { mode: 0o600 });
+    const writeVisitInput = async (directory: string, taxCode: string) => {
+        const original = await makePdf(['Paziente CF ' + taxCode, sentinel, therapy, service, diagnosis, exemption]);
+        const notePdf = await makePdf(['Codice fiscale paziente: ' + taxCode, 'Data visita: 2026-11-17', '', ...note]);
+        const document = (bytes: Buffer, fileName: string, facts: unknown[]) => ({ sha256: createHash('sha256').update(bytes).digest('hex'), fileName,
+            patient: { taxCode }, documentDate: '2026-11-17', documentType: 'visita', summary: null, coverage: { pages: 1, unreadablePages: [], complete: true, note: '' }, facts });
+        writeFileSync(path.join(directory, 'referto-sintetico.pdf'), original, { mode: 0o600 });
+        writeFileSync(path.join(directory, 'nota-visita.pdf'), notePdf, { mode: 0o600 });
+        const extraction = { schema: 'mediflow.dossier_prepared_extraction.v1', preparedAt: new Date().toISOString(), preparedBy: 'synthetic-cli-trial', sources: [
+            document(original, 'referto-sintetico.pdf', [
+                { kind: 'therapy', values: { drugName: 'Farmaco Sintetico', dosage: '1 compressa al giorno', status: 'active', startDate: '2026-11-17' }, quote: therapy },
+                { kind: 'service_prescription', values: { serviceName: 'Prestazione Sintetica', prescribedAt: '2026-11-17', category: 'other' }, quote: service },
+                { kind: 'diagnosis', values: { description: 'Diagnosi sintetica', code: 'E11.9', system: 'ICD-10', date: '2026-11-17' }, quote: diagnosis },
+                { kind: 'exemption', values: { code: '013' }, quote: exemption },
+            ]),
+            document(notePdf, 'nota-visita.pdf', [{ kind: 'document_entry', values: { text: note.join('\n'), date: '2026-11-17' }, quote: note.join('\n') }]),
+        ] };
+        const file = path.join(directory, 'estrazione-preparata.json');
+        writeFileSync(file, JSON.stringify(extraction), { mode: 0o600 });
+        return { extraction, file };
+    };
+    const { extraction, file: extractionFile } = await writeVisitInput(source, fiscalCode);
     const plainBodies: string[] = [];
     page.on('request', request => { if (request.url().endsWith('/api/agent-mandates/incoming') && request.method() === 'POST') plainBodies.push(request.postData() ?? ''); });
     const visitId = randomUUID();
     const deposited = await cli('deposita', '--agente', access.agentRef, '--estrazione', extractionFile, '--cf', fiscalCode, '--visita', visitId);
     expect(deposited.status).toBe('closed');
-    expect(deposited.itemCount).toBe(6);
+    expect(deposited.itemCount).toBe(7);
     expect(deposited.modelProvider).toBe('openai');
     const counts = async () => {
         const endpoints = ['entries', 'attachments', 'therapies', 'service-prescriptions'];
@@ -109,7 +117,7 @@ for (const reviewed of process.env.MEDIFLOW_VISIT_MAC_TRIAL ? [false] : [false, 
         }
         return result;
     };
-    await expect.poll(counts, { timeout: 30000 }).toEqual([1, 1, 0, 0]);
+    await expect.poll(counts, { timeout: 30000 }).toEqual([0, 1, 0, 0]);
     const patientAfter = await (await page.request.get('/api/patients/' + patient.id)).json();
     expect(JSON.stringify(patientAfter.diagnoses ?? [])).not.toContain('E11.9');
     expect(JSON.stringify(patientAfter.exemptions ?? [])).not.toContain('013');
@@ -124,7 +132,7 @@ for (const reviewed of process.env.MEDIFLOW_VISIT_MAC_TRIAL ? [false] : [false, 
     }, { ...JSON.parse(plainBodies[0]), expectedVersion: 99999 });
     expect(stale.status).toBe(409);
     expect(stale.body.status).toBe('not_applied');
-    expect(await counts()).toEqual([1, 1, 0, 0]);
+    expect(await counts()).toEqual([0, 1, 0, 0]);
     const seedExemption = async () => {
         const catalog = await page.evaluate(async () => {
             const response = await fetch('/api/exemptions', { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -161,14 +169,14 @@ for (const reviewed of process.env.MEDIFLOW_VISIT_MAC_TRIAL ? [false] : [false, 
         console.log('SYNTHETIC_VISIT_NATIVE_PLAN_SENT');
         if (process.env.MEDIFLOW_VISIT_MAC_TRIAL === 'interactive') {
             await expect.poll(result, { timeout: 65000, intervals: [1000, 2000] }).toBe('applied');
-            expect(await counts()).toEqual([1, 1, 1, 1]);
+            expect(await counts()).toEqual([1, 2, 1, 1]);
             expect(await result()).toBe('applied');
-            expect(await counts()).toEqual([1, 1, 1, 1]);
+            expect(await counts()).toEqual([1, 2, 1, 1]);
         } else {
             expect(await result()).toBe('waiting');
-            expect(await counts()).toEqual([1, 1, 0, 0]);
+            expect(await counts()).toEqual([0, 1, 0, 0]);
             await expect.poll(result, { timeout: 65000, intervals: [1000, 3000] }).toBe('not_applied');
-            expect(await counts()).toEqual([1, 1, 0, 0]);
+            expect(await counts()).toEqual([0, 1, 0, 0]);
         }
         const database = new Database(path.join(isolatedRuntime.dataDirectory, 'medical.db'), { readonly: true, fileMustExist: true });
         try {
@@ -187,9 +195,9 @@ for (const reviewed of process.env.MEDIFLOW_VISIT_MAC_TRIAL ? [false] : [false, 
                 const policy = metadata.flags.find((flag: string) => flag.startsWith('policy:'));
                 expect(['policy:biometrics-or-companion', 'policy:account-password']).toContain(policy);
                 if (process.env.MEDIFLOW_VISIT_EXPECTED_POLICY) expect(policy).toBe('policy:' + process.env.MEDIFLOW_VISIT_EXPECTED_POLICY);
-                expect(metadata.counts).toBe(4);
+                expect(metadata.counts).toBe(6);
                 const { appliedItemIds } = await (await page.request.get('/api/agent-mandates/incoming?visit=' + visitId)).json();
-                expect(appliedItemIds).toHaveLength(6);
+                expect(appliedItemIds).toHaveLength(7);
                 expect(appliedItemIds).toEqual(expect.arrayContaining(plan.items.map(item => item.id)));
                 const patientRow = database.prepare('SELECT diagnoses, exemptions, version FROM patients WHERE id=?').get(plan.patientId);
                 expect(patientRow).toMatchObject({ version: plan.expectedVersion + 2 });
@@ -223,28 +231,29 @@ for (const reviewed of process.env.MEDIFLOW_VISIT_MAC_TRIAL ? [false] : [false, 
             return request.status;
         }, { reference: opened.reference, plan: JSON.parse(plainBodies[0]) });
         expect(forged).toBe(403);
-        expect(await counts()).toEqual([1, 1, 0, 0]);
+        expect(await counts()).toEqual([0, 1, 0, 0]);
     }
     await page.getByRole('complementary', { name: 'MediFlow', exact: true }).getByRole('link', { name: 'In arrivo', exact: true }).click();
-    for (const label of ['Terapia proposta', 'Prestazione proposta', 'Diagnosi proposta', 'Esenzione proposta']) await expect(page.getByRole('heading', { name: label, exact: true })).toBeVisible();
+    for (const label of ['Nota', 'Terapia proposta', 'Prestazione proposta', 'Diagnosi proposta', 'Esenzione proposta']) await expect(page.getByRole('heading', { name: label, exact: true })).toBeVisible();
+    await expect(page.getByText(note[0]!, { exact: false }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: 'nota-visita.pdf', exact: true })).toBeVisible();
-    await page.getByRole('button', { name: 'nota-visita.pdf', exact: true }).click();
-    await expect(page.getByRole('dialog', { name: 'nota-visita.pdf', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'referto-sintetico.pdf', exact: true }).click();
+    await expect(page.getByRole('dialog', { name: 'referto-sintetico.pdf', exact: true })).toBeVisible();
     await expect(page.getByTestId('document-preview-pdf-page')).toBeVisible();
     await page.screenshot({ path: info.outputPath('originale-pdf-della-visita.png'), fullPage: true });
     await page.getByRole('dialog').getByRole('button', { name: 'Chiudi', exact: true }).click();
-    await page.screenshot({ path: info.outputPath('nota-pdf-applicati-proposte-in-attesa.png'), fullPage: true });
+    await page.screenshot({ path: info.outputPath('originale-applicato-nota-e-proposte-in-attesa.png'), fullPage: true });
     await page.getByRole('heading', { name: 'Esenzione proposta', exact: true }).scrollIntoViewIfNeeded();
     await page.screenshot({ path: info.outputPath('diagnosi-esenzione-in-attesa.png'), fullPage: true });
     const index = await (await page.request.get('/api/agent-mandates/incoming')).json();
     expect(index.visits).toContainEqual(expect.objectContaining({ id: visitId }));
     expect(JSON.stringify(index)).not.toContain('itemsCiphertext');
     const incoming = await (await page.request.get('/api/agent-mandates/incoming?visit=' + visitId)).json();
-    expect(incoming.appliedItemIds).toHaveLength(2);
+    expect(incoming.appliedItemIds).toHaveLength(1);
     const replay = await cli('riprendi', '--agente', access.agentRef, '--visita', visitId);
     expect(replay.visitId).toBe(visitId);
     await page.getByRole('button', { name: 'Aggiorna', exact: true }).click();
-    expect(await counts()).toEqual([1, 1, 0, 0]);
+    expect(await counts()).toEqual([0, 1, 0, 0]);
     for (const name of ['medical.db', 'medical.db-wal']) {
         try { expect(readFileSync(path.join(isolatedRuntime.dataDirectory, name)).includes(Buffer.from(sentinel))).toBe(false); }
         catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
@@ -260,17 +269,12 @@ for (const reviewed of process.env.MEDIFLOW_VISIT_MAC_TRIAL ? [false] : [false, 
         const concurrentPatient = await createPatient(concurrentCf);
         const concurrentId = randomUUID(), concurrentSource = path.join(source, 'visita-concorrente');
         mkdirSync(concurrentSource, { mode: 0o700 });
-        const concurrentFile = path.join(concurrentSource, 'estrazione-preparata.json');
-        const concurrentPdf = await makePdf(concurrentCf);
-        writeFileSync(path.join(concurrentSource, 'nota-visita.pdf'), concurrentPdf, { mode: 0o600 });
-        writeFileSync(concurrentFile, JSON.stringify({ ...extraction, sources: extraction.sources.map(document =>
-            ({ ...document, patient: { taxCode: concurrentCf },
-                sha256: createHash('sha256').update(concurrentPdf).digest('hex') })) }), { mode: 0o600 });
+        const { file: concurrentFile } = await writeVisitInput(concurrentSource, concurrentCf);
         expect((await cli('deposita', '--agente', access.agentRef, '--estrazione', concurrentFile, '--cf', concurrentCf, '--visita', concurrentId)).status).toBe('closed');
         const secondVisitId = randomUUID();
         const second = await cli('deposita', '--agente', access.agentRef, '--estrazione', extractionFile, '--cf', fiscalCode, '--visita', secondVisitId);
         expect(second.status).toBe('closed');
-        await expect.poll(counts).toEqual([2, 2, 0, 0]);
+        await expect.poll(counts).toEqual([0, 2, 0, 0]);
         await seedExemption();
         await page.getByRole('button', { name: 'Aggiorna', exact: true }).click();
         const validVisit = page.getByRole('region', { name: 'Visita ' + visitId });
@@ -282,7 +286,7 @@ for (const reviewed of process.env.MEDIFLOW_VISIT_MAC_TRIAL ? [false] : [false, 
         await expect(concurrentVisit.getByRole('button', { name: 'Applica la visita', exact: true })).toBeEnabled();
         await expect(doubtfulVisit.getByText('Codice fiscale non confermato in una scheda esistente.', { exact: true })).toBeVisible();
         await expect(doubtfulVisit.getByRole('button', { name: 'Applica la visita', exact: true })).toBeDisabled();
-        expect(await counts()).toEqual([2, 2, 0, 0]);
+        expect(await counts()).toEqual([0, 2, 0, 0]);
         const batchOrder: string[] = [];
         const archiveHeaders = await trustedArchiveWebRequestHeaders(page);
         await page.route('**/api/agent-mandates/incoming', async route => {
@@ -304,19 +308,19 @@ for (const reviewed of process.env.MEDIFLOW_VISIT_MAC_TRIAL ? [false] : [false, 
             && response.request().method() === 'POST' && response.request().postDataJSON().visitId === concurrentId);
         await page.getByRole('button', { name: 'Applica tutte le visite senza dubbi', exact: true }).click();
         expect((await rejected).status()).toBe(409);
-        await expect.poll(counts).toEqual([2, 2, 2, 2]);
+        await expect.poll(counts).toEqual([2, 4, 2, 2]);
         expect(batchOrder).toEqual([visitId, concurrentId, secondVisitId]);
         await expect(validVisit).toHaveCount(0);
         await expect(secondVisit).toHaveCount(0);
         await expect(doubtfulVisit).toBeVisible();
         await expect(concurrentVisit).toBeVisible();
         const concurrentReceipt = await (await page.request.get('/api/agent-mandates/incoming?visit=' + concurrentId)).json();
-        expect(concurrentReceipt.appliedItemIds).toHaveLength(2);
+        expect(concurrentReceipt.appliedItemIds).toHaveLength(1);
         const pendingIndex = await (await page.request.get('/api/agent-mandates/incoming')).json();
         expect(pendingIndex.visits).not.toContainEqual(expect.objectContaining({ id: visitId }));
         expect(pendingIndex.visits).toContainEqual(expect.objectContaining({ id: doubtfulId }));
         const applied = await (await page.request.get('/api/agent-mandates/incoming?visit=' + visitId)).json();
-        expect(applied.appliedItemIds).toHaveLength(6);
+        expect(applied.appliedItemIds).toHaveLength(7);
         const notApplied = await (await page.request.get('/api/agent-mandates/incoming?visit=' + doubtfulId)).json();
         expect(notApplied.appliedItemIds).toEqual([]);
         await page.screenshot({ path: info.outputPath('proposte-applicate-dopo-conferma.png'), fullPage: true });
