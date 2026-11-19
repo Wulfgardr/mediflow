@@ -3,6 +3,8 @@ import { openDbServer } from '../db-server';
 import { archiveGenerationForSession } from './archive-session-generation';
 import 'server-only';
 
+import { hasAttestedLoopbackIngress } from './loopback-ingress.mjs';
+import { presentedWebSessionProof, webSessionProofBindings } from './web-session-proof';
 import { types } from 'node:util';
 
 import {
@@ -43,7 +45,7 @@ const SESSION_ID = /^[a-f0-9]{64}$/u;
 type ExactRecord = Readonly<Record<string, unknown>>;
 
 export type WebAuthApplicationLockSources = Readonly<{
-    resolve(sessionId: unknown, controlId: unknown): unknown;
+    resolve(sessionId: unknown, controlId: unknown, request: Request): unknown;
     retire(projection: ServerSession | null, reason: 'lock', mutation: WebAuthControlMutation, request: Request): unknown;
     audit(session: ServerSession, sessionId: string, request: Request): unknown;
 }>;
@@ -114,6 +116,9 @@ function exactRetirementReceipt(value: unknown): { outcome: string; etag: string
 const productionSources: WebAuthApplicationLockSources = Object.freeze({
     resolve: resolveWebAuthControlSession,
     retire(session: ServerSession | null, _reason: 'lock', mutation: WebAuthControlMutation, request: Request) {
+        const proof = presentedWebSessionProof(request.headers);
+        if (!proof || !hasAttestedLoopbackIngress(request)
+            || !webSessionProofBindings.controlAvailable(mutation.controlId, proof)) return null;
         if (!session || request.headers.get('x-mediflow-lock-reason') === 'inactivity') {
             return retireWebAuthControlForLock(session, mutation);
         }
@@ -151,7 +156,7 @@ export async function completeExactWebP3ApplicationLock(
     if (!isWebAuthControlMutation(mutation)) return createApplicationLockResponse(unconfirmedReceipt);
     let session: ServerSession | null = null;
     if (sessionId) {
-        try { session = exactActiveResolution(sources.resolve(sessionId, mutation.controlId), sessionId); }
+        try { session = exactActiveResolution(sources.resolve(sessionId, mutation.controlId, request), sessionId); }
         catch { /* A valid control mutation still advances the revocation fence below. */ }
     }
     let ownerReceipt: unknown;
