@@ -1,6 +1,6 @@
 'use client';
 import { PatientSheetMenu } from '@/components/patient-sheet-menu';
-import { useEntryDraftMarker } from '@/hooks/use-entry-local-draft';
+import { useEntryDraftMarker, useEntryDraftWords } from '@/hooks/use-entry-local-draft';
 import { patientAgeLabel } from '@/lib/patient-identity';
 
 import { Disclosure } from '@/components/disclosure';
@@ -85,6 +85,15 @@ function buildObservationRequestId(loop: OpenLoop): string {
 function navigateToObservationForm(): void {
     window.location.assign('#parametri');
     requestAnimationFrame(() => document.getElementById('parametri')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+}
+
+function DraftReturn({ patientId }: { patientId: string }) {
+    const count = useEntryDraftWords(patientId);
+    return <Link href={`/patients/${patientId}/modules?voce=nuova`} className="mf-draft-return"
+        aria-label="Torna alla bozza" aria-describedby={count ? 'bozza-parole' : undefined}>
+        <DraftIcon size={15} aria-hidden /> Torna alla bozza
+        {count ? <span id="bozza-parole"><span aria-hidden>· </span>{count} {count === 1 ? 'parola' : 'parole'}</span> : null}
+    </Link>;
 }
 
 export default function PatientDetailPage() {
@@ -681,7 +690,7 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
                 </>
             )}
         >
-            {proposal && savedDraft && !writing ? <Link href={`/patients/${id}/modules?voce=nuova`} className="mf-draft-return"><DraftIcon size={15} aria-hidden /> Torna alla bozza</Link> : null}
+            {proposal && savedDraft && !writing ? <DraftReturn patientId={id} /> : null}
             <div className={workspaceStyles.clinicalStack}>
                 <section id="attenzione" className={workspaceStyles.attentionBand} data-has-attention={reviewQueueSummary.attentionCount + openLoopCount > 0 || hasInsightProposal} aria-labelledby="attention-title" data-testid="lume-scheda-attention">
                     <div className={workspaceStyles.attentionHead}>

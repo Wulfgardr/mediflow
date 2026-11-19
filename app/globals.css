@@ -1920,5 +1920,6 @@ h1[tabindex='-1']:focus:not(:focus-visible),
 h1[tabindex='-1']:focus { outline: none; }
 
 .mf-draft-return { position: fixed; left: max(14px, calc(100vw - 100% + 14px)); bottom: 18px; z-index: 6; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px dashed var(--lume-ink-muted); border-radius: 999px; background: var(--lume-surface-focal); color: var(--lume-ink); font: var(--type-body); }
-@media (min-width: 1001px) { [data-patient-record='true'] .mf-draft-return { left: calc(var(--twin-rail) + 26px); } }
+.mf-draft-return #bozza-parole { display: none; }
+@media (min-width: 1001px) { .mf-draft-return #bozza-parole { display: inline; } [data-patient-record='true'] .mf-draft-return { left: calc(var(--twin-rail) + 26px); } }
 @media (max-width: 700px) { .mf-draft-return { bottom: calc(72px + env(safe-area-inset-bottom)); } }

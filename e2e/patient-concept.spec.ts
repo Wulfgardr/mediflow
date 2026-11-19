@@ -36,6 +36,7 @@ test('Scheda desktop del concept con identità, tre colonne e ritorno alle sezio
     await expect(page.getByTestId('local-draft-status')).toContainText('conservati cifrati');
     await page.getByRole('link', { name: 'Chiudi la voce', exact: true }).click();
     await expect(page.getByRole('link', { name: 'Torna alla bozza', exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Torna alla bozza', exact: true })).toHaveAccessibleDescription('9 parole');
     const change = record.getByRole('region', { name: 'Variazioni dall’ultima visita' });
     const medication = change.locator('details').filter({ has: page.locator('summary', { hasText: 'Spironolattone' }) });
     await expect(medication).toHaveCount(1);
