@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow } from './utils';
+import { sealDiaryEntry } from './fixtures/sealed-diary-entry';
 
 test('Timeline paziente: indice cronologico e accessi allo storico senza duplicare il Diario', async ({ baseURL }) => {
     test.setTimeout(180_000);
@@ -62,10 +63,11 @@ test('Timeline paziente: indice cronologico e accessi allo storico senza duplica
         };
         await page.goto(`/patients/${fixture.emptyId}/modules`); await openPatientSection(page, 'timeline');
         await expect(page.locator('#timeline')).toContainText('Nessun evento recente'); await capture('vuota');
-        await page.evaluate(async patientId => {
-            const response = await fetch('/api/entries', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ patientId, type: 'note', date: '2026-10-26', title: 'Voce unica sintetica', content: 'Testo della voce unica, conservato nel Diario.' }) });
+        const single = await sealDiaryEntry(page, { patientId: fixture.emptyId, type: 'note', date: '2026-10-26', title: 'Voce unica sintetica', content: 'Testo della voce unica, conservato nel Diario.' });
+        await page.evaluate(async body => {
+            const response = await fetch('/api/entries', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
             if (!response.ok) throw new Error(`Single fixture: ${response.status}`);
-        }, fixture.emptyId);
+        }, single);
         await page.reload(); await openPatientSection(page, 'timeline');
         await expect(page.locator('#timeline').getByRole('article')).toHaveCount(1); await capture('singola');
         await page.goto(`/patients/${fixture.patientId}/modules`); await openPatientSection(page, 'timeline');

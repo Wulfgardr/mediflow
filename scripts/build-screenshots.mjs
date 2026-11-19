@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
+import { sealDiaryEntry } from '../e2e/fixtures/sealed-diary-entry.ts';
 
 const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUTPUT_DIR = path.join(ROOT_DIR, 'screenshots');
@@ -158,10 +159,10 @@ async function seed(page) {
       unitCode: index === 0 ? 'mm[Hg]' : 'score', codeSystem: 'LOINC', unitSystem: 'UCUM',
       observedAt: '2026-07-14T08:30:00.000Z', notes: 'Rilevazione dimostrativa sintetica', source: 'manual',
     });
-    await write(page, 'POST', '/api/entries', {
+    await write(page, 'POST', '/api/entries', await sealDiaryEntry(page, {
       id: `${id}-entry`, patientId: id, type: 'visit', title: 'Controllo territoriale',
       date: '2026-07-13T09:30:00.000Z', content: 'Voce di diario dimostrativa sintetica. Rivalutati parametri e aderenza terapeutica.',
-    });
+    }));
   }
 
   const insights = [{
@@ -173,10 +174,10 @@ async function seed(page) {
     routedClass: { classification: 'cardiology_report', confidence: 'high', synthesis: { kind: 'deterministic', rationale: 'Dati dimostrativi locali' } },
   }];
   await write(page, 'PUT', `/api/patients/${PATIENT_ID}`, { version: 1, documentInsights: JSON.stringify(insights) });
-  await write(page, 'POST', '/api/entries', {
+  await write(page, 'POST', '/api/entries', await sealDiaryEntry(page, {
     id: `${PATIENT_ID}-entry-phone`, patientId: PATIENT_ID, type: 'phone', title: 'Contatto di follow-up',
     date: '2026-07-14T11:15:00.000Z', content: 'Contatto dimostrativo sintetico: nessuna criticita riferita.',
-  });
+  }));
   for (const [id, name, state] of [
     ['screenshots-attachment-cardiology', 'referto-cardiologico-sintetico.pdf', 'manual_review'],
     ['screenshots-attachment-labs', 'controllo-metabolico-sintetico.pdf', 'ocr_done'],
