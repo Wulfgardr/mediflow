@@ -9,7 +9,8 @@ const args = process.argv.slice(2);
 /* run before runtime probes or target imports (ADR 0130). */
 const optionEnd = args.indexOf('--');
 const options = optionEnd === -1 ? args : args.slice(0, optionEnd);
-if (options.includes('--test') && !process.env.MEDIFLOW_DATA_DIR?.trim()) {
+const isTestRun = options.includes('--test');
+if (isTestRun && !process.env.MEDIFLOW_DATA_DIR?.trim()) {
   console.error('MEDIFLOW_TEST_DATA_DIR_REQUIRED: --test requires an explicit synthetic MEDIFLOW_DATA_DIR; the caller owns its cleanup.');
   process.exit(2);
 }
@@ -127,6 +128,47 @@ function expandArgs(rawArgs) {
   return expandedArgs;
 }
 
+const nodeOptionsWithValue = new Set([
+  '-r', '--require', '--import', '--loader', '--experimental-loader', '-C', '--conditions',
+  '--env-file', '--env-file-if-exists',
+  '--test-concurrency', '--test-coverage-branches', '--test-coverage-exclude', '--test-coverage-functions',
+  '--test-coverage-include', '--test-coverage-lines', '--test-global-setup', '--test-isolation',
+  '--experimental-test-isolation', '--test-name-pattern', '--test-random-seed', '--test-reporter',
+  '--test-reporter-destination', '--test-rerun-failures', '--test-shard', '--test-skip-pattern', '--test-timeout',
+]);
+
+function testPatterns(nodeArgs) {
+  let index = 0;
+  let testMode = false;
+  while (nodeArgs[index]?.startsWith('-')) {
+    const option = nodeArgs[index++];
+    if (option === '--') break;
+    if (option === '--test') testMode = true;
+    if (nodeOptionsWithValue.has(option)) index += 1;
+  }
+  return testMode ? nodeArgs.slice(index) : null;
+}
+
+function isTestFile(file) {
+  return fs.statSync(file, { throwIfNoEntry: false })?.isFile();
+}
+
+function validateTestSelection(nodeArgs) {
+  const patterns = testPatterns(nodeArgs);
+  if (patterns === null) return;
+  if (patterns.length === 0 && options.includes('--glob')) {
+    console.error('No test files remain after glob exclusions');
+    process.exit(1);
+  }
+
+  for (const pattern of patterns) {
+    const matches = fs.globSync(pattern, { exclude: name => name === 'node_modules' });
+    if (matches.some(isTestFile)) continue;
+    console.error(`No test files matched required selection: ${pattern}`);
+    process.exit(1);
+  }
+}
+
 function resolveCommand(command) {
   if (!command) return null;
   if (path.isAbsolute(command) || command.includes('/') || command.includes('\\')) return command;
@@ -174,11 +216,14 @@ function childEnvironment() {
   // A test never seeds itself from the checkout's own medical.db: the E2E preparer copies that file
   // unless told otherwise, and in a developer checkout it can be a real archive. A test of the
   // legacy copy sets the variable to '0' for the process it starts.
-  if (options.includes('--test') && env.MEDIFLOW_E2E_DISABLE_LEGACY_COPY === undefined) {
+  if (isTestRun && env.MEDIFLOW_E2E_DISABLE_LEGACY_COPY === undefined) {
     env.MEDIFLOW_E2E_DISABLE_LEGACY_COPY = '1';
   }
   return env;
 }
+
+const nodeArgs = optionEnd === -1 ? expandArgs(args) : [...expandArgs(options), ...args.slice(optionEnd)];
+if (isTestRun) validateTestSelection(nodeArgs);
 
 const nodePath = collectCandidates().find(supportsStripTypes);
 
@@ -188,7 +233,6 @@ if (!nodePath) {
   process.exit(1);
 }
 
-const nodeArgs = expandArgs(args);
 const result = spawnSync(nodePath, ['--experimental-strip-types', '--import', registerLoaderUrl, ...nodeArgs], {
   env: childEnvironment(),
   stdio: 'inherit',

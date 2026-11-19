@@ -47,7 +47,7 @@ const fact = z.object({
 }).strict();
 const nextProposals = z.object({
     stato: z.literal('da_verificare_in_mediflow'),
-    elementi: z.array(z.object({ tipo: z.enum(['terapia', 'prestazione', 'diagnosi', 'esenzione']), fonte: z.string() })),
+    elementi: z.array(z.object({ tipo: z.enum(['nota', 'terapia', 'prestazione', 'diagnosi', 'esenzione']), fonte: z.string() })),
 });
 const depositResult = z.object({
     ...visit, mandateRef: z.string().uuid(), agentRef: z.string().uuid(),
@@ -152,7 +152,7 @@ export function createAmbulatorioServer(home: string, value: unknown, plugin: st
     });
 
     server.registerTool('mediflow_deposita_visita', {
-        description: 'Deposita il Dossier verificato della visita. Le proposte cliniche attendono il medico in In arrivo.',
+        description: 'Deposita il Dossier verificato della visita. Nota, trascrizione, PDF e proposte cliniche attendono la conferma del medico in MediFlow.',
         inputSchema: z.object(visit).strict(), outputSchema: depositResult, annotations,
     }, ({ visitId }, { mcpReq }) => deposit(visitId, mcpReq.signal, false));
     server.registerTool('mediflow_riprendi_visita', {
