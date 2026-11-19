@@ -593,7 +593,7 @@ function normalizeLimit(value: number | undefined): number {
     return Math.min(normalized, 200);
 }
 
-function parseRedactedMetadata(value: string | null): AuditRedactedMetadata | null {
+export function parseRedactedMetadata(value: string | null): AuditRedactedMetadata | null {
     if (!value) return null;
     try {
         return sanitizeAuditMetadata(JSON.parse(value));

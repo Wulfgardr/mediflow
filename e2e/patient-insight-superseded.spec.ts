@@ -1,3 +1,4 @@
+import { diaryEntrySealer } from './fixtures/sealed-diary-entry';
 import { expect, test, type Page } from '@playwright/test';
 
 import type { FunctionModelPreferences } from '../lib/function-models/browser';
@@ -40,9 +41,9 @@ async function generatedProposal(page: Page) {
   const requests: PatientInsightPreviewRequest[] = [];
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   await setAiLaneKillSwitch(page, 'aiPatientInsightKillSwitch', 'enabled');
-  const patientId = await page.evaluate(async ({ title, drug }) => {
-    const post = async (path: string, body: unknown) => {
-      const response = await fetch(`/api/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const patientId = await page.evaluate(async ({ title, drug, seal }) => {
+    const post = async (path: string, body: Record<string, unknown>) => {
+      const response = await fetch(`/api/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(path === 'entries' ? await seal(body) : body) });
       if (!response.ok) throw new Error(`Synthetic ${path}: ${response.status}`);
       return response.json() as Promise<{ id: string }>;
     };
@@ -50,7 +51,7 @@ async function generatedProposal(page: Page) {
     await post('entries', { patientId: patient.id, type: 'visit', date: '2026-10-20T09:00:00.000Z', title, content: 'Contenuto sintetico della voce.', setting: 'ambulatory', metadata: { workflowStatus: 'signed' } });
     await post('therapies', { id: `therapy-${crypto.randomUUID()}`, patientId: patient.id, drugName: drug, activePrinciple: 'Principio sintetico', motivation: 'Nota iniziale sintetica', dosage: 'Dose iniziale sintetica', status: 'active', startDate: '2026-10-01T08:00:00.000Z' });
     return patient.id;
-  }, { title: ENTRY_TITLE, drug: DRUG });
+  }, { title: ENTRY_TITLE, drug: DRUG, seal: await diaryEntrySealer(page) });
   await page.route('**/api/settings/ai/functions', route => route.fulfill({ status: 200, json: CATALOG }));
   await page.route('**/api/ai/patient-insight/preview', async route => {
     const request = parsePatientInsightPreviewRequest(route.request().postDataJSON());
