@@ -19,4 +19,4 @@ export function outputs() {
     ];
 }
 export function profiles() { return [createPatientInsightOrdinaryTaskProfile(PI), createSmartImportOrdinaryTaskProfile({ projection: SI, generatedAt: SI.capturedAt }), createDocumentSynthesisOrdinaryTaskProfile(sourceSet())]; }
-export const tokenFrom = (text: string) => { const token = text.match(/\{\{MF_PII_[a-f0-9]{32}_\d+\}\}/u)?.[0]; assert.ok(token); return token; };
+export const tokenFrom = (text: string) => { const token = text.match(/\[\[MF_[A-Z]+[1-9][0-9]*_[a-z2-7]{8}\]\]/u)?.[0]; assert.ok(token); return token; };

@@ -50,7 +50,7 @@ function outputs() {
     ];
 }
 function profiles() { return [createPatientInsightOrdinaryTaskProfile(PI), createSmartImportOrdinaryTaskProfile({ projection: SI, generatedAt: SI.capturedAt }), createDocumentSynthesisOrdinaryTaskProfile(sourceSet())]; }
-const tokenFrom = (text: string) => { const token = text.match(/\{\{MF_PII_[a-f0-9]{32}_\d+\}\}/u)?.[0]; assert.ok(token); return token; };
+const tokenFrom = (text: string) => { const token = text.match(/\[\[MF_[A-Z]+[1-9][0-9]*_[a-z2-7]{8}\]\]/u)?.[0]; assert.ok(token); return token; };
 function reset() { calls = []; closes = 0; detection = 'Bea Riva'; behavior = 'normal'; release = undefined; }
 
 test('three named builders emit exactly their canonical prompt bytes and classify dynamic fields', () => {
@@ -141,7 +141,7 @@ for (const bad of ['foreign', 'truncated', 'unknown', 'key', 'sourceId', 'claimP
         let wire = JSON.stringify(outputs()[bad === 'sourceId' ? 1 : bad === 'claimPath' ? 2 : 0]).replaceAll('Bea Riva', token);
         if (bad === 'foreign') wire = wire.replaceAll(token, other);
         if (bad === 'truncated') wire = wire.replaceAll(token, token.slice(0, -1));
-        if (bad === 'unknown') wire = wire.replaceAll(token, token.replace(/_\d+\}\}$/u, '_4096}}'));
+        if (bad === 'unknown') wire = wire.replaceAll(token, token.replace(/^(\[\[MF_[A-Z]+)\d+_/u, '$14096_'));
         if (bad === 'key') wire = wire.replace('"summary":', `"${token}":`);
         if (bad === 'sourceId') wire = wire.replace('"source_synthetic"', JSON.stringify(token));
         if (bad === 'claimPath') wire = wire.replace('"claimPath":"summary"', `"claimPath":"${token}"`);
@@ -234,7 +234,7 @@ test('malformed/lowercase tokens and aggregate output overflow are denied, not r
     try {
         const read = readPreparedOrdinaryProfile(await job.ready), token = tokenFrom(read.content.input[0].text);
         const base = JSON.stringify(outputs()[0]).replaceAll('Bea Riva', token);
-        for (const bad of [token.toLowerCase(), token.replace('MF_PII_', 'MF_PII_!'), '{{MF_PII_broken}}']) assert.throws(() => read.parseOutput(base.replaceAll(token, bad)));
+        for (const bad of [token.toLowerCase(), token.replace('MF_PER', 'MF_PER!'), token.replace('[[', '['), token.replace('_PER1_', '_PER01_'), '[[MF_broken]]']) assert.throws(() => read.parseOutput(base.replaceAll(token, bad)));
         assert.throws(() => read.parseOutput(JSON.stringify({text: 'x'.repeat(262_145)})));
     } finally { await job.close(); }
 });

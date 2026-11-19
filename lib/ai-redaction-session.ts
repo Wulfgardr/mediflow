@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { types } from 'node:util';
 import { evaluateEgress } from './ai-egress-gate';
 import type { RedactionEntityType } from './redaction-contracts';
@@ -24,7 +24,7 @@ export interface RedactionSessionInput {
 
 export interface PreparedRedaction {
     readonly redactedText: string;
-    readonly spans: readonly Readonly<Span & { replacement: string }>[];
+    readonly spans: readonly PreparedSpan[];
     /** Counts of merged occurrences, not unique values or runner detections. */
     readonly entityCounts: Readonly<Partial<Record<RedactionEntityType, number>>>;
     readonly rehydrate: (output: string) => string;
@@ -34,8 +34,37 @@ const ENTITY_TYPES = {
     person: true, date: true, phone: true, address: true, tax_id: true,
     email: true, organization: true, identifier: true, other: true,
 } satisfies Record<RedactionEntityType, true>;
-const NAMESPACE = '{{MF_PII_';
-type Span = { start: number; end: number; type: RedactionEntityType };
+const ROLE_BY_TYPE = {
+    person: 'PER', date: 'DAT', phone: 'TEL', address: 'IND', tax_id: 'CF',
+    email: 'EML', organization: 'ORG', identifier: 'ID', other: 'ALT',
+} as const satisfies Record<RedactionEntityType, string>;
+export type PlaceholderRole = (typeof ROLE_BY_TYPE)[RedactionEntityType] | 'PAZ';
+export const PLACEHOLDER_PATTERN = /\[\[MF_(PAZ|PER|DAT|TEL|IND|CF|EML|ORG|ID|ALT)([1-9][0-9]{0,3})_([a-z2-7]{8})\]\]/gu;
+export const RESERVED_PLACEHOLDER_NAMESPACE = /\[\[\s*MF|MF_(?:PAZ|PER|DAT|NAS|TEL|IND|CF|EML|ORG|ID|ALT)\s*[0-9]|MF_GG\s*[+-]/iu;
+export type ResolvedPlaceholder = Readonly<{ role: PlaceholderRole; value: string }>;
+type Span = { start: number; end: number; type: RedactionEntityType; patient?: true };
+type PreparedSpan = Readonly<{ start: number; end: number; type: RedactionEntityType; replacement: string }>;
+const NONCE_ALPHABET = 'abcdefghijklmnopqrstuvwxyz234567';
+const liveNonces = new Set<string>();
+
+function nonceText(bytes: Uint8Array): string {
+    let bits = 0n;
+    for (const byte of bytes.subarray(0, 5)) bits = (bits << 8n) | BigInt(byte);
+    let text = '';
+    for (let index = 7; index >= 0; index -= 1) text += NONCE_ALPHABET[Number((bits >> BigInt(index * 5)) & 31n)];
+    return text;
+}
+
+function allocateLiveNonce(): string {
+    const seed = randomBytes(16);
+    for (let attempt = 0; ; attempt += 1) {
+        const nonce = nonceText(createHash('sha256').update(seed).update(String(attempt)).digest());
+        if (!liveNonces.has(nonce)) {
+            liveNonces.add(nonce);
+            return nonce;
+        }
+    }
+}
 
 function escapeRegex(value: string): string {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -106,7 +135,7 @@ function snapshot(value: RedactionSessionInput): RedactionSessionInput {
 
 function validate(input: RedactionSessionInput): Span[] {
     if (!input || typeof input.text !== 'string' || input.text.length > 12000
-        || input.text.includes(NAMESPACE) || !Array.isArray(input.entities)
+        || RESERVED_PLACEHOLDER_NAMESPACE.test(input.text) || !Array.isArray(input.entities)
         || input.entities.length > 512) throw new Error('Invalid redaction input');
     const spans: Span[] = [];
     for (const entity of input.entities) {
@@ -133,19 +162,22 @@ function validate(input: RedactionSessionInput): Span[] {
     return spans;
 }
 
-function layerOneType(token: string): RedactionEntityType {
-    if (/^\{\{CF(?:_CANDIDATO)?_/.test(token)) return 'tax_id';
-    if (token.startsWith('{{DATA_NASCITA_')) return 'date';
-    if (token.startsWith('{{PERSONA_')) return 'person';
-    if (token.startsWith('{{TELEFONO_')) return 'phone';
-    if (token.startsWith('{{EMAIL_')) return 'email';
-    return 'identifier';
+
+function layerOneSpanKind(token: string): Pick<Span, 'type' | 'patient'> {
+    if (/^\{\{CF(?:_CANDIDATO)?_/.test(token)) return { type: 'tax_id' };
+    if (token.startsWith('{{DATA_NASCITA_')) return { type: 'date' };
+    if (token.startsWith('{{PERSONA_')) return { type: 'person', patient: true };
+    if (token.startsWith('{{TELEFONO_')) return { type: 'phone' };
+    if (token.startsWith('{{EMAIL_')) return { type: 'email' };
+    return { type: 'identifier' };
+}
+
+function joinPatient(target: Span, span: Span): void {
+    if (span.patient) target.patient = true;
 }
 
 function mergeSpans(text: string, spans: Span[]): Span[] {
     spans.sort((a, b) => a.start - b.start || a.end - b.end);
-    // Resolve exact-range specificity before merging partial overlaps, so the
-    // result does not depend on the ordering of duplicate neural detections.
     const exact: Span[] = [];
     for (const span of spans) {
         const previous = exact[exact.length - 1];
@@ -154,6 +186,7 @@ function mergeSpans(text: string, spans: Span[]): Span[] {
                 previous.type = (previous.type === 'tax_id' && span.type === 'identifier')
                     || (previous.type === 'identifier' && span.type === 'tax_id') ? 'tax_id' : 'other';
             }
+            joinPatient(previous, span);
         } else exact.push({ ...span });
     }
     const merged: Span[] = [];
@@ -164,22 +197,37 @@ function mergeSpans(text: string, spans: Span[]): Span[] {
         if (previous && (span.start < previous.end || adjacentAddress)) {
             previous.end = Math.max(previous.end, span.end);
             if (previous.type !== span.type) previous.type = 'other';
+            joinPatient(previous, span);
         } else merged.push({ ...span });
     }
     return merged;
 }
 
-// Server-side RAM composition only: this object grants no admission or egress.
+function roleOf(span: Span): PlaceholderRole {
+    return span.type === 'person' && span.patient ? 'PAZ' : ROLE_BY_TYPE[span.type];
+}
+
+/** Server-side RAM composition only: this object grants no admission or egress.
+ * Placeholders carry a role and a nonce that no other live session holds. */
 export function createRedactionSession(): Readonly<{
     prepare: (input: RedactionSessionInput) => PreparedRedaction;
+    resolve: (placeholder: string) => ResolvedPlaceholder;
     close: () => void;
 }> {
-    const nonce = randomBytes(16).toString('hex');
+    const nonce = allocateLiveNonce();
     const tokensByValue = new Map<string, string>();
+    const valuesByToken = new Map<string, ResolvedPlaceholder>();
+    const roleCounts = new Map<PlaceholderRole, number>();
     const preparations = new Set<Map<string, string>>();
     let closed = false;
     const assertOpen = () => {
         if (closed) throw new Error('Redaction session closed');
+    };
+    const resolve = (placeholder: string): ResolvedPlaceholder => {
+        assertOpen();
+        const resolved = typeof placeholder === 'string' ? valuesByToken.get(placeholder) : undefined;
+        if (!resolved) throw new Error('Unknown redaction placeholder');
+        return resolved;
     };
     return Object.freeze({
         prepare(rawInput: RedactionSessionInput): PreparedRedaction {
@@ -197,11 +245,9 @@ export function createRedactionSession(): Readonly<{
             });
             for (const [token, value] of layerOne.rehydrationMap ?? []) {
                 if (!value) continue;
-                // Layer 1 coalesces case variants; locate all of them on the
-                // original text, including overlapping literal occurrences.
                 const pattern = new RegExp(`(?=(${escapeRegex(value)}))`, 'giu');
                 for (const match of input.text.matchAll(pattern)) {
-                    spans.push({ start: match.index, end: match.index + match[1].length, type: layerOneType(token) });
+                    spans.push({ start: match.index, end: match.index + match[1].length, ...layerOneSpanKind(token) });
                 }
             }
             spans.push(...localIdentifierSpans(input.text));
@@ -215,27 +261,28 @@ export function createRedactionSession(): Readonly<{
             if (tokensByValue.size + newValues.size > 4096) throw new Error('Redaction value budget exceeded');
             const values = new Map<string, string>();
             const entityCounts: Partial<Record<RedactionEntityType, number>> = {};
-            const metadata: Readonly<Span & { replacement: string }>[] = [];
+            const metadata: PreparedSpan[] = [];
             let redactedText = '';
             let cursor = 0;
             for (const span of merged) {
                 const raw = input.text.slice(span.start, span.end);
-                const key = raw;
-                let token = tokensByValue.get(key);
+                let token = tokensByValue.get(raw);
                 if (!token) {
-                    token = `${NAMESPACE}${nonce}_${tokensByValue.size + 1}}}`;
-                    tokensByValue.set(key, token);
+                    const role = roleOf(span);
+                    const ordinal = (roleCounts.get(role) ?? 0) + 1;
+                    roleCounts.set(role, ordinal);
+                    token = `[[MF_${role}${ordinal}_${nonce}]]`;
+                    tokensByValue.set(raw, token);
+                    valuesByToken.set(token, Object.freeze({ role, value: raw }));
                 }
-                // Exact raw identity preserves every original Unicode spelling.
                 if (!values.has(token)) values.set(token, raw);
                 entityCounts[span.type] = (entityCounts[span.type] ?? 0) + 1;
-                metadata.push(Object.freeze({ ...span, replacement: token }));
+                metadata.push(Object.freeze({ start: span.start, end: span.end, type: span.type, replacement: token }));
                 redactedText += input.text.slice(cursor, span.start) + token;
                 cursor = span.end;
             }
             redactedText += input.text.slice(cursor);
             preparations.add(values);
-            const pattern = values.size ? new RegExp([...values.keys()].map(escapeRegex).join('|'), 'g') : null;
             return Object.freeze({
                 redactedText,
                 spans: Object.freeze(metadata),
@@ -243,13 +290,16 @@ export function createRedactionSession(): Readonly<{
                 rehydrate(output: string): string {
                     assertOpen();
                     if (typeof output !== 'string') throw new Error('Invalid redaction output');
-                    return pattern ? output.replace(pattern, token => values.get(token)!) : output;
+                    return output.replace(PLACEHOLDER_PATTERN, token => values.get(token) ?? token);
                 },
             });
         },
+        resolve,
         close(): void {
+            if (!closed) liveNonces.delete(nonce);
             closed = true;
             tokensByValue.clear();
+            valuesByToken.clear();
             for (const values of preparations) values.clear();
             preparations.clear();
         },
