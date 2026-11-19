@@ -2879,21 +2879,21 @@ impl ClinicalApp {
             .flex()
             .items_center()
             .gap(px(8.))
-            .child(brand_icon(self.dark, if compact { 28. } else { 32. }))
+            .child(brand_icon(self.dark, if compact { 28. } else { 26. }))
             .child(
                 div()
                     .flex_auto()
                     .min_w_0()
                     .max_w_full()
                     .type_role(self.theme, crate::theme::TextRole::Brand)
-                    .child(text!("MediFlow.")),
+                    .child(text!("MediFlow")),
             )
     }
 
     fn navigation_item(&self, area: Area, compact: bool, cx: &Context<Self>) -> Stateful<Div> {
         let theme = self.theme;
         let active = self.area == area && !self.show_other;
-        let color = if active { theme.fresh } else { theme.ink };
+        let color = theme.ink;
         div()
             .id(area.id())
             .accessibility_id(area.id())
@@ -2911,17 +2911,26 @@ impl ClinicalApp {
             })
             .min_w_0()
             .max_w_full()
-            .min_h(px(44.))
-            .px(px(if compact { 8. } else { 12. }))
-            .py(px(8.))
+            .min_h(px(if compact { 44. } else { 34. }))
+            .px(px(if compact { 8. } else { 10. }))
+            .py(px(if compact { 8. } else { 6. }))
             .flex()
             .when(compact, |el| el.flex_col().flex_1())
             .items_center()
-            .gap(px(if compact { 4. } else { 12. }))
-            .rounded(px(theme.control_radius))
-            .bg(if active { theme.selected } else { theme.shade })
-            .border_2()
-            .border_color(if active { theme.selected } else { theme.shade })
+            .gap(px(if compact { 4. } else { 10. }))
+            .rounded(px(Theme::nested(theme.paper_radius, 10.)))
+            .border_1()
+            .border_color(if active {
+                theme.rule
+            } else {
+                gpui::transparent_black()
+            })
+            .when(active, |el| {
+                el.bg(theme.paper).shadow(vec![
+                    gpui::BoxShadow::new(px(0.), px(1.), Theme::tint(theme.ink, 0.06))
+                        .blur_radius(px(2.)),
+                ])
+            })
             .type_role(
                 theme,
                 if compact {
@@ -2935,9 +2944,9 @@ impl ClinicalApp {
             })
             .text_color(color)
             .cursor_pointer()
-            .hover(move |s| s.bg(theme.hover))
-            .focus(move |s| s.border_color(theme.fresh))
-            .child(icon(Icon::for_area(area), color, 20.))
+            .when(!active, move |el| el.hover(move |s| s.bg(theme.hover)))
+            .focus(move |s| s.shadow(vec![theme.focus_ring(false)]))
+            .child(icon(Icon::for_area(area), color, if compact { 20. } else { 16. }))
             .child(
                 div()
                     .min_w_0()
@@ -2948,6 +2957,17 @@ impl ClinicalApp {
                     .child(text!(area.title())),
             )
             .on_click(cx.listener(move |this, _, _, cx| this.navigate(area, cx)))
+    }
+
+    fn search_patients(&mut self, cx: &mut Context<Self>) {
+        self.navigate(Area::Patients, cx);
+        if self.area == Area::Patients && self.form.is_none() && !self.local_work_pending() {
+            if !self.directory {
+                self.back_from_patient(cx);
+            }
+            self.focus_search_after_render = true;
+            cx.notify();
+        }
     }
 
     fn sidebar(&self, layout: Layout, cx: &Context<Self>) -> Stateful<Div> {
@@ -2963,6 +2983,29 @@ impl ClinicalApp {
                     .unwrap_or_else(|| session.user().username.clone())
             })
             .unwrap_or_default();
+        let initials: String = operator
+            .split_whitespace()
+            .filter_map(|word| word.chars().find(|c| c.is_alphabetic()))
+            .flat_map(char::to_uppercase)
+            .take(2)
+            .collect();
+        let ambulatory = self
+            .ambulatories
+            .ready()
+            .into_iter()
+            .flatten()
+            .find(|scope| self.scope.as_deref() == Some(scope.id.as_str()))
+            .map(|scope| scope.name.clone());
+        let group = |label: &'static str| {
+            div()
+                .px(px(10.))
+                .pt(px(10.))
+                .pb(px(2.))
+                .type_role(theme, crate::theme::TextRole::Meta)
+                .font_weight(gpui::FontWeight::SEMIBOLD)
+                .text_color(theme.secondary)
+                .child(text!(label))
+        };
         div()
             .id("clinical-workspace-navigation")
             .accessibility_id("clinical-workspace-navigation")
@@ -2970,11 +3013,43 @@ impl ClinicalApp {
             .aria_label("Aree di MediFlow")
             .w(px(layout.navigation))
             .flex_shrink_0()
+            .my(px(6.))
+            .ml(px(6.))
             .flex()
             .flex_col()
-            .gap(px(24.))
-            .p(px(12.))
-            .child(div().px(px(4.)).py(px(12.)).child(self.brand(false)))
+            .gap(px(10.))
+            .p(px(10.))
+            .bg(theme.rail)
+            .border_1()
+            .border_color(theme.record.island_rule)
+            .rounded(px(theme.paper_radius))
+            .child(div().px(px(6.)).pt(px(8.)).child(self.brand(false)))
+            .child(
+                div()
+                    .id("clinical-workspace-rail-search")
+                    .accessibility_id("clinical-workspace-rail-search")
+                    .role(Role::Button)
+                    .aria_label("Cerca un paziente")
+                    .focusable()
+                    .tab_stop(true)
+                    .cursor_pointer()
+                    .min_h(px(34.))
+                    .px(px(10.))
+                    .flex()
+                    .items_center()
+                    .gap(px(8.))
+                    .bg(theme.paper)
+                    .border_1()
+                    .border_color(theme.rule)
+                    .rounded(px(Theme::nested(theme.paper_radius, 10.)))
+                    .type_role(theme, crate::theme::TextRole::Body)
+                    .text_color(theme.secondary)
+                    .hover(move |s| s.border_color(theme.strong_rule))
+                    .focus(move |s| s.shadow(vec![theme.focus_ring(false)]))
+                    .child(icon(Icon::Search, theme.secondary, 15.))
+                    .child(text!("Cerca"))
+                    .on_click(cx.listener(|this, _, _, cx| this.search_patients(cx))),
+            )
             .child(
                 div()
                     .id("clinical-workspace-navigation-items")
@@ -2985,37 +3060,90 @@ impl ClinicalApp {
                     .overflow_y_scroll()
                     .flex()
                     .flex_col()
-                    .gap(px(4.))
+                    .gap(px(2.))
+                    .child(group("Lavoro"))
                     .children(
-                        Area::ALL
+                        [Area::Patients, Area::Agenda, Area::Diary]
+                            .into_iter()
+                            .map(|area| self.navigation_item(area, false, cx)),
+                    )
+                    .child(group("Archivio"))
+                    .children(
+                        [Area::References, Area::Analytics, Area::Scales]
                             .into_iter()
                             .map(|area| self.navigation_item(area, false, cx)),
                     ),
             )
+            .child(self.navigation_item(Area::Settings, false, cx))
             .child(
                 div()
-                    .border_t_1()
-                    .border_color(theme.rule)
-                    .pt(px(16.))
+                    .id("clinical-workspace-identity")
+                    .min_w_0()
+                    .p(px(8.))
                     .flex()
-                    .flex_col()
-                    .gap(px(8.))
+                    .items_center()
+                    .gap(px(10.))
+                    .bg(theme.paper)
+                    .border_1()
+                    .border_color(theme.rule)
+                    .rounded(px(Theme::nested(theme.paper_radius, 8.)))
                     .child(
-                        div().px(px(8.)).text_color(theme.secondary).child(
-                            crate::title::title("ACCESSO PERSONALE", theme)
-                                .with_role(crate::theme::TitleRole::Section),
-                        ),
+                        div()
+                            .size(px(32.))
+                            .flex_none()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .rounded(px(10.))
+                            .bg(theme.selected)
+                            .text_color(theme.fresh)
+                            .type_role(theme, crate::theme::TextRole::Strong)
+                            .child(text!(initials)),
                     )
                     .child(
                         div()
-                            .px(px(8.))
-                            .type_role(theme, crate::theme::TextRole::Body)
-                            .child(text!(operator)),
+                            .flex_1()
+                            .min_w_0()
+                            .flex()
+                            .flex_col()
+                            .child(
+                                div()
+                                    .type_role(theme, crate::theme::TextRole::Strong)
+                                    .text_ellipsis()
+                                    .child(text!(operator)),
+                            )
+                            .children(ambulatory.map(|name| {
+                                div()
+                                    .type_role(theme, crate::theme::TextRole::Meta)
+                                    .text_color(theme.secondary)
+                                    .text_ellipsis()
+                                    .child(text!(name))
+                            })),
                     )
                     .child(
-                        button("clinical-workspace-lock", "Blocca", theme, false, true)
-                            .gap(px(8.))
-                            .child(icon(Icon::Lock, theme.ink, 16.))
+                        button("clinical-workspace-appearance", "", theme, false, true)
+                            .aria_label(if self.dark { "Passa al tema Giorno" } else { "Passa al tema Grafite" })
+                            .min_h(px(32.))
+                            .size(px(32.))
+                            .px(px(0.))
+                            .py(px(0.))
+                            .rounded(px(10.))
+                            .border_color(gpui::transparent_black())
+                            .child(icon(if self.dark { Icon::Sun } else { Icon::Moon }, theme.secondary, 15.))
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                let dark = !this.dark;
+                                this.change_local_preference(PreferenceChange::Appearance(Some(dark)), cx)
+                            })),
+                    )
+                    .child(
+                        button("clinical-workspace-lock", "", theme, false, true)
+                            .aria_label("Blocca")
+                            .min_h(px(32.))
+                            .size(px(32.))
+                            .px(px(0.))
+                            .py(px(0.))
+                            .rounded(px(10.))
+                            .child(icon(Icon::Lock, theme.ink, 15.))
                             .on_click(cx.listener(|this, _, _, cx| {
                                 this.request_discard(Discard::Lock, cx)
                             })),
@@ -3848,7 +3976,9 @@ impl ClinicalApp {
                     ),
             );
         }
-        if !layout.compact || self.show_sections {
+        if !layout.compact {
+            pane = pane.child(self.record_sections(layout, cx));
+        } else if self.show_sections {
             pane = pane.child(
                 div()
                     .id("clinical-workspace-patient-sections")
@@ -3877,7 +4007,9 @@ impl ClinicalApp {
         let mut content = div()
             .id("clinical-workspace-profile-scroll")
             .min_w_0()
-            .p(px(layout.margin));
+            .px(px(layout.margin))
+            .pb(px(layout.margin))
+            .pt(px(if layout.compact { layout.margin } else { 8. }));
         if self.form.is_some() {
             content = content.child(self.record_overview(patient, layout, cx));
         } else {
@@ -5426,7 +5558,7 @@ impl Render for ClinicalApp {
                                 } else if layout.compact {
                                     8.
                                 } else {
-                                    12.
+                                    6.
                                 }))
                                 .gap(px(12.))
                             })
@@ -6272,13 +6404,8 @@ fn diagnosis_labels(value: Option<&str>) -> Result<Vec<(String, String)>, ()> {
         .collect()
 }
 
-fn entry_type_label(kind: &str) -> &str {
-    match kind {
-        "note" => "Nota",
-        "visit" => "Visita",
-        "remote" => "Contatto remoto",
-        value => value,
-    }
+fn entry_type_label(kind: &str) -> String {
+    record_changes::entry_kind_label(kind)
 }
 
 fn therapy_status(status: &str) -> &str {
@@ -8407,13 +8534,14 @@ mod review706b_callers {
             let back = cx
                 .debug_bounds("clinical-workspace-back-directory")
                 .unwrap();
+            let actions = cx.debug_bounds("clinical-workspace-record-menu").unwrap();
             assert!(
                 birth.right() <= px(width - 15.9),
                 "date must wrap inside the page: {birth:?}"
             );
             assert!(
-                back.top() >= birth.bottom(),
-                "actions must not overlap the birth date: {back:?} / {birth:?}"
+                back.bottom() <= birth.top() && actions.top() >= birth.bottom(),
+                "the path stays above and the actions below the birth date: {back:?} / {actions:?} / {birth:?}"
             );
         }
     }

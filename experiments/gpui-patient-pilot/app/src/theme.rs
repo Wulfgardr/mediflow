@@ -4,7 +4,6 @@ use gpui::{BoxShadow, FontFeatures, FontWeight, Hsla, Styled, px, rgb};
 use serde_json::Value;
 
 pub const VOICE: &str = "Newsreader";
-pub const CODES: &str = "IBM Plex Mono";
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 pub const SYSTEM: &str = ".SystemUIFont";
 #[cfg(target_os = "windows")]
@@ -32,6 +31,7 @@ pub struct Theme {
     pub critical: Hsla,
     pub success: Hsla,
     pub threshold_text: Hsla,
+    pub rail: Hsla,
     pub control_radius: f32,
     pub paper_radius: f32,
     pub scale: f32,
@@ -111,6 +111,7 @@ impl Theme {
             critical: color("signal", "critical"),
             success: color("signal", "success"),
             threshold_text: color("ink", "threshold"),
+            rail: token_color(&tokens["record"][register][if dark { "island" } else { "tray" }]),
             control_radius: if cfg!(any(target_os = "ios", target_os = "macos")) {
                 12.
             } else if cfg!(target_os = "windows") {
@@ -154,6 +155,10 @@ impl Theme {
         self.control_radius + inset
     }
 
+    pub fn tint(color: Hsla, alpha: f32) -> Hsla {
+        Hsla { a: alpha, ..color }
+    }
+
     pub fn nested(outer: f32, inset: f32) -> f32 {
         (outer - inset).max(0.)
     }
@@ -181,18 +186,17 @@ impl Theme {
             TypeRole::PageTitle => (VOICE, 26., FontWeight::NORMAL, 1.2, false),
             TypeRole::PersonPreview => (VOICE, 22., FontWeight::NORMAL, 1.2, false),
             TypeRole::Prose => (VOICE, 17., FontWeight::NORMAL, 1.5, false),
-            TypeRole::Brand => (VOICE, 21., FontWeight::MEDIUM, 1.2, false),
+            TypeRole::Brand => (SYSTEM, 17., FontWeight::SEMIBOLD, 1.2, false),
             TypeRole::Body => (SYSTEM, 14., FontWeight::NORMAL, 1.5, true),
             TypeRole::Strong => (SYSTEM, 14., FontWeight::SEMIBOLD, 1.5, true),
             TypeRole::Threshold => (SYSTEM, 15., FontWeight::SEMIBOLD, 1.5, true),
             TypeRole::Meta => (SYSTEM, 13., FontWeight::NORMAL, 1.5, true),
             TypeRole::Section => (SYSTEM, 12., FontWeight::SEMIBOLD, 1.5, true),
             TypeRole::Title => (SYSTEM, 15., FontWeight::SEMIBOLD, 1.4, true),
-            TypeRole::RecordPerson => (SYSTEM, 28., FontWeight::BOLD, 1.15, false),
-            TypeRole::RecordZone => (SYSTEM, 20., FontWeight::BOLD, 1.2, false),
+            TypeRole::RecordPerson => (SYSTEM, 28., FontWeight::SEMIBOLD, 1.15, false),
             TypeRole::RecordIsland => (SYSTEM, 17., FontWeight::SEMIBOLD, 1.3, false),
             TypeRole::RecordRow => (SYSTEM, 15., FontWeight::SEMIBOLD, 1.35, false),
-            TypeRole::Code => (CODES, 12., FontWeight::NORMAL, 1.5, false),
+            TypeRole::Code => (SYSTEM, 12., FontWeight::MEDIUM, 1.5, false),
         };
         let size = self.size(points * if register { native_body / 14. } else { 1. });
         Typography {
@@ -221,7 +225,6 @@ pub enum TypeRole {
     Section,
     Title,
     RecordPerson,
-    RecordZone,
     RecordIsland,
     RecordRow,
     Code,
@@ -289,7 +292,6 @@ pub enum TitleRole {
     Section,
     SectionTitle,
     RecordPerson,
-    RecordZone,
     RecordIsland,
     Threshold,
 }
@@ -303,7 +305,6 @@ impl From<TitleRole> for TypeRole {
             TitleRole::Section => Self::Section,
             TitleRole::SectionTitle => Self::Title,
             TitleRole::RecordPerson => Self::RecordPerson,
-            TitleRole::RecordZone => Self::RecordZone,
             TitleRole::RecordIsland => Self::RecordIsland,
             TitleRole::Threshold => Self::Threshold,
         }
@@ -462,20 +463,20 @@ mod tests {
     voice!(
         brand,
         TypeRole::Brand,
-        "Newsreader",
-        21.,
-        42.,
-        FontWeight::MEDIUM,
-        25.2,
-        50.4
+        SYSTEM,
+        17.,
+        34.,
+        FontWeight::SEMIBOLD,
+        20.4,
+        40.8
     );
     voice!(
         code,
         TypeRole::Code,
-        "IBM Plex Mono",
+        SYSTEM,
         12.,
         24.,
-        FontWeight::NORMAL,
+        FontWeight::MEDIUM,
         18.,
         36.
     );
