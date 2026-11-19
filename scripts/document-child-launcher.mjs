@@ -9,22 +9,16 @@ export const DOCUMENT_CHILD_DATA_BYTES = 1024 * 1024 * 1024;
 export function documentChildLaunch(root, script, { allowAddons = false, args = [], wasmMemoryPages, networkGuard = true } = {}) {
   const nodeArgs = [`--max-old-space-size=${DOCUMENT_CHILD_HEAP_MB}`,
     ...(wasmMemoryPages ? [`--wasm-max-mem-pages=${wasmMemoryPages}`] : []),
-    '--permission', ...(networkGuard ? ['--import', path.join(root, 'scripts/document-child-network-guard.mjs')] : []), '--disable-warning=SecurityWarning', `--allow-fs-read=${root}`,
+    '--permission', ...(networkGuard ? ['--import', path.join(root, 'scripts/document-child-network-guard.mjs')] : []),
+    '--disable-warning=SecurityWarning', `--allow-fs-read=${root}`,
     ...(allowAddons ? ['--allow-addons'] : []), script, ...args];
-  return boundedDocumentLaunch(process.execPath, nodeArgs, root);
-}
-
-/** @param {string} executable
- * @param {readonly string[]} args
- * @param {string} root
- */
-export function boundedDocumentLaunch(executable, args, root) {
+  const executable = process.execPath;
   if (process.platform === 'darwin') {
-    const profile = '(version 1) (allow default) (deny network*) (deny file-write*)';
-    return { command: '/usr/bin/sandbox-exec', args: ['-p', profile, executable, ...args] };
+    const profile = '(version 1) (allow default) (deny network*) (deny file-write*) (deny process-fork)';
+    return { command: '/usr/bin/sandbox-exec', args: ['-p', profile, executable, ...nodeArgs] };
   }
   if (process.platform === 'linux') {
-    return { command: '/usr/bin/prlimit', args: [`--data=${DOCUMENT_CHILD_DATA_BYTES}`, '--', executable, ...args] };
+    return { command: '/usr/bin/prlimit', args: [`--data=${DOCUMENT_CHILD_DATA_BYTES}`, '--', executable, ...nodeArgs] };
   }
-  return { command: executable, args };
+  return { command: executable, args: nodeArgs };
 }

@@ -129,15 +129,16 @@ test('both real PDF callers pass the exact owned root, heap and conditional addo
     };
     syncBuiltinESMExports();
     try {
-        assert.equal((await runAnyDocPdfMaterializationChild(Buffer.from('%PDF-synthetic'), 1)).status, 'failed');
-        assert.equal((await runAnyDocPdfRenderingChild([{ page: 1, pdfBytes: Buffer.from('%PDF-synthetic') }])).status, 'failed');
+        const unavailable = { status: 'failed', reason: 'worker_unavailable', terminationSignal: null };
+        assert.deepEqual(await runAnyDocPdfMaterializationChild(Buffer.from('%PDF-synthetic'), 1), unavailable);
+        assert.deepEqual(await runAnyDocPdfRenderingChild([{ page: 1, pdfBytes: Buffer.from('%PDF-synthetic') }]), unavailable);
     } finally { childProcess.spawn = original; syncBuiltinESMExports(); }
     assert.equal(calls.length, 2);
     for (const [index, call] of calls.entries()) {
         const core = ['--max-old-space-size=256', '--permission', '--disable-warning=SecurityWarning', `--allow-fs-read=${root}`,
             ...(index === 1 ? ['--allow-addons'] : []), worker];
         const command = process.platform === 'darwin' ? '/usr/bin/sandbox-exec' : process.platform === 'linux' ? '/usr/bin/prlimit' : process.execPath;
-        const prefix = process.platform === 'darwin' ? ['-p', '(version 1) (allow default) (deny network*) (deny file-write*)', process.execPath]
+        const prefix = process.platform === 'darwin' ? ['-p', '(version 1) (allow default) (deny network*) (deny file-write*) (deny process-fork)', process.execPath]
             : process.platform === 'linux' ? ['--data=1073741824', '--', process.execPath] : [];
         assert.equal(call.command, command);
         assert.deepEqual(call.args, [...prefix, ...core]);
