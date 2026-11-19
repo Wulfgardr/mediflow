@@ -4,7 +4,7 @@ import { agentAppliedItemIds, agentConfirmationPatientState, applyConfirmedAgent
 import { readAgentCassette } from './agent-cassette-store';
 import { cassetteItems } from './agent-cassette-contract';
 import { openDbServer } from './db-server';
-import { automaticAgentKind, type AgentApplication } from './agent-visit-application-contract';
+import { agentCassetteConfirmsNatively, type AgentApplication } from './agent-visit-application-contract';
 import { launchNativeVisitConfirmation, nativeVisitConfirmationConfigured } from './agent-visit-confirmation-native';
 import { createVisitConfirmationChallenge } from './agent-visit-confirmation-proof';
 import { visitConfirmationDurationMs, type VisitConfirmationReceipt, type VisitConfirmationTicket } from './agent-visit-confirmation-contract';
@@ -65,13 +65,11 @@ function waiting(request: Confirmation): boolean {
     return false;
 }
 
-function fromCassette(request: Confirmation, requireAutomatic: boolean): boolean {
+function fromCassette(request: Confirmation, presentable: boolean): boolean {
     const row = readAgentCassette(openDbServer(), request.visitId, request.identity.actorRef);
     if (!row || !sameAgent(row, request.identity) || row.status !== 'closed' || row.revision !== request.revision) return false;
     const applied = new Set(agentAppliedItemIds(request.visitId));
-    const items = cassetteItems(row);
-    return items.some(item => !automaticAgentKind(item.kind) && !applied.has(item.id))
-        && (!requireAutomatic || items.filter(item => automaticAgentKind(item.kind)).every(item => applied.has(item.id)));
+    return cassetteItems(row).some(item => !applied.has(item.id)) && (!presentable || agentCassetteConfirmsNatively(row));
 }
 
 export function startVisitConfirmation(principal: AgentPrincipal, visitId: string): VisitConfirmationReceipt {

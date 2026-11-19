@@ -8,6 +8,7 @@ import {
   AIP_OPERATION_RPC_LATE_BIND_ENV_V1,
 } from '../../packages/aip/src/child-ipc-contract.ts';
 import { LOCAL_UI_RPC_MODE } from '../../packages/mcp/src/local-ui-contract.ts';
+import { HEADLESS_AGENT_KIND_ENV } from './headless-agent-kind.ts';
 import type { LateBoundMcpChildPortV1 } from './authenticated-headless-agent-pre-spawned-mcp-child.ts';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
@@ -168,6 +169,7 @@ export function createPortableSupervisorProductionChildProcessesV1(
     });
   }
   if (agentKind === 'plugin_local_ui') webEnvironment.MEDIFLOW_PLUGIN_LOCAL_UI = '1';
+  if (agentKind === 'mini') webEnvironment[HEADLESS_AGENT_KIND_ENV] = 'mini';
   const mcpEnvironment = {
     [AIP_OPERATION_RPC_ENV_KEY_V1]: agentKind === 'plugin_local_ui' ? LOCAL_UI_RPC_MODE : AIP_OPERATION_RPC_LATE_BIND_ENV_V1,
   } as unknown as NodeJS.ProcessEnv;

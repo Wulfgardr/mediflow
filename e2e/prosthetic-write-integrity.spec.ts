@@ -3,7 +3,7 @@ import Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
 import { isAbsolute, join } from 'node:path';
 import { bootstrapUnlockedSession, openPatientSection } from './utils';
-import { trustedArchiveWebRequestHeaders, trustedWebRequestHeaders } from './fixtures/trusted-web-request';
+import { reviewedRestoreHeaders, trustedArchiveWebRequestHeaders, trustedWebRequestHeaders } from './fixtures/trusted-web-request';
 
 test('Web creates, records testing, and removes a prosthetic prescription with one audit per action', async ({ page, baseURL }, testInfo) => {
     test.skip(process.env.MF085_SYNTHETIC_E2E !== '1', 'Requires an isolated synthetic server.');
@@ -132,7 +132,8 @@ test('HTTP attraverso il proxy conserva originali protesici da 8 e 25 MiB', asyn
     const db = new Database(join(dir, 'medical.db'), { fileMustExist: true });
     try {
         for (const original of originals) db.prepare('DELETE FROM prosthetics_catalog_documents WHERE id=?').run(original.id);
-        const restored = await page.request.post('/api/system/backup-restore', { headers: { ...headers, 'Content-Type': 'application/json', 'x-mediflow-restore-credential': JSON.stringify({ pin: process.env.E2E_PIN || '1234' }) }, data: artifact });
+        const intent = await reviewedRestoreHeaders(page.request, headers, artifact);
+        const restored = await page.request.post('/api/system/backup-restore', { headers: { ...headers, ...intent, 'Content-Type': 'application/json', 'x-mediflow-restore-credential': JSON.stringify({ pin: process.env.E2E_PIN || '1234' }) }, data: artifact });
         expect(restored.status(), await restored.text()).toBe(200);
         expect((await restored.json()).success).toBe(true);
         for (const original of originals) {

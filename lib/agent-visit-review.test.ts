@@ -12,6 +12,8 @@ import { AGENT_ITEM_OPERATION } from './agent-cassette-contract';
 import { readPatientDiaryMetadata } from './patient-diary-metadata';
 import { agentVisitPdfText } from './agent-visit-pdf-text';
 
+const pdfText = (text: string) => async () => ({ text, beyondText: false });
+
 const cfA = 'RSSMRA80A01F205X', cfB = 'RSSMRA85T10A562S';
 function patient(cf: string): Patient { return { id: 'synthetic-' + cf, taxCode: cf, firstName: 'Persona', lastName: 'Sintetica',
     address: '', phone: '', updatedAt: new Date(), createdAt: new Date(), version: 1 }; }
@@ -46,10 +48,10 @@ test('a PDF with another patient tax code blocks the whole cassette and produces
     const f = await fixture();
     try {
         const signal = new AbortController().signal;
-        const review = await inspectAgentVisit(f.row, [patient(cfA), patient(cfB)], null, signal, async () => 'Paziente CF ' + cfB);
+        const review = await inspectAgentVisit(f.row, [patient(cfA), patient(cfB)], null, signal, pdfText('Paziente CF ' + cfB));
         assert.ok(review.blockers.length);
         assert.match(review.blockers.join(' '), new RegExp(cfB));
-        assert.equal(await prepareAgentApplication(review, 'automatic', signal), null);
+        assert.equal(await prepareAgentApplication(review, signal), null);
     } finally { f.close(); }
 });
 
@@ -57,7 +59,7 @@ test('a prescription bearing patient and physician tax codes matches only the ex
     const f = await fixture();
     try {
         const review = await inspectAgentVisit(f.row, [patient(cfA), patient(cfB)], cfB, new AbortController().signal,
-            async () => `Paziente CF ${cfA}\nMedico prescrittore\nCodice fiscale del medico: ${cfB}`);
+            pdfText(`Paziente CF ${cfA}\nMedico prescrittore\nCodice fiscale del medico: ${cfB}`));
         assert.deepEqual(review.blockers, []);
         assert.equal(review.patient?.taxCode, cfA);
     } finally { f.close(); }
@@ -68,7 +70,7 @@ test('two visits deposited at the same time are linked by their PDF tax codes, n
         const f = await fixture(cf);
         try {
             f.row.depositedAt = 1900000000000;
-            const review = await inspectAgentVisit(f.row, [patient(cfA), patient(cfB)], null, new AbortController().signal, async () => 'Paziente CF ' + cf);
+            const review = await inspectAgentVisit(f.row, [patient(cfA), patient(cfB)], null, new AbortController().signal, pdfText('Paziente CF ' + cf));
             assert.deepEqual(review.blockers, []);
             assert.equal(review.patient?.taxCode, cf);
         } finally { f.close(); }
@@ -80,7 +82,7 @@ test('missing, unlabelled, unregistered or duplicated patient identity prevents 
     try {
         for (const [patients, pdf] of [[[], 'Paziente CF ' + cfA], [[patient(cfA), { ...patient(cfA), id: 'synthetic-duplicate' }], 'Paziente CF ' + cfA],
             [[patient(cfA)], 'Documento sintetico senza identità'], [[patient(cfA)], cfA]] as const) {
-            const review = await inspectAgentVisit(f.row, [...patients], null, new AbortController().signal, async () => pdf);
+            const review = await inspectAgentVisit(f.row, [...patients], null, new AbortController().signal, pdfText(pdf));
             assert.ok(review.blockers.length);
         }
     } finally { f.close(); }
@@ -90,7 +92,7 @@ test('a changed PDF hash never reaches the browser parser', async () => {
     const f = await fixture(cfA, true);
     try {
         let parsed = false;
-        const review = await inspectAgentVisit(f.row, [patient(cfA)], null, new AbortController().signal, async () => { parsed = true; return 'Paziente CF ' + cfA; });
+        const review = await inspectAgentVisit(f.row, [patient(cfA)], null, new AbortController().signal, async () => { parsed = true; return { text: 'Paziente CF ' + cfA, beyondText: false }; });
         assert.equal(parsed, false);
         assert.ok(review.blockers.length);
     } finally { f.close(); }
@@ -100,7 +102,7 @@ test('locking during local PDF inspection discards the result', async () => {
     const f = await fixture();
     try {
         const controller = new AbortController();
-        await assert.rejects(inspectAgentVisit(f.row, [patient(cfA)], null, controller.signal, async () => { controller.abort(); return 'Paziente CF ' + cfA; }));
+        await assert.rejects(inspectAgentVisit(f.row, [patient(cfA)], null, controller.signal, async () => { controller.abort(); return { text: 'Paziente CF ' + cfA, beyondText: false }; }));
     } finally { f.close(); }
 });
 
@@ -123,7 +125,7 @@ for (const [prefix, suffix, blocked] of [
         const query = mock.method(db.therapies, 'query', () => ({ toArray: async () => [] }));
         try {
             const review = await inspectAgentVisit(f.row, [patient(cfA)], null, new AbortController().signal,
-                async () => 'Paziente CF ' + cfA + '\n' + prefix + quote + suffix);
+                pdfText('Paziente CF ' + cfA + '\n' + prefix + quote + suffix));
             assert.deepEqual(review.blockers, []);
             assert.equal(review.proposalBlockers.length > 0, blocked);
         } finally { query.mock.restore(); f.close(); }
@@ -131,36 +133,37 @@ for (const [prefix, suffix, blocked] of [
 }
 
 
-for (const [provider, allowsClinicalEgress, appliesAutomatically] of [['openai', false, false], ['anthropic', false, false], ['openai', true, true], ['local', false, true]] as const) {
-    test(`J5: the ${provider} cassette with egress ${allowsClinicalEgress} ${appliesAutomatically ? 'keeps' : 'skips'} the automatic pass in the browser`, async () => {
+for (const [provider, allowsClinicalEgress] of [['openai', false], ['anthropic', false], ['openai', true], ['local', false]] as const) {
+    test(`L2: the ${provider} cassette with egress ${allowsClinicalEgress} brings its PDF to the doctor`, async () => {
         const f = await fixture(cfA, false, undefined, provider, allowsClinicalEgress);
         const get = mock.method(db.patients, 'get', async () => patient(cfA));
         try {
             const signal = new AbortController().signal;
-            const review = await inspectAgentVisit(f.row, [patient(cfA)], null, signal, async () => 'Paziente CF ' + cfA);
+            const review = await inspectAgentVisit(f.row, [patient(cfA)], null, signal, pdfText('Paziente CF ' + cfA));
             assert.deepEqual([...review.blockers, ...review.proposalBlockers], []);
-            assert.equal(review.appliesAutomatically, appliesAutomatically);
-            const automatic = await prepareAgentApplication(review, 'automatic', signal);
-            const reviewed = await prepareAgentApplication(review, 'review', signal);
-            assert.deepEqual(automatic?.items.map(item => item.kind) ?? null, appliesAutomatically ? ['pdf'] : null);
-            assert.deepEqual(reviewed?.items.map(item => item.kind) ?? null, appliesAutomatically ? null : ['pdf']);
-            assert.equal(agentVisitAwaitsReview(review), !appliesAutomatically);
+            const reviewed = await prepareAgentApplication(review, signal);
+            assert.equal(reviewed?.phase, 'review');
+            assert.deepEqual(reviewed?.items.map(item => item.kind), ['pdf']);
+            assert.equal(agentVisitAwaitsReview(review), true);
             assert.equal(agentVisitAwaitsReview({ ...review, appliedItemIds: review.visit.items.map(item => item.id) }), false);
         } finally { get.mock.restore(); f.close(); }
     });
 }
 
-test('a proposal still waits for review only after the automatic pass of a cassette that applies automatically', async () => {
+test('a proposal waits with the PDF it cites, and alone once the PDF entered under the previous rule', async () => {
     const quote = 'LOINC 2345-7. Glucosio 100 mg/dL intervallo 70 110';
     const f = await fixture(cfA, false, { kind: 'observation', values: { code: '2345-7', display: 'Glucosio', value: '100', unitCode: 'mg/dL', unit: 'mg/dL', observedAt: '2026-11-17', refLow: '70', refHigh: '110', refText: '70 110' }, quote });
     const query = mock.method(db.observations, 'query', () => ({ toArray: async () => [] }));
+    const get = mock.method(db.patients, 'get', async () => patient(cfA));
     try {
-        const review = await inspectAgentVisit(f.row, [patient(cfA)], null, new AbortController().signal, async () => 'Paziente CF ' + cfA + '\n' + quote);
+        const signal = new AbortController().signal;
+        const review = await inspectAgentVisit(f.row, [patient(cfA)], null, signal, pdfText('Paziente CF ' + cfA + '\n' + quote));
         assert.deepEqual([...review.blockers, ...review.proposalBlockers], []);
         const pdf = review.visit.items.find(item => item.kind === 'pdf')!.id;
-        assert.equal(agentVisitAwaitsReview(review), false);
-        assert.equal(agentVisitAwaitsReview({ ...review, appliedItemIds: [pdf] }), true);
-    } finally { query.mock.restore(); f.close(); }
+        assert.equal(agentVisitAwaitsReview(review), true);
+        assert.deepEqual((await prepareAgentApplication(review, signal))?.items.map(item => item.kind), ['pdf', 'observation']);
+        assert.deepEqual((await prepareAgentApplication({ ...review, appliedItemIds: [pdf] }, signal))?.items.map(item => item.kind), ['observation']);
+    } finally { get.mock.restore(); query.mock.restore(); f.close(); }
 });
 
 test('a patient revision changed after the displayed review cannot be silently adopted', async () => {
@@ -168,10 +171,10 @@ test('a patient revision changed after the displayed review cannot be silently a
     const original = db.patients.get;
     try {
         const signal = new AbortController().signal;
-        const review = await inspectAgentVisit(f.row, [patient(cfA)], null, signal, async () => 'Paziente CF ' + cfA);
+        const review = await inspectAgentVisit(f.row, [patient(cfA)], null, signal, pdfText('Paziente CF ' + cfA));
         assert.deepEqual(review.blockers, []);
         db.patients.get = async () => ({ ...patient(cfA), version: 2 });
-        await assert.rejects(prepareAgentApplication(review, 'automatic', signal), /scheda è cambiata/);
+        await assert.rejects(prepareAgentApplication(review, signal), /scheda è cambiata/);
     } finally { db.patients.get = original; f.close(); }
 });
 
@@ -183,9 +186,10 @@ test('a deposited note has readable diary metadata and preserves the document re
     const source = { sha256: 'a'.repeat(64), fileName: 'synthetic.pdf' };
     try {
         const signal = new AbortController().signal;
-        const review = await inspectAgentVisit(f.row, [patient(cfA)], null, signal, async () => 'Paziente CF ' + cfA);
+        const review = await inspectAgentVisit(f.row, [patient(cfA)], null, signal, pdfText('Paziente CF ' + cfA));
         review.visit.items.push({ kind: 'note', id: randomUUID(), value: { text: quote, quote, source } });
-        const application = await prepareAgentApplication(review, 'automatic', signal);
+        const application = await prepareAgentApplication(review, signal);
+        assert.deepEqual(application?.items.map(item => item.kind), ['pdf', 'note']);
         const note = application?.items.find(item => item.kind === 'note');
         assert.ok(note?.kind === 'note');
         const metadata = readPatientDiaryMetadata(await db.openLocalDraft(note.values.metadata));
@@ -200,7 +204,7 @@ test('service line items absent from the cited PDF cannot enter the no-doubts ba
     const f = await fixture(cfA, false, { kind: 'service', values: { serviceName: 'Prestazione Sintetica', prescribedAt: '2026-11-17', category: 'other', items: 'Esame aggiunto senza fonte' }, quote });
     const query = mock.method(db.servicePrescriptions, 'query', () => ({ toArray: async () => [] }));
     try {
-        const review = await inspectAgentVisit(f.row, [patient(cfA)], null, new AbortController().signal, async () => 'Paziente CF ' + cfA + '\n' + quote);
+        const review = await inspectAgentVisit(f.row, [patient(cfA)], null, new AbortController().signal, pdfText('Paziente CF ' + cfA + '\n' + quote));
         assert.deepEqual(review.blockers, []);
         assert.match(review.proposalBlockers.join(' '), /Voci della prestazione/);
     } finally { query.mock.restore(); f.close(); }
@@ -213,9 +217,9 @@ test('a reviewed observation preserves the reference range present in its source
     const get = mock.method(db.patients, 'get', async () => patient(cfA));
     try {
         const signal = new AbortController().signal;
-        const review = await inspectAgentVisit(f.row, [patient(cfA)], null, signal, async () => 'Paziente CF ' + cfA + '\n' + quote);
+        const review = await inspectAgentVisit(f.row, [patient(cfA)], null, signal, pdfText('Paziente CF ' + cfA + '\n' + quote));
         assert.deepEqual([...review.blockers, ...review.proposalBlockers], []);
-        const application = await prepareAgentApplication(review, 'review', signal);
+        const application = await prepareAgentApplication(review, signal);
         const values = application?.items.find(item => item.kind === 'observation')?.values as Record<string, unknown>;
         assert.equal(values.refLow, '70');
         assert.equal(values.refHigh, '110');
@@ -229,7 +233,7 @@ test('an observation code absent from its cited source remains a proposal with a
     const f = await fixture(cfA, false, { kind: 'observation', values: { code: '2345-7', display: 'Glucosio', value: '100', unit: 'mg/dL', unitCode: 'mg/dL', observedAt: '2026-11-17' }, quote });
     const query = mock.method(db.observations, 'query', () => ({ toArray: async () => [] }));
     try {
-        const review = await inspectAgentVisit(f.row, [patient(cfA)], null, new AbortController().signal, async () => 'Paziente CF ' + cfA + '\n' + quote);
+        const review = await inspectAgentVisit(f.row, [patient(cfA)], null, new AbortController().signal, pdfText('Paziente CF ' + cfA + '\n' + quote));
         assert.deepEqual(review.blockers, []);
         assert.match(review.proposalBlockers.join(' '), /Codice dell’osservazione/);
     } finally { query.mock.restore(); f.close(); }

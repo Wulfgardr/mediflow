@@ -221,11 +221,12 @@ export async function postNetworkPairingIntent(payload: unknown): Promise<Pairin
         payload,
     });
     if (result.ok) {
-        const persisted = await mutateNetworkPairingState((state) => ({
-            write: true,
-            nextState: addPendingPairingIntent(state, result.value),
-            result: null,
-        }));
+        const persisted = await mutateNetworkPairingState<PairingIntentDraftResult>((state) => {
+            const admission = addPendingPairingIntent(state, result.value);
+            return admission.ok
+                ? { write: true, nextState: admission.nextState, result }
+                : { write: false, result: admission };
+        });
         if (persisted.conflict) {
             return {
                 ok: false,
@@ -237,6 +238,7 @@ export async function postNetworkPairingIntent(payload: unknown): Promise<Pairin
                 },
             };
         }
+        return persisted.result;
     }
 
     return result;

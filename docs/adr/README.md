@@ -14,6 +14,8 @@ verifica dello stato successivo.
 
 ## Decisioni richiamate
 
+- L'[ADR 0195](0195-materiale-dell-agente-dopo-il-gesto-del-medico.md), accettato il 19/11/2026, fa entrare in cartella nota, trascrizione, PDF e proposte depositati da un client agente solo dopo il gesto del medico, sul Web o nella conferma nativa che li mostra per intero.
+- L'[ADR 0194](0194-profilo-pseudonimizzato-per-la-chat-esterna.md), accettato il 19/11/2026, fa uscire verso la chat MCP il profilo del paziente con segnaposto al posto dell'identità, sostituiti nel proprietario Web prima dell'IPC. Mini e le corsie HTTP restano con i dati veri.
 - L'[ADR 0193](0193-egress-clinico-controllato-dal-server.md), accettato il 19/11/2026, fa rifiutare dal server le operazioni cliniche dei mandati cloud senza egress dichiarato e toglie dall'applicazione automatica le cassette già depositate così.
 - L'[ADR 0192](0192-segnaposto-con-ruolo-e-date-relative.md), accettato il 19/11/2026, dà un ruolo ai segnaposto verso i modelli cloud, lega i ruoli ai campi dell'output ed esprime le date cliniche come scostamenti in giorni. La data di nascita non esce mai come scostamento.
 
