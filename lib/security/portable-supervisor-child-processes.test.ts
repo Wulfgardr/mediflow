@@ -96,9 +96,8 @@ test('spawns one marker-only MCP child with a file URL loader and one direct loo
 test('only a Mini Supervisor tells its Web child to release the identified profile', () => {
   for (const agentKind of ['mcp', 'mini'] as const) {
     const current = setup(undefined, agentKind);
-    const web = current.calls[1]?.options.env ?? {};
-    assert.equal(web.MEDIFLOW_HEADLESS_AGENT_KIND, agentKind === 'mini' ? 'mini' : undefined, agentKind);
-    assert.equal(current.calls[0]?.options.env?.MEDIFLOW_HEADLESS_AGENT_KIND, undefined);
+    assert.equal(Reflect.get(current.calls[1]?.options.env ?? {}, 'MEDIFLOW_HEADLESS_AGENT_KIND'), agentKind === 'mini' ? 'mini' : undefined, agentKind);
+    assert.equal(Reflect.get(current.calls[0]?.options.env ?? {}, 'MEDIFLOW_HEADLESS_AGENT_KIND'), undefined);
     current.processes.terminateAll();
   }
 });

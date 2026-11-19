@@ -230,7 +230,7 @@ test('keeps the profile operation separate from semantic reads and enforces exac
 
 test('no MCP operation that reaches a proposal or a write accepts host text, so a profile placeholder cannot return as data', async () => {
   const { toJSONSchema } = await import('zod');
-  const argumentsByOperation = new Map<string, Parameters<typeof toJSONSchema>[0]>([
+  const argumentsByOperation = new Map<string, import('zod').ZodType>([
     [TERMINOLOGY_OPERATION_ID, terminologyArgumentsSchema], [OPEN_LOOPS_OPERATION_ID, followUpProposalArgumentsSchema],
     [FOLLOW_UP_PROPOSAL_OPERATION_ID, followUpProposalArgumentsSchema], [SEMANTIC_QUERY_OPERATION_ID, semanticQueryArgumentsSchema],
     [CHECKUP_STATUS_TRANSITION_OPERATION_ID, checkupStatusTransitionArgumentsSchema],
