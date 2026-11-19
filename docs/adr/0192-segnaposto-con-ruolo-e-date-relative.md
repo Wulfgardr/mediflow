@@ -31,7 +31,7 @@ Un valore sostituito diventa `[[MF_<RUOLO><n>_<nonce>]]`, ad esempio
 
 | Ruolo | Che cosa sostituisce |
 |---|---|
-| `PAZ` | nomi del paziente in contesto, cioè quelli che arrivano dall'anagrafica |
+| `PAZ` | un valore fatto solo di nomi del paziente in contesto, cioè di parole che arrivano dall'anagrafica |
 | `PER` | ogni altra persona: familiari, medici, operatori |
 | `NAS` | date di nascita |
 | `DAT` | date che non diventano scostamenti |
@@ -42,6 +42,14 @@ Un valore sostituito diventa `[[MF_<RUOLO><n>_<nonce>]]`, ad esempio
 
 Lo stesso valore riceve lo stesso segnaposto per tutta la sessione, come
 prima. Il numero conta i valori dentro il ruolo.
+
+Un valore è `PAZ` solo se tutte le sue parole sono nomi dell'anagrafica, in
+qualunque ordine e maiuscolo, con spazi e punteggiatura fra loro: «Lucia
+Bianchi» e «Bianchi Lucia» sono `PAZ`. Basta una parola estranea perché il
+valore diventi `PER`: il padre «Carlo Bianchi» ed il fratello «Bianchi Aldo»
+non ricevono l'etichetta del paziente solo perché ne condividono il cognome.
+Un'etichetta falsa è peggio di un segnaposto opaco, perché il modello potrebbe
+attribuire al paziente la storia di un familiare.
 
 Il nonce ha 8 caratteri (40 bit) al posto di 32 esadecimali. La proprietà che
 prima dipendeva dai 128 bit ora la garantisce il processo: due sessioni vive
@@ -71,22 +79,36 @@ preparazione o dentro una chiave JSON fa fallire l'intera risposta.
 
 Le date intere che il Layer 1 riconosce (giorno/mese/anno con `/`, `.` o `-`,
 anni dal 1900 al 2099) escono come `[[MF_GG+n_<nonce>]]` o
-`[[MF_GG-n_<nonce>]]`. L'ancora è la prima di queste date nella sessione,
-spostata a caso di ±1024 giorni: non si ricava dai byte del payload e due
-preparazioni dello stesso testo danno scostamenti diversi, con gli stessi
-intervalli. Il testo inviato porta in coda una nota sulla forma delle date,
-solo quando ne contiene.
+`[[MF_GG-n_<nonce>]]` solo se cadono nella finestra clinica attorno al
+riferimento della sessione. Il riferimento è la data più recente, esclusa la
+nascita, del primo testo della sessione che contiene date: non dipende
+dall'ordine in cui le date compaiono e una nascita scritta per prima non lo
+fissa. La finestra (`CLINICAL_WINDOW` in `lib/redaction-date-offsets.ts`) va
+da 5 anni prima a 2 anni dopo il riferimento. Cinque anni tengono ricoveri,
+esami e controlli che contano per il quadro attuale, due anni in avanti i
+controlli programmati. Restano fuori le nascite di chiunque abbia più di
+cinque anni: se una nascita sfugge al riconoscimento, la differenza fra due
+scostamenti non può dare l'età esatta in giorni. Una data fuori dalla finestra
+esce come `DAT` opaco, anche se compare in un testo successivo della stessa
+sessione: perdere un intervallo è accettabile, far uscire un'età no.
+
+Gli scostamenti partono da un'ancora pari al riferimento spostato a caso di
+±1024 giorni: non si ricava dai byte del payload e due preparazioni dello
+stesso testo danno scostamenti diversi, con gli stessi intervalli. Il testo
+inviato porta in coda una nota sulla forma delle date, solo quando ne
+contiene.
 
 Il modello può restituire uno scostamento nuovo e MediFlow lo ricalcola in una
 data nel formato giorno/mese/anno. Uno scostamento già emesso torna con la
 grafia originale. Uno scostamento malformato, oltre 36.525 giorni o fuori dal
-1900-2099 fa fallire la risposta. Una data fuori da quell'intervallo
-rispetto all'ancora esce come `DAT`. Quella che riconosce solo il livello
+1900-2099 fa fallire la risposta. Quella che riconosce solo il livello
 neurale (ad esempio «3 marzo 2026») resta un segnaposto `DAT`.
 
 La data di nascita non esce mai come scostamento. È nascita se coincide con
 una data dell'anagrafica, in qualunque formato giorno/mese/anno o ISO, oppure
-se segue un richiamo come «nato il», «nascita», «DN». Esce come `NAS` e torna
+se segue un richiamo come «nato il», «nascita», «DN» nella stessa frase (fino a
+64 caratteri, anche dopo un luogo di nascita lungo) oppure sulla riga sopra,
+quando quella del valore contiene solo la data. Esce come `NAS` e torna
 indietro solo per reidratazione. Se una data è già uscita come scostamento e
 poi compare come nascita nella stessa sessione, la preparazione fallisce.
 Nessuna funzione attuale chiede l'età: quando servirà, il modello riceverà
@@ -97,11 +119,11 @@ l'età e non la data.
 | Invariante | Prova nel repository |
 |---|---|
 | I1. Nessuna identità nei byte in uscita | `ordinary-placeholder-roles.test.ts`, sentinella con paziente, familiare, medico, CF, telefono, email, indirizzo e date |
-| I2. Segnaposto con ruolo, `PAZ` distinto da `PER` | stesso file, I1 ed I2 |
+| I2. Segnaposto con ruolo, `PAZ` solo per valori fatti di nomi dell'anagrafica | stesso file, I1 ed I2, e `lib/redaction-patient-role.test.ts` |
 | I3. Nessuna confusione fra preparazioni | stesso file, I3, con la sorgente casuale forzata a ripetersi |
 | I4. Spazio di nomi riservato | stesso file, I4, con i casi legittimi che contengono «MF_» |
 | I5. Ruolo legato al campo | stesso file, I5 |
-| I6. Date relative, nascita mai come scostamento | stesso file, I6, e `lib/redaction-date-offsets.test.ts` |
+| I6. Date relative nella finestra clinica, nascita mai come scostamento | stesso file, I6, e `lib/redaction-date-offsets.test.ts` |
 | I7. Ingombro | `ordinary-preparation-golden.test.ts`: ogni payload della golden è più corto di quello con `MF_PII` |
 | I8. Il cancello resta chiuso | `ai-egress-gate.test.ts` e `ai-redaction-session.test.ts`, invariati |
 
@@ -117,6 +139,11 @@ l'età e non la data.
 - Gli intervalli fra le date restano veri, quindi la data di oggi e gli anni
   si possono indovinare dal contesto (un farmaco, una stagione, una
   ricorrenza). L'ancora nasconde il giorno esatto, non l'epoca.
+- Un cognome dell'anagrafica da solo resta `PAZ`, anche quando nel testo
+  indica un familiare («la signora Bianchi» può essere la madre).
+- La nascita di un bambino più giovane della finestra, scritta senza richiamo
+  e senza data in anagrafica, esce come scostamento: con una visita nella
+  stessa finestra dà l'età in giorni.
 - Le date scritte in altri formati restano affidate al livello neurale, come
   prima.
 

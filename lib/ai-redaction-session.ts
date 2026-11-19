@@ -3,7 +3,7 @@ import { types } from 'node:util';
 import { evaluateEgress } from './ai-egress-gate';
 import type { RedactionEntityType } from './redaction-contracts';
 import { localIdentifierSpans } from './redaction-identifier-spans';
-import { ANCHOR_SPREAD_DAYS, birthDateDays, clinicalDateDay, dayFromOffset, followsBirthCue, formatDay, offsetFromAnchor } from './redaction-date-offsets';
+import { ANCHOR_SPREAD_DAYS, birthDateDays, clinicalDateDay, dayFromOffset, followsBirthCue, formatDay, inClinicalWindow, nameWords, offsetFromAnchor, registryNameWords } from './redaction-date-offsets';
 
 export type RedactionSessionEntity = Readonly<{
     type: RedactionEntityType;
@@ -45,7 +45,7 @@ export const PLACEHOLDER_PATTERN = /\[\[MF_(?:(PAZ|PER|DAT|NAS|TEL|IND|CF|EML|OR
 const DATE_OFFSET_PLACEHOLDER = /^\[\[MF_GG(\+0|[+-][1-9][0-9]{0,4})_([a-z2-7]{8})\]\]$/u;
 export const RESERVED_PLACEHOLDER_NAMESPACE = /\[\[\s*MF|MF_(?:PAZ|PER|DAT|NAS|TEL|IND|CF|EML|ORG|ID|ALT)\s*[0-9]|MF_GG\s*[+-]/iu;
 export type ResolvedPlaceholder = Readonly<{ role: PlaceholderRole; value: string }>;
-type Span = { start: number; end: number; type: RedactionEntityType; patient?: true };
+type Span = { start: number; end: number; type: RedactionEntityType };
 type PreparedSpan = Readonly<{ start: number; end: number; type: RedactionEntityType; replacement: string }>;
 const NONCE_ALPHABET = 'abcdefghijklmnopqrstuvwxyz234567';
 const liveNonces = new Set<string>();
@@ -166,17 +166,13 @@ function validate(input: RedactionSessionInput): Span[] {
 }
 
 
-function layerOneSpanKind(token: string): Pick<Span, 'type' | 'patient'> {
-    if (/^\{\{CF(?:_CANDIDATO)?_/.test(token)) return { type: 'tax_id' };
-    if (token.startsWith('{{DATA_NASCITA_')) return { type: 'date' };
-    if (token.startsWith('{{PERSONA_')) return { type: 'person', patient: true };
-    if (token.startsWith('{{TELEFONO_')) return { type: 'phone' };
-    if (token.startsWith('{{EMAIL_')) return { type: 'email' };
-    return { type: 'identifier' };
-}
-
-function joinPatient(target: Span, span: Span): void {
-    if (span.patient) target.patient = true;
+function layerOneSpanType(token: string): RedactionEntityType {
+    if (/^\{\{CF(?:_CANDIDATO)?_/.test(token)) return 'tax_id';
+    if (token.startsWith('{{DATA_NASCITA_')) return 'date';
+    if (token.startsWith('{{PERSONA_')) return 'person';
+    if (token.startsWith('{{TELEFONO_')) return 'phone';
+    if (token.startsWith('{{EMAIL_')) return 'email';
+    return 'identifier';
 }
 
 function mergeSpans(text: string, spans: Span[]): Span[] {
@@ -189,7 +185,6 @@ function mergeSpans(text: string, spans: Span[]): Span[] {
                 previous.type = (previous.type === 'tax_id' && span.type === 'identifier')
                     || (previous.type === 'identifier' && span.type === 'tax_id') ? 'tax_id' : 'other';
             }
-            joinPatient(previous, span);
         } else exact.push({ ...span });
     }
     const merged: Span[] = [];
@@ -200,14 +195,14 @@ function mergeSpans(text: string, spans: Span[]): Span[] {
         if (previous && (span.start < previous.end || adjacentAddress)) {
             previous.end = Math.max(previous.end, span.end);
             if (previous.type !== span.type) previous.type = 'other';
-            joinPatient(previous, span);
         } else merged.push({ ...span });
     }
     return merged;
 }
 
-function roleOf(span: Span): NamedRole {
-    return span.type === 'person' && span.patient ? 'PAZ' : ROLE_BY_TYPE[span.type];
+function roleOf(span: Span, raw: string, registryWords: ReadonlySet<string>): NamedRole {
+    const words = nameWords(raw);
+    return span.type === 'person' && words.length > 0 && words.every(word => registryWords.has(word)) ? 'PAZ' : ROLE_BY_TYPE[span.type];
 }
 
 function withoutNeuralDatesAroundClinicalDates(text: string, neural: Span[], local: Span[]): Span[] {
@@ -233,6 +228,7 @@ export function createRedactionSession(): Readonly<{
     const roleCounts = new Map<NamedRole, number>();
     const rawByOffset = new Map<number, string>();
     let anchor: number | undefined;
+    let reference: number | undefined;
     const preparations = new Set<Map<string, string>>();
     let closed = false;
     const assertOpen = () => {
@@ -267,7 +263,7 @@ export function createRedactionSession(): Readonly<{
                 if (!value) continue;
                 const pattern = new RegExp(`(?=(${escapeRegex(value)}))`, 'giu');
                 for (const match of input.text.matchAll(pattern)) {
-                    spans.push({ start: match.index, end: match.index + match[1].length, ...layerOneSpanKind(token) });
+                    spans.push({ start: match.index, end: match.index + match[1].length, type: layerOneSpanType(token) });
                 }
             }
             spans.push(...localIdentifierSpans(input.text));
@@ -277,6 +273,17 @@ export function createRedactionSession(): Readonly<{
             }
             const merged = mergeSpans(input.text, [...withoutNeuralDatesAroundClinicalDates(input.text, neural, spans), ...spans]);
             const birthDays = birthDateDays(input.knownIdentifiers?.birthDates);
+            const registryWords = registryNameWords(input.knownIdentifiers?.names);
+            const dates = new Map(merged.map(span => {
+                const day = clinicalDateDay(input.text.slice(span.start, span.end));
+                const birth = day !== null && (birthDays.has(day) || followsBirthCue(input.text.slice(0, span.start)));
+                return [span, { day, birth }] as const;
+            }));
+            const clinicalDays = [...dates.values()].flatMap(({ day, birth }) => day !== null && !birth ? [day] : []);
+            if (reference === undefined && clinicalDays.length) {
+                reference = Math.max(...clinicalDays);
+                anchor = reference + randomInt(-ANCHOR_SPREAD_DAYS, ANCHOR_SPREAD_DAYS + 1);
+            }
             const newValues = new Set(merged.map(span => input.text.slice(span.start, span.end))
                 .filter(value => !tokensByValue.has(value)));
             if (tokensByValue.size + newValues.size > 4096) throw new Error('Redaction value budget exceeded');
@@ -287,12 +294,10 @@ export function createRedactionSession(): Readonly<{
             let cursor = 0;
             for (const span of merged) {
                 const raw = input.text.slice(span.start, span.end);
-                const day = clinicalDateDay(raw);
-                const birth = day !== null && (birthDays.has(day) || followsBirthCue(input.text.slice(0, span.start)));
+                const { day, birth } = dates.get(span)!;
                 let token = tokensByValue.get(raw);
                 if (token && birth && DATE_OFFSET_PLACEHOLDER.test(token)) throw new Error('Redaction birth date already offset');
-                if (!token && day !== null && !birth) {
-                    anchor ??= day + randomInt(-ANCHOR_SPREAD_DAYS, ANCHOR_SPREAD_DAYS + 1);
+                if (!token && day !== null && !birth && anchor !== undefined && reference !== undefined && inClinicalWindow(day, reference)) {
                     const offset = offsetFromAnchor(day, anchor);
                     if (offset !== null) {
                         token = `[[MF_GG${offset < 0 ? '-' : '+'}${Math.abs(offset)}_${nonce}]]`;
@@ -301,7 +306,7 @@ export function createRedactionSession(): Readonly<{
                     }
                 }
                 if (!token) {
-                    const role: NamedRole = birth ? 'NAS' : day !== null ? 'DAT' : roleOf(span);
+                    const role: NamedRole = birth ? 'NAS' : day !== null ? 'DAT' : roleOf(span, raw, registryWords);
                     const ordinal = (roleCounts.get(role) ?? 0) + 1;
                     roleCounts.set(role, ordinal);
                     token = `[[MF_${role}${ordinal}_${nonce}]]`;
@@ -340,6 +345,7 @@ export function createRedactionSession(): Readonly<{
             valuesByToken.clear();
             rawByOffset.clear();
             anchor = undefined;
+            reference = undefined;
             for (const values of preparations) values.clear();
             preparations.clear();
         },

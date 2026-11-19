@@ -1,11 +1,13 @@
 const DAY_MS = 86_400_000;
 const DAY_MONTH_YEAR = /^(0[1-9]|[12][0-9]|3[01])[/.-](0[1-9]|1[0-2])[/.-]((?:19|20)[0-9]{2})$/u;
 const ISO_DATE = /^((?:19|20)[0-9]{2})-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$/u;
-const BIRTH_CUE = /(?:\bnat[oaie]\b|\bnascita\b|\bDN\b|\bDOB\b|\bbirth)[^\r\n.;]{0,24}$/iu;
+const BIRTH_CUE = /(?:\bnat[oaie]\b|\bnascita\b|\bDN\b|\bDOB\b|\bbirth)(?:[^\r\n.!?]|\.(?!\s)){0,64}$/iu;
+const LABEL_ONLY_LINE = /^[\s:.,-]*$/u;
 const FIRST_DAY = Date.UTC(1900, 0, 1) / DAY_MS;
 const LAST_DAY = Date.UTC(2099, 11, 31) / DAY_MS;
 export const MAX_OFFSET_DAYS = 36_525;
 export const ANCHOR_SPREAD_DAYS = 1_024;
+export const CLINICAL_WINDOW = Object.freeze({ daysBefore: 1_826, daysAfter: 731 });
 
 function calendarDay(year: number, month: number, day: number): number | null {
     const date = new Date(Date.UTC(year, month - 1, day));
@@ -31,7 +33,24 @@ export function birthDateDays(values: readonly string[] | undefined): ReadonlySe
 }
 
 export function followsBirthCue(textBefore: string): boolean {
-    return BIRTH_CUE.test(textBefore.slice(-48));
+    const lines = textBefore.slice(-160).split(/\r?\n/u);
+    const current = lines.pop() ?? '';
+    if (BIRTH_CUE.test(current)) return true;
+    if (!LABEL_ONLY_LINE.test(current)) return false;
+    while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
+    return BIRTH_CUE.test(lines.pop() ?? '');
+}
+
+export function inClinicalWindow(day: number, reference: number): boolean {
+    return day >= reference - CLINICAL_WINDOW.daysBefore && day <= reference + CLINICAL_WINDOW.daysAfter;
+}
+
+export function registryNameWords(names: readonly string[] | undefined): ReadonlySet<string> {
+    return new Set((names ?? []).flatMap(nameWords));
+}
+
+export function nameWords(text: string): string[] {
+    return text.normalize('NFC').toLocaleLowerCase('it-IT').match(/[\p{L}\p{M}]+/gu) ?? [];
 }
 
 export function offsetFromAnchor(day: number, anchor: number): number | null {
