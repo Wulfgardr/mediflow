@@ -17,36 +17,27 @@ export type SheetInsightProposal = Extract<PatientInsightPreviewWire, { status: 
 
 const venueLabels = { local_process: 'dal modello locale', cloud: 'da un servizio esterno' } as const;
 
-function proposalSentences(proposal: SheetInsightProposal['proposal']) {
-    return [
-        ...proposal.alerts.map(text => ({ text, alert: true })),
-        ...proposal.currentState.map(text => ({ text, alert: false })),
-        ...proposal.nextSteps.map(text => ({ text, alert: false })),
-    ];
-}
-
-export function PatientProposalsSummary({ hasInsightProposal, hasSmartImportProposal, smartImportAvailable, proposal, patientId }: {
+export function PatientProposalsSummary({ hasInsightProposal, hasSmartImportProposal, smartImportAvailable, preview, patientId }: {
     hasInsightProposal: boolean;
     hasSmartImportProposal: boolean;
     smartImportAvailable: boolean;
-    proposal?: SheetInsightProposal | null;
+    preview?: SheetInsightProposal | null;
     patientId?: string;
 }) {
     const count = Number(hasInsightProposal) + Number(hasSmartImportProposal);
-    const shown = hasInsightProposal && proposal ? proposal : null;
-    const sentences = shown ? proposalSentences(shown.proposal) : [];
-    const captured = shown ? new Date(shown.proposal.currentness.capturedAt) : null;
+    const shown = hasInsightProposal && preview ? preview : null;
+    const sentences = shown ? [...shown.proposal.alerts, ...shown.proposal.currentState, ...shown.proposal.nextSteps] : [];
+    const generated = shown ? new Date(shown.proposal.generatedAt) : null;
     return <div className={`${styles.summary} ${sheet.proposalSummary}`} data-testid="patient-proposals-summary" data-has-proposals={count > 0}>
         <header className={sheet.islandHeader}>
             <span className={sheet.proposalIcon}><CircleDashed size={16} aria-hidden="true" /></span>
             <h2 className="type-section-heading">Quadro paziente</h2>
         </header>
-        {shown ? <p className={sheet.proposalLabel}>Proposta · non registrata</p>
-            : <InkState state="pencil">{count === 0 ? 'Nessuna proposta da rivedere' : `${count} ${count === 1 ? 'proposta' : 'proposte'} da rivedere`}</InkState>}
+        {shown ? <p className={sheet.proposalLabel}>Proposta · non registrata</p> : null}
+        {shown && !hasSmartImportProposal ? null : <InkState state="pencil">{count === 0 ? 'Nessuna proposta da rivedere' : `${count} ${count === 1 ? 'proposta' : 'proposte'} da rivedere`}</InkState>}
         {shown ? <>
-            {shown.proposal.summary ? <p className={sheet.proposalText}><PrivacyBlur intensity="sm">{shown.proposal.summary}</PrivacyBlur></p> : null}
-            <ul className={sheet.proposalList}>{sentences.map((sentence, index) => <li key={`${index}-${sentence.text}`} data-alert={sentence.alert ? 'true' : undefined}>
-                <PrivacyBlur intensity="sm">{sentence.text}</PrivacyBlur>
+            <ul className={sheet.proposalList}>{sentences.map((sentence, index) => <li key={`${index}-${sentence}`}>
+                <PrivacyBlur intensity="sm">{sentence}</PrivacyBlur>
             </li>)}</ul>
             {patientId ? <nav aria-label="Fonti della proposta" className={sheet.proposalSources}>
                 <a href={`/patients/${patientId}/modules#terapie`}>Terapie</a>
@@ -58,8 +49,8 @@ export function PatientProposalsSummary({ hasInsightProposal, hasSmartImportProp
             <a href="#patient-insight" className="mf-button-secondary"><Sparkles size={16} aria-hidden="true" />Apri il Quadro e le fonti</a>
             {smartImportAvailable ? <a href="#smart-import" className="mf-button-text">Smart Import</a> : null}
         </span>
-        {shown && captured ? <p className={sheet.proposalReceipt}>
-            Generata il <time dateTime={captured.toISOString()}>{captured.toLocaleString('it-IT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</time> {venueLabels[shown.receipt.venue]} · {shown.receipt.model}
+        {shown && generated && Number.isFinite(generated.getTime()) ? <p className={sheet.proposalReceipt}>
+            Generata il <time dateTime={generated.toISOString()}>{generated.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' })} alle {generated.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</time> {venueLabels[shown.receipt.venue]} <span title={shown.receipt.model}>{shown.receipt.model}</span>.{shown.receipt.egress === 'none' ? ' Nessuna uscita dati.' : null}
         </p> : null}
     </div>;
 }
@@ -67,7 +58,7 @@ export function PatientProposalsSummary({ hasInsightProposal, hasSmartImportProp
 export function PatientClinicalSupport({ patient, stale, onProposalChange }: {
     patient: Patient;
     stale: boolean;
-    onProposalChange?: (patientKey: string | null) => void;
+    onProposalChange?: (patientKey: string | null, preview?: SheetInsightProposal | null) => void;
 }) {
     const folder = useRuntimeTwinFolder();
     return <section className={styles.section} aria-label="Quadro paziente" hidden={folder !== null && folder !== 'attenzione'}>

@@ -140,6 +140,9 @@ test('isole del riepilogo: ritorno con variazioni, dettaglio, fonte e due temi',
     await setTheme(page, 'light');
 
     await expect(changes.getByText('2 terapie', { exact: true })).toBeVisible();
+    const strength = page.getByRole('table', { name: 'Terapie attive', exact: true }).getByText('5 mg cpr', { exact: true });
+    await expect(strength).toHaveCSS('font-weight', '400');
+    await expect(page.getByRole('table', { name: 'Terapie attive', exact: true }).getByText('Apixaban', { exact: true })).toHaveCSS('font-weight', '600');
     await expect(changes.getByText('1 valore fuori intervallo', { exact: true })).toBeVisible();
     await expect(changes.getByRole('link', { name: /1 telefonata · 1 accesso · 1 nota/ })).toHaveAttribute('href', '#diario');
     const spironolattone = changes.locator('details').filter({ hasText: 'Spironolattone 25 mg cpr' });

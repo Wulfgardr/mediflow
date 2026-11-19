@@ -6,6 +6,7 @@ import { projectTherapyRecordUpdates, type projectVisitReference, recordDate } f
 import { useState, type ReactNode } from 'react';
 import { ChevronDown, History } from 'lucide-react';
 import PrivacyBlur from './privacy-blur';
+import { DrugLabel } from './drug-label';
 import { InkSectionHeading } from './ui/ink-state';
 import styles from './twin-synoptic-sheet.module.css';
 
@@ -61,7 +62,7 @@ function TherapyDetails({ update, entries, openDiary, grouped }: {
     const start = recordDate(therapy.startDate);
     const end = recordDate(therapy.endDate);
     const sameDay = entries.filter(entry => !entry.deletedAt && recordDate(entry.createdAt)?.toDateString() === date.toDateString());
-    return <ChangeRow name={<PrivacyBlur>{therapy.drugName}</PrivacyBlur>} status={grouped ? undefined : label}>
+    return <ChangeRow name={<DrugLabel name={therapy.drugName} />} status={grouped ? undefined : label}>
         <Fact label="Stato attuale">{therapy.status === 'active' ? 'Attiva' : therapy.status === 'suspended' ? 'Sospesa' : 'Conclusa'} · <PrivacyBlur>{therapy.dosage}</PrivacyBlur></Fact>
         <Fact label="Prima">Valore precedente non conservato.</Fact>
         {therapy.motivation ? <Fact label="Indicazione"><PrivacyBlur>{therapy.motivation}</PrivacyBlur></Fact> : null}
