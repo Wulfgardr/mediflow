@@ -491,7 +491,8 @@ export function installArchiveGenerationTransport(): () => void {
         headers.delete(WEB_SESSION_LOCATOR_HEADER);
         if (webControlLocator) headers.set(WEB_CONTROL_LOCATOR_HEADER, webControlLocator);
         if (webSessionLocator) headers.set(WEB_SESSION_LOCATOR_HEADER, webSessionLocator);
-        if (scopedEpochRead || ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+        const archiveScoped = scopedEpochRead || ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
+        if (archiveScoped) {
             if (documentGeneration) headers.set('x-mediflow-archive-generation', documentGeneration);
             else headers.delete('x-mediflow-archive-generation');
         }
@@ -506,7 +507,7 @@ export function installArchiveGenerationTransport(): () => void {
             }
             if (response.ok && ['/api/auth/logout', '/api/auth/lock'].includes(url.pathname)
                 && headers.get(WEB_SESSION_LOCATOR_HEADER) === webSessionLocator) webSessionLocator = null;
-            if (response.status === 409) {
+            if (archiveScoped && response.status === 409) {
                 const payload = await response.clone().json().catch(() => null);
                 if (payload?.code === 'ARCHIVE_REPLACED') rejectReplacedArchive();
             }

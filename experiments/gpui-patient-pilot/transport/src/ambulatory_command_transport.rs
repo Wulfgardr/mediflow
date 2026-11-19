@@ -234,7 +234,10 @@ impl HostAmbulatoryCommand {
         });
         let mut headers = HeaderMap::new();
         headers.insert(COOKIE, sensitive_header(&value)?);
-        headers.insert(LOCAL_CLIENT_SESSION_PROOF_HEADER, sensitive_header(&self.proof)?);
+        headers.insert(
+            LOCAL_CLIENT_SESSION_PROOF_HEADER,
+            sensitive_header(&self.proof)?,
+        );
         headers.insert(
             "x-mediflow-ambulatory-command-reference",
             sensitive_header(&self.reference)?,
