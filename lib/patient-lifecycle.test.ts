@@ -1,8 +1,5 @@
 // WUL-306 (ADR 0066): behavioral coverage for the patient soft-delete tombstone.
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
 import test from 'node:test';
 import Database from 'better-sqlite3';
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
@@ -15,43 +12,17 @@ import {
 } from './patient-lifecycle';
 import { buildPatientVersionConflictPayload } from './patient-concurrency';
 import { normalizePatientUpdateInput } from './patient-write-normalization';
-
-const ROOT_DIR = path.resolve(__dirname, '..');
-
-function ensureColumn(sqlite: Database.Database, table: string, columnName: string, columnSql: string): void {
-    const columns = (sqlite.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).map((col) => col.name);
-    if (!columns.includes(columnName)) {
-        sqlite.prepare(`ALTER TABLE ${table} ADD COLUMN ${columnSql}`).run();
-    }
-}
+import { initializeSqliteSchema } from './sqlite-schema';
 
 function bootstrapDatabase(): { sqlite: Database.Database; db: BetterSQLite3Database } {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-soft-delete-'));
-    const sqlite = new Database(path.join(dir, 'medical.db'));
-    const migrationsDir = path.join(ROOT_DIR, 'drizzle');
-    const migrationFiles = fs
-        .readdirSync(migrationsDir)
-        .filter((file) => file.endsWith('.sql'))
-        .sort((left, right) => left.localeCompare(right));
-    for (const fileName of migrationFiles) {
-        const sql = fs
-            .readFileSync(path.join(migrationsDir, fileName), 'utf8')
-            .replace(/^-->\s+statement-breakpoint\s*$/gm, '');
-        if (sql.trim().length === 0) continue;
-        sqlite.exec(sql);
+    const sqlite = new Database(':memory:');
+    try {
+        initializeSqliteSchema(sqlite);
+        return { sqlite, db: drizzle(sqlite) };
+    } catch (error) {
+        sqlite.close();
+        throw error;
     }
-    // Mirror the patients ensureColumn() guards from lib/db-server.ts (incl. WUL-306).
-    ensureColumn(sqlite, 'patients', 'identifier_type', "identifier_type TEXT NOT NULL DEFAULT 'cf'");
-    ensureColumn(sqlite, 'patients', 'birth_date_precision', "birth_date_precision TEXT NOT NULL DEFAULT 'unknown'");
-    ensureColumn(sqlite, 'patients', 'birth_year', 'birth_year INTEGER');
-    ensureColumn(sqlite, 'patients', 'identifier_history', "identifier_history TEXT NOT NULL DEFAULT '[]'");
-    ensureColumn(sqlite, 'patients', 'exemptions', 'exemptions TEXT');
-    ensureColumn(sqlite, 'patients', 'diagnoses', 'diagnoses TEXT');
-    ensureColumn(sqlite, 'patients', 'monitoring_profile', 'monitoring_profile TEXT');
-    ensureColumn(sqlite, 'patients', 'status_reason', 'status_reason TEXT');
-    ensureColumn(sqlite, 'patients', 'deleted_at', 'deleted_at INTEGER');
-    ensureColumn(sqlite, 'patients', 'deletion_reason', 'deletion_reason TEXT');
-    return { sqlite, db: drizzle(sqlite) };
 }
 
 function insertFakePatient(db: BetterSQLite3Database, id: string, version: number): void {
