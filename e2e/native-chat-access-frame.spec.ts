@@ -516,7 +516,7 @@ for (const invalid of ['extra-field', 'missing-source', 'invalid-source', 'too-m
     if (invalid === 'invalid-source') rows[0].sourceRef = 'SENTINEL';
     if (invalid === 'too-many-rows') card.therapies = [rows[0], rows[0], rows[0]];
     if (invalid === 'wrong-type') rows[0].dose = { text: 'SENTINEL' };
-    if (invalid === 'reserved-token') rows[0].medicine = '{{MF_PII_' + 'c'.repeat(32) + '_1}}';
+    if (invalid === 'reserved-token') rows[0].medicine = '[[MF_PAZ1_' + 'c'.repeat(8) + ']]';
     const frame = await consumePayload(page, invalid === 'malformed-json' ? '{' : JSON.stringify(card));
     await expect(frame.getByRole('status')).toContainText('Accesso ritirato');
     await expect(frame.getByRole('region', { name: 'Scheda sintetica' })).toBeHidden();
@@ -603,7 +603,7 @@ for (const scenario of ['empty', 'limit', 'unknown-field', 'bad-aic', 'wrong-que
     if (scenario === 'wrong-query') value.query = 'SENTINEL';
     if (scenario === 'too-many') value.rows = Array.from({ length: 21 }, () => value.rows[0]);
     if (scenario === 'source') value.rows[0].sourceRef = 'foreign';
-    if (scenario === 'token') value.rows[0].name = '{{MF_PII_' + 'a'.repeat(32) + '_1}}';
+    if (scenario === 'token') value.rows[0].name = '[[MF_PER1_' + 'a'.repeat(8) + ']]';
     const frame = await readDrugs(page, JSON.stringify(value));
     if (scenario === 'empty') await expect(frame.locator('#card')).toContainText('Nessun farmaco trovato');
     else if (scenario === 'limit') await expect(frame.locator('#card')).toContainText('Limite di 20 risultati raggiunto');
@@ -640,7 +640,7 @@ for (const scenario of ['valid', 'empty', 'limit', 'unknown-field', 'token', 'wr
     if (scenario === 'empty') value.rows = [];
     if (scenario === 'limit') { value.rows = Array.from({ length: 20 }, () => value.rows[0]); value.truncated = true; }
     if (scenario === 'unknown-field') Object.assign(value.rows[0], { patientId: 'SENTINEL' });
-    if (scenario === 'token') value.rows[0].description = '{{MF_PII_' + 'b'.repeat(32) + '_1}}';
+    if (scenario === 'token') value.rows[0].description = 'MF_GG+12 senza parentesi';
     if (scenario === 'wrong-profile') value.profile = 'mediflow.synthetic-chat-card.v1';
     if (scenario === 'source') value.rows[0].sourceRef = 'foreign';
     if (scenario === 'too-many') value.rows = Array.from({ length: 21 }, () => value.rows[0]);
@@ -700,7 +700,7 @@ test('clinical mixed measurements and diagnoses retain exact visible text', asyn
     await expect(frame.getByRole('button', { name: 'Mostra scheda monouso' })).toBeEnabled();
     await frame.getByRole('button', { name: 'Mostra scheda monouso' }).click();
     await expect(frame.getByText(text, { exact: true })).toHaveCount(2);
-    await expect(frame.getByText(/MF_PII/u)).toHaveCount(0);
+    await expect(frame.getByText(/MF_/u)).toHaveCount(0);
 });
 
 for (const invalid of [false, true]) test(`internal agenda is app-only and rejects extra fields: ${invalid}`, async ({ page }) => {

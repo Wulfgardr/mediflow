@@ -6,6 +6,7 @@ import { types } from 'node:util';
 import { scanJsonObject } from '../ai-json-lexical';
 import { emissionPlan, emissionUnit, renderEmissionPlan, type EmissionPart, type EmissionPlan } from '../ai-preparation/emission-plan';
 import { buildPatientInsightExtractionPlan } from '../ai-task-contract-prompts';
+import type { PlaceholderRole } from '../ai-redaction-session';
 
 import {
     isEnvelopeUsable,
@@ -235,6 +236,20 @@ export function ordinaryTextPath(profile: OrdinaryTaskProfile, path: readonly (s
         }
     }
     return schema?.type === 'string' && schema.enum === undefined && schema.const === undefined;
+}
+
+const DATE_ROLES: ReadonlySet<PlaceholderRole> = new Set<PlaceholderRole>(['DAT', 'GG']);
+const REFERENCE_ROLES: ReadonlySet<PlaceholderRole> = new Set<PlaceholderRole>(['ID', 'ALT']);
+const FIELD_ROLES: Readonly<Partial<Record<OrdinaryTaskFunctionId, Readonly<Record<string, ReadonlySet<PlaceholderRole>>>>>> = Object.freeze({
+    smart_import: Object.freeze({ prescribedAt: DATE_ROLES, requestReference: REFERENCE_ROLES }),
+    document_synthesis: Object.freeze({ prescribedAt: DATE_ROLES, requestReference: REFERENCE_ROLES }),
+});
+
+/** Placeholder roles admitted in a rehydrated text path; undefined admits every role. */
+export function ordinaryTextRoles(profile: OrdinaryTaskProfile, path: readonly (string | number)[]): ReadonlySet<PlaceholderRole> | undefined {
+    const fields = FIELD_ROLES[readOrdinaryTaskProfile(profile).functionId];
+    const last = path[path.length - 1];
+    return fields && typeof last === 'string' && Object.hasOwn(fields, last) ? fields[last] : undefined;
 }
 
 /** Checks canonical text bounds before legacy parsers can normalize/truncate them. */

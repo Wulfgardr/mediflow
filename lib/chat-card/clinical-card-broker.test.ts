@@ -145,7 +145,7 @@ test('missing row neural detections are caught by the final serialized scan', as
         (error: unknown) => !!error && typeof error === 'object' && 'row' in error && error.row === 1);
 });
 test('foreign tokens, altered clinical text and residues deny output', async () => {
-    for (const text of ['{{MF_PII_' + 'f'.repeat(32) + '_1}}', 'VLLMRT72D57F205Z', '17/04/1972', 'alterato']) {
+    for (const text of ['[[MF_PAZ1_' + 'f'.repeat(8) + ']]', 'MF_PER1 alterato', 'VLLMRT72D57F205Z', '17/04/1972', 'alterato']) {
         mutation = c => ({ ...c, diagnoses: [{ ...c.diagnoses[0], text }] });
         const b = broker(); await b.owner.selectPatient('a'); await assert.rejects(b.owner.prepare(all, { names: [], birthDates: [] }));
     }
@@ -211,7 +211,7 @@ test('clinical neural false positives preserve exact diagnosis and excerpt bytes
         const token = await b.owner.prepare({ diagnoses: [], noteExcerpts: [], [section]: ['Diabete mellito'] }, { names: [], birthDates: [] }).catch(error => assert.fail(error.message));
         const review = b.owner.review(token);
         assert.equal(JSON.parse(review.payload)[section][0].text, 'Diabete mellito');
-        assert.ok(!review.payload.includes('MF_PII'));
+        assert.ok(!review.payload.includes('MF_'));
     }
 });
 test('empty neural detection fails closed even for apparently clean clinical text', async () => {

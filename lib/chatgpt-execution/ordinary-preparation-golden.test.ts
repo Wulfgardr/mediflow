@@ -21,12 +21,14 @@ mockOrdinaryModule(import.meta.url, '../gliner-redaction-runner', { namedExports
         }, async close() {},
     }),
 } });
-const { createRedactionSession } = await import('../ai-redaction-session');
+const redactionSession = await import('../ai-redaction-session');
+const { createRedactionSession } = redactionSession;
 let mappings: Array<(value: string) => string> = [];
 mockOrdinaryModule(import.meta.url, '../ai-redaction-session', { namedExports: {
+    ...redactionSession,
     createRedactionSession: () => {
         const session = createRedactionSession();
-        return { close: () => session.close(), prepare: (input: Parameters<typeof session.prepare>[0]) => {
+        return { close: () => session.close(), resolve: session.resolve, prepare: (input: Parameters<typeof session.prepare>[0]) => {
             const prepared = session.prepare(input); mappings.push(prepared.rehydrate); return prepared;
         } };
     },
@@ -65,4 +67,11 @@ for (const retirement of ['close', 'abort'] as const) test(`three ordinary profi
         }
     }
     assert.equal(JSON.stringify(snapshots), JSON.stringify(JSON.parse(readFileSync(new URL('./ordinary-preparation.golden.json', import.meta.url), 'utf8'))));
+});
+
+const MF_PII_GOLDEN_PAYLOAD_BYTES = Object.freeze({ patient_insight: 7514, smart_import: 10406, document_synthesis: 12304 });
+test('role placeholders keep each golden payload shorter than the 44-character MF_PII form', () => {
+    const golden: { functionId: keyof typeof MF_PII_GOLDEN_PAYLOAD_BYTES; payloadBytes: number }[] = JSON.parse(readFileSync(new URL('./ordinary-preparation.golden.json', import.meta.url), 'utf8'));
+    assert.equal(golden.length, 3);
+    for (const { functionId, payloadBytes } of golden) assert.ok(payloadBytes < MF_PII_GOLDEN_PAYLOAD_BYTES[functionId], functionId);
 });

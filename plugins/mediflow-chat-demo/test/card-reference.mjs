@@ -140,7 +140,7 @@ try {
     assert.ok(actual, 'capture real broker result across MCP HTTP');
     assert.equal(JSON.stringify(responses).includes('IDENTIFYING_SENTINEL'), false);
     const rendered = await frame.locator('#card').textContent();
-    for (const value of [actual.pseudonym, ...actual.therapies.flatMap(t => [t.medicine, t.dose, t.frequency]), ...actual.history.flatMap(h => [h.condition, h.note, h.relativeTime, h.sourceRef]), ...actual.measures.flatMap(m => [m.kind, m.value, m.unit])]) assert.ok(rendered.includes(String(value).replace(/\{\{MF_PII_[^{}]+\}\}/gu, '[omesso]')), value);
+    for (const value of [actual.pseudonym, ...actual.therapies.flatMap(t => [t.medicine, t.dose, t.frequency]), ...actual.history.flatMap(h => [h.condition, h.note, h.relativeTime, h.sourceRef]), ...actual.measures.flatMap(m => [m.kind, m.value, m.unit])]) assert.ok(rendered.includes(String(value).replace(/\[\[MF_[^[\]]+\]\]/gu, '[omesso]')), value);
     const before = await page.evaluate(() => ({ y: scrollY, sizes: window['cardSizes'].length }));
     const detailMs = await latency(frame, page, () => frame.locator('summary').first().click());
     const themes = [];
