@@ -84,6 +84,7 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
       : destinations[0]);
   const recordSearch = useRef<HTMLAnchorElement>(null);
   const [recordLabel, setRecordLabel] = useState<RecordCrumb | null>(null);
+  const [scrolledRecord, setScrolledRecord] = useState<string | null>(null);
   const currentRecord = recordLabel?.id === patientId ? recordLabel : null;
   const operator = user?.displayName?.trim() || user?.username || '';
   useEffect(() => {
@@ -214,9 +215,15 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
           </div>
         </div>
       </aside>
-      <div className={styles.workarea}>
-        {!patientId ? workspaceBar : null}
-        <div className={styles.page}>{patientId ? workspaceBar : null}{children}</div>
+      <div className={styles.workarea} data-scrolled-record={!!currentRecord && currentRecord.id === scrolledRecord && wideRecord}>
+        {workspaceBar}
+        <div className={styles.page} onScroll={wideRecord && currentRecord ? event => {
+          const page = event.currentTarget;
+          const heading = page.querySelector('main > header h1');
+          const tabs = page.previousElementSibling;
+          const pastHeading = page.scrollTop > 0 && heading && tabs && heading.getBoundingClientRect().bottom <= tabs.getBoundingClientRect().bottom;
+          setScrolledRecord(pastHeading ? patientId : null);
+        } : undefined}>{children}</div>
       </div>
     </div>
     </DirectoryReturnContext.Provider>

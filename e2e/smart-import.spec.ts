@@ -355,9 +355,11 @@ test('Proposte combinate: un solo conteggio effettivo e due destinazioni senza r
     await expect(insightProposal).toBeVisible();
     await openPatientSection(page, 'quadro'); await expect(summary).toContainText('Proposta · non registrata');
     await expect(insightProposal).not.toBeVisible();
-    await summary.getByRole('link', { name: 'Smart Import', exact: true }).click();
+    await expect(summary.getByRole('link', { name: 'Smart Import', exact: true })).toHaveCount(0);
+    await openPatientSection(page, 'documenti');
     const smart = page.locator('#smart-import');
-    const smartToggle = smart.locator(':scope > div > [data-disclosure-control]');
+    const smartToggle = smart.getByRole('button', { name: 'Proposte', exact: true });
+    await smartToggle.click();
     await expect(smartToggle).toHaveAttribute('aria-expanded', 'true');
     await smart.getByRole('button', { name: 'Cambia', exact: true }).click();
     await smart.getByRole('combobox', { name: 'Modello per questa proposta' }).selectOption(FIXTURE_MODEL.modelOptionId);
@@ -390,6 +392,7 @@ test('Proposte combinate: un solo conteggio effettivo e due destinazioni senza r
     await summary.getByRole('link', { name: 'Smart Import', exact: true }).click();
     await expect(smartProposal).toBeVisible(); await smart.getByRole('button', { name: 'Ricomincia', exact: true }).click();
     await openPatientSection(page, 'quadro'); await expect(summary).toContainText('Nessuna proposta da rivedere');
+    await expect(summary.getByRole('link', { name: 'Smart Import', exact: true })).toHaveCount(0);
     expect(insightCalls).toBe(1); expect(calls.preview).toBe(1); expect(calls.legacyApply).toBe(0);
   } finally { await zoom.close(); }
 });

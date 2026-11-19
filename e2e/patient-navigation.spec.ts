@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { bootstrapUnlockedSession, openPatientSection } from './utils';
 import { secureLaunch } from './fixtures/secure-browser';
+import { currentPreset } from './fixtures/territorial-preset';
 
 const wideHrefs = ['#quadro', '#diario', '#terapie', '#documenti', '#parametri', '#follow-up'];
 const compactHrefs = ['#quadro', '#terapie', '#parametri', '#documenti'];
@@ -70,13 +71,14 @@ test('Azioni restituisce il fuoco dopo Report PDF e lo cede ai dialoghi', async 
     await expect(archive).toBeHidden();
 });
 
-for (const [width, count] of [[1320, 0], [1320, 12], [390, 1], [1001, 1], [1000, 0]]) test(`quindici destinazioni accessibili a ${width}px con ${count} record sintetici`, async ({ page }) => {
+for (const [width, count] of [[1320, 0], [1320, 12], [390, 1], [1001, 1], [1000, 0]]) test(`destinazioni del profilo accessibili a ${width}px con ${count} record sintetici`, async ({ page }) => {
     await page.setViewportSize({ width, height: 880 });
     const wide = width >= 1001;
     await seed(page, count);
     const nav = navigation(page);
     const primaryHrefs = wide ? wideHrefs : compactHrefs;
-    const secondaryHrefs = compactMenuHrefs.filter(href => !primaryHrefs.includes(href));
+    const lombardy = await currentPreset(page) === 'core+it+lom';
+    const secondaryHrefs = compactMenuHrefs.filter(href => !primaryHrefs.includes(href) && (href !== '#siss' || lombardy));
     const suffix = count ? String(count) : '';
     const primary = nav.getByRole('link');
     await expect(primary).toHaveText(wide
