@@ -1151,6 +1151,7 @@ const runtimeContractPath = path.join(standaloneDir, 'mediflow-runtime-contract.
 
 const forbiddenMatchers = [
   (relativePath) => /^medical\.db$/i.test(relativePath),
+  (relativePath) => relativePath.startsWith('lib/fixtures/archive-v090/'),
   (relativePath) => /\.(db|sqlite|sqlite3)$/i.test(relativePath),
   (relativePath) => /^tmp[-_/]/.test(relativePath),
   (relativePath) => /^docs\//.test(relativePath),
