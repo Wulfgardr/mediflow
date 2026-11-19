@@ -208,9 +208,9 @@ class PackageStandardFontDataFactory {
 
     async fetch({ filename }) {
         if (typeof filename !== 'string' || !STANDARD_FONT_FILES.has(filename)) throw new EngineUnavailable();
-        const root = realpathSync(fileURLToPath(new URL('..', import.meta.url)));
+        const root = realpathSync.native(fileURLToPath(new URL('..', import.meta.url)));
         const file = path.join(path.dirname(require.resolve('pdfjs-dist/package.json')), 'standard_fonts', filename);
-        const relative = path.relative(root, realpathSync(file));
+        const relative = path.relative(root, realpathSync.native(file));
         const stat = lstatSync(file);
         if (!stat.isFile() || stat.size < 1 || stat.size > STANDARD_FONT_MAX_BYTES
             || relative.startsWith('..') || path.isAbsolute(relative)) throw new EngineUnavailable();
@@ -235,8 +235,8 @@ async function loadRenderer() {
         // @Codex: macOS packaging relocates and signs canvas; preserve its existing version gate.
         if (process.platform !== 'darwin') {
             const binaryPath = require.resolve(`${profile.package}/${profile.binary}`);
-            const root = realpathSync(fileURLToPath(new URL('..', import.meta.url)));
-            const relative = path.relative(root, realpathSync(binaryPath));
+            const root = realpathSync.native(fileURLToPath(new URL('..', import.meta.url)));
+            const relative = path.relative(root, realpathSync.native(binaryPath));
             if (!lstatSync(binaryPath).isFile() || relative.startsWith('..') || path.isAbsolute(relative)) throw new EngineUnavailable();
             const binary = readFileSync(binaryPath);
             if (binary.byteLength !== profile.binaryByteLength
@@ -249,7 +249,7 @@ async function loadRenderer() {
                 const assetPath = path.join(path.dirname(binaryPath), asset.file);
                 const assetStat = lstatSync(assetPath);
                 if (!assetStat.isFile() || assetStat.isSymbolicLink() || assetStat.size !== asset.byteLength
-                    || realpathSync(assetPath) !== assetPath) throw new EngineUnavailable();
+                    || realpathSync.native(assetPath) !== assetPath) throw new EngineUnavailable();
                 const bytes = readFileSync(assetPath);
                 if (bytes.byteLength !== asset.byteLength
                     || createHash('sha256').update(bytes).digest('hex') !== asset.sha256) throw new EngineUnavailable();
@@ -434,13 +434,13 @@ async function recognizeTesseract(frame) {
     if (offset !== frame.body.byteLength) return { failure: 'invalid_request' };
     let core, model, createCore;
     try {
-        const root = realpathSync(fileURLToPath(new URL('..', import.meta.url)));
+        const root = realpathSync.native(fileURLToPath(new URL('..', import.meta.url)));
         const manifest = JSON.parse(readFileSync(new URL('./anydoc-tesseract-artifacts.json', import.meta.url), 'utf8'));
         const directory = path.join(root, manifest.directory);
         const artifacts = new Map();
         for (const artifact of manifest.files) {
             const file = path.join(directory, artifact.name);
-            const relative = path.relative(root, realpathSync(file));
+            const relative = path.relative(root, realpathSync.native(file));
             if (!lstatSync(file).isFile() || relative.startsWith('..') || path.isAbsolute(relative)) throw new EngineUnavailable();
             const bytes = readFileSync(file);
             if (bytes.byteLength !== artifact.byteLength

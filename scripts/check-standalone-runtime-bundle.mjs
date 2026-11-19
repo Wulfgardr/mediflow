@@ -81,7 +81,7 @@ class PdfPageWorkerSmokeError extends Error {}
 const ANYDOC_WORKER_FILE = 'anydoc-local-extraction-worker.mjs';
 const ANYDOC_WORKER_SHA256 = '5d6e2e60f1d71f3fd45065961258a7debe8a96e017abdcee92823986c8f08c67';
 const ANYDOC_PDF_PAGE_WORKER_FILE = 'anydoc-pdf-page-worker.mjs';
-const ANYDOC_PDF_PAGE_WORKER_SHA256 = '5facb4803373cd1a15c7548813f9a3662107dd0efd5e9cf3739643921e49cedc';
+const ANYDOC_PDF_PAGE_WORKER_SHA256 = '72e7f91ddef9569a9ff0acae8f91893ec7218b4750d0f4886ca162913e1526d9';
 const PDFJS_STANDARD_FONT_FILES = Object.freeze([
   'FoxitDingbats.pfb', 'FoxitFixed.pfb', 'FoxitFixedBold.pfb', 'FoxitFixedBoldItalic.pfb', 'FoxitFixedItalic.pfb',
   'FoxitSerif.pfb', 'FoxitSerifBold.pfb', 'FoxitSerifBoldItalic.pfb', 'FoxitSerifItalic.pfb', 'FoxitSymbol.pfb',
@@ -360,23 +360,31 @@ function syntheticPdfPage() {
 
 function runPdfChild(workerPath, input, { allowAddons = false, args = [] } = {}) {
   const packageRoot = path.dirname(path.dirname(workerPath));
-  const launch = documentChildLaunch(packageRoot, workerPath, { allowAddons, args, networkGuard: false });
   const started = performance.now();
-  const result = spawnSync(launch.command, launch.args, {
-    cwd: path.dirname(workerPath),
-    env: { NODE_ENV: 'production', NAPI_RS_ENFORCE_VERSION_CHECK: '1' },
-    input,
-    encoding: 'buffer',
-    timeout: 30_000,
-    maxBuffer: 4 * 1024 * 1024,
-    windowsHide: true,
-  });
+  const result = runDocumentSmoke(packageRoot, workerPath, input, {
+    allowAddons, args, networkGuard: false,
+  }, 30_000);
   if (process.env.MEDIFLOW_PDF_SMOKE_TIMINGS === '1') {
     console.log(JSON.stringify({ type: 'pdf-smoke-timing', stage: allowAddons ? 'render' : 'materialize',
       elapsedMs: Math.round(performance.now() - started), status: result.status,
       signal: result.signal, error: result.error?.code ?? null }));
   }
   return result;
+}
+
+function runDocumentSmoke(root, worker, input, options, timeout) {
+  const launch = documentChildLaunch(root, worker, options);
+  try { return spawnSync(launch.command, launch.args, {
+    cwd: path.dirname(worker),
+    env: launch.env,
+    input,
+    encoding: 'buffer',
+    timeout,
+    maxBuffer: 4 * 1024 * 1024,
+    windowsHide: true,
+  }); } finally {
+    if (launch.cleanup?.() === false) throw new Error('Windows document sandbox cleanup failed.');
+  }
 }
 
 /* follow the pinned worker's desktop profiles and minimum glibc version.
@@ -1297,18 +1305,10 @@ if (!anyDocNativePackage) fail('AnyDoc does not declare a native package for the
 const anyDocNativeManifest = requireFromStandalone.resolve(`${anyDocNativePackage}/package`);
 const anyDocNativeDir = path.dirname(assertRealpathInsideStandalone(anyDocNativeManifest, `${anyDocNativePackage} package`));
 nativeArtifacts(anyDocNativeDir, `${anyDocNativePackage} native binding`, (name) => name.endsWith('.node'));
-const anyDocLaunch = documentChildLaunch(standaloneDir, anyDocWorkerPath, { allowAddons: true });
-const anyDocRun = spawnSync(anyDocLaunch.command, anyDocLaunch.args, {
-  cwd: path.dirname(anyDocWorkerPath),
-  env: { NODE_ENV: 'production', NAPI_RS_ENFORCE_VERSION_CHECK: '1' },
-  input: SYNTHETIC_RTF,
-  encoding: 'buffer',
-  timeout: 15_000,
-  windowsHide: true,
-});
+const anyDocRun = runDocumentSmoke(standaloneDir, anyDocWorkerPath, SYNTHETIC_RTF, { allowAddons: true }, 15_000);
 if (anyDocRun.error || anyDocRun.status !== 0 || !Buffer.isBuffer(anyDocRun.stdout)
     || anyDocRun.stdout.toString('utf8') !== 'Synthetic standalone note.\n') {
-  fail(`Standalone runtime AnyDoc worker did not extract the synthetic RTF via ${path.basename(anyDocLaunch.command)}.`);
+  fail('Standalone runtime AnyDoc worker did not extract the synthetic RTF through the production launcher.');
 }
 
 let databaseEntry;

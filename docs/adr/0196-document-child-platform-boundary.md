@@ -24,17 +24,28 @@ del chiamante. Il worker parte senza le interfacce e le rotte IP del guest.
 Il sistema deve permettere a un utente ordinario di creare questi namespace.
 Un avvio negato rende indisponibile l'elaborazione del documento.
 
-Windows 11 ARM con Node x64 emulato avvia direttamente Node. Su Linux con
-un'altra architettura resta il limite dati di `prlimit`. Su questi profili
-manca un blocco di rete imposto dal launcher a livello di sistema. Tutti i
-worker mantengono il modello dei permessi Node e il blocco JavaScript delle
-API di rete. Gli addon nativi operano fuori da quei controlli JavaScript.
+Windows 11 ARM richiede un confine di rete del sistema operativo per AnyDoc e
+il lettore PDF. Il launcher usa un AppContainer senza capacità, tramite
+`PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES` e `CreateProcessW`. Il
+bootstrap verifica il token prima di avviare il worker. Un errore durante
+la preparazione o la verifica rende indisponibile l'elaborazione.
+
+Il contenitore riceve in lettura ed esecuzione una copia temporanea di Node e
+degli asset necessari al worker. Il PDF e la risposta transitano attraverso
+le sole pipe standard. Il Job Object termina il worker se il bootstrap
+termina prima di lui.
+Il bootstrap verifica che il token del figlio sospeso abbia il SID atteso e
+zero capacità. Node conserva i permessi applicativi e il guard JavaScript.
+La copia contiene solo asset documentali fisici. Node risolve i moduli al
+suo interno conservando i percorsi delle copie, senza richiedere accesso
+alle directory superiori.
 
 ## Conseguenze
 
 Il namespace Linux separa la rete IP e i socket Unix astratti. I socket Unix
 visibili come file restano accessibili secondo i permessi del processo.
-Per Windows, AppContainer senza capacità di rete richiede di verificare anche
-accesso a Node x64, file del pacchetto, addon e pipe ereditate.
-L'evidenza relativa al runtime Web non attribuisce la stessa protezione al
-processo GPUI. La qualifica del client installato segue il profilo Mac di Q-6.
+Sulle altre architetture Linux resta il limite dati di `prlimit`.
+La qualifica GPUI resta quella del client installato sul Mac di Q-6.
+
+
+[API Microsoft per AppContainer](https://learn.microsoft.com/windows/win32/secauthz/implementing-an-appcontainer)

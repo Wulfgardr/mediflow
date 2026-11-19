@@ -9,7 +9,7 @@ import rendererProfiles from '../../../scripts/anydoc-pdf-renderer-profiles.json
 import tesseractArtifacts from '../../../scripts/anydoc-tesseract-artifacts.json' with { type: 'json' };
 
 export const ANYDOC_PDF_CHILD_PROTOCOL_SCHEMA_VERSION = 'mediflow.anydoc_pdf_child_protocol.v1' as const;
-export const ANYDOC_PDF_CHILD_WORKER_SHA256 = '5facb4803373cd1a15c7548813f9a3662107dd0efd5e9cf3739643921e49cedc' as const;
+export const ANYDOC_PDF_CHILD_WORKER_SHA256 = '72e7f91ddef9569a9ff0acae8f91893ec7218b4750d0f4886ca162913e1526d9' as const;
 export const ANYDOC_PDF_CHILD_JOB_TIMEOUT_MS = 30_000;
 export const ANYDOC_PDF_CHILD_MAX_HEADER_BYTES = 64 * 1024;
 export const ANYDOC_PDF_CHILD_MAX_OLD_SPACE_MB = DOCUMENT_CHILD_HEAP_MB;
@@ -170,17 +170,22 @@ async function runOwnedWorker(input: Buffer, options: RunOptions): Promise<RawRu
         if (!worker) return failure('worker_unavailable');
         return await new Promise<RawRunResult>((resolve) => {
             let child;
+            let launch: ReturnType<typeof documentChildLaunch> | undefined;
             try {
-                const launch = documentChildLaunch(worker.root, worker.path, {
+                launch = documentChildLaunch(worker.root, worker.path, {
                     networkGuard: false, allowAddons: options.allowAddons, args: options.args, wasmMemoryPages: options.wasmMemoryPages,
                 });
                 child = spawn(launch.command, launch.args, {
                     cwd: worker.directory,
-                    env: { NODE_ENV: 'production', NAPI_RS_ENFORCE_VERSION_CHECK: '1' },
+                    env: launch.env,
                     stdio: ['pipe', 'pipe', 'pipe'],
                     windowsHide: true,
                 });
-            } catch { resolve(failure('worker_unavailable')); return; }
+            } catch {
+                launch?.cleanup?.();
+                resolve(failure('worker_unavailable'));
+                return;
+            }
             const output: Buffer[] = [];
             let outputBytes = 0;
             let diagnosticBytes = 0;
@@ -190,7 +195,7 @@ async function runOwnedWorker(input: Buffer, options: RunOptions): Promise<RawRu
                 if (settled) return;
                 settled = true;
                 clearTimeout(timer);
-                resolve(result);
+                resolve(launch?.cleanup?.() === false ? failure('worker_unavailable') : result);
             };
             const stop = (reason: AnyDocPdfChildFailureReason) => {
                 if (forcedReason) return;
