@@ -6,7 +6,7 @@ import { isAbsolute, join } from 'node:path';
 import { serializeBackupArtifact } from '../lib/backup-artifact';
 import { bootstrapUnlockedSession } from './utils';
 import { loginWithWebAuthControl } from '../scripts/web-auth-control-test-client.mjs';
-import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
+import { reviewedRestoreHeaders, trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
 
 test('comando terapia nativo, backup e importazione portabile conservano storico senza importare autorità', async ({ page, baseURL }) => {
     test.setTimeout(120_000);
@@ -71,15 +71,17 @@ test('comando terapia nativo, backup e importazione portabile conservano storico
             ...forgedTherapyAudit, eventId: `u2-flood-${randomUUID()}`, occurredAt: now + index + 1, requestId: null,
         })));
         const hostile = await serializeBackupArtifact(artifact.payload);
+        const firstRestoreIntent = await reviewedRestoreHeaders(page.request, headers, hostile);
         for (const credential of [undefined, { pin: '99999999' }]) {
-            const denied = await page.request.post('/api/system/backup-restore', { headers: { ...headers, ...(credential ? { 'x-mediflow-restore-credential': JSON.stringify(credential) } : {}) }, data: hostile });
+            const denied = await page.request.post('/api/system/backup-restore', { headers: { ...headers, ...firstRestoreIntent, ...(credential ? { 'x-mediflow-restore-credential': JSON.stringify(credential) } : {}) }, data: hostile });
             expect(denied.status(), await denied.text()).toBe(401);
             expect(db.prepare('SELECT first_name FROM patients WHERE id=?').get(patientId)).toEqual({ first_name: 'Persona' });
             expect(db.prepare('SELECT * FROM therapy_status_commands WHERE command_id=?').get(command.commandId)).toEqual(ledger);
             expect(db.prepare('SELECT * FROM audit_events WHERE event_id=?').get(forgedId)).toBeUndefined();
         }
         const localHistory = db.prepare('SELECT * FROM audit_events').all() as { event_id: string }[];
-        const restored = await page.request.post('/api/system/backup-restore', { headers: { ...headers, 'x-mediflow-restore-credential': JSON.stringify({ pin }) }, data: hostile });
+        const renewedIntent = await reviewedRestoreHeaders(page.request, headers, hostile);
+        const restored = await page.request.post('/api/system/backup-restore', { headers: { ...headers, ...renewedIntent, 'x-mediflow-restore-credential': JSON.stringify({ pin }) }, data: hostile });
         expect(restored.status(), await restored.text()).toBe(200);
         expect(db.prepare('SELECT first_name FROM patients WHERE id=?').get(patientId)).toEqual({ first_name: 'Importata sintetica' });
         expect(db.prepare('SELECT status FROM physician_review_attestations WHERE actor_ref=?').get(actor.id)).toEqual({ status: 'inactive' });
@@ -90,7 +92,7 @@ test('comando terapia nativo, backup e importazione portabile conservano storico
         const imported = await (await import('../lib/backup-artifact')).parseBackupArtifact(JSON.parse(hostile));
         expect(db.prepare("SELECT subject_ref FROM audit_events WHERE event_id=? AND event_type='backup.portable.imported'").get(marker.request_id)).toEqual({ subject_ref: imported.manifest.checksum });
         expect(db.prepare('SELECT event_type,source_surface FROM audit_events WHERE event_id=?').get(forgedId)).toEqual({ event_type: 'patient.updated', source_surface: 'web' });
-        const stale = await page.request.post('/api/system/backup-restore', { headers: { ...headers, 'x-mediflow-restore-credential': JSON.stringify({ pin }) }, data: hostile });
+        const stale = await page.request.post('/api/system/backup-restore', { headers: { ...headers, ...renewedIntent, 'x-mediflow-restore-credential': JSON.stringify({ pin }) }, data: hostile });
         expect([401, 409]).toContain(stale.status());
         const renewed = await loginWithWebAuthControl(baseURL!, { username: process.env.E2E_USERNAME || 'admin', password: pin });
         expect(renewed.response.status).toBe(200);
@@ -138,6 +140,12 @@ test('la conferma UI conserva il file dopo una credenziale errata e richiede la 
     await expect(page.getByTestId('backup-outcome')).toContainText('Ripristino non riuscito');
     await expect(panel).toBeVisible();
     await expect(page.getByLabel('PIN amministrativo', { exact: true })).toHaveValue('');
+    await page.getByLabel('PIN amministrativo', { exact: true }).fill(process.env.E2E_PIN || '1234');
+    await submit.click();
+    await expect(page.getByTestId('backup-outcome')).toContainText('Verifica di nuovo il file');
+    await expect(panel).toHaveCount(0);
+    await page.getByText('Seleziona file .mediflow v1', { exact: true }).locator('input').setInputFiles({ name: 'sintetico.mediflow', mimeType: 'application/json', buffer: data });
+    await page.getByTestId('restore-confirmation-input').fill('RIPRISTINA');
     await page.getByLabel('PIN amministrativo', { exact: true }).fill(process.env.E2E_PIN || '1234');
     await panel.screenshot({ path: testInfo.outputPath('conferma-credenziale.png') });
     await submit.click();

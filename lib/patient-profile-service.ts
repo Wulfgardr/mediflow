@@ -40,6 +40,7 @@ import { NETWORK_PAIRING_STATE_KEY, parseNetworkPairingState } from './network-p
 import type { StoredNetworkPairedClient } from './network-pairing-model';
 import { currentArchiveGeneration } from './security/archive-session-generation';
 import type { PatientProfileQueryHostPort } from './security/patient-profile-query-host-port';
+import { createProfilePseudonymizer, type ProfilePseudonymizer, type ProfileRelease, type ReleasedProfile } from './patient-profile-pseudonymization';
 import { createSingleUseConfirmationOwner } from './security/single-use-confirmation';
 import { sessionPhysicianReviewAuthority } from './security/session-physician-review-authority-production';
 import { SessionPhysicianReviewAuthorityError, type SessionPhysicianReviewAuthorityV1 } from './security/session-physician-review-authority';
@@ -179,6 +180,7 @@ type ScopedContext = Readonly<{
     session: ServerSession; owner: ServerSessionProfileSelectionOwner; process: ScopedOwnerProcess;
     purpose: PatientProfileQuery['purpose']; lane: 'web' | 'network' | symbol; maximumProjection: ProfileProjection;
     currentScope(): string; pairedClient?: StoredNetworkPairedClient; resultDeadline?: number;
+    release?(handle: string, snapshot: PatientProfileView, projection: ProfileProjection): ReleasedProfile;
 }>;
 type ScopedReferences = {
     active: boolean; epoch: number; scope: ServerSessionSelectionScopeV1;
@@ -278,7 +280,7 @@ function references(context: ScopedContext): ScopedReferences {
     return state;
 }
 
-function scopedProjection(snapshot: PatientProfileView, projection: ProfileProjection, lane: ScopedContext['lane']): ProfileFields | Readonly<{ notes: string | null }> {
+function scopedProjection(snapshot: PatientProfileView, projection: ProfileProjection, lane: ScopedContext['lane']): ReleasedProfile {
     if (projection === 'notes') return Object.freeze({ notes: snapshot.notes });
     const fields = lane === 'web' || lane === 'network' ? HTTP_PROFILE_FIELD_NAMES : PROFILE_FIELD_NAMES;
     const profile = Object.fromEntries(fields.map(key => [key, snapshot[key]])) as ProfileFields;
@@ -327,7 +329,8 @@ function executeScopedProfile(context: ScopedContext, query: ProfileQuery, expec
                 const output = Object.freeze({ schemaVersion: PROFILE_QUERY_RESULT_SCHEMA, operationId: PROFILE_QUERY_OPERATION_ID,
                     contractVersion: 1 as const, handle, projection: query.projection,
                     currentness: Object.freeze({ revision: snapshot.version, selectionEpoch: state.epoch, observedAt, expiresAt }),
-                    profile: scopedProjection(snapshot, query.projection, context.lane) }) as ProfileResult;
+                    profile: context.release ? context.release(handle, snapshot, query.projection)
+                        : scopedProjection(snapshot, query.projection, context.lane) }) as ProfileResult;
                 assertProfileResultBudget(output);
                 if (signal?.aborted) return scopedFail('cancelled');
                 if (context.currentScope() !== ambulatoryId) return scopedFail('scope_denied');
@@ -600,34 +603,56 @@ export async function commitPatientProfileNotesHttp(request: Request, patientId:
     return profileNotesWorkflow(request, patientId);
 }
 
-export async function acquireScopedPatientProfileHostPort(projection: ProfileProjection, expiresAt: number): Promise<PatientProfileQueryHostPort | null> {
-    if ((projection !== 'profile' && projection !== 'notes') || !Number.isSafeInteger(expiresAt) || expiresAt <= Date.now()) return null;
+export async function acquireScopedPatientProfileHostPort(projection: ProfileProjection, expiresAt: number,
+    release: ProfileRelease): Promise<PatientProfileQueryHostPort | null> {
+    if ((projection !== 'profile' && projection !== 'notes') || (release !== 'identified' && release !== 'pseudonymized')
+        || !Number.isSafeInteger(expiresAt) || expiresAt <= Date.now()) return null;
     const authenticated = await acquireAuthenticatedWebSessionProjectionOwnerContext();
     if (!authenticated || expiresAt <= Date.now()) return null;
     let active = true;
+    const pseudonyms = new Map<string, ProfilePseudonymizer>();
+    const retirePseudonyms = (current: (handle: string) => boolean) => {
+        for (const [handle, pseudonymizer] of pseudonyms) {
+            if (!current(handle)) { pseudonyms.delete(handle); pseudonymizer.close(); }
+        }
+    };
     try {
         const { session, owner } = authenticated;
         const selected = owner.withLeaseCriticalSection(session, value => value);
+        const lane = Symbol('patient-profile-host-query');
         const context: ScopedContext = { session, owner, process: serverSessionProjectionOwnerProductionOwner,
-            purpose: 'care_coordination', lane: Symbol('patient-profile-host-query'), maximumProjection: projection, resultDeadline: expiresAt,
-            currentScope: () => selected.ambulatoryId };
+            purpose: 'care_coordination', lane, maximumProjection: projection, resultDeadline: expiresAt,
+            currentScope: () => selected.ambulatoryId,
+            ...(release === 'pseudonymized' ? { release(handle: string, snapshot: PatientProfileView, requested: ProfileProjection) {
+                let pseudonymizer = pseudonyms.get(handle);
+                if (!pseudonymizer) { pseudonymizer = createProfilePseudonymizer(); pseudonyms.set(handle, pseudonymizer); }
+                return pseudonymizer.project(snapshot, requested);
+            } } : {}) };
         const state = withCurrentProfileSession(context, () => references(context));
         const port: PatientProfileQueryHostPort = Object.freeze({
             async executeProfileQuery(value: ProfileQuery, signal?: AbortSignal): Promise<ProfileResult> {
-                if (!active || !state.active) return scopedFail('handle_unavailable');
-                if (Date.now() >= expiresAt) return scopedFail('handle_expired');
-                const input = parseProfileQuery(value); if (!input) return scopedFail('input_invalid');
-                return executeScopedProfile(context, input, selected.patientId, false, signal);
+                try {
+                    if (!active || !state.active) return scopedFail('handle_unavailable');
+                    if (Date.now() >= expiresAt) return scopedFail('handle_expired');
+                    const input = parseProfileQuery(value); if (!input) return scopedFail('input_invalid');
+                    return executeScopedProfile(context, input, selected.patientId, false, signal);
+                } finally {
+                    retirePseudonyms(handle => {
+                        const reference = state.handles.get(handle);
+                        return active && state.active && reference?.lane === lane && Date.now() < reference.expiresAt;
+                    });
+                }
             },
             dispose(): boolean {
                 if (!active) return false; active = false;
+                retirePseudonyms(() => false);
                 for (const [handle, reference] of state.handles) if (reference.lane === context.lane) state.handles.delete(handle);
                 return true;
             },
         });
         scopedHostPorts.set(port, { context, state, active: () => active });
         return port;
-    } catch { active = false; return null; }
+    } catch { active = false; retirePseudonyms(() => false); return null; }
 }
 
 export function isCurrentScopedPatientProfileResult(port: PatientProfileQueryHostPort, result: ProfileResult): boolean {

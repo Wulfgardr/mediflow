@@ -65,7 +65,7 @@ test('backup restore rejects cross-port and text/plain transport before prefligh
         const routeUrl = ${JSON.stringify(routeUrl)};
         const verifyUrl = ${JSON.stringify(verifyUrl)};
         const modules = new Map([
-            ['@/lib/backup-restore-receipt', ${JSON.stringify(toDataModule("export function parseRestoreIntent() { return null; } export function readRestorePreviewSnapshot() { return 'a'.repeat(64); }"))}],
+            ['@/lib/backup-restore-receipt', ${JSON.stringify(toDataModule("export function parseRestoreIntent() { return { id: 'synthetic', expectedSnapshot: 'a'.repeat(64), expectedSourceChecksum: 'b'.repeat(64) }; } export function readRestorePreviewSnapshot() { return 'a'.repeat(64); }"))}],
             ['@/lib/security/loopback-ingress.mjs', ${JSON.stringify(toDataModule("export function isLocalClientSession() { return false; }"))}],
             ['next/server', ${JSON.stringify(toDataModule("export const NextResponse = Response;"))}],
             ['@/lib/db-server', ${JSON.stringify(toDataModule("export const dbServer = { transaction() { globalThis.dbCalls = (globalThis.dbCalls ?? 0) + 1; throw new Error('database touched'); } };"))}],
@@ -80,7 +80,7 @@ test('backup restore rejects cross-port and text/plain transport before prefligh
                 'servicePrescriptions', 'sissHandoffEvents', 'therapies', 'therapyStatusCommands', 'ambulatoryDestructiveCommands',
             ].map((name) => `${name} = Object.freeze({})`).join(', ')};`))}],
             ['@/lib/security/server-auth', ${JSON.stringify(toDataModule("export async function requireSession() { globalThis.sessionCalls = (globalThis.sessionCalls ?? 0) + 1; if (globalThis.sessionMode === 'anonymous') return null; return Object.freeze({ id: 'session.synthetic.restore', userId: 'user.synthetic.restore', role: globalThis.sessionMode ?? 'admin' }); } export function unauthorizedResponse() { return new Response(null, { status: 401 }); } export function forbiddenResponse() { return new Response(null, { status: 403 }); }"))}],
-            ['@/lib/security/host-credential-verification', ${JSON.stringify(toDataModule("export async function verifyUnlockCredentials() { return { kind: 'verified', account: { id: 'user.synthetic.restore', role: 'admin' } }; }"))}],
+            ['@/lib/security/host-credential-verification', ${JSON.stringify(toDataModule("export async function verifyRestoreCredentials() { return { kind: 'verified', account: { id: 'user.synthetic.restore', role: 'admin' } }; }"))}],
             ['@/lib/security/current-session-authority', ${JSON.stringify(toDataModule("export function isCurrentServerSession() { return true; }"))}],
             ['@/lib/security/archive-session-generation', ${JSON.stringify(toDataModule("export function archiveGenerationForSession() { return 'synthetic-generation'; }"))}],
             ['@/lib/archive-generation', ${JSON.stringify(toDataModule("export function assertArchiveGeneration() {}"))}],

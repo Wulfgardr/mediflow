@@ -143,3 +143,19 @@ arbitraria: la memoria disponibile sul computer resta un limite operativo.
 Le regressioni coprono il matcher e lo stream sostitutivo del Next installato;
 gli E2E HTTP esportano, verificano e ripristinano backup oltre 35 MiB con
 originali protesici e allegati paziente su archivi sintetici isolati.
+
+## Conferma del ripristino Web
+
+Quando si sceglie il file da ripristinare, il Web verifica la copia e mostra il
+riepilogo prima di chiedere la conferma. Invia al server lo stesso contenuto,
+l’identificatore dell’operazione, il checksum restituito dalla verifica,
+l’impronta dell’archivio e la conferma esplicita. Il server confronta
+l’impronta nella transazione SQLite `IMMEDIATE` prima della scrittura.
+Se l’archivio è cambiato, bisogna verificare di nuovo il file e ripetere
+la conferma. Il contratto del client locale GPUI continua ad accettare
+la conferma con l’impronta dell’archivio e la copia conservata dal client.
+
+La verifica rifiuta le voci di una prescrizione assegnate a un altro paziente
+e le osservazioni collegate alla prestazione di un altro paziente. Un
+riferimento presente deve risolversi nel file. Le osservazioni dei backup
+precedenti senza un collegamento restano valide.

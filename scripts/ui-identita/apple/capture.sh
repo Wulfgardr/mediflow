@@ -10,7 +10,7 @@ finish() {
   echo "$result" > "$scratch/capture-exit-code.txt"
 }
 trap finish EXIT
-test -f /Users/leonardopegollo/Antigravity/mf-ui-identita-20261107/BANCO.md
+test -f "${MEDIFLOW_UI_CAPTURE_OUTPUT:-$HOME/Antigravity/mf-ui-identita-20261107}/BANCO.md"
 xcodebuild -project native/MediFlowAppleApp/MediFlowAppleApp.xcodeproj -scheme MediFlowMobileApp -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath "$scratch/DerivedData" -clonedSourcePackagesDirPath "$scratch/packages" CODE_SIGNING_ALLOWED=NO build > "$scratch/build-ios.log" 2>&1
 status=0
 for spec in 'ios-iphone:39C682EE-A9B7-4AE2-AF1F-840D44658BB6' 'ios-ipad:FB0654D2-8CC3-49F3-9406-903F2BD54241'; do

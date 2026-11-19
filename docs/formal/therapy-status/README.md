@@ -1148,3 +1148,17 @@ di una terapia continua a usare il controller e le ricevute dell’ADR 0168.
 Il confronto con l’archivio avviene nella transazione del server. I test
 di `lib/service-prescription-atomic.test.ts` verificano il conflitto, il rollback
 e le scritture nell’audit.
+
+### Ripristino portabile Web, WUL-908
+
+Il client del backup in `lib/db.ts` conserva la verifica fino alla conferma.
+Poi invia lo stato dell’archivio esaminato. Il writer confronta quello stato
+nella transazione SQLite prima delle scritture. La revoca in memoria dei
+riferimenti agli allegati precede la transazione, come nel writer esistente.
+Vale anche se il controllo preliminare successivo ferma il ripristino.
+
+Il raccordo registra il digest del client sul commit `ae3a41aca688`.
+Il writer, le transizioni del comando di stato terapia e il controllo
+concorrente della versione corrispondono alla base. Le regressioni Web
+coprono il conflitto durante il ripristino portabile. TLC verifica il
+modello legacy entro i limiti del manifest.

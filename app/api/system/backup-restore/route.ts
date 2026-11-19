@@ -1,4 +1,4 @@
-import { verifyUnlockCredentials } from '@/lib/security/host-credential-verification';
+import { verifyRestoreCredentials } from '@/lib/security/host-credential-verification';
 import { isCurrentServerSession } from '@/lib/security/current-session-authority';
 import { parseRestoreIntent } from '@/lib/backup-restore-receipt';
 import { isLocalClientSession } from '@/lib/security/loopback-ingress.mjs';
@@ -47,11 +47,12 @@ import {
 } from '@/lib/security/server-auth';
 import { isWebAdminSession } from '@/lib/security/server-auth-policy';
 import {
+    backupArtifactInputChecksum,
     type BackupDataset,
     serializeBackupArtifact,
 } from '@/lib/backup-artifact';
 import { enrichBackupPatientsWithAmbulatoryLinks } from '@/lib/backup-patient-ambulatory-links';
-import { BackupRestoreBlockedError, restoreBackupArtifact } from '@/lib/backup-restore-executor';
+import { BackupRestoreBlockedError, restoreBackupArtifact, type BackupRestoreBlockedReason } from '@/lib/backup-restore-executor';
 import { runBackupRestorePreflight } from '@/lib/backup-restore-preflight';
 import { apiFailure, apiInternalError } from '@/lib/api-error-response';
 import { disposeCheckupStatusTransitionForHostV1 } from
@@ -59,6 +60,13 @@ import { disposeCheckupStatusTransitionForHostV1 } from
 import { isTrustedWebMutationRequest } from '@/lib/security/request-transport';
 
 export const dynamic = 'force-dynamic';
+
+function blockedRestoreResponse(reason: BackupRestoreBlockedReason | 'source') {
+    return NextResponse.json({
+        success: false, code: 'restore_blocked', reason,
+        error: 'Ripristino bloccato: i dati attuali non sono stati modificati.',
+    }, { status: 409, headers: { 'Cache-Control': 'no-store' } });
+}
 
 function sortBackupRows<T extends Record<string, unknown>>(rows: T[]): T[] {
     return [...rows].sort((left, right) => {
@@ -187,7 +195,9 @@ export async function POST(request: Request) {
     try {
         let intent;
         try { intent = parseRestoreIntent(request); } catch { return apiFailure('invalid_restore_intent', 'Confirmation and snapshot required.', 400); }
-        if (isLocalClientSession(session.id) && !intent) return apiFailure('restore_intent_required', 'Confirmation and snapshot required.', 400);
+        if (!intent || (!intent.expectedSourceChecksum && !isLocalClientSession(session.id))) {
+            return apiFailure('restore_intent_required', 'Verifica il file prima di confermare il ripristino.', 400);
+        }
         const body = await request.json();
         const { artifact, result: preflight } = await runBackupRestorePreflight(body);
         if (!preflight.ok || !artifact) {
@@ -197,6 +207,9 @@ export async function POST(request: Request) {
             );
         }
 
+        if (intent.expectedSourceChecksum && intent.expectedSourceChecksum !== backupArtifactInputChecksum(artifact)) {
+            return blockedRestoreResponse('source');
+        }
         assertArchiveGeneration(dbServer, archiveGeneration);
         let credential: unknown;
         try { credential = JSON.parse(request.headers.get('x-mediflow-restore-credential') ?? 'null'); }
@@ -205,7 +218,7 @@ export async function POST(request: Request) {
             || Object.keys(credential).length !== 1 || !['pin', 'verifier'].includes(Object.keys(credential)[0])) {
             return apiFailure('restore_credential_required', 'Inserisci di nuovo la credenziale amministrativa.', 401);
         }
-        const verified = await verifyUnlockCredentials({ ...credential, username: session.username });
+        const verified = await verifyRestoreCredentials({ ...credential, username: session.username });
         if (verified.kind === 'denied') return NextResponse.json(verified.body, { status: verified.status });
         if (verified.account.id !== session.userId || verified.account.role !== 'admin'
             || !isCurrentServerSession(session)) return forbiddenResponse();
@@ -213,7 +226,7 @@ export async function POST(request: Request) {
         const restored = restoreBackupArtifact(artifact, () => {
             assertArchiveGeneration(dbServer, archiveGeneration);
             return disposeCheckupStatusTransitionForHostV1();
-        }, intent ?? undefined, session.userId);
+        }, intent, session.userId);
 
         return NextResponse.json({
             success: true,
@@ -224,16 +237,7 @@ export async function POST(request: Request) {
             ...restored,
         });
     } catch (error) {
-        /* Un blocco non e' un guasto: la transazione si e' chiusa senza cambiare
-           nulla e l'interfaccia deve poterlo dire, con il motivo. */
-        if (error instanceof BackupRestoreBlockedError) {
-            const response = NextResponse.json({
-                success: false, code: 'restore_blocked', reason: error.reason,
-                error: 'Ripristino bloccato: i dati attuali non sono stati modificati.',
-            }, { status: 409 });
-            response.headers.set('Cache-Control', 'no-store');
-            return response;
-        }
+        if (error instanceof BackupRestoreBlockedError) return blockedRestoreResponse(error.reason);
         /* La distinzione 400/500 resta: un artefatto malformato e' colpa del
            chiamante, il resto no. Cio' che non torna piu' e' il dettaglio, che
            su un restore contiene percorsi e struttura del manifest. */
