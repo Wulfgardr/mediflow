@@ -20,6 +20,7 @@ mockOrdinaryModule(import.meta.url, '../gliner-redaction-runner', { namedExports
 const { createOrdinaryPreparation, readPreparedOrdinaryProfile, DATE_OFFSET_NOTE } = await import('./ordinary-preparation');
 const { createRedactionSession } = await import('../ai-redaction-session');
 
+const summaryOf = (value: unknown) => (value as { summary: string }).summary;
 const configuration = { pythonExecutable: '/synthetic/python', workerPath: '/synthetic/worker', modelDirectory: '/synthetic/model' };
 const known = { names: ['Ada Sintetica'], birthDates: ['17/04/1972'] };
 const SENTINEL = 'Ada Sintetica, CF RSSMRA80A01H501U, nata il 17/04/1972, tel. 347 123 4567, ada.sintetica@example.invalid, indirizzo: Via Fittizia 3. '
@@ -81,7 +82,7 @@ test('I3: live preparations never share a nonce, even when the random source rep
             const theirs = token(second.read.payload, 'dalla figlia ', 'PER');
             assert.notEqual(mine, theirs);
             assert.equal(mine.replace(/_[a-z2-7]{8}\]\]$/u, ''), theirs.replace(/_[a-z2-7]{8}\]\]$/u, ''));
-            assert.equal(first.read.parseOutput(output('marzo', `Accompagnata da ${mine}`)).summary, 'Accompagnata da Bea Riva');
+            assert.equal(summaryOf(first.read.parseOutput(output('marzo', `Accompagnata da ${mine}`))), 'Accompagnata da Bea Riva');
             assert.throws(() => first.read.parseOutput(output('marzo', `Accompagnata da ${theirs}`)));
             assert.throws(() => second.read.parseOutput(output('marzo', `Accompagnata da ${mine}`)));
         } finally { await first.job.close(); await second.job.close(); }
@@ -116,7 +117,7 @@ test('I5: a role outside the field contract, a forged or a keyed placeholder rej
         const birth = token(read.payload, 'nata il ', 'NAS');
         const fiscal = token(read.payload, 'CF ', 'CF');
         const accepted = read.parseOutput(output(date, `${patient} con ${relative}`));
-        assert.equal(accepted.summary, 'Ada Sintetica con Bea Riva');
+        assert.equal(summaryOf(accepted), 'Ada Sintetica con Bea Riva');
         assert.equal((accepted as unknown as { servicePrescriptions: { prescribedAt?: string }[] }).servicePrescriptions[0].prescribedAt, '02/03/2026');
         for (const wire of [
             output(patient), output(`il ${relative}`), output(birth), output(date, 'Sintesi', { requestReference: fiscal }),
@@ -138,7 +139,7 @@ test('I6: clinical dates leave as offsets that keep intervals, and the model can
         const restored = (placeholder: string) => (read.parseOutput(output(placeholder)) as unknown as { servicePrescriptions: { prescribedAt: string }[] }).servicePrescriptions[0].prescribedAt;
         assert.equal(restored(prescription), '02/03/2026');
         assert.equal(restored(withOffset(visit, offsetOf(visit) + 30)), '11/04/2026');
-        assert.equal(read.parseOutput(output(prescription, `Controllo il ${withOffset(visit, offsetOf(visit) - 365)}`)).summary, 'Controllo il 12/03/2025');
+        assert.equal(summaryOf(read.parseOutput(output(prescription, `Controllo il ${withOffset(visit, offsetOf(visit) - 365)}`))), 'Controllo il 12/03/2025');
         for (const bad of [visit.replace(/GG([+-])/u, 'GG$10'), withOffset(visit, 36_526), withOffset(visit, offsetOf(visit) + 30_000),
             visit.replace(/_[a-z2-7]{8}\]\]$/u, '_aaaaaaaa]]'), visit.replace('GG', 'GG '), visit.replace(/[+-]/u, '±')]) {
             assert.throws(() => read.parseOutput(output(bad)), bad);

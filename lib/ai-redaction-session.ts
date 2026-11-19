@@ -51,10 +51,10 @@ const NONCE_ALPHABET = 'abcdefghijklmnopqrstuvwxyz234567';
 const liveNonces = new Set<string>();
 
 function nonceText(bytes: Uint8Array): string {
-    let bits = 0n;
-    for (const byte of bytes.subarray(0, 5)) bits = (bits << 8n) | BigInt(byte);
+    let bits = 0;
+    for (const byte of bytes.subarray(0, 5)) bits = bits * 256 + byte;
     let text = '';
-    for (let index = 7; index >= 0; index -= 1) text += NONCE_ALPHABET[Number((bits >> BigInt(index * 5)) & 31n)];
+    for (let index = 7; index >= 0; index -= 1) text += NONCE_ALPHABET[Math.floor(bits / 32 ** index) % 32];
     return text;
 }
 
