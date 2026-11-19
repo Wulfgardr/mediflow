@@ -2,7 +2,7 @@ import { test, expect } from './fixtures/isolated-runtime';
 import { unlockIfNeeded, bootstrapUnlockedSession } from './utils';
 import { documentRequests, fetchInterceptedRequest } from './fixtures/trusted-web-request';
 import { sealDiaryEntry } from './fixtures/sealed-diary-entry';
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import path from 'node:path';
 import type { Page } from '@playwright/test';
 
@@ -35,6 +35,10 @@ async function pair(page: Page, runtime: { offerPairing(): { nonce: string; host
 const confirmation = (page: Page) => page.getByRole('button', { name: 'Apri sulla cartella aperta', exact: true });
 
 test('history exposes content and source locally, confirmation is consumed and cancellation clears it', async ({ page, isolatedRuntime }, info) => {
+  execFileSync(process.execPath, ['scripts/prepare-e2e-db.mjs'], {
+    cwd: path.resolve(__dirname, '..'), timeout: 30_000,
+    env: { ...process.env, MEDIFLOW_DATA_DIR: isolatedRuntime.dataDirectory, E2E_PIN: '1234' },
+  });
   await bootstrapUnlockedSession(page, '1234');
   const p = await patient(page, 'fonte');
   const response = await documentRequests(page).post('/api/entries', { data: await sealDiaryEntry(page, { patientId: p.id, type: 'visit', title: 'Controllo inventato',
