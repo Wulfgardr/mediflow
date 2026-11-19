@@ -78,6 +78,20 @@ function suite(collect) {
   catch (error) { return { files: [], errors: [error.message] }; }
 }
 
+export function collectUnitSelection(root) {
+  return suite(() => {
+    const binding = collectNpmScriptBinding(root, {
+      script: 'test:unit',
+      workflow: '.github/workflows/web-core.yml',
+      job: 'web-core',
+      triggers: { pull_request: null, push: { branches: ['main'] } },
+      ciCall: 'npm run test:unit',
+    }, 'node scripts/run-unit-suite.mjs');
+    if (binding.jobIf !== null || binding.stepIf !== null) throw new Error('Unit CI job and step must run unconditionally');
+    return collectUnitTestFiles(root);
+  });
+}
+
 async function collectSelections(root) {
   let headless;
   try {
@@ -85,7 +99,7 @@ async function collectSelections(root) {
     headless = { files: await collectHeadlessPortableTests(root), errors: [] };
   } catch (error) { headless = { files: [], errors: [error.message] }; }
   return {
-    unit: suite(() => collectUnitTestFiles(root)),
+    unit: collectUnitSelection(root),
     ...collectExplicitNpmSelections(root),
     'npm:test:headless-portable': headless,
     ...collectGuardSelfTestSelections(root),
