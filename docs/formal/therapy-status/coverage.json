@@ -1,5 +1,5 @@
 {
-  "syncCommit": "c7e5735501a3723ce676db90d5c612a668b64e31",
+  "syncCommit": "ae3a41aca6883d1da48cc7be85ff6016a2f35f2c",
   "tool": {
     "release": "v1.7.4",
     "url": "https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar",
@@ -53,7 +53,7 @@
     "lib/backup-import-provenance.ts": "13eb1cc6083b5a07489d64cc9d195b82b6b8b660cb9874e4dc46b93fdf25999e",
     "lib/sqlite-schema.ts": "2e599cf106b4a681294351e3251e045c874e03ae169db1eb9a5fb8a6a6e2fa19",
     "lib/sqlite-schema-open.ts": "636b407e77488d6a20ba431d79d31a1f0bb7617e900fa30a108be90d5e6e47aa",
-    "lib/backup-restore-executor.ts": "ebebc6f9bf6ca7f6a75c0404d6b1402399462760299d72c493b38138be04a20d",
+    "lib/backup-restore-executor.ts": "ccdee2e7155b52594d2aa4cf5250cb9a09489f0ad735ba174572a858f86a1892",
     "lib/security/archive-maintenance-owner.ts": "57a026cca85845bf2ed3ae5b8c47dbc88caa8184b3d41639ea7ad9e90a420802",
     "lib/clinical-status-transitions.ts": "787915f339911dd4846d29d1fe3232be373242287390989d6a97d7a5dcea460f",
     "lib/status-normalization.ts": "fa2bbdeef55384ed1bf4a851f09a5d899d56e6331cde018f68f3d8a74d3a4e51",
