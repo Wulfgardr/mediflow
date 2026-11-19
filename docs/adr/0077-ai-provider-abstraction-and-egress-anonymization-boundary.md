@@ -39,6 +39,10 @@ l'esito della redazione non sostituiscono la governance e il chokepoint previsti
 sopra. Il gate ordinario resta chiuso finche la composizione completa non e
 collegata e verificata.
 
+La forma dei segnaposto, con il ruolo del valore sostituito, i ruoli ammessi
+per campo e le date cliniche come scostamenti in giorni sono proposti
+nell'[ADR 0192](0192-segnaposto-con-ruolo-e-date-relative.md).
+
 ## Problema
 
 Il runtime AI di MediFlow e oggi monolitico su Ollama: `AIProvider = 'ollama'`
@@ -156,7 +160,8 @@ futuro):
   benchmark-only, quindi oggi il gate e chiuso per costruzione.
 - **Pseudonimizzazione coerente**: i token sostitutivi sono deterministici
   per sessione; la mappa di reidratazione vive solo in RAM locale e l'output
-  del provider viene reidratato localmente prima del render.
+  del provider viene reidratato localmente prima del render. Forma e ruoli
+  dei token sono nell'[ADR 0192](0192-segnaposto-con-ruolo-e-date-relative.md).
 - **Minimizzazione**: parte solo il contesto richiesto dall'envelope della
   lane, mai il documento intero quando bastano le sezioni.
 - **Audit locale append-only**: per ogni egress si registrano hash del
