@@ -17,7 +17,7 @@ test('composes mandatory Layer 1 and readonly neural spans on original UTF16 tex
     ]), knownIdentifiers: Object.freeze({ names: Object.freeze(['Ada Sintetica']) }) });
     assert.deepEqual(prepared.entityCounts, { person: 1, email: 1, date: 1, phone: 1, address: 1 });
     assert.equal(prepared.rehydrate(prepared.redactedText), text);
-    assert.match(prepared.redactedText, /^😀 \{\{MF_PII_[a-f0-9]{32}_1\}\}:/);
+    assert.match(prepared.redactedText, /^😀 \[\[MF_PAZ1_[a-z2-7]{8}\]\]:/);
     for (const value of ['Ada Sintetica', 'test@example.invalid', 'Via Fittizia', '12/03/2001']) {
         assert.ok(!prepared.redactedText.includes(value));
         assert.ok(!JSON.stringify(prepared).includes(value));
@@ -88,8 +88,8 @@ test('rejects malformed spans and input before allocating tokens', () => {
     ];
     for (const input of badInputs) assert.throws(() => session.prepare(input as RedactionSessionInput));
     const valid = session.prepare({ text, entities: [good, entity(text, '😀', 'other')] });
-    assert.match(valid.redactedText, /_1\}\}/);
-    assert.match(valid.redactedText, /_2\}\}/);
+    assert.match(valid.redactedText, /MF_PER1_[a-z2-7]{8}\]\]/);
+    assert.match(valid.redactedText, /MF_ALT1_[a-z2-7]{8}\]\]/);
     assert.equal(valid.rehydrate(valid.redactedText), text);
     assert.doesNotThrow(() => session.prepare({ text: 'x'.repeat(12000), entities: [] }));
     assert.doesNotThrow(() => session.prepare({ text, entities: Array(512).fill({ ...good, confidence: 1 }) }));
@@ -146,9 +146,9 @@ test('joins adjacent addresses only over one to three whitespace/comma character
 
 test('namespace collisions fail before mutation and preparations only rehydrate their own tokens', () => {
     const session = createRedactionSession();
-    assert.throws(() => session.prepare({ text: 'Ada {{MF_PII_fake', entities: [entity('Ada', 'Ada')] }));
+    assert.throws(() => session.prepare({ text: 'Ada [[MF_PER1_fake', entities: [entity('Ada', 'Ada')] }));
     const first = session.prepare({ text: 'Ada', entities: [entity('Ada', 'Ada')] });
-    assert.match(first.redactedText, /_1\}\}$/);
+    assert.match(first.redactedText, /MF_PER1_[a-z2-7]{8}\]\]$/);
     assert.throws(() => session.prepare({ text: first.redactedText, entities: [] }));
     const second = session.prepare({ text: 'Bea', entities: [entity('Bea', 'Bea')] });
     assert.equal(first.rehydrate(second.redactedText), second.redactedText);
@@ -192,7 +192,7 @@ test('4096 unique raw values budget is checked atomically and duplicates remain 
     const prior = session.prepare(batch(3584, 511));
     assert.throws(() => session.prepare(batch(4095, 2)), /budget/);
     const last = session.prepare(batch(4095, 1));
-    assert.match(last.redactedText, /_4096\}\}$/);
+    assert.match(last.redactedText, /MF_ID4096_[a-z2-7]{8}\]\]$/);
     assert.throws(() => session.prepare(batch(4096, 1)), /budget/);
     assert.equal(session.prepare(batch(4095, 1)).redactedText, last.redactedText);
     assert.equal(prior.rehydrate(prior.redactedText), batch(3584, 511).text);
@@ -211,7 +211,7 @@ test('bounds known identifier arrays and strings before any session mutation', (
         }
         assert.doesNotThrow(() => session.prepare({ text: '', entities: [], knownIdentifiers: { [key]: Array(64).fill('x'.repeat(256)) } }));
     }
-    assert.match(session.prepare({ text: 'Ada', entities: [entity('Ada', 'Ada')] }).redactedText, /_1\}\}$/);
+    assert.match(session.prepare({ text: 'Ada', entities: [entity('Ada', 'Ada')] }).redactedText, /MF_PER1_[a-z2-7]{8}\]\]$/);
     session.close();
 });
 
@@ -249,7 +249,7 @@ test('rejects accessors and proxies at every input layer without invoking hooks 
     const session = createRedactionSession();
     for (const value of cases) assert.throws(() => session.prepare(value as RedactionSessionInput));
     assert.equal(hooks, 0);
-    assert.match(session.prepare(good()).redactedText, /_1\}\}$/);
+    assert.match(session.prepare(good()).redactedText, /MF_PER1_[a-z2-7]{8}\]\]$/);
     session.close();
 });
 

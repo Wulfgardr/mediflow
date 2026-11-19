@@ -14,6 +14,8 @@ verifica dello stato successivo.
 
 ## Decisioni richiamate
 
+- L'[ADR 0192](0192-segnaposto-con-ruolo-e-date-relative.md), accettato il 19/11/2026, dà un ruolo ai segnaposto verso i modelli cloud, lega i ruoli ai campi dell'output ed esprime le date cliniche come scostamenti in giorni. La data di nascita non esce mai come scostamento.
+
 - L'[ADR 0191](0191-conferma-da-chat-e-cassetta-senza-finestra.md), accettato il 18/11/2026, definisce la conferma da Codex tramite autenticazione macOS e il servizio facoltativo della cassetta con chiave in memoria fino a 8 ore.
 
 - [0190-mandato-agenti-e-cassetta-della-visita.md](./0190-mandato-agenti-e-cassetta-della-visita.md): mandato fino a 12 ore, deposito cifrato e applicazione condizionata della visita. Il runtime resta subordinato alla composizione atomica dei writer.

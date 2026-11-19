@@ -3,7 +3,7 @@ import 'server-only';
 import { createHash } from 'node:crypto';
 import { types } from 'node:util';
 import { createGlinerRedactionRunner, readGlinerRuntimeObservation } from '../gliner-redaction-runner';
-import { createRedactionSession, type PreparedRedaction, type RedactionSessionInput, type RedactionSessionEntity } from '../ai-redaction-session';
+import { createRedactionSession, PLACEHOLDER_PATTERN, RESERVED_PLACEHOLDER_NAMESPACE, type PlaceholderRole, type RedactionSessionInput, type RedactionSessionEntity } from '../ai-redaction-session';
 import type { RedactionRuntimeIdentity } from '../redaction-runtime-identity';
 import { renderEmissionPlan, type EmissionUnit, type EmissionPlan } from './emission-plan';
 
@@ -14,13 +14,12 @@ export type PreparedContentRead = Readonly<{
     content: Readonly<Record<string, unknown>>;
     entityCounts: Readonly<Record<string, number>>;
     redactionIdentity: RedactionRuntimeIdentity | null;
-    restoreText(text: string): string;
+    restoreText(text: string, allowedRoles?: ReadonlySet<PlaceholderRole>): string;
 }>;
 type Slot = { unit: EmissionUnit; start: number; end: number };
 type Batch = { text: string; slots: Slot[] };
 const records = new WeakMap<object, { read: PreparedContentRead; close(): Promise<void> }>();
-const RESERVED = /MF_PII/iu;
-const TOKEN = /\{\{MF_PII_[a-f0-9]{32}_[1-9][0-9]{0,3}\}\}/gu;
+const RESERVED = RESERVED_PLACEHOLDER_NAMESPACE;
 const SEPARATOR = '\n\u241e\n';
 const fail = (): never => { throw new Error('ai_preparation_invalid'); };
 const sha256 = (value: string) => createHash('sha256').update(value, 'utf8').digest('hex');
@@ -87,13 +86,12 @@ export function createContentPreparation(plan: EmissionPlan, configuration: Prep
     const runner = createGlinerRedactionRunner(configuration);
     const session = createRedactionSession();
     const token = Object.freeze(Object.create(null));
-    const tokenValues = new Map<string, { batch: PreparedRedaction }>();
     const replacements = new Map<EmissionUnit, string>();
     let closed = false;
     let closing: Promise<void> | undefined;
     function close(): Promise<void> {
         if (closing) return closing;
-        closed = true; records.delete(token); tokenValues.clear(); replacements.clear(); session.close();
+        closed = true; records.delete(token); replacements.clear(); session.close();
         signal?.removeEventListener('abort', abort);
         // Reject cleanup failures, never claim success merely from a timer.
         closing = Promise.resolve().then(() => runner.close()).catch(() => { throw new Error('ai_preparation_cleanup_unconfirmed'); });
@@ -103,12 +101,19 @@ export function createContentPreparation(plan: EmissionPlan, configuration: Prep
     const abort = () => { void close(); };
     const guard = () => { if (closed || signal?.aborted) return fail(); };
     signal?.addEventListener('abort', abort, { once: true });
-    function restoreText(text: string): string {
+    function restoreText(text: string, allowedRoles?: ReadonlySet<PlaceholderRole>): string {
         guard();
-        const used: string[] = [];
-        const without = text.replace(TOKEN, value => { if (!tokenValues.has(value)) return fail(); used.push(value); return ''; });
-        if (without.match(RESERVED) || used.length === 0) return fail();
-        return text.replace(TOKEN, value => tokenValues.get(value)!.batch.rehydrate(value));
+        if (typeof text !== 'string') return fail();
+        let used = 0;
+        const restored = text.replace(PLACEHOLDER_PATTERN, placeholder => {
+            let resolved: ReturnType<typeof session.resolve>;
+            try { resolved = session.resolve(placeholder); } catch { return fail(); }
+            if (allowedRoles && !allowedRoles.has(resolved.role)) return fail();
+            used += 1;
+            return resolved.value;
+        });
+        if (used === 0 || text.replace(PLACEHOLDER_PATTERN, '').match(RESERVED)) return fail();
+        return restored;
     }
     const ready = (async (): Promise<PreparedContent> => {
         try {
@@ -123,7 +128,6 @@ export function createContentPreparation(plan: EmissionPlan, configuration: Prep
                 const prepared = session.prepare({ text: batch.text, entities, knownIdentifiers: known });
                 for (const span of prepared.spans) {
                     slotForSpan(batch, span);
-                    tokenValues.set(span.replacement, { batch: prepared });
                     expansion = Math.max(expansion, span.replacement.length / (span.end - span.start));
                 }
                 for (const [key, count] of Object.entries(prepared.entityCounts)) {

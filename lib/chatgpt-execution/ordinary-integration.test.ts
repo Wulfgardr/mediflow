@@ -108,7 +108,7 @@ test('real unchanged gate denies ordinary content before thread/turn and audits 
         const row = rows().slice(count).find(row => row.payloadSha256 === value.read.payloadSha256);
         assert.equal(row.status, 'closed_pending_redaction_lane');
         assert.deepEqual(Object.keys(row).sort(), ['timestamp', 'payloadSha256', 'provider', 'lane', 'status', 'entityCounts'].sort());
-        assert.ok(!JSON.stringify(row).includes('Bea Riva') && !JSON.stringify(row).includes('MF_PII'));
+        assert.ok(!JSON.stringify(row).includes('Bea Riva') && !JSON.stringify(row).includes('MF_'));
         assert.equal(peer.closed, 1); assert.equal(prep.isPreparedOrdinaryProfileCurrent(value.handle), false);
     } finally { await service.dispose(); await value.job.close(); }
 });
