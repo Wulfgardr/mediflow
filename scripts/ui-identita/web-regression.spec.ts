@@ -93,7 +93,7 @@ test('voce con data ora tipo luogo e autore conserva provenienza e stato', async
   else await expect(row.locator(':scope > time')).toHaveCSS('flex-direction', 'row');
 });
 
-test('Nuova voce dalla scheda conserva identità quadro e diario', async ({ page }) => {
+test('Nuova voce dalla scheda conserva identità quadro e diario', async ({ page }, info) => {
   const id = reference();
   await navigate(page, `/patients/${id}/modules`);
   await page.getByRole('link', { name: 'Nuova voce', exact: true }).first().click();
@@ -101,6 +101,10 @@ test('Nuova voce dalla scheda conserva identità quadro e diario', async ({ page
   await expect(page.getByTestId('lume-scheda-header')).toContainText('Rossi Sintetica Maria');
   const editor = page.getByRole('textbox', { name: 'Resoconto clinico', exact: true });
   await expect(editor).toBeVisible();
+  if (info.project.name.endsWith('1440')) {
+    await expect(editor).toHaveCSS('min-height', '120px');
+    console.log(JSON.stringify({ project: info.project.name, embeddedDesktop: await editor.boundingBox() }));
+  }
   await editor.fill('Nota sintetica non registrata.');
   await expect(page.locator('#diario')).toContainText('Pressione 132/78');
   await expect(page.locator('#quadro')).toBeVisible();
