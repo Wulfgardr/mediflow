@@ -2,7 +2,7 @@
 
 Data: 2026-11-19
 
-Stato: **Proposed**. Decide Leonardo.
+Stato: **Accettato** da Leonardo il 19/11/2026.
 
 ## Problema
 
