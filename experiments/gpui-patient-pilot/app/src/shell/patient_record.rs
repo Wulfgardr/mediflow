@@ -2691,21 +2691,21 @@ mod tests {
             typed.1
         );
         for _ in "1,25 mg ".chars() {
-            cx.simulate_keystrokes("cmd-z");
+            cx.simulate_keystrokes("secondary-z");
         }
         assert_eq!(
             state(&view, cx).1,
             before.1,
             "undo goes back to the text before"
         );
-        cx.simulate_keystrokes("cmd-z");
+        cx.simulate_keystrokes("secondary-z");
         assert_eq!(
             state(&view, cx).1,
             before.1.replacen("rivalutare.", "rivalutare", 1),
             "the history from before the report is still there"
         );
         for _ in 0..9 {
-            cx.simulate_keystrokes("cmd-shift-z");
+            cx.simulate_keystrokes("secondary-shift-z");
         }
         assert_eq!(state(&view, cx).1, typed.1);
         let consulted = &host.routes()[routes..];
