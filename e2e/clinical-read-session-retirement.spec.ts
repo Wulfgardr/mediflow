@@ -1,3 +1,4 @@
+import { diaryEntrySealer } from './fixtures/sealed-diary-entry';
 import { test, expect, type Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { bootstrapUnlockedSession, openPatientSection, unlockIfNeeded } from './utils';
@@ -42,9 +43,9 @@ async function installGate(page: Page, query: Record<string, string>) {
 for (const consumer of ['EntryAttachments', 'NewEntryPage']) test(`${consumer}: a real old 401 preserves the new session and populated attachments`, async ({ page }) => {
     test.setTimeout(90_000);
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-    const fixture = await page.evaluate(async () => {
-        const post = async (path: string, body: unknown) => {
-            const response = await fetch(`/api/${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const fixture = await page.evaluate(async seal => {
+        const post = async (path: string, body: Record<string, unknown>) => {
+            const response = await fetch(`/api/${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(path === 'entries' ? await seal(body) : body) });
             if (!response.ok) throw new Error(`Synthetic ${path}: ${response.status}`);
             return response.json();
         };
@@ -56,7 +57,7 @@ for (const consumer of ['EntryAttachments', 'NewEntryPage']) test(`${consumer}: 
         await post('entries', { patientId: patient.id, type: 'note', date: '2026-10-27', title: 'Lettura sintetica',
             content: 'Nota sintetica con fonte.', attachments: [attachmentId] });
         return { patientId: patient.id as string, attachmentId };
-    });
+    }, await diaryEntrySealer(page));
     const errors: string[] = [];
     page.on('pageerror', error => errors.push(error.message));
     const query: Record<string, string> = consumer === 'NewEntryPage' ? { patientId: fixture.patientId, metadata: 'true' } : {};
