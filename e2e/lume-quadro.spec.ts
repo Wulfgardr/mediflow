@@ -105,12 +105,7 @@ async function assertQuadroContract(page: Page, quadro: Locator, patient: LivePa
   const shadows = await quadro.evaluate((element) => [element, ...element.querySelectorAll('*')]
     .filter(node => (node as HTMLElement).offsetParent !== null && getComputedStyle(node).boxShadow !== 'none')
     .map(node => ({ tray: node.getAttribute('data-record-tray'), shadow: getComputedStyle(node).boxShadow })));
-  for (const { tray, shadow } of shadows) {
-    expect(tray).toMatch(/^(stabile|cambiato|contesto)$/);
-    expect(shadow.match(/\binset\b/g)).toHaveLength(3);
-  }
-  if (page.viewportSize()!.width >= 1280) expect(shadows).toHaveLength(3);
-  if (page.viewportSize()!.width <= 390) expect(shadows).toHaveLength(0);
+  expect(shadows).toEqual([]);
   await expect(page.getByTestId('lume-scheda-surface')).toHaveCSS('box-shadow', 'none');
 
   const measure = quadro.getByRole('region', { name: 'Parametri recenti', exact: true });
@@ -160,7 +155,7 @@ async function assertReflowStack(quadro: Locator): Promise<void> {
     quadro.locator('#diario'),
     quadro.getByRole('region', { name: 'Parametri recenti', exact: true }),
   ];
-  const changed = (await quadro.getByRole('heading', { name: 'Cambiato', exact: true }).boundingBox())!;
+  const changed = (await quadro.getByRole('heading', { name: 'Cambiato dall’ultima visita', exact: true }).boundingBox())!;
   expect((await regions[0].boundingBox())!.y).toBeGreaterThan(changed.y + changed.height);
   let previous: { x: number; y: number; height: number } | undefined;
   for (const region of regions) {

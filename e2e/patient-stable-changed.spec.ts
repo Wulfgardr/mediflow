@@ -132,25 +132,27 @@ async function themes(page: Page, suffix: string) {
             const tray = element.querySelector('[aria-labelledby="riepilogo-stabile"]')!;
             const island = element.querySelector('#riepilogo-problemi')!;
             const title = tray.querySelector('h2')!;
-            const action = island.querySelector('a')!;
+            const islandTitle = island.querySelector('h2')!;
             return {
                 width: element.clientWidth,
                 rem: Number.parseFloat(getComputedStyle(document.documentElement).fontSize),
                 tracks: getComputedStyle(grid).gridTemplateColumns.split(' ').length,
                 tray: getComputedStyle(tray).backgroundColor,
-                trayRadius: Number.parseFloat(getComputedStyle(tray).borderRadius),
-                inset: Number.parseFloat(getComputedStyle(tray).paddingLeft),
+                trayShadow: getComputedStyle(tray).boxShadow,
+                island: getComputedStyle(island).backgroundColor,
                 islandRadius: Number.parseFloat(getComputedStyle(island).borderRadius),
                 titleSize: Number.parseFloat(getComputedStyle(title).fontSize),
-                actionSize: Number.parseFloat(getComputedStyle(action).fontSize),
+                islandTitleSize: Number.parseFloat(getComputedStyle(islandTitle).fontSize),
             };
         });
         const compact = layout.width < 44 * layout.rem;
         expect(layout.tracks).toBe(layout.width >= 62 * layout.rem ? 3 : compact ? 1 : 2);
-        expect(layout.tray).toBe(compact ? 'rgba(0, 0, 0, 0)' : theme === 'light' ? 'rgb(240, 242, 244)' : 'rgb(16, 18, 22)');
-        if (!compact) expect(layout.trayRadius - layout.inset).toBe(layout.islandRadius);
-        expect(layout.titleSize).toBe(1.25 * layout.rem);
-        expect(layout.titleSize).toBeGreaterThan(layout.actionSize);
+        expect(layout.tray).toBe('rgba(0, 0, 0, 0)');
+        expect(layout.trayShadow).toBe('none');
+        expect(layout.island).toBe(theme === 'light' ? 'rgb(243, 244, 246)' : 'rgb(31, 34, 40)');
+        expect(layout.islandRadius).toBe(14);
+        expect(layout.titleSize).toBe(0.75 * layout.rem);
+        expect(layout.islandTitleSize).toBeGreaterThan(layout.titleSize);
         if ([1320, 1180, 402, 390].includes(width)) await test.info().attach(`zone-${width}-${theme}`, {
             body: JSON.stringify(layout, null, 2), contentType: 'application/json',
         });
@@ -375,11 +377,11 @@ test('D gemella: un contatto nello stesso giorno si legge come voce, e una lettu
     await test.info().attach('gemella-primo-sguardo', { body: JSON.stringify({ viewport: [1180, 660], visibleChanges }),
         contentType: 'application/json' });
     await expect(stable.getByRole('row').filter({ hasText: 'Analogo 9' })).toContainText('Una compressa al mattino e mezza dopo il pasto della sera');
-    const sideBySide = await stable.getByRole('row').filter({ hasText: 'Analogo 10' }).getByRole('cell').evaluateAll(cells => {
+    const posologyBelowName = await stable.getByRole('row').filter({ hasText: 'Analogo 10' }).getByRole('cell').evaluateAll(cells => {
         const [drug, dosage] = cells.map(cell => cell.getBoundingClientRect());
-        return drug.top === dosage.top && drug.right <= dosage.left;
+        return dosage.top >= drug.bottom - 1 && Math.abs(dosage.left - drug.left) < 1;
     });
-    expect(sideBySide).toBe(true);
+    expect(posologyBelowName).toBe(true);
     await assertNoHorizontalOverflow(page, [{ label: 'Riepilogo gemello', selector: '#quadro' }]);
     const directory = process.env.MEDIFLOW_STABLE_CHANGED_SCREENSHOTS;
     if (directory) await page.screenshot({ path: `${directory}/gemella-1180.png`, animations: 'disabled' });

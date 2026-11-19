@@ -21,6 +21,7 @@ export interface PatientSynopticSheetProps {
     notesContent?: ReactNode;
     problems: QuadroRead<Diagnosis>;
     therapies: QuadroRead<Therapy>;
+    therapyChanges?: ReadonlyMap<string, string>;
     diary?: ReactNode;
     diaryTools?: { full: boolean; control: Ref<HTMLButtonElement>; show: () => void; resume: () => void };
     composer?: ReactNode;
@@ -58,46 +59,63 @@ function DateCell({ date }: { date?: Date }) {
     return <time dateTime={new Date(date).toISOString()}>{new Date(date).toLocaleDateString('it-IT')}</time>;
 }
 
-export function PatientSynopticSheet({ clinicalSupport, notesContent, problems, therapies, measures, checkups, diary, diaryTools, composer, sources, activity }: PatientSynopticSheetProps) {
+const rangeArrow = { alto: '↑', basso: '↓' } as const;
+
+export function PatientSynopticSheet({ clinicalSupport, notesContent, problems, therapies, therapyChanges, measures, checkups, diary, diaryTools, composer, sources, activity }: PatientSynopticSheetProps) {
     const measureRows = projectQuadroMeasures(measures.data ?? []);
+    const overview = Boolean(diary);
+    const secondary = `${register.secondaryColumn} ${reading.secondaryColumn}`;
     const stable = <>
-        <Section name="Problemi" id="riepilogo-problemi" icon={diary ? Heart : undefined} action={diary && !composer ? <a href="#clinica" className={reading.islandAction}>Clinica</a> : undefined} read={problems} count={formatCountLabel(problems.data?.length ?? 0, 'problema', 'problemi')} empty="Nessun problema registrato.">
-            <table className={`${register.table} ${reading.problems}`} aria-label="Problemi">
-                <thead><tr><th scope="col">Codice</th><th scope="col">Descrizione</th><th scope="col" className={`${register.secondaryColumn} ${reading.secondaryColumn}`}>Da quando</th></tr></thead>
-                <tbody>{problems.data?.map((problem, index) => <tr key={`${problem.system}-${problem.code}-${index}`}>
-                    <td className="lume-code">{problem.code}</td><td><PrivacyBlur>{problem.description}</PrivacyBlur>{diary && problem.date ? <small><DateCell date={problem.date} /></small> : null}</td><td className={`${register.secondaryColumn} ${reading.secondaryColumn}`}><DateCell date={problem.date} /></td>
+        <Section name="Problemi" id="riepilogo-problemi" icon={overview ? Heart : undefined} action={overview && !composer ? <a href="#clinica" className={reading.islandAction}>Clinica</a> : undefined} read={problems} count={formatCountLabel(problems.data?.length ?? 0, 'problema', 'problemi')} empty="Nessun problema registrato.">
+            <table role="table" className={`${register.table} ${reading.problems}`} aria-label="Problemi">
+                <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Descrizione</th><th role="columnheader" scope="col">Codice</th><th role="columnheader" scope="col" className={secondary}>Da quando</th></tr></thead>
+                <tbody role="rowgroup">{problems.data?.map((problem, index) => <tr role="row" key={`${problem.system}-${problem.code}-${index}`}>
+                    <td role="cell"><PrivacyBlur>{problem.description}</PrivacyBlur>{overview && problem.date ? <small>dal <DateCell date={problem.date} /></small> : null}</td>
+                    <td role="cell" className={`lume-code ${reading.codeColumn}`}>{problem.code}</td>
+                    <td role="cell" className={secondary}><DateCell date={problem.date} /></td>
                 </tr>)}</tbody>
             </table>
         </Section>
-        <Section name="Terapie attive" id="riepilogo-terapie" icon={diary ? Pill : undefined} action={diary && !composer ? <a href="#terapie" className={reading.islandAction}>Terapie</a> : undefined} read={therapies} count={formatCountLabel(therapies.data?.length ?? 0, 'attiva', 'attive')} empty="Nessuna terapia attiva.">
-            <table className={`${register.table} ${reading.therapies}`} aria-label="Terapie attive">
-                <thead><tr><th scope="col">Nome e dose</th><th scope="col">Posologia</th><th scope="col" className={`${register.secondaryColumn} ${reading.secondaryColumn}`}>ATC</th></tr></thead>
-                <tbody>{therapies.data?.map(therapy => <tr key={therapy.id}>
-                    <td><PrivacyBlur>{therapy.drugName}</PrivacyBlur>{diary && therapy.atc ? <small className="lume-code">{therapy.atc}</small> : null}</td><td><PrivacyBlur>{therapy.dosage}</PrivacyBlur></td><td className={`${register.secondaryColumn} ${reading.secondaryColumn} lume-code`}>{therapy.atc}</td>
-                </tr>)}</tbody>
+        <Section name="Terapie attive" id="riepilogo-terapie" icon={overview ? Pill : undefined} action={overview && !composer ? <a href="#terapie" className={reading.islandAction}>Terapie</a> : undefined} read={therapies} count={formatCountLabel(therapies.data?.length ?? 0, 'attiva', 'attive')} empty="Nessuna terapia attiva.">
+            <table role="table" className={`${register.table} ${reading.therapies}`} aria-label="Terapie attive">
+                <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Nome e dose</th><th role="columnheader" scope="col">Posologia</th><th role="columnheader" scope="col" className={secondary}>ATC</th></tr></thead>
+                <tbody role="rowgroup">{therapies.data?.map(therapy => {
+                    const change = therapyChanges?.get(therapy.id);
+                    return <tr role="row" key={therapy.id} data-changed={change ? 'true' : undefined}>
+                        <td role="cell"><PrivacyBlur>{therapy.drugName}</PrivacyBlur>{overview && therapy.atc ? <small className="lume-code">{therapy.atc}</small> : null}</td>
+                        <td role="cell"><PrivacyBlur>{therapy.dosage}</PrivacyBlur></td>
+                        <td role="cell" className={`${secondary} lume-code`}>{therapy.atc}</td>
+                        {overview && change ? <td role="cell" className={reading.rowStatus}><span className={reading.chipChange}>{change}</span></td> : null}
+                    </tr>;
+                })}</tbody>
             </table>
         </Section>
     </>;
     const context = <>
-        <Section name="Parametri recenti" icon={diary ? Activity : undefined} action={diary && !composer ? <a href="#parametri" className={reading.islandAction}>Andamento</a> : undefined} read={{ ...measures, data: measures.data === undefined ? undefined : measureRows }} count={formatCountLabel(measureRows.length, 'parametro', 'parametri')} empty="Nessuna misura registrata.">
-            <table className={`${register.table} ${reading.measures}`} aria-label="Parametri recenti">
-                <thead><tr><th scope="col">Nome</th><th scope="col" className={reading.value}>Valore</th><th scope="col">Data</th><th scope="col" className={`${register.secondaryColumn} ${reading.secondaryColumn}`}>Variazione</th></tr></thead>
-                <tbody>{measureRows.map(measure => <tr key={measure.id}>
-                    <td>{measure.display}</td><td className={`${reading.value} ${measure.outOfRange ? register.critical : ''}`}>{measure.valueLabel}{measure.outOfRange ? ` · ${measure.outOfRange}` : ''}{diary && measure.delta ? <small>{measure.delta}</small> : null}</td>
-                    <td><DateCell date={measure.date} /></td><td className={`${register.secondaryColumn} ${reading.secondaryColumn}`}>{measure.delta}</td>
+        <Section name="Parametri recenti" icon={overview ? Activity : undefined} action={overview && !composer ? <a href="#parametri" className={reading.islandAction}>Andamento</a> : undefined} read={{ ...measures, data: measures.data === undefined ? undefined : measureRows }} count={formatCountLabel(measureRows.length, 'parametro', 'parametri')} empty="Nessuna misura registrata.">
+            <table role="table" className={`${register.table} ${reading.measures}`} aria-label="Parametri recenti">
+                <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Nome</th><th role="columnheader" scope="col" className={reading.value}>Valore</th><th role="columnheader" scope="col">Data</th><th role="columnheader" scope="col" className={secondary}>Variazione</th></tr></thead>
+                <tbody role="rowgroup">{measureRows.map(measure => <tr role="row" key={measure.id}>
+                    <td role="cell">{measure.display}</td>
+                    <td role="cell" className={`${reading.value} ${measure.outOfRange ? register.critical : ''}`}>
+                        {overview && measure.outOfRange ? <span aria-hidden="true" className={reading.rangeArrow}>{rangeArrow[measure.outOfRange]}</span> : null}
+                        {measure.valueLabel}{measure.outOfRange ? <span className={overview ? reading.visuallyHidden : undefined}>{` · ${measure.outOfRange}`}</span> : null}
+                        {overview && measure.delta ? <small>{measure.delta}</small> : null}
+                    </td>
+                    <td role="cell"><DateCell date={measure.date} /></td><td role="cell" className={secondary}>{measure.delta}</td>
                 </tr>)}</tbody>
             </table>
         </Section>
         <Section name="Controlli aperti" read={checkups} count={formatCountLabel(checkups.data?.length ?? 0, 'aperto', 'aperti')} empty="Nessun controllo aperto.">
-            <table className={register.table} aria-label="Controlli aperti">
+            <table className={`${register.table} ${reading.checkups}`} aria-label="Controlli aperti">
                 <thead><tr><th scope="col">Nome</th><th scope="col">Scadenza</th></tr></thead>
                 <tbody>{checkups.data?.map(checkup => <tr key={checkup.id}><td>{checkup.title}</td><td><DateCell date={checkup.date} /></td></tr>)}</tbody>
             </table>
         </Section>
     </>;
     const stableWithNotes = <>{stable}{notesContent ? <div className={reading.notes}>{notesContent}</div> : null}</>;
-    return <section id="quadro" aria-label="Riepilogo clinico" className={`${register.register} ${reading.sheet}`} data-overview={diary ? 'true' : undefined} data-writing={composer ? 'true' : undefined} data-full-diary={diaryTools?.full ? 'true' : undefined}>
-        {diary ? <div className={reading.overview}>
+    return <section id="quadro" aria-label="Riepilogo clinico" className={`${register.register} ${reading.sheet}`} data-overview={overview ? 'true' : undefined} data-writing={composer ? 'true' : undefined} data-full-diary={diaryTools?.full ? 'true' : undefined}>
+        {overview ? <div className={reading.overview}>
             <nav aria-label="Nel riepilogo" className={reading.overviewIndex}>
                 <a href="#riepilogo-cambiato">Cambiato</a>
                 <a href="#riepilogo-terapie">Terapie</a>
@@ -105,7 +123,7 @@ export function PatientSynopticSheet({ clinicalSupport, notesContent, problems, 
                 <a href="#riepilogo-contesto">Contesto</a>
             </nav>
             <section aria-labelledby="riepilogo-cambiato" data-record-tray="cambiato" className={reading.middle}>
-                <h2 id="riepilogo-cambiato" className={reading.zoneTitle}>Cambiato</h2>
+                <h2 id="riepilogo-cambiato" className={reading.zoneTitle}>Cambiato dall’ultima visita</h2>
                 <div className={reading.activity}>{activity}</div>
                 {diaryTools ? <div className={reading.diaryTools} data-reading={diaryTools.full}>
                     <button ref={diaryTools.control} type="button" aria-controls="diario"
