@@ -44,6 +44,7 @@ function UnlockedIncoming() {
                         onClick={() => { void showPdf(visit.cassette.id, visit.cassette.revision, item.id); }}>{item.value.name}</button>)}</div>
                 {pending.map(item => <article key={item.id} className="min-w-0 space-y-2 whitespace-pre-wrap break-words border-t pt-3">
                     <h3 className="font-semibold">{agentReviewItemLabels[item.kind]}</h3>
+                    {item.kind === 'pdf' && typeof item.value.name === 'string' && <p>{item.value.name}</p>}
                     {typeof item.value.text === 'string' && <p>{item.value.text}</p>}
                     {review.currentSummary.has(item.id) && <p>In scheda: {review.currentSummary.get(item.id)}</p>}
                     {typeof item.value.values === 'object' && item.value.values !== null && <dl>{Object.entries(item.value.values).map(([field, value]) => <div key={field} className="grid gap-1 sm:grid-cols-[minmax(7rem,1fr)_minmax(0,3fr)] sm:gap-3"><dt>{fieldLabels[field] ?? 'Dato'}</dt><dd>{fieldValues[field]?.[String(value)] ?? String(value)}</dd></div>)}</dl>}
