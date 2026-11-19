@@ -227,3 +227,31 @@ test('keeps the profile operation separate from semantic reads and enforces exac
   assert.equal(semanticQueryArgumentsSchema.safeParse({ ...semanticArguments,
     steps: [{ stepRef: 'step_profile', operationId: PATIENT_PROFILE_QUERY_OPERATION_ID, input }] }).success, false);
 });
+
+test('no MCP operation that reaches a proposal or a write accepts host text, so a profile placeholder cannot return as data', async () => {
+  const { toJSONSchema } = await import('zod');
+  const argumentsByOperation = new Map<string, Parameters<typeof toJSONSchema>[0]>([
+    [TERMINOLOGY_OPERATION_ID, terminologyArgumentsSchema], [OPEN_LOOPS_OPERATION_ID, followUpProposalArgumentsSchema],
+    [FOLLOW_UP_PROPOSAL_OPERATION_ID, followUpProposalArgumentsSchema], [SEMANTIC_QUERY_OPERATION_ID, semanticQueryArgumentsSchema],
+    [CHECKUP_STATUS_TRANSITION_OPERATION_ID, checkupStatusTransitionArgumentsSchema],
+    [PATIENT_PROFILE_QUERY_OPERATION_ID, patientProfileQueryArgumentsSchema],
+  ]);
+  assert.deepEqual([...argumentsByOperation.keys()].sort(), OPERATION_DESCRIPTORS.map(item => item.operationId).sort());
+  const freeText = (node: unknown, path: string): string[] => {
+    if (!node || typeof node !== 'object') return [];
+    const schema = node as Record<string, unknown>;
+    const own = schema.type === 'string' && schema.pattern === undefined && schema.enum === undefined && schema.const === undefined ? [path] : [];
+    return [...own, ...Object.entries(schema).flatMap(([key, value]) => Array.isArray(value)
+      ? value.flatMap((item, index) => freeText(item, `${path} ${key}[${index}]`)) : freeText(value, `${path} ${key}`))];
+  };
+  const textInputs = OPERATION_DESCRIPTORS.flatMap(descriptor =>
+    freeText(toJSONSchema(argumentsByOperation.get(descriptor.operationId)!, { io: 'input' }), descriptor.operationId)
+      .map(path => ({ path, maximumStage: descriptor.maximumStage })));
+  assert.deepEqual(textInputs.filter(input => input.maximumStage !== 'read_only'), []);
+  assert.deepEqual(textInputs.map(input => input.path), [`${TERMINOLOGY_OPERATION_ID} properties query`,
+    `${SEMANTIC_QUERY_OPERATION_ID} properties explanation`,
+    `${SEMANTIC_QUERY_OPERATION_ID} properties steps items oneOf[0] properties input properties query`]);
+  const placeholder = '[[MF_PAZ1_abcdefgh]]';
+  assert.equal(checkupStatusTransitionArgumentsSchema.safeParse({ checkupRef: placeholder, targetStatus: 'completed', expectedRevision: 1 }).success, false);
+  assert.equal(followUpProposalArgumentsSchema.safeParse({ note: placeholder }).success, false);
+});

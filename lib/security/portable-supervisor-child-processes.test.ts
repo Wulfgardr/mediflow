@@ -50,11 +50,12 @@ for (const file of [paths.nodePath, paths.webTargetPath]) {
 }
 after(() => { fs.rmSync(fixtureRoot, { recursive: true, force: true }); });
 
-function setup(webBuildIdentity?: { revision: string; branch: string; worktreeHash: string; sourceFingerprint: string }) {
+function setup(webBuildIdentity?: { revision: string; branch: string; worktreeHash: string; sourceFingerprint: string },
+  agentKind?: 'mcp' | 'mini') {
   const calls: Array<{ command: string; args: readonly string[]; options: SpawnOptions }> = [];
   const children = [new SyntheticChild(), new SyntheticChild()];
   const processes = createPortableSupervisorProductionChildProcessesV1({
-    dataDir, ...paths, webBuildIdentity,
+    dataDir, ...paths, webBuildIdentity, ...(agentKind ? { agentKind } : {}),
     spawnChild: (command, args, options) => {
       calls.push({ command, args, options });
       return children[calls.length - 1] as unknown as ChildProcess;
@@ -90,6 +91,16 @@ test('spawns one marker-only MCP child with a file URL loader and one direct loo
     MEDIFLOW_APP_SOURCE_FINGERPRINT: identity.sourceFingerprint, MEDIFLOW_APP_FINGERPRINT: identity.sourceFingerprint,
   });
   current.processes.terminateAll();
+});
+
+test('only a Mini Supervisor tells its Web child to release the identified profile', () => {
+  for (const agentKind of ['mcp', 'mini'] as const) {
+    const current = setup(undefined, agentKind);
+    const web = current.calls[1]?.options.env ?? {};
+    assert.equal(web.MEDIFLOW_HEADLESS_AGENT_KIND, agentKind === 'mini' ? 'mini' : undefined, agentKind);
+    assert.equal(current.calls[0]?.options.env?.MEDIFLOW_HEADLESS_AGENT_KIND, undefined);
+    current.processes.terminateAll();
+  }
 });
 
 test('local-UI ownership stops at MCP and never creates or terminates a clinical Web child', () => {
