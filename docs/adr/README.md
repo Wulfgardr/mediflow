@@ -14,6 +14,7 @@ verifica dello stato successivo.
 
 ## Decisioni richiamate
 
+- L'[ADR 0196](0196-document-child-platform-boundary.md) propone il confine dei processi che estraggono il testo e disegnano le pagine PDF sul Web. Descrive i controlli disponibili su macOS, Linux e Windows.
 - L'[ADR 0193](0193-egress-clinico-controllato-dal-server.md), accettato il 19/11/2026, fa rifiutare dal server le operazioni cliniche dei mandati cloud senza egress dichiarato e toglie dall'applicazione automatica le cassette già depositate così.
 - L'[ADR 0192](0192-segnaposto-con-ruolo-e-date-relative.md), accettato il 19/11/2026, dà un ruolo ai segnaposto verso i modelli cloud, lega i ruoli ai campi dell'output ed esprime le date cliniche come scostamenti in giorni. La data di nascita non esce mai come scostamento.
 

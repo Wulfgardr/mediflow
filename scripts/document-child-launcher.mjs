@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 export const DOCUMENT_CHILD_HEAP_MB = 256;
 export const DOCUMENT_CHILD_DATA_BYTES = 1024 * 1024 * 1024;
 
@@ -9,7 +10,7 @@ export const DOCUMENT_CHILD_DATA_BYTES = 1024 * 1024 * 1024;
 export function documentChildLaunch(root, script, { allowAddons = false, args = [], wasmMemoryPages, networkGuard = true } = {}) {
   const nodeArgs = [`--max-old-space-size=${DOCUMENT_CHILD_HEAP_MB}`,
     ...(wasmMemoryPages ? [`--wasm-max-mem-pages=${wasmMemoryPages}`] : []),
-    '--permission', ...(networkGuard ? ['--import', path.join(root, 'scripts/document-child-network-guard.mjs')] : []),
+    '--permission', ...(networkGuard ? ['--import', pathToFileURL(path.join(root, 'scripts/document-child-network-guard.mjs')).href] : []),
     '--disable-warning=SecurityWarning', `--allow-fs-read=${root}`,
     ...(allowAddons ? ['--allow-addons'] : []), script, ...args];
   const executable = process.execPath;

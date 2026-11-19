@@ -303,7 +303,7 @@ conserva ordine, provenienza e hash ed è pubblicato soltanto se la sorgente
 è ancora corrente. Errori, formati ambigui, documenti cifrati e motori
 indisponibili fermano il percorso. La qualifica GPUI riguarda il client
 installato sul Mac fissato dal contratto. Queste policy appartengono ai
-worker del runtime Web. Vedi [ADR 0194](docs/adr/0194-document-child-platform-boundary.md).
+worker del runtime Web. Vedi [ADR 0196](docs/adr/0196-document-child-platform-boundary.md).
 
 DeepSeek-OCR 2/CUDA, benchmark di qualifica e readiness universale hanno stato
 `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`. Le route OCR legacy, dopo
