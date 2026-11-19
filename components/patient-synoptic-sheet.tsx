@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode, Ref } from 'react';
+import { Activity, Heart, Pill, type LucideIcon } from 'lucide-react';
 import type { Checkup, Diagnosis, Observation, Therapy } from '@/lib/db';
 import { formatCountLabel } from '@/lib/format-count';
 import { projectQuadroMeasures } from '@/lib/patient-quadro';
@@ -29,16 +30,23 @@ export interface PatientSynopticSheetProps {
     checkups: QuadroRead<Checkup>;
 }
 
-function Section<T>({ name, read, count, empty, children }: {
+function Section<T>({ name, read, count, empty, children, icon: Icon, action, id }: {
     name: string;
     read: QuadroRead<T>;
     count: string;
     empty: string;
     children: ReactNode;
+    icon?: LucideIcon;
+    action?: ReactNode;
+    id?: string;
 }) {
     const failed = read.error !== null && read.error !== undefined;
-    return <section aria-label={name}>
-        <InkSectionHeading count={!read.loading && !failed && read.data !== undefined ? count : undefined}>{name}</InkSectionHeading>
+    return <section id={id} aria-label={name}>
+        <header className={reading.islandHeader}>
+            {Icon ? <span className={reading.islandIcon}><Icon size={16} aria-hidden="true" /></span> : null}
+            <InkSectionHeading count={!read.loading && !failed && read.data !== undefined ? count : undefined}>{name}</InkSectionHeading>
+            {action}
+        </header>
         {failed ? <p className={register.empty} role="alert">Impossibile leggere {name.toLocaleLowerCase('it-IT')}.</p>
             : read.loading || read.data === undefined ? <p className={register.empty} role="status">Lettura {name.toLocaleLowerCase('it-IT')} in corso…</p>
                 : read.data.length === 0 ? <p className={register.empty}>{empty}</p> : children}
@@ -53,7 +61,7 @@ function DateCell({ date }: { date?: Date }) {
 export function PatientSynopticSheet({ clinicalSupport, notesContent, problems, therapies, measures, checkups, diary, diaryTools, composer, sources, activity }: PatientSynopticSheetProps) {
     const measureRows = projectQuadroMeasures(measures.data ?? []);
     const stable = <>
-        <Section name="Problemi" read={problems} count={formatCountLabel(problems.data?.length ?? 0, 'problema', 'problemi')} empty="Nessun problema registrato.">
+        <Section name="Problemi" id="riepilogo-problemi" icon={diary ? Heart : undefined} action={diary ? <a href="#clinica" className={reading.islandAction}>Clinica</a> : undefined} read={problems} count={formatCountLabel(problems.data?.length ?? 0, 'problema', 'problemi')} empty="Nessun problema registrato.">
             <table className={`${register.table} ${reading.problems}`} aria-label="Problemi">
                 <thead><tr><th scope="col">Codice</th><th scope="col">Descrizione</th><th scope="col" className={`${register.secondaryColumn} ${reading.secondaryColumn}`}>Da quando</th></tr></thead>
                 <tbody>{problems.data?.map((problem, index) => <tr key={`${problem.system}-${problem.code}-${index}`}>
@@ -61,7 +69,7 @@ export function PatientSynopticSheet({ clinicalSupport, notesContent, problems, 
                 </tr>)}</tbody>
             </table>
         </Section>
-        <Section name="Terapie attive" read={therapies} count={formatCountLabel(therapies.data?.length ?? 0, 'attiva', 'attive')} empty="Nessuna terapia attiva.">
+        <Section name="Terapie attive" id="riepilogo-terapie" icon={diary ? Pill : undefined} action={diary && !composer ? <a href="#terapie" className={reading.islandAction}>Terapie</a> : undefined} read={therapies} count={formatCountLabel(therapies.data?.length ?? 0, 'attiva', 'attive')} empty="Nessuna terapia attiva.">
             <table className={`${register.table} ${reading.therapies}`} aria-label="Terapie attive">
                 <thead><tr><th scope="col">Nome e dose</th><th scope="col">Posologia</th><th scope="col" className={`${register.secondaryColumn} ${reading.secondaryColumn}`}>ATC</th></tr></thead>
                 <tbody>{therapies.data?.map(therapy => <tr key={therapy.id}>
@@ -71,7 +79,7 @@ export function PatientSynopticSheet({ clinicalSupport, notesContent, problems, 
         </Section>
     </>;
     const context = <>
-        <Section name="Parametri recenti" read={{ ...measures, data: measures.data === undefined ? undefined : measureRows }} count={formatCountLabel(measureRows.length, 'parametro', 'parametri')} empty="Nessuna misura registrata.">
+        <Section name="Parametri recenti" icon={diary ? Activity : undefined} action={diary && !composer ? <a href="#parametri" className={reading.islandAction}>Andamento</a> : undefined} read={{ ...measures, data: measures.data === undefined ? undefined : measureRows }} count={formatCountLabel(measureRows.length, 'parametro', 'parametri')} empty="Nessuna misura registrata.">
             <table className={`${register.table} ${reading.measures}`} aria-label="Parametri recenti">
                 <thead><tr><th scope="col">Nome</th><th scope="col" className={reading.value}>Valore</th><th scope="col">Data</th><th scope="col" className={`${register.secondaryColumn} ${reading.secondaryColumn}`}>Variazione</th></tr></thead>
                 <tbody>{measureRows.map(measure => <tr key={measure.id}>
@@ -89,8 +97,15 @@ export function PatientSynopticSheet({ clinicalSupport, notesContent, problems, 
     </>;
     const stableWithNotes = <>{stable}{notesContent ? <div className={reading.notes}>{notesContent}</div> : null}</>;
     return <section id="quadro" aria-label="Riepilogo clinico" className={`${register.register} ${reading.sheet}`} data-overview={diary ? 'true' : undefined} data-writing={composer ? 'true' : undefined} data-full-diary={diaryTools?.full ? 'true' : undefined}>
-        {diary ? <>
-            <div className={reading.middle}>
+        {diary ? <div className={reading.overview}>
+            <nav aria-label="Nel riepilogo" className={reading.overviewIndex}>
+                <a href="#riepilogo-cambiato">Cambiato</a>
+                <a href="#riepilogo-terapie">Terapie</a>
+                <a href="#riepilogo-problemi">Problemi</a>
+                <a href="#riepilogo-contesto">Contesto</a>
+            </nav>
+            <section aria-labelledby="riepilogo-cambiato" className={reading.middle}>
+                <h2 id="riepilogo-cambiato" className={reading.zoneTitle}>Cambiato</h2>
                 <div className={reading.activity}>{activity}</div>
                 {diaryTools ? <div className={reading.diaryTools} data-reading={diaryTools.full}>
                     <button ref={diaryTools.control} type="button" aria-controls="diario"
@@ -101,15 +116,19 @@ export function PatientSynopticSheet({ clinicalSupport, notesContent, problems, 
                 </div> : null}
                 {diary}
                 {diaryTools ? null : <a href="#diario" className={`mf-button-text ${reading.fullDiary}`}>Tutto il diario</a>}
-            </div>
+            </section>
             <div className={reading.side}>
-                <div className={reading.stable}>{stableWithNotes}</div>
-                <aside aria-label="Contesto della cartella" className={reading.context}>
-                    {composer ? <div className={reading.composer}>{composer}</div> : null}
-                    <div className={reading.support}>{clinicalSupport}</div>
+                {composer ? <div className={reading.composer}>{composer}</div> : null}
+                <section aria-labelledby="riepilogo-stabile" className={reading.stable}>
+                    <h2 id="riepilogo-stabile" className={reading.zoneTitle}>Stabile</h2>
+                    {stableWithNotes}
+                </section>
+                <aside aria-labelledby="riepilogo-contesto" className={reading.context}>
+                    <h2 id="riepilogo-contesto" className={reading.zoneTitle}>Contesto</h2>
+                    {clinicalSupport ? <div className={reading.support}>{clinicalSupport}</div> : null}
                     <div className={reading.contextRows}>{context}{composer ? null : sources}</div>
                 </aside>
             </div>
-        </> : <>{stableWithNotes}{context}</>}
+        </div> : <>{stableWithNotes}{context}</>}
     </section>;
 }

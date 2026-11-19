@@ -70,8 +70,8 @@
 .patientCanvas { min-height: 100%; container-name: patient-canvas; }
 
 .patientBody[data-folder-section='diario'] :global(#quadro[data-overview]:not([data-writing])) { display: block; }
-.patientBody[data-folder-section='diario'] :global(#quadro[data-overview]:not([data-writing]) > :not(:has(> #diario))) { display: none; }
-.patientBody[data-folder-section='diario'] :global(#quadro[data-overview]:not([data-writing]) > :has(> #diario) > :not(#diario)) { display: none; }
+.patientBody[data-folder-section='diario'] :global(#quadro[data-overview]:not([data-writing]) > div > :not(:has(> #diario))) { display: none; }
+.patientBody[data-folder-section='diario'] :global(#quadro[data-overview]:not([data-writing]) > div > :has(> #diario) > :not(#diario)) { display: none; }
 .patientBody :global([data-folder-pane] > div) { padding-inline: 0; }
 @media (max-width: 700px) {
  .patientHeader { padding: 14px var(--ink-plane-inset); }
@@ -103,3 +103,5 @@
  .patientCanvas[data-folder-section='quadro'] .patientHeader { padding-block: 14px; }
  .patientBody[data-folder-section='quadro'] { padding-block-start: 18px; }
 }
+
+.patientCanvas[data-folder-section='quadro'] .identity h1 { font: var(--type-record-person); }

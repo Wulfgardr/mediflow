@@ -9,6 +9,9 @@ use super::*;
 pub(super) const READING_INSET: f32 = 12.;
 const QUIET_CHROME: f32 = 195.;
 const WRITING_CHROME: f32 = 260.;
+const TRAY_INSET: f32 = 10.;
+const ISLAND_RADIUS: f32 = 14.;
+const ZONE_GAP: f32 = 12.;
 
 #[derive(Clone, Default)]
 pub(super) struct RecordState {
@@ -189,6 +192,22 @@ pub(super) fn record_title(
     count: Option<String>,
     theme: Theme,
 ) -> Stateful<Div> {
+    record_heading(
+        id,
+        label,
+        count,
+        theme,
+        crate::theme::TitleRole::SectionTitle,
+    )
+}
+
+fn record_heading(
+    id: impl Into<SharedString>,
+    label: &str,
+    count: Option<String>,
+    theme: Theme,
+    role: crate::theme::TitleRole,
+) -> Stateful<Div> {
     let id = id.into();
     div()
         .id(SharedString::from(format!("{id}-row")))
@@ -206,10 +225,7 @@ pub(super) fn record_title(
                 .aria_label(SharedString::from(label.to_owned()))
                 .min_w_0()
                 .text_color(theme.ink)
-                .child(
-                    crate::title::title(label.to_owned(), theme)
-                        .with_role(crate::theme::TitleRole::SectionTitle),
-                ),
+                .child(crate::title::title(label.to_owned(), theme).with_role(role)),
         )
         .when_some(count, |el, count| {
             el.child(
@@ -221,24 +237,78 @@ pub(super) fn record_title(
         })
 }
 
-fn zone_label(label: &'static str, theme: Theme) -> Div {
+fn zone_label(label: &'static str, changed: bool, theme: Theme) -> Stateful<Div> {
     div()
-        .text_color(theme.secondary)
-        .child(crate::title::title(label, theme).with_role(crate::theme::TitleRole::Section))
+        .id(label)
+        .accessibility_id(label)
+        .min_w_0()
+        .px(px(4.))
+        .pt(px(4.))
+        .flex()
+        .items_center()
+        .gap(px(8.))
+        .role(Role::Heading)
+        .aria_label(label)
+        .text_color(theme.ink)
+        .child(crate::title::title(label, theme).with_role(crate::theme::TitleRole::RecordZone))
+        .when(changed, |el| {
+            el.child(
+                div()
+                    .size(px(8.))
+                    .flex_none()
+                    .rounded_full()
+                    .bg(theme.fresh),
+            )
+        })
+}
+
+fn tray(theme: Theme) -> Div {
+    block(theme)
+        .gap(px(TRAY_INSET))
+        .p(px(TRAY_INSET))
+        .bg(theme.record.tray)
+        .border_1()
+        .border_color(theme.record.tray_rule)
+        .rounded(px(ISLAND_RADIUS + TRAY_INSET))
+        .shadow(vec![
+            gpui::BoxShadow::new(px(0.), px(1.), theme.record.tray_light).inset(),
+            gpui::BoxShadow::new(px(0.), px(-1.), theme.record.tray_shadow)
+                .blur_radius(px(2.))
+                .inset(),
+        ])
+}
+
+fn island(theme: Theme, compact: bool) -> Div {
+    block(theme)
+        .p(px(12.))
+        .bg(if compact {
+            theme.record.compact_island
+        } else {
+            theme.record.island
+        })
+        .border_1()
+        .border_color(theme.record.island_rule)
+        .rounded(px(ISLAND_RADIUS))
+}
+
+fn island_title(
+    id: &'static str,
+    label: &str,
+    count: Option<String>,
+    theme: Theme,
+) -> Stateful<Div> {
+    record_heading(
+        id,
+        label,
+        count,
+        theme,
+        crate::theme::TitleRole::RecordIsland,
+    )
 }
 
 fn block(theme: Theme) -> Div {
     let _ = theme;
     div().min_w_0().max_w_full().flex().flex_col().gap(px(8.))
-}
-
-fn stable_block(theme: Theme) -> Div {
-    block(theme)
-        .flex_1()
-        .w_full()
-        .p(px(12.))
-        .bg(theme.shade)
-        .rounded(px(theme.control_radius))
 }
 
 fn row(theme: Theme) -> Div {
@@ -290,7 +360,7 @@ impl ClinicalApp {
                                 "clinical-workspace-patient-name",
                                 crate::title::TitleText::name(patient.display_name()),
                                 theme,
-                                crate::theme::TitleRole::Person { compact: true },
+                                crate::theme::TitleRole::RecordPerson,
                             ))
                             .child(
                                 div()
@@ -461,96 +531,110 @@ impl ClinicalApp {
                 .children(self.record_reading(Sheet::Wide, cx));
         }
         let reading = self.record_reading(Sheet::Stacked, cx);
-        let column = |id: &'static str| {
-            div()
+        let compact = zones == Zones::One;
+        let changed = self
+            .patient
+            .record
+            .anchor
+            .as_ref()
+            .is_some_and(Option::is_some);
+        let changed_column = |column: Div| {
+            column.child(zone_label("Cambiato", changed, theme)).child(
+                island(theme, compact)
+                    .bg(theme.record.change)
+                    .border_color(theme.record.change_rule)
+                    .child(self.record_band(cx)),
+            )
+        };
+        let work = (reading.is_some() || writing.is_some() || done.is_some()).then(|| {
+            block(theme)
+                .children(reading)
+                .children(writing)
+                .when(drafting, |el| {
+                    el.child(island(theme, compact).child(self.record_documents(cx)))
+                })
+                .children(done)
+        });
+        let context_column = |column: Div| {
+            column
+                .child(zone_label("Contesto", false, theme))
+                .child(self.record_context(patient, cx))
+        };
+        let zone = |column: Div, id: &'static str| {
+            column
                 .id(id)
                 .debug_selector(move || id.into())
-                .min_w_0()
-                .flex()
-                .flex_col()
-                .gap(px(24.))
+                .max_h(px(zone_height))
+                .overflow_y_scroll()
         };
-        let zone = |id: &'static str| column(id).max_h(px(zone_height)).overflow_y_scroll();
         match zones {
             Zones::Three => div()
                 .min_w_0()
                 .flex()
+                .gap(px(ZONE_GAP))
                 .items_start()
                 .child(
-                    zone("clinical-record-stable")
-                        .w(px(270.))
-                        .flex_none()
-                        .pr(px(20.))
-                        .child(zone_label("Stabile", theme))
+                    zone(tray(theme), "clinical-record-stable")
+                        .flex_1()
+                        .child(zone_label("Stabile", false, theme))
                         .child(self.record_stable(patient, true, cx)),
                 )
                 .child(
-                    zone("clinical-record-changed")
+                    zone(changed_column(tray(theme)), "clinical-record-changed")
                         .flex_1()
-                        .min_w(px(360.))
-                        .px(px(20.))
-                        .border_l_1()
-                        .border_r_1()
-                        .border_color(theme.rule)
-                        .child(self.record_band(cx))
-                        .child(self.record_diary(cx)),
+                        .flex_grow(1.22)
+                        .child(island(theme, false).child(self.record_diary(cx))),
                 )
                 .child(
-                    zone("clinical-record-context")
-                        .track_scroll(&self.patient.record.composer_column)
-                        .w(px(340.))
-                        .flex_none()
-                        .pl(px(20.))
-                        .children(reading)
-                        .children(writing)
-                        .when(drafting, |el| el.child(self.record_documents(cx)))
-                        .children(done)
-                        .child(self.record_context(patient, cx)),
+                    zone(
+                        tray(theme)
+                            .children(work)
+                            .child(context_column(block(theme))),
+                        "clinical-record-context",
+                    )
+                    .track_scroll(&self.patient.record.composer_column)
+                    .flex_1(),
                 ),
             Zones::Two => div()
                 .min_w_0()
                 .flex()
+                .gap(px(ZONE_GAP))
                 .items_start()
                 .child(
-                    zone("clinical-record-changed")
+                    zone(changed_column(tray(theme)), "clinical-record-changed")
                         .flex_1()
-                        .pr(px(20.))
-                        .child(self.record_band(cx))
-                        .child(self.record_diary(cx)),
+                        .child(island(theme, false).child(self.record_diary(cx))),
                 )
                 .child(
-                    zone("clinical-record-side")
+                    zone(block(theme), "clinical-record-side")
                         .track_scroll(&self.patient.record.composer_column)
                         .w(px(340.))
                         .flex_none()
-                        .pl(px(20.))
-                        .border_l_1()
-                        .border_color(theme.rule)
-                        .children(reading)
-                        .children(writing)
-                        .when(drafting, |el| {
-                            el.child(self.record_active_therapies(cx))
-                                .child(self.record_documents(cx))
-                        })
-                        .children(done)
-                        .child(zone_label("Stabile", theme))
-                        .child(self.record_stable(patient, !drafting, cx))
-                        .child(self.record_context(patient, cx)),
+                        .gap(px(ZONE_GAP))
+                        .children(work)
+                        .child(
+                            tray(theme)
+                                .child(zone_label("Stabile", false, theme))
+                                .child(self.record_stable(patient, true, cx)),
+                        )
+                        .child(context_column(tray(theme))),
                 ),
-            Zones::One => div().min_w_0().child(
-                column("clinical-record-single")
-                    .child(self.record_quadro(cx))
-                    .children(reading)
-                    .children(writing)
-                    .children(done)
-                    .when(drafting, |el| el.child(self.record_documents(cx)))
-                    .child(self.record_band(cx))
+            Zones::One => {
+                let context = context_column(block(theme));
+                let content = block(theme)
+                    .id("clinical-record-single")
+                    .debug_selector(|| "clinical-record-single".into())
+                    .gap(px(ZONE_GAP))
+                    .child(changed_column(block(theme)))
+                    .child(zone_label("Stabile", false, theme))
                     .child(self.record_stable(patient, true, cx))
-                    .child(self.record_diary(cx))
-                    .child(self.record_measures(cx))
-                    .child(self.record_checkups(cx))
-                    .when(!drafting, |el| el.child(self.record_documents(cx))),
-            ),
+                    .child(island(theme, true).child(self.record_diary(cx)));
+                block(theme)
+                    .gap(px(ZONE_GAP))
+                    .children(work)
+                    .child(content)
+                    .child(context)
+            }
         }
     }
 
@@ -566,7 +650,9 @@ impl ClinicalApp {
         } else {
             diagnosis_labels(patient.diagnoses.as_deref())
         };
-        let paired = self.stable_side_by_side();
+        let compact = self.record_compact();
+        let paired = compact && self.viewport_width / self.effective_text_scale() >= 700.;
+        let therapies_first = compact && with_therapies;
         div()
             .min_w_0()
             .flex()
@@ -578,10 +664,14 @@ impl ClinicalApp {
                     .flex()
                     .when(!paired, |el| el.flex_col())
                     .when(paired, |el| el.items_start())
-                    .gap(px(16.))
+                    .gap(px(TRAY_INSET))
+                    .when(therapies_first, |el| {
+                        el.child(self.record_active_therapies(cx))
+                    })
                     .child(
-                        stable_block(theme)
-                            .child(record_title(
+                        island(theme, compact)
+                            .flex_1()
+                            .child(island_title(
                                 "clinical-overview-problems",
                                 "Problemi",
                                 Some(diagnoses.as_ref().map_or_else(
@@ -631,7 +721,7 @@ impl ClinicalApp {
                                 },
                             )),
                     )
-                    .when(with_therapies, |el| {
+                    .when(with_therapies && !therapies_first, |el| {
                         el.child(self.record_active_therapies(cx))
                     }),
             )
@@ -648,10 +738,11 @@ impl ClinicalApp {
             .flatten()
             .filter(|row| row.status == "active" && row.deleted_at.is_none())
             .collect();
-        stable_block(theme)
+        island(theme, self.record_compact())
+            .flex_1()
             .id("clinical-record-active-therapies")
             .debug_selector(|| "clinical-record-active-therapies".into())
-            .child(record_title(
+            .child(island_title(
                 "clinical-workspace-active-therapies-heading",
                 "Terapie attive",
                 Some(
@@ -689,16 +780,11 @@ impl ClinicalApp {
                         "clinical-overview-therapy-{}",
                         therapy.id
                     )))
-                    .flex_row()
-                    .flex_wrap()
-                    .items_baseline()
-                    .justify_between()
-                    .gap_x(px(10.))
-                    .py(px(4.))
+                    .py(px(6.))
                     .child(
                         div()
                             .min_w_0()
-                            .type_role(theme, crate::theme::TextRole::Strong)
+                            .type_role(theme, crate::theme::TextRole::RecordRow)
                             .child({
                                 let text = text!(therapy.drug_name.clone());
                                 #[cfg(test)]
@@ -713,11 +799,6 @@ impl ClinicalApp {
                         text
                     }))
             }))
-    }
-
-    fn stable_side_by_side(&self) -> bool {
-        let width = self.viewport_width / self.effective_text_scale();
-        Zones::for_width(width) == Zones::One && width >= 700.
     }
 
     pub(super) fn record_notes(
@@ -744,7 +825,7 @@ impl ClinicalApp {
             .as_deref()
             .filter(|value| !value.trim().is_empty())
             .map(str::to_owned);
-        stable_block(theme)
+        island(theme, self.record_compact())
             .id("clinical-record-notes")
             .when(registered.is_some(), |el| {
                 el.p(px(10.))
@@ -962,21 +1043,21 @@ impl ClinicalApp {
             .role(Role::Region)
             .aria_label(SharedString::from(title.clone()))
             .min_w_0()
-            .p(px(14.))
-            .border_1()
-            .border_color(theme.strong_rule)
-            .bg(theme.selected)
-            .rounded(px(theme.control_radius))
             .flex()
             .flex_col()
-            .gap(px(4.))
+            .gap(px(6.))
             .child(
                 div()
                     .flex()
-                    .items_center()
-                    .justify_between()
-                    .gap(px(8.))
-                    .child(record_title("clinical-record-band-title", &title, None, theme).flex_1())
+                    .flex_wrap()
+                    .items_baseline()
+                    .gap(px(4.))
+                    .child(island_title(
+                        "clinical-record-band-title",
+                        &title,
+                        None,
+                        theme,
+                    ))
                     .child(
                         button(
                             "clinical-record-band-documents",
@@ -1045,12 +1126,12 @@ impl ClinicalApp {
                 div()
                     .min_w_0()
                     .flex()
+                    .flex_wrap()
                     .items_baseline()
-                    .gap(px(12.))
+                    .gap_x(px(10.))
                     .child(
                         div()
-                            .w(px(132.))
-                            .flex_none()
+                            .max_w_full()
                             .type_role(theme, crate::theme::TextRole::Strong)
                             .text_color(theme.warning)
                             .child(text!(kind.counted(named.len()))),
@@ -1058,6 +1139,7 @@ impl ClinicalApp {
                     .child(
                         div()
                             .flex_1()
+                            .flex_basis(px(128.))
                             .min_w_0()
                             .flex()
                             .flex_wrap()
@@ -1066,7 +1148,7 @@ impl ClinicalApp {
                     ),
             )
             .when_some(open, |el, change| {
-                el.child(self.change_detail(&change, entries, 144., cx))
+                el.child(self.change_detail(&change, entries, 8., cx))
             })
     }
 
@@ -1657,7 +1739,7 @@ impl ClinicalApp {
             .flex()
             .flex_col()
             .gap(px(12.))
-            .child(record_title(
+            .child(island_title(
                 "clinical-record-diary-title",
                 "Ultime voci del diario",
                 total.map(|total| total.to_string()),
@@ -1699,17 +1781,16 @@ impl ClinicalApp {
     pub(super) fn record_quadro(&self, cx: &Context<Self>) -> Div {
         let theme = self.theme;
         let open = self.patient.record.quadro;
-        div()
-            .min_w_0()
-            .flex()
-            .flex_col()
-            .gap(px(8.))
-            .p(px(12.))
-            .bg(theme.draft)
-            .border_1()
-            .border_dashed()
-            .border_color(theme.pencil)
-            .rounded(px(theme.control_radius))
+        let proposed = matches!(
+            self.patient.insight.phase,
+            patient_insight::InsightPhase::Proposal { .. }
+        );
+        island(theme, self.record_compact())
+            .when(proposed, |el| {
+                el.bg(gpui::transparent_black())
+                    .border_dashed()
+                    .border_color(theme.record.proposal_rule)
+            })
             .child(
                 div()
                     .min_w_0()
@@ -1719,10 +1800,10 @@ impl ClinicalApp {
                     .gap(px(8.))
                     .child(
                         div().w_full().min_w_0().flex().flex_col().child(
-                            div()
-                                .type_role(theme, crate::theme::TextRole::Strong)
-                                .text_color(theme.pencil)
-                                .child(text!("Quadro paziente · proposta")),
+                            div().text_color(theme.ink).child(
+                                crate::title::title("Quadro paziente", theme)
+                                    .with_role(crate::theme::TitleRole::RecordIsland),
+                            ),
                         ),
                     )
                     .child(
@@ -1987,6 +2068,10 @@ impl ClinicalApp {
             )
     }
 
+    fn record_compact(&self) -> bool {
+        Zones::for_width(self.viewport_width / self.effective_text_scale()) == Zones::One
+    }
+
     pub(super) fn record_context(&self, patient: &PatientDetail, cx: &Context<Self>) -> Div {
         let theme = self.theme;
         let profile_editable =
@@ -1995,13 +2080,12 @@ impl ClinicalApp {
             .min_w_0()
             .flex()
             .flex_col()
-            .gap(px(24.))
-            .child(zone_label("Contesto", theme))
+            .gap(px(TRAY_INSET))
             .child(self.record_quadro(cx))
-            .child(self.record_measures(cx))
-            .child(self.record_checkups(cx))
+            .child(island(theme, self.record_compact()).child(self.record_measures(cx)))
+            .child(island(theme, self.record_compact()).child(self.record_checkups(cx)))
             .when(self.form.is_none(), |el| {
-                el.child(self.record_documents(cx))
+                el.child(island(theme, self.record_compact()).child(self.record_documents(cx)))
             })
             .child(
                 div()
@@ -2401,6 +2485,40 @@ mod tests {
         });
         notes_recovery_tests::draw(cx);
         (view, cx)
+    }
+
+    #[gpui::test]
+    fn overview_trays_and_compact_islands_follow_the_available_width(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let host = notes_recovery_tests::Host::new();
+        let (view, cx) = opened_at_1180(&host, cx);
+        for dark in [false, true] {
+            for (width, height, scale) in [(1320., 880., 1.), (390., 760., 1.), (1320., 880., 2.)] {
+                cx.simulate_resize(gpui::size(px(width), px(height)));
+                view.update(cx, |app, cx| {
+                    app.dark_override = Some(dark);
+                    app.text_scale = scale;
+                    cx.notify();
+                });
+                notes_recovery_tests::draw(cx);
+                let therapies = cx.debug_bounds("clinical-record-active-therapies").unwrap();
+                if width == 1320. && scale == 1. {
+                    let stable = cx.debug_bounds("clinical-record-stable").unwrap();
+                    let changed = cx.debug_bounds("clinical-record-changed").unwrap();
+                    let context = cx.debug_bounds("clinical-record-context").unwrap();
+                    assert!(stable.right() < changed.left() && changed.right() < context.left());
+                    assert!(changed.size.width > stable.size.width);
+                    assert_eq!(therapies.left() - stable.left(), px(TRAY_INSET + 1.));
+                } else {
+                    let column = cx.debug_bounds("clinical-record-single").unwrap();
+                    assert!(cx.debug_bounds("clinical-record-stable").is_none());
+                    assert_eq!(therapies.left(), column.left());
+                    assert!(therapies.right() <= column.right());
+                }
+            }
+        }
+        view.update(cx, |app, cx| app.disconnect(cx));
     }
 
     #[gpui::test]
