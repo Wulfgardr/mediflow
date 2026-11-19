@@ -494,7 +494,7 @@ test('Ambulatorio admits only a verified visit and retries the same encrypted de
         assert.equal(f.rows()[0].status, 'open');
         const receipt = await send('mediflow_riprendi_visita', { visitId });
         assert.equal(receipt.status, 'closed', JSON.stringify(receipt));
-        assert.deepEqual(receipt.proposteInArrivo, { stato: 'da_verificare_in_mediflow', elementi: [{ tipo: 'terapia', fonte: 'trascrizione-visita.pdf' }] });
+        assert.deepEqual(receipt.proposteInArrivo, { stato: 'da_verificare_in_mediflow', elementi: [{ tipo: 'nota', fonte: 'nota-visita.pdf' }, { tipo: 'terapia', fonte: 'trascrizione-visita.pdf' }] });
         assert.deepEqual(await send('mediflow_deposita_visita', { visitId }), receipt);
         assert.equal(f.rows().length, 1);
         assert.equal(receipt.itemCount, 6);

@@ -34,10 +34,13 @@ test('the client restore sends nothing when the unlocked key cannot read the bac
     const artifact = await artifactSealedWith(key);
     try {
         db.setKey(await generateMasterKey());
-        await assert.rejects(importRawDatabase(artifact), /chiave diversa/);
+        const expectedSnapshot = 'a'.repeat(64), sourceChecksum = 'b'.repeat(64);
+        const decision = { id: '12345678-1234-4123-8123-123456789012', json: artifact,
+            verification: { expectedSnapshot, sourceChecksum, createdAt: null, collections: 0, records: 0 } };
+        await assert.rejects(importRawDatabase(decision, { verifier: 'synthetic-verifier' }), /chiave diversa/);
         assert.equal(requests.length, 0);
         db.setKey(key);
-        await importRawDatabase(artifact);
+        await importRawDatabase(decision, { verifier: 'synthetic-verifier' });
         assert.equal(requests.length, 1);
     } finally { db.setKey(null); }
 });
@@ -52,10 +55,13 @@ test('the client tells a blocked restore from a failed one and verifies through 
     try {
         db.setKey(key);
         answer = () => Response.json({ success: false, code: 'restore_blocked', reason: 'audit', error: 'Ripristino bloccato: i dati attuali non sono stati modificati.' }, { status: 409 });
-        await assert.rejects(importRawDatabase(artifact),
+        const expectedSnapshot = 'a'.repeat(64), sourceChecksum = 'b'.repeat(64);
+        const decision = { id: '12345678-1234-4123-8123-123456789012', json: artifact,
+            verification: { expectedSnapshot, sourceChecksum, createdAt: null, collections: 0, records: 0 } };
+        await assert.rejects(importRawDatabase(decision, { verifier: 'synthetic-verifier' }),
             (error: unknown) => error instanceof BackupRestoreBlockedError && error.reason === 'audit');
-        answer = () => Response.json({ success: true, createdAt: '2026-10-10T08:00:00.000Z', collections: ['patients', 'entries'], counts: { patients: 2, entries: 3 } });
-        assert.deepEqual(await verifyRawDatabase(artifact), { createdAt: '2026-10-10T08:00:00.000Z', collections: 2, records: 5 });
+        answer = () => Response.json({ success: true, expectedSnapshot, sourceChecksum, createdAt: '2026-10-10T08:00:00.000Z', collections: ['patients', 'entries'], counts: { patients: 2, entries: 3 } });
+        assert.deepEqual(await verifyRawDatabase(artifact), { expectedSnapshot, sourceChecksum, createdAt: '2026-10-10T08:00:00.000Z', collections: 2, records: 5 });
         assert.deepEqual(urls, ['/api/system/backup-restore', '/api/system/backup-restore/verify']);
         // A different key stops the verification before any request, as it stops the restore.
         db.setKey(await generateMasterKey());

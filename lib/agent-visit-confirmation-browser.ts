@@ -6,24 +6,50 @@ import { visitConfirmationPurpose, type VisitConfirmationPresentation } from './
 import type { AgentVisitReview } from './agent-visit-review';
 import type { AgentApplicationInput } from './agent-visit-application-contract';
 
-export function agentVisitPresentation(review: AgentVisitReview, plan: AgentApplicationInput): VisitConfirmationPresentation {
-    if (!review.patient || typeof review.visit.anchor.fiscalCode !== 'string') throw new Error('VISIT_PRESENTATION_UNAVAILABLE');
-    const proposals = plan.items.map(prepared => {
+const unavailable = () => new Error('VISIT_PRESENTATION_UNAVAILABLE');
+const nativeFieldBytes = 16_384;
+function shownWhole(value: unknown): string {
+    if (typeof value !== 'string' || !value.trim() || new TextEncoder().encode(value).length > nativeFieldBytes
+        || /[\p{Cf}]|(?!\n)\p{Cc}/u.test(value)) throw unavailable();
+    return value;
+}
+async function textHash(value: string): Promise<string> {
+    return [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)))].map(byte => byte.toString(16).padStart(2, '0')).join('');
+}
+const depositedText = { note: 'Scritta dal modello', transcription: 'Depositata dall’agente' } as const;
+
+export async function agentVisitPresentation(review: AgentVisitReview, plan: AgentApplicationInput): Promise<VisitConfirmationPresentation> {
+    if (!review.patient || typeof review.visit.anchor.fiscalCode !== 'string') throw unavailable();
+    const proposals: VisitConfirmationPresentation['proposals'] = [];
+    for (const prepared of plan.items) {
         const sourceItem = review.visit.items.find(item => item.id === prepared.id && item.kind === prepared.kind);
-        if (!sourceItem) throw new Error('VISIT_PRESENTATION_UNAVAILABLE');
+        if (!sourceItem) throw unavailable();
+        if (sourceItem.kind === 'pdf') {
+            const document = review.documents.find(value => value.id === sourceItem.id);
+            if (!document || document.beyondText) throw unavailable();
+            proposals.push({ title: agentReviewItemLabels.pdf, fields: [{ label: 'Testo', value: shownWhole(document.text.trim()) }], current: 'Non presente',
+                sourceName: shownWhole(document.name), sourceQuote: 'Depositato dall’agente', sourceHash: document.hash });
+            continue;
+        }
+        if (sourceItem.kind === 'note' || sourceItem.kind === 'transcription') {
+            const value = shownWhole(sourceItem.value.text);
+            proposals.push({ title: agentReviewItemLabels[sourceItem.kind], fields: [{ label: 'Testo', value }], current: 'Non presente',
+                sourceName: 'Cassetta della visita', sourceQuote: depositedText[sourceItem.kind], sourceHash: await textHash(value) });
+            continue;
+        }
         const { source, quote, values } = sourceItem.value;
         if (!source || typeof source !== 'object' || !('fileName' in source) || typeof source.fileName !== 'string'
             || !('sha256' in source) || typeof source.sha256 !== 'string' || typeof quote !== 'string' || !values || typeof values !== 'object') {
-            throw new Error('VISIT_PRESENTATION_UNAVAILABLE');
+            throw unavailable();
         }
         const fields = Object.entries(values).filter(([, value]) => value !== '').map(([field, value]) => {
             const label = agentReviewFieldLabels[field];
-            if (!label || typeof value !== 'string') throw new Error('VISIT_PRESENTATION_UNAVAILABLE');
+            if (!label || typeof value !== 'string') throw unavailable();
             return { label, value: agentReviewFieldValues[field]?.[value] ?? value };
         });
-        return { title: agentReviewItemLabels[sourceItem.kind], fields,
-            current: review.currentSummary.get(sourceItem.id) ?? 'Non presente', sourceName: source.fileName, sourceQuote: quote, sourceHash: source.sha256 };
-    });
+        proposals.push({ title: agentReviewItemLabels[sourceItem.kind], fields,
+            current: review.currentSummary.get(sourceItem.id) ?? 'Non presente', sourceName: source.fileName, sourceQuote: quote, sourceHash: source.sha256 });
+    }
     return { patient: review.patient.lastName + ' ' + review.patient.firstName, fiscalCode: review.visit.anchor.fiscalCode, proposals };
 }
 

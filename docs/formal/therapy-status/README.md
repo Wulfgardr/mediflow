@@ -1148,3 +1148,17 @@ mappatura. Passano le prove del controller e delle transizioni e il
 flusso autorizzato di scrittura. Le due impronte aggiornate identificano
 i file dopo la modifica ai log. Modello, limiti e commit di
 sincronizzazione restano quelli delle transizioni già verificate.
+
+### Ripristino portabile Web, WUL-908
+
+Il client del backup in `lib/db.ts` conserva la verifica fino alla conferma.
+Poi invia lo stato dell’archivio esaminato. Il writer confronta quello stato
+nella transazione SQLite prima delle scritture. La revoca in memoria dei
+riferimenti agli allegati precede la transazione, come nel writer esistente.
+Vale anche se il controllo preliminare successivo ferma il ripristino.
+
+Il raccordo registra il digest del client sul commit `ae3a41aca688`.
+Il writer, le transizioni del comando di stato terapia e il controllo
+concorrente della versione corrispondono alla base. Le regressioni Web
+coprono il conflitto durante il ripristino portabile. TLC verifica il
+modello legacy entro i limiti del manifest.
