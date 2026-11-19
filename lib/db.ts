@@ -1018,7 +1018,7 @@ class MedicalApiClient {
                         .catch(() => null);
                     continue;
                 }
-                const [prefix, iv, ciphertext, ...rest] = row[field].split(':');
+                const [prefix, iv, ciphertext, ...rest] = value.split(':');
                 const opened = prefix === 'ENC' && iv && ciphertext && !rest.length
                     ? await decryptData(ciphertext, iv, key) : null;
                 row[field] = typeof opened === 'string' ? opened : null;
