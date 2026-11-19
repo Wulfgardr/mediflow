@@ -3,7 +3,7 @@ import Database from 'better-sqlite3';
 import { createHash, randomUUID } from 'node:crypto';
 import { isAbsolute, join } from 'node:path';
 import { bootstrapUnlockedSession } from './utils';
-import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
+import { reviewedRestoreHeaders, trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
 
 test('HTTP ripristina un backup oltre 35 MiB con allegati paziente e conserva i controlli di accesso', async ({ page, request, baseURL }) => {
     test.skip(process.env.MF085_SYNTHETIC_E2E !== '1', 'Richiede un server sintetico isolato.');
@@ -42,7 +42,8 @@ test('HTTP ripristina un backup oltre 35 MiB con allegati paziente e conserva i 
             expect(db.prepare('SELECT * FROM attachments WHERE id=?').get(attachmentId)).toEqual(before);
         }
         db.prepare('DELETE FROM attachments WHERE id=?').run(attachmentId);
-        const restored = await page.request.post('/api/system/backup-restore', { data: artifact, headers: { ...headers, 'Content-Type': 'application/json', 'x-mediflow-restore-credential': JSON.stringify({ pin: process.env.E2E_PIN || '1234' }) } });
+        const intent = await reviewedRestoreHeaders(page.request, headers, artifact);
+        const restored = await page.request.post('/api/system/backup-restore', { data: artifact, headers: { ...headers, ...intent, 'Content-Type': 'application/json', 'x-mediflow-restore-credential': JSON.stringify({ pin: process.env.E2E_PIN || '1234' }) } });
         expect(restored.status(), await restored.text()).toBe(200);
         expect((await restored.json()).success).toBe(true);
         expect(db.prepare('SELECT * FROM attachments WHERE id=?').get(attachmentId)).toEqual(before);
