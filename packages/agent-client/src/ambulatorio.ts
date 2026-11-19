@@ -152,7 +152,7 @@ export function createAmbulatorioServer(home: string, value: unknown, plugin: st
     });
 
     server.registerTool('mediflow_deposita_visita', {
-        description: 'Deposita il Dossier verificato della visita. La nota e le proposte cliniche attendono la conferma del medico in MediFlow.',
+        description: 'Deposita il Dossier verificato della visita. Nota, trascrizione, PDF e proposte cliniche attendono la conferma del medico in MediFlow.',
         inputSchema: z.object(visit).strict(), outputSchema: depositResult, annotations,
     }, ({ visitId }, { mcpReq }) => deposit(visitId, mcpReq.signal, false));
     server.registerTool('mediflow_riprendi_visita', {

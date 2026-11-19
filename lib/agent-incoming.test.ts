@@ -31,7 +31,7 @@ const { createWebAttachmentInTransaction } = await import('./attachment-web-crea
 const { writeAuditEventInTransaction } = await import('./security/audit.ts');
 const { archiveGenerationForSession } = await import('./security/archive-session-generation.ts');
 const { refreshAgentIncoming, applyReviewedAgentVisits, agentIncomingSnapshot, subscribeAgentIncoming, attemptNativeConfirmation } = await import('./agent-incoming.ts');
-const { agentItemPhase, agentVisitAwaitsReview, inspectAgentVisit, prepareAgentApplication } = await import('./agent-visit-review.ts');
+const { agentVisitAwaitsReview, inspectAgentVisit, prepareAgentApplication } = await import('./agent-visit-review.ts');
 
 const database = dbServer.$client, actor = fixture.session.userId, cf = 'RSSMRA80A01H501U';
 const generation = archiveGenerationForSession(fixture.session)!;
@@ -116,7 +116,7 @@ async function cloudCassette() {
     ]);
     return { ...cassette, pdfs };
 }
-const readPdf = async () => 'Paziente CF ' + cf + '\n' + quote;
+const readPdf = async () => ({ text: 'Paziente CF ' + cf + '\n' + quote, beyondText: false });
 const visitApplied = (visitId: string) => database.prepare("SELECT * FROM audit_events WHERE event_type='agent.visit.applied' AND subject_ref=? ORDER BY rowid")
     .all(visitId) as { event_id: string; redacted_metadata: string }[];
 const added = (after: unknown[][], before: unknown[][]) => after.slice(0, clinicalTables).map((rows, index) => rows.length - before[index]!.length);
@@ -150,7 +150,8 @@ test('J5a: «Applica la visita» applies a cloud cassette without egress whole, 
     assert.deepEqual(snapshot(), after);
 });
 
-const contentReadPdf = async (bytes: Uint8Array) => Buffer.from(bytes).toString('utf8');
+const beyondTextMarker = 'SYNTHETIC_IMAGE_LAYER';
+const contentReadPdf = async (bytes: Uint8Array) => { const text = Buffer.from(bytes).toString('utf8'); return { text, beyondText: text.includes(beyondTextMarker) }; };
 const phrase = 'Allergia grave a penicillina sintetica';
 const dictation = 'Visita sintetica di controllo pressorio. Riferisce cefalea serale. Pressione 135 su 85. Ricontrollo tra tre mesi.';
 const soap = ['S: Controllo pressorio sintetico, riferisce cefalea serale.', 'O: PA 135/85, prosegue terapia anti-infiammatorio al bisogno.',
@@ -179,62 +180,58 @@ const itemFlags = (visitId: string) => Object.fromEntries((database.prepare("SEL
     .all(visitId) as { subject_ref: string; redacted_metadata: string }[]).map(row => [row.subject_ref, JSON.parse(row.redacted_metadata).flags]));
 const shownVisit = (visitId: string) => agentIncomingSnapshot().visits.find(review => review.visit.cassette.id === visitId);
 
-test('K1 K3 K6: the automatic pass files only dictation and original PDF; the model note and its PDF wait for «Applica la visita»', async () => {
+const textHash = (value: string) => createHash('sha256').update(value).digest('hex');
+const pending = (review: NonNullable<ReturnType<typeof shownVisit>>) => review.visit.items.filter(item => !review.appliedItemIds.includes(item.id)).map(item => item.id).sort();
+
+test('L1 L6: nothing the agent deposits enters before the doctor’s gesture; «Applica la visita» files note, dictation and every PDF in one review', async () => {
     posts.length = 0;
     const f = await modelNoteVisit(), before = snapshot(), withPhrase = await diaryWithPhrase();
     assert.ok(!dictation.toLowerCase().includes(phrase.toLowerCase()));
     await refreshAgentIncoming(db.getSessionReadSignal(), contentReadPdf);
-    assert.deepEqual(posts.map(body => body.phase), ['automatic']);
-    assert.deepEqual((posts[0]!.items as { id: string }[]).map(item => item.id).sort(), [f.transcriptionId, f.originalId].sort());
-    const automatic = snapshot();
-    assert.deepEqual(added(automatic, before), [1, 1, 0]);
-    assert.ok(attachmentIds().includes(f.originalId));
-    assert.ok(!attachmentIds().includes(f.notePdfId));
-    assert.ok(!(await diary()).some(entry => entry.id === f.noteId));
-    assert.deepEqual(await diaryWithPhrase(), withPhrase);
-    assert.deepEqual(itemFlags(f.visitId), { [f.transcriptionId]: ['automatic'], [f.originalId]: ['automatic'] });
-    const [automaticEvent] = visitApplied(f.visitId);
-    assert.deepEqual(JSON.parse(automaticEvent!.redacted_metadata).flags, ['automatic']);
-    assert.equal(JSON.parse(automaticEvent!.redacted_metadata).counts, 2);
-
+    assert.equal(posts.length, 0);
+    assert.deepEqual(snapshot(), before);
     const shown = shownVisit(f.visitId);
     assert.ok(shown && agentVisitAwaitsReview(shown));
-    assert.deepEqual(shown.noteDocuments.map(document => [document.id, document.noteId, document.hash]), [[f.notePdfId, f.noteId, pdfHash(f.notePdf)]]);
-    const pending = shown.visit.items.filter(item => !shown.appliedItemIds.includes(item.id));
-    assert.deepEqual(pending.map(item => item.id).sort(), [f.noteId, f.notePdfId].sort());
-    assert.ok(pending.every(item => agentItemPhase(shown, item) === 'review'));
-    assert.equal(pending.find(item => item.id === f.noteId)!.value.text, soap);
+    assert.deepEqual(pending(shown), [...f.ids].sort());
+    assert.deepEqual(shown.documents, []);
+    assert.equal(shown.visit.items.find(item => item.id === f.noteId)!.value.text, soap);
 
     await applyReviewedAgentVisits([f.visitId]);
     assert.equal(agentIncomingSnapshot().error, null);
-    assert.deepEqual(posts.map(body => body.phase), ['automatic', 'review']);
-    assert.deepEqual((posts[1]!.items as { id: string }[]).map(item => item.id).sort(), [f.noteId, f.notePdfId].sort());
+    assert.deepEqual(posts.map(body => body.phase), ['review']);
+    assert.deepEqual((posts[0]!.items as { id: string }[]).map(item => item.id).sort(), [...f.ids].sort());
     const after = snapshot();
-    assert.deepEqual(added(after, automatic), [1, 1, 0]);
-    assert.ok(attachmentIds().includes(f.notePdfId));
+    assert.deepEqual(added(after, before), [2, 2, 0]);
+    assert.ok([f.originalId, f.notePdfId].every(id => attachmentIds().includes(id)));
     assert.equal((await diary()).find(entry => entry.id === f.noteId)?.text, soap);
+    assert.equal((await diary()).find(entry => entry.id === f.transcriptionId)?.text, dictation);
     assert.deepEqual(await diaryWithPhrase(), [...withPhrase, f.noteId]);
-    assert.deepEqual(itemFlags(f.visitId), { [f.transcriptionId]: ['automatic'], [f.originalId]: ['automatic'], [f.noteId]: ['review'], [f.notePdfId]: ['review'] });
+    assert.deepEqual(itemFlags(f.visitId), Object.fromEntries(f.ids.map(id => [id, ['review']])));
     const events = visitApplied(f.visitId);
-    assert.deepEqual(events.map(event => JSON.parse(event.redacted_metadata).flags), [['automatic'], ['review', 'cassette_complete']]);
-    assert.equal(applyAgentVisit(new Request('http://127.0.0.1' + inbox, { method: 'POST' }), fixture.session, posts[1]).eventId, events[1]!.event_id);
+    assert.deepEqual(events.map(event => JSON.parse(event.redacted_metadata).flags), [['review', 'cassette_complete']]);
+    assert.equal(applyAgentVisit(new Request('http://127.0.0.1' + inbox, { method: 'POST' }), fixture.session, posts[0]).eventId, events[0]!.event_id);
     assert.deepEqual(snapshot(), after);
     await applyReviewedAgentVisits([f.visitId]);
-    assert.equal(posts.length, 2);
+    assert.equal(posts.length, 1);
     assert.deepEqual(snapshot(), after);
 });
 
-test('K2: the PDF that reproduces the note is recognised by its text, not by its name, and an original keeps the automatic pass', async () => {
+test('L2: dictation and PDFs wait for the doctor whatever their names, also in a cassette without a note', async () => {
     posts.length = 0;
-    const f = await modelNoteVisit('nota-visita.pdf', 'referto-allegato.pdf'), before = snapshot();
+    const pdfs = ['primo', 'secondo'].map(name => syntheticPdf('Paziente CF ' + cf + '\nReferto sintetico ' + name));
+    const f = await depositCassette('local', false, [{ kind: 'transcription', value: { text: dictation } },
+        { kind: 'pdf', value: { name: 'referto-originale.pdf' }, pdf: pdfs[0] }, { kind: 'pdf', value: { name: 'trascrizione-visita.pdf' }, pdf: pdfs[1] }]);
+    const before = snapshot();
     await refreshAgentIncoming(db.getSessionReadSignal(), contentReadPdf);
-    assert.deepEqual((posts[0]!.items as { id: string }[]).map(item => item.id).sort(), [f.transcriptionId, f.originalId].sort());
-    assert.deepEqual(added(snapshot(), before), [1, 1, 0]);
-    assert.ok(attachmentIds().includes(f.originalId));
+    assert.equal(posts.length, 0);
+    assert.deepEqual(snapshot(), before);
     const shown = shownVisit(f.visitId);
-    assert.deepEqual(shown?.noteDocuments.map(document => [document.id, document.name]), [[f.notePdfId, 'referto-allegato.pdf']]);
-    assert.equal(agentItemPhase(shown!, { id: f.originalId, kind: 'pdf' }), 'automatic');
-    assert.equal(agentItemPhase(shown!, { id: f.notePdfId, kind: 'pdf' }), 'review');
+    assert.ok(shown && agentVisitAwaitsReview(shown));
+    assert.deepEqual(pending(shown), [...f.ids].sort());
+    await applyReviewedAgentVisits([f.visitId]);
+    assert.deepEqual(posts.map(body => body.phase), ['review']);
+    assert.deepEqual(added(snapshot(), before), [1, 2, 0]);
+    assert.ok(!shownVisit(f.visitId));
 });
 
 async function openPresentation(reference: string, privateKey: CryptoKey, sealed: string) {
@@ -249,39 +246,58 @@ async function openPresentation(reference: string, privateKey: CryptoKey, sealed
         additionalData: encode.encode(reference) }, key, Buffer.from(envelope.ciphertext, 'base64'))));
 }
 
-test('K3 K4: a cassette with only note, dictation and PDFs is confirmable natively, with the whole note shown and bound to the plan', async () => {
+type ShownPlan = { reference: string; plan: unknown; presentation: string };
+async function withNativeConfirmation(run: (agreement: CryptoKeyPair, shown: ShownPlan[], actions: string[]) => Promise<void>) {
     const environment = ['MEDIFLOW_VISIT_CONFIRMATION_HELPER', 'MEDIFLOW_VISIT_CONFIRMATION_HELPER_SHA256', 'MEDIFLOW_VISIT_CONFIRMATION_HELPER_CDHASH'] as const;
     const previous = environment.map(name => process.env[name]), platform = Object.getOwnPropertyDescriptor(process, 'platform')!;
     Object.assign(process.env, { [environment[0]]: '/synthetic/visit-confirmation-helper', [environment[1]]: 'a'.repeat(64), [environment[2]]: 'b'.repeat(40) });
     Object.defineProperty(process, 'platform', { value: 'darwin' });
     const agreement = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
     const agreementPublicKey = agentBase64(new Uint8Array(await crypto.subtle.exportKey('raw', agreement.publicKey)));
-    const shownPlans: { reference: string; plan: unknown; presentation: string }[] = [];
+    const shown: ShownPlan[] = [], actions: string[] = [];
     try {
-        posts.length = 0;
-        const f = await modelNoteVisit();
-        await refreshAgentIncoming(db.getSessionReadSignal(), contentReadPdf);
-        assert.deepEqual(posts.map(body => body.phase), ['automatic']);
-        assert.equal(startVisitConfirmation(f.principal, f.visitId).status, 'waiting');
         confirmationRoute = init => {
             if (init?.method !== 'POST') return Response.json(nextVisitConfirmation(fixture.session));
             const body = JSON.parse(String(init.body));
+            actions.push(body.action);
             if (body.action === 'prepare') return Response.json({ agreementPublicKey });
-            if (body.action === 'show') shownPlans.push(body);
+            if (body.action === 'show') shown.push(body);
             return Response.json({});
         };
+        await run(agreement, shown, actions);
+    } finally {
+        confirmationRoute = null;
+        (globalThis as { mediFlowVisitConfirmations?: Map<string, unknown> }).mediFlowVisitConfirmations?.clear();
+        Object.defineProperty(process, 'platform', platform);
+        environment.forEach((name, index) => { if (previous[index] === undefined) delete process.env[name]; else process.env[name] = previous[index]; });
+    }
+}
+
+test('L3 L4: the native confirmation shows note, dictation and the text of every PDF whole, and binds them to the plan', async () => {
+    await withNativeConfirmation(async (agreement, shownPlans) => {
+        posts.length = 0;
+        const f = await modelNoteVisit();
+        await refreshAgentIncoming(db.getSessionReadSignal(), contentReadPdf);
+        assert.equal(posts.length, 0);
+        assert.equal(startVisitConfirmation(f.principal, f.visitId).status, 'waiting');
         await attemptNativeConfirmation(db.getSessionReadSignal(), contentReadPdf);
         assert.equal(shownPlans.length, 1);
-        const [{ reference, presentation }] = shownPlans as [typeof shownPlans[number]];
+        const [{ reference, presentation }] = shownPlans as [ShownPlan];
         const plan = agentApplicationSchema.parse(shownPlans[0]!.plan);
         assert.equal(plan.phase, 'review');
-        assert.deepEqual(plan.items.map(item => item.id).sort(), [f.noteId, f.notePdfId].sort());
+        assert.deepEqual(plan.items.map(item => item.id).sort(), [...f.ids].sort());
         const note = plan.items.find(item => item.id === f.noteId);
         assert.ok(note?.kind === 'note');
         assert.equal(await db.openLocalDraft(note.values.content), soap);
         assert.ok(soap.length > 600);
-        assert.deepEqual((await openPresentation(reference, agreement.privateKey, presentation)).proposals, [{ title: 'Nota', fields: [{ label: 'Testo', value: soap }],
-            current: 'Non presente', sourceName: 'nota-visita.pdf', sourceQuote: 'Scritta dal modello', sourceHash: pdfHash(f.notePdf) }]);
+        const pdfText = (pdf: Buffer) => pdf.toString('utf8').trim();
+        assert.deepEqual((await openPresentation(reference, agreement.privateKey, presentation)).proposals, [
+            { title: 'Nota', fields: [{ label: 'Testo', value: soap }], current: 'Non presente', sourceName: 'Cassetta della visita', sourceQuote: 'Scritta dal modello', sourceHash: textHash(soap) },
+            { title: 'Trascrizione', fields: [{ label: 'Testo', value: dictation }], current: 'Non presente', sourceName: 'Cassetta della visita', sourceQuote: 'Depositata dall’agente', sourceHash: textHash(dictation) },
+            { title: 'PDF', fields: [{ label: 'Testo', value: pdfText(f.original) }], current: 'Non presente', sourceName: 'referto.pdf', sourceQuote: 'Depositato dall’agente', sourceHash: pdfHash(f.original) },
+            { title: 'PDF', fields: [{ label: 'Testo', value: pdfText(f.notePdf) }], current: 'Non presente', sourceName: 'nota-visita.pdf', sourceQuote: 'Depositato dall’agente', sourceHash: pdfHash(f.notePdf) },
+        ]);
+        assert.ok(pdfText(f.original).includes(phrase.toLowerCase()));
 
         const keys = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
         const jwk = keys.publicKey.export({ format: 'jwk' });
@@ -298,18 +314,41 @@ test('K3 K4: a cassette with only note, dictation and PDFs is confirmable native
         const shortened = { ...plan, items: await Promise.all(plan.items.map(async item => item.kind === 'note'
             ? { ...item, values: { ...item.values, content: await db.sealLocalDraft(soap.slice(0, 600)) } } : item)) };
         assert.throws(() => applyConfirmedAgentVisit(new Request('http://127.0.0.1' + inbox, { method: 'POST' }), fixture.session, shortened, grant), /AGENT_APPLICATION_DENIED/);
+        const withoutPdf = { ...plan, items: plan.items.filter(item => item.id !== f.originalId) };
+        assert.throws(() => applyConfirmedAgentVisit(new Request('http://127.0.0.1' + inbox, { method: 'POST' }), fixture.session, withoutPdf, grant), /AGENT_APPLICATION_DENIED/);
         assert.deepEqual(snapshot(), before);
         const receipt = applyConfirmedAgentVisit(new Request('http://127.0.0.1' + inbox, { method: 'POST' }), fixture.session, plan, grant);
-        assert.deepEqual(added(snapshot(), before), [1, 1, 0]);
+        assert.deepEqual(added(snapshot(), before), [2, 2, 0]);
         assert.equal((await diary()).find(entry => entry.id === f.noteId)?.text, soap);
         const flags: string[] = JSON.parse((database.prepare('SELECT redacted_metadata FROM audit_events WHERE event_id=?').pluck().get(receipt.eventId) as string)).flags;
         assert.ok(['review', 'confirmation:codex-macos', 'cassette_complete'].every(flag => flags.includes(flag)));
         assert.deepEqual(agentAppliedItemIds(f.visitId).sort(), [...f.ids].sort());
-    } finally {
-        confirmationRoute = null;
-        Object.defineProperty(process, 'platform', platform);
-        environment.forEach((name, index) => { if (previous[index] === undefined) delete process.env[name]; else process.env[name] = previous[index]; });
-    }
+    });
+});
+
+test('L4: what the native window cannot show whole goes back to «In arrivo» untouched', async () => {
+    const long = 'Diario pressorio sintetico. '.repeat(700);
+    const cases = [
+        { name: 'a PDF that paints beyond its text', items: [{ kind: 'pdf' as const, value: { name: 'referto-con-immagine.pdf' }, pdf: syntheticPdf('Paziente CF ' + cf + '\n' + beyondTextMarker) }] },
+        { name: 'a dictation longer than a native field', items: [{ kind: 'transcription' as const, value: { text: long } }] },
+    ];
+    assert.ok(new TextEncoder().encode(long).length > 16_384);
+    for (const { name, items } of cases) await withNativeConfirmation(async (_agreement, shownPlans, actions) => {
+        posts.length = 0;
+        const f = await depositCassette('local', false, [{ kind: 'pdf', value: { name: 'referto.pdf' }, pdf: syntheticPdf('Paziente CF ' + cf + '\nReferto sintetico') }, ...items]);
+        await refreshAgentIncoming(db.getSessionReadSignal(), contentReadPdf);
+        const before = snapshot();
+        assert.equal(startVisitConfirmation(f.principal, f.visitId).status, 'waiting', name);
+        await attemptNativeConfirmation(db.getSessionReadSignal(), contentReadPdf).catch(() => undefined);
+        assert.equal(shownPlans.length, 0, name);
+        assert.deepEqual(actions, ['prepare', 'dismiss'], name);
+        assert.equal(posts.length, 0, name);
+        assert.deepEqual(snapshot(), before, name);
+        const shown = shownVisit(f.visitId);
+        assert.ok(shown && agentVisitAwaitsReview(shown), name);
+        await applyReviewedAgentVisits([f.visitId]);
+        assert.deepEqual(agentAppliedItemIds(f.visitId).sort(), [...f.ids].sort(), name);
+    });
 });
 
 function legacyAutomaticPass(visitId: string, principal: { agentRef: string; mandateRef: string; modelProvider: 'openai' | 'anthropic' | 'local' }, items: AgentApplicationInput['items']) {
@@ -332,13 +371,13 @@ function legacyAutomaticPass(visitId: string, principal: { agentRef: string; man
     }, { behavior: 'immediate' });
 }
 
-test('K5: a cassette whose note entered under the previous rule keeps it and completes only the pending proposal', async () => {
+test('L5: a cassette whose note, dictation and PDFs entered under the previous rule keeps them and completes only the pending proposal', async () => {
     posts.length = 0;
     const f = await modelNoteVisit(undefined, undefined, [observation]), signal = db.getSessionReadSignal();
     const review = await inspectAgentVisit({ ...readAgentCassette(database, f.visitId, actor)!, appliedItemIds: [] }, [patient()], null, signal, contentReadPdf);
     assert.deepEqual([...review.blockers, ...review.proposalBlockers], []);
-    const automatic = await prepareAgentApplication(review, 'automatic', signal), reviewed = await prepareAgentApplication(review, 'review', signal);
-    legacyAutomaticPass(f.visitId, f.principal, [...automatic!.items, ...reviewed!.items.filter(item => item.kind === 'note' || item.kind === 'pdf')]);
+    const prepared = await prepareAgentApplication(review, signal);
+    legacyAutomaticPass(f.visitId, f.principal, prepared!.items.filter(item => item.kind === 'note' || item.kind === 'transcription' || item.kind === 'pdf'));
     const legacy = snapshot(), legacyNote = (await diary()).find(entry => entry.id === f.noteId);
     assert.equal(legacyNote?.text, soap);
     await refreshAgentIncoming(signal, contentReadPdf);
@@ -351,49 +390,23 @@ test('K5: a cassette whose note entered under the previous rule keeps it and com
     assert.deepEqual((posts[0]!.items as { id: string }[]).map(item => item.id), f.proposalIds);
     const after = snapshot();
     assert.deepEqual(added(after, legacy), [0, 0, 1]);
-    assert.deepEqual(after[0], legacy[0]);
+    assert.deepEqual(after.slice(0, 2), legacy.slice(0, 2));
     assert.deepEqual(agentAppliedItemIds(f.visitId).sort(), [...f.ids].sort());
     assert.deepEqual(visitApplied(f.visitId).map(event => JSON.parse(event.redacted_metadata).flags), [['automatic'], ['review', 'cassette_complete']]);
     assert.equal(applyAgentVisit(new Request('http://127.0.0.1' + inbox, { method: 'POST' }), fixture.session, posts[0]).eventId, visitApplied(f.visitId)[1]!.event_id);
+    assert.throws(() => applyAgentVisit(new Request('http://127.0.0.1' + inbox, { method: 'POST' }), fixture.session, { ...prepared, phase: 'automatic' }), /AGENT_APPLICATION_DENIED/);
     assert.deepEqual(snapshot(), after);
 });
 
-test('K2: a note that no deposited PDF reproduces sends every PDF of the cassette to the doctor, together with the note', async () => {
-    posts.length = 0;
-    const lines = soap.split('\n'), paged = syntheticPdf('Codice fiscale paziente: ' + cf + '\n' + lines.slice(0, 2).join('\n') + '\nPagina 1 di 2\n' + lines.slice(2).join('\n'));
-    const f = await depositCassette('local', false, [
-        { kind: 'note', value: { text: soap, date: '2026-11-19', quote: soap.slice(0, 600) } },
-        { kind: 'transcription', value: { text: dictation } },
-        { kind: 'pdf', value: { name: 'nota-visita.pdf' }, pdf: paged },
-    ]);
-    const [noteId, transcriptionId, pdfId] = f.ids as [string, string, string], before = snapshot(), withPhrase = await diaryWithPhrase();
-    await refreshAgentIncoming(db.getSessionReadSignal(), contentReadPdf);
-    assert.deepEqual(posts.map(body => body.phase), ['automatic']);
-    assert.deepEqual((posts[0]!.items as { id: string }[]).map(item => item.id), [transcriptionId]);
-    assert.deepEqual(added(snapshot(), before), [1, 0, 0]);
-    assert.ok(!attachmentIds().includes(pdfId));
-    const shown = shownVisit(f.visitId);
-    assert.ok(shown && agentVisitAwaitsReview(shown));
-    assert.equal(shown.notesReproduced, false);
-    assert.equal(agentItemPhase(shown, { id: pdfId, kind: 'pdf' }), 'review');
-    assert.deepEqual(await diaryWithPhrase(), withPhrase);
-    await applyReviewedAgentVisits([f.visitId]);
-    assert.equal(agentIncomingSnapshot().error, null);
-    assert.deepEqual((posts[1]!.items as { id: string }[]).map(item => item.id).sort(), [noteId, pdfId].sort());
-    assert.ok(attachmentIds().includes(pdfId));
-    assert.deepEqual(await diaryWithPhrase(), [...withPhrase, noteId]);
-    assert.deepEqual(visitApplied(f.visitId).map(event => JSON.parse(event.redacted_metadata).flags), [['automatic'], ['review', 'cassette_complete']]);
-});
-
-test('K2: a note without any PDF, or a PDF whose text cannot be read, lets nothing of the cassette in automatically', async () => {
+test('L6: a note without any PDF, or a PDF whose text cannot be read, blocks the cassette and writes nothing', async () => {
     posts.length = 0;
     const unreadable = syntheticPdf('SYNTHETIC_UNREADABLE_PDF');
-    const readPdf = async (bytes: Uint8Array) => { const value = await contentReadPdf(bytes); if (value.includes('SYNTHETIC_UNREADABLE_PDF')) throw new Error('SYNTHETIC_PDF_TEXT_UNAVAILABLE'); return value; };
+    const readPdf = async (bytes: Uint8Array) => { const value = await contentReadPdf(bytes); if (value.text.includes('SYNTHETIC_UNREADABLE_PDF')) throw new Error('SYNTHETIC_PDF_TEXT_UNAVAILABLE'); return value; };
     const withoutPdf = await depositCassette('local', false, [{ kind: 'note', value: { text: soap, quote: soap.slice(0, 600) } }, { kind: 'transcription', value: { text: dictation } }]);
     const withUnreadable = await modelNoteVisit(undefined, undefined, [{ kind: 'pdf', value: { name: 'scansione.pdf' }, pdf: unreadable }]);
     const before = snapshot();
     await refreshAgentIncoming(db.getSessionReadSignal(), readPdf);
-    assert.deepEqual(posts, []);
+    assert.equal(posts.length, 0);
     assert.deepEqual(snapshot(), before);
     for (const visitId of [withoutPdf.visitId, withUnreadable.visitId]) {
         const shown = shownVisit(visitId);
@@ -401,15 +414,4 @@ test('K2: a note without any PDF, or a PDF whose text cannot be read, lets nothi
         assert.equal(agentVisitAwaitsReview(shown!), false);
         assert.deepEqual(agentAppliedItemIds(visitId), []);
     }
-});
-
-test('K2: a cassette without a note keeps every original PDF in the automatic pass', async () => {
-    posts.length = 0;
-    const pdfs = ['primo', 'secondo'].map(name => syntheticPdf('Paziente CF ' + cf + '\nReferto sintetico ' + name));
-    const f = await depositCassette('local', false, [{ kind: 'transcription', value: { text: dictation } },
-        ...pdfs.map((pdf, index) => ({ kind: 'pdf' as const, value: { name: 'referto-' + index + '.pdf' }, pdf }))]);
-    await refreshAgentIncoming(db.getSessionReadSignal(), contentReadPdf);
-    assert.deepEqual(posts.map(body => body.phase), ['automatic']);
-    assert.deepEqual((posts[0]!.items as { id: string }[]).map(item => item.id).sort(), [...f.ids].sort());
-    assert.ok(!shownVisit(f.visitId));
 });

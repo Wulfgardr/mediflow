@@ -103,8 +103,8 @@ Alla chiusura della cassetta la scheda MediFlow sbloccata applica senza un
 altro gesto soltanto nota di visita, trascrizione e PDF con identità
 coincidente e confermata. Se la scheda è bloccata, lo fa al primo sblocco
 successivo. Il medico ha autorizzato questo comportamento nel mandato.
-L'[ADR 0195](0195-nota-del-modello-dopo-il-gesto-del-medico.md) toglie da
-questo passaggio la nota scritta dal modello e il PDF che la riproduce.
+L'[ADR 0195](0195-materiale-dell-agente-dopo-il-gesto-del-medico.md) sostituisce questo passaggio: nessun
+elemento della cassetta entra più senza il gesto del medico.
 
 Terapie, prestazioni, diagnosi, esenzioni e osservazioni attendono un gesto
 nella vista «In arrivo», che mostra paziente, fonti, differenze e dubbi.
