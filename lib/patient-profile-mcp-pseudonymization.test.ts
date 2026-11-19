@@ -193,6 +193,7 @@ test('M4: one value keeps one placeholder for the whole handle and no correspond
     reset(); let selected = await select();
     const port = await acquirePatientProfileQueryHostPort('profile', Date.now() + 60_000, 'pseudonymized'); assert.ok(port);
     const first = await port.executeProfileQuery(open(selected.currentness.selectionEpoch));
+    assert.equal(nonces(first).size, 1); assert.match(String((first.profile as ProfileFields).firstName), placeholder('PAZ'));
     const again = await port.executeProfileQuery(reread(first));
     assert.deepEqual(again.profile, first.profile);
     assert.deepEqual((await port.executeProfileQuery(reread(first, 'notes'))).profile, { notes: first.profile.notes });
@@ -204,6 +205,7 @@ test('M4: one value keeps one placeholder for the whole handle and no correspond
     port.dispose();
     const replacement = await acquirePatientProfileQueryHostPort('profile', Date.now() + 60_000, 'pseudonymized'); assert.ok(replacement);
     const fresh = await replacement.executeProfileQuery(open(selected.currentness.selectionEpoch));
+    assert.equal(nonces(fresh).size, 1);
     assert.equal([...nonces(first)].some(nonce => nonces(fresh).has(nonce)), false);
     const clock = t.mock.method(Date, 'now', () => fresh.currentness.expiresAt + 1);
     await assert.rejects(replacement.executeProfileQuery(reread(fresh)), { code: 'handle_expired' });
