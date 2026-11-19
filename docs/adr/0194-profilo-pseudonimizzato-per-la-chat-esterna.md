@@ -136,6 +136,9 @@ riservata dei segnaposto fa fallire la lettura con `query_unavailable`.
   la lettura.
 - Un valore del caregiver molto corto o generico (una parola comune) viene
   sostituito ovunque compaia nei testi liberi.
+- Un valore d'identità oltre i 256 caratteri, il limite dei valori noti del
+  rimescolatore, fa rifiutare la lettura con `query_unavailable`: non si può
+  garantire che non esca dai testi liberi.
 
 ## Fuori da questa decisione
 

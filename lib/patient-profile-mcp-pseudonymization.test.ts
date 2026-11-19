@@ -191,6 +191,23 @@ test('M1: a free text longer than one preparation releases no identity piece whe
     } finally { unbroken.close(); }
 });
 
+test('M1: an identity value too long for the redactor refuses the read instead of passing through the free text', () => {
+    const base = { ...SENTINEL, birthDate: SENTINEL.birthDate.toISOString(), isAdi: null, isArchived: null } as ProfileFields;
+    const caregiver = 'Ottavio Brambillasca, figlio, ' + 'reperibile la sera presso la sentinella sintetica, '.repeat(6);
+    assert.ok(caregiver.trim().length > 256);
+    for (const field of ['caregiver', 'address'] as const) {
+        const source = { ...base, [field]: caregiver, notes: 'Riferimento: ' + caregiver };
+        for (const projection of ['profile', 'notes'] as const) {
+            const pseudonymizer = createProfilePseudonymizer();
+            try { assert.throws(() => pseudonymizer.project(source, projection), { code: 'query_unavailable' }); }
+            finally { pseudonymizer.close(); }
+        }
+    }
+    const fitting = createProfilePseudonymizer();
+    try { assert.match(String((fitting.project({ ...base, caregiver: caregiver.slice(0, 250), notes: caregiver.slice(0, 250) }, 'notes') as { notes: string }).notes), placeholder('PER')); }
+    finally { fitting.close(); }
+});
+
 test('M2: the substitution happens in the Web owner, so the IPC frame toward the Supervisor carries no identity value', async () => {
     reset(); const selected = await select();
     const port = await acquirePatientProfileQueryHostPort('profile', Date.now() + 60_000, 'pseudonymized'); assert.ok(port);

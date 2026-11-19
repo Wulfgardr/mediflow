@@ -30,7 +30,8 @@ function birthDay(value: string): string {
 function knownValues(values: readonly (string | null)[]): string[] {
     return [...new Set(values.flatMap(value => {
         const trimmed = value?.trim();
-        return trimmed && trimmed.length <= KNOWN_VALUE_LIMIT ? [trimmed] : [];
+        if (trimmed && trimmed.length > KNOWN_VALUE_LIMIT) unavailable();
+        return trimmed ? [trimmed] : [];
     }))];
 }
 
