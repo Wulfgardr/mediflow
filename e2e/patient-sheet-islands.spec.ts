@@ -149,6 +149,11 @@ test('isole del riepilogo: ritorno con variazioni, dettaglio, fonte e due temi',
     const spironolattone = changes.locator('details').filter({ hasText: 'Spironolattone 25 mg cpr' });
     await spironolattone.locator('summary').click();
     await expect(spironolattone).toContainText('Stato attuale: Sospesa');
+    const state = spironolattone.locator('dt').filter({ hasText: 'Stato attuale' }).locator('..').locator('dd');
+    await expect(state).toHaveText('Sospesa');
+    await spironolattone.getByRole('button', { name: 'Altri dettagli' }).click();
+    await expect(spironolattone.locator('dt').filter({ hasText: 'Posologia registrata' }).locator('..')).toContainText('1 cp al mattino');
+    await spironolattone.getByRole('button', { name: 'Meno dettagli' }).click();
     await expect(spironolattone).toContainText('Valore precedente non conservato.');
     await expect(spironolattone).toContainText('Scompenso cardiaco');
     const potassium = changes.locator('details').filter({ hasText: 'Potassio' });

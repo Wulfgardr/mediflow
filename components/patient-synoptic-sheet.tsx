@@ -33,7 +33,7 @@ export interface PatientSynopticSheetProps {
     checkups: QuadroRead<Checkup>;
 }
 
-function Section<T>({ name, read, count, empty, children, icon: Icon, action, id }: {
+function Section<T>({ name, read, count, empty, children, icon: Icon, action, shortName, id }: {
     name: string;
     read: QuadroRead<T>;
     count: string;
@@ -41,13 +41,17 @@ function Section<T>({ name, read, count, empty, children, icon: Icon, action, id
     children: ReactNode;
     icon?: LucideIcon;
     action?: ReactNode;
+    shortName?: string;
     id?: string;
 }) {
     const failed = read.error !== null && read.error !== undefined;
+    const space = count.indexOf(' ');
+    const compactCount = Icon && space > 0 ? <>{count.slice(0, space)}<span className={reading.visuallyHidden}>{count.slice(space)}</span></> : count;
+    const heading = Icon && shortName ? <>{shortName}<span className={reading.visuallyHidden}>{name.slice(shortName.length)}</span></> : name;
     return <section id={id} aria-label={name}>
         <header className={reading.islandHeader}>
             {Icon ? <span className={reading.islandIcon}><Icon size={16} aria-hidden="true" /></span> : null}
-            <InkSectionHeading count={!read.loading && !failed && read.data !== undefined ? count : undefined}>{name}</InkSectionHeading>
+            <InkSectionHeading count={!read.loading && !failed && read.data !== undefined ? compactCount : undefined}>{heading}</InkSectionHeading>
             {action}
         </header>
         {failed ? <p className={register.empty} role="alert">Impossibile leggere {name.toLocaleLowerCase('it-IT')}.</p>
@@ -94,7 +98,7 @@ export function PatientSynopticSheet({ clinicalSupport, notesContent, problems, 
         </Section>
     </>;
     const context = <>
-        <Section name="Parametri recenti" icon={overview ? Activity : undefined} action={overview && !composer ? <a href="#parametri" className={reading.islandAction}>Andamento</a> : undefined} read={{ ...measures, data: measures.data === undefined ? undefined : measureRows }} count={formatCountLabel(measureRows.length, 'parametro', 'parametri')} empty="Nessuna misura registrata.">
+        <Section name="Parametri recenti" shortName="Parametri" icon={overview ? Activity : undefined} action={overview && !composer ? <a href="#parametri" className={reading.islandAction}>Andamento</a> : undefined} read={{ ...measures, data: measures.data === undefined ? undefined : measureRows }} count={formatCountLabel(measureRows.length, 'parametro', 'parametri')} empty="Nessuna misura registrata.">
             <table role="table" className={`${register.table} ${reading.measures}`} aria-label="Parametri recenti">
                 <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Nome</th><th role="columnheader" scope="col" className={reading.value}>Valore</th><th role="columnheader" scope="col">Data</th><th role="columnheader" scope="col" className={secondary}>Variazione</th></tr></thead>
                 <tbody role="rowgroup">{measureRows.map(measure => {
