@@ -218,8 +218,8 @@ export const entryRevisions = sqliteTable('entry_revisions', {
     eventId: text('event_id').primaryKey(),
     entryId: text('entry_id').notNull().references(() => entries.id, { onDelete: 'cascade' }),
     version: integer('version').notNull(),
-    title: text('title'),
-    content: text('content'),
+    title: text('title').notNull(),
+    content: text('content').notNull(),
     correctedAt: integer('corrected_at', { mode: 'timestamp' }).notNull(),
     correctedBy: text('corrected_by'),
 }, (table) => [

@@ -5,6 +5,7 @@ import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth
 import { auditContextFromSession, requestIdFromRequest } from '@/lib/security/audit';
 import { parseEntryDeleteInput, prepareEntryUpdate, readEntryJsonObject } from '@/lib/entry-write-input';
 import { updateEntryOperation } from '@/lib/entry-write-operation';
+import { localLegacyRevisionProtection } from '@/lib/diary-revision-legacy-write';
 
 export async function PUT(
     request: Request,
@@ -22,7 +23,8 @@ export async function PUT(
         const prepared = prepareEntryUpdate(parsed.body, 'web');
         if (!prepared.ok) return NextResponse.json({ error: prepared.error }, { status: prepared.status });
         const context = auditContextFromSession(session);
-        const result = updateEntryOperation({ entryId: id, expectedVersion: prepared.expectedVersion,
+        const legacyRevisionProtection = localLegacyRevisionProtection(request, parsed.body.legacyRevisionProtection);
+        const result = updateEntryOperation({ entryId: id, expectedVersion: prepared.expectedVersion, legacyRevisionProtection,
             values: prepared.values, changedFields: prepared.changedFields, mode: 'web', audit: {
                 archiveGeneration: context.archiveGeneration, actorType: context.actorType, actorRef: context.actorRef, sourceSurface: context.sourceSurface,
                 requestId: requestIdFromRequest(request), flags: [`auth:${context.authContext}`],

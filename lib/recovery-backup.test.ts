@@ -1,3 +1,5 @@
+import { openLegacyDiaryRevision, prepareLegacyRevisionProtection } from './diary-revision-envelope';
+import { sealPreviousDiaryText } from './diary-revision-legacy-write';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import fs from 'node:fs';
@@ -531,6 +533,9 @@ for (const version of [11, 12, 13, 14, 15, 16]) test(`encrypted v${version} pred
         const file = path.join(f.root, `canonical${version}.db`);
         fs.writeFileSync(file, f.snapshot);
         const old = new Database(file);
+        if (version === 16) old.prepare(
+            "INSERT INTO entries (id,patient_id,type,date,title,content) VALUES ('synthetic-v16-diary','synthetic-patient','note',1783000000,?,?)",
+        ).run('Titolo legacy sintetico', 'Testo legacy sintetico ancora leggibile.');
         old.exec('DROP TABLE entry_revisions');
         if (version < 16) old.exec('DROP TABLE agent_unlock_grants; DROP TABLE agent_registrations');
         if (version < 15) old.exec('DROP TABLE agent_cassettes');
@@ -564,13 +569,17 @@ test('encrypted recovery preserves diary versions and clinical links, including 
             return `ENC:${iv}:${data}`;
         };
         const texts = ['Prima versione sintetica', 'Seconda versione sintetica', 'Versione sintetica attuale'];
+        const binding = { patientId: patient, entryId: 'synthetic-history-entry', version: 1 };
+        const legacy = sealPreviousDiaryText(binding, { title: 'Titolo sintetico', content: texts[0] },
+            await prepareLegacyRevisionProtection(binding, f.key))!;
         db.prepare("INSERT INTO entries (id,patient_id,type,date,content,version) VALUES ('synthetic-history-entry',?,'note',1783000000,?,3)").run(patient, await sealed(texts[2]));
         for (const version of [1, 2]) {
             const event = `synthetic-history-event-${version}`;
             db.prepare("INSERT INTO audit_events(event_id,event_type,occurred_at,outcome,actor_type,actor_ref,subject_type,subject_ref,source_surface,redacted_metadata) VALUES (?,'entry.updated',?,'success','user',?,'entry','synthetic-history-entry','web',?)")
                 .run(event, 1783000000 + version, actor, JSON.stringify({ resourceVersion: version + 1 }));
-            db.prepare("INSERT INTO entry_revisions(event_id,entry_id,version,content,corrected_at,corrected_by) VALUES (?,'synthetic-history-entry',?,?,?,'Operatore sintetico')")
-                .run(event, version, await sealed(texts[version - 1]), 1783000000 + version);
+            db.prepare("INSERT INTO entry_revisions(event_id,entry_id,version,title,content,corrected_at,corrected_by) VALUES (?,'synthetic-history-entry',?,?,?,?,'Operatore sintetico')")
+                .run(event, version, version === 1 ? legacy.title : await sealed('Titolo sintetico'),
+                    version === 1 ? legacy.content : await sealed(texts[version - 1]), 1783000000 + version);
         }
         db.prepare("INSERT INTO patients (id,first_name,last_name,tax_code) VALUES (?,'Altro','Sintetico','SYNTHETIC-OTHER')").run(other);
         db.prepare("INSERT INTO service_prescriptions (id,patient_id,category,service_name,prescribed_at) VALUES ('synthetic-prescription',?,'laboratory','Prestazione sintetica',1783000000)").run(patient);
@@ -592,6 +601,7 @@ test('encrypted recovery preserves diary versions and clinical links, including 
                 assert.deepEqual(rows.map(row => row.version), [1, 2, 3]);
                 const key = (await openRecoveryWrapping(f.kit.wrappedMasterKey, f.kit.salt, f.recoveryKey)).masterKey;
                 assert.deepEqual(await Promise.all(rows.map(row => {
+                    if (row.version === 1) return openLegacyDiaryRevision(row.content, binding, 'content', key);
                     const [, iv, data] = row.content.split(':');
                     return decryptData(data, iv, key);
                 })), texts);

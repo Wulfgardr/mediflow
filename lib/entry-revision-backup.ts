@@ -1,5 +1,6 @@
 import { isSealedAttachmentValue } from './attachment-payload.ts';
 import { snapshotBackupAudit } from './backup-audit.ts';
+import { isDiaryRevisionEnvelope } from './diary-revision-envelope.ts';
 
 type Row = Record<string, unknown>;
 const fields = ['eventId', 'entryId', 'version', 'title', 'content', 'correctedAt', 'correctedBy'];
@@ -15,8 +16,8 @@ export function assertEntryRevisionBackup(revisions: Row[], entries: Row[], audi
             || typeof row.eventId !== 'string' || typeof row.entryId !== 'string'
             || typeof row.version !== 'number' || !Number.isSafeInteger(row.version) || row.version < 1
             || (row.correctedBy !== null && typeof row.correctedBy !== 'string')
-            || (row.title !== null && !isSealedAttachmentValue(row.title))
-            || (row.content !== null && !isSealedAttachmentValue(row.content))) throw new Error('Invalid diary revision');
+            || (!isSealedAttachmentValue(row.title) && !isDiaryRevisionEnvelope(row.title))
+            || (!isSealedAttachmentValue(row.content) && !isDiaryRevisionEnvelope(row.content))) throw new Error('Invalid diary revision');
 
         const parent = parents.get(row.entryId);
         const event = auditById.get(row.eventId);

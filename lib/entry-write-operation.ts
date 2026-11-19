@@ -5,7 +5,8 @@ import { buildVersionConflictPayload } from './version-concurrency';
 import { activePatients } from './patient-lifecycle';
 import { writeAuditEventInTransaction, type RequiredAuditContext } from './security/audit';
 import { entries, entryRevisions, patients, patientsToAmbulatories, users } from './schema';
-import { isSealedValue } from './network-patient-lifecycle';
+import { sealPreviousDiaryText } from './diary-revision-legacy-write';
+import { LEGACY_REVISION_MESSAGE, LEGACY_REVISION_REQUIRED, type LegacyRevisionProtection } from './diary-revision-envelope';
 import type { NetworkPatientCommitGuard } from './network-patient-commit-authority';
 
 type CreateInput = {
@@ -23,6 +24,7 @@ type UpdateInput = {
     patientId?: string;
     entryId: string;
     expectedVersion: number;
+    legacyRevisionProtection?: LegacyRevisionProtection;
     values: Partial<typeof entries.$inferInsert>;
     changedFields: string[];
     mode: 'web' | 'v1' | 'network';
@@ -66,18 +68,16 @@ function entryOperator(tx: Tx, audit: RequiredAuditContext): string | null {
     return operator?.displayName?.trim() || operator?.username || null;
 }
 
-function retainEntryRevision(tx: Tx, input: UpdateInput, existing: typeof entries.$inferSelect, eventId: string, correctedAt: Date): void {
-    const titleChanged = input.values.title !== undefined && input.values.title !== existing.title;
-    const contentChanged = input.values.content !== undefined && input.values.content !== existing.content;
-    if (existing.type !== 'scale' && (titleChanged || contentChanged)) {
-        const revision = tx.insert(entryRevisions).values({
-            eventId, entryId: existing.id, version: existing.version, correctedAt,
-            correctedBy: entryOperator(tx, input.audit),
-            title: isSealedValue(existing.title) ? existing.title : null,
-            content: isSealedValue(existing.content) ? existing.content : null,
-        }).run();
-        if (revision.changes !== 1) throw new Error('Entry revision did not write exactly one row');
-    }
+function retainEntryRevision(
+    tx: Tx, input: UpdateInput, existing: typeof entries.$inferSelect, eventId: string, correctedAt: Date,
+    previous: { title: string; content: string } | undefined,
+): void {
+    if (!previous) return;
+    const revision = tx.insert(entryRevisions).values({
+        eventId, entryId: existing.id, version: existing.version, correctedAt,
+        correctedBy: entryOperator(tx, input.audit), title: previous.title, content: previous.content,
+    }).run();
+    if (revision.changes !== 1) throw new Error('Entry revision did not write exactly one row');
 }
 
 /* IMMEDIATE acquires the writer lock before parent/scope and duplicate reads. */
@@ -154,6 +154,18 @@ export function updateEntryOperationInTransaction(tx: Tx, input: UpdateInput): R
         return { status: 409, value: buildVersionConflictPayload(
             'entry', input.expectedVersion, input.entryId, existing) as unknown as Record<string, unknown> };
     }
+    let previous: { title: string; content: string } | undefined;
+    const titleChanged = input.values.title !== undefined && input.values.title !== existing.title;
+    const contentChanged = input.values.content !== undefined && input.values.content !== existing.content;
+    if (existing.type !== 'scale' && (titleChanged || contentChanged)) {
+        const protectedText = sealPreviousDiaryText({
+            patientId: existing.patientId, entryId: existing.id, version: existing.version,
+        }, existing, input.legacyRevisionProtection);
+        if (!protectedText) {
+            return { status: 409, value: { code: LEGACY_REVISION_REQUIRED, error: LEGACY_REVISION_MESSAGE } };
+        }
+        previous = protectedText;
+    }
     const correctedAt = new Date();
     const changed = tx.update(entries).set({ ...input.values, version: input.expectedVersion + 1 })
         .where(and(eq(entries.id, input.entryId), eq(entries.patientId, existing.patientId),
@@ -168,6 +180,6 @@ export function updateEntryOperationInTransaction(tx: Tx, input: UpdateInput): R
         redactedMetadata: { changedFields: input.changedFields,
             resourceVersion: input.expectedVersion + 1, flags: input.audit.flags },
     });
-    retainEntryRevision(tx, input, existing, auditEventId, correctedAt);
+    retainEntryRevision(tx, input, existing, auditEventId, correctedAt, previous);
     return { status: 200, value: { success: true } };
 }

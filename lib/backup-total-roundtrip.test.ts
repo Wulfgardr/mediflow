@@ -1,3 +1,5 @@
+import { openLegacyDiaryRevision, prepareLegacyRevisionProtection } from './diary-revision-envelope';
+import { sealPreviousDiaryText } from './diary-revision-legacy-write';
 import { prepareSyntheticBackupDestination } from './scheduled-backup.test-support.ts';
 import { isCiphertext, openPatientDocumentFile } from './security/attachment-file-envelope';
 import assert from 'node:assert/strict';
@@ -183,8 +185,13 @@ async function populateSyntheticClinicalFixture(db: Database.Database, actorRef:
             occurred_at: now + version + 1, created_at: now + version + 1, outcome: 'success', actor_type: 'user', actor_ref: actorRef,
             subject_type: 'entry', subject_ref: 'w7-entry', source_surface: 'web',
             redacted_metadata: JSON.stringify({ resourceVersion: version + 1 }) });
-        insertRow(db, 'entry_revisions', { event_id: eventId, entry_id: 'w7-entry', version, title: await seal('entry_revisions.title'),
-            content: await seal(`entry_revisions.content-${version}`), corrected_at: now + version + 1, corrected_by: 'Ada Sintetica' });
+        const binding = { patientId: 'w7-patient', entryId: 'w7-entry', version };
+        const previous = version === 2
+            ? sealPreviousDiaryText(binding, { title: 'Titolo sintetico legacy', content: 'synthetic:entry_revisions.content-2' },
+                await prepareLegacyRevisionProtection(binding, masterKey))!
+            : { title: await seal('entry_revisions.title'), content: await seal(`entry_revisions.content-${version}`) };
+        insertRow(db, 'entry_revisions', { event_id: eventId, entry_id: 'w7-entry', version, ...previous,
+            corrected_at: now + version + 1, corrected_by: 'Ada Sintetica' });
     }
     insertRow(db, 'therapies', {
         id: 'w7-therapy', patient_id: 'w7-patient', drug_name: 'Farmaco sintetico', dosage: '1 unita', status: 'stopped',
@@ -605,6 +612,9 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
             `).all() as Array<{ version: number; content: string }>;
             assert.deepEqual(texts.map(row => row.version), [2, 3, 4]);
             assert.deepEqual(await Promise.all(texts.map(row => {
+                if (row.version === 2) return openLegacyDiaryRevision(row.content, {
+                    patientId: 'w7-patient', entryId: 'w7-entry', version: 2,
+                }, 'content', cassetteMasterKey);
                 const [, iv, data] = row.content.split(':');
                 return decryptData(data, iv, cassetteMasterKey);
             })), ['synthetic:entry_revisions.content-2', 'synthetic:entry_revisions.content-3', 'synthetic:entries.content']);

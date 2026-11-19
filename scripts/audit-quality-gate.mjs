@@ -1389,7 +1389,7 @@ function validateRequiredClinicalRowAudit({ spec, routeSource, coreSource, bridg
     }
     if (capturedDiaryAudit) {
         const revision = statements[auditIndex + 1];
-        const expected = `retainEntryRevision(${txName},${name},existing,${auditIdentity.name.text},${compact(props?.get('occurredAt')?.initializer)});`;
+        const expected = `retainEntryRevision(${txName},${name},existing,${auditIdentity.name.text},${compact(props?.get('occurredAt')?.initializer)},previous);`;
         if (compact(revision) !== expected || !props?.get('occurredAt')
             || auditIndex !== statements.length - 3 || !ts.isReturnStatement(statements[auditIndex + 2])) {
             problems.push('diary success must follow the audit-linked revision write on the same transaction');

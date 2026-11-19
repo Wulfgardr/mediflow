@@ -70,10 +70,22 @@ lascia invariati nota, audit e storico.
 
 La versione SQLite 17 crea `entry_revisions` vuota. Il primo testo conservabile
 è quello presente quando avviene la prima rettifica dopo l'aggiornamento.
-Versioni già sovrascritte prima dell'aggiornamento sono indisponibili. Per un
-campo legacy in chiaro si conserva il solo riferimento alla rettifica. I campi
-protetti vengono copiati come buste cifrate e aperti dai client con la chiave
-già usata per la nota corrente.
+Le versioni già sovrascritte prima dell'aggiornamento sono indisponibili.
+I campi già protetti conservano la propria busta. Alla prima rettifica, un
+client locale aggiornato permette di conservare anche il titolo o il testo
+legacy presenti in chiaro. Il client genera una chiave monouso, la avvolge con
+la chiave dell'archivio e verifica di poterla riaprire. La richiesta usa la
+loopback attestata e contiene soltanto la chiave monouso, il suo involucro e
+l'identità di paziente, nota e versione. Il writer legge il valore da SQLite
+sotto lo stesso controllo di versione della rettifica e lo cifra con AES-256-GCM.
+L'involucro e il valore autenticato sono vincolati a paziente, nota e versione.
+Il valore è vincolato anche al campo. La chiave dell'archivio resta al client.
+
+Se manca la protezione richiesta, il writer restituisce 409
+`ENTRY_LEGACY_REVISION_REQUIRED` prima di toccare nota, storico o audit.
+La rettifica può riprendere da un client locale aggiornato. Lo storico apre
+il testo con la chiave dell'archivio e mostra l'operatore della rettifica
+registrato nell'audit. L'autore della nota legacy resta assente se mancava.
 
 La scheda Web locale e GPUI Mac su loopback espongono lo storico su richiesta
 per un singolo paziente e una singola nota attiva. GPUI usa il normale ambito

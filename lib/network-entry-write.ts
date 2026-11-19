@@ -3,6 +3,7 @@ import { archiveGenerationForSession } from './security/archive-session-generati
 import { requestIdFromRequest } from './security/audit';
 import { entryExpectedVersion, prepareEntryCreate, prepareEntryUpdate } from './entry-write-input';
 import { createEntryOperation, updateEntryOperation } from './entry-write-operation';
+import { localLegacyRevisionProtection } from './diary-revision-legacy-write';
 import { isSealedValue } from './network-patient-lifecycle';
 import type { NetworkWriteContext } from './network-write-context';
 import { prepareNetworkPatientCommitGuard } from './network-patient-commit-authority';
@@ -69,7 +70,9 @@ export async function updateNetworkScopedEntry(context: UpdateContext, body: Rec
     const prepared = prepareEntryUpdate(body, 'network');
     if (!prepared.ok) return { status: prepared.status, value: { error: prepared.error } };
     const authorizeCommit = await prepareNetworkPatientCommitGuard(context, NETWORK_ENTRY_WRITE_CAPABILITY);
-    return updateEntryOperation({ patientId: context.patientId, entryId: context.entryId,
+    const legacyRevisionProtection = context.session.authChannel === 'native'
+        ? localLegacyRevisionProtection(context.request, body.legacyRevisionProtection) : undefined;
+    return updateEntryOperation({ legacyRevisionProtection, patientId: context.patientId, entryId: context.entryId,
         expectedVersion: prepared.expectedVersion, values: prepared.values,
         changedFields: prepared.changedFields, mode: 'network',
         scopeAmbulatoryId: context.scopeAmbulatoryId, audit: audit(context), authorizeCommit });

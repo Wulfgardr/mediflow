@@ -1,5 +1,5 @@
 {
-  "syncCommit": "fdcf0ee35ad36ac53dfdb6bd1f8ea817aef12c9c",
+  "syncCommit": "8527a783ee4e2d0ccedcb06dfad980abc8b9f44d",
   "tool": {
     "release": "v1.7.4",
     "url": "https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar",
@@ -33,7 +33,7 @@
   "files": {
     "lib/therapy-status-confirmation.ts": "33eebc3197e988f3f1c134f1ac8499da1de95171e21d0ac7e3396c2a202c6486",
     "components/therapy-manager.tsx": "636419e0533f0368add66f0321d30ecfb0c99e69e02b1359d1ff1c7c513e6579",
-    "lib/db.ts": "499ffd45f9c381bb0769239c1d8d9929125a2ef5308172ecf9406ad206866464",
+    "lib/db.ts": "2e386a10b5ff92134d6bc6de6eb8dc3edcedb4fae53ea527d2e7a3729f665e06",
     "lib/security/client-auth-api.ts": "0d1c44a438588284c8c5ab80ab727fe5c50ae29dd33b02443324a0d70f6e8678",
     "lib/therapy-write-operation.ts": "81716a464a1a5271b16687b4152cf2a11a1b4968c44fc93c3a17c31b53a54b6f",
     "app/api/therapies/[id]/route.ts": "3f4765cd55a13360965fae38bced33cec5cc69403dd0bbfd6d67417c5c40e4e2",
@@ -51,7 +51,7 @@
     "lib/api-table-response.ts": "5f19aab147a2d4459c1d2ec96e6c6d67bb20ad8c23b0cd9f38239771ffbb602c",
     "lib/backup-encrypted-fields.json": "8009ed55c0b9f71d5968f62ea8f15fe9bb4b911c0b70b9c7d7b101635bbd1b0d",
     "lib/backup-import-provenance.ts": "13eb1cc6083b5a07489d64cc9d195b82b6b8b660cb9874e4dc46b93fdf25999e",
-    "lib/sqlite-schema.ts": "93143bbd9c2b4818731ec93d6bfdec2b46d3206614dad0d7b8b455294d9a350a",
+    "lib/sqlite-schema.ts": "e9a16c1d4ed991372a629a6386d75f240ce841d232eadce71a4849878b48c9a9",
     "lib/sqlite-schema-open.ts": "2ee4dcf641df086c7af8fc2a7c541a7ab147d111f078165c6125c4d709871d5d",
     "lib/backup-restore-executor.ts": "2fda131ca62a4283cfa231dda9757f7dce2de9d2cd4a2e2660a0320b9ed0fabd",
     "lib/security/archive-maintenance-owner.ts": "57a026cca85845bf2ed3ae5b8c47dbc88caa8184b3d41639ea7ad9e90a420802",
@@ -59,7 +59,7 @@
     "lib/status-normalization.ts": "fa2bbdeef55384ed1bf4a851f09a5d899d56e6331cde018f68f3d8a74d3a4e51",
     "docs/domain/clinical-status-transitions.json": "70233eaac55960b999f25768bb9f8897dcce27197ed99c1a692a2d98a0582f04",
     "lib/recovery-backup-server.ts": "80357a277f7fdc5daab793b4f6d086fb1f20782b473785f7943a0439b5941dc8",
-    "lib/schema.ts": "8a1841461e8cab8510cb9868778582eb1fcd283e39270401ca80b30525610489",
+    "lib/schema.ts": "a63799addd6217f91f39794a25881376c052b8e2012a115ff129fdd0aec5394b",
     "lib/backup-artifact.ts": "0c7868ca545975ec831782c031be3679e515d88dc3e197f6feff87727429eb2e"
   },
   "verificationInputs": [
@@ -155,5 +155,5 @@
     }
   },
   "legacyModelSyncCommit": "64e190438da8287928f0903b9b719c18b329a7ec",
-  "filesSha256": "62d3544d0f1c03791f8507b22b5101abba5e1e890f6156e405ea294e1ad41e07"
+  "filesSha256": "afa22729b2dffdfff3b91cd751456cfe6f81071295bfff67dd5e40756d421457"
 }

@@ -2,6 +2,7 @@
 
 import { useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { ApiConflictError, db, type ClinicalEntry } from '@/lib/db';
+import { LEGACY_REVISION_MESSAGE } from '@/lib/diary-revision-envelope';
 import { clinicalRichTextToPlainText } from '@/lib/clinical-rich-text';
 import { isEncryptedFieldValue, isLockedDataPlaceholder } from '@/lib/locked-field-guard';
 import { notifyDbChange, useLiveQueryState } from '@/lib/live-query';
@@ -75,17 +76,18 @@ function CorrectionEditor({ entry, version, close }: { entry: ClinicalEntry; ver
         try {
             const signal = db.getSessionReadSignal();
             signal.throwIfAborted();
-            await db.entries.update(entry.id, {
+            await db.correctDiaryEntry(entry, {
                 version: initial.version,
                 ...(title.trim() !== initial.title ? { title: title.trim() } : {}),
                 ...(content !== initial.content ? { content } : {}),
-            }, { signal });
+            }, signal);
             signal.throwIfAborted();
             close();
         } catch (error) {
             if (error instanceof ApiConflictError) notifyDbChange('entries');
             setError(error instanceof ApiConflictError ? 'La voce è cambiata. Chiudi la rettifica e riapri la versione attuale.'
-                : 'Salvataggio non verificato. Riprova.');
+                : error instanceof Error && error.message === LEGACY_REVISION_MESSAGE ? LEGACY_REVISION_MESSAGE
+                    : 'Salvataggio non verificato. Riprova.');
         } finally {
             submitting.current = false;
             setPending(false);

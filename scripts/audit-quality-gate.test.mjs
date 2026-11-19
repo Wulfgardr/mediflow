@@ -77,9 +77,9 @@ test('diary required-audit guard follows all eight handlers and rejects detached
         const source = original[sourceKey];
         assert.notDeepEqual(validate({ [sourceKey]: change(source, `mode: '${mode}'`, "mode: 'unadmitted'") }), []);
         if (operation === 'update') {
-            const append = 'retainEntryRevision(tx, input, existing, auditEventId, correctedAt);';
-            for (const bad of ['', 'retainEntryRevision(dbServer, input, existing, auditEventId, correctedAt);',
-                'retainEntryRevision(tx, input, existing, input.entryId, correctedAt);']) {
+            const append = 'retainEntryRevision(tx, input, existing, auditEventId, correctedAt, previous);';
+            for (const bad of ['', 'retainEntryRevision(dbServer, input, existing, auditEventId, correctedAt, previous);',
+                'retainEntryRevision(tx, input, existing, input.entryId, correctedAt, previous);']) {
                 assert.notDeepEqual(validate({ coreSource: change(coreSource, append, bad) }), []);
             }
         }

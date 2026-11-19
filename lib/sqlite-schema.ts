@@ -367,8 +367,8 @@ function applySchemaGuards(sqlite: Database.Database) {
                 event_id TEXT PRIMARY KEY NOT NULL,
                 entry_id TEXT NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
                 version INTEGER NOT NULL CONSTRAINT entry_revisions_version_positive CHECK (version > 0),
-                title TEXT,
-                content TEXT,
+                title TEXT NOT NULL,
+                content TEXT NOT NULL,
                 corrected_at INTEGER NOT NULL,
                 corrected_by TEXT
             );
