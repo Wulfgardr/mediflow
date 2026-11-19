@@ -5,7 +5,8 @@ import { getEventListeners } from 'node:events';
 import { agentCassetteFixture } from './test-fixtures/agent-cassette';
 import { sealAgentItemNode } from '../packages/agent-client/src/cassette-crypto';
 import { db, type Patient } from './db';
-import { inspectAgentVisit, prepareAgentApplication } from './agent-visit-review';
+import { agentVisitAwaitsReview, inspectAgentVisit, prepareAgentApplication } from './agent-visit-review';
+import type { AgentMandateInput } from './agent-mandate-contract';
 import type { AgentItemKind } from './agent-cassette-crypto';
 import { AGENT_ITEM_OPERATION } from './agent-cassette-contract';
 import { readPatientDiaryMetadata } from './patient-diary-metadata';
@@ -14,8 +15,9 @@ import { agentVisitPdfText } from './agent-visit-pdf-text';
 const cfA = 'RSSMRA80A01F205X', cfB = 'RSSMRA85T10A562S';
 function patient(cf: string): Patient { return { id: 'synthetic-' + cf, taxCode: cf, firstName: 'Persona', lastName: 'Sintetica',
     address: '', phone: '', updatedAt: new Date(), createdAt: new Date(), version: 1 }; }
-async function fixture(cf = cfA, wrongHash = false, proposal?: { kind: 'service' | 'observation' | 'therapy'; values: Record<string, string>; quote: string }) {
-    const f = await agentCassetteFixture();
+async function fixture(cf = cfA, wrongHash = false, proposal?: { kind: 'service' | 'observation' | 'therapy'; values: Record<string, string>; quote: string },
+    provider: AgentMandateInput['provider'] = 'local', allowsClinicalEgress = provider !== 'local') {
+    const f = await agentCassetteFixture(undefined, provider, allowsClinicalEgress);
     db.setKey(f.masterKey);
     const visitId = randomUUID();
     const seal = (id: string, kind: AgentItemKind, value: unknown) => {
@@ -128,6 +130,38 @@ for (const [prefix, suffix, blocked] of [
     });
 }
 
+
+for (const [provider, allowsClinicalEgress, appliesAutomatically] of [['openai', false, false], ['anthropic', false, false], ['openai', true, true], ['local', false, true]] as const) {
+    test(`J5: the ${provider} cassette with egress ${allowsClinicalEgress} ${appliesAutomatically ? 'keeps' : 'skips'} the automatic pass in the browser`, async () => {
+        const f = await fixture(cfA, false, undefined, provider, allowsClinicalEgress);
+        const get = mock.method(db.patients, 'get', async () => patient(cfA));
+        try {
+            const signal = new AbortController().signal;
+            const review = await inspectAgentVisit(f.row, [patient(cfA)], null, signal, async () => 'Paziente CF ' + cfA);
+            assert.deepEqual([...review.blockers, ...review.proposalBlockers], []);
+            assert.equal(review.appliesAutomatically, appliesAutomatically);
+            const automatic = await prepareAgentApplication(review, 'automatic', signal);
+            const reviewed = await prepareAgentApplication(review, 'review', signal);
+            assert.deepEqual(automatic?.items.map(item => item.kind) ?? null, appliesAutomatically ? ['pdf'] : null);
+            assert.deepEqual(reviewed?.items.map(item => item.kind) ?? null, appliesAutomatically ? null : ['pdf']);
+            assert.equal(agentVisitAwaitsReview(review), !appliesAutomatically);
+            assert.equal(agentVisitAwaitsReview({ ...review, appliedItemIds: review.visit.items.map(item => item.id) }), false);
+        } finally { get.mock.restore(); f.close(); }
+    });
+}
+
+test('a proposal still waits for review only after the automatic pass of a cassette that applies automatically', async () => {
+    const quote = 'LOINC 2345-7. Glucosio 100 mg/dL intervallo 70 110';
+    const f = await fixture(cfA, false, { kind: 'observation', values: { code: '2345-7', display: 'Glucosio', value: '100', unitCode: 'mg/dL', unit: 'mg/dL', observedAt: '2026-11-17', refLow: '70', refHigh: '110', refText: '70 110' }, quote });
+    const query = mock.method(db.observations, 'query', () => ({ toArray: async () => [] }));
+    try {
+        const review = await inspectAgentVisit(f.row, [patient(cfA)], null, new AbortController().signal, async () => 'Paziente CF ' + cfA + '\n' + quote);
+        assert.deepEqual([...review.blockers, ...review.proposalBlockers], []);
+        const pdf = review.visit.items.find(item => item.kind === 'pdf')!.id;
+        assert.equal(agentVisitAwaitsReview(review), false);
+        assert.equal(agentVisitAwaitsReview({ ...review, appliedItemIds: [pdf] }), true);
+    } finally { query.mock.restore(); f.close(); }
+});
 
 test('a patient revision changed after the displayed review cannot be silently adopted', async () => {
     const f = await fixture();
