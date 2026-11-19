@@ -185,7 +185,8 @@ test('a deposited note has readable diary metadata and preserves the document re
         const signal = new AbortController().signal;
         const review = await inspectAgentVisit(f.row, [patient(cfA)], null, signal, async () => 'Paziente CF ' + cfA);
         review.visit.items.push({ kind: 'note', id: randomUUID(), value: { text: quote, quote, source } });
-        const application = await prepareAgentApplication(review, 'automatic', signal);
+        assert.deepEqual((await prepareAgentApplication(review, 'automatic', signal))?.items.map(item => item.kind), ['pdf']);
+        const application = await prepareAgentApplication(review, 'review', signal);
         const note = application?.items.find(item => item.kind === 'note');
         assert.ok(note?.kind === 'note');
         const metadata = readPatientDiaryMetadata(await db.openLocalDraft(note.values.metadata));
