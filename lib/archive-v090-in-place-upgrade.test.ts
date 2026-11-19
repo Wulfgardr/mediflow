@@ -50,7 +50,7 @@ async function dataFolder() {
 const DROPPED_EMPTY_TABLES = ['durable_review_command_operations', 'durable_review_command_states', 'durable_review_operations',
     'durable_review_patient_links', 'durable_review_records', 'headless_soap_active_role_attestations', 'headless_soap_entry_commits'];
 const NEW_TABLES: Record<string, number> = { agent_cassettes: 0, agent_pairing_requests: 0, agent_clients: 0, agent_mandates: 0, agent_registrations: 0, agent_unlock_grants: 0, ambulatory_destructive_commands: 0, therapy_status_commands: 0, prosthetics_catalog_documents: 0,
-    prosthetics_catalog_sources: 1, portable_import_origins: 1 };
+    prosthetics_catalog_sources: 1, portable_import_origins: 1, entry_revisions: 0 };
 const NEW_COLUMNS: Record<string, string[]> = {
     patients: ['identifier_type', 'birth_date_precision', 'birth_year', 'identifier_history', 'allergies'],
     audit_events: ['proposer_ref', 'mandate_ref', 'model_provider'],
