@@ -4,8 +4,10 @@ import type { PDFDocumentLoadingTask, PDFWorker } from 'pdfjs-dist';
 import { preparePdfPreviewInput } from '../components/document-viewer-pdf';
 import { OwnedStandardFontDataFactory } from '../components/document-viewer-pdf-fonts';
 import { PreviewScope } from '../components/document-viewer-scope';
+import { pdfPagePaintsBeyondText } from './agent-visit-pdf-content';
 
-export async function agentVisitPdfText(bytes: Uint8Array<ArrayBuffer>, signal: AbortSignal): Promise<string> {
+export type AgentVisitPdf = { text: string; beyondText: boolean };
+export async function agentVisitPdfText(bytes: Uint8Array<ArrayBuffer>, signal: AbortSignal): Promise<AgentVisitPdf> {
     if (bytes.length > 16 * 1024 * 1024) throw new Error('AGENT_PDF_LIMIT');
     const scope = new PreviewScope(signal, 15000);
     let checked: Uint8Array | undefined;
@@ -23,16 +25,18 @@ export async function agentVisitPdfText(bytes: Uint8Array<ArrayBuffer>, signal: 
             disableFontFace: true, stopAtErrors: true, disableRange: true, disableStream: true, maxImageSize: 12000000 });
         const pdf = await scope.wait(task.promise);
         if (pdf.numPages < 1 || pdf.numPages > 80) throw new Error('AGENT_PDF_LIMIT');
-        let text = '';
+        let text = '', beyondText = false;
         for (let index = 1; index <= pdf.numPages; index++) {
             const page = await scope.wait(pdf.getPage(index));
             const content = await scope.wait(page.getTextContent());
             text += content.items.map(item => 'str' in item ? item.str + (item.hasEOL ? '\n' : ' ') : '').join('') + '\n';
+            const [operators, annotations] = await scope.wait(Promise.all([page.getOperatorList(), page.getAnnotations()]));
+            beyondText ||= pdfPagePaintsBeyondText(pdfjs.OPS, operators, annotations);
             page.cleanup();
             if (text.length > 2 * 1024 * 1024) throw new Error('AGENT_PDF_LIMIT');
         }
         scope.check();
-        return text;
+        return { text, beyondText };
     } finally {
         scope.finish();
         try { if (task) void task.destroy().catch(() => undefined); } catch { }

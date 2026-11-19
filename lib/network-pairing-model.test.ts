@@ -9,6 +9,8 @@ import {
     addPendingPairingIntent,
     confirmPendingPairingIntent,
     hashNetworkPairedClientToken,
+    MAX_PENDING_PAIRING_INTENTS,
+    MAX_PENDING_PAIRING_INTENT_BYTES,
     NETWORK_PAIRED_CLIENT_ID_HEADER,
     NETWORK_PAIRED_CLIENT_TOKEN_HEADER,
     parseNetworkPairingState,
@@ -49,9 +51,15 @@ function buildHomeBaseIntent(clientPlatform: 'macos' | 'ios' | 'ipados' | 'windo
     return result.value;
 }
 
+function admitIntent(intent: ReturnType<typeof buildHomeBaseIntent>) {
+    const admission = addPendingPairingIntent({ intents: [], clients: [] }, intent, new Date(intent.requestedAt));
+    assert.ok(admission.ok);
+    return admission.nextState;
+}
+
 test('confirmPendingPairingIntent removes the intent and persists only the token hash', () => {
     const intent = buildHomeBaseIntent();
-    const state = addPendingPairingIntent({ intents: [], clients: [] }, intent, new Date('2026-04-04T09:00:00.000Z'));
+    const state = admitIntent(intent);
 
     const result = confirmPendingPairingIntent({
         state,
@@ -75,7 +83,7 @@ test('confirmPendingPairingIntent removes the intent and persists only the token
 
 test('confirmPendingPairingIntent rejects expired intents', () => {
     const intent = buildHomeBaseIntent();
-    const state = addPendingPairingIntent({ intents: [], clients: [] }, intent, new Date('2026-04-04T09:00:00.000Z'));
+    const state = admitIntent(intent);
 
     const result = confirmPendingPairingIntent({
         state,
@@ -91,7 +99,7 @@ test('confirmPendingPairingIntent rejects expired intents', () => {
 
 test('authenticatePairedClientRequest requires both paired client headers', () => {
     const intent = buildHomeBaseIntent();
-    const state = addPendingPairingIntent({ intents: [], clients: [] }, intent, new Date('2026-04-04T09:00:00.000Z'));
+    const state = admitIntent(intent);
     const result = confirmPendingPairingIntent({
         state,
         intentId: intent.intentId,
@@ -205,7 +213,7 @@ test('desktop pairing preserves the declared platform through confirmation, pers
     for (const platform of ['macos', 'ios', 'ipados', 'windows', 'linux'] as const) {
         const intent = buildHomeBaseIntent(platform);
         assert.equal(intent.requestedBy.clientPlatform, platform);
-        const before = addPendingPairingIntent({ intents: [], clients: [] }, intent, new Date('2026-04-04T09:00:00.000Z'));
+        const before = admitIntent(intent);
         const loaded = parseNetworkPairingState(serializeNetworkPairingState(before), new Date('2026-04-04T09:01:00.000Z'));
         assert.deepEqual(loaded, before);
         const confirmed = confirmPendingPairingIntent({ state: loaded, intentId: intent.intentId, now: new Date('2026-04-04T09:02:00.000Z') });
@@ -242,4 +250,62 @@ test('unknown platforms cannot enter either pairing admission or the persisted r
         });
         assert.deepEqual(parseNetworkPairingState(raw, new Date('2026-04-04T09:01:00.000Z')), { intents: [], clients: [] });
     }
+});
+
+test('a full pending queue preserves live intents and permits revocation and expiry', () => {
+    const intent = buildHomeBaseIntent();
+    const clients = [buildStoredClient('client-remove', 'synthetic-token')];
+    const existing = Array.from({ length: MAX_PENDING_PAIRING_INTENTS }, (_, index) => ({
+        ...intent, intentId: `pending-${index}`,
+    }));
+    const fullState = { clients, intents: existing };
+    const now = new Date(intent.requestedAt);
+    const denied = addPendingPairingIntent(fullState, intent, now);
+    assert.ok(!denied.ok);
+    assert.equal(denied.status, 409);
+    assert.equal(denied.value.code, 'PAIRING_STATE_CONFLICT');
+
+    const removed = removePairedClient(fullState, clients[0].clientId);
+    assert.ok(removed.ok);
+    const stored = parseNetworkPairingState(serializeNetworkPairingState(removed.nextState), now);
+    assert.deepEqual(stored, { clients: [], intents: existing });
+
+    const confirmed = confirmPendingPairingIntent({ state: stored, intentId: existing[0].intentId, now });
+    assert.ok(confirmed.ok);
+    assert.ok(addPendingPairingIntent(confirmed.nextState, intent, now).ok);
+
+    const expiry = new Date(intent.expiresAt);
+    const admitted = addPendingPairingIntent(stored, {
+        ...intent, requestedAt: expiry.toISOString(), expiresAt: new Date(expiry.getTime() + 60_000).toISOString(),
+    }, expiry);
+    assert.ok(admitted.ok);
+    assert.deepEqual(admitted.nextState.intents.map((item) => item.intentId), [intent.intentId]);
+});
+
+test('each pending intent has a serialized UTF-8 byte limit', () => {
+    const intent = buildHomeBaseIntent();
+    const sizedIntent = { ...intent, requestedBy: { ...intent.requestedBy, appVersion: '' } };
+    const padding = MAX_PENDING_PAIRING_INTENT_BYTES - Buffer.byteLength(JSON.stringify(sizedIntent));
+    sizedIntent.requestedBy.appVersion = 'v'.repeat(padding);
+    const state = admitIntent(sizedIntent);
+    const now = new Date(intent.requestedAt);
+    assert.deepEqual(parseNetworkPairingState(serializeNetworkPairingState(state), now), state);
+    const oversized = { ...sizedIntent, requestedBy: { ...sizedIntent.requestedBy, appVersion: 'é' + 'v'.repeat(padding - 1) } };
+    const rejected = addPendingPairingIntent(state, oversized, now);
+    assert.ok(!rejected.ok);
+    assert.equal(rejected.status, 400);
+    assert.equal(rejected.value.code, 'PAIRING_REQUEST_INVALID');
+});
+
+test('legacy pending state is bounded on read and write while confirmed clients survive', () => {
+    const intent = buildHomeBaseIntent();
+    const valid = Array.from({ length: MAX_PENDING_PAIRING_INTENTS + 1 }, (_, index) => ({
+        ...intent, intentId: `legacy-${index}`,
+    }));
+    const oversized = { ...intent, requestedBy: { ...intent.requestedBy, appVersion: 'v'.repeat(MAX_PENDING_PAIRING_INTENT_BYTES) } };
+    const clients = [buildStoredClient('existing', 'synthetic-token')];
+    const legacy = { intents: [oversized, ...valid], clients };
+    const expected = { intents: valid.slice(0, MAX_PENDING_PAIRING_INTENTS), clients };
+    assert.deepEqual(parseNetworkPairingState(JSON.stringify(legacy), new Date(intent.requestedAt)), expected);
+    assert.deepEqual(JSON.parse(serializeNetworkPairingState(legacy)), expected);
 });

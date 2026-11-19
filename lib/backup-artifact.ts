@@ -128,6 +128,7 @@ export type BackupArtifactErrorCode =
     | 'invalid-format'
     | 'unsupported-version'
     | 'invalid-manifest'
+    | 'invalid-patient-link'
     | 'collection-mismatch'
     | 'count-mismatch'
     | 'checksum-mismatch';
@@ -321,6 +322,22 @@ function assertAttachmentCurrentnessRows(rows: readonly BackupRecord[]): void {
     }
 }
 
+function assertSamePatientLinks(
+    rows: readonly BackupRecord[],
+    reference: string,
+    targets: readonly BackupRecord[],
+    optional = false,
+): void {
+    const patientById = new Map(targets.map(row => [row.id, row.patientId]));
+    for (const row of rows) {
+        const targetId = row[reference];
+        if (optional && targetId == null) continue;
+        if (typeof targetId !== 'string' || patientById.get(targetId) !== row.patientId) {
+            throw new BackupArtifactError('invalid-patient-link', 'La copia contiene un collegamento clinico mancante o riferito a un altro paziente.');
+        }
+    }
+}
+
 async function assertCollectionReferences(
     payload: Partial<Record<BackupCollectionName, BackupRecord[]>>,
     patientDependentCollections: readonly BackupCollectionName[] = PATIENT_DEPENDENT_COLLECTIONS,
@@ -393,6 +410,9 @@ async function assertCollectionReferences(
             }
         }
     }
+
+    assertSamePatientLinks(payload.servicePrescriptionItems ?? [], 'prescriptionId', payload.servicePrescriptions ?? []);
+    assertSamePatientLinks(payload.observations ?? [], 'servicePrescriptionItemId', payload.servicePrescriptionItems ?? [], true);
 
     for (const message of payload.messages ?? []) {
         if (typeof message.conversationId !== 'string' || !conversationIds.has(message.conversationId)) {
