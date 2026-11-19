@@ -10,7 +10,7 @@ import { openVersionedSqliteDatabase } from './sqlite-schema-open';
 function fixture() {
     const root = mkdtempSync(join(tmpdir(), 'mediflow-pairing-migration-')), file = join(root, 'medical.db');
     const database = new Database(file); initializeSqliteSchema(database);
-    database.exec('DROP TABLE agent_unlock_grants; DROP TABLE agent_registrations; DROP TABLE IF EXISTS agent_cassettes; DROP TABLE IF EXISTS agent_clients; DROP TABLE IF EXISTS agent_pairing_requests; PRAGMA user_version=13');
+    database.exec('DROP TABLE entry_revisions; DROP TABLE agent_unlock_grants; DROP TABLE agent_registrations; DROP TABLE IF EXISTS agent_cassettes; DROP TABLE IF EXISTS agent_clients; DROP TABLE IF EXISTS agent_pairing_requests; PRAGMA user_version=13');
     database.prepare("INSERT INTO users(id,username,password_hash,encrypted_master_key,salt) VALUES ('synthetic-pairing-migration','synthetic-pairing-migration','synthetic-hash','synthetic-wrap','synthetic-salt')").run();
     const generation = (database.prepare('SELECT generation FROM archive_generation').get() as { generation: string }).generation;
     database.prepare(`INSERT INTO agent_mandates(id,actor_ref,archive_generation,operations,provider,allows_clinical_egress,public_key,wrapped_private_key,created_at,expires_at)
