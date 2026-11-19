@@ -3,13 +3,14 @@ import { pathToFileURL } from 'node:url';
 import { stageWindowsDocumentChild } from './document-windows-sandbox.mjs';
 export const DOCUMENT_CHILD_HEAP_MB = 256;
 export const DOCUMENT_CHILD_DATA_BYTES = 1024 * 1024 * 1024;
+const documentEnvironment = Object.freeze({ NODE_ENV: 'production', NAPI_RS_ENFORCE_VERSION_CHECK: '1' });
 
 /** @param {string} root
  * @param {string} script
  * @param {{allowAddons?: boolean, args?: readonly string[], wasmMemoryPages?: number, networkGuard?: boolean}} options
  */
 export function documentChildLaunch(root, script, { allowAddons = false, args = [], wasmMemoryPages, networkGuard = true } = {}) {
-  const env = { NODE_ENV: 'production', NAPI_RS_ENFORCE_VERSION_CHECK: '1' };
+  const env = { ...documentEnvironment };
   const localAppData = process.env.LOCALAPPDATA;
   if (process.platform === 'win32' && (!localAppData || !path.isAbsolute(localAppData))) {
     throw new Error('Windows document sandbox requires LOCALAPPDATA.');
