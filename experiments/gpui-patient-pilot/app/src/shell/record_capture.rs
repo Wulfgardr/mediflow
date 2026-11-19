@@ -1667,6 +1667,24 @@ mod concept {
                     cx.notify();
                 });
                 run.shot(&format!("{label}-riepilogo-quadro-sintetico"));
+                let receipt = run
+                    .app(|app, _, _| {
+                        app.current_insight().map(|(_, proposal)| {
+                            super::super::patient_record::proposal_receipt(proposal)
+                        })
+                    })
+                    .expect("the synthetic proposal is current");
+                assert!(receipt.starts_with("Banco sintetico · "), "{receipt}");
+                assert!(receipt.ends_with(" · nessuna uscita in rete"), "{receipt}");
+                run.app(|app, _, cx| {
+                    app.patient.record.quadro = true;
+                    cx.notify();
+                });
+                run.shot(&format!("{label}-quadro-aperto"));
+                run.app(|app, _, cx| {
+                    app.patient.record.quadro = false;
+                    cx.notify();
+                });
                 let spiro = run.app(|app, _, _| {
                     let anchor = app.patient.record.anchor.clone().flatten()?;
                     record_changes::changes_since(

@@ -420,17 +420,26 @@ fn tag(text: impl Into<SharedString>, color: Hsla, theme: Theme) -> Div {
         .child(text!(text.into()))
 }
 
-fn given_name_first(patient: &PatientDetail) -> mediflow_patient_client::PersonName {
-    let name = [patient.first_name.trim(), patient.last_name.trim()]
+pub(super) fn proposal_receipt(
+    proposal: &mediflow_runtime_client::PatientInsightProposal,
+) -> String {
+    let mut provider = proposal.provider.trim().chars();
+    let provider = provider
+        .next()
+        .map(|first| first.to_uppercase().chain(provider).collect::<String>())
+        .unwrap_or_default();
+    let at = record_changes::instant(&proposal.generated_at)
+        .map(|at| at.with_timezone(&chrono::Local).format("%H:%M").to_string())
+        .unwrap_or_default();
+    let egress = match proposal.egress.as_str() {
+        "none" => "nessuna uscita in rete".to_owned(),
+        other => format!("uscita: {other}"),
+    };
+    [provider, at, egress]
         .into_iter()
         .filter(|part| !part.is_empty())
         .collect::<Vec<_>>()
-        .join(" ");
-    if name.is_empty() {
-        patient.display_name()
-    } else {
-        name.into()
-    }
+        .join(" · ")
 }
 
 pub(super) fn exemption_codes(value: &str) -> Option<String> {
@@ -696,7 +705,7 @@ impl ClinicalApp {
                             )
                             .child(crate::components::heading_with_role(
                                 "clinical-workspace-patient-name",
-                                crate::title::TitleText::name(given_name_first(patient)),
+                                crate::title::TitleText::name(patient.display_name()),
                                 theme,
                                 crate::theme::TitleRole::RecordPerson,
                             ))
@@ -2745,15 +2754,7 @@ impl ClinicalApp {
                 )
             })
             .when_some(inline, |el, (lines, proposal)| {
-                el.child(
-                    div()
-                        .type_role(theme, crate::theme::TextRole::Meta)
-                        .text_color(theme.secondary)
-                        .child(text!(
-                            mediflow_runtime_client::PATIENT_INSIGHT_REVIEW_NOTICE
-                        )),
-                )
-                .children(lines.into_iter().take(4).enumerate().map(|(index, line)| {
+                el.children(lines.into_iter().take(4).enumerate().map(|(index, line)| {
                     div()
                         .id(SharedString::from(format!(
                             "clinical-record-quadro-line-{index}"
@@ -2816,17 +2817,7 @@ impl ClinicalApp {
                     div()
                         .type_role(theme, crate::theme::TextRole::Meta)
                         .text_color(theme.secondary)
-                        .child(text!(format!(
-                            "Generata {} da {} · {} · {}",
-                            crate::components::display_instant(&proposal.generated_at),
-                            proposal.provider,
-                            proposal.model,
-                            if proposal.egress == "none" {
-                                "nessuna uscita in rete"
-                            } else {
-                                "con uscita in rete"
-                            }
-                        ))),
+                        .child(text!(proposal_receipt(proposal))),
                 )
             })
             .child(
