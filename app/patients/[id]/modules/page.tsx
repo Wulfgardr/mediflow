@@ -1,4 +1,6 @@
 'use client';
+import { PatientSheetMenu } from '@/components/patient-sheet-menu';
+import { useEntryDraftMarker } from '@/hooks/use-entry-local-draft';
 import { patientAgeLabel } from '@/lib/patient-identity';
 
 import { Disclosure } from '@/components/disclosure';
@@ -10,7 +12,7 @@ import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import { useEntryDraftOnOpen } from '@/lib/hooks/effects/use-entry-draft-on-open';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, ArrowLeft, ChevronRight, Plus } from 'lucide-react';
+import { Activity, ArrowLeft, ChevronRight, ClipboardPenLine, FileText as DraftIcon, Plus } from 'lucide-react';
 
 import { PluginLocalUiNavigation, PluginPrescribingGuide } from '@/components/plugin-local-ui-navigation';
 import { PatientClinicalSupport, PatientProposalsSummary } from '@/components/patient-clinical-support';
@@ -94,6 +96,7 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
     const { proposal } = useRuntimeTwinDesign();
     const [draftOnOpen, setDraftOnOpen] = useEntryDraftOnOpen(id, proposal);
     const writing = requested || draftOnOpen;
+    const savedDraft = useEntryDraftMarker(id);
     const [fullDiary, setFullDiary] = useState(false);
     const diaryControl = useRef<HTMLButtonElement>(null);
     const composerFocus = useRef<ClinicalEditorFocus>(null);
@@ -647,9 +650,16 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
                 birthDateLabel: patient.birthDate ? birthDateLabel : patient.birthYear ? `anno stimato ${patient.birthYear}` : undefined,
                 ageLabel: patientAgeLabel(patient, new Date(currentTimestampMs)) ?? undefined,
                 taxCode: patient.taxCode || undefined,
+                exemptions: exemptionCodes,
+                adi: patient.isAdi === true,
                 identifierLabel: patientIdentifierLabel(patient.taxCode, patient.identifierType),
                 identifierAbsent: !patient.taxCode,
             }}
+            recordVisit={{ id, reference: visitReference?.latest ?? undefined, today: comparisonReadAt, proposals: Number(hasInsightProposal) }}
+            prescriptionAction={!writing ? <PatientSheetMenu label="Prescrivi" trigger={props => <button {...props} className="mf-button-secondary"><ClipboardPenLine size={15} aria-hidden />Prescrivi</button>}>
+                <a href="#prestazioni" role="menuitem" tabIndex={-1} className="mf-popover-row">Prescrizione di una prestazione</a>
+                {workspaceNavGroups.some(group => group.items.some(item => item.href === '#protesica')) ? <a href="#protesica" role="menuitem" tabIndex={-1} className="mf-popover-row">Prescrizione protesica</a> : null}
+            </PatientSheetMenu> : undefined}
             navGroups={workspaceNavGroups}
             primaryAction={writing ? undefined : { href: `/patients/${id}/modules?voce=nuova`, label: 'Nuova voce', icon: Plus }}
             headerActions={(
@@ -666,6 +676,7 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
                 </>
             )}
         >
+            {proposal && savedDraft && !writing ? <Link href={`/patients/${id}/modules?voce=nuova`} className="mf-draft-return"><DraftIcon size={15} aria-hidden /> Torna alla bozza</Link> : null}
             <div className={workspaceStyles.clinicalStack}>
                 <section id="attenzione" className={workspaceStyles.attentionBand} data-has-attention={reviewQueueSummary.attentionCount + openLoopCount > 0 || hasInsightProposal} aria-labelledby="attention-title" data-testid="lume-scheda-attention">
                     <div className={workspaceStyles.attentionHead}>
