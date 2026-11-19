@@ -40,7 +40,7 @@ Dichiara il Dossier pronto soltanto allo stato `verificato` con zero rifiuti. Se
 
 A «Fine visita» verifica il CF e prepara il Dossier sulla stessa visita, se serve. Quando il Dossier è verificato chiama subito `mediflow_deposita_visita` con il visitId. Se il deposito si interrompe, ripeti sulla stessa visita. Per riprendere le buste già preparate puoi chiamare `mediflow_riprendi_visita`. Se il server restituisce `DOSSIER_DA_RIGENERARE`, rigenera il Dossier dal dettato originale e dalle correzioni sulla stessa visita prima di riprovare. Se manca un mandato attivo, segui le indicazioni di «Collega MediFlow» per il diniego di accesso.
 
-Comunica il deposito soltanto se la ricevuta dice `closed`. Elenca le proposte riportate in `proposteInArrivo.elementi` e rimanda a «In arrivo» per verificarle e confermarle. La ricevuta riguarda la cassetta. MediFlow verifica l'identità prima di applicare nota, trascrizione e PDF. Nelle risposte usa soltanto le ultime quattro cifre del CF e segnala i dubbi clinici. Niente trattino lungo.
+Comunica il deposito soltanto se la ricevuta dice `closed`. Elenca gli elementi riportati in `proposteInArrivo.elementi`, nota compresa, e rimanda a «In arrivo» o alla conferma della visita per leggerli e confermarli. La ricevuta riguarda la cassetta. MediFlow verifica l'identità prima di applicare trascrizione e PDF originali. La nota entra in cartella solo dopo la conferma del medico: non dire che è già in cartella. Nelle risposte usa soltanto le ultime quattro cifre del CF e segnala i dubbi clinici. Niente trattino lungo.
 
 
 ## Conferma della visita
