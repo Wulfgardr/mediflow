@@ -337,8 +337,8 @@
     :global([data-folder-section='quadro']) .sheet:not([data-writing]) .middle { grid-column: 2; grid-row: 1; }
     :global([data-folder-section='quadro']) .sheet:not([data-writing]) .stable { grid-column: 1; grid-row: 1; }
     :global([data-folder-section='quadro']) .sheet:not([data-writing]) .context { grid-column: 3; grid-row: 1; }
-    :global([data-folder-section='quadro']) .sheet:not([data-writing]) .side > :is(.stable, .context) {
-        max-height: max(320px, calc(100dvh - 242px));
+    :global([data-folder-section='quadro']) .sheet:not([data-writing]) :is(.middle, .side > .stable, .side > .context) {
+        max-height: max(320px, calc(100dvh - 212px));
         overflow-y: auto;
         scrollbar-width: thin;
     }

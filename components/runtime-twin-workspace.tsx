@@ -255,7 +255,7 @@ export function RuntimeTwinPatientNavigation({ items, active, lastVisit }: {
     <div className={styles.segment}>
       {primary.map(item => {
         const count = item.meta?.match(/^\d+/)?.[0];
-        return <a key={item.href} href={item.href} aria-current={active === item.href.slice(1) ? 'location' : undefined}>{patientTabLabels[item.href] ?? item.label}{count && count !== '0' ? <span>{count}</span> : null}</a>;
+        return <a key={item.href} href={item.href} title={item.meta} aria-current={active === item.href.slice(1) ? 'location' : undefined}>{patientTabLabels[item.href] ?? item.label}{count && count !== '0' ? <span>{count}</span> : null}</a>;
       })}
       <PatientSheetMenu label="Altre sezioni della cartella" className={styles.moreSections}
         trigger={props => <button {...props} aria-label="Altro" title="Altre sezioni" aria-current={secondary.some(item => item.href === `#${active}`) ? 'location' : undefined}><span>Altro</span><ChevronDown size={14} aria-hidden /></button>}>
