@@ -53,6 +53,7 @@ async function visit(provider: AgentMandateInput['provider'] = 'local', allowsCl
     const note = { title: await field('Nota sintetica'), content: await field('SYNTHETIC_APPLICATION'), metadata: await field({ synthetic: true }), date: '2026-11-17' };
     const items: AgentApplicationInput['items'] = [
         { id: randomUUID(), kind: 'note', values: note },
+        { id: randomUUID(), kind: 'transcription', values: { ...note, title: await field('Trascrizione sintetica') } },
         { id: randomUUID(), kind: 'pdf', values: { name: await field('synthetic.pdf'), data: file.data, size: 45 } },
         { id: randomUUID(), kind: 'pdf', values: { name: await field('nota-visita.pdf'), data: file.data, size: 45 } },
         { id: randomUUID(), kind: 'therapy', values: { drugName: 'Farmaco sintetico', dosage: '1', startDate: '2026-11-17', status: 'active', motivation: await field('Fonte sintetica') } },
@@ -78,8 +79,10 @@ for (const [provider, allowsClinicalEgress] of [['local', false], ['openai', fal
     test(`L1 L6: the ${provider} cassette with egress ${allowsClinicalEgress} enters only whole, in one review; an automatic or partial request changes nothing`, async () => {
         const f = await visit(provider, allowsClinicalEgress), whole = f.whole(), before = snapshot();
         const without = (kind: string) => ({ ...whole, items: whole.items.filter(item => item.kind !== kind) });
-        for (const refused of [{ ...whole, phase: 'automatic' }, { ...whole, phase: 'automatic', items: whole.items.filter(item => item.kind === 'pdf') },
-            without('pdf'), without('note'), { ...whole, items: whole.items.filter(item => item.kind === 'note') }, { ...whole, patientId: 'another-synthetic-patient' }]) {
+        const only = (...kinds: string[]) => whole.items.filter(item => kinds.includes(item.kind));
+        for (const refused of [{ ...whole, phase: 'automatic' }, { ...whole, phase: 'automatic', items: only('transcription', 'pdf') },
+            { ...whole, phase: 'automatic', items: only('transcription') }, { ...whole, phase: 'automatic', items: only('pdf') },
+            without('pdf'), without('note'), without('transcription'), { ...whole, items: whole.items.filter(item => item.kind === 'note') }, { ...whole, patientId: 'another-synthetic-patient' }]) {
             assert.throws(() => applyAgentVisit(request, fixture.session, refused), /AGENT_APPLICATION_DENIED/);
         }
         assert.deepEqual(snapshot(), before);
@@ -88,7 +91,7 @@ for (const [provider, allowsClinicalEgress] of [['local', false], ['openai', fal
         const receipt = applyAgentVisit(request, fixture.session, whole), after = snapshot();
         assert.equal(receipt.phase, 'review');
         assert.equal(receipt.allowsClinicalEgress, allowsClinicalEgress);
-        assert.deepEqual(added(after, before), [1, 2, 1, 1, 2, 1]);
+        assert.deepEqual(added(after, before), [2, 2, 1, 1, 2, 1]);
         assert.deepEqual(agentAppliedItemIds(f.id).sort(), whole.items.map(item => item.id).sort());
         const audit = database.prepare('SELECT * FROM audit_events WHERE event_id=?').get(receipt.eventId) as Record<string, string>;
         assert.equal(audit.model_provider, provider);
@@ -105,9 +108,9 @@ test('one explicit review commits all structured proposals, service lines and pr
     const before = snapshot(), input = f.whole();
     const receipt = applyAgentVisit(request, fixture.session, input);
     const after = snapshot();
-    assert.deepEqual(added(after, before), [1, 2, 1, 1, 2, 1]);
+    assert.deepEqual(added(after, before), [2, 2, 1, 1, 2, 1]);
     assert.equal((after[0].at(-1) as { recorded_by: string }).recorded_by, 'Medico Sintetico');
-    assert.equal(agentAppliedItemIds(f.id).length, 8);
+    assert.equal(agentAppliedItemIds(f.id).length, 9);
     assert.ok(!readAgentCassetteIndex(database, fixture.session.userId, null).visits.some(row => row.id === f.id));
     assert.equal(readAgentCassette(database, f.id, fixture.session.userId)?.id, f.id);
     const audit = database.prepare("SELECT * FROM audit_events WHERE event_id=?").get(receipt.eventId) as Record<string, unknown>;
@@ -134,7 +137,7 @@ test('a stale patient revision or a revoked mandate applies nothing and leaves t
 
 test('failure of every audit position rolls back the whole review and its consumption receipts', async () => {
     const f = await visit();
-    const input = f.whole(), before = snapshot(), expectedAuditCount = 19;
+    const input = f.whole(), before = snapshot(), expectedAuditCount = 21;
     const withFault = (offset: number, apply: () => unknown) => {
         const count = (database.prepare('SELECT count(*) AS n FROM audit_events').get() as { n: number }).n + offset;
         database.exec(`CREATE TRIGGER synthetic_application_audit_fault BEFORE INSERT ON audit_events WHEN (SELECT count(*) FROM audit_events)=${count} BEGIN SELECT RAISE(ABORT, 'SYNTHETIC_APPLICATION_AUDIT_FAULT'); END`);
@@ -178,7 +181,7 @@ test('native approval commits and audits exactly one plan, and a valid proof can
 
     const result = applyConfirmedAgentVisit(request, fixture.session, plan, grant);
     const after = snapshot();
-    assert.deepEqual(added(after, before), [1, 2, 1, 1, 2, 1]);
+    assert.deepEqual(added(after, before), [2, 2, 1, 1, 2, 1]);
     assert.equal(hasAgentVisitConfirmationReceipt(reference, f.principal), true);
     assert.equal(hasAgentVisitConfirmationReceipt(reference, { ...f.principal, agentRef: randomUUID() }), false);
     const record = database.prepare('SELECT * FROM audit_events WHERE event_id=?').get(result.eventId) as Record<string, string>;
