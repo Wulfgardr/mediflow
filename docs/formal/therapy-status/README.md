@@ -1137,3 +1137,13 @@ per legare la CryptoKey alla sessione corrente. L'accessor non cambia
 ammissione, conferma, trasporto o commit delle terapie. Il modello resta
 invariato e non qualifica il trasferimento della chiave o l'applicazione
 delle cassette, che hanno prove separate.
+
+### Prova del documento Web, WUL-898
+
+Il trasporto aggiunge la prova del documento alle richieste API della stessa
+origine. Le scritture e la lettura di selection epoch conservano il controllo
+della generazione dell’archivio ed elaborano il rifiuto `ARCHIVE_REPLACED`.
+Una risposta di rifiuto su altre letture resta al chiamante. Il comando di
+stato terapia conserva ammissione, CAS, ledger e riconciliazione. Il modello
+TLC continua a rappresentare il controller legacy. La prova della sessione,
+il rinnovo e il blocco tra schede hanno regressioni proprie.
