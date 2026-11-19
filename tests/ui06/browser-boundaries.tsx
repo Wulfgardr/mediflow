@@ -22,6 +22,9 @@ export function useSecurity() {
 export function FixturePrivacy({ children }: { children: ReactNode; intensity?: string }) { return <>{children}</>; }
 export function FixtureLink(props: AnchorHTMLAttributes<HTMLAnchorElement>) { return <a {...props} />; }
 export function usePathname() { return window.location.pathname; }
+export function useParams() { return { id: 'ui06-patient' }; }
+export function useSearchParams() { return new URLSearchParams(window.location.search); }
+export function useRouter() { return { push: (href: string) => window.location.assign(href) }; }
 export function Kree8WorkspaceShell({ children, title, backHref, backLabel }: { children: ReactNode; title: string; backHref: string; backLabel: string }) {
     return <main><header><a href={backHref}>{backLabel}</a><h1>{title}</h1></header>{children}</main>;
 }
