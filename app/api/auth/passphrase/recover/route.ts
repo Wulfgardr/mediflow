@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { hasAttestedLoopbackIngress } from '@/lib/security/loopback-ingress.mjs';
 import { currentArchiveGeneration } from '@/lib/security/archive-session-generation';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
@@ -77,7 +78,7 @@ export async function POST(request: Request) {
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) { setWebAuthControlEtag(replacement, currentEtag()); return replacement; }
-        console.error('Passphrase recovery error:', error);
+        logServerError('Passphrase recovery error', error);
         return jsonResponse({ error: 'Errore durante il recupero.', code: 'PASSPHRASE_RECOVERY_FAILED' }, 500, currentEtag());
     } finally {
         if (attempt) abortWebAuthControl(attempt);

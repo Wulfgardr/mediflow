@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { readNativeNetworkJson, jsonBodyTooLargeResponse, NATIVE_BOOTSTRAP_JSON_MAX_BYTES } from '@/lib/native-network-json-body';
 import { NextResponse } from 'next/server';
 import { requireLocalApiToken } from '@/lib/security/local-api-auth';
@@ -14,7 +15,7 @@ export async function GET(request: Request) {
         const intents = await listNetworkPairingIntents();
         return NextResponse.json(intents);
     } catch (error) {
-        console.error('API GET /api/v1/network/pairing-intents error:', error);
+        logServerError('API GET /api/v1/network/pairing-intents error', error);
         return NextResponse.json({ error: 'Failed to load pairing intents' }, { status: 500 });
     }
 }
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
     } catch (error) {
         const sizeError = jsonBodyTooLargeResponse(error);
         if (sizeError) return sizeError;
-        console.error('API POST /api/v1/network/pairing-intents error:', error);
+        logServerError('API POST /api/v1/network/pairing-intents error', error);
         return NextResponse.json({ error: 'Failed to create pairing intent' }, { status: 500 });
     }
 }

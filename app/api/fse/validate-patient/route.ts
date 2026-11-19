@@ -1,4 +1,5 @@
 /* @Codex */
+import { logServerError } from '@/lib/server-error-log';
 import { NextResponse } from 'next/server';
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 import {
@@ -23,7 +24,7 @@ export async function GET(request: Request) {
 
         return NextResponse.json(validation);
     } catch (error) {
-        console.error('API GET /api/fse/validate-patient error:', error);
+        logServerError('API GET /api/fse/validate-patient error', error);
         return NextResponse.json({ error: 'Failed to validate patient export' }, { status: 500 });
     }
 }

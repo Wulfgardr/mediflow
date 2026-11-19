@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { hasAttestedLoopbackIngress } from '@/lib/security/loopback-ingress.mjs';
 import { NextResponse } from 'next/server';
 import { archiveGenerationForSession } from '@/lib/security/archive-session-generation';
@@ -99,7 +100,7 @@ export async function POST(request: Request) {
                 }, null),
             });
         } catch (error) {
-            console.error('Audit login success write failed:', error);
+            logServerError('Audit login success write failed', error);
         }
         const agentUnlockTicket = user.role === 'admin' && issuedArchiveGeneration
             && createAgentRegistrationStore(dbServer.$client).hasActiveRegistration(user.id, issuedArchiveGeneration)
@@ -122,7 +123,7 @@ export async function POST(request: Request) {
         return response;
     } catch (error) {
         if (attempt) abortWebAuthControl(attempt);
-        console.error("Login error:", error);
+        logServerError("Login error", error);
         return authFailureResponse({ error: "Login failed", code: "AUTH_LOGIN_FAILED" }, 500, mutation?.ifMatch);
     }
 }

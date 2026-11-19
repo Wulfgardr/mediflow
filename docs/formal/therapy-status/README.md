@@ -1138,6 +1138,17 @@ ammissione, conferma, trasporto o commit delle terapie. Il modello resta
 invariato e non qualifica il trasferimento della chiave o l'applicazione
 delle cassette, che hanno prove separate.
 
+## Raccordo del 19 novembre 2026 per i log del server
+
+La route delle terapie registra una categoria tecnica nei rami di errore
+di PUT e DELETE. Il bootstrap SQLite fa lo stesso nei controlli dello
+schema e rilancia le eccezioni come prima. Le transizioni, le guardie,
+la transazione, il CAS, l'audit e le risposte mantengono la stessa
+mappatura. Passano le prove del controller e delle transizioni e il
+flusso autorizzato di scrittura. Le due impronte aggiornate identificano
+i file dopo la modifica ai log. Modello, limiti e commit di
+sincronizzazione restano quelli delle transizioni già verificate.
+
 ## Eliminazione di una prestazione riesaminata il 19 novembre 2026
 
 In `cd8931931` la cancellazione Web di una prestazione invia le versioni

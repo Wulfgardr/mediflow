@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { unauthorizedResponse } from '@/lib/security/server-auth';
@@ -26,7 +27,7 @@ export async function GET(request: Request) {
         }
         return NextResponse.json(summary);
     } catch (error) {
-        console.error('API GET /api/v1/network/identity error:', error);
+        logServerError('API GET /api/v1/network/identity error', error);
         return NextResponse.json({ error: 'Failed to load network identity summary' }, { status: 500 });
     }
 }

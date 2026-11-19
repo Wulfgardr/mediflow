@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { rejectUnsealedV1Write } from '@/lib/api/v1/sealed-write';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 // Codex: created 2026-02-06
@@ -62,7 +63,7 @@ export async function GET(
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('API GET /api/v1/patients/[id]/therapies/[therapyId] error:', error);
+        logServerError('API GET /api/v1/patients/[id]/therapies/[therapyId] error', error);
         return NextResponse.json({ error: 'Failed to fetch therapy' }, { status: 500 });
     }
 }
@@ -102,7 +103,7 @@ export async function PUT(
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('API PUT /api/v1/patients/[id]/therapies/[therapyId] error:', error);
+        logServerError('API PUT /api/v1/patients/[id]/therapies/[therapyId] error', error);
         return NextResponse.json({ error: 'Failed to update therapy' }, { status: 500 });
     }
 }
@@ -136,7 +137,7 @@ export async function DELETE(
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('API DELETE /api/v1/patients/[id]/therapies/[therapyId] error:', error);
+        logServerError('API DELETE /api/v1/patients/[id]/therapies/[therapyId] error', error);
         return NextResponse.json({ error: 'Failed to delete therapy' }, { status: 500 });
     }
 }

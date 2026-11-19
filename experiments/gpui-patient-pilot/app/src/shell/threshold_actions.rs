@@ -114,6 +114,7 @@ impl ClinicalApp {
         let theme = self.theme;
         let menu = div()
             .id("threshold-other-actions-menu")
+            .accessibility_id("threshold-other-actions-menu")
             .debug_selector(|| "threshold-other-actions-menu".into())
             .role(Role::Menu)
             .aria_label("Altre azioni")
@@ -130,12 +131,14 @@ impl ClinicalApp {
             .border_1()
             .border_color(theme.strong_rule)
             .rounded(px(theme.control_radius))
-            .children(
-                secondary
-                    .into_iter()
-                    .enumerate()
-                    .map(|(index, command)| self.threshold_command(command, Some(index), cx)),
-            );
+            .children(secondary.into_iter().enumerate().map(|(index, command)| {
+                let item = self.threshold_command(command, Some(index), cx);
+                #[cfg(test)]
+                let item = rendered_command::observe(item);
+                item
+            }));
+        #[cfg(test)]
+        let menu = rendered_command::observe(menu);
         Some(
             div()
                 .id("clinical-workspace-save-threshold")

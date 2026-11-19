@@ -118,7 +118,7 @@ test('maps every typed ingest error to its stable HTTP status', async () => {
     } finally { console.error = originalError; }
 });
 
-test('passes unexpected original errors to server logging while sanitizing the response', async () => {
+test('records the error category for an unexpected ingest failure', async () => {
     const originalError = console.error; const entries: unknown[][] = [];
     const error = new Error('synthetic raw path and attachment detail'); console.error = (...values: unknown[]) => { entries.push(values); };
     try {
@@ -126,18 +126,18 @@ test('passes unexpected original errors to server logging while sanitizing the r
         assert.equal(response.status, 500); assert.equal(response.headers.get('Cache-Control'), 'no-store');
         assert.deepEqual(body, { error: 'Errore interno del server.', code: 'internal_error' });
         assert.equal(JSON.stringify(body).includes('synthetic raw'), false); assert.equal(entries.length, 1);
-        assert.equal(entries[0]?.[1], error);
+        assert.deepEqual(entries, [[JSON.stringify({ event: 'server.failure', level: 'error', operation: 'POST Smart Import ingest', kind: 'error' })]]);
     } finally { console.error = originalError; }
 });
 
-test('sanitizes a runtime-invalid controlled code while retaining the original error for logging', async () => {
+test('returns a generic error and records the category of an unknown ingest code', async () => {
     const originalError = console.error; const entries: unknown[][] = [];
     const error = new ProjectionBrokerError('future_ingest_code' as never);
     console.error = (...values: unknown[]) => { entries.push(values); };
     try {
         const response = await handler(error).handle(request());
         await rejects(response, 500, 'internal_error');
-        assert.equal(entries.length, 1); assert.equal(entries[0]?.[1], error);
+        assert.equal(entries.length, 1); assert.deepEqual(entries, [[JSON.stringify({ event: 'server.failure', level: 'error', operation: 'POST Smart Import ingest', kind: 'error' })]]);
     } finally { console.error = originalError; }
 });
 

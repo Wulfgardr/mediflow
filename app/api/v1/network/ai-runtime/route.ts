@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { NextResponse } from 'next/server';
 /* @Codex */
 import { getNetworkAiRuntimeSummary } from '@/lib/network-home-base-server';
@@ -13,7 +14,7 @@ export async function GET(request: Request) {
         const summary = await getNetworkAiRuntimeSummary();
         return NextResponse.json(summary);
     } catch (error) {
-        console.error('API GET /api/v1/network/ai-runtime error:', error);
+        logServerError('API GET /api/v1/network/ai-runtime error', error);
         return NextResponse.json({ error: 'Failed to load network AI runtime summary' }, { status: 500 });
     }
 }
