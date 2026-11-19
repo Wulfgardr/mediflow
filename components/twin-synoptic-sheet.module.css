@@ -20,22 +20,123 @@
 @media (pointer: coarse) { .sheet td { height: 44px; } }
 
 
-.sheet[data-overview] { container-type: normal; gap: 20px; align-items: start; }
-.stable, .middle, .side, .context, .contextRows, .activity { display: grid; gap: 14px; min-width: 0; align-content: start; }
-.stable > section, .contextRows > section { min-width: 0; }
-.stable > section, .stable .notes {
-    padding: 0 12px 6px;
-    background: var(--lume-surface-field);
-    border-radius: var(--lume-radius-control);
+.sheet[data-overview] {
+    container: record-sheet / inline-size;
+    --record-tray: #f0f2f4;
+    --record-tray-rule: #dfe1e5;
+    --record-tray-light: #ffffff;
+    --record-tray-shadow: #1418321a;
+    --record-island: #ffffff;
+    --record-compact-island: #f3f4f6;
+    --record-island-rule: #e7e8eb;
+    --record-change: #e3ebfa;
+    --record-change-rule: #bccbe8;
+    --record-proposal-rule: #2b8098;
+    --record-island-radius: 14px;
+    --record-tray-inset: 10px;
+    --record-gap: 12px;
 }
-.sheet[data-overview] :global(.lume-section-heading) { column-gap: 6px; flex-wrap: wrap; }
-.sheet[data-overview] :global(.lume-section-heading > span) { font: var(--type-meta); }
-.sheet[data-overview] :is(.stable, .contextRows) :is(th, td):is(.secondaryColumn) { display: none; }
-.sheet[data-overview] .stable :is(th, td) { height: auto; }
-.sheet[data-overview] .stable td { padding-block: 5px; }
-.sheet[data-overview] .problems th:first-child { width: 3.5rem; }
-.sheet[data-overview] .therapies th:first-child { width: 54%; }
-.sheet[data-overview] .therapies td { vertical-align: top; overflow-wrap: anywhere; }
+:global(.dark) .sheet[data-overview] {
+    --record-tray: #101216;
+    --record-tray-rule: #24262b;
+    --record-tray-light: #ffffff0d;
+    --record-tray-shadow: #00000066;
+    --record-island: #1f2228;
+    --record-compact-island: #1f2228;
+    --record-island-rule: #2f3238;
+    --record-change: #1c273d;
+    --record-change-rule: #364566;
+    --record-proposal-rule: #4a97ad;
+}
+.overview { display: grid; align-items: start; gap: var(--record-gap); min-width: 0; min-inline-size: 0; }
+.stable, .middle, .side, .context, .contextRows, .activity {
+    display: grid;
+    gap: 10px;
+    min-width: 0;
+    align-content: start;
+}
+.zoneTitle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    padding: 2px 4px;
+    color: var(--lume-ink);
+    font: var(--type-record-zone);
+    scroll-margin-block-start: 20px;
+}
+.middle > .zoneTitle:has(+ .activity .comparison)::after {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--lume-accent);
+}
+.overviewIndex {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 3px;
+}
+.overviewIndex a {
+    display: inline-flex;
+    align-items: center;
+    padding-inline: 12px;
+    min-height: 36px;
+    border: 1px solid var(--lume-rule-strong);
+    border-radius: 999px;
+    color: var(--lume-ink);
+    font: var(--type-body);
+    white-space: nowrap;
+}
+.overviewIndex a:hover, .islandAction:hover { text-decoration: underline; }
+.overview :is(.stable > section, .notes, .contextRows > section, .activity > section, .noComparison, .support),
+.overview .middle > :global(#diario) {
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid var(--record-island-rule);
+    border-radius: var(--record-island-radius);
+    background: var(--record-compact-island);
+    scroll-margin-block-start: 20px;
+}
+.overview .activity > .comparison { background: var(--record-change); border-color: var(--record-change-rule); }
+.overview .support:has([data-has-proposals='true']) {
+    border-style: dashed;
+    border-color: var(--record-proposal-rule);
+}
+.overview .islandHeader { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-bottom: 6px; }
+.islandHeader > h2 { flex: 1 1 auto; justify-content: start; }
+.islandIcon {
+    display: inline-grid;
+    width: 28px;
+    height: 28px;
+    place-items: center;
+    border: 1px solid var(--record-island-rule);
+    border-radius: 8px;
+    background: var(--record-island);
+    flex: none;
+    color: var(--lume-ink-muted);
+}
+.visitDate { color: var(--lume-ink-muted); font: var(--type-meta); overflow-wrap: anywhere; }
+.islandAction { color: var(--lume-accent); font: var(--type-body); }
+.overview :is(:global(.lume-section-heading), .support h2, .comparison h2) {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    font: var(--type-record-island);
+    overflow-wrap: anywhere;
+}
+.overview :global(.lume-section-heading > span) { color: var(--lume-ink-muted); font: var(--type-meta); }
+.overview :is(.stable, .contextRows) .secondaryColumn { display: none; }
+.overview .stable :is(th, td) { height: auto; }
+.overview .stable td { padding-block: 6px; }
+.overview .stable table td:not(:global(.lume-code)) { overflow-wrap: anywhere; }
+.overview .problems th:first-child { width: 3.5rem; }
+.overview .problems td:nth-child(2), .overview .therapies td:first-child { font: var(--type-record-row); }
+.overview .therapies th:first-child { width: 54%; }
+.overview .therapies td { vertical-align: top; }
+.overview .notes p { font: var(--type-body); }
+.overview table :global(.lume-code) { font: var(--type-meta); }
 .diaryTools { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
 .diaryTools button { padding: 3px 0; text-align: start; font: var(--type-meta); color: var(--lume-accent); font-weight: 600; }
 .diaryTools button:hover { text-decoration: underline; }
@@ -69,6 +170,7 @@
 .changeDetails summary > strong { color: var(--lume-ink); }
 .changeDetails[open] p { margin-block: 5px; }
 .changeDateGroup { padding-bottom: 4px; }
+.changeDateGroup:last-child { border: 0; }
 .changeGroup { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 10px; }
 .groupLabel, .changeGroup > .outOfRange { flex: 0 0 7.5rem; font: var(--type-meta); font-weight: 600; }
 .changeItems {
@@ -87,7 +189,16 @@
 .changeItems .changeDetails[open] { padding-bottom: 5px; }
 .changeItems .changeDetails summary > span { flex: none; }
 .changeItems a, .changeItems button { overflow-wrap: anywhere; }
-.activityLink { display: inline-block; padding-block: 5px; color: var(--lume-accent); font: var(--type-meta); font-weight: 600; }
+.activityLink {
+    display: inline-block;
+    margin-top: 4px;
+    padding: 4px 8px;
+    border-radius: 8px;
+    background: var(--record-island, var(--lume-surface-focal));
+    color: var(--lume-accent);
+    font: var(--type-meta);
+    font-weight: 600;
+}
 .activityLink:hover { text-decoration: underline; }
 .outOfRange { color: var(--lume-signal-critical); }
 .activityToggle { display: flex; align-items: center; gap: 8px; padding-block: 6px; }
@@ -97,58 +208,79 @@
 .sourceButton svg { flex: none; }
 .sourceButton:hover { color: var(--lume-accent); }
 .fullDiary { display: none; }
-:global([data-folder-section='quadro']) .middle :global(#diario > [data-section-header] > h3) { flex-basis: auto; }
-@media (min-width: 1000px) {
+.overview .middle :global(#diario > [data-section-header] > h3) { flex-basis: auto; }
+.overview .middle :global(#diario > [data-section-header] > h3 span:first-child) { font: var(--type-record-island); }
+.overview .middle :global(#diario [role='feed']) { min-width: 0; }
+.overview .middle :global(#diario [role='feed'] .prose) { font: var(--type-record-text); }
+.overview .support > :global([data-testid='patient-proposals-summary']) { padding: 0; border: 0; }
+.contextRows:has([data-source-open='true']) { display: contents; }
+.contextRows > [data-source-open='true'] { order: -1; }
+
+@container record-sheet (width >= 44rem) {
+    :global([data-folder-section='quadro']) .overview { grid-template-columns: minmax(0, 1.22fr) minmax(0, 1fr); }
+    .overviewIndex { display: none; }
+    .zoneTitle { padding: 6px 6px 0; }
+    .overview :is(.stable, .middle, .context) {
+        padding: var(--record-tray-inset);
+        border-radius: calc(var(--record-island-radius) + var(--record-tray-inset));
+        background: var(--record-tray);
+        box-shadow: inset 0 0 0 1px var(--record-tray-rule),
+            inset 0 2px 0 var(--record-tray-light),
+            inset 0 -12px 18px -18px var(--record-tray-shadow);
+    }
+    .overview :is(.stable > section, .notes, .contextRows > section, .activity > section, .noComparison, .support),
+    .overview .middle > :global(#diario) { background: var(--record-island); }
+    .overview .activity > .comparison { background: var(--record-change); }
+    .overview .support:has([data-has-proposals='true']) { background: transparent; }
+    :global([data-folder-section='quadro']) :is(.overview > .middle, .overview > .side) {
+        max-height: max(320px, calc(100dvh - 242px));
+        overflow-y: auto;
+        scrollbar-width: thin;
+        scroll-padding: var(--record-tray-inset);
+    }
     .diaryTools[data-reading='true'] {
         position: sticky;
         top: 0;
         z-index: 2;
-        background: var(--lume-surface-focal);
+        padding-inline: 6px;
+        background: var(--record-tray);
+        border-radius: 8px;
     }
-    :global([data-folder-section='quadro']) .sheet[data-overview] { grid-template-columns: minmax(0, 1fr) minmax(270px, 340px); }
-    .side .context { display: contents; }
-    .composer { order: -1; }
-    :global([data-folder-section='quadro']) .sheet[data-overview] > :is(.middle,.side) {
+}
+@container record-sheet (width >= 57rem) {
+    :global([data-folder-section='quadro']) .sheet:not([data-writing]) .overview {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.22fr) minmax(0, 1fr);
+    }
+    :global([data-folder-section='quadro']) .sheet:not([data-writing]) .side { display: contents; }
+    :global([data-folder-section='quadro']) .sheet:not([data-writing]) .middle { grid-column: 2; grid-row: 1; }
+    :global([data-folder-section='quadro']) .sheet:not([data-writing]) .stable { grid-column: 1; grid-row: 1; }
+    :global([data-folder-section='quadro']) .sheet:not([data-writing]) .context { grid-column: 3; grid-row: 1; }
+    :global([data-folder-section='quadro']) .sheet:not([data-writing]) .side > :is(.stable, .context) {
         max-height: max(320px, calc(100dvh - 242px));
         overflow-y: auto;
         scrollbar-width: thin;
-        padding: 2px 4px 6px;
-        scroll-padding: 6px;
+        scroll-padding: var(--record-tray-inset);
     }
 }
-@media (min-width: 1280px) {
-    :global([data-folder-section='quadro']) .sheet[data-overview] {
-        grid-template-columns: minmax(185px, 270px) minmax(0, 1fr) minmax(280px, 340px);
-    }
-    :global([data-folder-section='quadro']) .sheet[data-overview] > .side { display: contents; }
-    .middle { grid-column: 2; grid-row: 1; }
-    .stable { grid-column: 1; grid-row: 1; }
-    .side .context { display: grid; grid-column: 3; grid-row: 1; }
-    :global([data-folder-section='quadro']) .sheet[data-overview] .side > :is(.stable,.context) {
-        max-height: max(320px, calc(100dvh - 242px));
-        overflow-y: auto;
-        scrollbar-width: thin;
-        padding: 2px 4px 6px;
-        scroll-padding: 6px;
-    }
-}
-@media (max-width: 999px) {
-    :global([data-folder-section='quadro']) .sheet[data-overview] :is(.middle,.side,.context) { display: contents; }
-    .support { order: -5; }
+@container record-sheet (width < 44rem) {
+    :global([data-folder-section='quadro']) .overview :is(.middle, .side, .context) { display: contents; }
+    .overviewIndex { order: -5; }
     .composer { order: -4; }
-    .activity { order: -3; }
-    .stable { order: -2; }
-    .contextRows { order: 2; }
+    .contextRows > [data-source-open='true'] { order: -3; }
+    .middle > .zoneTitle, .activity { order: -2; }
+    .stable { order: -1; }
+    .stable > section:has(.therapies) { order: -1; }
+    .stable > .zoneTitle { order: -2; }
+    .context > .zoneTitle, .support, .contextRows { order: 2; }
     :global([data-folder-section='quadro']) .sheet:not([data-full-diary]) .middle :global(#diario:not(:target) [role='feed'] > article:nth-of-type(n + 6)) { display: none; }
     :global([data-folder-section='quadro']) .fullDiary { display: inline-flex; justify-self: start; order: 1; }
+    .sheet[data-full-diary] .diaryTools { order: -1; }
 }
-@media (min-width: 700px) and (max-width: 999px) {
-    .stable { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .stable .notes { grid-column: 1 / -1; }
+:global([data-folder-section='diario']) .overview > .middle {
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
 }
-
-.contextRows:has([data-source-open='true']) { display: contents; }
-.contextRows > [data-source-open='true'] { order: -1; }
-@media (max-width: 999px) {
-    .contextRows > [data-source-open='true'] { order: -4; }
+@media (pointer: coarse) {
+    .overviewIndex a, .islandAction { min-height: 44px; align-content: center; }
 }

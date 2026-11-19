@@ -35,6 +35,39 @@ pub struct Theme {
     pub control_radius: f32,
     pub paper_radius: f32,
     pub scale: f32,
+    pub(crate) record: RecordPalette,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub(crate) struct RecordPalette {
+    pub tray: Hsla,
+    pub tray_rule: Hsla,
+    pub tray_light: Hsla,
+    pub tray_shadow: Hsla,
+    pub island: Hsla,
+    pub compact_island: Hsla,
+    pub island_rule: Hsla,
+    pub change: Hsla,
+    pub change_rule: Hsla,
+    pub proposal_rule: Hsla,
+}
+
+impl RecordPalette {
+    fn for_dark(dark: bool) -> Self {
+        let color = |light, shadow| rgb(if dark { shadow } else { light }).into();
+        Self {
+            tray: color(0xf0f2f4, 0x101216),
+            tray_rule: color(0xdfe1e5, 0x24262b),
+            tray_light: color(0xffffff, 0x1d1f23),
+            tray_shadow: color(0xd9dce1, 0x08090b),
+            island: color(0xffffff, 0x1f2228),
+            compact_island: color(0xf3f4f6, 0x1f2228),
+            island_rule: color(0xe7e8eb, 0x2f3238),
+            change: color(0xe3ebfa, 0x1c273d),
+            change_rule: color(0xbccbe8, 0x364566),
+            proposal_rule: color(0x2b8098, 0x4a97ad),
+        }
+    }
 }
 
 impl Theme {
@@ -95,6 +128,7 @@ impl Theme {
                 10.
             },
             scale: 1.,
+            record: RecordPalette::for_dark(dark),
         }
     }
 
@@ -154,6 +188,10 @@ impl Theme {
             TypeRole::Meta => (SYSTEM, 13., FontWeight::NORMAL, 1.5, true),
             TypeRole::Section => (SYSTEM, 12., FontWeight::SEMIBOLD, 1.5, true),
             TypeRole::Title => (SYSTEM, 15., FontWeight::SEMIBOLD, 1.4, true),
+            TypeRole::RecordPerson => (SYSTEM, 28., FontWeight::BOLD, 1.15, false),
+            TypeRole::RecordZone => (SYSTEM, 20., FontWeight::BOLD, 1.2, false),
+            TypeRole::RecordIsland => (SYSTEM, 17., FontWeight::SEMIBOLD, 1.3, false),
+            TypeRole::RecordRow => (SYSTEM, 15., FontWeight::SEMIBOLD, 1.35, false),
             TypeRole::Code => (CODES, 12., FontWeight::NORMAL, 1.5, false),
         };
         let size = self.size(points * if register { native_body / 14. } else { 1. });
@@ -182,6 +220,10 @@ pub enum TypeRole {
     Meta,
     Section,
     Title,
+    RecordPerson,
+    RecordZone,
+    RecordIsland,
+    RecordRow,
     Code,
 }
 
@@ -221,6 +263,7 @@ pub enum TextRole {
     Body,
     Strong,
     Meta,
+    RecordRow,
     Code,
 }
 impl From<TextRole> for TypeRole {
@@ -231,6 +274,7 @@ impl From<TextRole> for TypeRole {
             TextRole::Body => Self::Body,
             TextRole::Strong => Self::Strong,
             TextRole::Meta => Self::Meta,
+            TextRole::RecordRow => Self::RecordRow,
 
             TextRole::Code => Self::Code,
         }
@@ -244,6 +288,9 @@ pub enum TitleRole {
     PersonPreview,
     Section,
     SectionTitle,
+    RecordPerson,
+    RecordZone,
+    RecordIsland,
     Threshold,
 }
 impl From<TitleRole> for TypeRole {
@@ -255,6 +302,9 @@ impl From<TitleRole> for TypeRole {
             TitleRole::PersonPreview => Self::PersonPreview,
             TitleRole::Section => Self::Section,
             TitleRole::SectionTitle => Self::Title,
+            TitleRole::RecordPerson => Self::RecordPerson,
+            TitleRole::RecordZone => Self::RecordZone,
+            TitleRole::RecordIsland => Self::RecordIsland,
             TitleRole::Threshold => Self::Threshold,
         }
     }

@@ -113,8 +113,8 @@ const geometry = async (target: Locator) => target.evaluate(element => {
 });
 
 async function themes(page: Page, suffix: string) {
-    for (const width of [1440, 1280, 1180, 1000, 999, 768, 390, 320]) for (const theme of ['light', 'dark']) {
-        await page.setViewportSize({ width, height: 660 });
+    for (const width of [1440, 1320, 1180, 1000, 999, 768, 402, 390, 320]) for (const theme of ['light', 'dark']) {
+        await page.setViewportSize({ width, height: width === 1320 ? 880 : width === 402 ? 874 : 660 });
         await page.evaluate(value => {
             localStorage.setItem('mediflow-theme', value);
             document.documentElement.classList.toggle('light', value === 'light');
@@ -122,10 +122,43 @@ async function themes(page: Page, suffix: string) {
         }, theme);
         await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
         const dir = process.env.MEDIFLOW_STABLE_CHANGED_SCREENSHOTS;
-        if (dir) await page.screenshot({ path: `${dir}/${suffix}-${width}-${theme}.png`, animations: 'disabled' });
+        if (dir && [1320, 1180, 402, 390].includes(width)) {
+            await page.screenshot({ path: `${dir}/${suffix}-${width}-${theme}.png`, animations: 'disabled' });
+        }
         await assertNoHorizontalOverflow(page, [{ label: 'Scheda', selector: '#quadro' }]);
-        const tracks = await page.locator('#quadro[data-overview]').evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length);
-        expect(tracks).toBe(width >= 1280 ? 3 : width >= 1000 ? 2 : 1);
+        const sheet = page.locator('#quadro[data-overview]');
+        const layout = await sheet.evaluate(element => {
+            const grid = element.firstElementChild!;
+            const tray = element.querySelector('[aria-labelledby="riepilogo-stabile"]')!;
+            const island = element.querySelector('#riepilogo-problemi')!;
+            const title = tray.querySelector('h2')!;
+            const action = island.querySelector('a')!;
+            return {
+                width: element.clientWidth,
+                rem: Number.parseFloat(getComputedStyle(document.documentElement).fontSize),
+                tracks: getComputedStyle(grid).gridTemplateColumns.split(' ').length,
+                tray: getComputedStyle(tray).backgroundColor,
+                trayRadius: Number.parseFloat(getComputedStyle(tray).borderRadius),
+                inset: Number.parseFloat(getComputedStyle(tray).paddingLeft),
+                islandRadius: Number.parseFloat(getComputedStyle(island).borderRadius),
+                titleSize: Number.parseFloat(getComputedStyle(title).fontSize),
+                actionSize: Number.parseFloat(getComputedStyle(action).fontSize),
+            };
+        });
+        const compact = layout.width < 44 * layout.rem;
+        expect(layout.tracks).toBe(layout.width >= 57 * layout.rem ? 3 : compact ? 1 : 2);
+        expect(layout.tray).toBe(compact ? 'rgba(0, 0, 0, 0)' : theme === 'light' ? 'rgb(240, 242, 244)' : 'rgb(16, 18, 22)');
+        if (!compact) expect(layout.trayRadius - layout.inset).toBe(layout.islandRadius);
+        expect(layout.titleSize).toBeGreaterThan(layout.actionSize);
+        if ([1320, 1180, 402, 390].includes(width)) await test.info().attach(`zone-${width}-${theme}`, {
+            body: JSON.stringify(layout, null, 2), contentType: 'application/json',
+        });
+        if (width === 390) {
+            const jump = page.getByRole('navigation', { name: 'Nel riepilogo' }).getByRole('link', { name: 'Terapie' });
+            await jump.click();
+            await expect(page.getByRole('region', { name: 'Terapie attive', exact: true })).toBeInViewport();
+            await page.getByRole('navigation', { name: 'Nel riepilogo' }).getByRole('link', { name: 'Cambiato' }).click();
+        }
     }
     await page.setViewportSize({ width: 1180, height: 660 });
 }
@@ -154,7 +187,11 @@ test('D: dalla lista, primo sguardo al ritorno e cartella senza storico al cambi
         if (index < 2) expect(item!.y + item!.height).toBeLessThanOrEqual(660);
         return item!;
     });
-    expect(changed.x).toBeLessThan(stable.x);
+    if (await page.getByRole('region', { name: 'Stabile', exact: true }).evaluate(el => el.getBoundingClientRect().left < el.parentElement!.parentElement!.getBoundingClientRect().left + 4)) {
+        expect(stable.x).toBeLessThan(changed.x);
+    } else {
+        expect(changed.x).toBeLessThan(stable.x);
+    }
     expect(changed.x).toBeLessThan(context.x);
     await test.info().attach('primo-sguardo-1180x660', {
         body: JSON.stringify({ problema: stable, variazione: changed, quadro: context }, null, 2), contentType: 'application/json',

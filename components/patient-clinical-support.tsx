@@ -16,7 +16,7 @@ export function PatientProposalsSummary({ hasInsightProposal, hasSmartImportProp
     smartImportAvailable: boolean;
 }) {
     const count = Number(hasInsightProposal) + Number(hasSmartImportProposal);
-    return <div className={styles.summary} data-testid="patient-proposals-summary">
+    return <div className={styles.summary} data-testid="patient-proposals-summary" data-has-proposals={count > 0}>
         <h2 className="type-section-heading">Quadro paziente</h2>
         <InkState state="pencil">{count === 0 ? 'Nessuna proposta da rivedere' : `${count} ${count === 1 ? 'proposta' : 'proposte'} da rivedere`}</InkState>
         <span className={styles.links}>

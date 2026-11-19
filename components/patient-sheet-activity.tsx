@@ -4,7 +4,7 @@ import type { Attachment, ClinicalEntry, Observation, Therapy } from '@/lib/db';
 import { diaryContactsAfter, diaryTypeLabel, outOfRangeAfter } from '@/lib/patient-sheet-activity';
 import { projectTherapyRecordUpdates, type projectVisitReference, recordDate } from '@/lib/patient-therapy-changes';
 import { useState, type ReactNode } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, History } from 'lucide-react';
 import PrivacyBlur from './privacy-blur';
 import { InkSectionHeading } from './ui/ink-state';
 import styles from './twin-synoptic-sheet.module.css';
@@ -113,7 +113,11 @@ export function PatientSheetActivity({ patientId, reference, now, entries, thera
 
     return <>
         {visit && hasActivity ? <section aria-label="Variazioni dall’ultima visita" className={styles.comparison}>
-            <h2>{heading}</h2>
+            <header className={styles.islandHeader}>
+                <span className={styles.islandIcon}><History size={16} aria-hidden="true" /></span>
+                <h2>Dall&apos;ultima visita</h2>
+                <span className={styles.visitDate}><SheetDate date={visit.date} />{visit.author ? <> · <PrivacyBlur>{visit.author}</PrivacyBlur></> : null}</span>
+            </header>
             {partial ? <p className={styles.readState} role="status">Confronto incompleto. Alcuni dati non sono disponibili.</p> : null}
             <ul className={styles.changeList}>{Array.from(groupActivity(rows), ([key, day]) => <li key={key} className={styles.changeDateGroup}>
                 <span className={styles.changeDay}><SheetDate date={day.date} /></span>

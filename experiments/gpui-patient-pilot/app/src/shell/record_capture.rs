@@ -1147,8 +1147,8 @@ fn capture_record_d_on_the_synthetic_bench() {
         );
         summary.push(serde_json::json!({"theme": theme, "gesture": result, "crowded": crowded, "pdf": pdf, "direction": direction, "letters": letters, "shots": run.log}));
         for (width, height, label) in [
-            (1440., 900., "1440"),
-            (820., 660., "820"),
+            (1320., 880., "1320"),
+            (402., 874., "402"),
             (390., 760., "390"),
         ] {
             let mut cx = context();
