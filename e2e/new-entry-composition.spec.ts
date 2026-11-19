@@ -38,7 +38,7 @@ test('Nuova voce: Quadro, bozza unica, uscita protetta e registrazione con fonte
         const composer = page.getByTestId('progressive-entry-composer'), form = page.locator('form[aria-label="Nuova voce clinica"]');
         const editor = page.getByRole('textbox', { name: 'Resoconto clinico', exact: true });
         await expect(form).toBeVisible(); await expect(editor).toHaveCount(1);
-        await expect(composer.locator('header')).toContainText('Sintetica Voce');
+        await expect(composer.locator(':scope > header')).toContainText('Sintetica Voce');
         const capture = async (state: string, anchor: Locator) => {
             if (causal) return;
             if (directory) await mkdir(directory, { recursive: true });

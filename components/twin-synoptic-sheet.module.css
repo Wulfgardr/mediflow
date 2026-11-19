@@ -69,7 +69,7 @@
 }
 .overviewIndex a:hover, .islandAction:hover { text-decoration: underline; }
 .overview :is(.stable > section, .notes, .contextRows > section, .activity > section, .noComparison, .support),
-.overview .middle > :global(#diario) {
+:global([data-folder-section='quadro']) .overview .middle > :global(#diario) {
     min-width: 0;
     padding: 12px;
     border: 1px solid var(--lume-record-island-rule);
@@ -150,7 +150,7 @@
 .changeDateGroup { padding-bottom: 4px; }
 .changeDateGroup:last-child { border: 0; }
 .changeGroup { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 10px; }
-.groupLabel, .changeGroup > .outOfRange { flex: 0 0 7.5rem; font: var(--type-meta); font-weight: 600; }
+.groupLabel, .changeGroup > .outOfRange { flex: 0 0 auto; min-width: min(5.25rem, 100%); max-width: 100%; font: var(--type-meta); font-weight: 600; }
 .changeItems {
     flex: 1 1 11rem;
     min-width: 0;
@@ -186,10 +186,10 @@
 .sourceButton svg { flex: none; }
 .sourceButton:hover { color: var(--lume-accent); }
 .fullDiary { display: none; }
-.overview .middle :global(#diario > [data-section-header] > h3) { flex-basis: auto; }
-.overview .middle :global(#diario > [data-section-header] > h3 span:first-child) { font: var(--type-record-island); }
+:global([data-folder-section='quadro']) .overview .middle :global(#diario > [data-section-header] > h3) { flex-basis: auto; }
+:global([data-folder-section='quadro']) .overview .middle :global(#diario > [data-section-header] > h3 span:first-child) { font: var(--type-record-island); }
 .overview .middle :global(#diario [role='feed']) { min-width: 0; }
-.overview .middle :global(#diario [role='feed'] .prose) { font: var(--type-record-text); }
+:global([data-folder-section='quadro']) .overview .middle :global(#diario [role='feed'] .prose) { font: var(--type-record-text); }
 .overview .support > :global([data-testid='patient-proposals-summary']) { padding: 0; border: 0; }
 .contextRows:has([data-source-open='true']) { display: contents; }
 .contextRows > [data-source-open='true'] { order: -1; }
@@ -207,7 +207,7 @@
             inset 0 -12px 18px -18px var(--lume-record-tray-shadow);
     }
     .overview :is(.stable > section, .notes, .contextRows > section, .activity > section, .noComparison, .support),
-    .overview .middle > :global(#diario) { background: var(--lume-record-island); }
+    :global([data-folder-section='quadro']) .overview .middle > :global(#diario) { background: var(--lume-record-island); }
     .overview .activity > .comparison { background: var(--lume-record-change); }
     .overview .support:has([data-has-proposals='true']) { background: transparent; }
     :global([data-folder-section='quadro']) :is(.overview > .middle, .overview > .side) {
