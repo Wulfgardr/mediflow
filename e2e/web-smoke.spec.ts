@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { bootstrapUnlockedSession, openPatientSection } from './utils';
 import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
+import { sealDiaryEntry } from './fixtures/sealed-diary-entry';
 
 type ObservedConsoleError = Readonly<{ text: string; url: string }>;
 const errorsByPage = new WeakMap<Page, ObservedConsoleError[]>();
@@ -233,10 +234,10 @@ test('web smoke: live decision CTAs always open their declared patient context',
   const rows = await latest.json() as Array<{ date: string }>;
   const date = new Date(Math.max(Date.now(), ...rows.map(row => Date.parse(row.date)).filter(Number.isFinite)) + 1_000).toISOString();
   const entryTitle = `Follow-up sintetico ${marker}`;
-  const entryResponse = await page.request.post('/api/entries', { headers: archiveHeaders, data: {
+  const entryResponse = await page.request.post('/api/entries', { headers: archiveHeaders, data: await sealDiaryEntry(page, {
     patientId: quadroPatient.id, type: 'note', title: entryTitle,
     content: 'Voce sintetica per verificare la destinazione della CTA.', date, setting: 'ambulatory',
-  } });
+  }) });
   expect(entryResponse.status()).toBe(201);
   const entry = await entryResponse.json() as { id: string; version: number };
 
