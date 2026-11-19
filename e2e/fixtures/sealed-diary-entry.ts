@@ -1,7 +1,5 @@
-import { createRequire } from 'node:module';
 import type { Page } from '@playwright/test';
-
-const encryptedFields = createRequire(import.meta.url)('../../lib/backup-encrypted-fields.json') as { entries: string[] };
+import encryptedFields from '../../lib/backup-encrypted-fields.json';
 
 export async function sealDiaryEntry<T extends Record<string, unknown>>(page: Page, entry: T): Promise<T> {
     return page.evaluate(async ({ entry: plain, fields }) => {
