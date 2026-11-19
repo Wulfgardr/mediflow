@@ -137,7 +137,7 @@ type InsertRunner = Pick<typeof dbServer, 'insert'>;
 type InsertableTable = (typeof TABLE_LOOKUP)[BackupCollectionName] | typeof patientsToAmbulatories;
 export type BackupRestoreMutationFence = () => boolean;
 
-export type BackupRestoreBlockedReason = 'audit' | 'runtime_fence' | 'therapy_status_commands' | 'ambulatory_destructive_commands' | 'snapshot';
+export type BackupRestoreBlockedReason = 'audit' | 'runtime_fence' | 'therapy_status_commands' | 'ambulatory_destructive_commands' | 'snapshot' | 'source';
 
 /* The restore stopped inside its transaction: the target archive is unchanged. Callers report it as blocked, not as failed. */
 export class BackupRestoreBlockedError extends Error {
@@ -298,7 +298,6 @@ export function restoreBackupArtifact(
     const coverage = backupAuditCoverage(artifact.payload);
     let audit: BackupRestoreResult['audit'] = { coverage, inserted: 0, reused: 0 };
     let receipt: RestoreReceipt | undefined;
-    revokeAttachmentExtractionLocatorGeneration();
     runDbServerImmediateTransaction(() => {
         if (intent && restoreSnapshot(openDbServer()) !== intent.expectedSnapshot) {
             throw new BackupRestoreBlockedError('snapshot', 'archive changed after preview.');
@@ -314,6 +313,7 @@ export function restoreBackupArtifact(
         const plan = planBackupAuditRestore(rows);
         const physicianAttestations = physicianAttestationsWithoutRestoredAuthority(artifact.payload.physicianReviewAttestations ?? []);
         runMutationFence(beforeMutation);
+        revokeAttachmentExtractionLocatorGeneration();
         rotateSqliteArchiveGeneration(openDbServer());
         clearAllSessions();
         for (const collection of CLEAR_ORDER) {

@@ -6,7 +6,7 @@ import { planUnlock, LONG_PIN_NOTICE, LONG_PIN_CONFIRM_LABEL } from '@/lib/secur
 import { formatCountLabel } from '@/lib/format-count';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Download, Upload, AlertTriangle, CheckCircle, RefreshCw, ShieldCheck } from 'lucide-react';
-import { BackupRestoreBlockedError, BackupRestorePreflightError, exportRawDatabase, importRawDatabase, verifyRawDatabase } from '@/lib/db';
+import { BackupRestoreBlockedError, BackupRestorePreflightError, exportRawDatabase, importRawDatabase, verifyRawDatabase, type PreparedBackupRestore } from '@/lib/db';
 import { BackupRestoreKeyError } from '@/lib/backup-restore-key-check';
 import { useSecurity } from './security-provider';
 import { RecoveryBackupUI } from './recovery-backup-ui';
@@ -50,6 +50,15 @@ function failedOutcome(err: unknown, action: 'verify' | 'restore'): Outcome {
         };
     }
     if (err instanceof BackupRestoreBlockedError) {
+        if (err.reason === 'snapshot' || err.reason === 'source') {
+            const changed = err.reason === 'snapshot' ? 'L’archivio è cambiato' : 'Il file è cambiato';
+            return {
+                type: 'error',
+                title: 'Ripristino bloccato',
+                message: changed + ' dopo la verifica. I dati sono rimasti intatti.',
+                nextStep: 'Verifica di nuovo il file selezionandolo per il ripristino.',
+            };
+        }
         return { type: 'error', title: 'Ripristino bloccato', message, nextStep: BLOCKED_NEXT_STEP[err.reason ?? ''] ?? 'Riprova; se si ripete, conserva il backup e segnala il problema.' };
     }
     return { type: 'error', title: action === 'verify' ? 'Verifica non riuscita' : 'Ripristino non riuscito', message };
@@ -67,7 +76,7 @@ export default function BackupRestoreUI({ recoveryPrimary = true, onRestorePendi
     const [exportConfirmed, setExportConfirmed] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [status, setStatus] = useState<Outcome | null>(null);
-    const [pendingRestoreFile, setPendingRestoreFile] = useState<File | null>(null);
+    const [pendingRestoreFile, setPendingRestoreFile] = useState<(PreparedBackupRestore & { name: string }) | null>(null);
     const [restoreConfirmText, setRestoreConfirmText] = useState('');
 
     useEffect(() => { onRestorePendingChange?.(pendingRestoreFile !== null); }, [pendingRestoreFile, onRestorePendingChange]);
@@ -124,27 +133,32 @@ export default function BackupRestoreUI({ recoveryPrimary = true, onRestorePendi
         }
     };
 
-    // WUL-297: il ripristino è un'operazione critica: la conferma richiede
-    // di digitare una parola chiave invece del vecchio confirm() del browser.
-    const handleRestoreFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        e.target.value = ''; // Reset input
-        if (!file) return;
-
-        setStatus(null);
-        setRestoreConfirmText('');
-        setRestoreSecret('');
-        setLongPinConfirmed(false);
-        setLongPinNotice(false);
-        setPendingRestoreFile(file);
-    };
-
     const cancelRestore = () => {
         setPendingRestoreFile(null);
         setRestoreConfirmText('');
         setRestoreSecret('');
         setLongPinConfirmed(false);
         setLongPinNotice(false);
+    };
+
+    const handleRestoreFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        e.target.value = '';
+        if (!file || pendingRestoreFile || isLoading) return;
+
+        cancelRestore();
+        setIsLoading(true);
+        setStatus({ type: 'info', message: 'Verifica in corso...' });
+        try {
+            const json = await file.text();
+            const verification = await verifyRawDatabase(json);
+            setPendingRestoreFile({ name: file.name, id: crypto.randomUUID(), json, verification });
+            setStatus(null);
+        } catch (err) {
+            setStatus(failedOutcome(err, 'verify'));
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const restoreConfirmed = restoreConfirmText.trim().toUpperCase() === RESTORE_CONFIRM_KEYWORD;
@@ -156,7 +170,6 @@ export default function BackupRestoreUI({ recoveryPrimary = true, onRestorePendi
         setStatus({ type: 'info', message: 'Ripristino in corso...' });
 
         try {
-            const text = await pendingRestoreFile.text();
             const health = await checkAuthHealthRequest({ fresh: true });
             const plan = planUnlock({ shown: unlockCredential, current: readUnlockParameters(health.payload?.unlock),
                 secret: restoreSecret, longPinConfirmed });
@@ -170,8 +183,8 @@ export default function BackupRestoreUI({ recoveryPrimary = true, onRestorePendi
                 ? { verifier: (await deriveUnlockMaterial(restoreSecret, Uint8Array.from(atob(plan.salt), c => c.charCodeAt(0)))).verifier }
                 : { pin: restoreSecret };
             setRestoreSecret('');
-            await importRawDatabase(text, credential);
-            setPendingRestoreFile(null);
+            await importRawDatabase(pendingRestoreFile, credential);
+            cancelRestore();
             setStatus({ type: 'success', title: 'Ripristino completato', message: 'I dati sono stati sostituiti con quelli del backup. L\'applicazione si blocca per ricaricare le chiavi.' });
 
             // Wait a sec then lock/reload
@@ -182,7 +195,11 @@ export default function BackupRestoreUI({ recoveryPrimary = true, onRestorePendi
 
         } catch (err) {
             console.error(err);
-            setRestoreSecret('');
+            if (err instanceof BackupRestoreBlockedError && (err.reason === 'snapshot' || err.reason === 'source')) {
+                cancelRestore();
+            } else {
+                setRestoreSecret('');
+            }
             setStatus(failedOutcome(err, 'restore'));
         } finally {
             setIsLoading(false);
@@ -280,8 +297,9 @@ export default function BackupRestoreUI({ recoveryPrimary = true, onRestorePendi
                             </p>
                         </div>
                         <p className="text-xs">
-                            File selezionato: <code>{pendingRestoreFile.name}</code>{' '}
-                            ({Math.max(1, Math.round(pendingRestoreFile.size / 1024)).toLocaleString()} KB)
+                            <code>{pendingRestoreFile.name}</code>{' · '}
+                            {formatCountLabel(pendingRestoreFile.verification.records, 'record', 'record')}
+                            {pendingRestoreFile.verification.createdAt && (' · ' + new Date(pendingRestoreFile.verification.createdAt).toLocaleString('it-IT'))}
                         </p>
                         <label className="block text-sm mb-3">
                             {unlockCredential === 'passphrase' ? 'Passphrase amministrativa' : 'PIN amministrativo'}
