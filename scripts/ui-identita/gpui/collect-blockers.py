@@ -5,7 +5,7 @@ import pathlib
 import subprocess
 import os
 
-root = pathlib.Path('/Users/leonardopegollo/Antigravity/mf-ui-identita-20261107')
+root = pathlib.Path(os.environ.get('MEDIFLOW_UI_CAPTURE_OUTPUT') or pathlib.Path.home() / 'Antigravity' / 'mf-ui-identita-20261107')
 results = []
 env = dict(os.environ, DEVELOPER_DIR='/Applications/Xcode-beta.app/Contents/Developer',
            SWIFT_MODULECACHE_PATH='/Volumes/Vision/mf-ui-identita-20261107-scratch/gpui/swift-cache',
