@@ -7,7 +7,7 @@ import { assertNoHorizontalOverflow, bootstrapUnlockedSession } from './utils';
 test('Scheda desktop del concept con identità, tre colonne e ritorno alle sezioni', async ({ page }) => {
     test.setTimeout(120_000);
     await page.setViewportSize({ width: 1320, height: 880 });
-    await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+    await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234', { displayName: 'Dott. Sintetico', ambulatoryName: 'Ambulatorio di prova' });
     const id = await createConceptPatient(page);
     await page.goto(`/patients/${id}/modules`);
     const record = page.getByTestId('lume-scheda-surface');
@@ -44,7 +44,13 @@ test('Scheda desktop del concept con identità, tre colonne e ritorno alle sezio
         expect(stable.x).toBeLessThan(changed.x);
         expect(changed.x).toBeLessThan(context.x);
     }
-    await page.getByRole('button', { name: 'Prescrivi', exact: true }).click();
+    const prescribe = page.getByRole('button', { name: 'Prescrivi', exact: true });
+    const exposed = await prescribe.evaluate(button => {
+        const box = button.getBoundingClientRect();
+        return [3, box.height / 2, box.height - 3].every(dy => button.contains(document.elementFromPoint(box.x + box.width / 2, box.y + dy)));
+    });
+    expect(exposed).toBe(true);
+    await prescribe.click();
     await page.getByRole('menuitem', { name: 'Prescrizione di una prestazione' }).click();
     await expect(page.locator('#prestazioni')).toBeVisible();
     await page.getByRole('link', { name: 'Riepilogo', exact: true }).click();

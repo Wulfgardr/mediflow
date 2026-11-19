@@ -108,7 +108,7 @@
 
 @media (min-width: 1001px) {
   .patientCanvas .patientHeader, :global(html[data-twin-composition='stream']) .patientCanvas .patientHeader {
-    position: relative; max-width: none; margin: 0; padding: 3px 24px 16px; align-items: flex-start;
+    position: relative; max-width: none; margin: 0; padding: 39px 24px 16px; align-items: flex-start;
   }
   .patientCanvas .patientBody, :global(html[data-twin-composition='stream']) .patientCanvas .patientBody[data-folder-section] {
     margin: 0; padding: 12px 24px 24px; max-width: none;
