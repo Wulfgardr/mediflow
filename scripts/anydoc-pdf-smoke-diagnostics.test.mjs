@@ -12,7 +12,7 @@ import { localImportClosure } from './fixtures/local-import-closure.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const SCHEMA = 'mediflow.anydoc_pdf_child_protocol.v1';
-const WORKER_HASH = '72e7f91ddef9569a9ff0acae8f91893ec7218b4750d0f4886ca162913e1526d9';
+const WORKER_HASH = '8019436fa83815e96f43e6371181650a272a0bb397145f10b39a37b754fc35a0';
 const SENTINEL = 'SYNTHETIC_PRIVATE_FIELD_NOT_FOR_DIAGNOSTICS';
 // Match the production runner's explicit test-data rule before invoking any child.
 if (!process.env.MEDIFLOW_DATA_DIR?.trim()) {
@@ -56,6 +56,17 @@ for (const reason of [
     assert.equal(info.exitCode, 0);
   });
 }
+
+test('render initialization exposes only an enumerated phase and error code', () => {
+  const stderr = Buffer.from('renderer-init:canvas_import:ERR_DLOPEN_FAILED\n');
+  const failure = completed(frame(workerError('engine_unavailable')), { stderr });
+  assert.deepEqual(diagnostic(failure, 'render', 'transport').rendererInit,
+    { stage: 'canvas_import', code: 'ERR_DLOPEN_FAILED' });
+  assert.equal(diagnostic(failure, 'materialize', 'transport').rendererInit, undefined);
+  for (const unexpected of [`renderer-init:canvas_import:${SENTINEL}\n`, stderr + SENTINEL]) {
+    assert.equal(diagnostic({ ...failure, stderr: Buffer.from(unexpected) }, 'render', 'transport').rendererInit, undefined);
+  }
+});
 
 test('bounded framing observations distinguish short, incomplete and noncanonical envelopes', () => {
   const longPrefix = Buffer.alloc(4); longPrefix.writeUInt32BE(65_537);
