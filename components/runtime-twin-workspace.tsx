@@ -206,13 +206,15 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
         <div className={styles.railBottom}>
           <div className={styles.railTools}>
             <Link href="/settings" aria-label="Impostazioni" title="Impostazioni" aria-current={currentDestinationHref === '/settings' ? 'page' : undefined}><Settings2 size={17} aria-hidden /><span>Impostazioni</span></Link>
-            {wideRecord ? <>{railToggle}<PrivacyModeToggle className={styles.privacy} /></> : null}
+            {wideRecord ? <>{railToggle}<PrivacyModeToggle className={styles.privacy} />
+              <button type="button" className={styles.iconButton} onClick={lock} aria-label="Blocca" title="Blocca"><LockKeyhole size={15} aria-hidden /></button>
+            </> : null}
           </div>
           <div className={styles.account} data-identified={wideRecord && !!operator}>
             {patientId && proposal && operator ? <><span className={styles.initials} aria-hidden="true">{operator.split(/\s+/).filter(Boolean).slice(-2).map(part => part[0]).join('').toLocaleUpperCase('it-IT')}</span>
               <div className={styles.operator}><span>{operator}</span>{user?.ambulatoryName ? <small>{user.ambulatoryName}</small> : null}</div></> : null}
-            {wideRecord ? <button type="button" className={styles.themeButton} aria-label="Cambia tema" title="Cambia tema" onClick={() => setTheme(document.documentElement.classList.contains('dark') ? 'light' : 'dark')}><Moon className={styles.toDark} size={15} aria-hidden /><Sun className={styles.toLight} size={15} aria-hidden /></button> : null}
-            <button type="button" onClick={lock} aria-label="Blocca" title="Blocca"><LockKeyhole size={17} aria-hidden /><span>Blocca</span></button>
+            {wideRecord ? <button type="button" className={styles.themeButton} aria-label="Cambia tema" title="Cambia tema" onClick={() => setTheme(document.documentElement.classList.contains('dark') ? 'light' : 'dark')}><Moon className={styles.toDark} size={15} aria-hidden /><Sun className={styles.toLight} size={15} aria-hidden /></button>
+              : <button type="button" onClick={lock} aria-label="Blocca" title="Blocca"><LockKeyhole size={17} aria-hidden /><span>Blocca</span></button>}
           </div>
         </div>
       </aside>

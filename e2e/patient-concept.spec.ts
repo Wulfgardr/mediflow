@@ -12,6 +12,13 @@ test('Scheda desktop del concept con identità, tre colonne e ritorno alle sezio
     await page.goto(`/patients/${id}/modules`);
     const record = page.getByTestId('lume-scheda-surface');
     await expect(record.getByText('Scompenso cardiaco').first()).toBeVisible();
+    await page.getByRole('link', { name: 'Nuova voce', exact: true }).click();
+    const editor = page.getByRole('textbox', { name: 'Resoconto clinico', exact: true });
+    const draft = 'Bozza sintetica per il prossimo accesso della squadra ADI.';
+    await editor.fill(draft);
+    await expect(page.getByTestId('local-draft-status')).toContainText('conservati cifrati');
+    await page.getByRole('link', { name: 'Chiudi la voce', exact: true }).click();
+    await expect(page.getByRole('link', { name: 'Torna alla bozza', exact: true })).toBeVisible();
     const change = record.getByRole('region', { name: 'Variazioni dall’ultima visita' });
     const medication = change.locator('details').filter({ has: page.locator('summary', { hasText: 'Spironolattone' }) });
     await expect(medication).toHaveCount(1);
@@ -24,10 +31,10 @@ test('Scheda desktop del concept con identità, tre colonne e ritorno alle sezio
         return { x, y, width, height };
     });
     for (const theme of ['light', 'dark']) {
-        await page.evaluate(value => {
-            document.documentElement.classList.toggle('light', value === 'light');
-            document.documentElement.classList.toggle('dark', value === 'dark');
-        }, theme);
+        if (await page.locator('html').evaluate(el => el.classList.contains('dark')) !== (theme === 'dark')) {
+            await page.getByRole('button', { name: 'Cambia tema', exact: true }).click();
+        }
+        await expect(page.locator('html')).toHaveClass(new RegExp(`\\b${theme}\\b`));
         await assertNoHorizontalOverflow(page, [{ label: 'Scheda', selector: '#quadro' }]);
         const rail = await rect('aside[aria-label="MediFlow"]');
         const main = await rect('[data-testid="lume-scheda-header"]');
@@ -55,6 +62,9 @@ test('Scheda desktop del concept con identità, tre colonne e ritorno alle sezio
     await expect(page.locator('#prestazioni')).toBeVisible();
     await page.getByRole('link', { name: 'Riepilogo', exact: true }).click();
     await expect(change).toBeVisible();
+    await page.getByRole('link', { name: 'Torna alla bozza', exact: true }).click();
+    await expect(editor).toHaveText(draft);
+    await page.getByRole('link', { name: 'Chiudi la voce', exact: true }).click();
     await page.getByRole('link', { name: 'Cerca pazienti', exact: true }).click();
     await expect(page.getByRole('searchbox', { name: 'Cerca nella lista pazienti' })).toBeFocused();
 });
