@@ -21,6 +21,7 @@ import { OCR_MIN_SHORT_SIDE_PIXELS } from '@/lib/patient-document-image-geometry
 import { birthError, identifierError, IDENTIFIER_LABELS, IDENTIFIER_TYPES, PATIENT_IDENTIFIER_DUPLICATE, type PatientIdentifierType } from '@/lib/patient-identity';
 import type { DossierIdentityProposal } from '@/lib/domain/documents/dossier-sections';
 import type { PatientDocumentCreateReview } from '@/lib/patient-document-create-command';
+import { focusPatientCreationTarget } from '@/lib/patient-creation-focus';
 
 /** Dossier (ADR 0175): documento già scelto nel lotto e proposte d'identità con evidenza. */
 export type PatientDocumentDossierSource = Readonly<{
@@ -147,11 +148,11 @@ export default function PatientDocumentCreate({ onActiveChange, dossier }: { onA
         const owned = work;
         return () => { live = false; owned.current.controller.abort(); owned.current.original?.fill(0); };
     }, [resolveScope]);
-    const moved = useRef(false);
+    const previousPhase = useRef(phase.kind);
     useEffect(() => {
-        // Focus follows the work after the first change of step, never on page load.
-        if (moved.current) heading.current?.focus();
-        moved.current = true;
+        if (previousPhase.current === phase.kind) return;
+        previousPhase.current = phase.kind;
+        if (heading.current) focusPatientCreationTarget(heading.current);
     }, [phase.kind]);
 
     async function choose(file: File | undefined) {

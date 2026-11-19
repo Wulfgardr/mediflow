@@ -212,6 +212,7 @@ for (const credentialKind of ['passphrase', 'pin'] as const) test(`a registered 
                 expect(duplicate).toBe(204);
                 expect((await retrieve(futureToken)).status()).toBe(401);
                 await page.getByRole('button', { name: 'Revoca Client sintetico successivo', exact: true }).click();
+                await page.getByRole('button', { name: 'Conferma revoca', exact: true }).click();
                 await expect(page.getByRole('button', { name: 'Revoca Client sintetico successivo', exact: true })).toHaveCount(0);
             }
             expect((await (await retrieve()).json()).receipt.mandateRef).toBe(shared.receipt.mandateRef);
@@ -221,6 +222,7 @@ for (const credentialKind of ['passphrase', 'pin'] as const) test(`a registered 
         } finally { await secondTab.close(); }
         await page.getByRole('button', { name: 'Aggiorna', exact: true }).click();
         await page.getByRole('button', { name: 'Revoca ' + registrationName, exact: true }).click();
+        await page.getByRole('button', { name: 'Conferma revoca', exact: true }).click();
         await expect(page.getByRole('button', { name: 'Revoca ' + registrationName, exact: true })).toHaveCount(0);
         expect((await deposit(sharedToken)).status()).toBe(401);
         expect((await retrieve()).status()).toBe(401);

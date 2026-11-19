@@ -122,7 +122,7 @@ test('Settings maintenance: scopes, canceled effects and uncertain reset', async
                         await page.evaluate(theme => { const v = theme === 'giorno' ? 'light' : 'dark'; localStorage.setItem('mediflow-theme', v); document.documentElement.classList.remove('light', 'dark'); document.documentElement.classList.add(v); document.documentElement.style.colorScheme = v; }, theme);
                         await assertNoHorizontalOverflow(page, [{ label: route, selector: 'document' }]);
                         const probe = await shot(route + '-' + theme + '-' + size, surface.locator('h2').first());
-                        expect(probe.fontSize).toBe('12px');
+                        expect(probe.fontSize).toBe('15px');
                         if (size === '1440')
                             palette.set(theme, probe.palette.color);
                     }

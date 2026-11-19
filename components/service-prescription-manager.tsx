@@ -660,16 +660,11 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                                 : canReceiveReport ? { label: 'Referto ricevuto', run: () => void markReportReceived(item) } : null;
                         return <tr key={item.id}>
                             <td><strong>{item.serviceName}</strong><small>{categoryLabel(item.category)}{childItems.length > 0 ? ` · ${formatCountLabel(childItems.length, 'voce', 'voci')}` : ''}</small>
-                                <Disclosure className={styles.recordDetails} title="Dettagli, referti e documenti">
-                                    <p>Prescritta il {formatDate(item.prescribedAt) ?? '–'}</p>
+                                {item.serviceCode ? <small className="lume-code">{item.serviceCode}{item.codeSystem ? ` · ${item.codeSystem}` : ''}</small> : null}
+                                {item.provider || item.requestReference || item.scheduledAt || item.performedAt || item.reportReceivedAt
+                                    || item.clinicalQuestion || item.outcomeNote || childItems.length || refs.length || item.notes
+                                    ? <Disclosure className={styles.recordDetails} title="Dettagli, referti e documenti">
                                         <div className="mt-2 grid gap-2 text-sm text-[color:var(--lume-ink-muted)] md:grid-cols-2">
-                                            {item.serviceCode && (
-                                                <p>
-                                                    <span className="font-semibold text-[color:var(--lume-ink)]">Codice:</span>{' '}
-                                                    {item.serviceCode}
-                                                    {item.codeSystem ? ` (${item.codeSystem})` : ''}
-                                                </p>
-                                            )}
                                             {item.provider && (
                                                 <p>
                                                     <span className="font-semibold text-[color:var(--lume-ink)]">Erogatore:</span> {item.provider}
@@ -752,9 +747,9 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                                             <p className="mt-3 text-sm leading-6 text-[color:var(--lume-ink-muted)]">{item.notes}</p>
                                         )}
 
-                                </Disclosure>
+                                </Disclosure> : null}
                             </td>
-                            <td className={`${styles.secondaryColumn} lume-registro`}>{formatDate(item.prescribedAt) ?? '–'}</td>
+                            <td className={`${styles.secondaryColumn} lume-registro`}><span className={styles.prescriptionDateLabel}>Prescritta il </span>{formatDate(item.prescribedAt) ?? '–'}</td>
                             <td><Badge tone={serviceStatusSignal(item.status)} size="xs" className={styles.status}>{statusLabel(item.status)}</Badge>
                                 {priority !== 'unknown' && <div><Badge tone={servicePrioritySignal(priority)} size="xs" className={styles.status}>{priorityLabel(priority)}</Badge></div>}
                                 {item.source === 'document_review' && <small>Da documento</small>}{item.source === 'legacy_therapy_cleanup' && <small>Da pulizia diario</small>}

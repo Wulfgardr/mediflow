@@ -65,3 +65,5 @@
   .patientNavigation { padding-inline: 12px; gap: 0; }
   .patientNavigation > a, .moreSections > button { padding: 12px 8px; font-size: 0.8125rem; }
 }
+
+.draftMarker { margin-inline-start: 0.35em; color: var(--lume-accent); }

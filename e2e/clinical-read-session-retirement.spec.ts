@@ -59,14 +59,14 @@ for (const consumer of ['EntryAttachments', 'NewEntryPage']) test(`${consumer}: 
     });
     const errors: string[] = [];
     page.on('pageerror', error => errors.push(error.message));
-    const query: Record<string, string> = consumer === 'NewEntryPage' ? { patientId: fixture.patientId } : {};
+    const query: Record<string, string> = consumer === 'NewEntryPage' ? { patientId: fixture.patientId, metadata: 'true' } : {};
     await installGate(page, query);
     const path = `/patients/${fixture.patientId}/${consumer === 'NewEntryPage' ? 'entries/new' : 'modules'}`;
     await page.goto(path);
     if (consumer === 'EntryAttachments') await openPatientSection(page, 'diario');
     await page.waitForFunction(() => window.clinicalReadGate.captured);
     expect(await page.evaluate(() => window.clinicalReadGate.request)).toEqual({
-        method: 'GET', url: `/api/attachments${consumer === 'NewEntryPage' ? `?patientId=${fixture.patientId}` : ''}`,
+        method: 'GET', url: `/api/attachments${consumer === 'NewEntryPage' ? `?patientId=${fixture.patientId}&metadata=true` : ''}`,
     });
     const locked = page.waitForResponse(response => response.url().endsWith('/api/auth/lock') && response.request().method() === 'POST');
     await page.getByRole('button', { name: 'Blocca', exact: true }).click();
@@ -87,6 +87,7 @@ for (const consumer of ['EntryAttachments', 'NewEntryPage']) test(`${consumer}: 
         await expect(page.getByRole('region', { name: 'Documenti in cartella' })).toContainText('fonte-sessione-inventata.txt');
     }
     const before = await page.evaluate(() => window.clinicalReadGate.denials);
+    expect(await page.evaluate(() => window.clinicalReadGate.signal?.aborted)).toBe(true);
     await page.evaluate(async () => {
         window.clinicalReadGate.deliver();
         await new Promise<void>(done => requestAnimationFrame(() => requestAnimationFrame(() => done())));

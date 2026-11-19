@@ -2,11 +2,15 @@ import type { Observation } from './db';
 import { classifyObservationRange, toNumericValue } from './observation-range';
 import { formatMeasureValue, formatUnitForDisplay, resolveStaticTerminology } from './terminology';
 
+export function observationSeriesKey(item: Pick<Observation, 'codeSystem' | 'code' | 'unitSystem' | 'unitCode'>) {
+    return JSON.stringify([item.codeSystem, item.code, item.unitSystem, item.unitCode]);
+}
+
 export function projectQuadroMeasures(observations: Observation[], { onlyOutOfRange = false } = {}) {
     const parameters = new Map<string, { latest: Observation; previous?: Observation }>();
     for (const item of observations) {
         if (item.deletedAt) continue;
-        const key = JSON.stringify([item.codeSystem, item.code, item.unitSystem, item.unitCode]);
+        const key = observationSeriesKey(item);
         const parameter = parameters.get(key);
         if (!parameter) {
             parameters.set(key, { latest: item });

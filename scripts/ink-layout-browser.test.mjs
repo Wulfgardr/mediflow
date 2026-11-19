@@ -5,6 +5,7 @@ import { chromium } from '@playwright/test';
 import path from 'node:path';
 import { readFile } from 'node:fs/promises';
 import postcss from 'postcss';
+import { secureLaunch } from '../e2e/fixtures/secure-browser.ts';
 
 const root = path.resolve(import.meta.dirname, '..');
 
@@ -20,7 +21,7 @@ test('le ricette del piano e delle sezioni funzionano senza il foglio globale', 
             globalThis.recipes = {layout, section, workspace, secondary, foundation, models};`, resolveDir: root },
         bundle: true, write: false, outfile: '/fixture.js', format: 'iife', logLevel: 'silent',
     });
-    const browser = await chromium.launch({ headless: true });
+    const browser = await chromium.launch(secureLaunch({ headless: true }));
     try {
         const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
         await page.setContent('<html data-runtime-twin-design="proposal"><head></head><body></body></html>');
@@ -50,10 +51,10 @@ test('le ricette del piano e delle sezioni funzionano senza il foglio globale', 
         }
         const metrics = await page.locator('section > h2,section > h3').evaluateAll(elements => elements.map(element => {
             const style = getComputedStyle(element);
-            return [style.fontSize, style.fontWeight, style.letterSpacing, style.textTransform];
+            return [style.fontSize, style.fontWeight, style.lineHeight, style.letterSpacing, style.textTransform];
         }));
-        assert.deepEqual(metrics, Array.from({length: 4}, () => ['12px', '600', '0.6px', 'uppercase']));
-        assert.equal(await page.getByText('Archivio documenti', {exact: true}).evaluate(element => getComputedStyle(element).fontSize), '12px');
+        assert.deepEqual(metrics, Array.from({length: 4}, () => ['15px', '600', '22.5px', 'normal', 'none']));
+        assert.equal(await page.getByText('Archivio documenti', {exact: true}).evaluate(element => getComputedStyle(element).fontSize), '15px');
         assert.equal(await page.getByText('3 file', {exact: true}).evaluate(element => getComputedStyle(element).textTransform), 'none');
         const recordFont = await page.locator('article h3').evaluate(element => getComputedStyle(element).fontSize);
         await page.locator('main > div').evaluate(element => element.classList.remove(globalThis.recipes.section.sections));
@@ -68,7 +69,7 @@ test('il focus comune resta visibile sui preset selezionati', async () => {
     const globalStyles = postcss.parse(await readFile(path.join(root, 'app/globals.css'), 'utf8'));
     const focus = globalStyles.nodes.find(node => node.type === 'rule' && node.selector.startsWith(':root :focus-visible'));
     assert.ok(focus);
-    const browser = await chromium.launch({ headless: true });
+    const browser = await chromium.launch(secureLaunch({ headless: true }));
     try {
         const page = await browser.newPage();
         await page.setContent('<style>:root { --lume-ink-fresh: blue; --lume-accent: blue; }</style>');

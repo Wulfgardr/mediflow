@@ -2,6 +2,7 @@
 
 /* WUL-676: one application frame; open record ids live only in the
    unlocked React session. The SecurityProvider unmounts this frame on lock. */
+import { useEntryDraftMarker } from '@/hooks/use-entry-local-draft';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
@@ -152,7 +153,7 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
           <nav className={styles.openRecords} aria-label="Cartelle aperte">
             <Link className={styles.directoryTab} href={activeDestination.href} aria-current={!patientId && currentDestinationHref !== null ? 'page' : undefined}>{activeDestination.label}</Link>
             {records.map((patient, index) => <span className={styles.recordTab} key={patient.id} data-active={patient.id === patientId}>
-              <Link href={`/patients/${patient.id}/modules`} aria-current={patient.id === patientId ? 'page' : undefined}><PrivacyBlur>{patient.lastName} {patient.firstName}</PrivacyBlur></Link>
+              <Link href={`/patients/${patient.id}/modules`} aria-current={patient.id === patientId ? 'page' : undefined}><PrivacyBlur>{patient.lastName} {patient.firstName}</PrivacyBlur><DraftMarker patientId={patient.id} /></Link>
               {patient.id === patientId ? <Link href="/?area=incarico" aria-label={`Chiudi cartella ${index + 1}`} onClick={() => setOpened(value => value.filter(id => id !== patient.id))}><X size={13} aria-hidden /></Link>
                 : <button type="button" aria-label={`Chiudi cartella ${index + 1}`} onClick={() => setOpened(value => value.filter(id => id !== patient.id))}><X size={13} aria-hidden /></button>}
             </span>)}
@@ -166,6 +167,10 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
     </WorkspaceCommandContext.Provider>
     </WorkspaceAreaContext.Provider>
   );
+}
+
+function DraftMarker({ patientId }: { patientId: string }) {
+  return useEntryDraftMarker(patientId) ? <span className={styles.draftMarker} aria-label="Bozza conservata" title="Bozza conservata">●</span> : null;
 }
 
 const patientPrimaryDestinations = ['#quadro', '#terapie', '#parametri', '#documenti'];

@@ -18,7 +18,7 @@ export default function SettingsRepertoriPage() {
     const panel = (id: string) => ({ expanded: active === id, onExpandedChange: (value: boolean) => setActive(value ? id : null) });
     return <section className={styles.page} data-testid="settings-repertori-section">
         <header className={styles.intro}>
-            <h2 className="type-section">Repertori</h2>
+            <h2>Repertori</h2>
             <p>Farmaci (AIFA o altra agenzia), esenzioni, protesica e codici ICD-11: fonti e aggiornamenti dei repertori.</p>
         </header>
         <div className={styles.rows}>

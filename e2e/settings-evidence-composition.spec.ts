@@ -70,7 +70,7 @@ test('Settings evidence: composition, disclosed checks and failed update reread'
         return probe;
     };
     const sectionTitle = async (heading: Locator) => {
-        await expect(heading).toHaveCSS('font-size', '12px');
+        await expect(heading).toHaveCSS('font-size', '15px');
         sectionTitles.push(await heading.evaluate(element => ({ text: element.textContent, fontSize: getComputedStyle(element).fontSize, caps: getComputedStyle(element).fontVariantCaps })));
     };
     const gallery = async (route: string, target: Locator) => {
@@ -88,7 +88,7 @@ test('Settings evidence: composition, disclosed checks and failed update reread'
             }, theme);
             await assertNoHorizontalOverflow(page, [{ label: route, selector: 'document' }]);
             const probe = await capture(`${route}-${theme}-${size}`, target);
-            expect(probe.fontSize).toBe('12px');
+            expect(probe.fontSize).toBe('15px');
             expect(probe.palette.storage).toBe(theme === 'giorno' ? 'light' : 'dark');
             expect(probe.palette.classes).toMatch(new RegExp(`\\b${theme === 'giorno' ? 'light' : 'dark'}\\b`));
             if (size === '1440') palettes.set(theme, probe.palette.foreground);

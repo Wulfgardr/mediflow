@@ -1,42 +1,34 @@
-import type { Therapy } from '@/lib/db';
+import type { ClinicalEntry, Therapy } from '@/lib/db';
 
-export type TherapyChangeKind = 'started' | 'updated' | 'suspended' | 'completed';
-
-export interface TherapyChange {
-    id: string;
-    drugName: string;
-    kind: TherapyChangeKind;
-    date: Date;
-}
-
-export const THERAPY_CHANGE_LABELS: Record<TherapyChangeKind, string> = {
-    started: 'Avviata',
-    updated: 'Aggiornata',
-    suspended: 'Sospesa',
-    completed: 'Conclusa',
-};
-
-function validDate(value: Date | null | undefined): Date | null {
+export function recordDate(value: Date | null | undefined): Date | null {
     if (!value) return null;
     const date = new Date(value);
     return Number.isFinite(date.getTime()) ? date : null;
 }
 
-function lastRecordedChange(therapy: Therapy): { kind: TherapyChangeKind; date: Date | null } {
-    const recorded = validDate(therapy.updatedAt) ?? validDate(therapy.createdAt);
-    if (therapy.status === 'completed') return { kind: 'completed', date: validDate(therapy.endDate) ?? recorded };
-    if (therapy.status === 'suspended') return { kind: 'suspended', date: recorded };
-    if ((therapy.version ?? 1) > 1 && validDate(therapy.updatedAt)) return { kind: 'updated', date: validDate(therapy.updatedAt) };
-    return { kind: 'started', date: validDate(therapy.startDate) };
+export function projectVisitReference(patientId: string, entries: readonly ClinicalEntry[], readAt: Date) {
+    let latest: { id: string; date: Date; author?: string } | null = null;
+    let undated = false;
+    for (const entry of entries) {
+        if (entry.patientId !== patientId || entry.type !== 'visit' || entry.deletedAt) continue;
+        const date = recordDate(entry.createdAt);
+        if (!date || date > readAt) {
+            undated = true;
+            continue;
+        }
+        if (!latest || date > latest.date) latest = { id: entry.id, date, author: entry.recordedBy?.trim() || undefined };
+    }
+    return { latest, undated };
 }
 
-export function projectLastRecordedTherapyChanges(therapies: readonly Therapy[], limit = 4): TherapyChange[] {
-    return therapies
-        .filter((therapy) => !therapy.deletedAt)
-        .flatMap((therapy) => {
-            const { kind, date } = lastRecordedChange(therapy);
-            return date ? [{ id: therapy.id, drugName: therapy.drugName, kind, date }] : [];
-        })
-        .sort((left, right) => right.date.getTime() - left.date.getTime())
-        .slice(0, limit);
+export function projectTherapyRecordUpdates(patientId: string, therapies: readonly Therapy[], readAt: Date) {
+    return therapies.flatMap(therapy => {
+        if (therapy.patientId !== patientId || therapy.deletedAt) return [];
+        const updated = recordDate(therapy.updatedAt);
+        const changed = (therapy.version ?? 1) > 1;
+        const date = therapy.status !== 'active' || changed ? updated : recordDate(therapy.createdAt);
+        if (!date || date > readAt) return [];
+        const label = therapy.status === 'suspended' ? 'Sospesa' : therapy.status === 'completed' ? 'Conclusa' : changed ? 'Aggiornata' : 'Avviata';
+        return [{ therapy, date, label }];
+    }).sort((a, b) => b.date.getTime() - a.date.getTime());
 }

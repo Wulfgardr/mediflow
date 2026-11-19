@@ -207,8 +207,16 @@ test('Quadro paziente invia un payload strict e mostra una proposta review-only'
   await expect(page.getByTestId('patient-proposals-summary')).toContainText('1 proposta da rivedere');
   await expect(proposal).not.toBeVisible();
   await expect(page.locator('#quadro [data-testid="patient-insight-review-proposal"]')).toHaveCount(0);
-  await page.getByTestId('patient-proposals-summary').getByRole('link', { name: 'Quadro paziente', exact: true }).click();
+  await page.getByTestId('patient-proposals-summary').getByRole('link', { name: 'Apri il Quadro e le fonti', exact: true }).click();
   await expect(proposal).toBeVisible();
+  expect(previewCalls).toBe(1);
+  const disclosureControl = insightDisclosure.locator(':scope > div > [data-disclosure-control]');
+  await disclosureControl.click();
+  await expect(disclosureControl).toHaveAttribute('aria-expanded', 'false');
+  await expect(proposal).toBeHidden();
+  await disclosureControl.press('Enter');
+  await expect(disclosureControl).toHaveAttribute('aria-expanded', 'true');
+  await expect(proposal).toContainText('Proposta sintetica da revisionare. [S1]');
   expect(previewCalls).toBe(1);
   await insightDisclosure.getByRole('button', { name: 'Riusa predefinito', exact: true }).click();
   await expect(proposal).toHaveCount(0);

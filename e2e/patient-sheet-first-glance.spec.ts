@@ -41,7 +41,7 @@ test.beforeEach(async ({ page }) => {
   await bootstrapUnlockedSession(page, pin);
 });
 
-test('Riepilogo: il primo sguardo mostra identità, problemi, ultime modifiche di terapia e l’ingresso al Quadro paziente', async ({ page }) => {
+test('Riepilogo: identità, problemi, terapie attive e Quadro paziente senza una visita di riferimento', async ({ page }) => {
   const id = await syntheticPatient(page, { taxCode: '', identifierType: 'none', birthDatePrecision: 'estimated', birthYear: 1984 });
   await openSheet(page, id);
 
@@ -53,22 +53,12 @@ test('Riepilogo: il primo sguardo mostra identità, problemi, ultime modifiche d
   const proposals = page.getByTestId('patient-proposals-summary');
   await expect(proposals).toHaveCount(1);
   await expect(proposals).toContainText('Nessuna proposta da rivedere');
-  const quadro = proposals.getByRole('link', { name: 'Quadro paziente', exact: true });
+  const quadro = proposals.getByRole('link', { name: 'Apri il Quadro e le fonti', exact: true });
   expect(await insideWorkArea(quadro)).toBe(true);
   const problems = page.locator('#quadro').getByRole('table', { name: 'Problemi' });
   await expect(problems).toBeVisible();
-  await expect.poll(() => page.evaluate(() => {
-    const summary = document.querySelector('[data-testid="patient-proposals-summary"]');
-    const table = document.querySelector('#quadro table[aria-label="Problemi"]');
-    return summary && table ? summary.getBoundingClientRect().bottom <= table.getBoundingClientRect().top : null;
-  })).toBe(true);
-
-  const changes = page.locator('#quadro').getByRole('table', { name: 'Ultime modifiche di terapia' });
-  expect(await insideWorkArea(changes.getByRole('row').nth(1))).toBe(true);
-  await expect(changes.getByRole('row').filter({ hasText: 'Farmaco sintetico concluso' })).toContainText('20/09/2026');
-  await expect(changes.getByRole('row').filter({ hasText: 'Farmaco sintetico concluso' })).toContainText('Conclusa');
-  await expect(changes.getByRole('row').filter({ hasText: 'Farmaco sintetico sospeso' })).toContainText('Sospesa');
-  await expect(changes.getByRole('row').filter({ hasText: 'Farmaco sintetico attivo' })).toContainText('Avviata');
+  await expect(page.getByText('Nessuna visita registrata.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Variazioni dall’ultima visita', exact: true })).toHaveCount(0);
   const active = page.locator('#quadro').getByRole('table', { name: 'Terapie attive' });
   await expect(active.getByRole('row')).toHaveCount(2);
   await expect(active).not.toContainText('Farmaco sintetico sospeso');
@@ -106,8 +96,47 @@ test('Terapie: indicazione, periodo e codici si leggono nella riga, e le sezioni
   await page.keyboard.press('ArrowDown');
   const menu = page.getByRole('menu', { name: 'Azioni terapia Farmaco sintetico attivo', exact: true });
   await expect(menu.getByRole('menuitem', { name: 'Sospendi', exact: true })).toBeFocused();
-  expect(await menu.evaluate(element => parseFloat(getComputedStyle(element).borderTopLeftRadius))).toBeGreaterThan(0);
-  await expect(menu.getByRole('menuitem').last()).toHaveText('Elimina (inserita per errore)');
+  const items = menu.getByRole('menuitem');
+  const last = items.last();
+  await expect(last).toHaveText('Elimina (inserita per errore)');
+  const probeCorner = (item: Locator, end: 'top' | 'bottom') => item.evaluate((element, edge) => {
+    const panel = element.closest('[role=menu]')!;
+    const outer = panel.getBoundingClientRect();
+    const inner = element.getBoundingClientRect();
+    const frame = getComputedStyle(panel);
+    const row = getComputedStyle(element);
+    const left = outer.left;
+    const right = outer.right;
+    const verticalInset = edge === 'top' ? inner.top - outer.top : outer.bottom - inner.bottom;
+    const outline = Math.max(0, parseFloat(row.outlineWidth) + parseFloat(row.outlineOffset));
+    return {
+      panel: [frame.borderTopLeftRadius, frame.borderTopRightRadius, frame.borderBottomLeftRadius, frame.borderBottomRightRadius].map(parseFloat),
+      frameInsets: [parseFloat(frame.borderLeftWidth) + parseFloat(frame.paddingLeft),
+        parseFloat(frame.borderRightWidth) + parseFloat(frame.paddingRight),
+        parseFloat(edge === 'top' ? frame.borderTopWidth : frame.borderBottomWidth) + parseFloat(edge === 'top' ? frame.paddingTop : frame.paddingBottom)],
+      row: (edge === 'top' ? [row.borderTopLeftRadius, row.borderTopRightRadius] : [row.borderBottomLeftRadius, row.borderBottomRightRadius]).map(parseFloat),
+      actualInsets: [inner.left - left, right - inner.right, verticalInset],
+      outline,
+      focusVisible: element.matches(':focus-visible') && row.outlineStyle !== 'none' && parseFloat(row.outlineWidth) >= 2,
+    };
+  }, end);
+  const top = await probeCorner(items.first(), 'top');
+  await test.info().attach('menu-terapia-prima-voce', { body: await menu.screenshot(), contentType: 'image/png' });
+  await page.keyboard.press('End');
+  await expect(last).toBeFocused();
+  const bottom = await probeCorner(last, 'bottom');
+  await test.info().attach('menu-terapia-ultima-voce', { body: await menu.screenshot(), contentType: 'image/png' });
+  await test.info().attach('geometria-menu-terapia', { body: JSON.stringify({ top, bottom }), contentType: 'application/json' });
+  for (const corner of [top, bottom]) {
+    expect(corner.panel).toEqual([10, 10, 10, 10]);
+    expect(corner.focusVisible).toBe(true);
+    corner.actualInsets.forEach((inset, index) => expect(inset).toBeCloseTo(corner.frameInsets[index], 1));
+    corner.row.forEach((radius, index) => {
+      expect(radius).toBeCloseTo(10 - corner.actualInsets[index], 1);
+      expect(radius).toBeCloseTo(10 - corner.actualInsets[2], 1);
+    });
+    expect(corner.outline).toBe(0);
+  }
   await page.keyboard.press('Escape');
   await expect(trigger).toBeFocused();
 
@@ -115,14 +144,32 @@ test('Terapie: indicazione, periodo e codici si leggono nella riga, e le sezioni
   await expect(pane.getByRole('textbox', { name: 'Principio attivo', exact: true })).toHaveValue('Principio sintetico');
   await expect(pane.getByRole('group', { name: 'Collegamento clinico', exact: true })).toBeVisible();
   await expect(pane.getByRole('combobox', { name: 'Collegamento clinico', exact: true })).toBeVisible();
-  const boundary = await pane.getByRole('textbox', { name: 'Posologia', exact: true }).evaluate(element => {
+  const boundary = () => pane.getByRole('textbox', { name: 'Posologia', exact: true }).evaluate(async element => {
     const channel = (value: number) => { const unit = value / 255; return unit <= 0.03928 ? unit / 12.92 : ((unit + 0.055) / 1.055) ** 2.4; };
     const luminance = (color: string) => { const [red, green, blue] = color.match(/[\d.]+/gu)!.map(Number); return 0.2126 * channel(red) + 0.7152 * channel(green) + 0.0722 * channel(blue); };
+    await Promise.allSettled(element.getAnimations().map(animation => animation.finished));
     const style = getComputedStyle(element);
-    const [light, dark] = [luminance(style.borderTopColor), luminance(style.backgroundColor)].sort((left, right) => right - left);
-    return (light + 0.05) / (dark + 0.05);
+    const border = luminance(style.borderTopColor);
+    const surrounding = getComputedStyle(element.closest('main')!).getPropertyValue('--lume-surface-focal').trim();
+    const sample = document.createElement('span');
+    sample.style.color = surrounding;
+    element.parentElement!.append(sample);
+    const outside = luminance(getComputedStyle(sample).color);
+    sample.remove();
+    return [luminance(style.backgroundColor), outside].map(background => (
+      (Math.max(border, background) + 0.05) / (Math.min(border, background) + 0.05)
+    ));
   });
-  expect(boundary).toBeGreaterThanOrEqual(3);
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate(value => {
+      localStorage.setItem('mediflow-theme', value);
+      document.documentElement.classList.toggle('light', value === 'light');
+      document.documentElement.classList.toggle('dark', value === 'dark');
+    }, theme);
+    const ratios = await boundary();
+    expect(Math.min(...ratios)).toBeGreaterThanOrEqual(3);
+    await test.info().attach(`contrasto-campo-${theme}`, { body: JSON.stringify(ratios), contentType: 'application/json' });
+  }
   await page.setViewportSize({ width: 768, height: 900 });
   await expect(start).toBeVisible();
   await expect(end).toBeVisible();
