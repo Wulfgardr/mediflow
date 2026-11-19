@@ -1,3 +1,4 @@
+import type { EntryRevisionPage } from './entry-revision-view';
 import { PatientIdentifierConflictError, PATIENT_IDENTIFIER_DUPLICATE, type PatientIdentifierType, type BirthDatePrecision } from './patient-identity';
 import { decodeBase64, encodeBase64, openPatientDocumentFile, sealPatientDocumentFile } from './security/attachment-file-envelope';
 import type { PatientAllergy } from './patient-allergies';
@@ -962,6 +963,33 @@ class MedicalApiClient {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         this.settings = new ApiTable<any>('/api/settings', 'settings', getKey, getReadSession);
         this.patientsToAmbulatories = new ApiTable<PatientAmbulatory>('/api/patients/assign', 'patients_to_ambulatories', getKey, getReadSession);
+    }
+
+    async readEntryRevisions(patientId: string, entryId: string, version: number, afterVersion: number): Promise<EntryRevisionPage> {
+        const signal = this.getSessionReadSignal();
+        signal.throwIfAborted();
+        const key = this.masterKey;
+        if (!key) throw new Error('Diary history needs an unlocked archive');
+        const response = await fetch(`/api/patients/${encodeURIComponent(patientId)}/entry-revisions/${encodeURIComponent(entryId)}?afterVersion=${afterVersion}`, { signal, cache: 'no-store' });
+        if (!response.ok) {
+            if (isApiTableAuthUnavailableStatus(response.status)) notifyApiAuthUnavailable(response.status, signal);
+            throw new Error('Diary history is unavailable');
+        }
+        const page: EntryRevisionPage = await response.json();
+        if (page.patientId !== patientId || page.entryId !== entryId || page.currentVersion !== version) {
+            throw new Error('Diary history changed');
+        }
+        for (const row of page.revisions) {
+            for (const field of ['title', 'content'] as const) {
+                if (row[field] === null) continue;
+                const [prefix, iv, ciphertext, ...rest] = row[field].split(':');
+                const opened = prefix === 'ENC' && iv && ciphertext && !rest.length
+                    ? await decryptData(ciphertext, iv, key) : null;
+                row[field] = typeof opened === 'string' ? opened : null;
+            }
+        }
+        signal.throwIfAborted();
+        return page;
     }
 
     async applyPatientSmartImport(

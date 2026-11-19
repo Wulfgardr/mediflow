@@ -57,3 +57,38 @@ a `patientDiaryRegistration(entry)` per lo stato registrato, mantenendo gli
 altri cambiamenti di composizione della #862. Il banco sintetico verifica
 l'autore restituito dal server per ogni voce di riferimento appena creata.
 Le fixture precedenti restano storiche e non ricevono nomi aggiunti dopo.
+
+## Rettifiche dalla 0.9.1
+
+Il writer del diario salva, nella stessa transazione della modifica e dell'audit,
+il titolo e il testo sostituiti delle voci diverse dalle scale. Ogni riga ha per
+identità l'evento di audit e per chiave univoca la coppia nota e versione
+sostituita. Ora e nome dell'operatore provengono dal server. La data clinica e
+l'autore della prima registrazione restano proprietà della nota. Una modifica
+del solo stato di cestino lascia lo storico com'è. Un conflitto di versione
+lascia invariati nota, audit e storico.
+
+La versione SQLite 17 crea `entry_revisions` vuota. Il primo testo conservabile
+è quello presente quando avviene la prima rettifica dopo l'aggiornamento.
+Versioni già sovrascritte prima dell'aggiornamento sono indisponibili. Per un
+campo legacy in chiaro si conserva il solo riferimento alla rettifica. I campi
+protetti vengono copiati come buste cifrate e aperti dai client con la chiave
+già usata per la nota corrente.
+
+La scheda Web locale e GPUI Mac su loopback espongono lo storico su richiesta
+per un singolo paziente e una singola nota attiva. GPUI usa il normale ambito
+ambulatoriale della sessione paired. Le liste, i report, FHIR, gli agenti e il
+diario via LAN continuano a leggere i contratti correnti. Nello storico
+l'operatore e l'ora su una versione precedente indicano la rettifica che l'ha
+sostituita. La versione vigente riporta l'ultima rettifica del testo.
+
+Lo storico è sospeso alla cancellazione logica e riappare al ripristino della
+nota o del paziente. La cancellazione definitiva della nota elimina le
+versioni tramite la relazione SQLite. Il backup portabile v1 aggiunge la
+collezione `entryRevisions`, con gli stessi campi cifrati e i relativi eventi
+nell'audit. Il formato resta v1. Le edizioni precedenti del lettore rifiutano la
+nuova collezione, mentre il nuovo lettore accetta backup precedenti con storico
+vuoto. Il kit di recupero conserva il database v17 intero e ammette il
+predecessore v16, che viene migrato. Il ritorno a un runtime precedente richiede
+l'originale pre-migrazione. Le rettifiche posteriori a quella copia richiedono
+un runtime compatibile con v17.

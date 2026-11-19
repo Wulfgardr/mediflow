@@ -2513,6 +2513,60 @@ impl RuntimeSession {
             },
         )
     }
+    pub fn read_entry_revisions(
+        &self,
+        scope: &str,
+        patient: &str,
+        id: &str,
+        version: u64,
+        after_version: u64,
+    ) -> Result<EntryRevisionPage> {
+        if !self.can_access_local_host() {
+            return Err(RuntimeError::Forbidden);
+        }
+        validate_id(patient)?;
+        validate_id(id)?;
+        let after = after_version.to_string();
+        let mut response = self.read_json_query(
+            Some(scope),
+            &[
+                "api",
+                "v1",
+                "network",
+                "patients",
+                patient,
+                "entries",
+                id,
+                "revisions",
+            ],
+            &[("afterVersion", &after)],
+            JSON_LIMIT,
+        )?;
+        let rows = response.value["revisions"]
+            .as_array_mut()
+            .ok_or(RuntimeError::InvalidResponse)?;
+        for row in rows {
+            self.decrypt_fields(row, &[("title", false, false), ("content", false, false)])?;
+        }
+        let page: EntryRevisionPage = decode(response.value)?;
+        if page.patient_id != patient
+            || page.entry_id != id
+            || page.current_version != version
+            || page
+                .revisions
+                .iter()
+                .any(|row| row.version <= after_version || row.version >= version)
+            || page
+                .revisions
+                .windows(2)
+                .any(|rows| rows[0].version >= rows[1].version)
+        {
+            return Err(RuntimeError::InvalidResponse);
+        }
+        self.check_read_epoch(response.epoch)?;
+        Ok(page)
+    }
+
     pub fn create_entry(
         &self,
         scope: &str,

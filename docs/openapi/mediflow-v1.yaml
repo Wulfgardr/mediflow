@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.59.0
+  version: 1.60.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -3180,6 +3180,81 @@ paths:
                     enum: [SCALE_PATIENT_INACTIVE, SCALE_IDEMPOTENCY_CONFLICT]
         '413':
           $ref: '#/components/responses/NetworkJsonBodyTooLarge'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/patients/{id}/entries/{entryId}/revisions:
+    parameters:
+      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
+    get:
+      tags: [Network]
+      operationId: getLocalNativeEntryRevisions
+      summary: Read previous versions of a diary note on the local Mac
+      description: |
+        Available to a native operator on attested loopback only, with the
+        ordinary paired diary read capability and matching effective ambulatory.
+        Returns previous versions in ascending order and an explicit coverage
+        boundary. The active entry stays on the existing diary detail route.
+        A null title or content denotes a legacy value that could not be retained
+        encrypted. Times identify when a preceding version was superseded.
+      security:
+        - pairedClientId: []
+          pairedClientToken: []
+          sessionCookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: entryId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: afterVersion
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+      responses:
+        '200':
+          description: History page with at most two retained versions.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [patientId, entryId, currentVersion, availableSince, latestCorrection, revisions, hasMore]
+                properties:
+                  patientId: { type: string }
+                  entryId: { type: string }
+                  currentVersion: { type: integer, minimum: 1 }
+                  availableSince: { type: string, format: date-time, nullable: true }
+                  latestCorrection:
+                    type: object
+                    nullable: true
+                    required: [correctedAt, correctedBy]
+                    properties:
+                      correctedAt: { type: string, format: date-time }
+                      correctedBy: { type: string, nullable: true }
+                  revisions:
+                    type: array
+                    maxItems: 2
+                    items:
+                      type: object
+                      required: [version, title, content, correctedAt, correctedBy]
+                      properties:
+                        version: { type: integer, minimum: 1 }
+                        title: { type: string, nullable: true, description: Encrypted previous title. }
+                        content: { type: string, nullable: true, description: Encrypted previous text. }
+                        correctedAt: { type: string, format: date-time }
+                        correctedBy: { type: string, nullable: true }
+                  hasMore: { type: boolean }
+        '400':
+          description: Invalid version cursor.
+        '401':
+          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Archive replaced.
         '500':
           $ref: '#/components/responses/InternalServerError'
   /api/v1/network/patients/{id}/entries/{entryId}:

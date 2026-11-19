@@ -1,3 +1,4 @@
+import { assertEntryRevisionBackup } from './entry-revision-backup.ts';
 import { assertAgentCassetteBackup } from './agent-cassette-contract.ts';
 import { validateAmbulatoryCommandRows } from './ambulatory-destructive-command-backup.ts';
 import { validateTherapyStatusCommandRows } from './therapy-status-command-backup.ts';
@@ -18,6 +19,7 @@ export const BACKUP_COLLECTIONS = [
     'documentDiagnosisProposals',
     'drugs',
     'entries',
+    'entryRevisions',
     'exemptions',
     'exemptionImportReceipts',
     'prostheticsCatalogEntries',
@@ -42,7 +44,7 @@ export const BACKUP_COLLECTIONS = [
 
 export type BackupCollectionName = (typeof BACKUP_COLLECTIONS)[number];
 export type BackupRecord = Record<string, unknown>;
-type AdditiveBackupCollection = 'agentCassettes' | 'ambulatoryDestructiveCommands' | 'therapyStatusCommands' | 'prostheticsCatalogSources' | 'prostheticsCatalogDocuments' | 'auditEvents' | 'prostheticsCatalogEntries' | 'prostheticsCatalogReceipts' | 'exemptionImportReceipts';
+type AdditiveBackupCollection = 'entryRevisions' | 'agentCassettes' | 'ambulatoryDestructiveCommands' | 'therapyStatusCommands' | 'prostheticsCatalogSources' | 'prostheticsCatalogDocuments' | 'auditEvents' | 'prostheticsCatalogEntries' | 'prostheticsCatalogReceipts' | 'exemptionImportReceipts';
 export type BackupDataset = Record<Exclude<BackupCollectionName, AdditiveBackupCollection>, BackupRecord[]>
     & Partial<Record<AdditiveBackupCollection, BackupRecord[]>>;
 
@@ -60,6 +62,7 @@ const OPTIONAL_COLLECTION_GROUPS: readonly (readonly BackupCollectionName[])[] =
     ['ambulatoryDestructiveCommands'],
     ['auditEvents'],
     ['documentDiagnosisProposals'],
+    ['entryRevisions'],
     ['exemptionImportReceipts'],
     ['physicianReviewAttestations'],
     ['prostheticsCatalogSources', 'prostheticsCatalogDocuments'],
@@ -414,6 +417,8 @@ async function assertCollectionReferences(
     catch { throw new BackupArtifactError('invalid-manifest', 'Ambulatory command ledger or audit is invalid.'); }
     try { assertAgentCassetteBackup(payload.agentCassettes ?? []); }
     catch { throw new BackupArtifactError('invalid-manifest', 'Encrypted agent cassettes are invalid.'); }
+    try { assertEntryRevisionBackup(payload.entryRevisions ?? [], payload.entries ?? [], payload.auditEvents ?? []); }
+    catch { throw new BackupArtifactError('invalid-manifest', 'Diary revision history is invalid.'); }
     assertPhysicianReviewAttestationRows(payload);
     if (backupAuditCoverage(payload) === 'included') {
         try { canonicalizeBackupAuditRows(payload.auditEvents); }
@@ -434,6 +439,7 @@ export async function createBackupArtifact(payload: BackupDataset, createdAt = n
     await assertCollectionReferences(currentPayload);
     const canonicalPayload = {
         ...currentPayload,
+        entryRevisions: [...(currentPayload.entryRevisions ?? [])].sort((a, b) => String(a.eventId).localeCompare(String(b.eventId))),
         exemptionImportReceipts: [...(currentPayload.exemptionImportReceipts ?? [])].sort((a, b) => Number(a.id) - Number(b.id)),
         ambulatoryDestructiveCommands: validateAmbulatoryCommandRows(currentPayload.ambulatoryDestructiveCommands ?? [], currentPayload.auditEvents ?? []),
         therapyStatusCommands: validateTherapyStatusCommandRows(currentPayload.therapyStatusCommands ?? [], currentPayload.auditEvents ?? []),

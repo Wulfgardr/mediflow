@@ -176,6 +176,12 @@ locali salvano ciò che ricevono.
 - In chiaro: `aic`, `name`, `active_principle`, `company`, `packaging`, `class`, `price`, `atc`, `aic_search`, `name_search`, `active_principle_search`, `packaging_search`
 - Leggibile senza chiave: dato pubblico di riferimento.
 
+### `entry_revisions`: rettifiche del diario
+
+- Cifrate: `title`, `content`
+- In chiaro: `event_id`, `entry_id`, `version`, `corrected_at`, `corrected_by`
+- Leggibile senza chiave: collegamento alla nota e all'audit, versione sostituita, data e nome dell'operatore. Titolo e testo conservano la busta cifrata della nota. Se un campo legacy era in chiaro, lo storico conserva un valore nullo per quel campo.
+
 ### `entries`: diario clinico
 
 - Cifrate: `title`, `content`, `metadata`, `attachments`, `deletion_reason`

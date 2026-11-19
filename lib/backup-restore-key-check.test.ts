@@ -63,3 +63,20 @@ test('the client tells a blocked restore from a failed one and verifies through 
         assert.equal(urls.length, 2);
     } finally { db.setKey(null); }
 });
+
+test('the Web restore checks prior diary text with the same archive key before sending', async t => {
+    const { db, importRawDatabase } = await import('./db.ts');
+    let calls = 0;
+    t.mock.method(globalThis, 'fetch', async () => { calls += 1; return Response.json({ success: true }); });
+    const key = await generateMasterKey();
+    const current = await seal(key);
+    const foreign = await seal(await generateMasterKey());
+    const backup = (content: string) => artifact({ entries: [{ content: current }], entryRevisions: [{ content }] });
+    db.setKey(key);
+    try {
+        await assert.rejects(importRawDatabase(backup(foreign)), BackupRestoreKeyError);
+        assert.equal(calls, 0);
+        await importRawDatabase(backup(current));
+        assert.equal(calls, 1);
+    } finally { db.setKey(null); }
+});

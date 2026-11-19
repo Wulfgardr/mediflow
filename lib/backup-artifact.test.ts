@@ -69,6 +69,7 @@ const basePayload = {
             createdAt: '2026-03-17T08:06:00.000Z',
         },
     ],
+    entryRevisions: [],
     observations: [],
     prostheticPrescriptions: [],
     serviceCatalogEntries: [],
@@ -350,6 +351,7 @@ const OPTIONAL_GROUPS = [
     ['agentCassettes'],
     ['ambulatoryDestructiveCommands'],
     ['documentDiagnosisProposals'],
+    ['entryRevisions'],
     ['exemptionImportReceipts'],
     ['physicianReviewAttestations'],
     ['prostheticsCatalogSources', 'prostheticsCatalogDocuments'],
@@ -459,5 +461,32 @@ test('still opens artifacts written before the removal of the durable review and
         const parsed = await parseBackupArtifact(artifact);
         assert.deepEqual(Object.keys(parsed.payload).sort(), BACKUP_COLLECTIONS.filter(collection => collection !== 'auditEvents').sort());
         assert.equal(parsed.payload.entries.length, 1);
+    }
+});
+
+
+test('portable diary history rejects clear text, mismatched events and cross-entry references', async () => {
+    const entry = { ...basePayload.entries[0], version: 2 };
+    const event = { eventId: 'synthetic-diary-event', schemaVersion: 1, eventType: 'entry.updated',
+        occurredAt: 1783000000, outcome: 'success', actorType: 'user', actorRef: 'synthetic-author',
+        subjectType: 'entry', subjectRef: entry.id, sourceSurface: 'web', requestId: null,
+        redactedMetadata: JSON.stringify({ resourceVersion: 2 }), createdAt: 1783000000 };
+    const row = { entryId: entry.id, eventId: event.eventId, version: 1, title: null, content: 'ENC:iv:cipher',
+        correctedAt: new Date(event.occurredAt * 1000).toISOString(), correctedBy: 'Operatore sintetico' };
+    const payload = { ...basePayload, entries: [entry], auditEvents: [event] };
+    const good = await createBackupArtifact({ ...payload, entryRevisions: [row] });
+    const parsed = await parseBackupArtifact(JSON.parse(JSON.stringify(good)));
+    assert.deepEqual(parsed.payload.entryRevisions, [row]);
+    for (const invalid of [
+        { ...row, content: 'Testo precedente in chiaro' },
+        { ...row, entryId: 'entry-of-another-patient' },
+        { ...row, eventId: 'unrelated-event' },
+        { ...row, correctedAt: '2026-01-01T00:00:00.000Z' },
+        { ...row, version: 2 },
+    ]) {
+        const artifact = JSON.parse(JSON.stringify(good));
+        artifact.payload.entryRevisions = [invalid];
+        await assert.rejects(() => reauthor(artifact).then(parseBackupArtifact),
+            (error: unknown) => error instanceof BackupArtifactError && error.code === 'invalid-manifest');
     }
 });

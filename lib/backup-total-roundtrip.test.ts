@@ -39,6 +39,7 @@ const BACKUP_TABLES = {
     documentDiagnosisProposals: 'document_diagnosis_proposals',
     drugs: 'drugs',
     entries: 'entries',
+    entryRevisions: 'entry_revisions',
     exemptions: 'exemptions',
     exemptionImportReceipts: 'exemption_import_receipts',
     prostheticsCatalogEntries: 'prosthetics_catalog_entries',
@@ -176,6 +177,13 @@ async function populateSyntheticClinicalFixture(db: Database.Database, actorRef:
         ...(await sealed('entries', ['title', 'content', 'metadata', 'attachments', 'deletion_reason'])),
         setting: 'ambulatorio', deleted_at: now + 4, version: 4, created_at: now + 3, updated_at: now + 4,
     });
+    const diaryEventId = 'f21a22fe-01db-4fed-bdab-23a76ae10bcf';
+    insertRow(db, 'audit_events', { event_id: diaryEventId, schema_version: 1, event_type: 'entry.updated',
+        occurred_at: now + 4, created_at: now + 4, outcome: 'success', actor_type: 'user', actor_ref: actorRef,
+        subject_type: 'entry', subject_ref: 'w7-entry', source_surface: 'web',
+        redacted_metadata: JSON.stringify({ resourceVersion: 4 }) });
+    insertRow(db, 'entry_revisions', { event_id: diaryEventId, entry_id: 'w7-entry', version: 3,
+        ...(await sealed('entry_revisions', ['title', 'content'])), corrected_at: now + 4, corrected_by: 'Ada Sintetica' });
     insertRow(db, 'therapies', {
         id: 'w7-therapy', patient_id: 'w7-patient', drug_name: 'Farmaco sintetico', dosage: '1 unita', status: 'stopped',
         start_date: now + 5, end_date: now + 6, motivation: await seal('therapies.motivation'), deletion_reason: await seal('therapies.deletion_reason'),

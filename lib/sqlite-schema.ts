@@ -362,6 +362,18 @@ function applySchemaGuards(sqlite: Database.Database) {
         ensureColumn(sqlite, 'entries', 'version', 'version INTEGER NOT NULL DEFAULT 1');
         ensureColumn(sqlite, 'entries', 'updated_at', 'updated_at INTEGER');
         ensureColumn(sqlite, 'entries', 'recorded_by', 'recorded_by TEXT');
+        sqlite.exec(`
+            CREATE TABLE IF NOT EXISTS entry_revisions (
+                event_id TEXT PRIMARY KEY NOT NULL,
+                entry_id TEXT NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
+                version INTEGER NOT NULL CONSTRAINT entry_revisions_version_positive CHECK (version > 0),
+                title TEXT,
+                content TEXT,
+                corrected_at INTEGER NOT NULL,
+                corrected_by TEXT
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS entry_revisions_entry_version_idx ON entry_revisions(entry_id, version);
+        `);
     } catch (error) {
         console.warn('[MediFlow] Entries schema check failed:', error);
         throw error;

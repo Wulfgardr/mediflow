@@ -20,6 +20,16 @@ pub(super) struct RecordState {
     pub(super) registered: Option<(FormKind, String)>,
     pub(super) composer_column: gpui::ScrollHandle,
     pub(super) diary_all: bool,
+    history: Option<DiaryHistory>,
+}
+
+#[derive(Clone)]
+struct DiaryHistory {
+    entry_id: String,
+    version: u64,
+    cursors: Vec<u64>,
+    selected: Option<u64>,
+    page: Option<Result<mediflow_runtime_client::EntryRevisionPage, RuntimeError>>,
 }
 
 impl RecordState {
@@ -1633,6 +1643,278 @@ impl ClinicalApp {
                 .child(gpui::StyledText::new(point.text).with_highlights(highlights))
                 .on_click(cx.listener(|this, _, window, cx| this.close_record_reading(window, cx))),
         )
+    }
+
+    fn read_diary_history(
+        &mut self,
+        id: String,
+        version: u64,
+        cursors: Vec<u64>,
+        cx: &mut Context<Self>,
+    ) {
+        let (Some(session), Some(scope), Some(patient)) = (
+            self.session.clone(),
+            self.scope.clone(),
+            self.selected_id.clone(),
+        ) else {
+            return;
+        };
+        let cursor = cursors.last().copied().unwrap_or_default();
+        self.patient.record.history = Some(DiaryHistory {
+            entry_id: id.clone(),
+            version,
+            cursors,
+            selected: None,
+            page: None,
+        });
+        let requested = id.clone();
+        self.run(
+            move || session.read_entry_revisions(&scope, &patient, &id, version, cursor),
+            move |this, result, _| {
+                if let Some(history) = this.patient.record.history.as_mut().filter(|history| {
+                    history.entry_id == requested
+                        && history.version == version
+                        && history.cursors.last() == Some(&cursor)
+                }) {
+                    history.page = Some(result);
+                }
+            },
+            cx,
+        );
+        cx.notify();
+    }
+
+    pub(super) fn viewing_prior_diary_version(&self, entry: &Entry) -> bool {
+        self.patient.record.history.as_ref().is_some_and(|history| {
+            history.entry_id == entry.id
+                && history.version == entry.version
+                && history.selected.is_some()
+        })
+    }
+
+    pub(super) fn diary_history(
+        &self,
+        entry: &Entry,
+        current: AnyElement,
+        cx: &Context<Self>,
+    ) -> AnyElement {
+        if entry.entry_type == "scale"
+            || !self
+                .session
+                .as_ref()
+                .is_some_and(|session| session.can_access_local_host())
+        {
+            return current;
+        }
+        let theme = self.theme;
+        let history = self
+            .patient
+            .record
+            .history
+            .as_ref()
+            .filter(|history| history.entry_id == entry.id && history.version == entry.version);
+        let id = entry.id.clone();
+        let version = entry.version;
+        let mut panel =
+            div()
+                .min_w_0()
+                .max_w_full()
+                .flex()
+                .flex_col()
+                .items_start()
+                .gap(px(8.))
+                .child(
+                    button(
+                        format!("clinical-workspace-entry-history-{id}"),
+                        "Storico delle rettifiche",
+                        theme,
+                        false,
+                        true,
+                    )
+                    .debug_selector(|| format!("clinical-workspace-entry-history-{id}"))
+                    .aria_expanded(history.is_some())
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        if this.patient.record.history.as_ref().is_some_and(|history| {
+                            history.entry_id == id && history.version == version
+                        }) {
+                            this.patient.record.history = None;
+                            cx.notify();
+                        } else {
+                            this.read_diary_history(id.clone(), version, vec![0], cx);
+                        }
+                    })),
+                );
+        let Some(history) = history else {
+            return panel.child(current).into_any_element();
+        };
+        let Some(result) = &history.page else {
+            return panel
+                .child(current)
+                .child(text!("Lettura dello storico…"))
+                .into_any_element();
+        };
+        let Ok(page) = result else {
+            let id = entry.id.clone();
+            let cursors = history.cursors.clone();
+            return panel
+                .child(current)
+                .child(text!("Storico non disponibile."))
+                .child(
+                    button(
+                        "clinical-diary-history-retry",
+                        "Riprova",
+                        theme,
+                        false,
+                        true,
+                    )
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        this.read_diary_history(id.clone(), version, cursors.clone(), cx)
+                    })),
+                )
+                .into_any_element();
+        };
+        let stamp = |label: &str, row: &mediflow_runtime_client::EntryCorrection| {
+            format!(
+                "{label} {} · {}",
+                crate::components::display_instant(&row.corrected_at),
+                row.corrected_by
+                    .as_deref()
+                    .unwrap_or("Autore non disponibile"),
+            )
+        };
+        let coverage = page
+            .available_since
+            .as_ref()
+            .map(|date| format!("Storico dal {}", crate::components::display_instant(date)))
+            .unwrap_or_else(|| {
+                "Lo storico inizia con la prima rettifica registrata dalla versione 0.9.1.".into()
+            });
+        let selected = page
+            .revisions
+            .iter()
+            .find(|row| Some(row.version) == history.selected);
+        let current_label = format!("Versione attuale {version}");
+        let mut options = div().w_full().min_w_0().flex().flex_wrap().gap(px(6.));
+        for (selection, label, is_selected) in page
+            .revisions
+            .iter()
+            .map(|row| {
+                (
+                    Some(row.version),
+                    format!("Versione {}", row.version),
+                    Some(row.version) == history.selected,
+                )
+            })
+            .chain(std::iter::once((
+                None,
+                current_label.clone(),
+                selected.is_none(),
+            )))
+        {
+            let id = entry.id.clone();
+            let control_id = format!(
+                "clinical-diary-version-{}-{}",
+                entry.id,
+                selection.unwrap_or(version)
+            );
+            options = options.child(
+                button(control_id.clone(), label, theme, is_selected, true)
+                    .debug_selector(move || control_id)
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        if let Some(history) =
+                            this.patient.record.history.as_mut().filter(|history| {
+                                history.entry_id == id && history.version == version
+                            })
+                        {
+                            history.selected = selection;
+                            cx.notify();
+                        }
+                    })),
+            );
+        }
+        panel = panel
+            .child(
+                div()
+                    .type_role(theme, crate::theme::TextRole::Meta)
+                    .child(text!(coverage)),
+            )
+            .when(!page.revisions.is_empty(), |el| el.child(options));
+        for (label, cursors) in [
+            (
+                "Versioni meno recenti",
+                (history.cursors.len() > 1)
+                    .then(|| history.cursors[..history.cursors.len() - 1].to_vec()),
+            ),
+            (
+                "Versioni più recenti",
+                page.revisions.last().filter(|_| page.has_more).map(|row| {
+                    let mut cursors = history.cursors.clone();
+                    cursors.push(row.version);
+                    cursors
+                }),
+            ),
+        ] {
+            if let Some(cursors) = cursors {
+                let id = entry.id.clone();
+                panel = panel.child(button(label, label, theme, false, true).on_click(
+                    cx.listener(move |this, _, _, cx| {
+                        this.read_diary_history(id.clone(), version, cursors.clone(), cx)
+                    }),
+                ));
+            }
+        }
+        let (label, text) = match selected {
+            Some(row) => (
+                format!(
+                    "Versione {} · {}",
+                    row.version,
+                    stamp("Sostituita il", &row.correction)
+                ),
+                div()
+                    .w_full()
+                    .min_w_0()
+                    .flex()
+                    .flex_col()
+                    .gap(px(4.))
+                    .when_some(row.title.as_ref(), |el, title| {
+                        el.child(
+                            div()
+                                .type_role(theme, crate::theme::TextRole::Strong)
+                                .child(text!(title.clone())),
+                        )
+                    })
+                    .child(match row.content.as_deref() {
+                        Some(content) => clinical_text::render(content, WritingInk::Dry, theme),
+                        None => div()
+                            .child(text!("Testo precedente non disponibile."))
+                            .into_any_element(),
+                    })
+                    .into_any_element(),
+            ),
+            None => (
+                page.latest_correction
+                    .as_ref()
+                    .map(|last| format!("{current_label} · {}", stamp("Rettificata il", last)))
+                    .unwrap_or(current_label),
+                current,
+            ),
+        };
+        panel
+            .child(
+                div()
+                    .min_w_0()
+                    .type_role(theme, crate::theme::TextRole::Meta)
+                    .child(text!(label)),
+            )
+            .child(
+                div()
+                    .w_full()
+                    .min_w_0()
+                    .id("clinical-diary-history-text")
+                    .debug_selector(|| "clinical-diary-history-text".into())
+                    .child(text),
+            )
+            .into_any_element()
     }
 
     pub(super) fn record_diary(&self, cx: &Context<Self>) -> Div {
