@@ -22,31 +22,9 @@
 
 .sheet[data-overview] {
     container: record-sheet / inline-size;
-    --record-tray: #f0f2f4;
-    --record-tray-rule: #dfe1e5;
-    --record-tray-light: #ffffff;
-    --record-tray-shadow: #1418321a;
-    --record-island: #ffffff;
-    --record-compact-island: #f3f4f6;
-    --record-island-rule: #e7e8eb;
-    --record-change: #e3ebfa;
-    --record-change-rule: #bccbe8;
-    --record-proposal-rule: #2b8098;
     --record-island-radius: 14px;
     --record-tray-inset: 10px;
     --record-gap: 12px;
-}
-:global(.dark) .sheet[data-overview] {
-    --record-tray: #101216;
-    --record-tray-rule: #24262b;
-    --record-tray-light: #ffffff0d;
-    --record-tray-shadow: #00000066;
-    --record-island: #1f2228;
-    --record-compact-island: #1f2228;
-    --record-island-rule: #2f3238;
-    --record-change: #1c273d;
-    --record-change-rule: #364566;
-    --record-proposal-rule: #4a97ad;
 }
 .overview { display: grid; align-items: start; gap: var(--record-gap); min-width: 0; min-inline-size: 0; }
 .stable, .middle, .side, .context, .contextRows, .activity {
@@ -55,7 +33,7 @@
     min-width: 0;
     align-content: start;
 }
-.zoneTitle {
+:global(:root) .overview .zoneTitle {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -94,15 +72,15 @@
 .overview .middle > :global(#diario) {
     min-width: 0;
     padding: 12px;
-    border: 1px solid var(--record-island-rule);
+    border: 1px solid var(--lume-record-island-rule);
     border-radius: var(--record-island-radius);
-    background: var(--record-compact-island);
+    background: var(--lume-record-compact-island);
     scroll-margin-block-start: 20px;
 }
-.overview .activity > .comparison { background: var(--record-change); border-color: var(--record-change-rule); }
+.overview .activity > .comparison { background: var(--lume-record-change); border-color: var(--lume-record-change-rule); }
 .overview .support:has([data-has-proposals='true']) {
     border-style: dashed;
-    border-color: var(--record-proposal-rule);
+    border-color: var(--lume-record-proposal-rule);
 }
 .overview .islandHeader { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-bottom: 6px; }
 .islandHeader > h2 { flex: 1 1 auto; justify-content: start; }
@@ -111,15 +89,15 @@
     width: 28px;
     height: 28px;
     place-items: center;
-    border: 1px solid var(--record-island-rule);
+    border: 1px solid var(--lume-record-island-rule);
     border-radius: 8px;
-    background: var(--record-island);
+    background: var(--lume-record-island);
     flex: none;
     color: var(--lume-ink-muted);
 }
 .visitDate { color: var(--lume-ink-muted); font: var(--type-meta); overflow-wrap: anywhere; }
-.islandAction { color: var(--lume-accent); font: var(--type-body); }
-.overview :is(:global(.lume-section-heading), .support h2, .comparison h2) {
+.islandAction { display: inline-flex; align-items: center; min-height: 28px; color: var(--lume-accent); font: var(--type-body); }
+:global(:root) .overview :is(.islandHeader > h2, .support h2, .activity > section > h2, .contextRows > section > h2) {
     margin: 0;
     padding: 0;
     border: 0;
@@ -194,7 +172,7 @@
     margin-top: 4px;
     padding: 4px 8px;
     border-radius: 8px;
-    background: var(--record-island, var(--lume-surface-focal));
+    background: var(--lume-record-island);
     color: var(--lume-accent);
     font: var(--type-meta);
     font-weight: 600;
@@ -219,18 +197,18 @@
 @container record-sheet (width >= 44rem) {
     :global([data-folder-section='quadro']) .overview { grid-template-columns: minmax(0, 1.22fr) minmax(0, 1fr); }
     .overviewIndex { display: none; }
-    .zoneTitle { padding: 6px 6px 0; }
+    :global(:root) .overview .zoneTitle { padding: 4px 6px 0; }
     .overview :is(.stable, .middle, .context) {
         padding: var(--record-tray-inset);
         border-radius: calc(var(--record-island-radius) + var(--record-tray-inset));
-        background: var(--record-tray);
-        box-shadow: inset 0 0 0 1px var(--record-tray-rule),
-            inset 0 2px 0 var(--record-tray-light),
-            inset 0 -12px 18px -18px var(--record-tray-shadow);
+        background: var(--lume-record-tray);
+        box-shadow: inset 0 0 0 1px var(--lume-record-tray-rule),
+            inset 0 2px 0 var(--lume-record-tray-light),
+            inset 0 -12px 18px -18px var(--lume-record-tray-shadow);
     }
     .overview :is(.stable > section, .notes, .contextRows > section, .activity > section, .noComparison, .support),
-    .overview .middle > :global(#diario) { background: var(--record-island); }
-    .overview .activity > .comparison { background: var(--record-change); }
+    .overview .middle > :global(#diario) { background: var(--lume-record-island); }
+    .overview .activity > .comparison { background: var(--lume-record-change); }
     .overview .support:has([data-has-proposals='true']) { background: transparent; }
     :global([data-folder-section='quadro']) :is(.overview > .middle, .overview > .side) {
         max-height: max(320px, calc(100dvh - 242px));
@@ -243,11 +221,11 @@
         top: 0;
         z-index: 2;
         padding-inline: 6px;
-        background: var(--record-tray);
+        background: var(--lume-record-tray);
         border-radius: 8px;
     }
 }
-@container record-sheet (width >= 57rem) {
+@container record-sheet (width >= 62rem) {
     :global([data-folder-section='quadro']) .sheet:not([data-writing]) .overview {
         grid-template-columns: minmax(0, 1fr) minmax(0, 1.22fr) minmax(0, 1fr);
     }

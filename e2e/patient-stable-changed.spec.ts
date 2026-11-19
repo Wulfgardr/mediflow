@@ -146,9 +146,10 @@ async function themes(page: Page, suffix: string) {
             };
         });
         const compact = layout.width < 44 * layout.rem;
-        expect(layout.tracks).toBe(layout.width >= 57 * layout.rem ? 3 : compact ? 1 : 2);
+        expect(layout.tracks).toBe(layout.width >= 62 * layout.rem ? 3 : compact ? 1 : 2);
         expect(layout.tray).toBe(compact ? 'rgba(0, 0, 0, 0)' : theme === 'light' ? 'rgb(240, 242, 244)' : 'rgb(16, 18, 22)');
         if (!compact) expect(layout.trayRadius - layout.inset).toBe(layout.islandRadius);
+        expect(layout.titleSize).toBe(1.25 * layout.rem);
         expect(layout.titleSize).toBeGreaterThan(layout.actionSize);
         if ([1320, 1180, 402, 390].includes(width)) await test.info().attach(`zone-${width}-${theme}`, {
             body: JSON.stringify(layout, null, 2), contentType: 'application/json',
@@ -187,11 +188,7 @@ test('D: dalla lista, primo sguardo al ritorno e cartella senza storico al cambi
         if (index < 2) expect(item!.y + item!.height).toBeLessThanOrEqual(660);
         return item!;
     });
-    if (await page.getByRole('region', { name: 'Stabile', exact: true }).evaluate(el => el.getBoundingClientRect().left < el.parentElement!.parentElement!.getBoundingClientRect().left + 4)) {
-        expect(stable.x).toBeLessThan(changed.x);
-    } else {
-        expect(changed.x).toBeLessThan(stable.x);
-    }
+    expect(changed.x).toBeLessThan(stable.x);
     expect(changed.x).toBeLessThan(context.x);
     await test.info().attach('primo-sguardo-1180x660', {
         body: JSON.stringify({ problema: stable, variazione: changed, quadro: context }, null, 2), contentType: 'application/json',

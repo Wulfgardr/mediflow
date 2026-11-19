@@ -53,21 +53,27 @@ pub(crate) struct RecordPalette {
 }
 
 impl RecordPalette {
-    fn for_dark(dark: bool) -> Self {
-        let color = |light, shadow| rgb(if dark { shadow } else { light }).into();
+    fn from_tokens(tokens: &Value) -> Self {
+        let color = |name: &str| token_color(&tokens[name]);
         Self {
-            tray: color(0xf0f2f4, 0x101216),
-            tray_rule: color(0xdfe1e5, 0x24262b),
-            tray_light: color(0xffffff, 0x1d1f23),
-            tray_shadow: color(0xd9dce1, 0x08090b),
-            island: color(0xffffff, 0x1f2228),
-            compact_island: color(0xf3f4f6, 0x1f2228),
-            island_rule: color(0xe7e8eb, 0x2f3238),
-            change: color(0xe3ebfa, 0x1c273d),
-            change_rule: color(0xbccbe8, 0x364566),
-            proposal_rule: color(0x2b8098, 0x4a97ad),
+            tray: color("tray"),
+            tray_rule: color("tray-rule"),
+            tray_light: color("tray-light"),
+            tray_shadow: color("tray-shadow"),
+            island: color("island"),
+            compact_island: color("compact-island"),
+            island_rule: color("island-rule"),
+            change: color("change"),
+            change_rule: color("change-rule"),
+            proposal_rule: color("proposal-rule"),
         }
     }
+}
+
+fn token_color(token: &Value) -> Hsla {
+    let value = token["$value"].as_str().expect("required Lume color token");
+    rgb(u32::from_str_radix(value.trim_start_matches('#'), 16).expect("hexadecimal Lume color"))
+        .into()
 }
 
 impl Theme {
@@ -79,15 +85,9 @@ impl Theme {
             ))
             .expect("versioned Punto d'inchiostro runtime tokens must be valid JSON")
         });
-        let colors = &tokens["register"][if dark { "grafite" } else { "giorno" }];
-        let color = |group: &str, name: &str| {
-            let value = colors[group][name]["$value"]
-                .as_str()
-                .expect("required Punto d'inchiostro color token");
-            rgb(u32::from_str_radix(value.trim_start_matches('#'), 16)
-                .expect("hexadecimal Punto d'inchiostro color"))
-            .into()
-        };
+        let register = if dark { "grafite" } else { "giorno" };
+        let colors = &tokens["register"][register];
+        let color = |group: &str, name: &str| token_color(&colors[group][name]);
         Self {
             shade: color("surface", "canvas"),
             paper: color("surface", "focal"),
@@ -128,7 +128,7 @@ impl Theme {
                 10.
             },
             scale: 1.,
-            record: RecordPalette::for_dark(dark),
+            record: RecordPalette::from_tokens(&tokens["record"][register]),
         }
     }
 

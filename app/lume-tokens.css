@@ -63,6 +63,26 @@
   --lume-guardia-signal-critical: #a33a2f;
   --lume-guardia-signal-success: #4b6354;
   --lume-guardia-accent-minerale: #7fa0bc;
+  --lume-giorno-record-tray: #f0f2f4;
+  --lume-giorno-record-tray-rule: #dfe1e5;
+  --lume-giorno-record-tray-light: #ffffff;
+  --lume-giorno-record-tray-shadow: #d9dce1;
+  --lume-giorno-record-island: #ffffff;
+  --lume-giorno-record-compact-island: #f3f4f6;
+  --lume-giorno-record-island-rule: #e7e8eb;
+  --lume-giorno-record-change: #e3ebfa;
+  --lume-giorno-record-change-rule: #bccbe8;
+  --lume-giorno-record-proposal-rule: #2b8098;
+  --lume-grafite-record-tray: #101216;
+  --lume-grafite-record-tray-rule: #24262b;
+  --lume-grafite-record-tray-light: #1d1f23;
+  --lume-grafite-record-tray-shadow: #08090b;
+  --lume-grafite-record-island: #1f2228;
+  --lume-grafite-record-compact-island: #1f2228;
+  --lume-grafite-record-island-rule: #2f3238;
+  --lume-grafite-record-change: #1c273d;
+  --lume-grafite-record-change-rule: #364566;
+  --lume-grafite-record-proposal-rule: #4a97ad;
   --lume-signal-plum: #555161;
   --lume-surface-canvas: var(--lume-giorno-surface-canvas);
   --lume-surface-field: var(--lume-giorno-surface-field);
@@ -85,6 +105,16 @@
   --lume-signal-warning: var(--lume-giorno-signal-warning);
   --lume-signal-critical: var(--lume-giorno-signal-critical);
   --lume-signal-success: var(--lume-giorno-signal-success);
+  --lume-record-tray: var(--lume-giorno-record-tray);
+  --lume-record-tray-rule: var(--lume-giorno-record-tray-rule);
+  --lume-record-tray-light: var(--lume-giorno-record-tray-light);
+  --lume-record-tray-shadow: var(--lume-giorno-record-tray-shadow);
+  --lume-record-island: var(--lume-giorno-record-island);
+  --lume-record-compact-island: var(--lume-giorno-record-compact-island);
+  --lume-record-island-rule: var(--lume-giorno-record-island-rule);
+  --lume-record-change: var(--lume-giorno-record-change);
+  --lume-record-change-rule: var(--lume-giorno-record-change-rule);
+  --lume-record-proposal-rule: var(--lume-giorno-record-proposal-rule);
 }
 
 .dark {
@@ -109,4 +139,14 @@
   --lume-signal-warning: var(--lume-grafite-signal-warning);
   --lume-signal-critical: var(--lume-grafite-signal-critical);
   --lume-signal-success: var(--lume-grafite-signal-success);
+  --lume-record-tray: var(--lume-grafite-record-tray);
+  --lume-record-tray-rule: var(--lume-grafite-record-tray-rule);
+  --lume-record-tray-light: var(--lume-grafite-record-tray-light);
+  --lume-record-tray-shadow: var(--lume-grafite-record-tray-shadow);
+  --lume-record-island: var(--lume-grafite-record-island);
+  --lume-record-compact-island: var(--lume-grafite-record-compact-island);
+  --lume-record-island-rule: var(--lume-grafite-record-island-rule);
+  --lume-record-change: var(--lume-grafite-record-change);
+  --lume-record-change-rule: var(--lume-grafite-record-change-rule);
+  --lume-record-proposal-rule: var(--lume-grafite-record-proposal-rule);
 }
