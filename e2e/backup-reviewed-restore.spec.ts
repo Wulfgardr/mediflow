@@ -169,8 +169,10 @@ test('copie con riferimenti clinici incoerenti vengono rifiutate in verifica e r
         const verify = (data: Buffer) => web.post(backupPath + '/verify', {
             data,
         });
+        const beforePreview = archiveRows(db);
         const preview = await verify(Buffer.from(JSON.stringify(valid)));
         expect(preview.status(), await preview.text()).toBe(200);
+        expect(archiveRows(db)).toEqual(beforePreview);
         const { expectedSnapshot, sourceChecksum } = await preview.json();
         const before = archiveRows(db);
         const restoreHeaders = {
@@ -197,6 +199,7 @@ test('copie con riferimenti clinici incoerenti vengono rifiutate in verifica e r
             const failed = await verify(data);
             expect(failed.status(), await failed.text()).toBe(412);
             expect((await failed.json()).preflight.checks).toContainEqual(expect.objectContaining({ id: 'artifact-references', status: 'fail' }));
+            expect(archiveRows(db)).toEqual(before);
             const restore = await web.post(backupPath, { data, headers: restoreHeaders });
             expect(restore.status(), await restore.text()).toBe(412);
             expect(archiveRows(db)).toEqual(before);
