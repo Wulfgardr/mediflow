@@ -65,6 +65,7 @@ test('backup restore rejects cross-port and text/plain transport before prefligh
         const routeUrl = ${JSON.stringify(routeUrl)};
         const verifyUrl = ${JSON.stringify(verifyUrl)};
         const modules = new Map([
+            ['@/lib/server-error-log', ${JSON.stringify(toDataModule(`export { logServerError } from ${JSON.stringify(pathToFileURL(path.join(ROOT, 'lib/server-error-log.ts')).href)};`))}],
             ['@/lib/backup-restore-receipt', ${JSON.stringify(toDataModule("export function parseRestoreIntent() { return null; } export function readRestorePreviewSnapshot() { return 'a'.repeat(64); }"))}],
             ['@/lib/security/loopback-ingress.mjs', ${JSON.stringify(toDataModule("export function isLocalClientSession() { return false; }"))}],
             ['next/server', ${JSON.stringify(toDataModule("export const NextResponse = Response;"))}],
