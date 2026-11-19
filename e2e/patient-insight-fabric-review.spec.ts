@@ -3,33 +3,14 @@ import { mkdir } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 
-import type { FunctionModelPreferences } from '../lib/function-models/browser';
+import { availablePreview, MODEL, MODEL_OPTION_ID, PATIENT_INSIGHT_CATALOG } from './fixtures/patient-insight-preview';
 import {
   parsePatientInsightPreviewRequest,
   type PatientInsightPreviewRequest,
 } from '../lib/ai-providers/fabric/patient-insight-preview-contract';
 import { bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch, assertNoHorizontalOverflow, assertNotClippedInViewport } from './utils';
 
-const MODEL = 'synthetic-patient-insight:latest';
 const REVIEW_NOTICE = 'Controlla ogni frase sulla fonte che cita: il modello può scambiare ciò che è fatto con ciò che è da fare.';
-const REVIEW_REF = `review_${'b'.repeat(32)}`;
-const MODEL_OPTION_ID = `model_option_${'a'.repeat(32)}`;
-const PATIENT_INSIGHT_CATALOG = {
-  schemaVersion: 'mediflow.function-preferences.v1',
-  revision: `sha256_${'c'.repeat(64)}`,
-  catalogRevision: `sha256_${'d'.repeat(64)}`,
-  check: 'configuration_only',
-  apply: 'denied',
-  presets: ['host_defaults', 'all_off'],
-  functions: (['patient_insight', 'smart_import', 'document_synthesis', 'treatment_reasoning'] as const).map(id => ({
-    id,
-    enabled: id === 'patient_insight',
-    defaultModelOptionId: MODEL_OPTION_ID,
-    defaultSource: 'host_configuration',
-    bindingState: 'current',
-    options: [{ modelOptionId: MODEL_OPTION_ID, label: MODEL, provider: 'ollama', state: 'available_unqualified' }],
-  })),
-} satisfies FunctionModelPreferences;
 
 async function createSyntheticPatient(page: Page): Promise<string> {
   return await page.evaluate(async (taxCode: string) => {
@@ -51,52 +32,6 @@ async function createSyntheticPatient(page: Page): Promise<string> {
     }
     return payload.id;
   }, `PIFABRIC${Date.now()}`);
-}
-
-function availablePreview(request: PatientInsightPreviewRequest) {
-  return {
-    preview: {
-      writesPerformed: 0,
-      apply: 'denied',
-      status: 'available',
-      code: null,
-      proposal: {
-        schemaVersion: 'mediflow.patient-insight.review-proposal.v2',
-        reviewOnly: true,
-        summary: 'Proposta sintetica da revisionare. [S1]',
-        currentState: ['Quadro sintetico stabile da verificare. [S1]'],
-        alerts: ['Attenzione sintetica da confermare. [S1]'],
-        nextSteps: ['Rivedere la fonte sintetica durante il follow-up. [S1]'],
-        gaps: ['Dato sintetico ancora da integrare.'],
-        generatedAt: request.capturedAt,
-        currentness: {
-          selectionEpoch: 7,
-          patientRevision: request.patientRevision,
-          projectionDigest: `sha256_${'a'.repeat(64)}`,
-          capturedAt: request.capturedAt,
-          verifiedAt: request.capturedAt,
-        },
-      },
-      receipt: {
-        schemaVersion: 'mediflow.ai.fabric-resolution.v1',
-        capability: 'patient_insight',
-        venue: 'local_process',
-        provider: 'ollama',
-        model: MODEL,
-        egress: 'none',
-      },
-      provenance: {
-        schemaVersion: 'mediflow.ai.fabric-provenance.v1',
-        capability: 'patient_insight',
-        venue: 'local_process',
-        provider: 'ollama',
-        model: MODEL,
-        preprocessing: ['context_minimization', 'envelope_validation'],
-        attempts: 2,
-      },
-      reviewRef: REVIEW_REF,
-    },
-  };
 }
 
 test.describe.configure({ retries: 0 });

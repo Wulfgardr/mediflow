@@ -11,11 +11,12 @@ import Link from 'next/link';
 import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import { useEntryDraftOnOpen } from '@/lib/hooks/effects/use-entry-draft-on-open';
 import { useParams, useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, ArrowLeft, ChevronRight, ClipboardPenLine, FileText as DraftIcon, Plus } from 'lucide-react';
 
 import { PluginLocalUiNavigation, PluginPrescribingGuide } from '@/components/plugin-local-ui-navigation';
 import { PatientClinicalSupport, PatientProposalsSummary } from '@/components/patient-clinical-support';
+import type { PatientInsightCardPreview } from '@/components/ai-patient-insight';
 import { AttentionGroup } from '@/components/attention-group';
 import { ClinicalRiverTimeline } from '@/components/clinical-river-timeline';
 import { PatientEntryComposer } from '@/components/patient-entry-composer';
@@ -125,7 +126,10 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
         },
     };
     const [smartImportProposalCapture, setSmartImportProposalCapture] = useState<PatientSmartImportProjectionCaptureInput | null>(null);
-    const [insightProposalKey, setInsightProposalKey] = useState<string | null>(null);
+    const [insightProposal, setInsightProposal] = useState<{ key: string; preview: PatientInsightCardPreview } | null>(null);
+    const onInsightProposalChange = useCallback((key: string | null, preview?: PatientInsightCardPreview | null) => {
+        setInsightProposal(key && preview ? { key, preview } : null);
+    }, []);
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
     /* Whether this browser can actually hand a file to the system.
        Probed rather than assumed: the Web Share API accepts files on iOS, iPadOS
@@ -464,7 +468,8 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
     const insightStale = Boolean(patient.aiSummary?.trim())
         && insightGeneratedAt !== null
         && maxClinicalTimestamp > insightGeneratedAt + 5000;
-    const hasInsightProposal = insightProposalKey === `${patient.id}:${patient.version ?? 'unknown'}`;
+    const currentInsightPreview = insightProposal?.key === `${patient.id}:${patient.version ?? 'unknown'}` ? insightProposal.preview : null;
+    const hasInsightProposal = currentInsightPreview !== null;
     const reviewQueueProjection = buildPatientReviewQueueSummary({
         insight: {
             enabled: isAiPatientInsightEnabledValue(patientInsightKillSwitch?.value),
@@ -734,12 +739,12 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
                             ) : null}
                         </div>
                     </div>
-                    <PatientClinicalSupport patient={patient} stale={insightStale} onProposalChange={setInsightProposalKey} />
+                    <PatientClinicalSupport patient={patient} stale={insightStale} onProposalChange={onInsightProposalChange} />
                 </section>
 
                 <PluginLocalUiNavigation key={id} patientId={id} patientVersion={patient.version} patientLabel={`${patient.firstName} ${patient.lastName}`} />
                 <PatientSynopticSheet
-                    clinicalSupport={<PatientProposalsSummary hasInsightProposal={hasInsightProposal}
+                    clinicalSupport={<PatientProposalsSummary hasInsightProposal={hasInsightProposal} patientId={patient.id} preview={currentInsightPreview}
                             hasSmartImportProposal={smartImportProposalCapture !== null && smartImportProposalCapture === smartImportFabricCaptureInput}
                             smartImportAvailable={smartImportSourceCount > 0} />}
                     notesContent={<PatientProfileNotes patientId={id} patientVersion={patient.version} />}
