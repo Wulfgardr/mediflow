@@ -1,4 +1,4 @@
-import { syntheticLoopbackRequest } from './security/loopback-ingress-test-fixture';
+import { syntheticLoopbackRequest, syntheticWebClientRequest } from './security/loopback-ingress-test-fixture';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
@@ -21,7 +21,7 @@ const dataDir = mkdtempSync(join(tmpdir(), 'mediflow-scoped-profile-'));
 process.env.MEDIFLOW_DATA_DIR = dataDir;
 const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server');
 openDbServer();
-const cookieState: { cookies: Map<string, string>; headers: Headers; onCookies?: () => Promise<void> | void } = { cookies: new Map(), headers: syntheticLoopbackRequest('http://127.0.0.1').headers };
+const cookieState: { cookies: Map<string, string>; headers: Headers; onCookies?: () => Promise<void> | void } = { cookies: new Map(), headers: syntheticWebClientRequest('http://127.0.0.1').headers };
 const cleanup = installNetworkPatientCookieFixture(dataDir, cookieState);
 const web = load('../app/api/patients/[id]/profile-query/route.ts') as typeof import('../app/api/patients/[id]/profile-query/route');
 const network = load('../app/api/v1/network/patients/[id]/profile-query/route.ts') as typeof import('../app/api/v1/network/patients/[id]/profile-query/route');

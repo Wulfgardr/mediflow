@@ -6,13 +6,13 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { harness } from './ai-settings-controller.test-support.ts';
 import { installNetworkPatientCookieFixture } from '../network-patient-authority-test-fixture';
-import { syntheticLoopbackRequest } from '../security/loopback-ingress-test-fixture';
+import { syntheticLoopbackRequest, syntheticWebClientRequest } from '../security/loopback-ingress-test-fixture';
 import { issueSyntheticWebSessionContext, retireSyntheticWebSession } from '../security/web-auth-lifecycle-owner-test-fixture';
 import { readFunctionModelPreferences } from '../ai-providers/fabric/function-model-preferences';
 
 const root = mkdtempSync(join(tmpdir(), 'mf-d06-synthetic-'));
 process.env.MEDIFLOW_DATA_DIR = root;
-const cookieState = { cookies: new Map<string, string>(), headers: syntheticLoopbackRequest('http://127.0.0.1').headers };
+const cookieState = { cookies: new Map<string, string>(), headers: syntheticWebClientRequest('http://127.0.0.1').headers };
 const cleanup = installNetworkPatientCookieFixture(root, cookieState);
 const load = createRequire(import.meta.url);
 const { dbServer, openDbServer } = load('../db-server.ts') as typeof import('../db-server');
