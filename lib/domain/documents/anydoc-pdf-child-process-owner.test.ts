@@ -138,8 +138,11 @@ test('both real PDF callers pass the exact owned root, heap and conditional addo
         const core = ['--max-old-space-size=256', '--permission', '--disable-warning=SecurityWarning', `--allow-fs-read=${root}`,
             ...(index === 1 ? ['--allow-addons'] : []), worker];
         const command = process.platform === 'darwin' ? '/usr/bin/sandbox-exec' : process.platform === 'linux' ? '/usr/bin/prlimit' : process.execPath;
+        const networkNamespace = process.platform === 'linux' && process.arch === 'arm64'
+            ? ['/usr/bin/unshare', '--user', '--map-current-user', '--net', '--']
+            : [];
         const prefix = process.platform === 'darwin' ? ['-p', '(version 1) (allow default) (deny network*) (deny file-write*) (deny process-fork)', process.execPath]
-            : process.platform === 'linux' ? ['--data=1073741824', '--', process.execPath] : [];
+            : process.platform === 'linux' ? ['--data=1073741824', '--', ...networkNamespace, process.execPath] : [];
         assert.equal(call.command, command);
         assert.deepEqual(call.args, [...prefix, ...core]);
     }

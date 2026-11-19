@@ -289,8 +289,12 @@ dipende dal profilo.
 | Profilo | Controlli di sistema del launcher documentale |
 | --- | --- |
 | macOS Apple Silicon | `sandbox-exec` applica la policy Seatbelt che nega `network*`, scritture su file e fork ai worker AnyDoc/PDF. Il launcher non ripiega su Node diretto. Il processo Apple Vision ha una policy Seatbelt separata che nega `network*`. |
-| Omarchy ARM | `prlimit` impone il limite dati del processo. Nessun blocco di rete imposto dal launcher a livello di sistema. |
+| Omarchy ARM | `prlimit` impone il limite dati. `unshare` avvia il figlio in un namespace di rete distinto, senza interfacce e rotte IP del guest. Il kernel deve consentire la creazione di namespace all'utente ordinario. Se l'avvio fallisce, l'elaborazione resta indisponibile. |
 | Windows 11 ARM, Node x64 emulato | Node parte direttamente con i permessi applicativi previsti. Nessun blocco di rete imposto dal launcher a livello di sistema. |
+
+Il namespace Linux riguarda la rete IP e i socket Unix astratti. I socket
+Unix nel filesystem restano soggetti ai permessi del processo. Sulle altre
+architetture Linux il launcher impone il limite dati tramite `prlimit`.
 
 Per i PDF supportati, il passaggio OCR riguarda soltanto le pagine `needsOcr`.
 Il riconoscimento locale usa Apple Vision sul Mac e Tesseract WASM su Linux
