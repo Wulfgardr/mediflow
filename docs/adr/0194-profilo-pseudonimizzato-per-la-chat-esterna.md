@@ -2,7 +2,7 @@
 
 Data: 2026-11-19
 
-Stato: **Proposed**, decide Leonardo. Riferimenti: WUL-904, WUL-905,
+Stato: **Accettato** da Leonardo il 19/11/2026. Riferimenti: WUL-904, WUL-905,
 [ADR 0146](0146-patient-profile-query-application-boundary.md),
 [ADR 0160](0160-mediflow-in-desktop-chat.md),
 [ADR 0192](0192-segnaposto-con-ruolo-e-date-relative.md).
