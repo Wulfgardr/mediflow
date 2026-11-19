@@ -914,6 +914,9 @@ paths:
         Requests an explicit pairing bootstrap intent for a trusted LAN client.
         This does not complete trust by itself. If the node is still in
         `local-only` mode, the server returns a PHI-safe `409` gate response.
+        Oversized intents are invalid. When the pending queue is full,
+        existing intents remain available for confirmation or expiry. The
+        server reports `409 PAIRING_STATE_CONFLICT` for the new request.
       security: []
       requestBody:
         required: true
