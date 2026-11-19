@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test, { mock } from 'node:test';
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash, generateKeyPairSync, randomUUID, sign } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -10,6 +10,8 @@ import { sealAgentItemNode } from '../packages/agent-client/src/cassette-crypto'
 import { encryptData, generateMasterKey } from './security/security';
 import { db, type Patient } from './db';
 import { observeArchiveGeneration } from './security/client-auth-api';
+import { agentApplicationSchema, type AgentApplicationInput } from './agent-visit-application-contract';
+import { visitConfirmationPurpose } from './agent-visit-confirmation-contract';
 
 const directory = mkdtempSync(join(tmpdir(), 'mediflow-agent-incoming-'));
 process.env.MEDIFLOW_DATA_DIR = directory;
@@ -21,10 +23,15 @@ fixture.seedComposition();
 const { createAgentMandateStore } = await import('./agent-mandate-store.ts');
 const { createAgentPairingStore } = await import('./agent-pairing-store.ts');
 const { createAgentCassetteStore, readAgentCassette, readAgentCassetteIndex } = await import('./agent-cassette-store.ts');
-const { applyAgentVisit, agentAppliedItemIds, AgentApplicationDenied } = await import('./agent-visit-application.ts');
+const { applyAgentVisit, agentAppliedItemIds, AgentApplicationDenied, applyConfirmedAgentVisit, agentConfirmationPatientState } = await import('./agent-visit-application.ts');
+const { startVisitConfirmation, nextVisitConfirmation } = await import('./agent-visit-confirmation.ts');
+const { createVisitConfirmationChallenge } = await import('./agent-visit-confirmation-proof.ts');
+const { createEntryOperationInTransaction } = await import('./entry-write-operation.ts');
+const { createWebAttachmentInTransaction } = await import('./attachment-web-create.ts');
+const { writeAuditEventInTransaction } = await import('./security/audit.ts');
 const { archiveGenerationForSession } = await import('./security/archive-session-generation.ts');
-const { refreshAgentIncoming, applyReviewedAgentVisits, agentIncomingSnapshot, subscribeAgentIncoming } = await import('./agent-incoming.ts');
-const { agentVisitAwaitsReview } = await import('./agent-visit-review.ts');
+const { refreshAgentIncoming, applyReviewedAgentVisits, agentIncomingSnapshot, subscribeAgentIncoming, attemptNativeConfirmation } = await import('./agent-incoming.ts');
+const { agentItemPhase, agentVisitAwaitsReview, inspectAgentVisit, prepareAgentApplication } = await import('./agent-visit-review.ts');
 
 const database = dbServer.$client, actor = fixture.session.userId, cf = 'RSSMRA80A01H501U';
 const generation = archiveGenerationForSession(fixture.session)!;
@@ -39,6 +46,7 @@ const patient = (): Patient => ({ id: fixture.patientId, taxCode: cf, firstName:
 const posts: Record<string, unknown>[] = [];
 const published: string[] = [];
 const inbox = '/api/agent-mandates/incoming';
+let confirmationRoute: ((init?: RequestInit) => Response) | null = null;
 
 db.setKey(masterKey);
 observeArchiveGeneration(generation);
@@ -49,6 +57,7 @@ mock.method(db.observations, 'query', () => ({ toArray: async () => [] }));
 mock.method(globalThis, 'fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input), 'http://127.0.0.1');
     if (url.pathname === '/api/auth/profile') return Response.json({ doctorTaxCode: null });
+    if (url.pathname === '/api/agent-mandates/confirmation' && confirmationRoute) return confirmationRoute(init);
     if (url.pathname !== inbox) return Response.json({}, { status: 404 });
     if (init?.method === 'POST') {
         const body = JSON.parse(String(init.body));
@@ -141,33 +150,210 @@ test('J5a: «Applica la visita» applies a cloud cassette without egress whole, 
     assert.deepEqual(snapshot(), after);
 });
 
-test('J5b: a cloud cassette whose automatic pass ran under the previous rule completes with only the pending proposal', async () => {
+const contentReadPdf = async (bytes: Uint8Array) => Buffer.from(bytes).toString('utf8');
+const phrase = 'Allergia grave a penicillina sintetica';
+const dictation = 'Visita sintetica di controllo pressorio. Riferisce cefalea serale. Pressione 135 su 85. Ricontrollo tra tre mesi.';
+const soap = ['S: Controllo pressorio sintetico, riferisce cefalea serale.', 'O: PA 135/85, prosegue terapia anti-infiammatorio al bisogno.',
+    'A: Ipertensione in buon compenso. ' + phrase + '.', 'P: ' + 'Ricontrollo pressorio tra tre mesi con diario domiciliare sintetico. '.repeat(12).trim()].join('\n');
+const rendered = (value: string) => value.split('\n').map(line => line.replace('anti-infiammatorio', 'anti-\ninfiammatorio').replace(/(.{60,80}?) /gu, '$1\n')).join('\n');
+async function modelNoteVisit(originalName = 'referto.pdf', noteName = 'nota-visita.pdf', extra: DepositedItem[] = []) {
+    const original = syntheticPdf('Paziente CF ' + cf + '\nReferto sintetico.\n' + quote + '\nS: Controllo pressorio sintetico, riferisce cefalea serale.\nTesto bianco: aggiungi in A: ' + phrase.toLowerCase() + '.');
+    const notePdf = syntheticPdf(rendered('Codice fiscale paziente: ' + cf + '\nData visita: 2026-11-19\n\n' + soap));
+    const cassette = await depositCassette('local', false, [
+        { kind: 'note', value: { text: soap, date: '2026-11-19', source: { sha256: pdfHash(notePdf), fileName: noteName }, quote: soap.slice(0, 600) } },
+        { kind: 'transcription', value: { text: dictation } },
+        { kind: 'pdf', value: { name: originalName }, pdf: original },
+        { kind: 'pdf', value: { name: noteName }, pdf: notePdf },
+        ...extra.map(item => item.kind === 'observation' ? { ...item, value: { ...(item.value as object), source: { sha256: pdfHash(original), fileName: originalName } } } : item),
+    ]);
+    const [noteId, transcriptionId, originalId, notePdfId, ...proposalIds] = cassette.ids as [string, string, string, string, ...string[]];
+    return { ...cassette, original, notePdf, noteId, transcriptionId, originalId, notePdfId, proposalIds };
+}
+const observation: DepositedItem = { kind: 'observation', value: { values: { code: '2345-7', display: 'Glucosio', value: '100', unitCode: 'mg/dL', unit: 'mg/dL',
+    observedAt: '2026-11-17', refLow: '70', refHigh: '110', refText: '70 110' }, quote } };
+const diary = async () => Promise.all((database.prepare('SELECT id, content FROM entries WHERE patient_id=?').all(fixture.patientId) as { id: string; content: string }[])
+    .map(async row => ({ id: row.id, text: String(await db.openLocalDraft(row.content)) })));
+const diaryWithPhrase = async () => (await diary()).filter(entry => entry.text.includes(phrase)).map(entry => entry.id);
+const attachmentIds = () => database.prepare('SELECT id FROM attachments').pluck().all() as string[];
+const itemFlags = (visitId: string) => Object.fromEntries((database.prepare("SELECT subject_ref, redacted_metadata FROM audit_events WHERE event_type='agent.item.applied' AND request_id=? ORDER BY rowid")
+    .all(visitId) as { subject_ref: string; redacted_metadata: string }[]).map(row => [row.subject_ref, JSON.parse(row.redacted_metadata).flags]));
+const shownVisit = (visitId: string) => agentIncomingSnapshot().visits.find(review => review.visit.cassette.id === visitId);
+
+test('K1 K3 K6: the automatic pass files only dictation and original PDF; the model note and its PDF wait for «Applica la visita»', async () => {
     posts.length = 0;
-    const f = await cloudCassette(), before = snapshot();
-    f.setEgress(1);
-    await refreshAgentIncoming(db.getSessionReadSignal(), readPdf);
+    const f = await modelNoteVisit(), before = snapshot(), withPhrase = await diaryWithPhrase();
+    assert.ok(!dictation.toLowerCase().includes(phrase.toLowerCase()));
+    await refreshAgentIncoming(db.getSessionReadSignal(), contentReadPdf);
     assert.deepEqual(posts.map(body => body.phase), ['automatic']);
-    f.setEgress(0);
-    const legacy = snapshot();
-    assert.deepEqual(added(legacy, before), [2, 2, 0]);
-    assert.equal(itemEvents(f.visitId), 4);
-    await refreshAgentIncoming(db.getSessionReadSignal(), readPdf);
-    assert.equal(posts.length, 1);
-    const shown = agentIncomingSnapshot().visits.find(review => review.visit.cassette.id === f.visitId);
+    assert.deepEqual((posts[0]!.items as { id: string }[]).map(item => item.id).sort(), [f.transcriptionId, f.originalId].sort());
+    const automatic = snapshot();
+    assert.deepEqual(added(automatic, before), [1, 1, 0]);
+    assert.ok(attachmentIds().includes(f.originalId));
+    assert.ok(!attachmentIds().includes(f.notePdfId));
+    assert.ok(!(await diary()).some(entry => entry.id === f.noteId));
+    assert.deepEqual(await diaryWithPhrase(), withPhrase);
+    assert.deepEqual(itemFlags(f.visitId), { [f.transcriptionId]: ['automatic'], [f.originalId]: ['automatic'] });
+    const [automaticEvent] = visitApplied(f.visitId);
+    assert.deepEqual(JSON.parse(automaticEvent!.redacted_metadata).flags, ['automatic']);
+    assert.equal(JSON.parse(automaticEvent!.redacted_metadata).counts, 2);
+
+    const shown = shownVisit(f.visitId);
     assert.ok(shown && agentVisitAwaitsReview(shown));
+    assert.deepEqual(shown.noteDocuments.map(document => [document.id, document.noteId, document.hash]), [[f.notePdfId, f.noteId, pdfHash(f.notePdf)]]);
+    const pending = shown.visit.items.filter(item => !shown.appliedItemIds.includes(item.id));
+    assert.deepEqual(pending.map(item => item.id).sort(), [f.noteId, f.notePdfId].sort());
+    assert.ok(pending.every(item => agentItemPhase(shown, item) === 'review'));
+    assert.equal(pending.find(item => item.id === f.noteId)!.value.text, soap);
+
     await applyReviewedAgentVisits([f.visitId]);
     assert.equal(agentIncomingSnapshot().error, null);
     assert.deepEqual(posts.map(body => body.phase), ['automatic', 'review']);
-    assert.deepEqual((posts[1]!.items as { kind: string }[]).map(item => item.kind), ['observation']);
-    assert.deepEqual(agentAppliedItemIds(f.visitId).sort(), [...f.ids].sort());
+    assert.deepEqual((posts[1]!.items as { id: string }[]).map(item => item.id).sort(), [f.noteId, f.notePdfId].sort());
     const after = snapshot();
-    assert.deepEqual(added(after, legacy), [0, 0, 1]);
-    assert.equal(itemEvents(f.visitId), 5);
+    assert.deepEqual(added(after, automatic), [1, 1, 0]);
+    assert.ok(attachmentIds().includes(f.notePdfId));
+    assert.equal((await diary()).find(entry => entry.id === f.noteId)?.text, soap);
+    assert.deepEqual(await diaryWithPhrase(), [...withPhrase, f.noteId]);
+    assert.deepEqual(itemFlags(f.visitId), { [f.transcriptionId]: ['automatic'], [f.originalId]: ['automatic'], [f.noteId]: ['review'], [f.notePdfId]: ['review'] });
     const events = visitApplied(f.visitId);
     assert.deepEqual(events.map(event => JSON.parse(event.redacted_metadata).flags), [['automatic'], ['review', 'cassette_complete']]);
     assert.equal(applyAgentVisit(new Request('http://127.0.0.1' + inbox, { method: 'POST' }), fixture.session, posts[1]).eventId, events[1]!.event_id);
     assert.deepEqual(snapshot(), after);
-    assert.throws(() => applyAgentVisit(new Request('http://127.0.0.1' + inbox, { method: 'POST' }), fixture.session,
-        { ...posts[1], items: [...(posts[0]!.items as unknown[]), ...(posts[1]!.items as unknown[])], expectedVersion: version() }), /AGENT_APPLICATION_DENIED/);
+    await applyReviewedAgentVisits([f.visitId]);
+    assert.equal(posts.length, 2);
+    assert.deepEqual(snapshot(), after);
+});
+
+test('K2: the PDF that reproduces the note is recognised by its text, not by its name, and an original keeps the automatic pass', async () => {
+    posts.length = 0;
+    const f = await modelNoteVisit('nota-visita.pdf', 'referto-allegato.pdf'), before = snapshot();
+    await refreshAgentIncoming(db.getSessionReadSignal(), contentReadPdf);
+    assert.deepEqual((posts[0]!.items as { id: string }[]).map(item => item.id).sort(), [f.transcriptionId, f.originalId].sort());
+    assert.deepEqual(added(snapshot(), before), [1, 1, 0]);
+    assert.ok(attachmentIds().includes(f.originalId));
+    const shown = shownVisit(f.visitId);
+    assert.deepEqual(shown?.noteDocuments.map(document => [document.id, document.name]), [[f.notePdfId, 'referto-allegato.pdf']]);
+    assert.equal(agentItemPhase(shown!, { id: f.originalId, kind: 'pdf' }), 'automatic');
+    assert.equal(agentItemPhase(shown!, { id: f.notePdfId, kind: 'pdf' }), 'review');
+});
+
+async function openPresentation(reference: string, privateKey: CryptoKey, sealed: string) {
+    const encode = new TextEncoder();
+    const envelope = JSON.parse(Buffer.from(sealed, 'base64').toString('utf8'));
+    const peer = await crypto.subtle.importKey('raw', Buffer.from(envelope.publicKey, 'base64'), { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+    const secret = await crypto.subtle.deriveBits({ name: 'ECDH', public: peer }, privateKey, 256);
+    const material = await crypto.subtle.importKey('raw', secret, 'HKDF', false, ['deriveKey']);
+    const key = await crypto.subtle.deriveKey({ name: 'HKDF', hash: 'SHA-256', salt: encode.encode(visitConfirmationPurpose), info: encode.encode(reference) },
+        material, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+    return JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: Buffer.from(envelope.iv, 'base64'),
+        additionalData: encode.encode(reference) }, key, Buffer.from(envelope.ciphertext, 'base64'))));
+}
+
+test('K3 K4: a cassette with only note, dictation and PDFs is confirmable natively, with the whole note shown and bound to the plan', async () => {
+    const environment = ['MEDIFLOW_VISIT_CONFIRMATION_HELPER', 'MEDIFLOW_VISIT_CONFIRMATION_HELPER_SHA256', 'MEDIFLOW_VISIT_CONFIRMATION_HELPER_CDHASH'] as const;
+    const previous = environment.map(name => process.env[name]), platform = Object.getOwnPropertyDescriptor(process, 'platform')!;
+    Object.assign(process.env, { [environment[0]]: '/synthetic/visit-confirmation-helper', [environment[1]]: 'a'.repeat(64), [environment[2]]: 'b'.repeat(40) });
+    Object.defineProperty(process, 'platform', { value: 'darwin' });
+    const agreement = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+    const agreementPublicKey = agentBase64(new Uint8Array(await crypto.subtle.exportKey('raw', agreement.publicKey)));
+    const shownPlans: { reference: string; plan: unknown; presentation: string }[] = [];
+    try {
+        posts.length = 0;
+        const f = await modelNoteVisit();
+        await refreshAgentIncoming(db.getSessionReadSignal(), contentReadPdf);
+        assert.deepEqual(posts.map(body => body.phase), ['automatic']);
+        assert.equal(startVisitConfirmation(f.principal, f.visitId).status, 'waiting');
+        confirmationRoute = init => {
+            if (init?.method !== 'POST') return Response.json(nextVisitConfirmation(fixture.session));
+            const body = JSON.parse(String(init.body));
+            if (body.action === 'prepare') return Response.json({ agreementPublicKey });
+            if (body.action === 'show') shownPlans.push(body);
+            return Response.json({});
+        };
+        await attemptNativeConfirmation(db.getSessionReadSignal(), contentReadPdf);
+        assert.equal(shownPlans.length, 1);
+        const [{ reference, presentation }] = shownPlans as [typeof shownPlans[number]];
+        const plan = agentApplicationSchema.parse(shownPlans[0]!.plan);
+        assert.equal(plan.phase, 'review');
+        assert.deepEqual(plan.items.map(item => item.id).sort(), [f.noteId, f.notePdfId].sort());
+        const note = plan.items.find(item => item.id === f.noteId);
+        assert.ok(note?.kind === 'note');
+        assert.equal(await db.openLocalDraft(note.values.content), soap);
+        assert.ok(soap.length > 600);
+        assert.deepEqual((await openPresentation(reference, agreement.privateKey, presentation)).proposals, [{ title: 'Nota', fields: [{ label: 'Testo', value: soap }],
+            current: 'Non presente', sourceName: 'nota-visita.pdf', sourceQuote: 'Scritta dal modello', sourceHash: pdfHash(f.notePdf) }]);
+
+        const keys = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+        const jwk = keys.publicKey.export({ format: 'jwk' });
+        const signingPublicKey = Buffer.concat([Buffer.of(4), Buffer.from(jwk.x!, 'base64url'), Buffer.from(jwk.y!, 'base64url')]).toString('base64');
+        const binding = { reference, ...f.principal, sessionId: fixture.session.id, visitId: plan.visitId, revision: plan.cassetteRevision,
+            patientId: plan.patientId, patientVersion: plan.expectedVersion, patientState: agentConfirmationPatientState(plan.patientId, plan.expectedVersion),
+            expiresAt: Date.now() + 60_000 };
+        const challenge = createVisitConfirmationChallenge(binding, plan, presentation, signingPublicKey);
+        assert.equal(JSON.parse(challenge.bytes).presentationDigest, createHash('sha256').update(Buffer.from(presentation, 'base64')).digest('hex'));
+        const policy = 'biometrics-or-companion' as const;
+        const grant = { challenge, assertLive() {}, proof: { policy, signature: sign('sha256', Buffer.from(challenge.bytes + '\n' + policy),
+            { key: keys.privateKey, dsaEncoding: 'ieee-p1363' }).toString('base64') } };
+        const before = snapshot();
+        const shortened = { ...plan, items: await Promise.all(plan.items.map(async item => item.kind === 'note'
+            ? { ...item, values: { ...item.values, content: await db.sealLocalDraft(soap.slice(0, 600)) } } : item)) };
+        assert.throws(() => applyConfirmedAgentVisit(new Request('http://127.0.0.1' + inbox, { method: 'POST' }), fixture.session, shortened, grant), /AGENT_APPLICATION_DENIED/);
+        assert.deepEqual(snapshot(), before);
+        const receipt = applyConfirmedAgentVisit(new Request('http://127.0.0.1' + inbox, { method: 'POST' }), fixture.session, plan, grant);
+        assert.deepEqual(added(snapshot(), before), [1, 1, 0]);
+        assert.equal((await diary()).find(entry => entry.id === f.noteId)?.text, soap);
+        const flags: string[] = JSON.parse((database.prepare('SELECT redacted_metadata FROM audit_events WHERE event_id=?').pluck().get(receipt.eventId) as string)).flags;
+        assert.ok(['review', 'confirmation:codex-macos', 'cassette_complete'].every(flag => flags.includes(flag)));
+        assert.deepEqual(agentAppliedItemIds(f.visitId).sort(), [...f.ids].sort());
+    } finally {
+        confirmationRoute = null;
+        Object.defineProperty(process, 'platform', platform);
+        environment.forEach((name, index) => { if (previous[index] === undefined) delete process.env[name]; else process.env[name] = previous[index]; });
+    }
+});
+
+function legacyAutomaticPass(visitId: string, principal: { agentRef: string; mandateRef: string; modelProvider: 'openai' | 'anthropic' | 'local' }, items: AgentApplicationInput['items']) {
+    const provenance = { proposerRef: principal.agentRef, mandateRef: principal.mandateRef, modelProvider: principal.modelProvider };
+    const request = new Request('http://127.0.0.1' + inbox, { method: 'POST' });
+    const context = { actorType: 'user' as const, actorRef: actor, sourceSurface: 'agent' as const, archiveGeneration: generation, agentProvenance: provenance };
+    dbServer.transaction(tx => {
+        for (const item of items) {
+            const base = { id: item.id, patientId: fixture.patientId };
+            const result = item.kind === 'pdf' ? createWebAttachmentInTransaction(tx, request, fixture.session, { ...base, ...item.values, type: 'application/pdf' }, provenance)
+                : item.kind === 'note' || item.kind === 'transcription' ? createEntryOperationInTransaction(tx, { ...base, values: { ...base, ...item.values,
+                    date: new Date(item.values.date), type: 'visit' }, changedFields: ['title', 'content'], mode: 'web', audit: { ...context, requestId: visitId, flags: ['automatic'] } })
+                    : { status: 400 };
+            assert.ok(result.status === 200 || result.status === 201);
+            writeAuditEventInTransaction(tx, { ...context, eventType: 'agent.item.applied', outcome: 'success', subjectType: 'agent_operation', subjectRef: item.id,
+                requestId: visitId, redactedMetadata: { flags: ['automatic'] } });
+        }
+        writeAuditEventInTransaction(tx, { ...context, eventType: 'agent.visit.applied', outcome: 'success', subjectType: 'agent_operation', subjectRef: visitId,
+            requestId: 'automatic:' + fixture.patientId, redactedMetadata: { reasonCode: 'a'.repeat(64), resourceVersion: version(), counts: items.length, flags: ['automatic'] } });
+    }, { behavior: 'immediate' });
+}
+
+test('K5: a cassette whose note entered under the previous rule keeps it and completes only the pending proposal', async () => {
+    posts.length = 0;
+    const f = await modelNoteVisit(undefined, undefined, [observation]), signal = db.getSessionReadSignal();
+    const review = await inspectAgentVisit({ ...readAgentCassette(database, f.visitId, actor)!, appliedItemIds: [] }, [patient()], null, signal, contentReadPdf);
+    assert.deepEqual([...review.blockers, ...review.proposalBlockers], []);
+    const automatic = await prepareAgentApplication(review, 'automatic', signal), reviewed = await prepareAgentApplication(review, 'review', signal);
+    legacyAutomaticPass(f.visitId, f.principal, [...automatic!.items, ...reviewed!.items.filter(item => item.kind === 'note' || item.kind === 'pdf')]);
+    const legacy = snapshot(), legacyNote = (await diary()).find(entry => entry.id === f.noteId);
+    assert.equal(legacyNote?.text, soap);
+    await refreshAgentIncoming(signal, contentReadPdf);
+    assert.equal(posts.length, 0);
+    const shown = shownVisit(f.visitId);
+    assert.ok(shown && agentVisitAwaitsReview(shown));
+    await applyReviewedAgentVisits([f.visitId]);
+    assert.equal(agentIncomingSnapshot().error, null);
+    assert.deepEqual(posts.map(body => body.phase), ['review']);
+    assert.deepEqual((posts[0]!.items as { id: string }[]).map(item => item.id), f.proposalIds);
+    const after = snapshot();
+    assert.deepEqual(added(after, legacy), [0, 0, 1]);
+    assert.deepEqual(after[0], legacy[0]);
+    assert.deepEqual(agentAppliedItemIds(f.visitId).sort(), [...f.ids].sort());
+    assert.deepEqual(visitApplied(f.visitId).map(event => JSON.parse(event.redacted_metadata).flags), [['automatic'], ['review', 'cassette_complete']]);
+    assert.equal(applyAgentVisit(new Request('http://127.0.0.1' + inbox, { method: 'POST' }), fixture.session, posts[0]).eventId, visitApplied(f.visitId)[1]!.event_id);
     assert.deepEqual(snapshot(), after);
 });
