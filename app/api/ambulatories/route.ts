@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { readAmbulatoryJsonObject } from '@/lib/ambulatory-json-body';
@@ -16,7 +17,7 @@ export async function GET() {
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('API GET /ambulatories error:', error);
+        logServerError('API GET /ambulatories error', error);
         return NextResponse.json({ error: 'Failed to fetch ambulatories' }, { status: 500 });
     }
 }
@@ -35,7 +36,7 @@ export async function POST(request: Request) {
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('API POST /ambulatories error:', error);
+        logServerError('API POST /ambulatories error', error);
         return NextResponse.json({ error: 'Failed to create ambulatory' }, { status: 500 });
     }
 }

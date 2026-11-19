@@ -1,4 +1,5 @@
 /* @Codex */
+import { logServerError } from '@/lib/server-error-log';
 import { NextResponse } from 'next/server';
 /* @Codex */
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
@@ -14,7 +15,7 @@ export async function GET() {
         const status = readSissSessionStatusFromAtlasHistory();
         return NextResponse.json(status);
     } catch (error) {
-        console.error('API GET /api/siss/session-status error:', error);
+        logServerError('API GET /api/siss/session-status error', error);
         return NextResponse.json({ error: 'Failed to inspect local SISS session state' }, { status: 500 });
     }
 }

@@ -1,4 +1,5 @@
 /* @Codex */
+import { logServerError } from '@/lib/server-error-log';
 import { NextResponse } from 'next/server';
 
 import { mutateNetworkPairingState } from '@/lib/network-home-base-server';
@@ -33,7 +34,7 @@ export async function DELETE(
 
         return NextResponse.json(persisted.result.value, { status: persisted.result.status });
     } catch (error) {
-        console.error('API DELETE /api/v1/network/pairing-clients/[clientId] error:', error);
+        logServerError('API DELETE /api/v1/network/pairing-clients/[clientId] error', error);
         return NextResponse.json({ error: 'Failed to revoke paired client' }, { status: 500 });
     }
 }

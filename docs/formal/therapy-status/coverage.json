@@ -1,5 +1,5 @@
 {
-  "syncCommit": "11a41d23bd6ab519fa50a6c0fd99ee7387b093b8",
+  "syncCommit": "3047d540cd4dcb1ca131cf95dbf4067daca9a352",
   "tool": {
     "release": "v1.7.4",
     "url": "https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar",
@@ -36,7 +36,7 @@
     "lib/db.ts": "dbd89ddb171975599fd155c298761293aed6a0053d63362fcee59ee1fc7ccb10",
     "lib/security/client-auth-api.ts": "0d1c44a438588284c8c5ab80ab727fe5c50ae29dd33b02443324a0d70f6e8678",
     "lib/therapy-write-operation.ts": "8fa4abf13ad501bdb1d199b2abeaee5e18331f84e6dcdb19caa0b040b5c63345",
-    "app/api/therapies/[id]/route.ts": "3f4765cd55a13360965fae38bced33cec5cc69403dd0bbfd6d67417c5c40e4e2",
+    "app/api/therapies/[id]/route.ts": "ecc8f661c1f2521e567a6666c4c9da89097ef8da2874281285066b266f6fdcc1",
     "app/api/therapies/route.ts": "e13c48abb76cb0461eb1a9c1f23cf8724ec9cf34d32a7bd54909e58d4e251dac",
     "lib/locked-field-guard.ts": "a4b64b4db1968423169937a2b491add2d2a19b6fba2489b1515e37b358a55d3a",
     "lib/therapy-status-command-service.ts": "2e27218f4d0f6f4efbf9466ed783e43852254217a0623186ade3252438c09dd3",
@@ -51,7 +51,7 @@
     "lib/api-table-response.ts": "5f19aab147a2d4459c1d2ec96e6c6d67bb20ad8c23b0cd9f38239771ffbb602c",
     "lib/backup-encrypted-fields.json": "1fe7775a81e0f2d2882946815e4e17840ca4661439c410b75a58c3dd0ce65998",
     "lib/backup-import-provenance.ts": "13eb1cc6083b5a07489d64cc9d195b82b6b8b660cb9874e4dc46b93fdf25999e",
-    "lib/sqlite-schema.ts": "2e599cf106b4a681294351e3251e045c874e03ae169db1eb9a5fb8a6a6e2fa19",
+    "lib/sqlite-schema.ts": "03a1f998cec3a47122a58d8c97c0d7e8d8d8fc6325b5197f5b50d5aecd0fefbd",
     "lib/sqlite-schema-open.ts": "636b407e77488d6a20ba431d79d31a1f0bb7617e900fa30a108be90d5e6e47aa",
     "lib/backup-restore-executor.ts": "ccdee2e7155b52594d2aa4cf5250cb9a09489f0ad735ba174572a858f86a1892",
     "lib/security/archive-maintenance-owner.ts": "57a026cca85845bf2ed3ae5b8c47dbc88caa8184b3d41639ea7ad9e90a420802",
