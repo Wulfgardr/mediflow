@@ -1,3 +1,4 @@
+import { logServerError, logServerWarning } from '@/lib/server-error-log';
 import { RESTORE_RECEIPT_PREFIX } from '@/lib/backup-restore-receipt-contract';
 import { writeSettingWithFunctionModelGeneration } from '@/lib/ai-providers/fabric/function-model-settings-write';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
@@ -31,7 +32,7 @@ export async function GET(
 
         return NextResponse.json(result);
     } catch (error) {
-        console.error("GET Setting Error:", error);
+        logServerError("GET Setting Error", error);
         return NextResponse.json({ error: "Failed to fetch setting" }, { status: 500 });
     }
 }
@@ -59,7 +60,7 @@ export async function PUT(
         const archiveDenial = archiveWriteRequestDenial(request, session);
         if (archiveDenial) return archiveDenial;
         if (decision.unregistered) {
-            console.warn(`[MediFlow] settings write TODO: registra la chiave sconosciuta "${key}" in lib/security/settings-write-policy.ts`);
+            logServerWarning('Settings: unregistered key in single write');
         }
 
         if (!isValidInsightSetting(key, value)) {
@@ -107,12 +108,12 @@ export async function PUT(
                 }),
             });
         } catch (error) {
-            console.error('Audit settings write failed:', error);
+            logServerError('Audit settings write failed', error);
         }
 
         return NextResponse.json({ success: true, key, value: persistedValue });
     } catch (error) {
-        console.error("PUT Setting Error:", error);
+        logServerError("PUT Setting Error", error);
         return NextResponse.json({ error: "Failed to update setting" }, { status: 500 });
     }
 }

@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { NextResponse } from 'next/server';
 import { and, asc, inArray, isNull, not, sql } from 'drizzle-orm';
@@ -122,7 +123,7 @@ export async function GET(request: Request) {
 
         return NextResponse.json(rows);
     } catch (error) {
-        console.error('API GET /exemptions error:', error);
+        logServerError('API GET /exemptions error', error);
         return NextResponse.json({ error: 'Failed to fetch exemptions' }, { status: 500 });
     }
 }
@@ -168,7 +169,7 @@ export async function POST(request: Request) {
 
         return NextResponse.json({ success: true, count: imported });
     } catch (error) {
-        console.error('API POST /exemptions error:', error);
+        logServerError('API POST /exemptions error', error);
         return NextResponse.json({ error: 'Failed to import exemptions' }, { status: 500 });
     }
 }
@@ -183,7 +184,7 @@ export async function DELETE(request: Request) {
         await dbServer.delete(exemptions);
         return NextResponse.json({ success: true });
     } catch (error) {
-        console.error('API DELETE /exemptions error:', error);
+        logServerError('API DELETE /exemptions error', error);
         return NextResponse.json({ error: 'Failed to clear exemptions' }, { status: 500 });
     }
 }

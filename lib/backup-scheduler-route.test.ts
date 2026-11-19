@@ -31,6 +31,7 @@ test('route-attacks: atomic revision, stale and simultaneous writers, rejected s
     const dependencies: Record<string, unknown> = {
         'node:crypto': { randomUUID },
         '@/scripts/backup-destination-policy.mjs': destinationPolicy,
+        '@/lib/server-error-log': await import('./server-error-log'),
         '@/lib/api-error-response': { archiveReplacementResponse: () => null, apiInternalError: () => json({}, { status: 500 }) },
         '@/lib/security/archive-write-request': { archiveWriteRequestDenial: () => null },
         'next/server': { NextResponse: { json } }, 'drizzle-orm': { eq: () => true },

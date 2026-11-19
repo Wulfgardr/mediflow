@@ -1,4 +1,5 @@
 /* @Codex */
+import { logServerError } from '@/lib/server-error-log';
 import { NextResponse } from 'next/server';
 /* @Codex */
 import {
@@ -18,7 +19,7 @@ export async function GET(request: Request) {
         const result = await resolveTerminologyCatalog(searchParams);
         return NextResponse.json(result.body, { status: result.status ?? 200 });
     } catch (error) {
-        console.error('API GET /api/v1/network/terminology/resolve error:', error);
+        logServerError('API GET /api/v1/network/terminology/resolve error', error);
         return NextResponse.json({ error: 'Failed to resolve terminology code' }, { status: 500 });
     }
 }

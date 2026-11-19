@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { AifaCatalogConflictError, AifaReductionError, AifaUpdateError } from '@/lib/aifa-catalog-lock';
 import { buildAuditWriteInputFromRequest } from '@/lib/security/audit';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
@@ -77,7 +78,7 @@ export async function GET(request: Request) {
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('[MediFlow] AIFA catalog read failed:', error);
+        logServerError('[MediFlow] AIFA catalog read failed', error);
         return NextResponse.json({ error: 'Failed to read drug catalog' }, { status: 500 });
     }
 }
@@ -157,7 +158,7 @@ export async function DELETE(request: Request) {
         if (error instanceof AifaUpdateError) {
             return NextResponse.json({ error: error.message }, { status: error.status });
         }
-        console.error('[MediFlow] AIFA catalog clear failed:', error);
+        logServerError('[MediFlow] AIFA catalog clear failed', error);
         return NextResponse.json({ error: 'Svuotamento AIFA non riuscito; catalogo conservato' }, { status: 500 });
     }
 }

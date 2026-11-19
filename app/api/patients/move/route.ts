@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { canIncrementVersion } from '@/lib/version-concurrency';
@@ -134,7 +135,7 @@ export async function POST(request: Request) {
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error("Move patients error:", error);
+        logServerError("Move patients error", error);
         return NextResponse.json({ error: "Failed to move patients" }, { status: 500 });
     }
 }

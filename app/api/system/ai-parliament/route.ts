@@ -1,4 +1,5 @@
 /* @Codex */
+import { logServerError } from '@/lib/server-error-log';
 import { NextResponse } from 'next/server';
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 import { readAiModelParliamentArtifact } from '@/lib/ai-model-parliament-storage';
@@ -22,7 +23,7 @@ export async function GET() {
             report: artifact.report,
         });
     } catch (error) {
-        console.error('GET ai parliament report failed:', error);
+        logServerError('GET ai parliament report failed', error);
         return NextResponse.json({ error: 'Failed to load AI parliament report.' }, { status: 500 });
     }
 }
