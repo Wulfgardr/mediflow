@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { rejectUnsealedV1Write } from '@/lib/api/v1/sealed-write';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
@@ -36,7 +37,7 @@ export async function PUT(
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('API PUT /entries/[id] error:', error);
+        logServerError('API PUT /entries/[id] error', error);
         return NextResponse.json({ error: 'Update Failed' }, { status: 500 });
     }
 }
@@ -68,7 +69,7 @@ export async function DELETE(
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('API DELETE /entries/[id] error:', error);
+        logServerError('API DELETE /entries/[id] error', error);
         return NextResponse.json({ error: 'Delete Failed' }, { status: 500 });
     }
 }

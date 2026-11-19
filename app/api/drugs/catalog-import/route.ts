@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { NextResponse } from 'next/server';
 import { AifaCatalogConflictError, AifaReductionError, AifaUpdateError } from '@/lib/aifa-catalog-lock';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
@@ -52,7 +53,7 @@ export async function POST(request: Request) {
         if (error instanceof DrugCatalogImportError || error instanceof AifaUpdateError) {
             return NextResponse.json({ error: error.message }, { status: error.status, headers });
         }
-        console.error('[MediFlow] drug catalog import failed:', error);
+        logServerError('[MediFlow] drug catalog import failed', error);
         return NextResponse.json({ error: 'Importazione non riuscita; catalogo conservato.' }, { status: 500, headers });
     }
 }

@@ -1,3 +1,4 @@
+import { logServerError } from '../server-error-log';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -190,7 +191,7 @@ export function reconcileAccountResets(db: Database.Database): AccountResetRecei
                 finishedAt: new Date().toISOString(), reconciled: true, archiveGeneration: row?.archiveGeneration ?? null } satisfies Outcome);
             if (!row && regularFile(path.join(dir, 'previous.db.partial'))) fs.unlinkSync(path.join(dir, 'previous.db.partial'));
         } catch (error) {
-            console.error('[MediFlow] Account reset journal entry left for inspection:', id, (error as Error).message);
+            logServerError('Account reset journal: entry retained for inspection', error);
         }
     }
     return listAccountResetReceipts(db);

@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { rejectUnsealedV1Write } from '@/lib/api/v1/sealed-write';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
@@ -82,7 +83,7 @@ export async function POST(request: Request) {
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error("API POST /entries error:", error);
+        logServerError("API POST /entries error", error);
         return NextResponse.json({ error: 'Create Failed' }, { status: 500 });
     }
 }

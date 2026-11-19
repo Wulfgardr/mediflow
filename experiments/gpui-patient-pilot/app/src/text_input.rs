@@ -136,6 +136,11 @@ impl TextInput {
     }
 
     #[cfg(test)]
+    pub(crate) fn test_accessibility_id(&self) -> &'static str {
+        self.id
+    }
+
+    #[cfg(test)]
     pub fn accessible_label(&self) -> &'static str {
         self.label
     }
@@ -1011,6 +1016,8 @@ impl Render for TextInput {
                 .unwrap(),
             element.style().border_color.unwrap(),
         );
+        #[cfg(test)]
+        let element = crate::shell::rendered_command::observe(element);
         element
     }
 }

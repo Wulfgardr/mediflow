@@ -1,7 +1,7 @@
 use super::*;
 use gpui::{Bounds, Element, Fill, Focusable, Pixels, Styled, size};
 
-fn draw(cx: &mut gpui::VisualTestContext) {
+pub(super) fn draw(cx: &mut gpui::VisualTestContext) {
     for _ in 0..8 {
         let pending = cx.update(|window, cx| {
             window.refresh();

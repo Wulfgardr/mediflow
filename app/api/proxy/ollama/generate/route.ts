@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 
@@ -36,7 +37,7 @@ export async function POST(req: Request) {
         });
 
         if (!res.ok) {
-            console.error(`[Proxy] Ollama Error: ${res.statusText}`);
+            logServerError('Ollama proxy: generate upstream', undefined, res.status);
             return NextResponse.json({ error: `Ollama Error: ${res.statusText}` }, { status: res.status });
         }
 
@@ -49,7 +50,7 @@ export async function POST(req: Request) {
         if (replacement) return replacement;
         const localityResponse = ollamaLocalityErrorResponse(e);
         if (localityResponse) return localityResponse;
-        console.error("[Proxy] Generate Failed:", e);
+        logServerError("[Proxy] Generate Failed", e);
         return NextResponse.json({ error: "Proxy Error" }, { status: 500 });
     }
 }

@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { readNativeNetworkJson, jsonBodyTooLargeResponse } from '@/lib/native-network-json-body';
 import { NextResponse } from 'next/server';
 import {
@@ -27,7 +28,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
         return NextResponse.json(observations);
     } catch (error) {
-        console.error('API GET /api/v1/network/patients/[id]/observations error:', error);
+        logServerError('API GET /api/v1/network/patients/[id]/observations error', error);
         return NextResponse.json({ error: 'Failed to fetch observations' }, { status: 500 });
     }
 }
@@ -54,7 +55,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     } catch (error) {
         const sizeError = jsonBodyTooLargeResponse(error);
         if (sizeError) return sizeError;
-        console.error('API POST /api/v1/network/patients/[id]/observations error:', error);
+        logServerError('API POST /api/v1/network/patients/[id]/observations error', error);
         return NextResponse.json({ error: 'Failed to create observation' }, { status: 500 });
     }
 }
