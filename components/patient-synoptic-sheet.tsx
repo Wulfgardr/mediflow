@@ -76,7 +76,7 @@ export function PatientSynopticSheet({ clinicalSupport, notesContent, problems, 
             <table role="table" className={`${register.table} ${reading.problems}`} aria-label="Problemi">
                 <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Descrizione</th><th role="columnheader" scope="col">Codice</th><th role="columnheader" scope="col" className={secondary}>Da quando</th></tr></thead>
                 <tbody role="rowgroup">{problems.data?.map((problem, index) => <tr role="row" key={`${problem.system}-${problem.code}-${index}`}>
-                    <td role="cell"><PrivacyBlur>{problem.description}</PrivacyBlur>{overview && problem.date ? <small>dal <DateCell date={problem.date} /></small> : null}</td>
+                    <td role="cell"><PrivacyBlur>{problem.description}</PrivacyBlur>{overview && problem.date ? <small>Registrata il <DateCell date={problem.date} /></small> : null}</td>
                     <td role="cell" className={`lume-code ${reading.codeColumn}`}>{problem.code}</td>
                     <td role="cell" className={secondary}><DateCell date={problem.date} /></td>
                 </tr>)}</tbody>
