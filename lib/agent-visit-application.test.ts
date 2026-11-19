@@ -69,18 +69,17 @@ async function visit(provider: AgentMandateInput['provider'] = 'local', allowsCl
     receipt = database.transaction(() => store.close(principal, id, receipt.revision)).immediate();
     return { id, mandate, mandates, principal, operations,
         input(phase: 'automatic' | 'review'): AgentApplicationInput { return { visitId: id, phase, patientId: fixture.patientId, expectedVersion: version(), cassetteRevision: receipt.revision,
-            items: items.filter(item => ['note', 'transcription', 'pdf'].includes(item.kind) === (phase === 'automatic')) }; },
+            items: items.filter(item => ['transcription', 'pdf'].includes(item.kind) === (phase === 'automatic')) }; },
         whole(): AgentApplicationInput { return { visitId: id, phase: 'review', patientId: fixture.patientId, expectedVersion: version(), cassetteRevision: receipt.revision, items }; } };
 }
 
-test('automatic application consumes only note and PDF, leaves all clinical proposals pending and replays without duplicates', async () => {
+test('automatic application consumes only the PDF, leaves the note and all clinical proposals pending and replays without duplicates', async () => {
     const f = await visit(), input = f.input('automatic'), initial = snapshot();
     const receipt = applyAgentVisit(request, fixture.session, input);
     assert.equal(receipt.status, 'applied');
     assert.deepEqual(agentAppliedItemIds(f.id).sort(), input.items.map(item => item.id).sort());
     const after = snapshot();
-    assert.deepEqual(after.slice(0, 6).map((rows, index) => rows.length - initial[index].length), [1, 1, 0, 0, 0, 0]);
-    assert.equal((after[0].at(-1) as { recorded_by: string }).recorded_by, 'Medico Sintetico');
+    assert.deepEqual(after.slice(0, 6).map((rows, index) => rows.length - initial[index].length), [0, 1, 0, 0, 0, 0]);
     assert.equal(applyAgentVisit(request, fixture.session, input).eventId, receipt.eventId);
     assert.deepEqual(snapshot(), after);
     const forged = { ...input, patientId: 'another-synthetic-patient' };
@@ -124,7 +123,8 @@ test('one explicit review commits all structured proposals, service lines and pr
     const before = snapshot(), input = f.input('review');
     const receipt = applyAgentVisit(request, fixture.session, input);
     const after = snapshot();
-    assert.deepEqual(after.slice(0, 6).map((rows, index) => rows.length - before[index].length), [0, 0, 1, 1, 2, 1]);
+    assert.deepEqual(after.slice(0, 6).map((rows, index) => rows.length - before[index].length), [1, 0, 1, 1, 2, 1]);
+    assert.equal((after[0].at(-1) as { recorded_by: string }).recorded_by, 'Medico Sintetico');
     assert.equal(agentAppliedItemIds(f.id).length, 7);
     assert.ok(!readAgentCassetteIndex(database, fixture.session.userId, null).visits.some(row => row.id === f.id));
     assert.equal(readAgentCassette(database, f.id, fixture.session.userId)?.id, f.id);
@@ -154,7 +154,7 @@ for (const phase of ['automatic', 'review'] as const) test(`failure of every aud
     const f = await visit();
     if (phase === 'review') applyAgentVisit(request, fixture.session, f.input('automatic'));
     const input = f.input(phase), before = snapshot(), appliedBefore = agentAppliedItemIds(f.id);
-    const expectedAuditCount = phase === 'automatic' ? 6 : 13;
+    const expectedAuditCount = phase === 'automatic' ? 4 : 15;
     for (let offset = 0; offset < expectedAuditCount; offset++) {
         const count = (database.prepare('SELECT count(*) AS n FROM audit_events').get() as { n: number }).n + offset;
         database.exec(`CREATE TRIGGER synthetic_application_audit_fault BEFORE INSERT ON audit_events WHEN (SELECT count(*) FROM audit_events)=${count} BEGIN SELECT RAISE(ABORT, 'SYNTHETIC_APPLICATION_AUDIT_FAULT'); END`);
@@ -163,6 +163,20 @@ for (const phase of ['automatic', 'review'] as const) test(`failure of every aud
         assert.deepEqual(snapshot(), before);
         assert.deepEqual(agentAppliedItemIds(f.id), appliedBefore);
     }
+});
+
+test('the server never lets the note into the automatic pass and refuses a review that leaves part of the visit behind', async () => {
+    const f = await visit(), automatic = f.input('automatic'), note = f.input('review').items.find(item => item.kind === 'note')!, before = snapshot();
+    assert.throws(() => applyAgentVisit(request, fixture.session, { ...automatic, items: [...automatic.items, note] }), /AGENT_APPLICATION_DENIED/);
+    assert.throws(() => applyAgentVisit(request, fixture.session, { ...automatic, items: [note] }), /AGENT_APPLICATION_DENIED/);
+    assert.deepEqual(snapshot(), before);
+    applyAgentVisit(request, fixture.session, automatic);
+    const applied = snapshot(), current = f.input('review');
+    assert.throws(() => applyAgentVisit(request, fixture.session, { ...current, items: current.items.filter(item => item.kind !== 'note') }), /AGENT_APPLICATION_DENIED/);
+    assert.throws(() => applyAgentVisit(request, fixture.session, { ...current, items: [note] }), /AGENT_APPLICATION_DENIED/);
+    assert.deepEqual(snapshot(), applied);
+    assert.equal(applyAgentVisit(request, fixture.session, f.input('review')).status, 'applied');
+    assert.equal(agentAppliedItemIds(f.id).length, 7);
 });
 
 test('automatic mode cannot consume or relabel a structured proposal', async () => {
@@ -204,7 +218,7 @@ test('native approval commits and audits exactly one plan, and a valid proof can
 
     const result = applyConfirmedAgentVisit(request, fixture.session, plan, grant);
     const after = snapshot();
-    assert.deepEqual(after.slice(0, 6).map((rows, index) => rows.length - before[index].length), [0, 0, 1, 1, 2, 1]);
+    assert.deepEqual(after.slice(0, 6).map((rows, index) => rows.length - before[index].length), [1, 0, 1, 1, 2, 1]);
     assert.equal(hasAgentVisitConfirmationReceipt(reference, f.principal), true);
     assert.equal(hasAgentVisitConfirmationReceipt(reference, { ...f.principal, agentRef: randomUUID() }), false);
     const record = database.prepare('SELECT * FROM audit_events WHERE event_id=?').get(result.eventId) as Record<string, string>;
