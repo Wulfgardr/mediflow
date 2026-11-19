@@ -30,9 +30,13 @@ Per `scripts/run-strip-types.mjs --test`, anche tramite npm, imposta `MEDIFLOW_D
 
 Se `MEDIFLOW_DATA_DIR` è assente o vuota, il launcher termina prima del target con `MEDIFLOW_TEST_DATA_DIR_REQUIRED`. Un import statico può aprire il database prima degli hook della fixture: il percorso esplicito impedisce al runtime la copia automatica di `medical.db` dalla directory di lavoro, mentre il preparatore E2E ha un controllo distinto e il launcher dei test imposta la variabile indicata sopra.
 
+Il launcher verifica ogni percorso e glob incluso prima di avviare i test. Se una selezione richiesta non trova alcun file, l'intero comando fallisce anche quando gli altri percorsi sono validi.
+
 Per la produzione il lanciatore costruisce la build quando serve. La pagina Avvio e Ctrl+C arrestano solo i figli che gli appartengono. `scripts/Launch_MediFlowMac.command` prepara il bundle come strumento interno, mentre la voce «App per Mac» è l’ingresso per l’utente e richiede un bundle costruito e un’identità coerente.
 
 ## Verifica
+
+Il job `repository-guards` esegue `npm run check:test-selection`. Per la suite unit, il controllo segue `test:unit` in `package.json` fino a `scripts/run-unit-suite.mjs` e richiede la chiamata `npm run test:unit` nel job `web-core` di `.github/workflows/web-core.yml`, sulle PR e sui push a `main`.
 
 Per i documenti parti da questi comandi:
 
