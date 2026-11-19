@@ -45,7 +45,7 @@ function Section<T>({ name, read, count, empty, children }: {
     </section>;
 }
 
-function DateCell({ date }: { date?: Date }) {
+function DateCell({ date }: { date?: Date | null }) {
     if (!date || !Number.isFinite(new Date(date).getTime())) return null;
     return <time dateTime={new Date(date).toISOString()}>{new Date(date).toLocaleDateString('it-IT')}</time>;
 }
@@ -55,9 +55,9 @@ export function PatientSynopticSheet({ clinicalSupport, notesContent, problems, 
     const stable = <>
         <Section name="Problemi" read={problems} count={formatCountLabel(problems.data?.length ?? 0, 'problema', 'problemi')} empty="Nessun problema registrato.">
             <table className={`${register.table} ${reading.problems}`} aria-label="Problemi">
-                <thead><tr><th scope="col">Codice</th><th scope="col">Descrizione</th><th scope="col" className={`${register.secondaryColumn} ${reading.secondaryColumn}`}>Da quando</th></tr></thead>
+                <thead><tr><th scope="col">Codice</th><th scope="col">Descrizione</th><th scope="col" className={`${register.secondaryColumn} ${reading.secondaryColumn}`}>Registrata il</th></tr></thead>
                 <tbody>{problems.data?.map((problem, index) => <tr key={`${problem.system}-${problem.code}-${index}`}>
-                    <td className="lume-code">{problem.code}</td><td><PrivacyBlur>{problem.description}</PrivacyBlur>{diary && problem.date ? <small><DateCell date={problem.date} /></small> : null}</td><td className={`${register.secondaryColumn} ${reading.secondaryColumn}`}><DateCell date={problem.date} /></td>
+                    <td className="lume-code">{problem.code}</td><td><PrivacyBlur>{problem.description}</PrivacyBlur>{diary && problem.date ? <small>Registrata il <DateCell date={problem.date} /></small> : null}</td><td className={`${register.secondaryColumn} ${reading.secondaryColumn}`}>{problem.date ? <DateCell date={problem.date} /> : 'Data sconosciuta'}</td>
                 </tr>)}</tbody>
             </table>
         </Section>

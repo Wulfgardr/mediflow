@@ -149,3 +149,33 @@ test('scale precheck blocks before Bundle construction even when another mapper 
         return true;
     });
 });
+
+test('precheck blocks diagnoses without a valid recording date before coding confirmation', async () => {
+    for (const date of [undefined, null, '2025-02-29']) {
+        const input = fixture();
+        input.patient.diagnoses = [{ id: 'undated', code: 'SYN', description: 'Synthetic diagnosis', system: 'UNKNOWN', date }];
+        await assert.rejects(prepareFhirBundleFromRecords(input, () => assert.fail('Unexpected warning confirmation')),
+            { name: 'FhirExportPrecheckError', code: 'INVALID_DATE', category: 'diagnosis', recordId: 'undated' });
+    }
+});
+
+test('precheck blocks unrepresentable encounters and ignores a deleted one', async () => {
+    const input = fixture();
+    const entry = input.entries[0];
+    for (const [type, setting] of [['visit', undefined], ['exam', 'hospital'], ['hospitalization', 'ambulatory']] as const) {
+        input.entries = [{ ...entry, type, setting }];
+        await assert.rejects(prepareFhirBundleFromRecords(input), {
+            name: 'FhirExportPrecheckError', code: 'INVALID_ENCOUNTER_PAIR', category: 'entry', recordId: entry.id,
+        });
+        input.entries[0].deletedAt = input.generatedAt;
+        assert.ok(await prepareFhirBundleFromRecords(input));
+    }
+});
+
+test('precheck blocks an inverted historical therapy period', async () => {
+    const input = fixture();
+    input.therapies[0].endDate = '2000-01-01';
+    await assert.rejects(prepareFhirBundleFromRecords(input), {
+        code: 'INVALID_DATE', category: 'therapy', recordId: input.therapies[0].id,
+    });
+});
