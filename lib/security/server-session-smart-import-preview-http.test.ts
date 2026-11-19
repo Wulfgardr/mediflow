@@ -116,17 +116,17 @@ test('rejects malformed or authority-expanding runtime results without exposing 
             const response = await subject(result).preview(request()); await rejects(response, 500, 'internal_error');
         }
         assert.equal(entries.length, malformed.length);
-        malformed.forEach((result, index) => assert.equal(entries[index]?.[1], result));
+        for (const entry of entries) assert.deepEqual(entry, [JSON.stringify({ event: 'server.failure', level: 'error', operation: 'POST Smart Import preview', kind: 'unexpected_value' })]);
     } finally { console.error = originalError; }
 });
 
-test('sanitizes a runtime-invalid controlled error code while logging its original object', async () => {
+test('returns a generic error and records the category of an unknown preview code', async () => {
     const originalError = console.error; const entries: unknown[][] = [];
     const error = new AuthenticatedSmartImportPreviewError('future_preview_code' as never);
     console.error = (...values: unknown[]) => { entries.push(values); };
     try {
         await rejects(await subject(error).preview(request()), 500, 'internal_error');
-        assert.equal(entries.length, 1); assert.equal(entries[0]?.[1], error);
+        assert.equal(entries.length, 1); assert.deepEqual(entries, [[JSON.stringify({ event: 'server.failure', level: 'error', operation: 'POST Smart Import preview', kind: 'error' })]]);
     } finally { console.error = originalError; }
 });
 
