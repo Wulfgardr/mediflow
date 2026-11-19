@@ -52,8 +52,8 @@
 }
 .overviewIndex {
     display: flex;
+    flex-wrap: wrap;
     gap: 6px;
-    overflow-x: auto;
     padding: 3px;
 }
 .overviewIndex a {
