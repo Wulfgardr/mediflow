@@ -18,7 +18,10 @@ export function documentChildLaunch(root, script, { allowAddons = false, args = 
     return { command: '/usr/bin/sandbox-exec', args: ['-p', profile, executable, ...nodeArgs] };
   }
   if (process.platform === 'linux') {
-    return { command: '/usr/bin/prlimit', args: [`--data=${DOCUMENT_CHILD_DATA_BYTES}`, '--', executable, ...nodeArgs] };
+    const networkNamespace = process.arch === 'arm64'
+      ? ['/usr/bin/unshare', '--user', '--map-current-user', '--net', '--']
+      : [];
+    return { command: '/usr/bin/prlimit', args: [`--data=${DOCUMENT_CHILD_DATA_BYTES}`, '--', ...networkNamespace, executable, ...nodeArgs] };
   }
   return { command: executable, args: nodeArgs };
 }
