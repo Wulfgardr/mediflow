@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 /* ordinary Web observation mutation adapters; the synchronous operation owns the write and audit. */
@@ -42,7 +43,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('API PUT /observations/[id] error:', error);
+        logServerError('API PUT /observations/[id] error', error);
         return NextResponse.json({ error: 'Failed to update observation' }, { status: 500 });
     }
 }
@@ -72,7 +73,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('API DELETE /observations/[id] error:', error);
+        logServerError('API DELETE /observations/[id] error', error);
         return NextResponse.json({ error: 'Failed to delete observation' }, { status: 500 });
     }
 }

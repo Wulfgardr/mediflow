@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { readAmbulatoryJsonObject } from '@/lib/ambulatory-json-body';
@@ -22,7 +23,7 @@ export async function PUT(request: Request, context: RouteContext) {
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('API PUT /ambulatories/[id] error:', error);
+        logServerError('API PUT /ambulatories/[id] error', error);
         return NextResponse.json({ error: 'Failed to update ambulatory' }, { status: 500 });
     }
 }
@@ -42,7 +43,7 @@ export async function DELETE(request: Request, context: RouteContext) {
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('API DELETE /ambulatories/[id] error:', error);
+        logServerError('API DELETE /ambulatories/[id] error', error);
         return NextResponse.json({ error: 'Failed to delete ambulatory' }, { status: 500 });
     }
 }

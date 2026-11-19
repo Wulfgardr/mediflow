@@ -27,7 +27,7 @@ pub(crate) fn button_ids(render: impl FnOnce()) -> Vec<String> {
     BUTTON_IDS.with(|ids| ids.borrow_mut().take().unwrap())
 }
 
-pub(super) fn observe(element: Stateful<Div>) -> gpui::AnyElement {
+pub(crate) fn observe(element: Stateful<Div>) -> gpui::AnyElement {
     Observed(element).into_any_element()
 }
 
@@ -38,6 +38,25 @@ pub(super) fn clip(id: &str) -> gpui::Bounds<gpui::Pixels> {
 thread_local! {
     static MASKS: std::cell::RefCell<HashMap<String, gpui::Bounds<gpui::Pixels>>> = std::cell::RefCell::new(HashMap::new());
     static NODES: std::cell::RefCell<HashMap<String, (gpui::accesskit::Node, gpui::Bounds<gpui::Pixels>)>> = std::cell::RefCell::new(HashMap::new());
+}
+
+pub(super) type RenderedControl = (gpui::accesskit::Node, gpui::Bounds<gpui::Pixels>);
+
+thread_local! {
+    static CONTROLS: std::cell::RefCell<Option<Vec<RenderedControl>>> = const { std::cell::RefCell::new(None) };
+}
+
+pub(super) fn controls(render: impl FnOnce()) -> Vec<RenderedControl> {
+    struct Capture;
+    impl Drop for Capture {
+        fn drop(&mut self) {
+            CONTROLS.with(|items| *items.borrow_mut() = None);
+        }
+    }
+    CONTROLS.with(|items| assert!(items.borrow_mut().replace(Vec::new()).is_none()));
+    let _capture = Capture;
+    render();
+    CONTROLS.with(|items| items.borrow_mut().take().unwrap())
 }
 
 pub(super) fn node(id: &str) -> (gpui::accesskit::Node, gpui::Bounds<gpui::Pixels>) {
@@ -101,6 +120,12 @@ impl gpui::Element for Observed {
     ) -> Self::PrepaintState {
         let mut node = gpui::accesskit::Node::new(self.0.a11y_role().expect("real command role"));
         self.0.write_a11y_info(&mut node);
+        CONTROLS.with(|items| {
+            if let Some(items) = items.borrow_mut().as_mut() {
+                let visible = bounds.intersect(&window.content_mask().bounds);
+                items.push((node.clone(), visible));
+            }
+        });
         MASKS.with(|masks| {
             masks.borrow_mut().insert(
                 node.author_id().unwrap().to_string(),

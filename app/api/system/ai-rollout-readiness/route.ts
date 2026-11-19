@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { NextResponse } from 'next/server';
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 import { inArray } from 'drizzle-orm';
@@ -39,7 +40,7 @@ export async function GET() {
 
         return NextResponse.json(buildAiRolloutReadinessArtifactsPayload({ localControls }));
     } catch (error) {
-        console.error('GET ai rollout readiness artifacts failed:', error);
+        logServerError('GET ai rollout readiness artifacts failed', error);
         return NextResponse.json({ error: 'Failed to load AI rollout readiness artifacts.' }, { status: 500 });
     }
 }

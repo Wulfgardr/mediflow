@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { jsonBodyTooLargeResponse } from '@/lib/native-network-json-body';
 import { readPatientJsonObject } from '@/lib/patient-json-object';
 import { NextResponse } from 'next/server';
@@ -65,7 +66,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         if (!resolved.profile) return NextResponse.json({ error: 'Not found' }, { status: 404 });
         return NextResponse.json(resolved.profile);
     } catch (error) {
-        console.error('API GET /api/v1/network/patients/[id] error:', error);
+        logServerError('API GET /api/v1/network/patients/[id] error', error);
         return NextResponse.json({ error: 'Failed to fetch patient' }, { status: 500 });
     }
 }
@@ -84,7 +85,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     } catch (error) {
         const sizeError = jsonBodyTooLargeResponse(error);
         if (sizeError) return sizeError;
-        console.error('API PUT /api/v1/network/patients/[id] error:', error);
+        logServerError('API PUT /api/v1/network/patients/[id] error', error);
         return NextResponse.json({ error: 'Failed to update patient' }, { status: 500 });
     }
 }
@@ -109,7 +110,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     } catch (error) {
         const sizeError = jsonBodyTooLargeResponse(error);
         if (sizeError) return sizeError;
-        console.error('API DELETE /api/v1/network/patients/[id] error:', error);
+        logServerError('API DELETE /api/v1/network/patients/[id] error', error);
         return NextResponse.json({ error: 'Failed to delete patient' }, { status: 500 });
     }
 }

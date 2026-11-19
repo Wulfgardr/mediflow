@@ -1,3 +1,4 @@
+import { logServerError } from '../server-error-log';
 import 'server-only';
 
 import bcrypt from 'bcryptjs';
@@ -279,7 +280,7 @@ export async function changePin(
             }),
         });
     } catch (error) {
-        console.error('Audit pin change write failed:', error);
+        logServerError('Audit pin change write failed:', error);
     }
 
     return { kind: 'success' };
@@ -425,7 +426,7 @@ export async function adoptPassphrase(
             }),
         });
     } catch (error) {
-        console.error('Audit passphrase adoption write failed:', error);
+        logServerError('Audit passphrase adoption write failed:', error);
     }
 
     return { kind: 'success', earlierCopiesCleared: residues.complete };
@@ -619,7 +620,7 @@ async function rotatePassphrase(
             }),
         });
     } catch (error) {
-        console.error('Audit passphrase recovery write failed:', error);
+        logServerError('Audit passphrase recovery write failed:', error);
     }
 
     return { kind: 'success' };
