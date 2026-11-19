@@ -8808,7 +8808,7 @@ fn allergy_label(known: Option<&str>, theme: crate::theme::Theme) -> Div {
                 .py(px(4.))
         })
         .child(text!(known.map_or_else(
-            || "Allergie: dato non disponibile in questa scheda".into(),
+            || "Allergie: dato non disponibile".into(),
             |value| format!("▲ Allergie: {value}")
         )))
 }
