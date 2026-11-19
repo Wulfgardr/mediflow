@@ -11,16 +11,15 @@ import sheet from './twin-synoptic-sheet.module.css';
 import { useRuntimeTwinFolder } from '@/components/runtime-twin-design';
 import { InkState } from '@/components/ui/ink-state';
 import PrivacyBlur from './privacy-blur';
-import { CircleDashed, Sparkles } from 'lucide-react';
+import { CircleDashed } from 'lucide-react';
 
 export type SheetInsightProposal = Extract<PatientInsightPreviewWire, { status: 'available' }>;
 
 const venueLabels = { local_process: 'dal modello locale', cloud: 'da un servizio esterno' } as const;
 
-export function PatientProposalsSummary({ hasInsightProposal, hasSmartImportProposal, smartImportAvailable, preview, patientId }: {
+export function PatientProposalsSummary({ hasInsightProposal, hasSmartImportProposal, preview, patientId }: {
     hasInsightProposal: boolean;
     hasSmartImportProposal: boolean;
-    smartImportAvailable: boolean;
     preview?: SheetInsightProposal | null;
     patientId?: string;
 }) {
@@ -54,8 +53,8 @@ export function PatientProposalsSummary({ hasInsightProposal, hasSmartImportProp
             Generata <time dateTime={generated.toISOString()}>{generated.toDateString() === new Date().toDateString() ? 'oggi' : `il ${generated.toLocaleDateString('it-IT')}`} alle {generated.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</time> <span title={shown.receipt.model}>{venueLabels[shown.receipt.venue]}</span>.{shown.receipt.egress === 'none' ? ' Nessun dato inviato all’esterno.' : null}
         </p> : null}
         <nav aria-label="Azioni sulle proposte" className={styles.links}>
-            <a href="#patient-insight" aria-label="Apri il Quadro e le fonti" className="mf-button-secondary"><Sparkles size={16} aria-hidden="true" />Apri il Quadro</a>
-            {smartImportAvailable ? <a href="#smart-import" className="mf-button-text">Smart Import</a> : null}
+            <a href="#patient-insight" aria-label="Apri il Quadro e le fonti" className="mf-button-secondary">Apri il Quadro</a>
+            {hasSmartImportProposal ? <a href="#smart-import" className="mf-button-text">Smart Import</a> : null}
         </nav>
     </div>;
 }

@@ -754,8 +754,7 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
                 <PluginLocalUiNavigation key={id} patientId={id} patientVersion={patient.version} patientLabel={`${patient.firstName} ${patient.lastName}`} />
                 <PatientSynopticSheet
                     clinicalSupport={<PatientProposalsSummary hasInsightProposal={hasInsightProposal} patientId={patient.id} preview={currentInsightPreview}
-                            hasSmartImportProposal={smartImportProposalCapture !== null && smartImportProposalCapture === smartImportFabricCaptureInput}
-                            smartImportAvailable={smartImportSourceCount > 0} />}
+                            hasSmartImportProposal={smartImportProposalCapture !== null && smartImportProposalCapture === smartImportFabricCaptureInput} />}
                     therapyChanges={therapyChangesSinceVisit(id, therapiesError ? undefined : therapies, visitReference, comparisonReadAt)}
                     notesContent={<PatientProfileNotes patientId={id} patientVersion={patient.version} />}
                     problems={{ data: diagnosisItems, loading: patientLoading, error: patientError }}

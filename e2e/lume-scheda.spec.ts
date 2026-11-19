@@ -1,5 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow, assertNotClippedInViewport } from './utils';
+import { test as isolatedTest } from './fixtures/isolated-runtime';
+import { switchPreset } from './fixtures/territorial-preset';
 
 type SchedaCase = { register: 'giorno' | 'grafite'; viewport: 'wide' | 'narrow'; width: number; height: number };
 const CASES: SchedaCase[] = [
@@ -192,9 +194,10 @@ test('il controllo back della Scheda torna alla lista pazienti', async ({ page }
   await expect(page.getByTestId('lume-worklist')).toBeVisible();
 });
 
-test('le quindici sezioni restano raggiungibili con una sola destinazione corrente', async ({ page }) => {
+isolatedTest('le quindici sezioni del profilo Lombardia restano raggiungibili con una sola destinazione corrente', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+  await switchPreset(page, 'core+it+lom');
   const patient = await createFixture(page);
   await page.goto(`/patients/${patient.id}/modules`);
   const nav = page.getByRole('navigation', { name: 'Sezioni della vista' });
@@ -305,7 +308,14 @@ for (const schedaCase of CASES) {
     expect(scrollEvidence!.overflow).toBeGreaterThan(100);
     expect(scrollEvidence!.offset).toBeGreaterThan(100);
     const records = page.getByRole('navigation', { name: 'Cartelle aperte' });
-    await expectInViewport(records.getByRole('link', { name: patient.name, exact: true }));
+    const recordLink = records.getByRole('link', { name: patient.name, exact: true });
+    await expectInViewport(recordLink);
+    await expect.poll(() => recordLink.getByText(patient.name, { exact: true }).evaluate(element => {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      const box = range.getBoundingClientRect();
+      return box.width > 20 && element.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2));
+    })).toBe(true);
     await page.getByTestId('privacy-mode-header-toggle').click();
     await expectPatientIdentityPrivate(header, patient);
     await expect(records.getByRole('link', { name: patient.name, exact: true }).locator('.liquid-blur')).toHaveCount(1);

@@ -151,6 +151,10 @@
   .workspace[data-patient-record='true'] .directoryTab::after { content: '·'; margin-left: 4px; }
   .workspace[data-patient-record='true'] .recordWhen { display: inline; }
   .workspace[data-patient-record='true'] .recordName { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .workspace[data-patient-record='true'] .workarea[data-scrolled-record='true'] .workspaceBar { width: 100%; max-width: none; z-index: 6; }
+  .workspace[data-patient-record='true'] .workarea[data-scrolled-record='true'] .recordName { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
+  .workspace[data-patient-record='true'] .workarea[data-scrolled-record='true'] .recordWhen { display: none; }
+  .workspace[data-patient-record='true'] .workarea[data-scrolled-record='true'] .patientNavigation { top: 36px; }
   .workspace[data-patient-record='true'] .workspaceBar .recordTab > :last-child { width: 22px; height: 22px; }
   .workspace[data-patient-record='true'] .workspaceBar > .iconButton { order: 1; width: 24px; height: 24px; }
   .workspace[data-patient-record='true'] .workspaceBar > .privacy { order: 2; min-width: 24px !important; width: 24px !important; height: 24px !important; }
