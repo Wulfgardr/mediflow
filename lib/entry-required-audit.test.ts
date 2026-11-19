@@ -1,3 +1,5 @@
+import { decryptData, encryptData, generateMasterKey } from './security/security';
+import { syntheticLoopbackRequest } from './security/loopback-ingress-test-fixture';
 import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
 /* real SQLite candidate oracle for the eight ordinary diary mutations. */
 import assert from 'node:assert/strict';
@@ -68,6 +70,9 @@ const v1Create = load('../app/api/v1/patients/[id]/entries/route.ts') as typeof 
 const v1Item = load('../app/api/v1/patients/[id]/entries/[entryId]/route.ts') as typeof import('../app/api/v1/patients/[id]/entries/[entryId]/route.ts');
 const networkCreate = load('../app/api/v1/network/patients/[id]/entries/route.ts') as typeof import('../app/api/v1/network/patients/[id]/entries/route.ts');
 const networkItem = load('../app/api/v1/network/patients/[id]/entries/[entryId]/route.ts') as typeof import('../app/api/v1/network/patients/[id]/entries/[entryId]/route.ts');
+const { readEntryRevisionPage } = load('./entry-revision-read.ts') as typeof import('./entry-revision-read.ts');
+const historyRoute = load('../app/api/patients/[id]/entry-revisions/[entryId]/route.ts') as typeof import('../app/api/patients/[id]/entry-revisions/[entryId]/route.ts');
+const nativeHistoryRoute = load('../app/api/v1/network/patients/[id]/entries/[entryId]/revisions/route.ts') as typeof import('../app/api/v1/network/patients/[id]/entries/[entryId]/revisions/route.ts');
 const sql = new Database(join(dataDir, 'medical.db'));
 const observations: Record<string, unknown>[] = [];
 let serial = 0;
@@ -103,6 +108,7 @@ function readBack(patientId: string, entryId: string) {
             allPatientEntries: fresh.prepare('SELECT * FROM entries WHERE patient_id=? ORDER BY id').all(patientId),
             patient: fresh.prepare('SELECT * FROM patients WHERE id=?').get(patientId) ?? null,
             memberships: fresh.prepare('SELECT * FROM patients_to_ambulatories WHERE patient_id=? ORDER BY ambulatory_id').all(patientId),
+            revisions: fresh.prepare('SELECT * FROM entry_revisions WHERE entry_id=? ORDER BY version').all(entryId),
             audit: fresh.prepare("SELECT * FROM audit_events WHERE subject_type='entry' AND (subject_ref=? OR subject_ref IN (SELECT id FROM entries WHERE patient_id=?)) ORDER BY rowid").all(entryId, patientId),
         };
     } finally { fresh.close(); }
@@ -781,4 +787,77 @@ test('profilo senza displayName usa lo username corrente, storico e sistema rest
     const historical = seed('autore-storico', true);
     const dto = await v1Item.GET(request('GET', undefined, 'v1'), { params: Promise.resolve({ id: historical.patientId, entryId: historical.entryId }) });
     assert.equal((await dto.json()).recordedBy, null);
+});
+
+
+test('two corrections read back in order and share the identity and time of the required audit', async () => {
+    const ids = seed('history', true);
+    const other = seed('not-the-parent', true);
+    const key = await generateMasterKey();
+    const plaintext = ['Testo sintetico prima', 'Testo sintetico rettificato', 'Testo sintetico attuale'];
+    const ciphertext = await Promise.all(plaintext.map(async text => {
+        const { iv, data } = await encryptData(text, key);
+        return `ENC:${iv}:${data}`;
+    }));
+    sql.prepare('UPDATE entries SET content=? WHERE id=?').run(ciphertext[0], ids.entryId);
+    dbServer.update(users).set({ displayName: 'Medico Sintetico' }).where(eq(users.id, 'synthetic-admin')).run();
+    assert.equal(readEntryRevisionPage(ids.patientId, ids.entryId, 0, archiveGeneration)?.availableSince, null);
+    assert.equal((await invoke('web', 'PUT', ids, { version: 3, content: ciphertext[1] })).status, 200);
+    const first = readBack(ids.patientId, ids.entryId);
+    assert.equal((await invoke('web', 'PUT', ids, { version: 3, content: ciphertext[1] })).status, 409);
+    assert.deepEqual(readBack(ids.patientId, ids.entryId), first);
+
+    sql.exec('CREATE TRIGGER synthetic_revision_failure BEFORE INSERT ON entry_revisions BEGIN SELECT RAISE(IGNORE); END');
+    try {
+        assert.equal((await invoke('v1', 'PUT', ids, { version: 4, content: ciphertext[2] })).status, 500);
+        assert.deepEqual(readBack(ids.patientId, ids.entryId), first);
+    } finally { sql.exec('DROP TRIGGER synthetic_revision_failure'); }
+
+    assert.equal((await invoke('v1', 'PUT', ids, { version: 4, content: ciphertext[2] })).status, 200);
+    const last = readBack(ids.patientId, ids.entryId);
+    assert.deepEqual(last.revisions.map(row => (row as Record<string, unknown>).event_id),
+        last.audit.map(row => (row as Record<string, unknown>).event_id));
+    assert.deepEqual(last.revisions.map(row => (row as Record<string, unknown>).corrected_at),
+        last.audit.map(row => (row as Record<string, unknown>).occurred_at));
+
+    const params = Promise.resolve({ id: ids.patientId, entryId: ids.entryId });
+    const requestUrl = `http://127.0.0.1/api/patients/${ids.patientId}/entry-revisions/${ids.entryId}`;
+    assert.equal((await historyRoute.GET(new Request(requestUrl), { params })).status, 404);
+    const admitted = await syntheticLoopbackRequest(requestUrl);
+    const webResponse = await historyRoute.GET(admitted, { params });
+    assert.equal(webResponse.status, 200);
+    const webPage = await webResponse.json();
+    assert.deepEqual(webPage.revisions.map((row: { version: number }) => row.version), [3, 4]);
+    assert.equal(webPage.availableSince, webPage.revisions[0].correctedAt);
+    assert.equal(webPage.revisions[0].correctedBy, 'Medico Sintetico');
+    assert.equal(webPage.currentVersion, 5);
+    assert.equal(readEntryRevisionPage(other.patientId, ids.entryId, 0, archiveGeneration), null);
+    assert.equal(readEntryRevisionPage(ids.patientId, ids.entryId, 0, archiveGeneration, 'a-different-ambulatory'), null);
+
+    const native = await nativeHistoryRoute.GET(admitted, { params });
+    assert.equal(native.status, 200);
+    assert.deepEqual(await native.json(), webPage);
+
+    const protectedTexts = [...webPage.revisions.map((row: { content: string }) => row.content),
+        (last.entry as { content: string }).content];
+    assert.deepEqual(await Promise.all(protectedTexts.map(sealed => {
+        const [, iv, data] = sealed.split(':');
+        return decryptData(data, iv, key);
+    })), plaintext);
+    assert.equal((await invoke('web', 'DELETE', ids, { version: 5, deletionReason: 'ENC:Test:Test' })).status, 200);
+    assert.equal(readEntryRevisionPage(ids.patientId, ids.entryId, 0, archiveGeneration), null);
+    assert.equal((await invoke('web', 'PUT', ids, { version: 6, deletedAt: null })).status, 200);
+    assert.deepEqual(readEntryRevisionPage(ids.patientId, ids.entryId, 0, archiveGeneration)?.revisions, webPage.revisions);
+    sql.pragma('foreign_keys=ON');
+    sql.prepare('DELETE FROM entries WHERE id=?').run(ids.entryId);
+    assert.equal(readBack(ids.patientId, ids.entryId).revisions.length, 0);
+});
+
+test('a legacy plain-text value is not copied to the history table', async () => {
+    const ids = seed('legacy-history', true);
+    sql.prepare('UPDATE entries SET content=? WHERE id=?').run('SYNTHETIC_PLAINTEXT_DIARY', ids.entryId);
+    assert.equal((await invoke('web', 'PUT', ids, { version: 3, content: 'ENC:Test:Test' })).status, 200);
+    const page = readEntryRevisionPage(ids.patientId, ids.entryId, 0, archiveGeneration);
+    assert.equal(page?.revisions[0].content, null);
+    assert.ok(page?.availableSince);
 });

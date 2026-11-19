@@ -3958,7 +3958,8 @@ impl ClinicalApp {
             .children(rows.into_iter().map(|entry| {
                 let id = entry.id.clone();
                 let edit_id = id.clone();
-                let editable = self.can_edit_record(editing::Kind::Entry) && entry.locked_fields.is_empty();
+                let currently_reading_prior = self.viewing_prior_diary_version(entry);
+                let editable = !currently_reading_prior && self.can_edit_record(editing::Kind::Entry) && entry.locked_fields.is_empty();
                 let unavailable = entry.locked_fields.iter().any(|field| field == "title" || field == "content");
                 let title = if entry.locked_fields.iter().any(|field| field == "title") { "Titolo non leggibile".into() } else { entry.title.clone() };
                 let prose = if entry.locked_fields.iter().any(|field| field == "content") { "Il testo cifrato non è leggibile con questo accesso.".into() } else { plain_text(&entry.content) };
@@ -3973,16 +3974,17 @@ impl ClinicalApp {
                     .child(div().flex().flex_wrap().gap(px(8.))
                         .child(div().type_role(theme, crate::theme::TextRole::Strong).child(text!(entry_type_label(&entry.entry_type))))
                         .child(div().type_role(theme, crate::theme::TextRole::Meta).text_color(theme.secondary).child(text!(entry.setting.clone().unwrap_or_default()))))
+                    .child(self.diary_history(entry, div().w_full().min_w_0().flex().flex_col().gap(px(8.))
                     .child(div().type_role(theme, crate::theme::TextRole::Strong).child(text!(title)))
                     .child(if entry.locked_fields.iter().any(|field| field == "content") {
                         self.unreadable_field("clinical-workspace-entry-unreadable", cx).into_any_element()
-                    } else { clinical_text::render(&entry.content, WritingInk::Dry, theme) })
+                    } else { clinical_text::render(&entry.content, WritingInk::Dry, theme) }).into_any_element(), cx))
                     .child(div().id(SharedString::from(format!("clinical-workspace-entry-status-{id}"))).role(Role::Status).aria_label(SharedString::from(diary_registration(entry.recorded_by.as_deref(), entry.created_at.as_deref(), &chrono::Local))).min_w_0().max_w_full().flex().items_start().gap(px(6.)).type_role(theme, crate::theme::TextRole::Meta).text_color(theme.ink)
                         .child(crate::components::writing_dot(WritingInk::Dry, WritingSurface::Plane, theme))
                         .child(div().min_w_0().flex_1().debug_selector(|| format!("clinical-workspace-entry-registration-{id}")).child(text!(diary_registration(entry.recorded_by.as_deref(), entry.created_at.as_deref(), &chrono::Local)))))
-                    .child(button(format!("clinical-workspace-edit-entry-{id}"), "Modifica voce", theme, false, editable)
-                        .when(editable, |el| el.on_click(cx.listener(move |this, _, _, cx| this.edit_record(editing::Kind::Entry, &edit_id, cx)))))
-                    .when(!unavailable, |el| el.child(div().flex().child(button(format!("clinical-workspace-copy-entry-{id}"), "Copia voce", theme, false, true)
+                    .when(!currently_reading_prior, |el| el.child(button(format!("clinical-workspace-edit-entry-{id}"), "Modifica voce", theme, false, editable)
+                        .when(editable, |el| el.on_click(cx.listener(move |this, _, _, cx| this.edit_record(editing::Kind::Entry, &edit_id, cx))))))
+                    .when(!unavailable && !currently_reading_prior, |el| el.child(div().flex().child(button(format!("clinical-workspace-copy-entry-{id}"), "Copia voce", theme, false, true)
                         .on_click(cx.listener(move |this, _, _, cx| {
                             cx.write_to_clipboard(ClipboardItem::new_string(clipboard.clone()));
                             this.message = Some(("Voce copiata.".into(), false)); cx.notify();

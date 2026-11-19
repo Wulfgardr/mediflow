@@ -27,7 +27,7 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
 const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server.ts');
 const archiveGeneration = bindSyntheticArchiveSessions('synthetic-session');
 openDbServer();
-const { ambulatories, patients, patientsToAmbulatories, entries } = load('./schema.ts') as typeof import('./schema.ts');
+const { ambulatories, patients, patientsToAmbulatories, entries, entryRevisions } = load('./schema.ts') as typeof import('./schema.ts');
 const { GET, POST } = load('../app/api/system/purge-patient/route.ts') as typeof import('../app/api/system/purge-patient/route.ts');
 const { countPatientCascadeRows, totalPatientCascadeRows } = load('./patient-cascade.ts') as typeof import('./patient-cascade.ts');
 const { captureAttachmentExtractionLocatorGeneration, isCurrentAttachmentExtractionLocatorGeneration } =
@@ -52,7 +52,9 @@ function reset(active = false) {
         deletedAt: active ? null : new Date('2025-01-01') }).run();
     dbServer.insert(patientsToAmbulatories).values({ patientId, ambulatoryId: 'synthetic-amb' }).run();
     dbServer.insert(entries).values({ id: `entry-${patientId}`, patientId, type: 'note',
-        date: new Date('2025-01-01'), content: 'ENC:synthetic:entry' }).run();
+        date: new Date('2025-01-01'), content: 'ENC:synthetic:entry', version: 2 }).run();
+    dbServer.insert(entryRevisions).values({ eventId: `revision-${patientId}`, entryId: `entry-${patientId}`,
+        version: 1, content: 'ENC:synthetic:older', correctedAt: new Date('2025-01-02') }).run();
 }
 function snapshot() {
     const reopened = new Database(join(dataDir, 'medical.db'), { readonly: true });
@@ -60,6 +62,7 @@ function snapshot() {
         patients: reopened.prepare('SELECT * FROM patients ORDER BY id').all(),
         retired: reopened.prepare('SELECT * FROM patient_retired_ids ORDER BY id').all() as Array<{ id: string }>,
         entries: reopened.prepare('SELECT * FROM entries ORDER BY id').all(),
+        revisions: reopened.prepare('SELECT * FROM entry_revisions ORDER BY event_id').all(),
         memberships: reopened.prepare('SELECT * FROM patients_to_ambulatories ORDER BY patient_id, ambulatory_id').all(),
         events: reopened.prepare('SELECT * FROM audit_events ORDER BY rowid').all() as Array<Record<string, unknown>>,
     }; } finally { reopened.close(); }
@@ -102,6 +105,8 @@ test('purge: tombstone and children removed with one host-attributed count event
     assert.equal(after.patients.length, 0);
     assert.equal(after.retired.some(row => row.id === patientId), true);
     assert.equal(after.entries.length, 0);
+    assert.equal(before.revisions.length, 1);
+    assert.equal(after.revisions.length, 0);
     assert.equal(after.memberships.length, 0);
     const events = after.events.slice(before.events.length);
     assert.equal(events.length, 1);

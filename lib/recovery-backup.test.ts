@@ -272,7 +272,7 @@ test(`therapy command predecessor encrypted v4 recovery ${alteration}`, async ()
         const oldFile = path.join(path.dirname(f.source), 'v4-snapshot.db');
         fs.writeFileSync(oldFile, f.snapshot);
         const old = new Database(oldFile);
-        old.exec('DROP TABLE agent_unlock_grants; DROP TABLE agent_registrations; DROP TABLE agent_cassettes; DROP TABLE agent_clients; DROP TABLE agent_pairing_requests; DROP TABLE agent_mandates');
+        old.exec('DROP TABLE entry_revisions; DROP TABLE agent_unlock_grants; DROP TABLE agent_registrations; DROP TABLE agent_cassettes; DROP TABLE agent_clients; DROP TABLE agent_pairing_requests; DROP TABLE agent_mandates');
         for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year', 'allergies']) old.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
         old.exec('ALTER TABLE entries DROP COLUMN recorded_by');
         old.exec('DROP TABLE portable_import_origins; DROP TABLE synthetic_extension; DROP TABLE ambulatory_destructive_commands; DROP TABLE therapy_status_commands; PRAGMA user_version=4;');
@@ -314,7 +314,7 @@ test(`ambulatory command encrypted predecessor v5 recovery ${alteration}`, async
     try {
         const oldFile = path.join(f.root, 'canonical5.db'); fs.writeFileSync(oldFile, f.snapshot);
         const old = new Database(oldFile);
-        old.exec('DROP TABLE agent_unlock_grants; DROP TABLE agent_registrations; DROP TABLE agent_cassettes; DROP TABLE agent_clients; DROP TABLE agent_pairing_requests; DROP TABLE agent_mandates');
+        old.exec('DROP TABLE entry_revisions; DROP TABLE agent_unlock_grants; DROP TABLE agent_registrations; DROP TABLE agent_cassettes; DROP TABLE agent_clients; DROP TABLE agent_pairing_requests; DROP TABLE agent_mandates');
         for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year', 'allergies']) old.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
         old.exec('ALTER TABLE entries DROP COLUMN recorded_by');
         old.exec('DROP TABLE portable_import_origins; DROP TABLE synthetic_extension; DROP TABLE ambulatory_destructive_commands; PRAGMA user_version=5;');
@@ -356,7 +356,7 @@ for (const alteration of ['none', 'column', 'index', 'view', 'authority-table'])
     try {
         const file = path.join(f.root, 'canonical6.db'); fs.writeFileSync(file, f.snapshot);
         const old = new Database(file);
-        old.exec('DROP TABLE agent_unlock_grants; DROP TABLE agent_registrations; DROP TABLE agent_cassettes; DROP TABLE agent_clients; DROP TABLE agent_pairing_requests; DROP TABLE agent_mandates');
+        old.exec('DROP TABLE entry_revisions; DROP TABLE agent_unlock_grants; DROP TABLE agent_registrations; DROP TABLE agent_cassettes; DROP TABLE agent_clients; DROP TABLE agent_pairing_requests; DROP TABLE agent_mandates');
         for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year', 'allergies']) old.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
         old.exec('ALTER TABLE entries DROP COLUMN recorded_by');
         old.exec('DROP TABLE synthetic_extension');
@@ -447,7 +447,7 @@ test('encrypted v10 predecessor recovers without the tables of the removed featu
     try {
         const file = path.join(f.root, 'canonical10.db'); fs.writeFileSync(file, f.snapshot);
         const old = new Database(file);
-        old.exec('DROP TABLE agent_unlock_grants; DROP TABLE agent_registrations; DROP TABLE agent_cassettes; DROP TABLE agent_clients; DROP TABLE agent_pairing_requests; DROP TABLE agent_mandates');
+        old.exec('DROP TABLE entry_revisions; DROP TABLE agent_unlock_grants; DROP TABLE agent_registrations; DROP TABLE agent_cassettes; DROP TABLE agent_clients; DROP TABLE agent_pairing_requests; DROP TABLE agent_mandates');
         old.exec('DROP TABLE synthetic_extension; PRAGMA user_version=10;');
         for (const column of ['proposer_ref', 'mandate_ref', 'model_provider']) old.exec(`ALTER TABLE audit_events DROP COLUMN ${column}`);
         for (const sql of RETIRED_FEATURE_TABLES_SQL) old.exec(sql);
@@ -470,7 +470,7 @@ test('encrypted v9 predecessor resta recuperabile dopo l’aggiunta dell’autor
     try {
         const file = path.join(f.root, 'canonical9.db'); fs.writeFileSync(file, f.snapshot);
         const old = new Database(file);
-        old.exec('DROP TABLE agent_unlock_grants; DROP TABLE agent_registrations; DROP TABLE agent_cassettes; DROP TABLE agent_clients; DROP TABLE agent_pairing_requests; DROP TABLE agent_mandates');
+        old.exec('DROP TABLE entry_revisions; DROP TABLE agent_unlock_grants; DROP TABLE agent_registrations; DROP TABLE agent_cassettes; DROP TABLE agent_clients; DROP TABLE agent_pairing_requests; DROP TABLE agent_mandates');
         old.exec('DROP TABLE synthetic_extension; ALTER TABLE entries DROP COLUMN recorded_by; PRAGMA user_version=9;');
         for (const column of ['proposer_ref', 'mandate_ref', 'model_provider']) old.exec(`ALTER TABLE audit_events DROP COLUMN ${column}`);
         for (const sql of RETIRED_FEATURE_TABLES_SQL) old.exec(sql);
@@ -492,7 +492,7 @@ test(`encrypted 0.9.0 predecessor (schema 3) ${alteration}: the published releas
     try {
         const file = path.join(f.root, 'canonical3.db'); fs.writeFileSync(file, f.snapshot);
         const old = new Database(file);
-        old.exec('DROP TABLE agent_unlock_grants; DROP TABLE agent_registrations; DROP TABLE agent_cassettes; DROP TABLE agent_clients; DROP TABLE agent_pairing_requests; DROP TABLE agent_mandates');
+        old.exec('DROP TABLE entry_revisions; DROP TABLE agent_unlock_grants; DROP TABLE agent_registrations; DROP TABLE agent_cassettes; DROP TABLE agent_clients; DROP TABLE agent_pairing_requests; DROP TABLE agent_mandates');
         for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year', 'allergies']) old.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
         old.exec(`ALTER TABLE entries DROP COLUMN recorded_by; DROP TABLE synthetic_extension; DROP TABLE portable_import_origins;
             DROP TABLE ambulatory_destructive_commands; DROP TABLE therapy_status_commands;
@@ -525,13 +525,14 @@ test(`encrypted 0.9.0 predecessor (schema 3) ${alteration}: the published releas
     } finally { f.cleanup(); }
 });
 
-for (const version of [11, 12, 13, 14, 15]) test(`encrypted v${version} predecessor restores historical audit into current schema without fabricating agent provenance`, async () => {
+for (const version of [11, 12, 13, 14, 15, 16]) test(`encrypted v${version} predecessor restores historical audit into current schema without fabricating agent provenance`, async () => {
     const f = await fixture();
     try {
         const file = path.join(f.root, `canonical${version}.db`);
         fs.writeFileSync(file, f.snapshot);
         const old = new Database(file);
-        old.exec('DROP TABLE agent_unlock_grants; DROP TABLE agent_registrations');
+        old.exec('DROP TABLE entry_revisions');
+        if (version < 16) old.exec('DROP TABLE agent_unlock_grants; DROP TABLE agent_registrations');
         if (version < 15) old.exec('DROP TABLE agent_cassettes');
         if (version < 14) old.exec('DROP TABLE agent_clients; DROP TABLE agent_pairing_requests');
         if (version < 13) old.exec('DROP TABLE agent_mandates');
@@ -548,5 +549,29 @@ for (const version of [11, 12, 13, 14, 15]) test(`encrypted v${version} predeces
             assertPredecessorAuditHistory(contents(restored).audit_events as Record<string, unknown>[], expected.audit_events as Record<string, unknown>[]);
         } finally { restored.close(); }
         assert.deepEqual(fs.readFileSync(file), bytes);
+    } finally { f.cleanup(); }
+});
+
+
+test('physical recovery preserves a sealed diary revision and opens it with the recovered key', async () => {
+    const f = await fixture();
+    try {
+        const { iv, data } = await encryptData('Prima versione sintetica', f.key);
+        const sealed = `ENC:${iv}:${data}`;
+        f.db.prepare("INSERT INTO entries (id,patient_id,type,date,content,version) VALUES ('synthetic-history-entry','synthetic-patient','note',1783000000,?,2)").run(sealed);
+        f.db.prepare("INSERT INTO audit_events(event_id,event_type,occurred_at,outcome,actor_type,actor_ref,subject_type,subject_ref,source_surface,redacted_metadata) VALUES ('synthetic-history-event','entry.updated',1783000000,'success','user',?,'entry','synthetic-history-entry','web',?)")
+            .run(actor, JSON.stringify({ resourceVersion: 2 }));
+        f.db.prepare("INSERT INTO entry_revisions(event_id,entry_id,version,content,corrected_at,corrected_by) VALUES ('synthetic-history-event','synthetic-history-entry',1,?,1783000000,'Operatore sintetico')").run(sealed);
+        const artifact = await encryptRecoveryBackup(createRecoverySnapshot(f.db, actor), f.key);
+        await f.restore({ artifact });
+        const restored = openVersionedSqliteDatabase(f.destination);
+        try {
+            const row = restored.prepare('SELECT * FROM entry_revisions').get() as { content: string; entry_id: string; version: number };
+            assert.equal(row.entry_id, 'synthetic-history-entry');
+            assert.equal(row.version, 1);
+            assert.equal(row.content, sealed);
+            const key = (await openRecoveryWrapping(f.kit.wrappedMasterKey, f.kit.salt, f.recoveryKey)).masterKey;
+            assert.equal(await decryptData(data, iv, key), 'Prima versione sintetica');
+        } finally { restored.close(); }
     } finally { f.cleanup(); }
 });

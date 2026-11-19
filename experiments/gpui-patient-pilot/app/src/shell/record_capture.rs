@@ -1177,3 +1177,104 @@ fn capture_record_d_on_the_synthetic_bench() {
     )
     .unwrap();
 }
+
+#[gpui::test]
+fn live_diary_revisions_select_long_previous_text_at_narrow_width(cx: &mut gpui::TestAppContext) {
+    let Ok(path) = std::env::var("MEDIFLOW_DIARY_HISTORY_BENCH") else {
+        return;
+    };
+    let pairing: Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let session = login(&pairing);
+    let scope = session
+        .list_ambulatories()
+        .unwrap()
+        .into_iter()
+        .find(|row| row.is_default)
+        .unwrap()
+        .id;
+    let patient = pairing["patient"].as_str().unwrap();
+    session.select_profile_patient(&scope, patient).unwrap();
+    let original = "Inizio nota sintetica. ".to_owned()
+        + &"Testo di prova per la rilettura. ".repeat(120)
+        + "Fine prima versione.";
+    let draft = |content: &str| EntryDraft {
+        entry_type: "note".into(),
+        title: "Nota sintetica con rettifiche".into(),
+        date: chrono::Utc::now().to_rfc3339(),
+        setting: None,
+        content: content.into(),
+    };
+    let created = session
+        .create_entry(&scope, patient, &draft(&original))
+        .unwrap();
+    let second = "Seconda versione sintetica.";
+    let third = "Terza versione sintetica.";
+    for text in [second, third] {
+        let current = session.read_entry(&scope, patient, &created.id).unwrap();
+        session
+            .update_entry(&scope, patient, &created.id, current.version, &draft(text))
+            .unwrap();
+    }
+    let current = session.read_entry(&scope, patient, &created.id).unwrap();
+    assert_eq!(current.version, 3);
+    let history = session
+        .read_entry_revisions(&scope, patient, &created.id, current.version, 0)
+        .unwrap();
+    assert_eq!(
+        history
+            .revisions
+            .iter()
+            .map(|row| row.content.as_deref().unwrap())
+            .collect::<Vec<_>>(),
+        [original.as_str(), second]
+    );
+    assert!(
+        history
+            .revisions
+            .iter()
+            .all(|row| row.correction.corrected_by.is_some())
+    );
+    assert!(history.available_since.is_some());
+
+    let (view, cx) = cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+    cx.simulate_resize(gpui::size(px(760.), px(610.)));
+    view.update(cx, |app, cx| {
+        app.session = Some(session);
+        app.scope = Some(scope);
+        app.area = Area::Patients;
+        app.select_patient(patient, true, cx);
+        app.section_selected(PatientSection::Diary, cx);
+    });
+    let wait_for = |cx: &mut gpui::VisualTestContext, selector: &'static str| {
+        for _ in 0..120 {
+            notes_recovery_tests::draw(cx);
+            if let Some(bounds) = cx.debug_bounds(selector) {
+                return bounds;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        panic!("control {selector} was not rendered");
+    };
+    let toggle =
+        Box::leak(format!("clinical-workspace-entry-history-{}", created.id).into_boxed_str());
+    let bounds = wait_for(cx, toggle);
+    cx.simulate_click(bounds.center(), gpui::Modifiers::default());
+    for version in 1..=3 {
+        let control =
+            Box::leak(format!("clinical-diary-version-{}-{version}", created.id).into_boxed_str());
+        let bounds = wait_for(cx, control);
+        cx.simulate_click(bounds.center(), gpui::Modifiers::default());
+        let text = wait_for(cx, "clinical-diary-history-text");
+        assert!(
+            text.right() <= px(760.) && text.left() >= px(0.),
+            "{text:?}"
+        );
+        if version == 1 {
+            assert!(
+                text.size.height > px(100.),
+                "long content lays out across lines: {text:?}"
+            );
+        }
+    }
+    view.update(cx, |app, cx| app.disconnect(cx));
+}
