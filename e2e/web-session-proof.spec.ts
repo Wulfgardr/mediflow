@@ -2,7 +2,8 @@ import { existsSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { test as standalone } from './fixtures/isolated-runtime';
-import { bootstrapUnlockedSession, openPatientSection } from './utils';
+import { documentRequests } from './fixtures/trusted-web-request';
+import { bootstrapUnlockedSession, openPatientSection, unlockIfNeeded } from './utils';
 
 test.use({ trace: 'off', video: 'off', screenshot: 'off' });
 standalone.use({ trace: 'off', video: 'off', screenshot: 'off' });
@@ -34,8 +35,8 @@ async function lockAndWaitForConfirmation(page: Page): Promise<void> {
     await expect(page.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeVisible();
 }
 
-standalone('al primo avvio il medico accede, legge una scheda, registra una nota e scarica il backup', async ({ page }) => {
-    standalone.setTimeout(120_000);
+standalone('al primo avvio il medico accede, legge una scheda, registra una nota e scarica il backup', async ({ page, isolatedRuntime }) => {
+    standalone.setTimeout(180_000);
     const pin = process.env.E2E_PIN || '1234';
     const note = 'Nota sintetica per la verifica della sessione Web.';
     const operator = { displayName: 'Ada E2E', ambulatoryName: 'Studio E2E Sessione' };
@@ -107,6 +108,21 @@ standalone('al primo avvio il medico accede, legge una scheda, registra una nota
     await expect(peer.locator('#diario')).toContainText(peerNote);
     await lockAndWaitForConfirmation(peer);
     await expect(page.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeVisible();
+
+    await standalone.step('il riavvio richiede un nuovo accesso e conserva il diario', async () => {
+        await unlockIfNeeded(peer, pin, operator);
+        const session = () => documentRequests(peer).get('/api/auth/check').then(response => response.json());
+        expect(await session()).toMatchObject({ hasSession: true });
+        await isolatedRuntime.restart();
+        expect(await session()).toMatchObject({ hasSession: false });
+        await peer.reload();
+        await expect(peer.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeVisible();
+        await expect(peer.getByLabel('Passphrase', { exact: true })).toBeEnabled();
+        await unlockIfNeeded(peer, pin, operator);
+        await openPatientSection(peer, 'diario');
+        await expect(peer.locator('#diario')).toContainText(note);
+        await expect(peer.locator('#diario')).toContainText(peerNote);
+    });
 });
 
 test('il client API locale autorizzato legge la lista pazienti', async ({ baseURL }) => {
