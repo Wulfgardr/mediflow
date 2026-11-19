@@ -1,3 +1,4 @@
+import { logServerError } from '../server-error-log';
 import { auditOrigin, type BackupOrigin } from '../backup-import-provenance';
 import { buildAifaCatalogManifest, parseStoredAifaCatalogManifest, type AifaCatalogManifest } from '../aifa-catalog';
 import { assertArchiveRequestInTransaction } from './archive-request-context';
@@ -333,7 +334,7 @@ export async function safeWriteAuditEventFromRequest(
     try {
         await writeAuditEvent(buildAuditWriteInputFromRequest(request, session, input));
     } catch (error) {
-        console.error(errorLabel, error);
+        logServerError(errorLabel, error);
     }
 }
 

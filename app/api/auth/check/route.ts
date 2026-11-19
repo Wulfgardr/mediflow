@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { hasAttestedLoopbackIngress } from '@/lib/security/loopback-ingress.mjs';
 import { NextResponse } from 'next/server';
 import { requiresLocalUiDocumentLease } from '@/lib/security/plugin-local-ui-runtime';
@@ -108,16 +109,12 @@ export async function GET(request: Request) {
     }
 
     let dbHealth: ReturnType<typeof getDbHealth> | null = null;
-    /* WUL-547. Qui passava `error.message` grezzo: percorsi del filesystem e
-       internals SQLite finivano nella risposta. Il ramo generico piu' sotto usava
-       gia' il classificatore; questo no, ed era l'unico che non lo faceva.
-       Il dettaglio resta nel log, al client va il messaggio autoriale. */
     let dbHealthClassification: ReturnType<typeof classifyAuthHealthError> | null = null;
     try {
         dbHealth = getDbHealth();
     } catch (error) {
         dbHealthClassification = classifyAuthHealthError(error);
-        console.error('[auth-check]', dbHealthClassification.code, dbHealthClassification.message);
+        logServerError('Auth check: database health', error);
     }
     const sessionId = webAuthSessionIdFromRequest(request);
     const resolution = sessionId && hasAttestedLoopbackIngress(request) ? resolveWebAuthControlSession(sessionId, control.controlId) : null;
@@ -184,7 +181,7 @@ export async function GET(request: Request) {
         return finalizeControlResponse(response, request, presentedControlId, control);
     } catch (error) {
         const classification = classifyAuthHealthError(error);
-        console.error('[auth-check]', classification.code, classification.message);
+        logServerError('Auth check: account state', error);
         const response = NextResponse.json({
             status: 'error',
             isSetup: false,

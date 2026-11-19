@@ -1,3 +1,4 @@
+import { logServerWarning } from './server-error-log';
 import { ensureAgentCassetteSchema } from './agent-cassette-schema';
 import { ensureAgentRegistrationSchema } from './agent-registration-schema';
 import { ensureAgentPairingSchema } from './agent-pairing-schema';
@@ -288,7 +289,7 @@ function applySchemaGuards(sqlite: Database.Database) {
     try {
         ensureColumn(sqlite, 'ambulatories', 'version', 'version INTEGER NOT NULL DEFAULT 1');
     } catch (error) {
-        console.warn('[MediFlow] Ambulatories schema check failed:', error);
+        logServerWarning('[MediFlow] Ambulatories schema check failed:', error);
         throw error;
     }
     try {
@@ -301,14 +302,14 @@ function applySchemaGuards(sqlite: Database.Database) {
         ensureColumn(sqlite, 'users', 'recovery_salt', 'recovery_salt TEXT');
         ensureColumn(sqlite, 'users', 'recovery_verifier_hash', 'recovery_verifier_hash TEXT');
     } catch (error) {
-        console.warn('[MediFlow] Users schema check failed:', error);
+        logServerWarning('[MediFlow] Users schema check failed:', error);
         throw error;
     }
     try {
         migrateP2aPhysicianReviewAttestationSchema(sqlite);
         sqlite.prepare(PHYSICIAN_REVIEW_ATTESTATIONS_DDL.replace('CREATE TABLE', 'CREATE TABLE IF NOT EXISTS')).run();
     } catch (error) {
-        console.warn('[MediFlow] Physician review attestation schema check failed:', error);
+        logServerWarning('[MediFlow] Physician review attestation schema check failed:', error);
         throw error;
     }
     ensureHeadlessCheckupActiveRoleAttestationSchema(sqlite);
@@ -321,7 +322,7 @@ function applySchemaGuards(sqlite: Database.Database) {
         ensureColumn(sqlite, 'attachments', 'ocr_queue_updated_at', 'ocr_queue_updated_at INTEGER');
         ensureColumn(sqlite, 'attachments', 'ocr_replay_artifact_snapshot', 'ocr_replay_artifact_snapshot TEXT');
     } catch (error) {
-        console.warn('[MediFlow] Attachments schema check failed:', error);
+        logServerWarning('[MediFlow] Attachments schema check failed:', error);
         throw error;
     }
     try {
@@ -349,7 +350,7 @@ function applySchemaGuards(sqlite: Database.Database) {
         ensureColumn(sqlite, 'patients', 'ai_summary_generated_at', 'ai_summary_generated_at INTEGER');
         ensureColumn(sqlite, 'patients', 'ai_summary_context_hash', 'ai_summary_context_hash TEXT');
     } catch (error) {
-        console.warn('[MediFlow] Patients schema check failed:', error);
+        logServerWarning('[MediFlow] Patients schema check failed:', error);
         throw error;
     }
     try {
@@ -363,7 +364,7 @@ function applySchemaGuards(sqlite: Database.Database) {
         ensureColumn(sqlite, 'entries', 'updated_at', 'updated_at INTEGER');
         ensureColumn(sqlite, 'entries', 'recorded_by', 'recorded_by TEXT');
     } catch (error) {
-        console.warn('[MediFlow] Entries schema check failed:', error);
+        logServerWarning('[MediFlow] Entries schema check failed:', error);
         throw error;
     }
     try {
@@ -374,7 +375,7 @@ function applySchemaGuards(sqlite: Database.Database) {
         ensureColumn(sqlite, 'checkups', 'deleted_at', 'deleted_at INTEGER');
         ensureColumn(sqlite, 'checkups', 'deletion_reason', 'deletion_reason TEXT');
     } catch (error) {
-        console.warn('[MediFlow] Checkups schema check failed:', error);
+        logServerWarning('[MediFlow] Checkups schema check failed:', error);
         throw error;
     }
     try {
@@ -387,7 +388,7 @@ function applySchemaGuards(sqlite: Database.Database) {
         ensureColumn(sqlite, 'therapies', 'deleted_at', 'deleted_at INTEGER');
         ensureColumn(sqlite, 'therapies', 'deletion_reason', 'deletion_reason TEXT');
     } catch (error) {
-        console.warn('[MediFlow] Therapies schema check failed:', error);
+        logServerWarning('[MediFlow] Therapies schema check failed:', error);
         throw error;
     }
     try {
@@ -418,13 +419,13 @@ function applySchemaGuards(sqlite: Database.Database) {
         sqlite.prepare('CREATE INDEX IF NOT EXISTS drugs_name_search_idx ON drugs(name_search)').run();
         sqlite.prepare('CREATE INDEX IF NOT EXISTS drugs_active_principle_search_idx ON drugs(active_principle_search)').run();
     } catch (error) {
-        console.warn('[MediFlow] Drugs schema check failed:', error);
+        logServerWarning('[MediFlow] Drugs schema check failed:', error);
         throw error;
     }
     try {
         ensureColumn(sqlite, 'conversations', 'is_deleted', 'is_deleted INTEGER NOT NULL DEFAULT 0');
     } catch (error) {
-        console.warn('[MediFlow] Conversations schema check failed:', error);
+        logServerWarning('[MediFlow] Conversations schema check failed:', error);
         throw error;
     }
     try {
@@ -445,7 +446,7 @@ function applySchemaGuards(sqlite: Database.Database) {
         sqlite.prepare("CREATE INDEX IF NOT EXISTS exemptions_code_idx ON exemptions(code)").run();
         sqlite.prepare("CREATE INDEX IF NOT EXISTS exemptions_type_idx ON exemptions(type)").run();
     } catch (error) {
-        console.warn('[MediFlow] Exemptions schema check failed:', error);
+        logServerWarning('[MediFlow] Exemptions schema check failed:', error);
         throw error;
     }
     /* fail closed on an unsupported import-receipt schema. */
@@ -459,7 +460,7 @@ function applySchemaGuards(sqlite: Database.Database) {
             sqlite.prepare("ALTER TABLE therapies ADD COLUMN atc TEXT").run();
         }
     } catch (error) {
-        console.warn('[MediFlow] Therapies schema check failed:', error);
+        logServerWarning('[MediFlow] Therapies schema check failed:', error);
         throw error;
     }
     try {
@@ -501,7 +502,7 @@ function applySchemaGuards(sqlite: Database.Database) {
         sqlite.prepare("CREATE INDEX IF NOT EXISTS observations_code_idx ON observations(code_system, code)").run();
         sqlite.prepare("CREATE INDEX IF NOT EXISTS observations_service_prescription_item_idx ON observations(service_prescription_item_id)").run();
     } catch (error) {
-        console.warn('[MediFlow] Observations schema check failed:', error);
+        logServerWarning('[MediFlow] Observations schema check failed:', error);
         throw error;
     }
     try {
@@ -535,7 +536,7 @@ function applySchemaGuards(sqlite: Database.Database) {
         sqlite.prepare('CREATE INDEX IF NOT EXISTS prosthetic_prescriptions_prescribed_idx ON prosthetic_prescriptions(prescribed_at DESC)').run();
         sqlite.prepare('CREATE INDEX IF NOT EXISTS prosthetic_prescriptions_status_idx ON prosthetic_prescriptions(status)').run();
     } catch (error) {
-        console.warn('[MediFlow] Prosthetic prescriptions schema check failed:', error);
+        logServerWarning('[MediFlow] Prosthetic prescriptions schema check failed:', error);
         throw error;
     }
     try {
@@ -673,7 +674,7 @@ function applySchemaGuards(sqlite: Database.Database) {
         sqlite.prepare('CREATE INDEX IF NOT EXISTS service_catalog_entries_display_idx ON service_catalog_entries(display_name)').run();
         sqlite.prepare('CREATE INDEX IF NOT EXISTS service_catalog_entries_category_idx ON service_catalog_entries(category)').run();
     } catch (error) {
-        console.warn('[MediFlow] Service prescriptions schema check failed:', error);
+        logServerWarning('[MediFlow] Service prescriptions schema check failed:', error);
         throw error;
     }
     try {
@@ -704,7 +705,7 @@ function applySchemaGuards(sqlite: Database.Database) {
         sqlite.prepare('CREATE INDEX IF NOT EXISTS siss_handoff_events_started_idx ON siss_handoff_events(started_at DESC)').run();
         sqlite.prepare('CREATE INDEX IF NOT EXISTS siss_handoff_events_outcome_idx ON siss_handoff_events(outcome)').run();
     } catch (error) {
-        console.warn('[MediFlow] SISS handoff events schema check failed:', error);
+        logServerWarning('[MediFlow] SISS handoff events schema check failed:', error);
         throw error;
     }
     sqlite.prepare(`
@@ -752,7 +753,7 @@ function applySchemaGuards(sqlite: Database.Database) {
         sqlite.prepare('CREATE INDEX IF NOT EXISTS patients_deleted_idx ON patients(deleted_at)').run();
         sqlite.prepare('CREATE INDEX IF NOT EXISTS patients_last_name_idx ON patients(last_name)').run();
     } catch (error) {
-        console.warn('[MediFlow] Core secondary index check failed:', error);
+        logServerWarning('[MediFlow] Core secondary index check failed:', error);
         throw error;
     }
     // Not best-effort: without the audit table and its append-only triggers the

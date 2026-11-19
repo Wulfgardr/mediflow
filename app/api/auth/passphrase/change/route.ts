@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { archiveGenerationForSession } from '@/lib/security/archive-session-generation';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
@@ -32,7 +33,7 @@ export async function POST(request: Request) {
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('Passphrase change failed:', error);
+        logServerError('Passphrase change failed', error);
         return response({ error: 'Errore durante il cambio della passphrase.' }, 500);
     }
 }

@@ -1,4 +1,5 @@
 /* @Codex */
+import { logServerError } from '@/lib/server-error-log';
 import { NextResponse } from 'next/server';
 /* @Codex */
 import { cookies } from 'next/headers';
@@ -46,7 +47,7 @@ export async function GET(request: Request) {
             lastSyncAt: null,
         });
     } catch (error) {
-        console.error('API GET /api/system/network-overview error:', error);
+        logServerError('API GET /api/system/network-overview error', error);
         return NextResponse.json({ error: 'Failed to load network overview' }, { status: 500 });
     }
 }

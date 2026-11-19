@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { hasPatientIdentifierConflict, PatientIdentifierConflictError, PATIENT_IDENTIFIER_DUPLICATE } from '@/lib/patient-identifier-conflict';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
@@ -94,7 +95,7 @@ export async function GET(request: Request) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        console.error("API GET /patients error:", error, (error as any)?.message, (error as any)?.stack);
+        logServerError('API GET /patients', error);
         return NextResponse.json({ error: "Failed to fetch patients" }, { status: 500 });
     }
 }
@@ -202,7 +203,7 @@ export async function POST(request: Request) {
                 ? 'Patient create precondition denied; review again' : 'Failed to create patient' },
                 { status: error instanceof PatientCreateFenceError ? 409 : 500 });
         }
-        console.error("API POST /patients error:", error);
+        logServerError("API POST /patients error", error);
         return NextResponse.json({ error: "Failed to create patient" }, { status: 500 });
     }
 }

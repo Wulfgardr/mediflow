@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { assertArchiveGeneration } from '@/lib/archive-generation';
 import { archiveGenerationForSession } from '@/lib/security/archive-session-generation';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
@@ -80,7 +81,7 @@ export async function POST(request: Request) {
                 }),
             });
         } catch (error) {
-            console.error('Audit KDF rewrap write failed:', error);
+            logServerError('Audit KDF rewrap write failed', error);
         }
 
         const response = NextResponse.json({ success: true });
@@ -89,7 +90,7 @@ export async function POST(request: Request) {
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('KDF rewrap error:', error);
+        logServerError('KDF rewrap error', error);
         return failureResponse(500, 'KDF_REWRAP_FAILED', 'Errore durante il re-wrap della chiave.');
     }
 }

@@ -1,3 +1,4 @@
+import { logServerError } from '../server-error-log';
 import 'server-only';
 
 import fs from 'node:fs';
@@ -120,13 +121,13 @@ export function retirePinEraResidues(userId: string, db: ArchiveConnection, data
     try {
         copies = retirePinEraArchiveCopies(databasePath, userId);
     } catch (error) {
-        console.error('[MediFlow] The copies kept before the passphrase could not be examined:', error);
+        logServerError('[MediFlow] The copies kept before the passphrase could not be examined:', error);
     }
     let logEmptied = false;
     try {
         logEmptied = emptyWriteAheadLog(db);
     } catch (error) {
-        console.error('[MediFlow] The archive could not be compacted or its write-ahead log emptied after the passphrase:', error);
+        logServerError('[MediFlow] The archive could not be compacted or its write-ahead log emptied after the passphrase:', error);
     }
     const residues = {
         removed: copies?.removed ?? [],
