@@ -105,7 +105,7 @@ async function hasStableUnlockedShell(page: Page): Promise<boolean> {
 type SyntheticOperator = { displayName: string; ambulatoryName: string; passphrase?: string };
 const defaultOperator: SyntheticOperator = { displayName: 'Dr. E2E Smoke', ambulatoryName: 'Ambulatorio E2E' };
 
-function onboardingPassphrase(pin: string, operator: SyntheticOperator): string {
+export function onboardingPassphrase(pin: string, operator = defaultOperator): string {
   return operator.passphrase ?? `Accesso sintetico MediFlow ${pin}`;
 }
 
@@ -188,16 +188,23 @@ export async function unlockIfNeeded(page: Page, pin: string, operator = default
 }
 
 export async function lockAllTabsAndSignIn(page: Page, pin: string): Promise<void> {
+  const heading = page.getByRole('heading', { name: 'Sblocca MediFlow' });
+  if (await isVisible(heading)) {
+    await page.getByRole('button', { name: 'Rinnova accesso', exact: true }).click();
+    await expect(heading).toBeHidden();
+  }
+  const lockAll = page.getByRole('button', { name: 'Blocca tutte le schede', exact: true });
+  const lockButton = await lockAll.isVisible() ? lockAll : page.getByRole('button', { name: 'Blocca', exact: true });
   const [lock] = await Promise.all([
     page.waitForResponse(response => new URL(response.url()).pathname === '/api/auth/lock'
       && response.request().method() === 'POST' && response.status() === 200, { timeout: 15_000 }),
-    page.getByRole('button', { name: 'Blocca tutte le schede', exact: true }).click({ timeout: 5_000 }),
+    lockButton.click({ timeout: 5_000 }),
   ]);
   expect(await lock.json()).toMatchObject({ state: 'server_invalidation_confirmed' });
   const [login] = await Promise.all([
     page.waitForResponse(response => new URL(response.url()).pathname === '/api/auth/login'
       && response.request().method() === 'POST', { timeout: 15_000 }),
-    submitPin(page, pin),
+    unlockIfNeeded(page, pin),
   ]);
   expect(login.status()).toBe(200);
 }
