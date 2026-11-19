@@ -68,6 +68,7 @@ pub struct TextInput {
     painted_content: SharedString,
     selecting: bool,
     autoscroll: bool,
+    focus_in_place: bool,
     scroll: ScrollHandle,
     focus_subscription: Option<Subscription>,
     pub read_only: bool,
@@ -110,6 +111,7 @@ impl TextInput {
             painted_content: "".into(),
             selecting: false,
             autoscroll: true,
+            focus_in_place: false,
             scroll: ScrollHandle::new(),
             focus_subscription: None,
             read_only: false,
@@ -170,6 +172,10 @@ impl TextInput {
         self.autoscroll = true;
         cx.notify();
         true
+    }
+
+    pub fn selection(&self) -> Range<usize> {
+        self.range.clone()
     }
 
     pub fn value(&self) -> &str {
@@ -244,6 +250,11 @@ impl TextInput {
     pub fn retire(&mut self, cx: &mut Context<Self>) {
         self.set_content("", cx);
         self.read_only = true;
+    }
+
+    pub fn focus_in_place(&mut self, window: &mut Window, cx: &mut App) {
+        self.focus_in_place = true;
+        window.focus(&self.focus, cx);
     }
 
     pub fn focus(&self, window: &mut Window, cx: &mut App) {
@@ -839,7 +850,7 @@ impl Render for TextInput {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         if self.focus_subscription.is_none() {
             self.focus_subscription = Some(cx.on_focus(&self.focus, window, |input, _, cx| {
-                input.autoscroll = true;
+                input.autoscroll = !std::mem::take(&mut input.focus_in_place);
                 cx.notify();
             }));
         }

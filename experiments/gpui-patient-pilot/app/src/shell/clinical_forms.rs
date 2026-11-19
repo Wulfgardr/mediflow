@@ -607,6 +607,9 @@ impl ClinicalApp {
                                             .type_role(theme, crate::theme::TextRole::Meta)
                                             .child(text!(subject)),
                                     )
+                                })
+                                .when(self.draft_folded(layout), |el| {
+                                    el.children(self.draft_point(cx))
                                 }),
                         )
                         .child(

@@ -15,10 +15,39 @@ pub(super) enum OriginalPlace {
     Record { save: bool },
 }
 
+fn inked_page(pdf: &documents::pdf::Preview, theme: Theme) -> Stateful<Div> {
+    let size = pdf.image.size(0);
+    let (width, height) = (size.width.0.max(1) as f32, size.height.0.max(1) as f32);
+    let ink = pdf.ink.start as f32..pdf.ink.end.max(pdf.ink.start + 1) as f32;
+    let shown = ink.end - ink.start;
+    div()
+        .id("document-original-page")
+        .debug_selector(|| "document-original-page".into())
+        .relative()
+        .w_full()
+        .flex_none()
+        .aspect_ratio(shown / height)
+        .overflow_hidden()
+        .bg(gpui::white())
+        .rounded(px(Theme::nested(
+            theme.around_control(patient_record::READING_INSET),
+            patient_record::READING_INSET,
+        )))
+        .child(
+            gpui::img(pdf.image.clone())
+                .absolute()
+                .top_0()
+                .h_full()
+                .w(gpui::relative(width / shown))
+                .left(gpui::relative(-ink.start / shown))
+                .object_fit(gpui::ObjectFit::Fill),
+        )
+}
+
 pub(super) struct DocumentOriginal {
     pub(super) id: String,
     pub(super) state: ReadLoad<Result<documents::OriginalPreview, String>>,
-    page: usize,
+    pub(super) page: usize,
     context: RequestContext,
 }
 
@@ -109,7 +138,7 @@ impl ClinicalApp {
         cx.notify();
     }
 
-    fn turn_document_original(&mut self, page: usize, cx: &mut Context<Self>) {
+    pub(super) fn turn_document_original(&mut self, page: usize, cx: &mut Context<Self>) {
         let Some(original) = &mut self.patient.document_original else {
             return;
         };
@@ -126,6 +155,7 @@ impl ClinicalApp {
                 let id = original.id.clone();
                 original.page = page;
                 original.state = ReadLoad::loading();
+                self.profile_scroll.set_offset(gpui::point(px(0.), px(0.)));
                 self.run(
                     move || {
                         Ok(documents::pdf::render(source, page + 1, &work_context)
@@ -262,29 +292,33 @@ impl ClinicalApp {
                     .child(self.document_original_controls(original.page, count, cx));
             }
             ReadLoad::Ready(Ok(documents::OriginalPreview::Pdf(pdf))) => {
-                let page = gpui::img(pdf.image.clone()).object_fit(gpui::ObjectFit::Contain);
-                let size = pdf.image.size(0);
-                view = view
-                    .child(match place {
-                        OriginalPlace::Documents => {
-                            page.w_full().max_h(px(640.)).into_any_element()
-                        }
-                        OriginalPlace::Record { .. } => div()
-                            .w_full()
-                            .flex_none()
-                            .aspect_ratio(size.width.0 as f32 / size.height.0.max(1) as f32)
-                            .child(page.size_full().rounded(px(Theme::nested(
-                                theme.around_control(patient_record::READING_INSET),
-                                patient_record::READING_INSET,
-                            ))))
-                            .into_any_element(),
-                    })
-                    .child(text!(format!(
-                        "Pagina {} di {}",
-                        original.page + 1,
-                        pdf.pages
-                    )))
-                    .child(self.document_original_controls(original.page, pdf.pages, cx));
+                let page_line = text!(format!("Pagina {} di {}", original.page + 1, pdf.pages));
+                let controls = self.document_original_controls(original.page, pdf.pages, cx);
+                view = match place {
+                    OriginalPlace::Documents => view
+                        .child(
+                            gpui::img(pdf.image.clone())
+                                .object_fit(gpui::ObjectFit::Contain)
+                                .w_full()
+                                .max_h(px(640.)),
+                        )
+                        .child(page_line)
+                        .child(controls),
+                    OriginalPlace::Record { .. } => view
+                        .when(pdf.pages > 1, |el| {
+                            el.child(
+                                div()
+                                    .flex()
+                                    .flex_wrap()
+                                    .items_center()
+                                    .justify_between()
+                                    .gap(px(8.))
+                                    .child(page_line)
+                                    .child(controls),
+                            )
+                        })
+                        .child(inked_page(pdf, theme)),
+                };
                 let warning = notice(
                     "document-pdf-fidelity-notice",
                     PDF_FIDELITY_NOTICE,
@@ -1195,7 +1229,9 @@ mod tests {
                 .context
                 .clone()
         });
-        view.update(cx, |app, cx| app.close_record_reading(cx));
+        cx.update_window_entity(&view, |app, window, cx| {
+            app.close_record_reading(window, cx)
+        });
         notes_recovery_tests::draw(cx);
         assert!(context.check().is_err(), "closing retires the preview");
         view.read_with(cx, |app, _| {
@@ -1241,7 +1277,9 @@ mod tests {
                 assert!(app.form.is_some());
             });
             assert_eq!(caret_and_draft(&view, cx).1, typed.1);
-            view.update(cx, |app, cx| app.close_record_reading(cx));
+            cx.update_window_entity(&view, |app, window, cx| {
+                app.close_record_reading(window, cx)
+            });
             notes_recovery_tests::draw(cx);
             assert_eq!(caret_and_draft(&view, cx), typed);
             assert!(writes(&host, before).is_empty());
@@ -1539,6 +1577,7 @@ mod tests {
                                     image::Frame::new(image::RgbaImage::new(2, 2)),
                                 ])),
                                 pages: 2,
+                                ink: 0..2,
                             })),
                         }),
                         page,

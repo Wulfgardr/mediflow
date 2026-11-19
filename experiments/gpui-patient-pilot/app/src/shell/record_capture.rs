@@ -18,6 +18,17 @@ struct Bench {
     reader: String,
     referto: String,
     damaged: String,
+    letters: Vec<Letter>,
+}
+
+struct Letter {
+    case: &'static str,
+    patient: String,
+    raster: String,
+    original: String,
+    sentence: &'static str,
+    gap: &'static str,
+    value: &'static str,
 }
 
 fn login(pairing: &Value) -> RuntimeSession {
@@ -318,9 +329,52 @@ fn bench(path: &str) -> Bench {
         )
         .unwrap()
         .id;
+    let mut letters = vec![];
+    if let Ok(folder) = std::env::var("MEDIFLOW_RECORD_LETTERS") {
+        for (case, patient, sentence, gap, value) in [
+            (
+                "affollato",
+                crowded.clone(),
+                "\nBisoprololo ridotto alla dimissione a  al mattino.",
+                " al mattino.",
+                "1,25 mg",
+            ),
+            (
+                "gemello",
+                reader.clone(),
+                "\nLosartan ridotto alla dimissione a  la sera.",
+                " la sera.",
+                "½ cp",
+            ),
+        ] {
+            session.select_profile_patient(&scope, &patient).unwrap();
+            let upload = |name: &str, file: String| {
+                let bytes = std::fs::read(format!("{folder}/{file}")).unwrap();
+                session
+                    .create_attachment(&scope, &patient, name, "application/pdf", &bytes)
+                    .unwrap()
+                    .id
+            };
+            let raster = upload("Lettera di dimissione sintetica.pdf", format!("{case}.pdf"));
+            let original = upload(
+                "Lettera di dimissione sintetica (originale).pdf",
+                format!("originale-{case}.pdf"),
+            );
+            letters.push(Letter {
+                case,
+                patient,
+                raster,
+                original,
+                sentence,
+                gap,
+                value,
+            });
+        }
+    }
     session.clear_profile_selection();
     session.lock();
     Bench {
+        letters,
         reader,
         referto,
         damaged,
@@ -746,7 +800,7 @@ fn crowded_and_interrupted(run: &mut Run, bench: &Bench, prefix: &str) -> Value 
         &format!("{prefix}-13-voce-sopra-la-bozza"),
         "La voce dello stesso giorno si apre nel Contesto sopra la bozza",
     );
-    run.app(|app, _, cx| app.close_record_reading(cx));
+    run.app(|app, window, cx| app.close_record_reading(window, cx));
     let after_entry = run.caret_and_text();
     let document = run.app(|app, _, _| {
         app.patient
@@ -766,7 +820,7 @@ fn crowded_and_interrupted(run: &mut Run, bench: &Bench, prefix: &str) -> Value 
         &format!("{prefix}-14-referto-sopra-la-bozza"),
         "Il referto si apre nel Contesto sopra la bozza",
     );
-    run.app(|app, _, cx| app.close_record_reading(cx));
+    run.app(|app, window, cx| app.close_record_reading(window, cx));
     run.shot(
         &format!("{prefix}-15-torna-alla-bozza"),
         "Torna alla bozza: testo e punto di scrittura",
@@ -799,6 +853,107 @@ fn crowded_and_interrupted(run: &mut Run, bench: &Bench, prefix: &str) -> Value 
         "independentReadEndsWithAddition": true})
 }
 
+fn letter_from_draft(run: &mut Run, bench: &Bench, letter: &Letter, prefix: &str) -> Value {
+    let before = independent_profile(bench, &letter.patient);
+    run.open(&letter.patient);
+    run.app(|app, window, cx| app.open_form(FormKind::Notes, window, cx));
+    run.type_at_end(letter.sentence);
+    let gap = letter.gap.to_owned();
+    run.app(move |app, window, cx| {
+        let editor = app.form.as_ref().unwrap().fields[0].editor.clone();
+        editor.update(cx, |input, cx| {
+            let value = input.value().to_owned();
+            let at = value[..value.rfind(&gap).unwrap()].encode_utf16().count();
+            input.focus(window, cx);
+            input.set_selected_text_range(at..at, window, cx);
+        });
+    });
+    let paused = run.caret_and_text();
+    run.shot(
+        &format!("{prefix}-40-frase-interrotta"),
+        "Frase interrotta al posto della dose",
+    );
+    let raster = letter.raster.clone();
+    run.app(move |app, _, cx| app.read_record_document(&raster, cx));
+    let first = run.wait_for_original();
+    run.shot(
+        &format!("{prefix}-41-lettera-pagina-1"),
+        "La lettera prende la larghezza, la nota resta nella striscia",
+    );
+    run.app(|app, _, cx| app.turn_document_original(1, cx));
+    let second = run.wait_for_original();
+    let page = run.app(|app, _, _| {
+        app.patient
+            .document_original
+            .as_ref()
+            .map(|original| original.page)
+    });
+    for tick in 0..8 {
+        run.app(move |app, _, cx| {
+            app.profile_scroll
+                .set_offset(gpui::point(px(0.), px(-120. * tick as f32)));
+            cx.notify();
+        });
+        run.shot(
+            &format!("{prefix}-42-pagina-2-tacca-{tick}"),
+            "Pagina 2, una tacca di rotella alla volta",
+        );
+    }
+    let during = independent_profile(bench, &letter.patient);
+    run.app(|app, window, cx| app.close_record_reading(window, cx));
+    run.shot(
+        &format!("{prefix}-43-ritorno-terapie"),
+        "Ritorno alla bozza: terapie attive sotto il compositore",
+    );
+    let resumed = run.caret_and_text();
+    let value = letter.value.to_owned();
+    let typed = run.app(move |app, window, cx| {
+        let editor = app.form.as_ref().unwrap().fields[0].editor.clone();
+        editor.update(cx, |input, cx| {
+            for character in value.chars() {
+                input.replace_text_in_range(None, &character.to_string(), window, cx);
+            }
+            input.value().to_owned()
+        })
+    });
+    run.shot(
+        &format!("{prefix}-44-dose-scritta"),
+        "Dose scritta in mezzo alla frase",
+    );
+    let original = letter.original.clone();
+    run.app(move |app, _, cx| app.read_record_document(&original, cx));
+    let refused = run.wait_for_original();
+    run.shot(
+        &format!("{prefix}-45-originale-rifiutato"),
+        "La lettera originale è rifiutata dal visore, bozza intatta",
+    );
+    run.app(|app, window, cx| app.close_record_reading(window, cx));
+    let after_refusal = run.caret_and_text();
+    run.app(|app, window, cx| app.review_form(window, cx));
+    run.app(|app, _, cx| app.confirm_form(cx));
+    run.shot(&format!("{prefix}-46-registrata"), "Registrata una volta");
+    let stored = independent_profile(bench, &letter.patient);
+    assert_eq!(first, "pdf");
+    assert_eq!(second, "pdf");
+    assert_eq!(page, Some(1));
+    assert_eq!(resumed, paused, "caret and text come back from the strip");
+    assert_eq!(during, before, "reading writes nothing");
+    assert_eq!(refused, "rifiutato");
+    assert_eq!(after_refusal.1, typed);
+    let expected = before.0.clone().unwrap_or_default()
+        + &letter
+            .sentence
+            .replacen(letter.gap, &format!("{}{}", letter.value, letter.gap), 1);
+    assert_eq!(
+        stored.0.as_deref(),
+        Some(expected.as_str()),
+        "second session reads the note"
+    );
+    assert_eq!(stored.1, before.1 + 1, "one confirmation, one version");
+    serde_json::json!({"case": letter.case, "caretPaused": paused.0, "caretResumed": resumed.0,
+        "versionBefore": before.1, "versionAfter": stored.1, "originalRefused": refused})
+}
+
 fn pdf_while_drafting(run: &mut Run, bench: &Bench, prefix: &str) -> Value {
     let patient = bench.reader.clone();
     let before = independent_profile(bench, &patient);
@@ -821,8 +976,17 @@ fn pdf_while_drafting(run: &mut Run, bench: &Bench, prefix: &str) -> Value {
         &format!("{prefix}-22b-fuoco"),
         "Fuoco sul comando che precede la bozza",
     );
+    run.app(|app, _, cx| {
+        app.profile_scroll
+            .set_offset(gpui::point(px(0.), px(-240.)));
+        cx.notify();
+    });
+    run.shot(
+        &format!("{prefix}-22c-pdf-due-tacche"),
+        "Due tacche di rotella sulla pagina",
+    );
     let during = independent_profile(bench, &patient);
-    run.app(|app, _, cx| app.close_record_reading(cx));
+    run.app(|app, window, cx| app.close_record_reading(window, cx));
     run.shot(
         &format!("{prefix}-23-torna-alla-bozza"),
         "Torna alla bozza: stesso testo e stesso punto",
@@ -835,7 +999,7 @@ fn pdf_while_drafting(run: &mut Run, bench: &Bench, prefix: &str) -> Value {
         &format!("{prefix}-24-pdf-illeggibile"),
         "PDF danneggiato: anteprima rifiutata, bozza intatta",
     );
-    run.app(|app, _, cx| app.close_record_reading(cx));
+    run.app(|app, window, cx| app.close_record_reading(window, cx));
     let after_damaged = run.caret_and_text();
     let unchanged = independent_profile(bench, &patient);
     run.app(|app, window, cx| app.review_form(window, cx));
@@ -904,6 +1068,30 @@ fn capture_record_d_on_the_synthetic_bench() {
             crowded_and_interrupted(&mut run, &bench, &format!("{theme}-1180"))
         };
         let pdf = pdf_while_drafting(&mut run, &bench, &format!("{theme}-1180"));
+        let mut letters = vec![];
+        for (letter, (width, height)) in bench
+            .letters
+            .iter()
+            .flat_map(|letter| [(letter, (1180., 660.)), (letter, (1024., 640.))])
+        {
+            let mut cx = context();
+            let window = open_window(&mut cx, &bench, dark, width, height);
+            let mut letter_run = Run {
+                cx: &mut cx,
+                window,
+                directory: directory.clone(),
+                log: vec![],
+            };
+            let size = format!("{width}x{height}");
+            let result = letter_from_draft(
+                &mut letter_run,
+                &bench,
+                letter,
+                &format!("{theme}-{size}-{}", letter.case),
+            );
+            letters
+                .push(serde_json::json!({"size": size, "result": result, "shots": letter_run.log}));
+        }
         let direction = {
             let mut cx = context();
             let window = open_window(&mut cx, &bench, dark, 1180., 660.);
@@ -930,7 +1118,7 @@ fn capture_record_d_on_the_synthetic_bench() {
             &format!("{theme}-1180-10-primo-accesso"),
             "Primo accesso, senza identificativo e senza visite",
         );
-        summary.push(serde_json::json!({"theme": theme, "gesture": result, "crowded": crowded, "pdf": pdf, "direction": direction, "shots": run.log}));
+        summary.push(serde_json::json!({"theme": theme, "gesture": result, "crowded": crowded, "pdf": pdf, "direction": direction, "letters": letters, "shots": run.log}));
         for (width, height, label) in [
             (1440., 900., "1440"),
             (820., 660., "820"),
