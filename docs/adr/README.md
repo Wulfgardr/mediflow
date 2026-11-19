@@ -15,6 +15,7 @@ verifica dello stato successivo.
 ## Decisioni richiamate
 
 - L'[ADR 0193](0193-egress-clinico-controllato-dal-server.md), accettato il 19/11/2026, fa rifiutare dal server le operazioni cliniche dei mandati cloud senza egress dichiarato e toglie dall'applicazione automatica le cassette già depositate così.
+- L'[ADR 0192](0192-segnaposto-con-ruolo-e-date-relative.md), accettato il 19/11/2026, dà un ruolo ai segnaposto verso i modelli cloud, lega i ruoli ai campi dell'output ed esprime le date cliniche come scostamenti in giorni. La data di nascita non esce mai come scostamento.
 
 - L'[ADR 0191](0191-conferma-da-chat-e-cassetta-senza-finestra.md), accettato il 18/11/2026, definisce la conferma da Codex tramite autenticazione macOS e il servizio facoltativo della cassetta con chiave in memoria fino a 8 ore.
 

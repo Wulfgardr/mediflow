@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="it"><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ugH/EXGQX57mZw/HHXGLu1DVylrlbCHW6/JAF1JSvNY='; style-src 'sha256-nDLYNGJAq2NN356ZfJgk8AcRaxZu6zn5pUDbxnDnGBM='; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MediFlow: accesso nativo</title>
+<html lang="it"><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-Z+tITPaBYdpFdi3rVIr35NqdHS88AbgxHB7Ef2tkenY='; style-src 'sha256-nDLYNGJAq2NN356ZfJgk8AcRaxZu6zn5pUDbxnDnGBM='; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MediFlow: accesso nativo</title>
 <style>html{color-scheme:light dark;font:17px system-ui}body{margin:24px;max-width:40rem}h1{font-size:1.4rem;font-weight:500}button{font:inherit;margin:8px 8px 8px 0;padding:10px 16px}p{line-height:1.5}section{overflow-wrap:anywhere;border-top:1px solid GrayText;margin-top:20px}h2{font-size:1.15rem}li{margin-block:12px;line-height:1.5}</style></head>
 <body><h1>MediFlow</h1><p>Conferma l’accesso nella finestra MediFlow già sbloccata. La selezione clinica viene redatta localmente e condivisa dopo la tua revisione nella finestra nativa. Il rilevatore può sbagliare: il medico è responsabile di controllare i byte prima della conferma.</p>
 <p id="status" role="status" aria-live="polite">Collegamento alla chat…</p>
@@ -68,7 +68,7 @@
         if (typeof payload !== 'string' || payload.length > 60000) throw new Error('denied');
         const value = JSON.parse(payload);
         if (prostheticsMode) {
-            const text = v => typeof v === 'string' && v.length > 0 && v.length <= 4096 && !/MF_PII|\{\{|\}\}/u.test(v);
+            const text = v => typeof v === 'string' && v.length > 0 && v.length <= 4096 && !/\[\[|\]\]|\{\{|\}\}|MF_(?:PAZ|PER|DAT|NAS|TEL|IND|CF|EML|ORG|ID|ALT)\s*[0-9]|MF_GG\s*[+-]/iu.test(v);
             const exact = (v, keys) => v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length === keys.length && keys.every(k => Object.hasOwn(v, k));
             if (!exact(value, ['profile','query','freshness','limit','rows','truncated']) || value.profile !== 'mediflow.prosthetics-catalog.v1'
                 || value.query !== element('drug-query').value.trim() || !text(value.query) || value.query.length < 2 || value.query.length > 80
@@ -79,7 +79,7 @@
             return value;
         }
         const exact = (v, keys) => v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length === keys.length && keys.every(k => Object.hasOwn(v, k));
-        const text = v => typeof v === 'string' && v.length > 0 && v.length <= 4096 && !/MF_PII|\{\{|\}\}/u.test(v);
+        const text = v => typeof v === 'string' && v.length > 0 && v.length <= 4096 && !/\[\[|\]\]|\{\{|\}\}|MF_(?:PAZ|PER|DAT|NAS|TEL|IND|CF|EML|ORG|ID|ALT)\s*[0-9]|MF_GG\s*[+-]/iu.test(v);
         const nullable = v => v === null || text(v);
         if (!exact(value, ['profile','query','freshness','limit','rows']) || value.profile !== 'mediflow.drug-catalog.v1'
             || !text(value.query) || value.query.length < 2 || value.query.length > 80 || /[\u0000-\u001f\u007f]/u.test(value.query)
@@ -123,7 +123,7 @@
         const refs = new Set();
         const rows = (list, limit) => Array.isArray(list) && list.length <= limit && list.every(r => {
             if (!exact(r, ['text','sourceRef']) || typeof r.text !== 'string' || !r.text.length || r.text.length > 4096
-                || /MF_PII|\{\{|\}\}/u.test(r.text.replace(/\{\{MF_PII_[a-f0-9]{32}_[1-9][0-9]{0,3}\}\}/gu, '[redatto]'))
+                || /\[\[|\]\]|\{\{|\}\}|MF_(?:PAZ|PER|DAT|NAS|TEL|IND|CF|EML|ORG|ID|ALT)\s*[0-9]|MF_GG\s*[+-]/iu.test(r.text.replace(/\[\[MF_(?:(?:PAZ|PER|DAT|NAS|TEL|IND|CF|EML|ORG|ID|ALT)[1-9][0-9]{0,3}|GG(?:\+0|[+-][1-9][0-9]{0,4}))_[a-z2-7]{8}\]\]/gu, '[redatto]'))
                 || typeof r.sourceRef !== 'string' || !/^src_[a-f0-9]{32}$/u.test(r.sourceRef) || refs.has(r.sourceRef)) return false;
             refs.add(r.sourceRef); return true;
         });
@@ -149,7 +149,7 @@
         const exact = (value, keys) => value && typeof value === 'object' && !Array.isArray(value)
             && Object.keys(value).length === keys.length && keys.every(key => Object.hasOwn(value, key));
         const text = value => typeof value === 'string' && value.length > 0 && value.length <= 4096;
-        const plain = value => text(value) && !/MF_PII|\{\{|\}\}/u.test(value);
+        const plain = value => text(value) && !/\[\[|\]\]|\{\{|\}\}|MF_(?:PAZ|PER|DAT|NAS|TEL|IND|CF|EML|ORG|ID|ALT)\s*[0-9]|MF_GG\s*[+-]/iu.test(value);
         const ref = value => typeof value === 'string' && /^src_[a-f0-9]{32}$/u.test(value);
         const time = value => ['ultimi_6_mesi', 'attuale'].includes(value);
         const rows = (values, limit, keys, valid) => Array.isArray(values) && values.length <= limit
@@ -157,7 +157,7 @@
         if (!exact(card, ['profile','pseudonym','history','therapies','measures'])
             || card.profile !== 'mediflow.synthetic-chat-card.v1' || typeof card.pseudonym !== 'string' || !/^card_[a-f0-9]{32}$/u.test(card.pseudonym)
             || !rows(card.history, 1, ['condition','note','relativeTime','sourceRef'], row => plain(row.condition) && text(row.note)
-                && plain(row.note.replace(/\{\{MF_PII_[a-f0-9]{32}_[1-9][0-9]{0,3}\}\}/gu, '[redatto]')) && time(row.relativeTime))
+                && plain(row.note.replace(/\[\[MF_(?:(?:PAZ|PER|DAT|NAS|TEL|IND|CF|EML|ORG|ID|ALT)[1-9][0-9]{0,3}|GG(?:\+0|[+-][1-9][0-9]{0,4}))_[a-z2-7]{8}\]\]/gu, '[redatto]')) && time(row.relativeTime))
             || !rows(card.therapies, 2, ['medicine','dose','frequency','sourceRef'], row => plain(row.medicine) && plain(row.dose) && plain(row.frequency))
             || !rows(card.measures, 2, ['kind','value','unit','relativeTime','sourceRef'], row => plain(row.kind) && plain(row.value) && plain(row.unit) && time(row.relativeTime))
             || JSON.stringify(card) !== payload) throw new Error('denied');

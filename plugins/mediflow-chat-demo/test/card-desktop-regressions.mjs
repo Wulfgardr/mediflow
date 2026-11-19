@@ -208,10 +208,10 @@ try {
   });
   await check('placeholders', '', async ({ frame, responses }) => {
     await share(frame);
-    assert.match(JSON.stringify(responses.find(r => r.result?.structuredContent)), /MF_PII_/);
+    assert.match(JSON.stringify(responses.find(r => r.result?.structuredContent)), /\[\[MF_/);
     for (const theme of ['giorno', 'grafite']) {
       await frame.locator('#theme').selectOption(theme);
-      assert.doesNotMatch(await frame.locator('#card').textContent(), /MF_PII_/);
+      assert.doesNotMatch(await frame.locator('#card').textContent(), /MF_/);
       assert.match(await frame.locator('#card').textContent(), /\[omesso\]/);
     }
   });
