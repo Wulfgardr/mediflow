@@ -91,6 +91,14 @@ function IncaricoArea({
   const actionsRef = useRef<HTMLDivElement>(null);
   const actionsTriggerRef = useRef<HTMLButtonElement>(null);
   const actionsMenuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const focusSearch = () => {
+      if (window.location.hash === '#ricerca-pazienti') searchInputRef.current?.focus();
+    };
+    focusSearch();
+    window.addEventListener('hashchange', focusSearch);
+    return () => window.removeEventListener('hashchange', focusSearch);
+  }, []);
   const normalizedQuery = useMemo(() => normalizeClinicalSearch(query), [query]);
 
   useEffect(() => {
@@ -343,7 +351,7 @@ function IncaricoArea({
         <h1 className="lume-voice">Pazienti<span aria-hidden="true">.</span></h1>
         <label className={classNames("mf-composite-field", patientStyles.patientSearchField)}>
           <Search size={16} aria-hidden="true" />
-          <input ref={searchInputRef} type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Nome, codice o diagnosi" aria-label="Cerca nella lista pazienti" />
+          <input id="ricerca-pazienti" ref={searchInputRef} type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Nome, codice o diagnosi" aria-label="Cerca nella lista pazienti" />
           <button type="button" className={classNames('mf-button-icon h-[44px]! min-h-[44px]! min-w-[44px]!', !query && 'invisible')} aria-label="Cancella la ricerca" title="Cancella la ricerca" aria-hidden={!query || undefined} tabIndex={query ? 0 : -1} onClick={() => { setQuery(''); searchInputRef.current?.focus(); }}><X size={16} aria-hidden="true" /></button>
         </label>
         <div className={patientStyles.inboxScope} aria-label="Stato elenco">
