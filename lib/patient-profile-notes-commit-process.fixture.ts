@@ -1,4 +1,4 @@
-import { syntheticLoopbackRequest } from './security/loopback-ingress-test-fixture';
+import { syntheticLoopbackRequest, syntheticWebClientRequest } from './security/loopback-ingress-test-fixture';
 /** Synthetic process fixture: never invoked by the application or a provider. */
 import { createRequire } from 'node:module';
 import { mkdtempSync, readFileSync, rmSync, writeSync } from 'node:fs';
@@ -17,7 +17,7 @@ if (process.env.MEDIFLOW_TEST_PROFILE_NOTES_PROCESS !== '1' || !dataDir || !base
 const load = createRequire(import.meta.url);
 const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server'); openDbServer();
 const cookieDir = mkdtempSync(join(dataDir, 'process-cookies-'));
-const cookieState = { cookies: new Map<string, string>(), headers: syntheticLoopbackRequest('http://127.0.0.1').headers };
+const cookieState = { cookies: new Map<string, string>(), headers: syntheticWebClientRequest('http://127.0.0.1').headers };
 const cleanup = installNetworkPatientCookieFixture(cookieDir, cookieState);
 const queryRoute = load('../app/api/patients/[id]/profile-query/route.ts') as typeof import('../app/api/patients/[id]/profile-query/route');
 const commitRoute = load('../app/api/patients/[id]/notes-commit/route.ts') as typeof import('../app/api/patients/[id]/notes-commit/route');
