@@ -51,9 +51,11 @@ async function visit(provider: AgentMandateInput['provider'] = 'local', allowsCl
     const file = await sealPatientDocumentFile(new TextEncoder().encode('%PDF-1.4\nSYNTHETIC_APPLICATION\n%%EOF'), key);
     file.fileKey.fill(0);
     const note = { title: await field('Nota sintetica'), content: await field('SYNTHETIC_APPLICATION'), metadata: await field({ synthetic: true }), date: '2026-11-17' };
+    const notePdfId = randomUUID();
     const items: AgentApplicationInput['items'] = [
         { id: randomUUID(), kind: 'note', values: note },
         { id: randomUUID(), kind: 'pdf', values: { name: await field('synthetic.pdf'), data: file.data, size: 45 } },
+        { id: notePdfId, kind: 'pdf', values: { name: await field('nota-visita.pdf'), data: file.data, size: 45 } },
         { id: randomUUID(), kind: 'therapy', values: { drugName: 'Farmaco sintetico', dosage: '1', startDate: '2026-11-17', status: 'active', motivation: await field('Fonte sintetica') } },
         { id: randomUUID(), kind: 'service', values: { serviceName: await field('Prestazione sintetica'), prescribedAt: '2026-11-17',
             lineItems: [{ serviceName: await field('Prima prestazione sintetica') }, { serviceName: await field('Seconda prestazione sintetica') }] } },
@@ -69,7 +71,7 @@ async function visit(provider: AgentMandateInput['provider'] = 'local', allowsCl
     receipt = database.transaction(() => store.close(principal, id, receipt.revision)).immediate();
     return { id, mandate, mandates, principal, operations,
         input(phase: 'automatic' | 'review'): AgentApplicationInput { return { visitId: id, phase, patientId: fixture.patientId, expectedVersion: version(), cassetteRevision: receipt.revision,
-            items: items.filter(item => ['transcription', 'pdf'].includes(item.kind) === (phase === 'automatic')) }; },
+            items: items.filter(item => (['transcription', 'pdf'].includes(item.kind) && item.id !== notePdfId) === (phase === 'automatic')) }; },
         whole(): AgentApplicationInput { return { visitId: id, phase: 'review', patientId: fixture.patientId, expectedVersion: version(), cassetteRevision: receipt.revision, items }; } };
 }
 
@@ -96,7 +98,7 @@ for (const provider of ['openai', 'anthropic'] as const) test(`J5: the ${provide
     assert.throws(() => applyAgentVisit(request, fixture.session, f.input('review')), /AGENT_APPLICATION_DENIED/);
     assert.deepEqual(snapshot(), before);
     const input = f.whole(), receipt = applyAgentVisit(request, fixture.session, input), after = snapshot();
-    assert.deepEqual(after.slice(0, 6).map((rows, index) => rows.length - before[index].length), [1, 1, 1, 1, 2, 1]);
+    assert.deepEqual(after.slice(0, 6).map((rows, index) => rows.length - before[index].length), [1, 2, 1, 1, 2, 1]);
     assert.deepEqual(agentAppliedItemIds(f.id).sort(), input.items.map(item => item.id).sort());
     assert.ok(!readAgentCassetteIndex(database, fixture.session.userId, null).visits.some(row => row.id === f.id));
     const audit = database.prepare('SELECT * FROM audit_events WHERE event_id=?').get(receipt.eventId) as Record<string, string>;
@@ -113,7 +115,7 @@ test('J4: a cloud cassette deposited with clinical egress keeps the automatic pa
     assert.equal(applyAgentVisit(request, fixture.session, f.input('automatic')).allowsClinicalEgress, true);
     assert.throws(() => applyAgentVisit(request, fixture.session, { ...f.whole(), expectedVersion: version() }), /AGENT_APPLICATION_DENIED/);
     assert.equal(applyAgentVisit(request, fixture.session, f.input('review')).status, 'applied');
-    assert.equal(agentAppliedItemIds(f.id).length, 7);
+    assert.equal(agentAppliedItemIds(f.id).length, 8);
 });
 
 test('one explicit review commits all structured proposals, service lines and proposer audit atomically', async () => {
@@ -123,9 +125,9 @@ test('one explicit review commits all structured proposals, service lines and pr
     const before = snapshot(), input = f.input('review');
     const receipt = applyAgentVisit(request, fixture.session, input);
     const after = snapshot();
-    assert.deepEqual(after.slice(0, 6).map((rows, index) => rows.length - before[index].length), [1, 0, 1, 1, 2, 1]);
+    assert.deepEqual(after.slice(0, 6).map((rows, index) => rows.length - before[index].length), [1, 1, 1, 1, 2, 1]);
     assert.equal((after[0].at(-1) as { recorded_by: string }).recorded_by, 'Medico Sintetico');
-    assert.equal(agentAppliedItemIds(f.id).length, 7);
+    assert.equal(agentAppliedItemIds(f.id).length, 8);
     assert.ok(!readAgentCassetteIndex(database, fixture.session.userId, null).visits.some(row => row.id === f.id));
     assert.equal(readAgentCassette(database, f.id, fixture.session.userId)?.id, f.id);
     const audit = database.prepare("SELECT * FROM audit_events WHERE event_id=?").get(receipt.eventId) as Record<string, unknown>;
@@ -154,7 +156,7 @@ for (const phase of ['automatic', 'review'] as const) test(`failure of every aud
     const f = await visit();
     if (phase === 'review') applyAgentVisit(request, fixture.session, f.input('automatic'));
     const input = f.input(phase), before = snapshot(), appliedBefore = agentAppliedItemIds(f.id);
-    const expectedAuditCount = phase === 'automatic' ? 4 : 15;
+    const expectedAuditCount = phase === 'automatic' ? 4 : 17;
     for (let offset = 0; offset < expectedAuditCount; offset++) {
         const count = (database.prepare('SELECT count(*) AS n FROM audit_events').get() as { n: number }).n + offset;
         database.exec(`CREATE TRIGGER synthetic_application_audit_fault BEFORE INSERT ON audit_events WHEN (SELECT count(*) FROM audit_events)=${count} BEGIN SELECT RAISE(ABORT, 'SYNTHETIC_APPLICATION_AUDIT_FAULT'); END`);
@@ -176,7 +178,14 @@ test('the server never lets the note into the automatic pass and refuses a revie
     assert.throws(() => applyAgentVisit(request, fixture.session, { ...current, items: [note] }), /AGENT_APPLICATION_DENIED/);
     assert.deepEqual(snapshot(), applied);
     assert.equal(applyAgentVisit(request, fixture.session, f.input('review')).status, 'applied');
-    assert.equal(agentAppliedItemIds(f.id).length, 7);
+    assert.equal(agentAppliedItemIds(f.id).length, 8);
+});
+
+test('with the note still pending the server refuses an automatic pass that would take every PDF of the cassette', async () => {
+    const f = await visit(), automatic = f.input('automatic'), notePdf = f.input('review').items.find(item => item.kind === 'pdf')!, before = snapshot();
+    assert.throws(() => applyAgentVisit(request, fixture.session, { ...automatic, items: [...automatic.items, notePdf] }), /AGENT_APPLICATION_DENIED/);
+    assert.deepEqual(snapshot(), before);
+    assert.equal(applyAgentVisit(request, fixture.session, automatic).status, 'applied');
 });
 
 test('automatic mode cannot consume or relabel a structured proposal', async () => {
@@ -218,7 +227,7 @@ test('native approval commits and audits exactly one plan, and a valid proof can
 
     const result = applyConfirmedAgentVisit(request, fixture.session, plan, grant);
     const after = snapshot();
-    assert.deepEqual(after.slice(0, 6).map((rows, index) => rows.length - before[index].length), [1, 0, 1, 1, 2, 1]);
+    assert.deepEqual(after.slice(0, 6).map((rows, index) => rows.length - before[index].length), [1, 1, 1, 1, 2, 1]);
     assert.equal(hasAgentVisitConfirmationReceipt(reference, f.principal), true);
     assert.equal(hasAgentVisitConfirmationReceipt(reference, { ...f.principal, agentRef: randomUUID() }), false);
     const record = database.prepare('SELECT * FROM audit_events WHERE event_id=?').get(result.eventId) as Record<string, string>;

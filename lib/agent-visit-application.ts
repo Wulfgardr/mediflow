@@ -112,6 +112,9 @@ function commitAgentVisit(request: Request, session: ServerSession, value: unkno
         }
         const provenance = { proposerRef: cassette.agentRef, mandateRef: cassette.mandateRef, modelProvider: cassette.modelProvider };
         if (input.phase === 'review' && pending.some(item => agentKindOnlyAutomatic(appliesAutomatically, item.kind))) throw new AgentApplicationDenied(409);
+        const pendingPdfs = pending.filter(item => item.kind === 'pdf');
+        if (!replay && input.phase === 'automatic' && pending.some(item => item.kind === 'note') && pendingPdfs.length
+            && pendingPdfs.every(item => selected.includes(item))) throw new AgentApplicationDenied(409);
         if (replay) {
             if (confirmation) throw new AgentApplicationDenied(409);
             if (!selected.every(item => appliedIds.includes(item.id))) throw new AgentApplicationDenied(409);

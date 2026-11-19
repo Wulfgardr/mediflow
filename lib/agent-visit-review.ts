@@ -15,7 +15,7 @@ import { agentVisitPdfText } from './agent-visit-pdf-text';
 
 export type AgentNoteDocument = { id: string; noteId: string; name: string; hash: string };
 export type AgentVisitReview = { visit: Omit<OpenedAgentVisit, 'cassette'> & { cassette: AgentCassetteIndexEntry }; patient: Patient | null;
-    appliesAutomatically: boolean; noteDocuments: AgentNoteDocument[]; appliedItemIds: string[]; currentSummary: Map<string, string>; blockers: string[]; proposalBlockers: string[] };
+    appliesAutomatically: boolean; noteDocuments: AgentNoteDocument[]; notesReproduced: boolean; appliedItemIds: string[]; currentSummary: Map<string, string>; blockers: string[]; proposalBlockers: string[] };
 const proposalLabels: Record<string, string> = { therapy: 'la terapia', service: 'la prestazione', diagnosis: 'la diagnosi', exemption: 'l’esenzione', observation: 'l’osservazione' };
 const hex = (value: ArrayBuffer) => [...new Uint8Array(value)].map(byte => byte.toString(16).padStart(2, '0')).join('');
 const text = (value: unknown) => typeof value === 'string' ? value.trim() : '';
@@ -115,7 +115,8 @@ export async function inspectAgentVisit(row: IncomingAgentCassette, patients: Pa
             currentSummary.set(item.id, before.join('; ') || 'Non presente');
         }
     }
-    return { visit, patient, appliesAutomatically: agentCassetteAppliesAutomatically(row), noteDocuments, appliedItemIds: row.appliedItemIds, currentSummary, blockers, proposalBlockers };
+    const notesReproduced = visit.items.every(item => item.kind !== 'note' || noteDocuments.some(document => document.noteId === item.id));
+    return { visit, patient, appliesAutomatically: agentCassetteAppliesAutomatically(row), noteDocuments, notesReproduced, appliedItemIds: row.appliedItemIds, currentSummary, blockers, proposalBlockers };
 }
 export async function reopenReviewedAgentItems(review: AgentVisitReview, row: IncomingAgentCassette): Promise<AgentVisitReview['visit']['items'] | null> {
     const visit = await openAgentVisit(row);
@@ -130,8 +131,9 @@ export async function reopenReviewedAgentItems(review: AgentVisitReview, row: In
     }
     return visit.items;
 }
-export function agentItemPhase(review: Pick<AgentVisitReview, 'appliesAutomatically' | 'noteDocuments'>, item: { id: string; kind: string }): AgentApplicationPhase {
-    const faithfulCopy = item.kind === 'transcription' || item.kind === 'pdf' && !review.noteDocuments.some(document => document.id === item.id);
+export function agentItemPhase(review: Pick<AgentVisitReview, 'appliesAutomatically' | 'noteDocuments' | 'notesReproduced'>, item: { id: string; kind: string }): AgentApplicationPhase {
+    const faithfulCopy = item.kind === 'transcription'
+        || item.kind === 'pdf' && review.notesReproduced && !review.noteDocuments.some(document => document.id === item.id);
     return review.appliesAutomatically && faithfulCopy ? 'automatic' : 'review';
 }
 export function agentVisitAwaitsReview(review: AgentVisitReview): boolean {
