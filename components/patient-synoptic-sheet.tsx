@@ -104,7 +104,7 @@ export function PatientSynopticSheet({ clinicalSupport, notesContent, problems, 
                 <a href="#riepilogo-problemi">Problemi</a>
                 <a href="#riepilogo-contesto">Contesto</a>
             </nav>
-            <section aria-labelledby="riepilogo-cambiato" className={reading.middle}>
+            <section aria-labelledby="riepilogo-cambiato" data-record-tray="cambiato" className={reading.middle}>
                 <h2 id="riepilogo-cambiato" className={reading.zoneTitle}>Cambiato</h2>
                 <div className={reading.activity}>{activity}</div>
                 {diaryTools ? <div className={reading.diaryTools} data-reading={diaryTools.full}>
@@ -119,11 +119,11 @@ export function PatientSynopticSheet({ clinicalSupport, notesContent, problems, 
             </section>
             <div className={reading.side}>
                 {composer ? <div className={reading.composer}>{composer}</div> : null}
-                <section aria-labelledby="riepilogo-stabile" className={reading.stable}>
+                <section aria-labelledby="riepilogo-stabile" data-record-tray="stabile" className={reading.stable}>
                     <h2 id="riepilogo-stabile" className={reading.zoneTitle}>Stabile</h2>
                     {stableWithNotes}
                 </section>
-                <aside aria-labelledby="riepilogo-contesto" className={reading.context}>
+                <aside aria-labelledby="riepilogo-contesto" data-record-tray="contesto" className={reading.context}>
                     <h2 id="riepilogo-contesto" className={reading.zoneTitle}>Contesto</h2>
                     {clinicalSupport ? <div className={reading.support}>{clinicalSupport}</div> : null}
                     <div className={reading.contextRows}>{context}{composer ? null : sources}</div>

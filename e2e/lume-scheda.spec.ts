@@ -95,8 +95,9 @@ async function expectSurfaceHierarchyAndNeutralChrome(page: Page, header: Locato
     expect.soft(target.height, `${target.label}: altezza target`).toBeGreaterThanOrEqual(minimum);
   }
   expect(evidence.title).toBeGreaterThan(evidence.atoms);
-  expect(evidence.title).toBe(await page.evaluate(() => innerWidth < 700 ? 26 : 28));
-  await expect(header.locator('h1')).toHaveCSS('font-weight', '400');
+  expect(evidence.title).toBe(28);
+  await expect(header.locator('h1')).toHaveCSS('font-weight', '700');
+  await expect(header.locator('h1')).toHaveCSS('font-family', /system-ui/);
   expect(evidence.leftPadding).toBeGreaterThanOrEqual(16);
   expect(evidence.rightPadding).toBeGreaterThanOrEqual(16);
   const surface = page.getByTestId('lume-scheda-surface');
