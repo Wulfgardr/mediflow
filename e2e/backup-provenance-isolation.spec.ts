@@ -49,7 +49,14 @@ test('file markers have no authority and a legitimate A to B to A restore keeps 
         }
         async function restore(payload: BackupDataset) {
             const raw = await serializeBackupArtifact(payload);
-            headers['x-mediflow-restore-credential'] = JSON.stringify({ pin });
+            const preview = await request('/api/system/backup-restore/verify', raw);
+            Object.assign(headers, {
+                'x-mediflow-restore-id': randomUUID(),
+                'x-mediflow-restore-snapshot': preview.expectedSnapshot,
+                'x-mediflow-restore-source-checksum': preview.sourceChecksum,
+                'x-mediflow-restore-confirmation': 'RIPRISTINA',
+                'x-mediflow-restore-credential': JSON.stringify({ pin }),
+            });
             const result = await request('/api/system/backup-restore', raw); await login(); return result;
         }
         await login(); return { data, request, restore };

@@ -105,6 +105,11 @@ function artifactFailureToCheck(error: BackupArtifactError): BackupRestorePrefli
             error.message,
             'Rigenera il backup con una versione supportata del formato v1.',
         ),
+        'invalid-patient-link': fail(
+            'artifact-references',
+            error.message,
+            'Scegli un’altra copia.',
+        ),
         'invalid-manifest': fail(
             'artifact-manifest',
             error.message,
