@@ -3202,7 +3202,7 @@ dependencies = [
 
 [[package]]
 name = "mediflow-gpui-patient-pilot"
-version = "0.1.0"
+version = "0.9.1"
 dependencies = [
  "base64 0.22.1",
  "chrono",
@@ -3229,14 +3229,14 @@ dependencies = [
 
 [[package]]
 name = "mediflow-local-state"
-version = "0.1.0"
+version = "0.9.1"
 dependencies = [
  "windows-sys 0.61.2",
 ]
 
 [[package]]
 name = "mediflow-patient-client"
-version = "0.1.0"
+version = "0.9.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -3244,7 +3244,7 @@ dependencies = [
 
 [[package]]
 name = "mediflow-runtime-client"
-version = "0.1.0"
+version = "0.9.1"
 dependencies = [
  "aes-gcm",
  "base64 0.22.1",
