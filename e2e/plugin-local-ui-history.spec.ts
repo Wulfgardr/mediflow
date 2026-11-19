@@ -1,6 +1,7 @@
 import { test, expect } from './fixtures/isolated-runtime';
 import { unlockIfNeeded, bootstrapUnlockedSession } from './utils';
 import { documentRequests, fetchInterceptedRequest } from './fixtures/trusted-web-request';
+import { sealDiaryEntry } from './fixtures/sealed-diary-entry';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import type { Page } from '@playwright/test';
@@ -36,8 +37,8 @@ const confirmation = (page: Page) => page.getByRole('button', { name: 'Apri sull
 test('history exposes content and source locally, confirmation is consumed and cancellation clears it', async ({ page, isolatedRuntime }, info) => {
   await bootstrapUnlockedSession(page, '1234');
   const p = await patient(page, 'fonte');
-  const response = await documentRequests(page).post('/api/entries', { data: { patientId: p.id, type: 'visit', title: 'Controllo inventato',
-    date: '2026-10-29T10:00:00Z', content: '<p>Contenuto sintetico della storia.</p>', setting: 'ambulatory', metadata: { sourceLabel: 'Fonte sintetica verificabile' } } });
+  const response = await documentRequests(page).post('/api/entries', { data: await sealDiaryEntry(page, { patientId: p.id, type: 'visit', title: 'Controllo inventato',
+    date: '2026-10-29T10:00:00Z', content: '<p>Contenuto sintetico della storia.</p>', setting: 'ambulatory', metadata: { sourceLabel: 'Fonte sintetica verificabile' } }) });
   expect(response.status()).toBe(201);
   await openFolder(page, p.id);
   const grant = await pair(page, isolatedRuntime);

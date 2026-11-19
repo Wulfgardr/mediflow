@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { unlockIfNeeded, bootstrapUnlockedSession } from './utils';
 import { documentRequests, fetchInterceptedRequest } from './fixtures/trusted-web-request';
+import { sealDiaryEntry } from './fixtures/sealed-diary-entry';
 
 function barrier() {
   let release = () => {};
@@ -136,10 +137,10 @@ test('Apri quadro has one destination while folder navigation is pending', async
   const patients = await response.json() as Array<{ id: string; lastName: string }>;
   const patient = patients.find(value => value.lastName.includes(marker));
   expect(patient).toBeTruthy();
-  const entryResponse = await documentRequests(page).post('/api/entries', { data: {
+  const entryResponse = await documentRequests(page).post('/api/entries', { data: await sealDiaryEntry(page, {
     patientId: patient!.id, type: 'note', title: `Navigazione ${marker}`,
     content: 'Verifica sintetica del ritorno al diario.', date: new Date().toISOString(), setting: 'ambulatory',
-  } });
+  }) });
   expect(entryResponse.status()).toBe(201);
   const entry = await entryResponse.json() as { id: string; version: number };
   const received = barrier();

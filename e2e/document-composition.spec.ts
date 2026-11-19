@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { openDocumentActions, bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch, assertNoHorizontalOverflow } from './utils';
+import { sealDiaryEntry } from './fixtures/sealed-diary-entry';
 
 test.describe.configure({ retries: 0 });
 
@@ -310,12 +311,12 @@ test('Documenti e Diario: scansioni 400 e 600 dpi conservano il salvataggio espl
         await viewer.getByRole('button', { name: 'Chiudi', exact: true }).click();
     }
     expect(lastAttachmentId).not.toBeNull();
-    await page.evaluate(async attachmentId => {
-        const patientId = location.pathname.split('/')[2];
-        const entry = await fetch('/api/entries', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ patientId,
-            type: 'visit', date: '2026-11-01T09:00:00Z', title: 'Originale sintetico Diario', content: '<p>Solo dati sintetici.</p>', attachments: [attachmentId] }) });
+    const diaryEntry = await sealDiaryEntry(page, { patientId: new URL(page.url()).pathname.split('/')[2],
+        type: 'visit', date: '2026-11-01T09:00:00Z', title: 'Originale sintetico Diario', content: '<p>Solo dati sintetici.</p>', attachments: [lastAttachmentId] });
+    await page.evaluate(async body => {
+        const entry = await fetch('/api/entries', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
         if (!entry.ok) throw new Error(`Synthetic diary HTTP ${entry.status}`);
-    }, lastAttachmentId);
+    }, diaryEntry);
     await page.reload();
     await openPatientSection(page, 'diario');
     await page.locator('#diario').getByRole('button', { name: /Scansione sintetica 600.pdf/u }).click();

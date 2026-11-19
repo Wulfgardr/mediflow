@@ -1,7 +1,8 @@
 import { expect, test } from '@playwright/test';
 import Database from 'better-sqlite3';
 import { isAbsolute, join } from 'node:path';
-import { bootstrapUnlockedSession, openPatientSection } from './utils';
+import { bootstrapUnlockedSession, openPatientSection, unlockIfNeeded } from './utils';
+import { documentRequests } from './fixtures/trusted-web-request';
 
 test('Web service prescriptions and items retain the draft on audit failure and persist each accepted action', async ({ page, baseURL }, testInfo) => {
     test.skip(process.env.MF085_SYNTHETIC_E2E !== '1', 'Requires an isolated synthetic server.');
@@ -28,10 +29,11 @@ test('Web service prescriptions and items retain the draft on audit failure and 
         }; } finally { db.close(); }
     };
     const http = async (kind: string) => {
-        const response = await page.request.get(`/api/${kind}?patientId=${patientId}`);
+        const response = await documentRequests(page).get(`/api/${kind}?patientId=${patientId}`);
         expect(response.status()).toBe(200); return await response.json() as Array<{ id: string; version: number; status: string }>;
     };
     await page.goto(`/patients/${patientId}/modules`);
+    await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
     await openPatientSection(page, 'prestazioni');
     const pane = page.locator('#prestazioni');
     await pane.getByRole('button', { name: 'Nuova prestazione', exact: true }).click();
@@ -79,17 +81,42 @@ test('Web service prescriptions and items retain the draft on audit failure and 
     expect((await http('service-prescriptions'))[0]).toMatchObject({ version: 2, status: 'performed' });
     expect((await http('service-prescription-items')).every(item => item.version === 2 && item.status === 'performed')).toBe(true);
     await page.screenshot({ path: testInfo.outputPath('service-performed.png'), fullPage: false });
-    const removed = page.waitForResponse(r => new URL(r.url()).pathname === `/api/service-prescriptions/${parentId}` && r.request().method() === 'DELETE');
+    const nextRemoval = () => page.waitForResponse(r => new URL(r.url()).pathname === `/api/service-prescriptions/${parentId}` && r.request().method() === 'DELETE');
+    const deletionPaths: string[] = [];
+    page.on('request', request => {
+        if (request.method() === 'DELETE') deletionPaths.push(new URL(request.url()).pathname);
+    });
     await pane.getByRole('button', { name: 'Azioni prestazione Controllo sintetico di verifica', exact: true }).click();
     await page.getByRole('menuitem', { name: 'Elimina prestazione', exact: true }).click();
+    const edited = await page.evaluate(async (id) => {
+        const response = await fetch(`/api/service-prescription-items/${id}`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ version: 2, reportReceivedAt: '2026-07-19T10:00:00Z' }),
+        });
+        return response.status;
+    }, itemIds[0]);
+    expect(edited).toBe(200);
+    const conflict = nextRemoval();
+    const refreshed = Promise.all(['service-prescriptions', 'service-prescription-items'].map(resource =>
+        page.waitForResponse(response => response.request().method() === 'GET'
+            && new URL(response.url()).pathname === `/api/${resource}` && response.ok())));
+    await page.getByRole('dialog').getByRole('button', { name: 'Elimina', exact: true }).click();
+    expect((await conflict).status()).toBe(409);
+    await expect(pane.getByRole('alert')).toContainText('Eliminazione non confermata');
+    expect(read().items.find(row => row.id === itemIds[0])).toMatchObject({ version: 3 });
+    await refreshed;
+    await pane.getByRole('button', { name: 'Azioni prestazione Controllo sintetico di verifica', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'Elimina prestazione', exact: true }).click();
+    const removed = nextRemoval();
     await page.getByRole('dialog').getByRole('button', { name: 'Elimina', exact: true }).click();
     expect((await removed).status()).toBe(200);
+    expect(deletionPaths).toEqual([`/api/service-prescriptions/${parentId}`, `/api/service-prescriptions/${parentId}`]);
     await expect(pane.getByText('Controllo sintetico di verifica', { exact: true })).toHaveCount(0);
     const deleted = read();
     expect(deleted.rows).toHaveLength(0); expect(deleted.items).toHaveLength(0);
     expect(await http('service-prescriptions')).toHaveLength(0); expect(await http('service-prescription-items')).toHaveLength(0);
     const events = ownedEvents(deleted);
-    expect(events).toHaveLength(7);
+    expect(events).toHaveLength(8);
     expect(events.at(-1)).toMatchObject({ event_type: 'service.prescription.deleted', subject_ref: parentId });
     expect(JSON.parse(String(events.at(-1)?.redacted_metadata)).resourceVersion).toBe(2);
     expect(events.every(event => event.source_surface === 'web')).toBe(true);
