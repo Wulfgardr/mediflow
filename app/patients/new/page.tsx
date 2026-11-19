@@ -5,7 +5,7 @@ import { formatCountLabel } from '@/lib/format-count';
 import ink from '@/components/ink-secondary.module.css';
 import styles from './new-patient.module.css';
 
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
     db,
@@ -17,6 +17,7 @@ import { AlertTriangle, CheckCircle2, FileSearch, FileSpreadsheet, FolderOpen } 
 import { v4 as uuidv4 } from 'uuid';
 import PatientForm from '@/components/patient-form';
 import PatientDocumentCreate from '@/components/patient-document-create';
+import { focusPatientCreationTarget } from '@/lib/patient-creation-focus';
 import { useToast } from '@/components/ui/toast-provider';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { Kree8WorkspaceShell } from '@/components/kree8/kree8-workspace-shell';
@@ -98,6 +99,14 @@ export default function NewPatientPage() {
     const [pendingImportReview, setPendingImportReview] = useState<PatientDocumentReviewDraft | null>(null);
     const [documentFlowActive, setDocumentFlowActive] = useState(false);
     const [formSeed, setFormSeed] = useState(0);
+    const enteredManualForm = useRef(false);
+    const focusManualEntry = useCallback((container: HTMLDivElement | null) => {
+        if (!container || enteredManualForm.current) return;
+        enteredManualForm.current = true;
+        if (window.location.hash) return;
+        const firstName = container.querySelector('form')?.elements.namedItem('firstName');
+        if (firstName instanceof HTMLInputElement) focusPatientCreationTarget(firstName);
+    }, []);
     const [importMeta, setImportMeta] = useState<{
         quality?: { level: string; reason?: string };
         diagnosisCount: number;
@@ -326,7 +335,7 @@ export default function NewPatientPage() {
                 </section>
             )}
 
-            <div id="dati" className="scroll-mt-40" hidden={documentFlowActive}>
+            <div id="dati" ref={focusManualEntry} className="scroll-mt-40" hidden={documentFlowActive}>
                 <PatientForm
                     onSubmit={onSubmit}
                     defaultValues={importedData || undefined}
