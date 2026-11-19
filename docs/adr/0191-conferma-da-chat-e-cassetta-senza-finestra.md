@@ -370,7 +370,7 @@ Restano esclusi la cifratura integrale di SQLite, lo zero-knowledge
 sull'intero archivio, la protezione da un sistema compromesso e l'accesso
 ininterrotto per 8 ore. Restano da descrivere separatamente il profilo PIN
 transitorio, gli export, il recupero completo ed il mandato che autorizza
-l'eventuale egress. Il servizio non estende l'egress né concede nuove
+l'eventuale egress, per cui vedi l'[ADR 0193](0193-egress-clinico-controllato-dal-server.md). Il servizio non estende l'egress né concede nuove
 autorità al provider.
 
 Prima di pubblicare la modalità, a prove concluse, allineare ADR 0065,

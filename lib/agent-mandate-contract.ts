@@ -4,6 +4,8 @@ export const AGENT_OPERATIONS = [
     'visita.proponi.esenzione', 'visita.proponi.osservazione', 'visita.chiudi',
 ] as const;
 export type AgentOperation = typeof AGENT_OPERATIONS[number];
+export const clinicalContentAllowed = (provider: AgentMandateInput['provider'], allowsClinicalEgress: boolean | number) =>
+    provider === 'local' || allowsClinicalEgress === true || allowsClinicalEgress === 1;
 export const MANDATE_MAX_DURATION_MS = 12 * 60 * 60 * 1000;
 export type AgentMandateInput = {
     id: string;

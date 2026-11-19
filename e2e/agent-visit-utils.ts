@@ -35,10 +35,12 @@ export async function createSyntheticAgentMandate(page: Page, credential: 'passp
     await page.getByRole('link', { name: 'Agenti', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Nuovo mandato', exact: true })).toBeVisible();
     await page.getByLabel('PIN di conferma', { exact: true }).fill(pin);
+    await page.getByLabel('Autorizzo il passaggio di documenti e trascrizioni al fornitore scelto', { exact: true }).check();
     const creation = page.waitForResponse(response => response.url().endsWith('/api/agent-mandates') && response.request().method() === 'POST');
     await page.getByRole('button', { name: 'Crea mandato', exact: true }).click();
     const created = await creation; expect(created.status()).toBe(201);
     const mandate = created.request().postDataJSON().mandate;
+    expect(mandate).toMatchObject({ provider: 'openai', allowsClinicalEgress: true });
     expect(mandate.durationMs).toBe(43200000);
     return { ...mandate, recovery };
 }

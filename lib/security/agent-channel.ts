@@ -4,7 +4,7 @@ import { hasAttestedLoopbackIngress } from './loopback-ingress.mjs';
 import { createAgentPairingStore, type AgentPrincipal } from '../agent-pairing-store';
 import { isAgentUnlockActive } from './agent-unlock-session';
 import { createAgentRegistrationStore } from '../agent-registration-store';
-import type { AgentOperation } from '../agent-mandate-contract';
+import { clinicalContentAllowed, type AgentOperation } from '../agent-mandate-contract';
 
 export class AgentChannelDenied extends Error {
     constructor(readonly status: 401 | 403 | 404) { super('AGENT_CHANNEL_DENIED'); }
@@ -21,7 +21,8 @@ export function withAuthenticatedAgentTransaction<T>(database: Database.Database
         const principal = createAgentPairingStore(database).principal(match[1]!)
             ?? createAgentRegistrationStore(database).principal(match[1]!, isAgentUnlockActive);
         if (!principal) throw new AgentChannelDenied(401);
-        if (operation && !principal.operations.includes(operation)) throw new AgentChannelDenied(403);
+        if (operation && (!principal.operations.includes(operation)
+            || !clinicalContentAllowed(principal.modelProvider, principal.allowsClinicalEgress))) throw new AgentChannelDenied(403);
         return consume(principal);
     }).immediate();
 }
