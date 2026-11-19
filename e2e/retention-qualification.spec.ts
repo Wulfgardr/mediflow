@@ -243,7 +243,7 @@ test('R-1: profilo di conservazione per nucleo, Italia e Lombardia con minimi e 
     const profile = RETENTION_PROFILES[profileId];
     await switchPreset(page, preset);
     await page.goto('/settings/conservazione');
-    await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
+    await unlockIfNeeded(page, '314159');
     const state = await overview();
     expect(state, `R-1 profilo ${profileId} per ${preset}`).toMatchObject({ preset, profileId, review: [] });
     const card = page.getByTestId('retention-profile');
@@ -272,7 +272,7 @@ test('R-1: profilo di conservazione per nucleo, Italia e Lombardia con minimi e 
       await expect(page.getByText('La finestra è più breve del minimo del profilo attivo.', { exact: true })).toBeVisible();
       expect((await overview()).windows, `R-1 finestra sotto il minimo respinta per ${profileId}`).toEqual(state.windows);
       await page.reload();
-      await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
+      await unlockIfNeeded(page, '314159');
     } else {
       expect(RETENTION_CATEGORIES.filter(category => profile.terms[category].term.kind === 'owner')).toHaveLength(RETENTION_CATEGORIES.length - 1);
     }
@@ -281,7 +281,7 @@ test('R-1: profilo di conservazione per nucleo, Italia e Lombardia con minimi e 
     await saveWindow(category, years);
     await expect(page.getByText('Finestre salvate', { exact: true })).toBeVisible();
     await page.reload();
-    await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
+    await unlockIfNeeded(page, '314159');
     await expect(page.getByTestId(`retention-term-${category}`).getByRole('spinbutton')).toHaveValue(String(years));
     await expect(page.getByTestId(`retention-term-${category}`)).toContainText(`Applicato: ${years} anni`);
     const saved = await overview();

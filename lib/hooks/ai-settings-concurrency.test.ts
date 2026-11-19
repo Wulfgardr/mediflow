@@ -196,3 +196,33 @@ for (const concurrentParameters of [false, true]) test(`confirmed preference swi
     if (concurrentParameters) assert.deepEqual(snapshot(), before, 'switch readback cannot authorize a stale parameter draft');
     else { assert.equal(value('aiPatientInsightKillSwitch'), 'enabled'); assert.equal(value('aiInsightMode'), 'balanced'); }
 });
+
+test('concurrent migrations of an accessibility preference record one change', async () => {
+    reset(); active = clientA;
+    const key = 'uiReduceTransparency';
+    sql.prepare('INSERT INTO settings(key,value) VALUES (?,?)').run(key, 'true');
+    const audit = () => sql.prepare("SELECT COUNT(*) FROM audit_events WHERE event_type='settings.updated' AND subject_ref=?").pluck().get(key);
+    const before = audit();
+    const migrate = () => boundary('/api/settings/' + key, {
+        method: 'PUT', body: JSON.stringify({ value: false, expectedValue: 'true' }),
+    });
+    const [first, second] = await Promise.all([migrate(), migrate()]);
+    assert.equal(first.status, 200);
+    assert.equal(second.status, 200);
+    assert.equal(value(key), 'false');
+    assert.equal(audit(), Number(before) + 1);
+});
+
+test('an accessibility migration preserves a newer explicit setting', async () => {
+    reset(); active = clientA;
+    const key = 'uiReduceMotion';
+    const explicit = await boundary('/api/settings/' + key, { method: 'PUT', body: JSON.stringify({ value: false }) });
+    assert.equal(explicit.status, 200);
+    const before = snapshot();
+    const migration = await boundary('/api/settings/' + key, {
+        method: 'PUT', body: JSON.stringify({ value: true, expectedValue: null }),
+    });
+    assert.equal(migration.status, 200);
+    assert.equal(value(key), 'false');
+    assert.deepEqual(snapshot(), before);
+});

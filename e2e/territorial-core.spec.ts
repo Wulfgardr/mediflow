@@ -147,7 +147,9 @@ test('J-4: con il solo nucleo la protesica chiede un prontuario con fonte dichia
       return sources.sources.find((row: { name: string }) => row.name === sourceName) as { id: string; name: string };
     }, name);
 
-    await page.reload(); await openPatientSection(page, 'protesica');
+    await page.reload();
+    await unlockIfNeeded(page, '314159');
+    await openPatientSection(page, 'protesica');
     await pane.getByRole('button', { name: /^Nuova voce(?: protesica)?$/u }).click();
     await pane.getByRole('button', { name: 'Cerca un ausilio nel repertorio', exact: true }).click();
     await pane.getByRole('combobox', { name: 'Fonte', exact: true }).selectOption(source.id);
