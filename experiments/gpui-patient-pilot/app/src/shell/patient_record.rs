@@ -1349,7 +1349,7 @@ impl ClinicalApp {
             .is_some_and(|original| original.id == id)
         {
             self.patient.document_original = None;
-            self.open_document_original(id, cx);
+            self.open_document_original(id, documents::pdf::Resolution::Screen, cx);
         }
         cx.notify();
     }

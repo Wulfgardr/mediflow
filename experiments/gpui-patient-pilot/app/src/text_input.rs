@@ -296,7 +296,7 @@ impl TextInput {
         self.redo.clear();
     }
 
-    fn undo(&mut self, _: &Undo, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn undo(&mut self, _: &Undo, window: &mut Window, cx: &mut Context<Self>) {
         if self.read_only {
             return;
         }
@@ -306,7 +306,7 @@ impl TextInput {
         }
     }
 
-    fn redo(&mut self, _: &Redo, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn redo(&mut self, _: &Redo, window: &mut Window, cx: &mut Context<Self>) {
         if self.read_only {
             return;
         }

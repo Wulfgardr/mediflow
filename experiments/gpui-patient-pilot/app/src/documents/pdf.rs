@@ -22,6 +22,29 @@ pub struct Preview {
     pub image: Arc<gpui::RenderImage>,
     pub pages: usize,
     pub ink: std::ops::Range<u32>,
+    pub resolution: Resolution,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Resolution {
+    Page,
+    Screen,
+}
+
+impl Resolution {
+    fn argument(self) -> &'static str {
+        match self {
+            Self::Page => "page",
+            Self::Screen => "screen",
+        }
+    }
+
+    pub fn from_argument(argument: Option<&str>) -> Self {
+        match argument {
+            Some("screen") => Self::Screen,
+            _ => Self::Page,
+        }
+    }
 }
 
 const INK_MARGIN: u32 = 12;
@@ -137,6 +160,7 @@ pub mod test_worker {
         PATH.get().cloned()
     }
 
+    #[cfg(target_os = "macos")]
     pub fn use_built_binary() -> bool {
         let Some(binary) = std::env::current_exe().ok().and_then(|test| {
             Some(test.parent()?.parent()?.join(format!(
@@ -154,6 +178,7 @@ pub mod test_worker {
 pub fn render(
     source: Arc<Zeroizing<Vec<u8>>>,
     page: usize,
+    resolution: Resolution,
     context: &RequestContext,
 ) -> Result<Preview, Error> {
     if source.len() > super::MAX_DOCUMENT_BYTES
@@ -175,6 +200,7 @@ pub fn render(
         Command::new(executable)
             .arg("--document-preview-worker")
             .arg(page.to_string())
+            .arg(resolution.argument())
             .env_clear()
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -182,7 +208,10 @@ pub fn render(
             .spawn()
             .map_err(|_| Error::Engine)?,
     );
-    collect_child(child, source, page, context, TIMEOUT)
+    collect_child(child, source, page, context, TIMEOUT).map(|preview| Preview {
+        resolution,
+        ..preview
+    })
 }
 
 fn collect_child(
@@ -282,12 +311,13 @@ fn parse_output(
         image: Arc::new(gpui::RenderImage::new([image::Frame::new(pixels)])),
         pages,
         ink,
+        resolution: Resolution::Page,
     })
 }
 
 #[cfg(target_os = "macos")]
 unsafe extern "C" {
-    fn MFDocumentPreviewWorker(page: usize) -> i32;
+    fn MFDocumentPreviewWorker(page: usize, screen: i32) -> i32;
     fn MFDocumentPreviewMemory(pid: i32) -> u64;
 }
 
@@ -298,19 +328,21 @@ fn worker_memory(pid: u32) -> Result<u64, Error> {
     Ok(unsafe { MFDocumentPreviewMemory(pid as i32) })
 }
 
-pub fn worker(page: usize) -> Result<(), std::io::Error> {
+pub fn worker(page: usize, resolution: Resolution) -> Result<(), std::io::Error> {
     #[cfg(target_os = "macos")]
     {
         // This entry runs before GPUI/session initialization, exclusively in the
         // owned child. The bridge installs Seatbelt before reading/parsing bytes.
-        if unsafe { MFDocumentPreviewWorker(page) } != 0 {
+        if unsafe { MFDocumentPreviewWorker(page, i32::from(resolution == Resolution::Screen)) }
+            != 0
+        {
             return Err(std::io::ErrorKind::Other.into());
         }
         Ok(())
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = page;
+        let _ = (page, resolution);
         writeln!(
             std::io::stdout(),
             "{{\"error\":\"{}\"}}",

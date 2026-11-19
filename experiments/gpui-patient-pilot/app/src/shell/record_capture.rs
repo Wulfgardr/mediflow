@@ -7,6 +7,16 @@ use std::sync::Arc;
 const ADDITION: &str = "\nQ7 0.9.1: rilettura completata.";
 
 const PDF_ONLY: &str = "K59-S3-4417";
+const LETTERS: [(&str, &str); 2] = [
+    (
+        "affollato",
+        "9ca49c8e7d4c34be5edc13fad558ae0006183d3c8bcd402bba3d5c6a912b6313",
+    ),
+    (
+        "gemello",
+        "308d9a6a7b5a50b0ea0c8f99d3e593a15fe2eae74cc55684005c43b616b0a80e",
+    ),
+];
 const PDF_ADDITION: &str = "\nS3: potassio da ricontrollare.";
 
 struct Bench {
@@ -24,7 +34,6 @@ struct Bench {
 struct Letter {
     case: &'static str,
     patient: String,
-    raster: String,
     original: String,
     sentence: &'static str,
     gap: &'static str,
@@ -348,22 +357,27 @@ fn bench(path: &str) -> Bench {
             ),
         ] {
             session.select_profile_patient(&scope, &patient).unwrap();
-            let upload = |name: &str, file: String| {
-                let bytes = std::fs::read(format!("{folder}/{file}")).unwrap();
-                session
-                    .create_attachment(&scope, &patient, name, "application/pdf", &bytes)
-                    .unwrap()
-                    .id
-            };
-            let raster = upload("Lettera di dimissione sintetica.pdf", format!("{case}.pdf"));
-            let original = upload(
-                "Lettera di dimissione sintetica (originale).pdf",
-                format!("originale-{case}.pdf"),
+            use sha2::{Digest, Sha256};
+            let bytes =
+                std::fs::read(format!("{folder}/lettera-dimissione-sintetica-{case}.pdf")).unwrap();
+            assert_eq!(
+                format!("{:x}", Sha256::digest(&bytes)),
+                LETTERS.iter().find(|(name, _)| *name == case).unwrap().1,
+                "original bytes of {case}"
             );
+            let original = session
+                .create_attachment(
+                    &scope,
+                    &patient,
+                    "Lettera di dimissione sintetica.pdf",
+                    "application/pdf",
+                    &bytes,
+                )
+                .unwrap()
+                .id;
             letters.push(Letter {
                 case,
                 patient,
-                raster,
                 original,
                 sentence,
                 gap,
@@ -873,8 +887,8 @@ fn letter_from_draft(run: &mut Run, bench: &Bench, letter: &Letter, prefix: &str
         &format!("{prefix}-40-frase-interrotta"),
         "Frase interrotta al posto della dose",
     );
-    let raster = letter.raster.clone();
-    run.app(move |app, _, cx| app.read_record_document(&raster, cx));
+    let original = letter.original.clone();
+    run.app(move |app, _, cx| app.read_record_document(&original, cx));
     let first = run.wait_for_original();
     run.shot(
         &format!("{prefix}-41-lettera-pagina-1"),
@@ -920,15 +934,25 @@ fn letter_from_draft(run: &mut Run, bench: &Bench, letter: &Letter, prefix: &str
         &format!("{prefix}-44-dose-scritta"),
         "Dose scritta in mezzo alla frase",
     );
-    let original = letter.original.clone();
-    run.app(move |app, _, cx| app.read_record_document(&original, cx));
-    let refused = run.wait_for_original();
-    run.shot(
-        &format!("{prefix}-45-originale-rifiutato"),
-        "La lettera originale è rifiutata dal visore, bozza intatta",
-    );
-    run.app(|app, window, cx| app.close_record_reading(window, cx));
-    let after_refusal = run.caret_and_text();
+    let steps = letter.value.chars().count();
+    let undone = run.app(move |app, window, cx| {
+        let editor = app.form.as_ref().unwrap().fields[0].editor.clone();
+        editor.update(cx, |input, cx| {
+            for _ in 0..steps {
+                input.undo(&crate::text_input::Undo, window, cx);
+            }
+            input.value().to_owned()
+        })
+    });
+    let redone = run.app(move |app, window, cx| {
+        let editor = app.form.as_ref().unwrap().fields[0].editor.clone();
+        editor.update(cx, |input, cx| {
+            for _ in 0..steps {
+                input.redo(&crate::text_input::Redo, window, cx);
+            }
+            input.value().to_owned()
+        })
+    });
     run.app(|app, window, cx| app.review_form(window, cx));
     run.app(|app, _, cx| app.confirm_form(cx));
     run.shot(&format!("{prefix}-46-registrata"), "Registrata una volta");
@@ -938,8 +962,11 @@ fn letter_from_draft(run: &mut Run, bench: &Bench, letter: &Letter, prefix: &str
     assert_eq!(page, Some(1));
     assert_eq!(resumed, paused, "caret and text come back from the strip");
     assert_eq!(during, before, "reading writes nothing");
-    assert_eq!(refused, "rifiutato");
-    assert_eq!(after_refusal.1, typed);
+    assert_eq!(
+        undone, paused.1,
+        "undo goes back to the interrupted sentence"
+    );
+    assert_eq!(redone, typed, "redo brings the dose back");
     let expected = before.0.clone().unwrap_or_default()
         + &letter
             .sentence
@@ -951,7 +978,7 @@ fn letter_from_draft(run: &mut Run, bench: &Bench, letter: &Letter, prefix: &str
     );
     assert_eq!(stored.1, before.1 + 1, "one confirmation, one version");
     serde_json::json!({"case": letter.case, "caretPaused": paused.0, "caretResumed": resumed.0,
-        "versionBefore": before.1, "versionAfter": stored.1, "originalRefused": refused})
+        "versionBefore": before.1, "versionAfter": stored.1, "undoRedo": true})
 }
 
 fn pdf_while_drafting(run: &mut Run, bench: &Bench, prefix: &str) -> Value {
