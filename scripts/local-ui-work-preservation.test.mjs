@@ -122,7 +122,9 @@ test('real browser and plugin launcher: UI owns lease, encrypted draft survives 
         if (evidence) await page.screenshot({ path: path.join(evidence, `draft-before-${theme}.png`), fullPage: true });
     }
     const headers = { Origin: url, 'Sec-Fetch-Site': 'same-origin', 'Content-Type': 'application/json' };
-    assert.equal((await context.request.post('/api/plugin-local-ui/lease', { headers: { ...headers, Origin: 'http://evil.example' }, data: { tab: crypto.randomUUID(), action: 'renew' } })).status(), 403);
+    const refusedLease = await context.request.post('/api/plugin-local-ui/lease', { headers: { ...headers, Origin: 'http://evil.example' }, data: { tab: crypto.randomUUID(), action: 'renew' } });
+    assert.equal(refusedLease.status(), 404);
+    assert.equal(await refusedLease.text(), '');
     first.disconnect();
     await pause(17000);
     assert.equal(terminal(first), false, 'Last host exit killed a browser-held runtime');
