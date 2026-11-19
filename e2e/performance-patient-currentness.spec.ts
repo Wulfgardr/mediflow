@@ -118,8 +118,8 @@ test('production patient read/edit stays fresh and correct without AI', async ({
     await page.goto(`${url}/patients/${patientId}/modules`);
     await unlockIfNeeded(page, '314159');
     const openEdit = async () => {
-      await page.getByRole('button', { name: 'Azioni scheda', exact: true }).click();
-      await page.getByRole('menuitem', { name: 'Modifica', exact: true }).click();
+      await page.getByRole('button', { name: 'Azioni', exact: true }).click();
+      await page.getByRole('menu', { name: 'Azioni scheda', exact: true }).getByRole('menuitem', { name: 'Modifica', exact: true }).click();
     };
     for (let index = 0; index < 5; index++) {
       const name = page.locator('input[name="firstName"]');
