@@ -1,6 +1,6 @@
 import type { NetworkPatientCommitGuard } from './network-patient-commit-authority';
 import { prepareNetworkPatientCommitGuard } from './network-patient-commit-authority';
-import { and, asc, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql, type SQL } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import {
     servicePrescriptionCreateSchema,
@@ -14,7 +14,7 @@ import {
 } from './api-schemas/prescriptions';
 import { dbServer } from './db-server';
 import { readPatientOpenLoopProjection } from './patient-open-loops-read';
-import { observations } from './schema';
+import { updateObservationOperationInTransaction } from './observation-write-operation';
 import { activePatients } from './patient-lifecycle';
 import type { NetworkWriteContext } from './network-write-context';
 import { buildPrescriptionVersionConflictPayload, parsePrescriptionExpectedVersion } from './prescription-concurrency';
@@ -32,9 +32,10 @@ import {
     parseOptionalPrescriptionDate,
     parsePrescriptionDate,
 } from './prescription-domain';
-import { patients, patientsToAmbulatories, serviceCatalogEntries, servicePrescriptionItems, servicePrescriptions } from './schema';
+import { auditEvents, observations, patients, patientsToAmbulatories, serviceCatalogEntries, servicePrescriptionItems, servicePrescriptions } from './schema';
 import {
     listChangedFields,
+    parseRedactedMetadata,
     requestIdFromRequest,
     auditContextFromSession,
     withAuditContextMetadata,
@@ -445,23 +446,15 @@ const CASCADE_DATE_FIELDS = ['scheduledAt', 'performedAt', 'reportReceivedAt'] a
 type ServicePrescriptionWriteTx = Parameters<Parameters<typeof dbServer.transaction>[0]>[0];
 type ServicePrescriptionItemRow = typeof servicePrescriptionItems.$inferSelect;
 
-/*
- * Cascata dello stato dalla prescrizione alle voci (WUL-800). Il client elenca
- * tutte le voci correnti con la versione letta: una voce aggiunta, tolta o
- * modificata nel frattempo rende la richiesta un conflitto e nulla viene scritto.
- * Si spostano solo le voci che erano nello stato della prescrizione: una voce
- * portata altrove a parte, per esempio annullata da sola, resta com'è. La data
- * della voce, se c'è, prevale su quella della prescrizione.
- */
-function planServicePrescriptionItemCascade(
+type ReviewedPrescriptionItems = ReadonlyArray<{ id: string; version: number }>;
+
+function matchPrescriptionItems(
     tx: ServicePrescriptionWriteTx,
-    parent: { id: string; status: string },
-    nextStatus: string | undefined,
-    listed: ReadonlyArray<{ id: string; version: number }>,
-): { ok: true; moves: ServicePrescriptionItemRow[] } | { ok: false; response: MutationResponse } {
-    if (nextStatus === undefined) return { ok: false, response: badRequest('Items cascade requires a status') };
+    prescriptionId: string,
+    listed: ReviewedPrescriptionItems,
+): { ok: true; children: ServicePrescriptionItemRow[] } | { ok: false; response: MutationResponse } {
     const listedVersions = new Map(listed.map((item) => [item.id, item.version]));
-    const children = tx.select().from(servicePrescriptionItems).where(eq(servicePrescriptionItems.prescriptionId, parent.id)).all();
+    const children = tx.select().from(servicePrescriptionItems).where(eq(servicePrescriptionItems.prescriptionId, prescriptionId)).all();
     if (listedVersions.size !== listed.length || listedVersions.size !== children.length
         || children.some((child) => !listedVersions.has(child.id))) {
         return { ok: false, response: { status: 409, value: { error: 'Service prescription items changed', code: 'service_prescription_items_changed' } } };
@@ -472,8 +465,7 @@ function planServicePrescriptionItemCascade(
             return { ok: false, response: { status: 409, value: buildPrescriptionVersionConflictPayload('service_prescription_item', listedVersion, child.id, selectServicePrescriptionItemConflictSnapshot(tx, child.id)) } };
         }
     }
-    if (nextStatus === parent.status) return { ok: true, moves: [] };
-    return { ok: true, moves: children.filter((child) => child.status === parent.status) };
+    return { ok: true, children };
 }
 
 /*
@@ -489,9 +481,7 @@ const IMPLICIT_CASCADE_REASON = 'status_cascade_without_items';
 function planImplicitServicePrescriptionItemCascade(
     tx: ServicePrescriptionWriteTx,
     parent: { id: string; status: string },
-    nextStatus: string | undefined,
 ): ServicePrescriptionItemRow[] {
-    if (nextStatus === undefined || nextStatus === parent.status) return [];
     return tx.select().from(servicePrescriptionItems)
         .where(and(eq(servicePrescriptionItems.prescriptionId, parent.id), eq(servicePrescriptionItems.status, parent.status))).all();
 }
@@ -544,14 +534,17 @@ async function updateServicePrescription(
         if (nextStatus !== undefined && !isServicePrescriptionTransitionAllowed(existing.status, nextStatus)) {
             return statusTransitionDenial('service_prescription', existing.status, nextStatus);
         }
-        const cascade = body.items === undefined ? null : planServicePrescriptionItemCascade(tx, existing, nextStatus, body.items);
+        if (body.items && nextStatus === undefined) return badRequest('Items cascade requires a status');
+        const cascade = body.items === undefined ? null : matchPrescriptionItems(tx, existing.id, body.items);
         if (cascade && !cascade.ok) return cascade.response;
         const updated = tx.update(servicePrescriptions).set({ ...normalized.values, version: expectedVersion + 1 })
             .where(and(eq(servicePrescriptions.id, context.id), eq(servicePrescriptions.version, expectedVersion))).run();
         if (updated.changes !== 1) throw new Error('Service prescription update did not write exactly one row');
-        if (cascade) applyServicePrescriptionItemCascade(tx, context, surface, cascade.moves, normalized.values);
-        else applyServicePrescriptionItemCascade(tx, context, surface,
-            planImplicitServicePrescriptionItemCascade(tx, existing, nextStatus), normalized.values, IMPLICIT_CASCADE_REASON);
+        if (nextStatus !== undefined && nextStatus !== existing.status) {
+            const moves = cascade ? cascade.children.filter(child => child.status === existing.status)
+                : planImplicitServicePrescriptionItemCascade(tx, existing);
+            applyServicePrescriptionItemCascade(tx, context, surface, moves, normalized.values, cascade ? undefined : IMPLICIT_CASCADE_REASON);
+        }
         writeAuditEventInTransaction(tx, serviceAuditInput(context, surface, 'service.prescription.updated', 'service_prescription', context.id, {
             changedFields: listChangedFields(body as Record<string, unknown>, ['version', 'items']), resourceVersion: expectedVersion + 1,
         }));
@@ -559,15 +552,45 @@ async function updateServicePrescription(
     }, { behavior: 'immediate' });
 }
 
-export async function deleteHostServicePrescription(context: HostContext & { id: string }, expectedVersion: number): Promise<MutationResponse> {
+function detachPrescriptionObservations(
+    tx: ServicePrescriptionWriteTx, context: HostContext, patientId: string, linkedToItems: SQL,
+): void {
+    const linked = tx.select({ id: observations.id, version: observations.version, patientId: observations.patientId })
+        .from(observations).where(linkedToItems).all();
+    const actor = auditContextFromSession(context.session);
+    const audit = {
+        actorType: actor.actorType,
+        actorRef: actor.actorRef,
+        archiveGeneration: actor.archiveGeneration,
+        sourceSurface: context.agentProvenance ? 'agent' as const : actor.sourceSurface,
+        agentProvenance: context.agentProvenance,
+        requestId: requestIdFromRequest(context.request),
+        flags: [`auth:${actor.authContext}`],
+    };
+    for (const row of linked) {
+        if (row.patientId !== patientId) throw new Error('Observation and prescription patient do not match');
+        const updated = updateObservationOperationInTransaction(tx, {
+            mode: 'web', observationId: row.id, expectedVersion: row.version,
+            values: { servicePrescriptionItemId: null, updatedAt: new Date() }, changedFields: ['servicePrescriptionItemId'],
+            audit,
+        });
+        if (updated.status !== 200) throw new Error('Linked observation could not be updated');
+    }
+}
+
+export async function deleteHostServicePrescription(context: HostContext & { id: string }, expectedVersion: number, listed: ReviewedPrescriptionItems = []): Promise<MutationResponse> {
     return dbServer.transaction((tx): MutationResponse => {
         const existing = selectServicePrescriptionConflictSnapshot(tx, context.id);
         if (!existing) return { status: 404, value: { error: 'Service prescription not found' } };
         if (!activeParentExists(tx, existing.patientId)) return { status: 404, value: { error: 'Not found' } };
         if (existing.version !== expectedVersion) return { status: 409, value: buildPrescriptionVersionConflictPayload('service_prescription', expectedVersion, context.id, existing) };
-        // the aggregate version guards its hard-delete cascade.
-        const childCount = tx.select({ count: sql<number>`count(*)` }).from(servicePrescriptionItems)
-            .where(eq(servicePrescriptionItems.prescriptionId, context.id)).get()?.count ?? 0;
+        const reviewed = matchPrescriptionItems(tx, context.id, listed);
+        if (!reviewed.ok) return reviewed.response;
+        if (reviewed.children.some(child => child.patientId !== existing.patientId)) throw new Error('Item and prescription patient do not match');
+        const childCount = reviewed.children.length;
+        const itemIds = tx.select({ id: servicePrescriptionItems.id }).from(servicePrescriptionItems)
+            .where(eq(servicePrescriptionItems.prescriptionId, context.id));
+        detachPrescriptionObservations(tx, context, existing.patientId, inArray(observations.servicePrescriptionItemId, itemIds));
         const children = tx.delete(servicePrescriptionItems).where(eq(servicePrescriptionItems.prescriptionId, context.id)).run();
         if (children.changes !== childCount) throw new Error('Service prescription cascade did not remove every item');
         const deleted = tx.delete(servicePrescriptions).where(and(eq(servicePrescriptions.id, context.id), eq(servicePrescriptions.version, expectedVersion))).run();
@@ -624,23 +647,28 @@ export async function updateHostServicePrescriptionItem(context: HostContext & {
 
 const ITEM_ECHO_FIELDS = new Set(['version', 'status', ...CASCADE_DATE_FIELDS]);
 
-/*
- * Dopo la cascata dal server, la build Apple 0.9.0 manda a ogni voce lo stesso
- * stato con la versione letta prima. Se la voce è già in quello stato, che è
- * anche quello della prescrizione, e la richiesta porta solo stato e date, la
- * chiamata riesce senza effetti: il passaggio è già avvenuto e la data salvata
- * resta. Ogni altra versione superata resta un conflitto.
- */
 function isAlreadyAppliedItemEcho(
-    body: ServicePrescriptionItemUpdatePayload,
-    expectedVersion: number,
-    existing: { status: string; version: number },
-    parentStatus: string,
+    tx: ServicePrescriptionWriteTx, context: NetworkWriteContext, body: ServicePrescriptionItemUpdatePayload,
+    normalized: Partial<typeof servicePrescriptionItems.$inferInsert>, existing: ServicePrescriptionItemRow, parentStatus: string,
 ): boolean {
-    return expectedVersion < existing.version
-        && body.status === existing.status
-        && existing.status === parentStatus
-        && Object.keys(body).every((key) => ITEM_ECHO_FIELDS.has(key));
+    if (body.version !== existing.version - 1 || body.status !== existing.status || existing.status !== parentStatus
+        || !Object.keys(body).every(key => ITEM_ECHO_FIELDS.has(key))) return false;
+    for (const field of CASCADE_DATE_FIELDS) {
+        if (!hasOwn(body, field)) continue;
+        const requested = normalized[field];
+        if (requested === undefined) return false;
+        const storedTime = existing[field]?.getTime() ?? null;
+        const requestedTime = requested === null ? null : Math.floor(requested.getTime() / 1000) * 1000;
+        if (requestedTime !== storedTime) return false;
+    }
+    const last = tx.select({ type: auditEvents.eventType, actor: auditEvents.actorRef, source: auditEvents.sourceSurface,
+        metadata: auditEvents.redactedMetadata }).from(auditEvents)
+        .where(and(eq(auditEvents.subjectType, 'service_prescription_item'), eq(auditEvents.subjectRef, existing.id)))
+        .orderBy(desc(sql`rowid`)).limit(1).get();
+    if (last?.type !== 'service.prescription_item.updated' || last.actor !== context.session.userId || last.source !== 'native') return false;
+    const receipt = parseRedactedMetadata(last.metadata);
+    return receipt?.reasonCode === IMPLICIT_CASCADE_REASON && receipt.resourceVersion === existing.version
+        && receipt.flags?.includes(`paired-client:${context.pairedClient.clientId}`) === true;
 }
 
 async function updateServicePrescriptionItem(context: (HostContext | NetworkWriteContext) & { id: string }, body: ServicePrescriptionItemUpdatePayload, surface: 'host' | 'network'): Promise<MutationResponse> {
@@ -658,7 +686,7 @@ async function updateServicePrescriptionItem(context: (HostContext | NetworkWrit
         if (!parent || parent.patientId !== existing.patientId || !activeParentExists(tx, existing.patientId) || (surface === 'network' && !patientIsInScope(tx, existing.patientId, (context as NetworkWriteContext).scopeAmbulatoryId))) return { status: 404, value: { error: 'Not found' } };
         const nextStatus = normalized.values.status;
         if (existing.version !== expectedVersion) {
-            if (isAlreadyAppliedItemEcho(body, expectedVersion, existing, parent.status)) return { status: 200, value: { success: true } };
+            if (surface === 'network' && isAlreadyAppliedItemEcho(tx, context as NetworkWriteContext, body, normalized.values, existing, parent.status)) return { status: 200, value: { success: true } };
             return { status: 409, value: buildPrescriptionVersionConflictPayload('service_prescription_item', expectedVersion, context.id, selectServicePrescriptionItemConflictSnapshot(tx, context.id)) };
         }
         if (nextStatus !== undefined && !isServicePrescriptionTransitionAllowed(existing.status, nextStatus)) {
@@ -681,6 +709,7 @@ export async function deleteHostServicePrescriptionItem(context: HostContext & {
         const parent = tx.select({ patientId: servicePrescriptions.patientId }).from(servicePrescriptions).where(eq(servicePrescriptions.id, existing.prescriptionId)).get();
         if (!parent || parent.patientId !== existing.patientId || !activeParentExists(tx, existing.patientId)) return { status: 404, value: { error: 'Not found' } };
         if (existing.version !== expectedVersion) return { status: 409, value: buildPrescriptionVersionConflictPayload('service_prescription_item', expectedVersion, context.id, selectServicePrescriptionItemConflictSnapshot(tx, context.id)) };
+        detachPrescriptionObservations(tx, context, existing.patientId, eq(observations.servicePrescriptionItemId, existing.id));
         const deleted = tx.delete(servicePrescriptionItems).where(and(eq(servicePrescriptionItems.id, context.id), eq(servicePrescriptionItems.version, expectedVersion))).run();
         if (deleted.changes !== 1) throw new Error('Service prescription item delete did not remove exactly one row');
         writeAuditEventInTransaction(tx, serviceAuditInput(context, 'host', 'service.prescription_item.deleted', 'service_prescription_item', context.id,
