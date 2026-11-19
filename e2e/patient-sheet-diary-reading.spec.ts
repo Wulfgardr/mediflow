@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
+import { diaryEntrySealer } from './fixtures/sealed-diary-entry';
 import { assertNoHorizontalOverflow, bootstrapUnlockedSession, openPatientSection } from './utils';
 
 test.describe.configure({ retries: 0 });
@@ -31,7 +32,7 @@ async function seed(page: Page) {
         { days: 7, hour: 10, minute: 15, type: 'access', title: 'Nota ADI', content: accessText, author: 'Inf. Sintetica' },
         { days: 20, hour: 11, minute: 0, type: 'note', title: 'Nota di archivio', content: noteText, author: 'Dott. Sintetico' },
     ] as const;
-    const fixture = await page.evaluate(async rows => {
+    const fixture = await page.evaluate(async ({ rows, seal }) => {
         async function post(entity: string, body: object) {
             const response = await fetch(`/api/${entity}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
             if (!response.ok) throw new Error(`Fixture ${entity}: ${response.status}`);
@@ -40,9 +41,15 @@ async function seed(page: Page) {
         const patient = await post('patients', { firstName: 'Diario', lastName: `Sintetico ${crypto.randomUUID().slice(0, 4)}`, identifierType: 'none', taxCode: '',
             birthDatePrecision: 'estimated', birthYear: 1947 });
         const entries = [];
-        for (const row of rows) entries.push(await post('entries', { patientId: patient, type: row.type, date: row.date, title: row.title, content: row.content }));
+        for (const row of rows) {
+            const entry = await seal({ patientId: patient, type: row.type, date: row.date, title: row.title, content: row.content });
+            entries.push(await post('entries', entry));
+        }
         return { patient, entries };
-    }, rows.map(row => ({ ...row, date: stamp(row.days, row.hour, row.minute).toISOString() })));
+    }, {
+        rows: rows.map(row => ({ ...row, date: stamp(row.days, row.hour, row.minute).toISOString() })),
+        seal: await diaryEntrySealer(page),
+    });
     const database = new Database(join(process.env.MEDIFLOW_DATA_DIR!, 'medical.db'), { fileMustExist: true });
     try {
         database.transaction(() => rows.forEach((row, index) => database.prepare('UPDATE entries SET created_at = ?, recorded_by = ? WHERE id = ?')
