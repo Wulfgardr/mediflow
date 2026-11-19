@@ -1,3 +1,4 @@
+import { RESERVED_PLACEHOLDER_NAMESPACE } from '../ai-redaction-session';
 import { clinicalIdentifierSpans, ClinicalRowDenied, type KnownClinicalIdentifiers } from './clinical-identifiers';
 import { z } from 'zod';
 import type { ClinicalPreparedRead } from './clinical-preparation';
@@ -24,5 +25,5 @@ export function assertClinicalBoundary(read: ClinicalPreparedRead, expected: Cli
         });
     }
     if (clinicalIdentifierSpans([...got.diagnoses, ...got.noteExcerpts].map(r => r.text).join('\n'), known).length) return fail();
-    if (/MF_PII|\{\{|\}\}/u.test(read.payload)) return fail();
+    if (RESERVED_PLACEHOLDER_NAMESPACE.test(read.payload) || /\{\{|\}\}|\[\[|\]\]/u.test(read.payload)) return fail();
 }

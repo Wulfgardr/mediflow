@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { jsonEmissionPlan } from '../ai-preparation/emission-plan';
 import type { PreparedContentRead } from '../ai-preparation/preparation-core';
+import { PLACEHOLDER_PATTERN } from '../ai-redaction-session';
 
 export const CARD_PROFILE_VERSION = 'mediflow.synthetic-chat-card.v1';
 const reference = z.string().regex(/^src_[a-f0-9]{32}$/u);
@@ -50,7 +51,7 @@ export function assertCardSerializedBoundary(read: PreparedContentRead, expected
         const { note, ...clinical } = got.history[i];
         const { note: _originalNote, ...original } = expected.history[i];
         if (JSON.stringify(clinical) !== JSON.stringify(original)) return fail();
-        const reduced = note.replace(/\{\{MF_PII_[a-f0-9]{32}_[1-9][0-9]{0,3}\}\}/gu, token => {
+        const reduced = note.replace(PLACEHOLDER_PATTERN, token => {
             if (!read.restoreText(token)) return fail();
             return '[redacted]';
         });

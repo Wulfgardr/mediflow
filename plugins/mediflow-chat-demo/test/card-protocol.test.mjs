@@ -71,7 +71,7 @@ test('real stdio: model-visible opener and app-only sharing; data-free resource;
     const { resource, view } = await open(client);
     const html = resource.contents[0].text;
     for (const value of ['Elena', 'Serena', 'metformina', 'card_', 'src_', '__DEMO_CONNECTION__']) assert.equal(html.includes(value), false, value);
-    assert.doesNotMatch(html, /\{\{MF_PII_[a-f0-9]{32}_\d+\}\}/);
+    assert.doesNotMatch(html, /\[\[MF_[A-Z]+[0-9+-]+_[a-z2-7]{8}\]\]/);
     assert.deepEqual(resource.contents[0]._meta.ui.csp.connectDomains, []);
     assert.equal((await call(client, 'share', view)).isError, true);
     assert.equal((await call(client, 'prepare', view)).structuredContent, undefined);
@@ -210,7 +210,7 @@ test('delivery authorization is current-attempt bound, one-shot and retired by o
 
 test('unapproved frame sees no MediFlow data in any result, metadata or readable resource', async () => protocol([], async (client, frames) => {
   const { view, resource } = await open(client);
-  const clinical = /metformina|diabete mellito|paracetamolo|MF_PII_[a-f0-9]{32}_|card_[a-f0-9]{32}|src_[a-f0-9]{32}/;
+  const clinical = /metformina|diabete mellito|paracetamolo|\[\[MF_|card_[a-f0-9]{32}|src_[a-f0-9]{32}/;
   const empty = result => {
     assert.equal(result.structuredContent, undefined);
     assert.equal(result._meta?.approvedPayload, undefined);

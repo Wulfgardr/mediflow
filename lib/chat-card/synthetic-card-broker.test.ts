@@ -161,8 +161,8 @@ const attacks: [string, (card: Card) => unknown][] = [
     ['unknown root field', card => ({ ...card, metadata: 'Serena Falsa' })],
     ['unknown nested field', card => { Object.assign(card.therapies[0], { filename: 'Serena_Falsa.pdf' }); return card; }],
     ['unknown key in array', card => { card.measures.push({ ...card.measures[0], unit: 'Serena Falsa' }); return card; }],
-    ['foreign redaction token', card => { card.history[0].note = card.history[0].note.replace(/MF_PII_[a-f0-9]{32}/u, 'MF_PII_' + 'a'.repeat(32)); return card; }],
-    ['clinical drug corruption', card => { card.therapies[0].medicine = 'MF_PII'; return card; }],
+    ['foreign redaction token', card => { card.history[0].note = card.history[0].note.replace(/(\[\[MF_[A-Z]+[0-9]+_)[a-z2-7]{8}/u, '$1' + 'a'.repeat(8)); return card; }],
+    ['clinical drug corruption', card => { card.therapies[0].medicine = 'MF_PAZ1'; return card; }],
     ['clinical dose corruption', card => { card.therapies[0].dose = '50 mg'; return card; }],
     ['clinical condition corruption', card => { card.history[0].condition = 'ipertensione'; return card; }],
     ['clinical measure corruption', card => { card.measures[0].value = '120/80'; return card; }],
@@ -350,13 +350,13 @@ test('source mapping is local only, scoped to current attempt and retired on clo
     assert.throws(() => b.owner.resolveSource(token, 'synthetic-document-basic'), denied);
     await b.owner.close();
     assert.throws(() => b.owner.resolveSource(token, ref), denied);
-    const tokenText = JSON.parse(review.payload).history[0].note.match(/\{\{MF_PII_[^}]+\}\}/u)[0];
+    const tokenText = JSON.parse(review.payload).history[0].note.match(/\[\[MF_[^\]]+\]\]/u)[0];
     assert.throws(() => lastRead!.restoreText(tokenText), /ai_preparation_invalid/u);
 });
 test('idle session timer retires local redaction mappings without another read', async t => {
     t.mock.timers.enable({ apis: ['setTimeout'] });
     const { b, token, review, consent } = await ready();
-    const tokenText = JSON.parse(review.payload).history[0].note.match(/\{\{MF_PII_[^}]+\}\}/u)[0];
+    const tokenText = JSON.parse(review.payload).history[0].note.match(/\[\[MF_[^\]]+\]\]/u)[0];
     t.mock.timers.tick(600_000);
     assert.throws(() => lastRead!.restoreText(tokenText), /ai_preparation_invalid/u);
     assert.throws(() => b.reader.takeApprovedBytes(token, consent), denied);

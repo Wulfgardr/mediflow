@@ -36,14 +36,14 @@ test('named remote audit hashes exact wire bytes and records only closed metadat
     const previous = process.env.MEDIFLOW_DATA_DIR;
     const root = mkdtempSync(path.join(os.tmpdir(), 'mediflow-chatgpt-audit-'));
     process.env.MEDIFLOW_DATA_DIR = root;
-    const payload = JSON.stringify({ input: [{ text: 'Contesto {{MF_PII_synthetic_1}}' }] });
+    const payload = JSON.stringify({ input: [{ text: 'Contesto [[MF_PAZ1_synthetc]]' }] });
     const input = { payload, lane: 'patient_insight' as const, status: 'allowed' as const, entityCounts: { person: 1 } };
     try {
         const record = appendChatGptEgressAudit(input);
         assert.equal(record.payloadSha256, createHash('sha256').update(payload, 'utf8').digest('hex'));
         assert.equal(record.provider, 'chatgpt_subscription');
         const first = readFileSync(getEgressGateAuditPath(), 'utf8');
-        assert.doesNotMatch(first, /Contesto|MF_PII|synthetic|rehydrat/);
+        assert.doesNotMatch(first, /Contesto|MF_|synthetc|rehydrat/);
         const invalidCounts: Record<string, number>[] = [{ 'Synthetic Person': 1 }, { person: -1 }, { person: 0.5 }, { person: 4097 }];
         for (const entityCounts of invalidCounts) {
             assert.throws(() => appendChatGptEgressAudit({ ...input, entityCounts }), /Invalid egress audit/);

@@ -19,7 +19,7 @@ async function mount() {
     status(text);
   }
   async function revoke(text) { clear(text); try { await call('revoke'); } catch {} }
-  function node(tag, text) { const result = document.createElement(tag); result.textContent = String(text).replace(/\{\{MF_PII_[^{}]+\}\}/gu, '[omesso]'); return result; }
+  function node(tag, text) { const result = document.createElement(tag); result.textContent = String(text).replace(/\[\[MF_[^[\]]+\]\]/gu, '[omesso]'); return result; }
   function render(card) {
     const section = el('card'); section.replaceChildren();
     const reference = node('p', card.pseudonym); reference.className = 'meta'; section.append(reference);

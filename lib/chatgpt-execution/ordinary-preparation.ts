@@ -1,12 +1,12 @@
 /* local content preparation, NEVER egress or patient-context authority. */
 import 'server-only';
 import { types } from 'node:util';
-import type { RedactionSessionInput } from '../ai-redaction-session';
+import { RESERVED_PLACEHOLDER_NAMESPACE, type RedactionSessionInput } from '../ai-redaction-session';
 import type { RedactionRuntimeIdentity } from '../redaction-runtime-identity';
 import { scanJsonObject } from '../ai-json-lexical';
 import { renderEmissionPlan } from '../ai-preparation/emission-plan';
 import { createContentPreparation, readPreparedContent, isPreparedContentCurrent, type PreparationRunnerConfiguration, type PreparedContent } from '../ai-preparation/preparation-core';
-import { readOrdinaryTaskProfile, ordinaryTextPath, ordinaryCanonicalTextBounds, type OrdinaryTaskProfile, type OrdinaryTaskOutput } from './ordinary-task-profile';
+import { readOrdinaryTaskProfile, ordinaryTextPath, ordinaryTextRoles, ordinaryCanonicalTextBounds, type OrdinaryTaskProfile, type OrdinaryTaskOutput } from './ordinary-task-profile';
 
 export type OrdinaryRunnerConfiguration = PreparationRunnerConfiguration;
 export type PreparedOrdinaryProfile = object;
@@ -21,8 +21,10 @@ export type PreparedOrdinaryRead = Readonly<{
     parseOutput(text: string): OrdinaryTaskOutput;
 }>;
 const records = new WeakMap<object, { core: PreparedContent; read: PreparedOrdinaryRead; close(): Promise<void> }>();
-const RESERVED = /MF_PII/iu;
+const RESERVED = RESERVED_PLACEHOLDER_NAMESPACE;
 const fail = (): never => { throw new Error('ordinary_preparation_invalid'); };
+export const DATE_OFFSET_NOTE = '\n\nNota sulle date: [[MF_GG+n_codice]] e [[MF_GG-n_codice]] indicano una data n giorni dopo o prima di un giorno di riferimento non indicato. Per un\'altra data usa la stessa forma, con lo stesso codice e il numero di giorni ricalcolato; non convertirla in una data di calendario.';
+const withDateOffsetNote = (text: string) => /\[\[MF_GG[+-]/u.test(text) ? text + DATE_OFFSET_NOTE : text;
 function expandSchema(profile: OrdinaryTaskProfile, schema: Readonly<Record<string, unknown>>, expansion: number, path: readonly (string | number)[] = []): Readonly<Record<string, unknown>> {
     const result = { ...schema };
     if (schema.type === 'object') result.properties = Object.freeze(Object.fromEntries(Object.entries(schema.properties as Record<string, Readonly<Record<string, unknown>>>).map(([key, child]) => [key, expandSchema(profile, child, expansion, [...path, key])])));
@@ -39,7 +41,7 @@ export function createOrdinaryPreparation(profile: OrdinaryTaskProfile, configur
     let job: ReturnType<typeof createContentPreparation>;
     try {
         job = createContentPreparation(read.emissionPlan, configuration, (text, expansion) => Object.freeze({
-            input: Object.freeze([Object.freeze({ type: 'text' as const, text, text_elements: Object.freeze([]) as readonly [] })]),
+            input: Object.freeze([Object.freeze({ type: 'text' as const, text: withDateOffsetNote(text), text_elements: Object.freeze([]) as readonly [] })]),
             outputSchema: expandSchema(profile, read.outputSchema, expansion),
         }), signal, knownIdentifiers);
     } catch (error) {
@@ -67,7 +69,7 @@ export function createOrdinaryPreparation(profile: OrdinaryTaskProfile, configur
                 if (!literal.value.match(RESERVED)) continue;
                 if (literal.key || !ordinaryTextPath(profile, literal.path)) return fail();
                 let value: string;
-                try { value = prepared.restoreText(literal.value); } catch { return fail(); }
+                try { value = prepared.restoreText(literal.value, ordinaryTextRoles(profile, literal.path)); } catch { return fail(); }
                 restored += text.slice(cursor, literal.start) + JSON.stringify(value);
                 cursor = literal.end;
                 if (restored.length > 262_144) return fail();

@@ -13,7 +13,7 @@ const mutations = [
   ['frame-csp', 'src/card-server.mjs', "script-src ${hashes('script')};", "script-src ${hashes('script')} http://127.0.0.1:*;", 'external script must trigger script-src-elem CSP violation',
     ["resourceDomains: []", "resourceDomains: ['http://127.0.0.1:*']"]],
   ['theme', 'src/app.css', ':root[data-card]', ':root[data-disabled-card]', 'Giorno uses its Lume field'],
-  ['placeholders', 'src/card-app.mjs', "String(text).replace(/\\{\\{MF_PII_[^{}]+\\}\\}/gu, '[omesso]')", 'String(text)', 'MF_PII_'],
+  ['placeholders', 'src/card-app.mjs', "String(text).replace(/\\[\\[MF_[^[\\]]+\\]\\]/gu, '[omesso]')", 'String(text)', 'MF_'],
   ['expiry', 'src/card-app.mjs', 'if (!event.isTrusted || !ready) return;\n    clearTimeout(expiry);', 'if (!event.isTrusted || !ready) return;', 'shared card survives the decision deadline'],
   ['turn-input', 'src/card-app.mjs', 'initializing && !initialInputSeen', '!initialInputSeen', 'Timeout 1500ms'],
   ['turn-result', 'src/card-app.mjs', 'initializing && !initialResultSeen', '!initialResultSeen', 'Timeout 1500ms'],
