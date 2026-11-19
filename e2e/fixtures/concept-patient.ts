@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import type { Page } from '@playwright/test';
 import { encryptData } from '../../lib/security/security';
 
-export async function createConceptPatient(page: Page) {
+export async function createConceptPatient(page: Page, taxCode = 'SNTBNC47H52Z000K') {
     const archive = process.env.MEDIFLOW_DATA_DIR;
     const host = new URL(page.url());
     if (!archive || process.env.MF085_SYNTHETIC_E2E !== '1' || host.hostname !== '127.0.0.1' || !host.port || host.port === '3000') {
@@ -39,13 +39,13 @@ export async function createConceptPatient(page: Page) {
         { code: 'N18.3', description: 'Malattia renale cronica', date: '2023-11-09' },
     ].map(item => ({ ...item, system: 'ICD-10' }));
     const patientId = await post('patients', {
-        firstName: 'Bianca', lastName: 'Sintetica', taxCode: 'SNTBNC47H52Z000K', birthDate: '1947-06-12',
+        firstName: 'Bianca', lastName: 'Sintetica', taxCode, birthDate: '1947-06-12',
         isAdi: true, diagnoses: await seal(diagnoses), exemptions: await seal(['013', '021']),
         allergies: await seal([{ substance: 'penicillina' }]),
     });
     const entries: { id: string; day: number; hour: number; author: string }[] = [];
     for (const [day, hour, type, author, title, content] of [
-        [15, 9, 'visit', 'Dott. Sintetico', 'Visita ambulatoriale', 'Rilevati i parametri per il controllo successivo.'],
+        [15, 9, 'visit', 'Dott. Sintetico', 'Visita ambulatoriale', 'Malattia renale cronica stadio 3a. Peso 70,2 kg.'],
         [7, 10, 'access', 'Inf. Sintetica', 'Nota ADI', 'Edemi declivi. Peso 71,4 kg. Concordato il prossimo accesso.'],
         [7, 16, 'phone', 'Dott.ssa Prova', 'Telefonata', 'Potassio 5,6. Sospeso spironolattone. Ricontrollo elettroliti tra 7 giorni.'],
     ] as const) {
@@ -70,7 +70,8 @@ export async function createConceptPatient(page: Page) {
         ['2160-0', 'Creatinina', 'mg/dL', 1.21, 1.32, null],
         ['29463-7', 'Peso', 'kg', 70.2, 71.4, null],
     ] as const) {
-        for (const [day, value] of [[22, earlier], [9, recent]] as const) {
+        const days = code === '29463-7' ? [15, 7] : [22, 9];
+        for (const [day, value] of [[days[0], earlier], [days[1], recent]] as const) {
             const id = await post('observations', { patientId, codeSystem: 'LOINC', code, display, unitCode, unitSystem: 'UCUM',
                 value, observedAt: stamp(day), source: 'manual', ...(refHigh ? { refHigh } : {}) });
             measures.push({ id, day });
