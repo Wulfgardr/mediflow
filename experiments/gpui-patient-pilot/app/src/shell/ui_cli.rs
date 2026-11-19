@@ -142,7 +142,10 @@ pub(super) fn drive(
     if op == "discover" && target.is_null() {
         let mut by_role = BTreeMap::new();
         for control in &controls {
-            *by_role.entry(control.role).or_insert(0) += 1;
+            by_role
+                .entry(control.role)
+                .and_modify(|count| *count += 1)
+                .or_insert(1);
         }
         return Ok(
             json!({ "tree": controls.iter().map(Control::describe).collect::<Vec<_>>(),
