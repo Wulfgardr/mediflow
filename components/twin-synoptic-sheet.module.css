@@ -303,10 +303,11 @@
 }
 .proposalSources a:hover { text-decoration: underline; }
 .proposalReceipt { margin: 0; color: var(--lume-ink-muted); font: var(--type-meta); }
-.fullDiary { display: none; }
 :global([data-folder-section='quadro']) .overview .middle :global(#diario > [data-section-header] > h3) { flex-basis: auto; }
 :global([data-folder-section='quadro']) .overview .middle :global(#diario > [data-section-header] > h3 span:first-child) { font: var(--type-record-island); }
 .overview .middle :global(#diario [role='feed']) { min-width: 0; }
+:global([data-folder-section='quadro']) .sheet:not([data-writing]) .middle > :global(#diario > div[id]) { padding: 4px 0 0; }
+:global([data-folder-section='quadro']) .sheet:not([data-writing]) .middle > :global(#diario > [data-section-header]) { align-items: center; gap: 8px 12px; margin: 0; padding: 0; border: 0; }
 :global([data-folder-section='quadro']) .overview .middle :global(#diario [role='feed'] .prose) { font: var(--type-record-text); }
 .overview .support > :global([data-testid='patient-proposals-summary']) { padding: 0; border: 0; }
 .contextRows:has([data-source-open='true']) { display: contents; }
@@ -353,7 +354,6 @@
     .stable > section:has(.therapies) { order: -1; }
     .stable > .zoneTitle { order: -2; }
     .context > .zoneTitle, .support, .contextRows { order: 2; }
-    :global([data-folder-section='quadro']) .fullDiary { display: inline-flex; justify-self: start; order: 1; }
     .sheet[data-full-diary] .diaryTools { order: -1; }
 }
 @media (max-width: 999px) {
