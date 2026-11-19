@@ -1027,3 +1027,7 @@ pub fn bind_keys(cx: &mut App) {
 #[cfg(test)]
 #[path = "demo_app_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "demo_ui_cli.rs"]
+pub(crate) mod ui_cli;

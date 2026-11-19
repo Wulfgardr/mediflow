@@ -1,0 +1,58 @@
+{"op":"expect","target":{"role":"heading","name":"Chi sei?"},"state":"visible"}
+{"op":"discover"}
+{"op":"fill","target":{"role":"textbox","name":"Nome e cognome"},"value":"Dottore Sintetico CLI"}
+{"op":"fill","target":{"role":"textbox","name":"Nome dell’ambulatorio"},"value":"Ambulatorio Sintetico CLI"}
+{"op":"focus","target":{"role":"button","name":"Avanti"}}
+{"op":"press","key":"Enter"}
+{"op":"expect","target":{"role":"heading","name":"Proteggi l’accesso"},"state":"visible"}
+{"op":"fill","target":{"label":"Passphrase di accesso"},"value":"Archivio sintetico del collaudo 091"}
+{"op":"fill","target":{"label":"Conferma passphrase"},"value":"Archivio sintetico del collaudo 091"}
+{"op":"fill","target":{"label":"PIN di conferma"},"value":"collaudo091"}
+{"op":"fill","target":{"label":"Conferma PIN"},"value":"collaudo091"}
+{"op":"click","target":{"role":"button","name":"Prepara il kit di recupero"}}
+{"op":"expect","target":{"role":"heading","name":"Conserva il nuovo kit prima di continuare"},"state":"visible"}
+{"op":"download","target":{"role":"button","name":"Scarica kit di recupero"}}
+{"op":"check","target":{"role":"checkbox","name":"Ho salvato il kit e scritto la chiave su carta; li conserverò separati."}}
+{"op":"click","target":{"role":"button","name":"Attiva la nuova passphrase"}}
+{"op":"fill","target":{"label":"Passphrase"},"value":"Archivio sintetico del collaudo 091"}
+{"op":"click","target":{"role":"button","name":"Sblocca"}}
+{"op":"click","target":{"role":"link","name":"Apri la cartella manualmente"}}
+{"op":"click","target":[{"role":"navigation","name":"Navigazione principale"},{"role":"link","name":"Pazienti"}]}
+{"op":"click","target":{"role":"link","name":"Nuova scheda"}}
+{"op":"expect","target":{"role":"heading","name":"Nuova scheda"},"state":"visible"}
+{"op":"discover"}
+{"op":"fill","target":{"role":"textbox","name":"Nome *"},"value":"Adele"}
+{"op":"fill","target":{"role":"textbox","name":"Cognome *"},"value":"Collaudo"}
+{"op":"fill","target":{"role":"textbox","name":"Codice fiscale"},"value":"SMOQKU80A01H501J"}
+{"op":"click","target":{"role":"button","name":"Crea scheda"}}
+{"op":"discover"}
+{"op":"expect","target":{"role":"searchbox","name":"Cerca nella lista pazienti"},"state":"visible"}
+{"op":"fill","target":{"role":"searchbox","name":"Cerca nella lista pazienti"},"value":"Collaudo"}
+{"op":"click","target":{"role":"link","name":"Apri scheda paziente"}}
+{"op":"expect","target":{"role":"region","name":"Riepilogo clinico"},"state":"visible"}
+{"op":"screenshot","file":"01-scheda"}
+{"op":"click","target":{"role":"link","name":"Documenti"}}
+{"op":"discover"}
+{"op":"uploadText","target":{"role":"button","name":"Carica documenti"},"file":"fonte-sintetica-cli","value":"Originale sintetico per il collaudo della CLI."}
+{"op":"expect","target":{"role":"heading","name":"fonte-sintetica-cli.txt"},"state":"visible"}
+{"op":"expectText","target":[{"role":"region","name":"Caricamento documenti"},{"role":"status","name":""}],"value":"1 allegato salvato."}
+{"op":"scroll","target":{"role":"button","name":"Visualizza fonte-sintetica-cli.txt"}}
+{"op":"discover"}
+{"op":"click","target":{"role":"button","name":"Visualizza fonte-sintetica-cli.txt"}}
+{"op":"expect","target":{"role":"complementary","name":"Originale del documento"},"state":"visible"}
+{"op":"expectText","target":{"role":"complementary","name":"Originale del documento"},"contains":true,"value":"Originale sintetico per il collaudo della CLI."}
+{"op":"discover","target":{"role":"complementary","name":"Originale del documento"}}
+{"op":"screenshot","file":"02-fonte"}
+{"op":"click","target":[{"role":"complementary","name":"Originale del documento"},{"role":"button","name":"Chiudi"}]}
+{"op":"click","target":{"role":"link","name":"Riepilogo"}}
+{"op":"click","target":{"role":"link","name":"Nuova voce"}}
+{"op":"expect","target":{"role":"textbox","name":"Resoconto clinico"},"state":"visible"}
+{"op":"fill","target":{"role":"textbox","name":"Resoconto clinico"},"value":"Bozza sintetica della prova CLI."}
+{"op":"expectText","target":{"role":"form","name":"Nuova voce clinica"},"contains":true,"value":"Testo e dati della bozza conservati cifrati"}
+{"op":"click","target":{"role":"link","name":"Chiudi la voce"}}
+{"op":"expect","target":{"role":"textbox","name":"Resoconto clinico"},"state":"hidden"}
+{"op":"focus","target":{"role":"link","name":"Torna alla bozza"}}
+{"op":"expect","target":{"role":"link","name":"Torna alla bozza"},"state":"focused"}
+{"op":"press","key":"Enter"}
+{"op":"expectText","target":{"role":"textbox","name":"Resoconto clinico"},"value":"Bozza sintetica della prova CLI."}
+{"op":"screenshot","file":"03-bozza-ritrovata"}
