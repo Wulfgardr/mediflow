@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { NextResponse } from 'next/server';
 import {
     listAuditEvents,
@@ -77,7 +78,7 @@ export async function GET(request: Request) {
 
         return NextResponse.json(rows);
     } catch (error) {
-        console.error('[MediFlow] Audit viewer failed:', error);
+        logServerError('[MediFlow] Audit viewer failed', error);
         return NextResponse.json({ error: 'Failed to fetch audit events' }, { status: 500 });
     }
 }

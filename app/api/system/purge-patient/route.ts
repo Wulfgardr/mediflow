@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 // WUL-306 (ADR 0066): audited admin purge of a soft-deleted patient (GDPR Art. 17 tool).
@@ -61,7 +62,7 @@ export async function GET(request: Request) {
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('[MediFlow] Purge patient dry-run failed:', error);
+        logServerError('[MediFlow] Purge patient dry-run failed', error);
         return NextResponse.json({ error: 'Purge dry-run failed' }, { status: 500 });
     }
 }
@@ -142,7 +143,7 @@ export async function POST(request: Request) {
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('[MediFlow] Purge patient failed:', error);
+        logServerError('[MediFlow] Purge patient failed', error);
         return NextResponse.json({ error: 'Purge failed' }, { status: 500 });
     }
 }

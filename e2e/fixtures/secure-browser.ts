@@ -12,15 +12,19 @@ import type { LaunchOptions, PlaywrightWorkerOptions } from '@playwright/test';
 // CI keeps Playwright defaults (ephemeral runners; Linux runners often cannot
 // start the sandbox). PLAYWRIGHT_ALLOW_EXTERNAL_NETWORK=1 opts out locally,
 // e.g. for an E2E_BASE_URL that is not on loopback.
-const LOOPBACK_ONLY_NETWORK = [
-  '--proxy-server=http://127.0.0.1:1',
-  '--proxy-bypass-list=<-loopback>;localhost;127.0.0.1;[::1]',
-];
+const proxy = '--proxy-server=http://127.0.0.1:1';
+const loopbackOnlyNetwork = (allow: string) => [proxy, `--proxy-bypass-list=<-loopback>;${allow}`];
+const LOOPBACK_ONLY_NETWORK = loopbackOnlyNetwork('localhost;127.0.0.1;[::1]');
 
-// E2E_BROWSER_CHANNEL=chrome runs the suite on the installed Google Chrome
-// instead of the bundled Chromium, with the same hardening. Unset keeps the
-// bundled Chromium (CI). Fixtures that load an unpacked extension pin
-// channel 'chromium', because branded Chrome ignores --load-extension.
+export function isolatedChromeLaunch(origin: string): LaunchOptions {
+  if (!/^http:\/\/127\.0\.0\.1:[1-9][0-9]{0,4}$/u.test(origin)) throw new Error('Expected an owned IPv4 loopback origin.');
+  return {
+    channel: 'chrome',
+    chromiumSandbox: true,
+    args: [...loopbackOnlyNetwork(new URL(origin).host), '--force-webrtc-ip-handling-policy=disable_non_proxied_udp'],
+  };
+}
+
 const browserChannel = process.env.E2E_BROWSER_CHANNEL?.trim() || undefined;
 
 export const browserChannelUse: Partial<Pick<PlaywrightWorkerOptions, 'channel'>> =

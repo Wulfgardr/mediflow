@@ -1,4 +1,5 @@
 /* @Codex */
+import { logServerError } from '@/lib/server-error-log';
 import { NextResponse } from 'next/server';
 /* @Codex */
 import {
@@ -25,7 +26,7 @@ export async function GET(
 
         return NextResponse.json(attachment);
     } catch (error) {
-        console.error('API GET /api/v1/network/patients/[id]/attachments/[attachmentId] error:', error);
+        logServerError('API GET /api/v1/network/patients/[id]/attachments/[attachmentId] error', error);
         return NextResponse.json({ error: 'Failed to fetch attachment' }, { status: 500 });
     }
 }

@@ -4,6 +4,7 @@ import { getEventListeners } from 'node:events';
 import path from 'node:path';
 import { test } from 'node:test';
 import ts from 'typescript';
+import * as serverErrorLog from '../lib/server-error-log.ts';
 
 const root = path.resolve(import.meta.dirname, '..');
 const routePath = 'app/api/v1/network/patients/[id]/attachments/route.ts';
@@ -44,6 +45,7 @@ function harness({ deny = false, service = async () => ({ status: 201, value: { 
                 events.push('service'); return service(...args);
             } };
             if (name === '@/lib/network-attachment-read') return {};
+            if (name === '@/lib/server-error-log') return serverErrorLog;
             throw new Error(`Unexpected import ${name}`);
         };
         new Function('require', 'exports', 'setTimeout', 'clearTimeout', 'console', output)(require, exports,

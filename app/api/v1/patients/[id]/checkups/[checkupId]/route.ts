@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { rejectUnsealedV1Write } from '@/lib/api/v1/sealed-write';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { readCheckupJsonObject } from '@/lib/checkup-json-body';
@@ -59,7 +60,7 @@ export async function GET(
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('API GET /api/v1/patients/[id]/checkups/[checkupId] error:', error);
+        logServerError('API GET /api/v1/patients/[id]/checkups/[checkupId] error', error);
         return NextResponse.json({ error: 'Failed to fetch checkup' }, { status: 500 });
     }
 }
@@ -110,7 +111,7 @@ export async function PUT(
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('API PUT /api/v1/patients/[id]/checkups/[checkupId] error:', error);
+        logServerError('API PUT /api/v1/patients/[id]/checkups/[checkupId] error', error);
         return NextResponse.json({ error: 'Failed to update checkup' }, { status: 500 });
     }
 }
@@ -164,7 +165,7 @@ export async function DELETE(
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('API DELETE /api/v1/patients/[id]/checkups/[checkupId] error:', error);
+        logServerError('API DELETE /api/v1/patients/[id]/checkups/[checkupId] error', error);
         return NextResponse.json({ error: 'Failed to delete checkup' }, { status: 500 });
     }
 }

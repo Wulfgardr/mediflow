@@ -40,6 +40,10 @@ pub(super) struct Host {
 }
 impl Host {
     pub(super) fn new() -> Self {
+        Self::with_diary(json!([]))
+    }
+
+    pub(super) fn with_diary(diary: Value) -> Self {
         let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
         let socket = listener.local_addr().unwrap();
         let requests = Arc::new(Mutex::new(Vec::new()));
@@ -64,6 +68,7 @@ impl Host {
         let planned = responses.clone();
         let worker = thread::spawn(move || {
             let mut workers = Vec::new();
+            let diary = Arc::new(diary);
             loop {
                 let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                 if stopping.load(Ordering::Acquire) {
@@ -72,6 +77,7 @@ impl Host {
                 let captured = captured.clone();
                 let shared = shared.clone();
                 let planned = planned.clone();
+                let diary = diary.clone();
                 workers.push(thread::spawn(move || {
                 stream
                     .set_read_timeout(Some(Duration::from_secs(10)))
@@ -147,6 +153,7 @@ impl Host {
                     response
                 }
                 "GET /api/v1/network/patients" => json!([]),
+                "GET /api/v1/network/patients/patient-a/entries" => diary.as_ref().clone(),
                 value if value.starts_with("GET /api/v1/network/checkups?") => json!([]),
                 "POST /api/auth/native/logout" => json!({"success":true}),
                 value if value.starts_with("GET /api/v1/network/patients/") => json!([]),
