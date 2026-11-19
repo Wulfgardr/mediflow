@@ -250,7 +250,6 @@
     .stable > section:has(.therapies) { order: -1; }
     .stable > .zoneTitle { order: -2; }
     .context > .zoneTitle, .support, .contextRows { order: 2; }
-    :global([data-folder-section='quadro']) .sheet:not([data-full-diary]) .middle :global(#diario:not(:target) [role='feed'] > article:nth-of-type(n + 6)) { display: none; }
     :global([data-folder-section='quadro']) .fullDiary { display: inline-flex; justify-self: start; order: 1; }
     .sheet[data-full-diary] .diaryTools { order: -1; }
 }
@@ -258,6 +257,9 @@
     background: transparent;
     box-shadow: none;
     padding: 0;
+}
+@media (max-width: 999px) {
+    :global([data-folder-section='quadro']) .sheet:not([data-full-diary]) .middle :global(#diario:not(:target) [role='feed'] > article:nth-of-type(n + 6)) { display: none; }
 }
 @media (pointer: coarse) {
     .overviewIndex a, .islandAction { min-height: 44px; align-content: center; }
