@@ -2896,11 +2896,11 @@ impl ClinicalApp {
             )
     }
 
-    fn navigation_item(&self, area: Area, compact: bool, cx: &Context<Self>) -> Stateful<Div> {
+    fn navigation_item(&self, area: Area, compact: bool, cx: &Context<Self>) -> impl IntoElement {
         let theme = self.theme;
         let active = self.area == area && !self.show_other;
         let color = theme.ink;
-        div()
+        let control = div()
             .id(area.id())
             .accessibility_id(area.id())
             .role(Role::Button)
@@ -2966,7 +2966,8 @@ impl ClinicalApp {
                     .when(!compact, |el| el.flex_1())
                     .child(text!(area.title())),
             )
-            .on_click(cx.listener(move |this, _, _, cx| this.navigate(area, cx)))
+            .on_click(cx.listener(move |this, _, _, cx| this.navigate(area, cx)));
+        crate::components::observe_control(control)
     }
 
     fn search_patients(&mut self, cx: &mut Context<Self>) {
@@ -4032,8 +4033,9 @@ impl ClinicalApp {
                                 .iter()
                                 .position(|item| *item == patient_section)
                                 .unwrap();
-                            rendered_command::observe(
+                            rendered_command::observe_focus(
                                 section_tab.track_focus(&self.ui_cli_section_focus[index]),
+                                self.ui_cli_section_focus[index].clone(),
                             )
                         };
                         section_tab
@@ -4636,7 +4638,7 @@ impl ClinicalApp {
         let selected = self.area;
         div().reading_surface(theme).w_full().min_w_0().max_w_full().flex().flex_col().gap(px(24.))
             .child(div().flex().flex_wrap().items_center().justify_between().gap(px(12.))
-                .child(heading("clinical-workspace-global-heading", if agenda { "Agenda" } else { "Diario generale" }, theme))
+                .child(crate::components::observe_control(heading("clinical-workspace-global-heading", if agenda { "Agenda" } else { "Diario generale" }, theme)))
                 .child(div().flex().flex_wrap().gap(px(8.))
                     .when(!agenda, |el| el.child(button("clinical-workspace-global-refresh", "Rileggi", theme, false, true)
                         .debug_selector(|| "clinical-workspace-global-refresh".into())
@@ -8092,17 +8094,16 @@ mod tests {
         let discover = serde_json::json!({"op":"discover"});
         eprintln!(
             "MEDIFLOW_MENU_UI_CLI_BEFORE {}",
-            ui_cli::drive(&discover, &app, cx).unwrap()
+            ui_cli::drive(&discover, cx).unwrap()
         );
         let other_actions = serde_json::json!({"role":"button", "name":"Altre azioni"});
         ui_cli::drive(
             &serde_json::json!({"op":"press", "target":other_actions, "key":"Enter"}),
-            &app,
             cx,
         )
         .unwrap();
         render_clinical_window(cx);
-        let open = ui_cli::drive(&discover, &app, cx).unwrap();
+        let open = ui_cli::drive(&discover, cx).unwrap();
         let controls = open["tree"].as_array().unwrap();
         assert!(
             controls
@@ -8119,9 +8120,9 @@ mod tests {
             })
             .expect("voce Copia esposta dal menu");
         let item = serde_json::json!({"role":"menuitem", "name":item["name"]});
-        ui_cli::drive(&serde_json::json!({"op":"click", "target":item}), &app, cx).unwrap();
+        ui_cli::drive(&serde_json::json!({"op":"click", "target":item}), cx).unwrap();
         render_clinical_window(cx);
-        let closed = ui_cli::drive(&discover, &app, cx).unwrap();
+        let closed = ui_cli::drive(&discover, cx).unwrap();
         assert!(closed["byRole"].get("menu").is_none());
         eprintln!("MEDIFLOW_MENU_UI_CLI {open}");
     }

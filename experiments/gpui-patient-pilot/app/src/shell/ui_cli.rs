@@ -1,13 +1,14 @@
 use super::*;
 use crate::demo_app::ui_cli::{press, run};
-use gpui::{Bounds, Pixels, VisualTestContext};
+use gpui::{Bounds, Focusable, Pixels, VisualTestContext};
+use rendered_command::{InputProbe, RenderedControl};
 use serde_json::{Value, json};
 
 enum Input {
-    Activate(Bounds<Pixels>, Option<FocusHandle>),
+    Activate(Option<FocusHandle>),
     Keyboard(FocusHandle),
     Text(Entity<TextInput>),
-    Scroll(Bounds<Pixels>, ScrollHandle),
+    Scroll(ScrollHandle),
     Observe,
 }
 
@@ -15,18 +16,32 @@ struct Control {
     role: &'static str,
     name: String,
     node: gpui::accesskit::Node,
+    bounds: Bounds<Pixels>,
     input: Input,
 }
 
 impl Control {
-    fn describe(&self) -> Value {
+    fn focus_handle(&self, cx: &App) -> Option<FocusHandle> {
+        match &self.input {
+            Input::Activate(focus) => focus.clone(),
+            Input::Keyboard(focus) => Some(focus.clone()),
+            Input::Text(editor) => Some(editor.read(cx).focus_handle(cx)),
+            Input::Observe | Input::Scroll(_) => None,
+        }
+    }
+
+    fn focused(&self, window: &Window, cx: &App) -> Option<bool> {
+        self.focus_handle(cx).map(|focus| focus.is_focused(window))
+    }
+
+    fn describe(&self, window: &Window, cx: &App) -> Value {
         use gpui::accesskit::Action;
         let operations: &[&str] = match self.input {
-            Input::Activate(_, Some(_)) => &["click", "focus", "press", "expect"],
-            Input::Activate(_, None) => &["click", "expect"],
+            Input::Activate(Some(_)) => &["click", "focus", "press", "expect"],
+            Input::Activate(None) => &["click", "expect"],
             Input::Keyboard(_) => &["focus", "press", "expect"],
-            Input::Text(_) => &["focus", "fill", "press", "expect", "expectValue"],
-            Input::Scroll(_, _) => &["scroll", "expect"],
+            Input::Text(_) => &["click", "focus", "fill", "press", "expect", "expectValue"],
+            Input::Scroll(_) => &["scroll", "expect"],
             Input::Observe => &["expect"],
         };
         let ax_actions: Vec<_> = [
@@ -39,74 +54,105 @@ impl Control {
         .filter(|action| self.node.supports_action(*action))
         .map(|action| format!("{action:?}"))
         .collect();
+        let selection = match &self.input {
+            Input::Text(editor) => {
+                let selection = editor.read(cx).selection();
+                Some(json!({"startByte": selection.start, "endByte": selection.end}))
+            }
+            _ => None,
+        };
         json!({"role":self.role, "name":self.name, "id":self.node.author_id(),
                "actions": operations, "accessKitActions": ax_actions,
                "selected":self.node.is_selected(), "expanded":self.node.is_expanded(),
-               "pointerClipped": matches!(self.input, Input::Keyboard(_))})
+               "focused":self.focused(window, cx), "selection":selection,
+               "bounds": {
+                   "x": f32::from(self.bounds.origin.x), "y": f32::from(self.bounds.origin.y),
+                   "width": f32::from(self.bounds.size.width), "height": f32::from(self.bounds.size.height)
+               },
+               "pointerClipped": self.bounds.is_empty()})
     }
 }
 
-fn frame(view: &Entity<ClinicalApp>, cx: &mut VisualTestContext) -> (Vec<Control>, Vec<Value>) {
+fn frame(cx: &mut VisualTestContext) -> (Vec<Control>, Vec<Value>) {
     let painted = rendered_command::controls(|| {
         cx.update(|window, cx| {
             window.refresh();
             window.draw(cx).clear(cx);
         });
     });
-    view.read_with(cx, |app, cx| {
-        let mut controls = vec![];
-        let mut excluded = vec![];
-        for (node, bounds) in painted {
-            let role = match node.role() {
-                Role::Button => "button",
-                Role::Link => "link",
-                Role::Tab => "tab",
-                Role::Menu => "menu",
-                Role::MenuItem => "menuitem",
-                Role::Region => "region",
-                Role::TextInput | Role::MultilineTextInput => "textbox",
-                _ => "other",
-            };
-            let id = node.author_id().unwrap_or_default();
-            let name = node.label().unwrap_or_default().to_owned();
-            let focus = if id == "threshold-other-actions" {
-                Some(app.threshold_menu_focus.clone())
-            } else {
-                PatientSection::ALL.iter().position(|section| section.id() == id)
-                    .map(|index| app.ui_cli_section_focus[index].clone())
-            };
-            let reason = if bounds.is_empty() && focus.is_none() { Some("clipped") }
-                else if name.is_empty() { Some("unnamed") }
-                else if role == "other" { Some("unsupported-role") }
-                else { None };
-            if let Some(reason) = reason {
-                excluded.push(json!({"id":id, "role":format!("{:?}",node.role()), "name":name, "reason":reason}));
-                continue;
-            }
-            let editor = app.form.as_ref().and_then(|form| form.fields.iter().find(|field|
-                field.editor.read(cx).test_accessibility_id() == id && !field.read_only));
-            let input = match role {
-                "textbox" => match editor {
-                    Some(field) => Input::Text(field.editor.clone()),
-                    None => {
-                        excluded.push(json!({"id":id,"name":name,"role":role,"reason":"outside-editor"}));
-                        continue;
-                    }
-                },
-                "region" if id == "clinical-record-changed-scroll" =>
-                    Input::Scroll(bounds, app.patient.record.changed_column.clone()),
-                "button" | "link" | "tab" | "menuitem" if node.supports_action(gpui::accesskit::Action::Click) => {
-                    match focus {
-                        Some(focus) if bounds.is_empty() => Input::Keyboard(focus),
-                        focus => Input::Activate(bounds, focus),
-                    }
-                }
-                _ => Input::Observe,
-            };
-            controls.push(Control { role, name, node, input });
+    let mut controls = vec![];
+    let mut excluded = vec![];
+    for RenderedControl {
+        node,
+        bounds,
+        input: probe,
+    } in painted
+    {
+        let role = match node.role() {
+            Role::Button => "button",
+            Role::Link => "link",
+            Role::Tab => "tab",
+            Role::Menu => "menu",
+            Role::MenuItem => "menuitem",
+            Role::Region => "region",
+            Role::Heading => "heading",
+            Role::TextInput | Role::MultilineTextInput => "textbox",
+            _ => "other",
+        };
+        let id = node.author_id().unwrap_or_default();
+        let name = node.label().unwrap_or_default().to_owned();
+        let focus = match &probe {
+            Some(InputProbe::Focus(focus)) => Some(focus.clone()),
+            _ => None,
+        };
+        let reason = if bounds.is_empty() && focus.is_none() {
+            Some("clipped")
+        } else if name.is_empty() {
+            Some("unnamed")
+        } else if role == "other" {
+            Some("unsupported-role")
+        } else {
+            None
+        };
+        if let Some(reason) = reason {
+            excluded.push(
+                json!({"id":id, "role":format!("{:?}",node.role()), "name":name, "reason":reason}),
+            );
+            continue;
         }
-        (controls, excluded)
-    })
+        let input = match role {
+            "textbox" => match probe {
+                Some(InputProbe::Editor(editor)) => Input::Text(editor),
+                _ => {
+                    excluded.push(
+                        json!({"id":id,"name":name,"role":role,"reason":"editor-not-exposed"}),
+                    );
+                    continue;
+                }
+            },
+            "region" => match probe {
+                Some(InputProbe::Scroll(scroll)) => Input::Scroll(scroll),
+                _ => Input::Observe,
+            },
+            "button" | "link" | "tab" | "menuitem"
+                if node.supports_action(gpui::accesskit::Action::Click) =>
+            {
+                match focus {
+                    Some(focus) if bounds.is_empty() => Input::Keyboard(focus),
+                    focus => Input::Activate(focus),
+                }
+            }
+            _ => Input::Observe,
+        };
+        controls.push(Control {
+            role,
+            name,
+            node,
+            bounds,
+            input,
+        });
+    }
+    (controls, excluded)
 }
 
 fn resolve<'a>(controls: &'a [Control], target: &Value) -> Result<&'a Control, String> {
@@ -126,18 +172,17 @@ fn resolve<'a>(controls: &'a [Control], target: &Value) -> Result<&'a Control, S
     }
 }
 
-pub(super) fn drive(
-    action: &Value,
-    view: &Entity<ClinicalApp>,
-    cx: &mut VisualTestContext,
-) -> Result<Value, String> {
+pub(super) fn drive(action: &Value, cx: &mut VisualTestContext) -> Result<Value, String> {
     let op = action["op"].as_str().ok_or("Azione assente.")?;
     let key = || {
         action["key"]
             .as_str()
             .ok_or_else(|| "Tasto assente.".to_owned())
     };
-    let (controls, excluded) = frame(view, cx);
+    if op == "resize" {
+        return resize(action, cx);
+    }
+    let (controls, excluded) = frame(cx);
     let target = &action["target"];
     if op == "discover" && target.is_null() {
         let mut by_role = BTreeMap::new();
@@ -147,27 +192,37 @@ pub(super) fn drive(
                 .and_modify(|count| *count += 1)
                 .or_insert(1);
         }
-        return Ok(
-            json!({ "tree": controls.iter().map(Control::describe).collect::<Vec<_>>(),
-                          "total": controls.len(), "byRole":by_role, "excluded": excluded }),
-        );
+        return Ok(cx.update(|window, cx| {
+            json!({ "tree": controls.iter().map(|control| control.describe(window, cx)).collect::<Vec<_>>(),
+                    "total": controls.len(), "byRole":by_role, "excluded": excluded,
+                    "focus": focused_control(&controls, window, cx), "viewport": viewport(window),
+                    "accessKit": { "active": window.is_a11y_active(),
+                                   "treeAvailable": window.debug_a11y_tree_json().is_some() } })
+        }));
     }
     if op == "press" && target.is_null() {
+        let before = cx.update(|window, cx| focused_control(&controls, window, cx));
         press(key()?, cx)?;
-        return Ok(json!({}));
+        notes_recovery_tests::draw(cx);
+        let (controls, _) = frame(cx);
+        let after = cx.update(|window, cx| focused_control(&controls, window, cx));
+        return Ok(json!({"focusBefore":before,"focusAfter":after}));
     }
     let control = resolve(&controls, target)?;
+    let before = cx.update(|window, cx| control.describe(window, cx));
+    let focus_before = cx.update(|window, cx| focused_control(&controls, window, cx));
     match (&control.input, op) {
-        (Input::Activate(bounds, _), "click") => {
-            cx.simulate_click(bounds.center(), gpui::Modifiers::default())
+        (Input::Activate(_) | Input::Text(_), "click") => {
+            cx.simulate_click(control.bounds.center(), gpui::Modifiers::default())
         }
-        (Input::Activate(_, Some(focus)) | Input::Keyboard(focus), "press" | "focus") => {
+        (Input::Activate(Some(focus)) | Input::Keyboard(focus), "press" | "focus") => {
             cx.update(|window, cx| window.focus(focus, cx));
             if op == "press" {
                 press(key()?, cx)?;
             }
         }
-        (Input::Scroll(bounds, scroll), "scroll") => {
+        (Input::Scroll(scroll), "scroll") => {
+            let bounds = control.bounds;
             let before = f32::from(scroll.offset().y);
             cx.simulate_event(gpui::ScrollWheelEvent {
                 position: gpui::point(bounds.left() + px(4.), bounds.center().y),
@@ -202,11 +257,9 @@ pub(super) fn drive(
                 press(key()?, cx)?;
             }
         }
-        (Input::Text(editor), "expect") if action["state"] == "focused" => {
-            if !cx.update(|window, cx| {
-                gpui::Focusable::focus_handle(editor.read(cx), cx).is_focused(window)
-            }) {
-                return Err("Il campo non ha il focus.".into());
+        (_, "expect") if action["state"] == "focused" => {
+            if !cx.update(|window, cx| control.focused(window, cx) == Some(true)) {
+                return Err("Il focus del controllo non è osservato.".into());
             }
         }
         (Input::Text(editor), "expectValue") => {
@@ -216,7 +269,60 @@ pub(super) fn drive(
         }
         _ => return Err(format!("Azione {op} non disponibile su {}.", control.name)),
     }
-    Ok(control.describe())
+    if op.starts_with("expect") {
+        return Ok(before);
+    }
+    notes_recovery_tests::draw(cx);
+    let (painted, _) = frame(cx);
+    Ok(cx.update(|window, cx| {
+        let mut matching = painted.iter().filter(|other| {
+            control.node.author_id().is_some()
+                && other.node.author_id() == control.node.author_id()
+                && other.role == control.role
+        });
+        let after = matching.next().filter(|_| matching.next().is_none());
+        let mut result = before;
+        result["after"] = json!(after.map(|node| node.describe(window, cx)));
+        result["focusBefore"] = json!(focus_before);
+        result["focusAfter"] = json!(focused_control(&painted, window, cx));
+        result
+    }))
+}
+
+fn focused_control(controls: &[Control], window: &Window, cx: &App) -> Option<Value> {
+    controls
+        .iter()
+        .find(|control| control.focused(window, cx) == Some(true))
+        .map(|control| json!({"role":control.role,"name":control.name,"id":control.node.author_id()}))
+}
+
+fn viewport(window: &Window) -> Value {
+    let size = window.viewport_size();
+    json!({"width":f32::from(size.width),"height":f32::from(size.height)})
+}
+
+fn resize(action: &Value, cx: &mut VisualTestContext) -> Result<Value, String> {
+    let dimension = |name, range: std::ops::RangeInclusive<u64>| {
+        action[name]
+            .as_u64()
+            .filter(|value| range.contains(value))
+            .map(|value| value as f32)
+            .ok_or_else(|| format!("Dimensione {name} fuori intervallo."))
+    };
+    let requested = gpui::size(
+        px(dimension("width", 280..=3840)?),
+        px(dimension("height", 240..=2160)?),
+    );
+    let (id, before) =
+        cx.update(|window, _| (window.window_handle().window_id(), viewport(window)));
+    cx.simulate_resize(requested);
+    notes_recovery_tests::draw(cx);
+    cx.update(|window, _| {
+        if window.window_handle().window_id() != id || window.viewport_size() != requested {
+            return Err("La finestra di test non ha recepito il ridimensionamento.".into());
+        }
+        Ok(json!({"windowId":format!("{id:?}"),"previousViewport":before,"viewport":viewport(window)}))
+    })
 }
 
 #[gpui::test]
@@ -234,7 +340,19 @@ fn shell_ui_cli(cx: &mut gpui::TestAppContext) {
             })
         })
         .collect();
-    let host = notes_recovery_tests::Host::with_diary(json!(diary));
+    let document = json!({
+        "id": "documento-sintetico",
+        "patientId": "patient-a",
+        "name": "Referto sintetico.txt",
+        "path": "referto-sintetico.txt",
+        "type": "text/plain",
+        "size": 20,
+        "summarySnapshot": "Sintesi di collaudo del documento.",
+        "data": "data:text/plain;base64,T3JpZ2luYWxlIHNpbnRldGljby4="
+    });
+    let host =
+        notes_recovery_tests::Host::with_diary_and_documents(json!(diary), json!([document]));
+    let original_route = "GET /api/v1/network/patients/patient-a/attachments/documento-sintetico";
     let (view, cx) = cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
     cx.simulate_resize(gpui::size(px(1360.), px(900.)));
     view.update(cx, |app, cx| {
@@ -249,12 +367,39 @@ fn shell_ui_cli(cx: &mut gpui::TestAppContext) {
         assert_eq!(app.patient.detail.ready().unwrap().last_name, "Sintetica");
         assert_eq!(app.patient.entries.ready().map(Vec::len), Some(14));
     });
+    let terminal = std::env::var_os("MEDIFLOW_UI_CLI").is_some();
+    if !terminal {
+        let invalid = json!({"op":"resize", "width":640.5, "height":880});
+        assert!(drive(&invalid, cx).is_err());
+        assert_eq!(
+            cx.update(|window, _| viewport(window)),
+            json!({"width":1360.0,"height":900.0})
+        );
+    }
     run(
         include_str!("../../../../../e2e/ui-cli/gpui-shell.jsonl"),
         |action| {
-            let result = drive(action, &view, cx)?;
-            notes_recovery_tests::draw(cx);
-            Ok(result)
+            let receipt = drive(action, cx)?;
+            if !terminal && action["key"] == "Shift+ArrowLeft" {
+                assert_eq!(receipt["after"]["focused"], true);
+                let selection = &receipt["selection"];
+                let end = selection["endByte"].as_u64().unwrap();
+                assert_eq!(selection["startByte"], end);
+                assert_eq!(
+                    receipt["after"]["selection"],
+                    json!({"startByte":end-1,"endByte":end})
+                );
+            }
+            Ok(receipt)
         },
     );
+    if !terminal {
+        assert_eq!(
+            host.routes()
+                .iter()
+                .filter(|route| *route == original_route)
+                .count(),
+            1
+        );
+    }
 }
