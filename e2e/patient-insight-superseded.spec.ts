@@ -133,6 +133,6 @@ test('controesempio: una scrittura che non cambia le fonti lascia la proposta at
   await openPatientSection(page, 'attenzione');
   await expect(panel.getByTestId('patient-insight-review-proposal')).toBeVisible();
   await expect(panel.getByTestId('patient-insight-superseded')).toHaveCount(0);
-  await expect(page.getByTestId('patient-proposals-summary')).toContainText('1 proposta da rivedere');
+  await expect(page.getByTestId('patient-proposals-summary')).toContainText('Proposta · non registrata');
   expect(requests).toHaveLength(1);
 });

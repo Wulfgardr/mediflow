@@ -353,7 +353,7 @@ test('Proposte combinate: un solo conteggio effettivo e due destinazioni senza r
     await insight.getByRole('button', { name: 'Genera proposta', exact: true }).click();
     const insightProposal = insight.getByTestId('patient-insight-review-proposal');
     await expect(insightProposal).toBeVisible();
-    await openPatientSection(page, 'quadro'); await expect(summary).toContainText('1 proposta da rivedere');
+    await openPatientSection(page, 'quadro'); await expect(summary).toContainText('Proposta · non registrata');
     await expect(insightProposal).not.toBeVisible();
     await summary.getByRole('link', { name: 'Smart Import', exact: true }).click();
     const smart = page.locator('#smart-import');
