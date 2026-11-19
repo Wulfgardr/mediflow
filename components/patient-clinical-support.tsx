@@ -36,9 +36,14 @@ export function PatientProposalsSummary({ hasInsightProposal, hasSmartImportProp
         {shown ? <p className={sheet.proposalLabel}>Proposta · non registrata</p> : null}
         {shown && !hasSmartImportProposal ? null : <InkState state="pencil">{count === 0 ? 'Nessuna proposta da rivedere' : `${count} ${count === 1 ? 'proposta' : 'proposte'} da rivedere`}</InkState>}
         {shown ? <>
-            <ul className={sheet.proposalList}>{sentences.map((sentence, index) => <li key={`${index}-${sentence}`}>
+            {sentences.length === 0 && shown.proposal.summary ? <p className={sheet.proposalText}><PrivacyBlur intensity="sm">{shown.proposal.summary}</PrivacyBlur></p> : null}
+            {sentences.length ? <ul className={sheet.proposalList}>{sentences.map((sentence, index) => <li key={`${index}-${sentence}`}>
                 <PrivacyBlur intensity="sm">{sentence}</PrivacyBlur>
-            </li>)}</ul>
+            </li>)}</ul> : null}
+            {shown.proposal.gaps.length ? <div className={sheet.proposalGaps}>
+                <h3>Dati mancanti</h3>
+                <ul>{shown.proposal.gaps.map((gap, index) => <li key={`${index}-${gap}`}><PrivacyBlur intensity="sm">{gap}</PrivacyBlur></li>)}</ul>
+            </div> : null}
             {patientId ? <nav aria-label="Fonti della proposta" className={sheet.proposalSources}>
                 <a href={`/patients/${patientId}/modules#terapie`}>Terapie</a>
                 <a href={`/patients/${patientId}/modules#diario`}>Diario</a>
