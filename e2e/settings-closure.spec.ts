@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { bootstrapUnlockedSession, unlockIfNeeded } from './utils';
+import { documentRequests } from './fixtures/trusted-web-request';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 import { closureGallery } from './fixtures/settings-closure-gallery';
 
@@ -21,6 +22,7 @@ test('Profilo: ritorno browser e blocco conservano la bozza senza salvarla', asy
     try {
         await bootstrapUnlockedSession(page, '1234');
         await page.goto(`${baseURL}/settings`);
+        await unlockIfNeeded(page, '1234');
         await page.getByRole('link', { name: 'Profilo', exact: true }).click();
         const name = page.getByLabel('Nome medico', { exact: true });
         await expect(name).toBeEnabled();
@@ -43,7 +45,7 @@ test('Profilo: ritorno browser e blocco conservano la bozza senza salvarla', asy
             await page.getByRole('button', { name: 'Rileggi profilo mantenendo la bozza', exact: true }).click();
             await expect(save).toBeEnabled(); await expect(name).toHaveValue('Bozza sintetica dopo blocco');
         }
-        const saved = await (await page.request.get(`${baseURL}/api/auth/profile`)).json();
+        const saved = await (await documentRequests(page).get(`${baseURL}/api/auth/profile`)).json();
         expect(saved.displayName ?? '').toBe(original); expect(writes).toBe(0);
     } finally { await zoom.close(); }
 });
@@ -58,8 +60,10 @@ test('Backup: avviso completo e annullamento raggiungibili al 400 percento', asy
         return route.continue();
     });
     try {
-        await bootstrapUnlockedSession(page, '1234'); await page.goto(`${baseURL}/settings/backup`);
-        const artifact = await (await page.request.get(`${baseURL}/api/system/backup-restore`)).text();
+        await bootstrapUnlockedSession(page, '1234');
+        await page.goto(`${baseURL}/settings/backup`);
+        await unlockIfNeeded(page, '1234');
+        const artifact = await (await documentRequests(page).get(`${baseURL}/api/system/backup-restore`)).text();
         await page.getByText('Seleziona file .mediflow v1', { exact: true }).locator('input').setInputFiles({
             name: 'backup-sintetico.mediflow', mimeType: 'application/json', buffer: Buffer.from(artifact) });
         const panel = page.getByTestId('restore-confirmation-panel');
