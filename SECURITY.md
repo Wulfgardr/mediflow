@@ -258,6 +258,11 @@ rispettare anche queste regole:
 - rifiutare provider, modello, endpoint, venue, prompt, fallback o apply forniti
   dal caller
 
+Lo stesso vale per la visita depositata da un client agente: nota,
+trascrizione, PDF e proposte entrano in cartella solo con il gesto del medico,
+perché MediFlow non ha una prova di provenienza indipendente dall'agente
+([ADR 0195](docs/adr/0195-materiale-dell-agente-dopo-il-gesto-del-medico.md)).
+
 Anche quando un documento riporti un codice ICD esplicito, la diagnosi estratta
 resta una proposta da rivedere. Per questo il payload automatico della sintesi
 non include `patients.diagnoses` (vedi ADR 0084).
