@@ -38,6 +38,26 @@ const TELEMETRY_PACKAGES = [
     'rudder-sdk-js',
 ];
 
+const AGENT_ROUTE_ROOT = 'app/api/agent/v1';
+const AGENT_CHANNEL_MODULE = '@/lib/security/agent-channel';
+const AGENT_CHANNEL_GUARD = 'withAuthenticatedAgentTransaction';
+const AGENT_OPERATION_MODULES = new Set(['@/lib/agent-cassette-store', '@/lib/agent-visit-confirmation']);
+const AGENT_OPERATION_ERRORS = new Set(['AgentCassetteDenied']);
+const AGENT_NEUTRAL_MODULES = new Set([
+    'zod',
+    '@/lib/db-server',
+    '@/lib/agent-registration-store',
+    '@/lib/agent-mandate-store',
+    '@/lib/agent-pairing-store',
+    '@/lib/agent-cassette-contract',
+    '@/lib/agent-cassette-crypto',
+    '@/lib/agent-visit-confirmation-contract',
+    '@/lib/native-network-json-body',
+    '@/lib/security/agent-unlock-session',
+    AGENT_CHANNEL_MODULE,
+]);
+const AGENT_OPERATION_FREE_READS = new Set([`${AGENT_ROUTE_ROOT}/context/route.ts`]);
+
 const findings = [];
 
 if (process.argv[1] && path.resolve(process.argv[1]) === __filename) main();
@@ -51,6 +71,7 @@ function main() {
     runIcd11WhoRouteCheck();
     runLegacyOcrRetirementCheck();
     runLegacyPdfRetirementCheck();
+    runAgentRouteChannelCheck();
     reportAndExit();
 }
 
@@ -134,6 +155,73 @@ function isCanonicalIcdGetHandler(node, sourceFile) {
         'returnhandleIcd11WhoRequest(request);',
         '}',
     ].join('');
+}
+
+export function validateAgentRouteSource(source, relativePath) {
+    const issues = new Set();
+    const sourceFile = ts.createSourceFile(relativePath, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+    if (sourceFile.parseDiagnostics.length > 0) issues.add('route source has syntax errors');
+    const operationBindings = new Set();
+    let guardImported = false;
+    for (const statement of sourceFile.statements.filter(ts.isImportDeclaration)) {
+        const specifier = ts.isStringLiteral(statement.moduleSpecifier) ? statement.moduleSpecifier.text : '';
+        if (!AGENT_NEUTRAL_MODULES.has(specifier) && !AGENT_OPERATION_MODULES.has(specifier)) {
+            issues.add(`${specifier} must be classified as an operation or neutral module of the agent channel`);
+        }
+        const clause = statement.importClause;
+        if (!clause || clause.isTypeOnly) continue;
+        const named = clause.namedBindings && ts.isNamedImports(clause.namedBindings) ? clause.namedBindings.elements : [];
+        if (specifier === AGENT_CHANNEL_MODULE) {
+            for (const element of named) {
+                if ((element.propertyName ?? element.name).text === AGENT_CHANNEL_GUARD) {
+                    if (element.propertyName) issues.add(`${AGENT_CHANNEL_GUARD} must be imported unaliased`);
+                    else guardImported = true;
+                }
+            }
+        }
+        if (!AGENT_OPERATION_MODULES.has(specifier)) continue;
+        if (clause.name || (clause.namedBindings && !ts.isNamedImports(clause.namedBindings))) {
+            issues.add(`${specifier} must use named imports`);
+        }
+        for (const element of named) {
+            if (!element.isTypeOnly && !AGENT_OPERATION_ERRORS.has((element.propertyName ?? element.name).text)) operationBindings.add(element.name.text);
+        }
+    }
+    const isFactoryCall = (node) => ts.isCallExpression(node.parent) && node.parent.expression === node
+        && ts.isVariableDeclaration(node.parent.parent) && node.parent.parent.initializer === node.parent
+        && ts.isIdentifier(node.parent.parent.name);
+    const visit = (node, guarded) => {
+        if (ts.isImportDeclaration(node)) return;
+        if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === AGENT_CHANNEL_GUARD && guardImported) {
+            const [, , operation, consume] = node.arguments;
+            const operationFree = !operation || operation.kind === ts.SyntaxKind.NullKeyword;
+            if (operationFree && !AGENT_OPERATION_FREE_READS.has(relativePath)) {
+                issues.add(`${AGENT_CHANNEL_GUARD} without an operation is reserved for operation-free reads`);
+            }
+            node.arguments.forEach((argument) => visit(argument, argument === consume ? guarded || !operationFree : guarded));
+            return;
+        }
+        if (ts.isIdentifier(node) && operationBindings.has(node.text) && !guarded
+            && !(ts.isPropertyAccessExpression(node.parent) && node.parent.name === node)
+            && !(ts.isVariableDeclaration(node.parent) && node.parent.name === node)) {
+            if (isFactoryCall(node)) operationBindings.add(node.parent.parent.name.text);
+            else issues.add(`${node.text} must run inside the consume callback of ${AGENT_CHANNEL_GUARD} with an operation`);
+        }
+        ts.forEachChild(node, (child) => visit(child, guarded));
+    };
+    visit(sourceFile, false);
+    return [...issues];
+}
+
+function runAgentRouteChannelCheck() {
+    const routes = [];
+    walkRuntimeTree(path.join(ROOT_DIR, AGENT_ROUTE_ROOT), routes);
+    for (const route of routes.filter((file) => path.basename(file) === 'route.ts')) {
+        const relativePath = path.relative(ROOT_DIR, route).split(path.sep).join('/');
+        for (const issue of validateAgentRouteSource(fs.readFileSync(route, 'utf8'), relativePath)) addFinding({
+            code: 'NR-AGENT-CHANNEL', file: relativePath, line: 1, message: issue, snippet: 'agent operations pass through the mandate egress check',
+        });
+    }
 }
 
 export function validateLegacyOcrRetirementSource(source) {
