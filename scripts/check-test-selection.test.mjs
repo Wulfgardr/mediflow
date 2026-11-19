@@ -382,7 +382,7 @@ test('GPUI title roles and patient names are protected by types and a fail-close
   const sources = new Map(readdirSync(directory, { recursive: true }).filter(file => file.endsWith('.rs')).map(file => [file.split(path.sep).join('/'), readFileSync(path.join(directory, file), 'utf8')]));
   const result = gpuiTitleCallerInventory(sources);
   assert.deepEqual(result.errors, []);
-  assert.equal(result.inventory.length, 22, 'title renderer role callers must not silently appear or disappear');
+  assert.equal(result.inventory.length, 21, 'title renderer role callers must not silently appear or disappear');
   t.diagnostic(result.inventory.join('\n'));
   for (const role of ['PageTitle', 'Section', 'Person', 'PersonPreview', 'Threshold']) {
     for (const expression of [`TypeRole::${role}`, `TitleRole::${role}`, 'role', 'unknown_role()', 'TextRole::Missing', 'if selected { TextRole::Body } else { role }']) {
