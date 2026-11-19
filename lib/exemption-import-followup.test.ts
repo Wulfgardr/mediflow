@@ -199,7 +199,14 @@ test('scheduled export from a historical SQLite without the receipt table produc
 test('a restore admitted on A cannot overwrite B after waiting for its body', async () => {
     activeSession();
     const artifact = await (await backupRoute.GET()).json();
-    const request = syntheticExemptionRequest('http://localhost/api/system/backup-restore', { method: 'POST', headers: { origin: 'http://localhost', 'sec-fetch-site': 'same-origin', 'content-type': 'application/json' } });
+    const { readRestorePreviewSnapshot } = await import('./backup-restore-receipt');
+    const request = syntheticExemptionRequest('http://localhost/api/system/backup-restore', { method: 'POST', headers: {
+        origin: 'http://localhost', 'sec-fetch-site': 'same-origin', 'content-type': 'application/json',
+        'x-mediflow-restore-id': '12345678-1234-4123-8123-123456789012',
+        'x-mediflow-restore-snapshot': readRestorePreviewSnapshot(),
+        'x-mediflow-restore-source-checksum': artifact.manifest.checksum,
+        'x-mediflow-restore-confirmation': 'RIPRISTINA',
+    } });
     const { rotateSqliteArchiveGeneration, readSqliteArchiveGeneration } = await import('./archive-generation');
     let generationB: string;
     Object.defineProperty(request, 'json', { value: async () => {

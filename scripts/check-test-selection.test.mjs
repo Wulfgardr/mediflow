@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { checkTestSelection, discoverTestFiles, existingListedPaths, readCheckoutSource } from './check-test-selection.mjs';
+import { checkTestSelection, collectUnitSelection, discoverTestFiles, existingListedPaths, readCheckoutSource } from './check-test-selection.mjs';
 import { collectNativeToolSelections } from './native-tool-test-selection.mjs';
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -58,6 +58,45 @@ test('a deleted file still listed by git is not read as a test', () => {
 });
 
 const sourceRoot = fileURLToPath(new URL('..', import.meta.url));
+
+test('unit inventory follows the npm script and the unconditional Web Core CI step', () => {
+  const selection = collectUnitSelection(sourceRoot);
+  assert.deepEqual(selection.errors, []);
+  assert.ok(selection.files.includes('scripts/run-strip-types.test.mjs'));
+});
+
+test('unit inventory fails when the workflow skips the suite or npm changes its runner', t => {
+  const root = mkdtempSync(path.join(tmpdir(), 'mediflow-unit-ci-selection-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const workflow = path.join(root, '.github/workflows/web-core.yml');
+  mkdirSync(path.dirname(workflow), { recursive: true });
+  const pkg = path.join(root, 'package.json');
+  const source = `on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  web-core:
+    runs-on: ubuntu-latest
+    steps:
+      - run: npm run test:unit
+`;
+  for (const [workflowSource, npmCommand, error] of [
+    [source.replace('npm run test:unit', 'echo skipped'), 'node scripts/run-unit-suite.mjs',
+      'Expected exactly one literal CI call: test:unit; found 0'],
+    [source.replace('      - run:', "      - if: github.event_name == 'push'\n        run:"),
+      'node scripts/run-unit-suite.mjs', 'Unit CI job and step must run unconditionally'],
+    [source, 'node --test scripts/one.test.mjs', 'Required npm command changed or missing: test:unit'],
+  ]) {
+    writeFileSync(workflow, workflowSource);
+    writeFileSync(pkg, JSON.stringify({ scripts: { 'test:unit': npmCommand } }));
+    const selection = collectUnitSelection(root);
+    assert.deepEqual(selection.files, []);
+    assert.deepEqual(checkTestSelection([], { unit: selection }, []).errors,
+      [`INCOMPLETE_SELECTION: unit: ${error}`, 'EMPTY_SELECTION: unit']);
+  }
+});
+
 const pilot = 'experiments/gpui-patient-pilot';
 const pilotWorkflow = '.github/workflows/rust-gpui-pilot.yml';
 const pilotFiles = ['client/tests/flow.rs', 'client/tests/patient_names.rs', 'app/src/demo_app_tests.rs', 'app/src/chat_access/owner.rs', 'app/src/chat_access/chain.rs', 'app/src/chat_access/native.rs', 'app/src/chat_access/card.rs', 'app/src/chat_access/references.rs', 'app/src/clinical_text.rs', 'app/src/clinical_units.rs', 'app/src/components.rs', 'app/src/demo.rs', 'app/src/documents.rs', 'app/src/documents/pdf.rs', 'app/tests/document_pdf.rs', 'app/tests/identity_contract.rs', 'app/src/editing.rs', 'app/src/main.rs', 'app/src/native_lock.rs', 'app/src/navigation.rs', 'app/src/patient_forms.rs', 'app/src/patient_text.rs', 'app/src/platform_integration.rs', 'app/src/references.rs', 'app/src/shell.rs', 'app/src/shell/account_profile.rs', 'app/src/shell/agenda_flow.rs', 'app/src/shell/ambulatories.rs', 'app/src/shell/ai_preferences.rs', 'app/src/shell/ai_status.rs', 'app/src/shell/analytics.rs', 'app/src/shell/chat_access.rs', 'app/src/shell/document_details.rs', 'app/src/shell/document_library.rs', 'app/src/shell/patient_document.rs', 'app/src/shell/settings.rs', 'app/src/shell/local_preferences.rs', 'app/src/shell/local_settings.rs', 'app/src/shell/local_host.rs', 'app/src/shell/local_host/archives.rs', 'app/src/shell/local_host/security.rs', 'app/src/shell/local_host/models.rs', 'app/src/shell/local_host/models/provider.rs', 'app/src/shell/local_host/parameters.rs', 'app/src/shell/local_host/chatgpt.rs', 'app/src/shell/notes_recovery_tests.rs', 'app/src/shell/rendered_command.rs', 'app/src/shell/scales.rs', 'app/src/shell/therapy_picker.rs', 'app/src/shell/view_state.rs', 'app/src/shell/voice_model.rs', 'app/src/shell/who_lookup.rs', 'app/src/text_input.rs', 'app/src/theme.rs', 'app/src/title.rs',

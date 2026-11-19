@@ -29,7 +29,7 @@ export const SCHEDULED_BACKUP_RUNTIME_ROSTER = Object.freeze([
   ['lib/ambulatory-destructive-command-contract.ts', 'cfe41527fa09e7a0a16afebbbd48fe303c0a2fee229cf7d00bf637e83cd08315'],
   ['lib/agent-cassette-contract.ts', 'cb565028007af0a171b682e60ae09e380538bf1b3f66d8f5e0c6cdcdd7e81278'],
   ['lib/agent-cassette-crypto.ts', 'bfe97efa318f110c72c3a0ffbeff91b433248293dff70e0e8ab20c63a7747dc3'],
-  ['lib/backup-artifact.ts', '4c05d4632b54a53001b0d1b58d7fca3dc481ec129c2e6f3fb94ca282b16b455f'],
+  ['lib/backup-artifact.ts', '246f3add9bd187492574e6a32b0d475ecdc5838236382fd673d835cfe7fde60d'],
   ['lib/backup-audit.ts', '68d219d79cee938e1854199266f50ba53ff4598a5913982635a5c372bd44cd31'],
   ['lib/exemption-import-receipt.ts', '894cc749fa4f512f65d10e3ff66f0a445b129cd23c56627bfe0c549a932c1e3a'],
   ['lib/exemption-import-contract.ts', '12b97b4a54bca6a3d56103f442035b81d5269ec276789ee2febc0560e533b0e0'],
