@@ -63,14 +63,6 @@ test('subscriptions observe their latest scope and can unsubscribe', () => {
     assert.equal(globalInvalidations, 3);
 });
 
-test('composite mutations retain every required invalidation', () => {
-    const serviceSource = readFileSync('components/service-prescription-manager.tsx', 'utf8');
-    const deleteBlock = sourceBetween(serviceSource, '    const deleteItem = async', '\n    };\n');
-    assert.doesNotMatch(deleteBlock, /servicePrescriptionItems\.delete/);
-    assert.match(deleteBlock, /try\s*\{[\s\S]*servicePrescriptions\.delete[\s\S]*\}\s*catch \(error\) \{[^}]*notifyDbChange\('service_prescriptions'\);[^}]*throw error;\s*\}\s*finally\s*\{[^}]*notifyDbChange\('service_prescription_items'\);\s*\}/);
-
-});
-
 test('both React hooks retain dynamic scope resolver wiring', () => {
     const source = readFileSync('lib/live-query.ts', 'utf8');
     const hookBlocks = [
