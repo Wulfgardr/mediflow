@@ -1231,6 +1231,11 @@ fn live_diary_revisions_select_long_previous_text_at_narrow_width(cx: &mut gpui:
         app.select_patient(patient, true, cx);
         app.section_selected(PatientSection::Diary, cx);
     });
+    let current_session = |cx: &mut gpui::VisualTestContext| {
+        view.read_with(cx, |app, _| {
+            app.session.clone().expect("active profile session")
+        })
+    };
     let wait_for = |cx: &mut gpui::VisualTestContext, selector: &'static str| {
         for _ in 0..120 {
             notes_recovery_tests::draw(cx);
@@ -1242,35 +1247,56 @@ fn live_diary_revisions_select_long_previous_text_at_narrow_width(cx: &mut gpui:
         panic!("control {selector} was not rendered");
     };
     let click = |cx: &mut gpui::VisualTestContext, selector| {
-        for _ in 0..30 {
+        for _ in 0..80 {
             let bounds = wait_for(cx, selector);
-            if bounds.top() >= px(65.) && bounds.bottom() <= px(590.) {
+            let viewport = cx
+                .debug_bounds("threshold-full-plane")
+                .or_else(|| cx.debug_bounds("threshold-scroll"))
+                .unwrap();
+            let in_view = |area: gpui::Bounds<gpui::Pixels>| {
+                area.contains(&bounds.center())
+                    && bounds.top() >= area.top()
+                    && bounds.bottom() <= area.bottom() + px(1.)
+            };
+            if in_view(viewport) || cx.debug_bounds("threshold-bar").is_some_and(in_view) {
                 cx.simulate_click(bounds.center(), gpui::Modifiers::default());
                 notes_recovery_tests::draw(cx);
                 return;
             }
+            let delta = f32::from(viewport.center().y - bounds.center().y).clamp(-180., 180.);
             cx.simulate_event(gpui::ScrollWheelEvent {
-                position: gpui::point(px(550.), px(420.)),
-                delta: gpui::ScrollDelta::Pixels(gpui::point(
-                    px(0.),
-                    if bounds.top() < px(65.) {
-                        px(70.)
-                    } else {
-                        px(-70.)
-                    },
-                )),
+                position: viewport.center(),
+                delta: gpui::ScrollDelta::Pixels(gpui::point(px(0.), px(delta))),
                 ..Default::default()
             });
         }
-        panic!("control {selector} was not reachable");
+        panic!(
+            "control {selector} was not reachable: {:?} in {:?}",
+            cx.debug_bounds(selector),
+            cx.debug_bounds("threshold-scroll"),
+        );
     };
     let edit: &'static str =
         Box::leak(format!("clinical-workspace-edit-entry-{id}").into_boxed_str());
     let toggle = Box::leak(format!("clinical-workspace-entry-history-{id}").into_boxed_str());
-    let content = "clinical-workspace-edit-entry-content";
+    let wait_for_form = |cx: &mut gpui::VisualTestContext| {
+        for _ in 0..120 {
+            notes_recovery_tests::draw(cx);
+            if view.read_with(cx, |app, _| {
+                app.form
+                    .as_ref()
+                    .is_some_and(|form| form.kind == FormKind::Entry)
+            }) {
+                return;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        let message = view.read_with(cx, |app, _| app.message.clone());
+        panic!("the diary edit must open its existing form: {message:?}");
+    };
     let set_text = |cx: &mut gpui::VisualTestContext, text: &'static str| {
         click(cx, edit);
-        wait_for(cx, content);
+        wait_for_form(cx);
         view.update(cx, |app, cx| {
             app.form
                 .as_mut()
@@ -1287,7 +1313,7 @@ fn live_diary_revisions_select_long_previous_text_at_narrow_width(cx: &mut gpui:
     set_text(cx, "Testo sintetico annullato.");
     click(cx, "clinical-workspace-review-save");
     click(cx, "threshold-back");
-    let before = session
+    let before = current_session(cx)
         .read_entry_revisions(&scope, patient, &id, 1, 0)
         .unwrap();
     assert!(before.revisions.is_empty());
@@ -1314,14 +1340,18 @@ fn live_diary_revisions_select_long_previous_text_at_narrow_width(cx: &mut gpui:
             std::thread::sleep(std::time::Duration::from_millis(20));
         }
         assert_eq!(
-            session.read_entry(&scope, patient, &id).unwrap().version,
+            current_session(cx)
+                .read_entry(&scope, patient, &id)
+                .unwrap()
+                .version,
             index as u64 + 2
         );
         if index == 0 {
             click(cx, edit);
-            wait_for(cx, content);
+            wait_for_form(cx);
         }
     }
+    let session = current_session(cx);
     let retry = session.update_entry(&scope, patient, &id, first.version, &draft(second));
     assert_eq!(retry, Err(RuntimeError::ReadRequired));
     let current = session.read_entry(&scope, patient, &id).unwrap();
