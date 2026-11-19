@@ -138,7 +138,7 @@ impl Layout {
             compact,
             wide,
             magnified: text_scale >= 2.5 || effective < 360.,
-            navigation: (if wide { 192. } else { 160. }) * scale,
+            navigation: (if wide { 232. } else { 160. }) * scale,
             margin: if compact { 16. } else { 28. },
             gap: if wide { 40. } else { 24. },
             row: if compact { 44. } else { 40. },
