@@ -113,3 +113,23 @@ test('the clinical window follows the most recent date, not the order of appeara
         assert.deepEqual([uncued, visit as number - (exam as number), far], ['DAT', 7, 'DAT']);
     } finally { session.close(); }
 });
+
+test('a birth date written in ISO form leaves as NAS, from the registry or after a birth cue, and never as DAT', () => {
+    const known = 'Data di nascita 1972-04-17. Visita 03/11/2026.';
+    const session = createRedactionSession();
+    const prepared = session.prepare({ text: known, entities: [], knownIdentifiers: { birthDates: ['1972-04-17'] } });
+    assert.match(prepared.redactedText, /^Data di nascita \[\[MF_NAS1_[a-z2-7]{8}\]\]\. Visita \[\[MF_GG[+-][0-9]+_[a-z2-7]{8}\]\]\.$/u);
+    assert.equal(prepared.rehydrate(prepared.redactedText), known);
+    session.close();
+    const uncued = 'Paziente del 1972-04-17, controllo 03/11/2026.';
+    const other = createRedactionSession();
+    const registry = other.prepare({ text: uncued, entities: [], knownIdentifiers: { birthDates: ['17/04/1972'] } });
+    assert.match(registry.redactedText, /^Paziente del \[\[MF_NAS1_/u);
+    other.close();
+    const cued = 'Nata il 1972-04-17 a Milano.';
+    const neural = createRedactionSession();
+    const detected = neural.prepare({ text: cued, entities: [date(cued, '1972-04-17')] });
+    assert.match(detected.redactedText, /^Nata il \[\[MF_NAS1_/u);
+    assert.doesNotMatch(detected.redactedText, /MF_DAT/u);
+    neural.close();
+});

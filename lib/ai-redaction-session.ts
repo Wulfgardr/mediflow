@@ -3,7 +3,7 @@ import { types } from 'node:util';
 import { evaluateEgress } from './ai-egress-gate';
 import type { RedactionEntityType } from './redaction-contracts';
 import { localIdentifierSpans } from './redaction-identifier-spans';
-import { ANCHOR_SPREAD_DAYS, birthDateDays, clinicalDateDay, dayFromOffset, followsBirthCue, formatDay, inClinicalWindow, nameWords, offsetFromAnchor, registryNameWords } from './redaction-date-offsets';
+import { ANCHOR_SPREAD_DAYS, birthDateDays, clinicalDateDay, dayFromOffset, followsBirthCue, formatDay, inClinicalWindow, isoDay, nameWords, offsetFromAnchor, registryNameWords, writtenDateDay } from './redaction-date-offsets';
 
 export type RedactionSessionEntity = Readonly<{
     type: RedactionEntityType;
@@ -271,12 +271,19 @@ export function createRedactionSession(): Readonly<{
                 const start = match.index + match[0].lastIndexOf(match[1]);
                 spans.push({ start, end: start + match[1].length, type: 'address' });
             }
-            const merged = mergeSpans(input.text, [...withoutNeuralDatesAroundClinicalDates(input.text, neural, spans), ...spans]);
             const birthDays = birthDateDays(input.knownIdentifiers?.birthDates);
+            for (const day of birthDays) {
+                for (const match of input.text.matchAll(new RegExp(`(?<![0-9])${isoDay(day)}(?![0-9])`, 'gu'))) {
+                    spans.push({ start: match.index, end: match.index + match[0].length, type: 'date' });
+                }
+            }
+            const merged = mergeSpans(input.text, [...withoutNeuralDatesAroundClinicalDates(input.text, neural, spans), ...spans]);
             const registryWords = registryNameWords(input.knownIdentifiers?.names);
             const dates = new Map(merged.map(span => {
-                const day = clinicalDateDay(input.text.slice(span.start, span.end));
-                const birth = day !== null && (birthDays.has(day) || followsBirthCue(input.text.slice(0, span.start)));
+                const raw = input.text.slice(span.start, span.end);
+                const day = clinicalDateDay(raw);
+                const written = day ?? writtenDateDay(raw);
+                const birth = written !== null && (birthDays.has(written) || followsBirthCue(input.text.slice(0, span.start)));
                 return [span, { day, birth }] as const;
             }));
             const clinicalDays = [...dates.values()].flatMap(({ day, birth }) => day !== null && !birth ? [day] : []);

@@ -21,12 +21,19 @@ export function clinicalDateDay(text: string): number | null {
     return match ? calendarDay(Number(match[3]), Number(match[2]), Number(match[1])) : null;
 }
 
+export function writtenDateDay(text: string): number | null {
+    const iso = ISO_DATE.exec(text);
+    return iso ? calendarDay(Number(iso[1]), Number(iso[2]), Number(iso[3])) : clinicalDateDay(text);
+}
+
+export function isoDay(day: number): string {
+    return new Date(day * DAY_MS).toISOString().slice(0, 10);
+}
+
 export function birthDateDays(values: readonly string[] | undefined): ReadonlySet<number> {
     const days = new Set<number>();
     for (const value of values ?? []) {
-        const trimmed = value.trim();
-        const iso = ISO_DATE.exec(trimmed);
-        const day = iso ? calendarDay(Number(iso[1]), Number(iso[2]), Number(iso[3])) : clinicalDateDay(trimmed);
+        const day = writtenDateDay(value.trim());
         if (day !== null) days.add(day);
     }
     return days;
