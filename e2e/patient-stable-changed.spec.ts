@@ -1,3 +1,4 @@
+import { diaryEntrySealer } from './fixtures/sealed-diary-entry';
 import Database from 'better-sqlite3';
 import { join } from 'node:path';
 import { expect, test, type Locator, type Page } from '@playwright/test';
@@ -22,9 +23,9 @@ function updateSyntheticArchive(update: (database: Database.Database) => void) {
 }
 
 async function seed(page: Page, { crowded = false, twin = false, withDocument = true } = {}) {
-    const fixture = await page.evaluate(async ({ original, sourceName, crowded, twin, withDocument }) => {
-        async function post(entity: string, body: object) {
-            const response = await fetch(`/api/${entity}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const fixture = await page.evaluate(async ({ original, sourceName, crowded, twin, withDocument, seal }) => {
+        async function post(entity: string, body: Record<string, unknown>) {
+            const response = await fetch(`/api/${entity}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(entity === 'entries' ? await seal(body) : body) });
             if (!response.ok) throw new Error(`Fixture ${entity}: ${response.status}`);
             return response.json() as Promise<{ id: string }>;
         }
@@ -71,7 +72,7 @@ async function seed(page: Page, { crowded = false, twin = false, withDocument = 
         if (withDocument) await post('attachments', { id: crypto.randomUUID(), patientId: patient.id, name: sourceName, type: 'text/plain', size: original.length,
             path: `uploads/${sourceName}`, data: `data:text/plain;base64,${btoa(original)}` });
         return { patient, other, returning, first, visit, active, activeName, changed, suspendedName, observationId, previousObservationId };
-    }, { original, sourceName, crowded, twin, withDocument });
+    }, { original, sourceName, crowded, twin, withDocument, seal: await diaryEntrySealer(page) });
     const at = (day: number) => Date.UTC(2026, 1, day, 12) / 1000;
     const offset = twin ? 2 : 0;
     updateSyntheticArchive(database => {

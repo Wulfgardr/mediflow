@@ -1,7 +1,7 @@
 from pathlib import Path
 import json, subprocess, sys, os
 scratch=Path(os.environ.get('MEDIFLOW_UI_APPLE_SCRATCH', '/Volumes/Vision/mf-ui-identita-20261107-scratch/apple'))
-banco=Path('/Users/leonardopegollo/Antigravity/mf-ui-identita-20261107/BANCO.md')
+banco = Path(os.environ.get('MEDIFLOW_UI_CAPTURE_OUTPUT') or Path.home() / 'Antigravity' / 'mf-ui-identita-20261107') / 'BANCO.md'
 if not banco.exists(): raise SystemExit('BANCO.md assente: attendo la lane proprietaria del banco')
 paired=json.loads(subprocess.check_output(['node','scripts/ui-identita/banco.mjs','pair',sys.argv[1] if len(sys.argv)>1 else 'ios'],text=True, cwd=os.environ.get('MEDIFLOW_UI_BANCO_WORKTREE', str(Path(__file__).resolve().parents[3]))))
 (scratch/f'pair-{paired["platform"]}.json').write_text(json.dumps(paired,indent=2))

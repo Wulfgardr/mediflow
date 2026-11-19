@@ -3,6 +3,7 @@ import { mkdir } from 'node:fs/promises';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow, assertNotClippedInViewport } from './utils';
 import { fetchInterceptedRequest } from './fixtures/trusted-web-request';
+import { sealDiaryEntry } from './fixtures/sealed-diary-entry';
 
 const PROSE = 'Racconto clinico sintetico W15a: il testo originale resta leggibile, con enfasi e riferimenti conservati.';
 const ORIGINAL = 'Originale inventato W15a: fonte documentale del diario, senza dati reali.';
@@ -15,19 +16,30 @@ test('Diario paziente: prosa, provenienza e storico senza cambiare Scale o Timel
     const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
     try {
         await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-        const fixture = await page.evaluate(async ({ prose, original }) => {
+        const parent = await page.evaluate(async original => {
             const post = async (path: string, body: unknown) => {
                 const response = await fetch(`/api/${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
                 if (!response.ok) throw new Error(`Synthetic ${path}: ${response.status}`); return response.json();
             };
             const patient = await post('patients', { firstName: 'Diario', lastName: 'Sintetico', taxCode: `D15${crypto.randomUUID().replaceAll('-', '').slice(0, 13).toUpperCase()}`, birthDate: '1980-01-01T00:00:00Z', diagnoses: [] });
             const attachment = await post('attachments', { id: crypto.randomUUID(), patientId: patient.id, name: 'fonte-diario-inventata.txt', type: 'text/plain', size: original.length, path: 'uploads/fonte-diario-inventata.txt', data: `data:text/plain;base64,${btoa(original)}` });
-            const entry = await post('entries', { patientId: patient.id, type: 'visit', date: '2026-10-26T10:00:00Z', title: 'Controllo sintetico W15a', content: `<p>${prose}</p><p>Secondo paragrafo con <strong>enfasi originale</strong> e <a href="https://synthetic.invalid/fonte">riferimento inventato</a>.</p>`, setting: 'ambulatory', attachments: [attachment.id], metadata: { authorName: 'Ada Sintetica', sourceLabel: 'Fonte documentale inventata', workflowStatus: 'signed' } });
-            await post('entries', { patientId: patient.id, type: 'phone', date: '2026-10-25T09:30:00Z', title: 'Bozza sintetica conservata', content: 'Bozza storica sintetica W15a senza autore dichiarato.', setting: 'home', metadata: { workflowStatus: 'draft' } });
-            await post('entries', { patientId: patient.id, type: 'legacy-local-note', date: '2026-10-24T09:00:00Z', title: 'Voce storica non classificata', content: 'Voce storica sintetica W15a: tipo non conosciuto, contenuto conservato.' });
-            const scale = await post('entries', { patientId: patient.id, type: 'scale', date: '2026-10-23T08:00:00Z', title: 'Scala inventata W15a', content: 'Valutazione storica sintetica W15a.', metadata: { title: 'Scala inventata W15a', score: 5, interpretation: 'Interpretazione registrata inventata' } });
-            return { patientId: patient.id as string, entryId: entry.id as string, scaleId: scale.id as string };
-        }, { prose: PROSE, original: ORIGINAL });
+            return { patientId: patient.id as string, attachmentId: attachment.id as string };
+        }, ORIGINAL);
+        const diaryEntries = await Promise.all([
+            { patientId: parent.patientId, type: 'visit', date: '2026-10-26T10:00:00Z', title: 'Controllo sintetico W15a', content: `<p>${PROSE}</p><p>Secondo paragrafo con <strong>enfasi originale</strong> e <a href="https://synthetic.invalid/fonte">riferimento inventato</a>.</p>`, setting: 'ambulatory', attachments: [parent.attachmentId], metadata: { authorName: 'Ada Sintetica', sourceLabel: 'Fonte documentale inventata', workflowStatus: 'signed' } },
+            { patientId: parent.patientId, type: 'phone', date: '2026-10-25T09:30:00Z', title: 'Bozza sintetica conservata', content: 'Bozza storica sintetica W15a senza autore dichiarato.', setting: 'home', metadata: { workflowStatus: 'draft' } },
+            { patientId: parent.patientId, type: 'legacy-local-note', date: '2026-10-24T09:00:00Z', title: 'Voce storica non classificata', content: 'Voce storica sintetica W15a: tipo non conosciuto, contenuto conservato.' },
+            { patientId: parent.patientId, type: 'scale', date: '2026-10-23T08:00:00Z', title: 'Scala inventata W15a', content: 'Valutazione storica sintetica W15a.', metadata: { title: 'Scala inventata W15a', score: 5, interpretation: 'Interpretazione registrata inventata' } },
+        ].map(entry => sealDiaryEntry(page, entry)));
+        const fixture = await page.evaluate(async ({ patientId, bodies }) => {
+            const ids: string[] = [];
+            for (const body of bodies) {
+                const response = await fetch('/api/entries', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+                if (!response.ok) throw new Error(`Synthetic entries: ${response.status}`);
+                ids.push((await response.json()).id);
+            }
+            return { patientId, entryId: ids[0], scaleId: ids[3] };
+        }, { patientId: parent.patientId, bodies: diaryEntries });
         await page.goto(`/patients/${fixture.patientId}/modules`); await openPatientSection(page, 'diario');
         const pane = page.locator('#diario'), feed = pane.getByRole('feed', { name: 'Diario clinico del paziente', exact: true });
         await expect(feed.locator(':scope > article')).toHaveCount(3);
@@ -132,13 +144,17 @@ test('Diario paziente distingue metadata object/JSON, assenti, illeggibili e sta
     test.setTimeout(90_000);
     if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL || !['127.0.0.1', 'localhost'].includes(new URL(baseURL).hostname) || new URL(baseURL).port === '3000') throw new Error('Runtime e archivio sintetici isolati richiesti');
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-    const fixture = await page.evaluate(async () => {
-        const post = async (path: string, body: unknown) => { const response = await fetch(`/api/${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }); if (!response.ok) throw new Error(String(response.status)); return response.json(); };
-        const metadata = { authorName: 'Ada Sintetica', sourceLabel: 'Fonte inventata coerente', workflowStatus: 'signed' };
-        const patient = await post('patients', { firstName: 'Metadati', lastName: 'Sintetici', taxCode: crypto.randomUUID(), birthDate: '1980-01-01', diagnoses: [] });
-        const entry = await post('entries', { patientId: patient.id, type: 'visit', date: '2026-10-26T10:00:00Z', title: 'Voce singola sintetica', content: 'Testo originale della stessa voce W15a.', setting: 'ambulatory', metadata });
-        return { patientId: patient.id, entryId: entry.id, metadata };
+    const patientId = await page.evaluate(async () => {
+        const response = await fetch('/api/patients', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ firstName: 'Metadati', lastName: 'Sintetici', taxCode: crypto.randomUUID(), birthDate: '1980-01-01', diagnoses: [] }) });
+        if (!response.ok) throw new Error(String(response.status)); return (await response.json()).id as string;
     });
+    const singleMetadata = { authorName: 'Ada Sintetica', sourceLabel: 'Fonte inventata coerente', workflowStatus: 'signed' };
+    const singleEntry = await sealDiaryEntry(page, { patientId, type: 'visit', date: '2026-10-26T10:00:00Z', title: 'Voce singola sintetica', content: 'Testo originale della stessa voce W15a.', setting: 'ambulatory', metadata: singleMetadata });
+    const fixture = await page.evaluate(async ({ body, metadata }) => {
+        const response = await fetch('/api/entries', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+        if (!response.ok) throw new Error(String(response.status));
+        return { patientId: body.patientId, entryId: (await response.json()).id as string, metadata };
+    }, { body: singleEntry, metadata: singleMetadata });
     let metadata: unknown = fixture.metadata;
     await page.route('**/api/entries?*', async route => {
         if (new URL(route.request().url()).searchParams.get('patientId') !== fixture.patientId) return route.continue();
@@ -158,7 +174,7 @@ test('Diario paziente distingue metadata object/JSON, assenti, illeggibili e sta
     metadata = { ...fixture.metadata, workflowStatus: 'future-unrecognized-state' }; await read(); await expect(row).toContainText('Stato non riconosciuto'); await expect(row).toContainText('Ada Sintetica'); await expect(row.locator('[data-ink]')).toHaveCount(0);
     metadata = null; await read(); await expect(row).toContainText('Registrata'); await expect(row).not.toContainText('Metadati della voce non leggibili.'); await expect(row).not.toContainText('Autore:');
     const response = await page.request.get(`/api/entries?patientId=${fixture.patientId}`); const stored = await response.json();
-    expect(stored[0]).toMatchObject({ id: fixture.entryId, version: 1, metadata: JSON.stringify(fixture.metadata) });
+    expect(stored[0]).toMatchObject({ id: fixture.entryId, version: 1 }); expect(stored[0].metadata).toMatch(/^ENC:/u);
 });
 
 
@@ -166,14 +182,19 @@ test('registrazione del diario: autore server, orario di creazione e storico sen
     test.setTimeout(90_000);
     if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL || new URL(baseURL).port === '3000') throw new Error('Banco sintetico isolato richiesto');
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-    const fixture = await page.evaluate(async () => {
-        const post = async (path: string, body: unknown) => {
-            const response = await fetch(`/api/${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const registrationPatientId = await page.evaluate(async () => {
+        const response = await fetch('/api/patients', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ firstName: 'Registrazione', lastName: 'Sintetica', taxCode: crypto.randomUUID(), diagnoses: [] }) });
+        if (!response.ok) throw new Error(`Synthetic patients: ${response.status}`);
+        return (await response.json()).id as string;
+    });
+    const registrationBody = await sealDiaryEntry(page, { patientId: registrationPatientId, type: 'visit', date: '2099-01-01T08:00:00Z', title: 'Registrazione sintetica con autore', content: 'Prova della registrazione sintetica.' });
+    const fixture = await page.evaluate(async body => {
+        const post = async (path: string, value: unknown) => {
+            const response = await fetch(`/api/${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(value) });
             if (!response.ok) throw new Error(`Synthetic ${path}: ${response.status}`);
             return response.json();
         };
-        const patient = await post('patients', { firstName: 'Registrazione', lastName: 'Sintetica', taxCode: crypto.randomUUID(), diagnoses: [] });
-        const body = { patientId: patient.id, type: 'visit', date: '2099-01-01T08:00:00Z', title: 'Registrazione sintetica con autore', content: 'Prova della registrazione sintetica.' };
+        const patient = { id: body.patientId };
         const spoof = await fetch('/api/entries', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...body, recordedBy: 'Nome falso del client' }) });
         if (spoof.status !== 400) throw new Error(`Autore del client accettato: ${spoof.status}`);
         const entry = await post('entries', body);
@@ -185,7 +206,7 @@ test('registrazione del diario: autore server, orario di creazione e storico sen
         const at = new Date(stored.createdAt);
         return { patientId: patient.id as string, entryId: entry.id as string, author: expected as string,
             timestamp: `il ${at.toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })} alle ${at.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}` };
-    });
+    }, registrationBody);
     const read = async () => { await page.goto(`/patients/${fixture.patientId}/modules`); await openPatientSection(page, 'diario'); };
     await read();
     const row = page.locator('#diario article').filter({ hasText: 'Prova della registrazione sintetica.' });
