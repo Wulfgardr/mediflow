@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { harness } from './ai-settings-controller.test-support.ts';
 import { installNetworkPatientCookieFixture } from '../network-patient-authority-test-fixture';
-import { syntheticLoopbackRequest, syntheticWebClientRequest } from '../security/loopback-ingress-test-fixture';
+import { syntheticWebClientRequest } from '../security/loopback-ingress-test-fixture';
 import { issueSyntheticWebSessionContext, retireSyntheticWebSession } from '../security/web-auth-lifecycle-owner-test-fixture';
 import { readFunctionModelPreferences } from '../ai-providers/fabric/function-model-preferences';
 
@@ -48,7 +48,7 @@ const value = (key: string) => sql.prepare('SELECT value FROM settings WHERE key
 function request(url: string, options: RequestInit = {}) {
     cookieState.cookies.set('mediflow_session', active.session.id);
     cookieState.cookies.set('mediflow_auth_control', active.controlId);
-    const input = syntheticLoopbackRequest('http://127.0.0.1' + url, { ...options, headers: {
+    const input = syntheticWebClientRequest('http://127.0.0.1' + url, { ...options, headers: {
         'content-type': 'application/json', origin: 'http://127.0.0.1', 'sec-fetch-site': 'same-origin',
         'x-mediflow-archive-generation': currentArchiveGeneration(), ...options.headers,
     } });
