@@ -44,19 +44,19 @@ export function PatientProposalsSummary({ hasInsightProposal, hasSmartImportProp
                 <h3>Dati mancanti</h3>
                 <ul>{shown.proposal.gaps.map((gap, index) => <li key={`${index}-${gap}`}><PrivacyBlur intensity="sm">{gap}</PrivacyBlur></li>)}</ul>
             </div> : null}
-            {patientId ? <nav aria-label="Fonti della proposta" className={sheet.proposalSources}>
+            {patientId ? <nav aria-label="Sezioni della cartella per la revisione" className={sheet.proposalSources}>
                 <a href={`/patients/${patientId}/modules#terapie`}>Terapie</a>
                 <a href={`/patients/${patientId}/modules#diario`}>Diario</a>
                 <a href={`/patients/${patientId}/modules#quadro`}>Scheda clinica</a>
             </nav> : null}
         </> : null}
+        {shown && generated && Number.isFinite(generated.getTime()) ? <p className={sheet.proposalReceipt}>
+            Generata <time dateTime={generated.toISOString()}>{generated.toDateString() === new Date().toDateString() ? 'oggi' : `il ${generated.toLocaleDateString('it-IT')}`} alle {generated.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</time> <span title={shown.receipt.model}>{venueLabels[shown.receipt.venue]}</span>.{shown.receipt.egress === 'none' ? ' Nessun dato inviato all’esterno.' : null}
+        </p> : null}
         <span className={styles.links}>
-            <a href="#patient-insight" className="mf-button-secondary"><Sparkles size={16} aria-hidden="true" />Apri il Quadro e le fonti</a>
+            <a href="#patient-insight" aria-label="Apri il Quadro e le fonti" className="mf-button-secondary"><Sparkles size={16} aria-hidden="true" />Apri il Quadro</a>
             {smartImportAvailable ? <a href="#smart-import" className="mf-button-text">Smart Import</a> : null}
         </span>
-        {shown && generated && Number.isFinite(generated.getTime()) ? <p className={sheet.proposalReceipt}>
-            Generata il <time dateTime={generated.toISOString()}>{generated.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' })} alle {generated.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</time> {venueLabels[shown.receipt.venue]} <span title={shown.receipt.model}>{shown.receipt.model}</span>.{shown.receipt.egress === 'none' ? ' Nessuna uscita dati.' : null}
-        </p> : null}
     </div>;
 }
 

@@ -188,7 +188,10 @@ test('Il riepilogo rende la sintesi, i dati mancanti e la ricevuta della propost
   await expect(island).toContainText(summary);
   await expect(island.getByRole('heading', { name: 'Dati mancanti' })).toBeVisible();
   await expect(island).toContainText(gap);
-  await expect(island).toContainText(`dal modello locale ${MODEL}. Nessuna uscita dati.`);
+  await expect(island).toContainText('dal modello locale. Nessun dato inviato all’esterno.');
+  await expect(island.getByText('dal modello locale', { exact: true })).toHaveAttribute('title', MODEL);
+  await island.getByRole('link', { name: 'Apri il Quadro e le fonti' }).click();
+  await expect(page.getByTestId('patient-insight-review-proposal')).toContainText(MODEL);
 });
 
 for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '390', '320', 'zoom-200', 'zoom-400']) {
