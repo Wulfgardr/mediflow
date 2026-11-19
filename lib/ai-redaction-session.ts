@@ -1,8 +1,9 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, randomInt } from 'node:crypto';
 import { types } from 'node:util';
 import { evaluateEgress } from './ai-egress-gate';
 import type { RedactionEntityType } from './redaction-contracts';
 import { localIdentifierSpans } from './redaction-identifier-spans';
+import { ANCHOR_SPREAD_DAYS, birthDateDays, clinicalDateDay, dayFromOffset, followsBirthCue, formatDay, offsetFromAnchor } from './redaction-date-offsets';
 
 export type RedactionSessionEntity = Readonly<{
     type: RedactionEntityType;
@@ -38,8 +39,10 @@ const ROLE_BY_TYPE = {
     person: 'PER', date: 'DAT', phone: 'TEL', address: 'IND', tax_id: 'CF',
     email: 'EML', organization: 'ORG', identifier: 'ID', other: 'ALT',
 } as const satisfies Record<RedactionEntityType, string>;
-export type PlaceholderRole = (typeof ROLE_BY_TYPE)[RedactionEntityType] | 'PAZ';
-export const PLACEHOLDER_PATTERN = /\[\[MF_(PAZ|PER|DAT|TEL|IND|CF|EML|ORG|ID|ALT)([1-9][0-9]{0,3})_([a-z2-7]{8})\]\]/gu;
+type NamedRole = (typeof ROLE_BY_TYPE)[RedactionEntityType] | 'PAZ' | 'NAS';
+export type PlaceholderRole = NamedRole | 'GG';
+export const PLACEHOLDER_PATTERN = /\[\[MF_(?:(PAZ|PER|DAT|NAS|TEL|IND|CF|EML|ORG|ID|ALT)([1-9][0-9]{0,3})|GG(\+0|[+-][1-9][0-9]{0,4}))_([a-z2-7]{8})\]\]/gu;
+const DATE_OFFSET_PLACEHOLDER = /^\[\[MF_GG(\+0|[+-][1-9][0-9]{0,4})_([a-z2-7]{8})\]\]$/u;
 export const RESERVED_PLACEHOLDER_NAMESPACE = /\[\[\s*MF|MF_(?:PAZ|PER|DAT|NAS|TEL|IND|CF|EML|ORG|ID|ALT)\s*[0-9]|MF_GG\s*[+-]/iu;
 export type ResolvedPlaceholder = Readonly<{ role: PlaceholderRole; value: string }>;
 type Span = { start: number; end: number; type: RedactionEntityType; patient?: true };
@@ -203,12 +206,22 @@ function mergeSpans(text: string, spans: Span[]): Span[] {
     return merged;
 }
 
-function roleOf(span: Span): PlaceholderRole {
+function roleOf(span: Span): NamedRole {
     return span.type === 'person' && span.patient ? 'PAZ' : ROLE_BY_TYPE[span.type];
 }
 
-/** Server-side RAM composition only: this object grants no admission or egress.
- * Placeholders carry a role and a nonce that no other live session holds. */
+function withoutNeuralDatesAroundClinicalDates(text: string, neural: Span[], local: Span[]): Span[] {
+    const dates = local.filter(span => clinicalDateDay(text.slice(span.start, span.end)) !== null);
+    return neural.filter(span => {
+        if (span.type !== 'date') return true;
+        const inside = dates.filter(date => date.start < span.end && span.start < date.end);
+        if (!inside.length || inside.some(date => date.start < span.start || date.end > span.end)) return true;
+        let residual = '', cursor = span.start;
+        for (const date of inside.sort((a, b) => a.start - b.start)) { residual += text.slice(cursor, date.start); cursor = date.end; }
+        return /[0-9]/u.test(residual + text.slice(cursor, span.end));
+    });
+}
+
 export function createRedactionSession(): Readonly<{
     prepare: (input: RedactionSessionInput) => PreparedRedaction;
     resolve: (placeholder: string) => ResolvedPlaceholder;
@@ -217,7 +230,9 @@ export function createRedactionSession(): Readonly<{
     const nonce = allocateLiveNonce();
     const tokensByValue = new Map<string, string>();
     const valuesByToken = new Map<string, ResolvedPlaceholder>();
-    const roleCounts = new Map<PlaceholderRole, number>();
+    const roleCounts = new Map<NamedRole, number>();
+    const rawByOffset = new Map<number, string>();
+    let anchor: number | undefined;
     const preparations = new Set<Map<string, string>>();
     let closed = false;
     const assertOpen = () => {
@@ -225,16 +240,21 @@ export function createRedactionSession(): Readonly<{
     };
     const resolve = (placeholder: string): ResolvedPlaceholder => {
         assertOpen();
-        const resolved = typeof placeholder === 'string' ? valuesByToken.get(placeholder) : undefined;
-        if (!resolved) throw new Error('Unknown redaction placeholder');
-        return resolved;
+        if (typeof placeholder !== 'string') throw new Error('Unknown redaction placeholder');
+        const named = valuesByToken.get(placeholder);
+        if (named) return named;
+        const offset = DATE_OFFSET_PLACEHOLDER.exec(placeholder);
+        const day = offset && offset[2] === nonce && anchor !== undefined ? dayFromOffset(anchor, Number(offset[1])) : null;
+        if (day === null || !offset) throw new Error('Unknown redaction placeholder');
+        return Object.freeze({ role: 'GG', value: rawByOffset.get(Number(offset[1])) ?? formatDay(day) });
     };
     return Object.freeze({
         prepare(rawInput: RedactionSessionInput): PreparedRedaction {
             assertOpen();
             if (preparations.size >= 64) throw new Error('Redaction preparation budget exceeded');
             const input = snapshot(rawInput);
-            const spans = validate(input);
+            const neural = validate(input);
+            const spans: Span[] = [];
             const layerOne = evaluateEgress({
                 text: input.text, lane: 'clinical',
                 knownIdentifiers: input.knownIdentifiers ? {
@@ -255,7 +275,8 @@ export function createRedactionSession(): Readonly<{
                 const start = match.index + match[0].lastIndexOf(match[1]);
                 spans.push({ start, end: start + match[1].length, type: 'address' });
             }
-            const merged = mergeSpans(input.text, spans);
+            const merged = mergeSpans(input.text, [...withoutNeuralDatesAroundClinicalDates(input.text, neural, spans), ...spans]);
+            const birthDays = birthDateDays(input.knownIdentifiers?.birthDates);
             const newValues = new Set(merged.map(span => input.text.slice(span.start, span.end))
                 .filter(value => !tokensByValue.has(value)));
             if (tokensByValue.size + newValues.size > 4096) throw new Error('Redaction value budget exceeded');
@@ -266,9 +287,21 @@ export function createRedactionSession(): Readonly<{
             let cursor = 0;
             for (const span of merged) {
                 const raw = input.text.slice(span.start, span.end);
+                const day = clinicalDateDay(raw);
+                const birth = day !== null && (birthDays.has(day) || followsBirthCue(input.text.slice(0, span.start)));
                 let token = tokensByValue.get(raw);
+                if (token && birth && DATE_OFFSET_PLACEHOLDER.test(token)) throw new Error('Redaction birth date already offset');
+                if (!token && day !== null && !birth) {
+                    anchor ??= day + randomInt(-ANCHOR_SPREAD_DAYS, ANCHOR_SPREAD_DAYS + 1);
+                    const offset = offsetFromAnchor(day, anchor);
+                    if (offset !== null) {
+                        token = `[[MF_GG${offset < 0 ? '-' : '+'}${Math.abs(offset)}_${nonce}]]`;
+                        tokensByValue.set(raw, token);
+                        if (!rawByOffset.has(offset)) rawByOffset.set(offset, raw);
+                    }
+                }
                 if (!token) {
-                    const role = roleOf(span);
+                    const role: NamedRole = birth ? 'NAS' : day !== null ? 'DAT' : roleOf(span);
                     const ordinal = (roleCounts.get(role) ?? 0) + 1;
                     roleCounts.set(role, ordinal);
                     token = `[[MF_${role}${ordinal}_${nonce}]]`;
@@ -290,7 +323,12 @@ export function createRedactionSession(): Readonly<{
                 rehydrate(output: string): string {
                     assertOpen();
                     if (typeof output !== 'string') throw new Error('Invalid redaction output');
-                    return output.replace(PLACEHOLDER_PATTERN, token => values.get(token) ?? token);
+                    return output.replace(PLACEHOLDER_PATTERN, token => {
+                        const own = values.get(token);
+                        if (own !== undefined) return own;
+                        if (!DATE_OFFSET_PLACEHOLDER.test(token)) return token;
+                        try { return resolve(token).value; } catch { return token; }
+                    });
                 },
             });
         },
@@ -300,6 +338,8 @@ export function createRedactionSession(): Readonly<{
             closed = true;
             tokensByValue.clear();
             valuesByToken.clear();
+            rawByOffset.clear();
+            anchor = undefined;
             for (const values of preparations) values.clear();
             preparations.clear();
         },
