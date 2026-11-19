@@ -18,6 +18,10 @@ test.describe.configure({ retries: 0 });
 
 for (const reviewed of process.env.MEDIFLOW_VISIT_MAC_TRIAL ? [false] : [false, true]) test(reviewed ? 'the physician explicitly applies the verified clinical proposals after reading the original PDF' : 'a CLI paired for twelve hours deposits a visit and the unlocked tab files nothing before the physician’s gesture', async ({ page, isolatedRuntime }, info) => {
     test.setTimeout(150000);
+    await execute(process.execPath, ['scripts/prepare-e2e-db.mjs'], {
+        cwd: repository, timeout: 30000,
+        env: { ...process.env, MEDIFLOW_DATA_DIR: isolatedRuntime.dataDirectory, E2E_PIN: agentVisitPin },
+    });
     await createSyntheticAgentMandate(page);
     const credentials = info.outputPath('private-agent');
     mkdirSync(credentials, { mode: 0o700 });
