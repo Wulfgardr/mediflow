@@ -91,6 +91,7 @@ test('Scheda desktop del concept con identità, tre colonne e ritorno alle sezio
     await expect(proposal.getByRole('link', { name: 'Diario', exact: true })).toHaveAttribute('href', `/patients/${id}/modules#diario`);
     await expect(page.locator('[data-record-tray="contesto"] > div').first()).toHaveCSS('border-top-style', 'dashed');
     if (!await medication.evaluate(el => (el as HTMLDetailsElement).open)) await medication.locator('summary').click();
+    await expect(medication.getByText('Potassio 5,6 mmol/L', { exact: true })).toBeVisible();
     for (const theme of ['light', 'dark']) {
         await setTheme(theme);
         await page.getByTestId('lume-scheda-header').evaluate(element => element.scrollIntoView({ block: 'start' }));

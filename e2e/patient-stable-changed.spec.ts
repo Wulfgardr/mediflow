@@ -202,7 +202,7 @@ test('D: dalla lista, primo sguardo al ritorno e cartella senza storico al cambi
     await expect(changes.getByRole('link', { name: /1 telefonata/ })).toHaveAttribute('href', '#diario');
     await changes.getByText('Terapia sospesa sintetica', { exact: true }).click();
     await expect(changes).toContainText('Stato attuale: Sospesa');
-    await expect(changes).toContainText('Valore precedente non conservato.');
+    await expect(changes).toContainText('Prima: Non conservato.');
     await changes.getByRole('button', { name: /Diario del.*Telefonata/ }).click();
     await expect(page.getByRole('region', { name: 'Voce del diario' })).toContainText('Telefonata di archivio.');
     await page.getByRole('button', { name: 'Chiudi', exact: true }).click();

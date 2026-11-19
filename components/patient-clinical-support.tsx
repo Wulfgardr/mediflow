@@ -53,10 +53,10 @@ export function PatientProposalsSummary({ hasInsightProposal, hasSmartImportProp
         {shown && generated && Number.isFinite(generated.getTime()) ? <p className={sheet.proposalReceipt}>
             Generata <time dateTime={generated.toISOString()}>{generated.toDateString() === new Date().toDateString() ? 'oggi' : `il ${generated.toLocaleDateString('it-IT')}`} alle {generated.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</time> <span title={shown.receipt.model}>{venueLabels[shown.receipt.venue]}</span>.{shown.receipt.egress === 'none' ? ' Nessun dato inviato all’esterno.' : null}
         </p> : null}
-        <span className={styles.links}>
+        <nav aria-label="Azioni sulle proposte" className={styles.links}>
             <a href="#patient-insight" aria-label="Apri il Quadro e le fonti" className="mf-button-secondary"><Sparkles size={16} aria-hidden="true" />Apri il Quadro</a>
             {smartImportAvailable ? <a href="#smart-import" className="mf-button-text">Smart Import</a> : null}
-        </span>
+        </nav>
     </div>;
 }
 
