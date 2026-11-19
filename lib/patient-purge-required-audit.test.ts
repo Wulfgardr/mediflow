@@ -54,7 +54,7 @@ function reset(active = false) {
     dbServer.insert(entries).values({ id: `entry-${patientId}`, patientId, type: 'note',
         date: new Date('2025-01-01'), content: 'ENC:synthetic:entry', version: 2 }).run();
     dbServer.insert(entryRevisions).values({ eventId: `revision-${patientId}`, entryId: `entry-${patientId}`,
-        version: 1, content: 'ENC:synthetic:older', correctedAt: new Date('2025-01-02') }).run();
+        version: 1, title: 'ENC:synthetic:title', content: 'ENC:synthetic:older', correctedAt: new Date('2025-01-02') }).run();
 }
 function snapshot() {
     const reopened = new Database(join(dataDir, 'medical.db'), { readonly: true });

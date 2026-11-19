@@ -894,7 +894,7 @@ for (const surface of ['web', 'network'] as const) {
         const revision = readEntryRevisionPage(ids.patientId, ids.entryId, 0, archiveGeneration)?.revisions[0];
         assert.ok(revision?.title && revision?.content);
         for (const field of ['title', 'content'] as const) {
-            const sealed = revision[field]!;
+            const sealed: string = revision[field]!;
             assert.match(sealed, /^ENCD1:/);
             assert.ok(!sealed.includes(legacy[field]) && !sealed.includes(protection.key));
             assert.equal(await openLegacyDiaryRevision(sealed, binding, field, key), legacy[field]);
