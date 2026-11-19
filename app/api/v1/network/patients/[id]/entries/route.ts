@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { readNativeNetworkJson, jsonBodyTooLargeResponse } from '@/lib/native-network-json-body';
 import { entryJsonObject } from '@/lib/entry-write-input';
 import { NextResponse } from 'next/server';
@@ -28,7 +29,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
         return NextResponse.json(entries);
     } catch (error) {
-        console.error('API GET /api/v1/network/patients/[id]/entries error:', error);
+        logServerError('API GET /api/v1/network/patients/[id]/entries error', error);
         return NextResponse.json({ error: 'Failed to fetch entries' }, { status: 500 });
     }
 }
@@ -50,7 +51,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         const sizeError = jsonBodyTooLargeResponse(error);
         if (sizeError) return sizeError;
         if (error instanceof SyntaxError) return NextResponse.json({ error: 'Richiesta non valida.' }, { status: 400 });
-        console.error('API POST /api/v1/network/patients/[id]/entries error:', error);
+        logServerError('API POST /api/v1/network/patients/[id]/entries error', error);
         return NextResponse.json({ error: 'Failed to create entry' }, { status: 500 });
     }
 }

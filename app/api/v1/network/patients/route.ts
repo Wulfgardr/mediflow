@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { readPatientJsonObject } from '@/lib/patient-json-object';
 import { jsonBodyTooLargeResponse } from '@/lib/native-network-json-body';
 import { NextResponse } from 'next/server';
@@ -43,7 +44,7 @@ export async function GET(request: Request) {
         const result = await listNetworkScopedPatients(scopeAmbulatoryId, { includeDeleted, includeDiagnoses });
         return NextResponse.json(result);
     } catch (error) {
-        console.error('API GET /api/v1/network/patients error:', error);
+        logServerError('API GET /api/v1/network/patients error', error);
         return NextResponse.json({ error: 'Failed to fetch patients' }, { status: 500 });
     }
 }
@@ -61,7 +62,7 @@ export async function POST(request: Request) {
     } catch (error) {
         const sizeError = jsonBodyTooLargeResponse(error);
         if (sizeError) return sizeError;
-        console.error('API POST /api/v1/network/patients error:', error);
+        logServerError('API POST /api/v1/network/patients error', error);
         return NextResponse.json({ error: 'Failed to create patient' }, { status: 500 });
     }
 }

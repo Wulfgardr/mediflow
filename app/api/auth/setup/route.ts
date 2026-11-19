@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { hasAttestedLoopbackIngress } from '@/lib/security/loopback-ingress.mjs';
 import { assertArchiveGeneration } from '@/lib/archive-generation';
 import { currentArchiveGeneration } from '@/lib/security/archive-session-generation';
@@ -122,7 +123,7 @@ export async function POST(request: Request) {
         if (attempt) abortWebAuthControl(attempt);
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error("Setup error:", error);
+        logServerError("Setup error", error);
         return setupResponse({ error: "Setup failed" }, 500, mutation?.ifMatch);
     }
 }

@@ -1,4 +1,5 @@
 // Codex: created 2026-02-06
+import { logServerError } from '@/lib/server-error-log';
 import { NextResponse } from 'next/server';
 import { AifaCatalogConflictError, AifaUpdateError } from '@/lib/aifa-catalog-lock';
 import { AIFA_LEGACY_REPLACE_CONFIRMATION, normalizeAifaSearchText } from '@/lib/aifa-catalog';
@@ -65,7 +66,7 @@ export async function GET(request: Request) {
         const result = await readDrugCatalog(searchParams);
         return NextResponse.json(result.body, { status: result.status ?? 200 });
     } catch (error) {
-        console.error('API GET /api/v1/drugs error:', error);
+        logServerError('API GET /api/v1/drugs error', error);
         return NextResponse.json({ error: 'Failed to fetch drugs' }, { status: 500 });
     }
 }
@@ -123,7 +124,7 @@ export async function POST(request: Request) {
         if (error instanceof AifaUpdateError && error.status === 400) {
             return NextResponse.json({ error: 'Versione attesa o conferma della sostituzione AIFA assente o non valida' }, { status: 400 });
         }
-        console.error('API POST /api/v1/drugs error:', error);
+        logServerError('API POST /api/v1/drugs error', error);
         return NextResponse.json({ error: 'Sostituzione AIFA non riuscita; catalogo conservato' }, { status: 500 });
     }
 }

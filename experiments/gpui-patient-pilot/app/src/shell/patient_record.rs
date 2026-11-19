@@ -6,6 +6,12 @@ macro_rules! text {
 }
 use super::*;
 
+fn record_command(command: Stateful<Div>) -> impl IntoElement {
+    #[cfg(test)]
+    let command = super::rendered_command::observe(command);
+    command
+}
+
 pub(super) const READING_INSET: f32 = 12.;
 const QUIET_CHROME: f32 = 221.;
 const WRITING_CHROME: f32 = 286.;
@@ -370,7 +376,7 @@ fn card_title(
                 .min_w_0()
                 .child(island_title(id, label, count, theme).justify_start()),
         )
-        .children(action)
+        .children(action.map(record_command))
 }
 
 fn link(
@@ -757,23 +763,32 @@ impl ClinicalApp {
                             .justify_end()
                             .items_center()
                             .gap(px(8.))
-                            .child(match self.form.as_ref().map(|form| form.kind) {
-                                Some(kind) => button(
-                                    "clinical-workspace-close-draft",
-                                    if kind == FormKind::Notes {
-                                        "Chiudi la nota"
-                                    } else {
-                                        "Chiudi la voce"
-                                    },
-                                    theme,
-                                    false,
-                                    true,
-                                )
-                                .min_h(px(36.))
-                                .on_click(cx.listener(|this, _, _, cx| this.close_clean_notes(cx))),
-                                None => {
-                                    let enabled = writable && self.can_write(FormKind::Entry);
-                                    button("clinical-workspace-new-entry", "", theme, true, enabled)
+                            .child(record_command(
+                                match self.form.as_ref().map(|form| form.kind) {
+                                    Some(kind) => button(
+                                        "clinical-workspace-close-draft",
+                                        if kind == FormKind::Notes {
+                                            "Chiudi la nota"
+                                        } else {
+                                            "Chiudi la voce"
+                                        },
+                                        theme,
+                                        false,
+                                        true,
+                                    )
+                                    .min_h(px(36.))
+                                    .on_click(
+                                        cx.listener(|this, _, _, cx| this.close_clean_notes(cx)),
+                                    ),
+                                    None => {
+                                        let enabled = writable && self.can_write(FormKind::Entry);
+                                        button(
+                                            "clinical-workspace-new-entry",
+                                            "",
+                                            theme,
+                                            true,
+                                            enabled,
+                                        )
                                         .aria_label("Nuova voce")
                                         .min_h(px(36.))
                                         .gap(px(6.))
@@ -787,15 +802,19 @@ impl ClinicalApp {
                                             15.,
                                         ))
                                         .child(text!("Nuova voce"))
-                                        .when(enabled, |el| {
-                                            el.on_click(cx.listener(|this, _, window, cx| {
-                                                this.patient.record.menu = false;
-                                                this.open_form(FormKind::Entry, window, cx)
-                                            }))
-                                        })
-                                }
-                            })
-                            .child(
+                                        .when(
+                                            enabled,
+                                            |el| {
+                                                el.on_click(cx.listener(|this, _, window, cx| {
+                                                    this.patient.record.menu = false;
+                                                    this.open_form(FormKind::Entry, window, cx)
+                                                }))
+                                            },
+                                        )
+                                    }
+                                },
+                            ))
+                            .child(record_command(
                                 button(
                                     "clinical-workspace-record-menu",
                                     "",
@@ -817,9 +836,9 @@ impl ClinicalApp {
                                         cx.notify();
                                     }))
                                 }),
-                            )
+                            ))
                             .when(menu, |el| {
-                                el.child(gpui::deferred(
+                                el.child(gpui::deferred(record_command(
                                     div()
                                         .id("clinical-workspace-record-menu-list")
                                         .accessibility_id("clinical-workspace-record-menu-list")
@@ -845,7 +864,7 @@ impl ClinicalApp {
                                             )
                                             .blur_radius(px(24.)),
                                         ])
-                                        .child(
+                                        .child(record_command(
                                             menu_item(
                                                 "clinical-workspace-refresh",
                                                 "Rileggi",
@@ -857,8 +876,8 @@ impl ClinicalApp {
                                                     this.request_discard(Discard::Reload, cx)
                                                 }),
                                             ),
-                                        )
-                                        .child(
+                                        ))
+                                        .child(record_command(
                                             menu_item(
                                                 "clinical-workspace-copy-profile",
                                                 "Copia scheda",
@@ -870,8 +889,8 @@ impl ClinicalApp {
                                                     this.copy_profile(cx)
                                                 }),
                                             ),
-                                        )
-                                        .child(
+                                        ))
+                                        .child(record_command(
                                             menu_item(
                                                 "clinical-workspace-edit-profile",
                                                 "Modifica anagrafica",
@@ -886,8 +905,8 @@ impl ClinicalApp {
                                                     }))
                                                 },
                                             ),
-                                        )
-                                        .child(
+                                        ))
+                                        .child(record_command(
                                             menu_item(
                                                 "clinical-workspace-current-profile",
                                                 "Altri dati della scheda…",
@@ -903,8 +922,8 @@ impl ClinicalApp {
                                                     }
                                                 }),
                                             ),
-                                        ),
-                                ))
+                                        )),
+                                )))
                             }),
                     ),
             )
@@ -968,7 +987,7 @@ impl ClinicalApp {
                     .rounded(px(14.))
                     .children(PatientSection::ALL.into_iter().map(|section| {
                         let selected = self.patient_section == section;
-                        div()
+                        let section_tab = div()
                             .id(section.id())
                             .accessibility_id(section.id())
                             .role(Role::Tab)
@@ -1019,11 +1038,20 @@ impl ClinicalApp {
                                     .text_color(theme.secondary)
                                     .child(text!(count.to_string()))
                             }))
-                            .on_click(
-                                cx.listener(move |this, _, _, cx| {
-                                    this.section_selected(section, cx)
-                                }),
+                            .on_click(cx.listener(move |this, _, _, cx| {
+                                this.section_selected(section, cx)
+                            }));
+                        #[cfg(test)]
+                        let section_tab = {
+                            let index = PatientSection::ALL
+                                .iter()
+                                .position(|item| *item == section)
+                                .unwrap();
+                            super::rendered_command::observe(
+                                section_tab.track_focus(&self.ui_cli_section_focus[index]),
                             )
+                        };
+                        section_tab
                     })),
             )
             .children(last_visit.map(|line| {
@@ -1140,19 +1168,29 @@ impl ClinicalApp {
                       title: Stateful<Div>,
                       body: Div,
                       handle: &gpui::ScrollHandle| {
+            let body = body
+                .id(scroll)
+                .flex_1()
+                .min_h_0()
+                .overflow_y_scroll()
+                .track_scroll(handle);
             tray(theme)
                 .id(id)
                 .debug_selector(move || id.into())
                 .h(px(zone_height))
                 .min_h_0()
                 .child(title)
-                .child(
-                    body.id(scroll)
-                        .flex_1()
-                        .min_h_0()
-                        .overflow_y_scroll()
-                        .track_scroll(handle),
-                )
+                .map(|el| {
+                    if scroll == "clinical-record-changed-scroll" {
+                        el.child(record_command(
+                            body.accessibility_id(scroll)
+                                .role(Role::Region)
+                                .aria_label("Cambiato"),
+                        ))
+                    } else {
+                        el.child(body)
+                    }
+                })
         };
         let band = || {
             island(theme, false)

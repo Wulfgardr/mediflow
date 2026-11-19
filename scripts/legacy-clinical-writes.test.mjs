@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { after, test } from 'node:test';
+import { openField, sealField, unwrapLoginKey } from './mobile-home-base-interop.mjs';
 import { loginWithWebAuthControl } from './web-auth-control-test-client.mjs';
 
 const BASE_URL = process.env.E2E_BASE_URL || 'http://127.0.0.1:3310';
@@ -27,21 +28,21 @@ after(() => {
 test('legacy entries and checkups use version guards and soft-delete tombstones', async () => {
     await assertServerReady();
 
-    const sessionHeaders = await login();
+    const { headers: sessionHeaders, key } = await login();
     const patientId = await createSeedPatient();
 
-    await exerciseLegacyEntryContract(sessionHeaders, patientId);
+    await exerciseLegacyEntryContract(sessionHeaders, patientId, key);
     await exerciseLegacyCheckupContract(sessionHeaders, patientId);
 });
 
-async function exerciseLegacyEntryContract(sessionHeaders, patientId) {
+async function exerciseLegacyEntryContract(sessionHeaders, patientId, key) {
     const create = await webRequest(sessionHeaders, 'POST', '/api/entries', {
         id: crypto.randomUUID(),
         patientId,
         type: 'note',
-        title: 'Legacy diary',
+        title: await sealField('Legacy diary', key),
         date: '2026-05-03T09:00:00.000Z',
-        content: 'Voce legacy con contratto versionato',
+        content: await sealField('Voce legacy con contratto versionato', key),
     });
     assert.equal(create.status, 201);
     const entryId = create.json?.id;
@@ -53,32 +54,33 @@ async function exerciseLegacyEntryContract(sessionHeaders, patientId) {
     const listedEntry = listed.json.find((item) => item.id === entryId);
     assert.equal(listedEntry?.version, 1);
     assert.equal(listedEntry?.deletedAt, null);
+    assert.equal(await openField(listedEntry.content, key), 'Voce legacy con contratto versionato');
 
     const missingPut = await webRequest(sessionHeaders, 'PUT', `/api/entries/${crypto.randomUUID()}`, {
         version: 1,
-        content: 'missing record',
+        content: await sealField('missing record', key),
     });
     assert.equal(missingPut.status, 404);
     assert.deepEqual(missingPut.json, { error: 'Not found' });
 
     const missingDelete = await webRequest(sessionHeaders, 'DELETE', `/api/entries/${crypto.randomUUID()}`, {
         version: 1,
-        deletionReason: 'missing record',
+        deletionReason: await sealField('missing record', key),
     });
     assert.equal(missingDelete.status, 404);
     assert.deepEqual(missingDelete.json, { error: 'Not found' });
 
-    await expectWebError(sessionHeaders, 'PUT', `/api/entries/${entryId}`, { content: 'senza versione' }, 400, 'Version is required');
+    await expectWebError(sessionHeaders, 'PUT', `/api/entries/${entryId}`, { content: await sealField('senza versione', key) }, 400, 'Version is required');
 
     const fresh = await webRequest(sessionHeaders, 'PUT', `/api/entries/${entryId}`, {
         version: 1,
-        content: 'Voce legacy aggiornata',
+        content: await sealField('Voce legacy aggiornata', key),
     });
     assert.equal(fresh.status, 200);
 
     const stale = await webRequest(sessionHeaders, 'PUT', `/api/entries/${entryId}`, {
         version: 1,
-        content: 'stale write',
+        content: await sealField('stale write', key),
     });
     assert.equal(stale.status, 409);
     assert.equal(stale.json?.code, 'VERSION_CONFLICT');
@@ -86,11 +88,11 @@ async function exerciseLegacyEntryContract(sessionHeaders, patientId) {
     assert.equal(stale.json?.recordId, entryId);
     assert.equal(stale.json?.currentVersion, 2);
 
-    await expectWebError(sessionHeaders, 'DELETE', `/api/entries/${entryId}`, { deletionReason: 'missing version' }, 400, 'Version is required');
+    await expectWebError(sessionHeaders, 'DELETE', `/api/entries/${entryId}`, { deletionReason: await sealField('missing version', key) }, 400, 'Version is required');
 
     const staleDelete = await webRequest(sessionHeaders, 'DELETE', `/api/entries/${entryId}`, {
         version: 1,
-        deletionReason: 'stale delete',
+        deletionReason: await sealField('stale delete', key),
     });
     assert.equal(staleDelete.status, 409);
     assert.equal(staleDelete.json?.code, 'VERSION_CONFLICT');
@@ -98,7 +100,7 @@ async function exerciseLegacyEntryContract(sessionHeaders, patientId) {
 
     const deletion = await webRequest(sessionHeaders, 'DELETE', `/api/entries/${entryId}`, {
         version: 2,
-        deletionReason: 'legacy-entry-delete-smoke',
+        deletionReason: await sealField('legacy-entry-delete-smoke', key),
     });
     assert.equal(deletion.status, 200);
 
@@ -113,7 +115,7 @@ async function exerciseLegacyEntryContract(sessionHeaders, patientId) {
     const tombstone = await localRequest('GET', `/api/v1/patients/${patientId}/entries/${entryId}`);
     assert.equal(tombstone.status, 200);
     assert.ok(tombstone.json?.deletedAt, 'entry tombstone should remain readable by id');
-    assert.equal(tombstone.json?.deletionReason, 'legacy-entry-delete-smoke');
+    assert.equal(await openField(tombstone.json.deletionReason, key), 'legacy-entry-delete-smoke');
     assert.equal(tombstone.json?.version, 3);
 
     const restore = await webRequest(sessionHeaders, 'PUT', `/api/entries/${entryId}`, {
@@ -132,6 +134,7 @@ async function exerciseLegacyEntryContract(sessionHeaders, patientId) {
     assert.equal(restored.json?.deletedAt, null);
     assert.equal(restored.json?.deletionReason, null);
     assert.equal(restored.json?.version, 4);
+    assert.equal(await openField(restored.json.content, key), 'Voce legacy aggiornata');
 
     scenarioResults.push({ resource: 'entry', entryId, staleStatus: stale.status, deleteStatus: deletion.status, restoreStatus: restore.status });
 }
@@ -247,7 +250,7 @@ async function login() {
     const loginResponse = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: PIN });
     assert.equal(loginResponse.response.status, 200);
     assert.ok(loginResponse.webHeaders);
-    return loginResponse.webHeaders;
+    return { headers: loginResponse.webHeaders, key: await unwrapLoginKey(loginResponse.json, PIN) };
 }
 
 async function createSeedPatient() {

@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { NextResponse } from 'next/server';
@@ -116,7 +117,7 @@ export async function POST(request: Request) {
             }, '[MediFlow] SISS patient-context prescription audit write failed:');
         }
 
-        console.error('API POST /api/siss/context error:', error);
+        logServerError('API POST /api/siss/context error', error);
         return NextResponse.json({ error: 'Failed to start SISS contextual flow' }, { status: 500 });
     }
 }
