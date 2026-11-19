@@ -5,6 +5,7 @@ use serde_json::{Value, json};
 
 enum Input {
     Activate(Bounds<Pixels>, Option<FocusHandle>),
+    Keyboard(FocusHandle),
     Text(Entity<TextInput>),
     Scroll(Bounds<Pixels>, ScrollHandle),
     Observe,
@@ -23,6 +24,7 @@ impl Control {
         let operations: &[&str] = match self.input {
             Input::Activate(_, Some(_)) => &["click", "focus", "press", "expect"],
             Input::Activate(_, None) => &["click", "expect"],
+            Input::Keyboard(_) => &["focus", "press", "expect"],
             Input::Text(_) => &["focus", "fill", "press", "expect", "expectValue"],
             Input::Scroll(_, _) => &["scroll", "expect"],
             Input::Observe => &["expect"],
@@ -39,7 +41,8 @@ impl Control {
         .collect();
         json!({"role":self.role, "name":self.name, "id":self.node.author_id(),
                "actions": operations, "accessKitActions": ax_actions,
-               "selected":self.node.is_selected(), "expanded":self.node.is_expanded()})
+               "selected":self.node.is_selected(), "expanded":self.node.is_expanded(),
+               "pointerClipped": matches!(self.input, Input::Keyboard(_))})
     }
 }
 
@@ -66,7 +69,13 @@ fn frame(view: &Entity<ClinicalApp>, cx: &mut VisualTestContext) -> (Vec<Control
             };
             let id = node.author_id().unwrap_or_default();
             let name = node.label().unwrap_or_default().to_owned();
-            let reason = if bounds.is_empty() { Some("clipped") }
+            let focus = if id == "threshold-other-actions" {
+                Some(app.threshold_menu_focus.clone())
+            } else {
+                PatientSection::ALL.iter().position(|section| section.id() == id)
+                    .map(|index| app.ui_cli_section_focus[index].clone())
+            };
+            let reason = if bounds.is_empty() && focus.is_none() { Some("clipped") }
                 else if name.is_empty() { Some("unnamed") }
                 else if role == "other" { Some("unsupported-role") }
                 else { None };
@@ -87,9 +96,10 @@ fn frame(view: &Entity<ClinicalApp>, cx: &mut VisualTestContext) -> (Vec<Control
                 "region" if id == "clinical-record-changed" =>
                     Input::Scroll(bounds, app.patient.record.diary_scroll_probe.clone()),
                 "button" | "link" | "tab" | "menuitem" if node.supports_action(gpui::accesskit::Action::Click) => {
-                    let focus = PatientSection::ALL.iter().position(|section| section.id() == id)
-                        .map(|index| app.ui_cli_section_focus[index].clone());
-                    Input::Activate(bounds, focus)
+                    match focus {
+                        Some(focus) if bounds.is_empty() => Input::Keyboard(focus),
+                        focus => Input::Activate(bounds, focus),
+                    }
                 }
                 _ => Input::Observe,
             };
@@ -116,7 +126,7 @@ fn resolve<'a>(controls: &'a [Control], target: &Value) -> Result<&'a Control, S
     }
 }
 
-fn drive(
+pub(super) fn drive(
     action: &Value,
     view: &Entity<ClinicalApp>,
     cx: &mut VisualTestContext,
@@ -148,7 +158,7 @@ fn drive(
         (Input::Activate(bounds, _), "click") => {
             cx.simulate_click(bounds.center(), gpui::Modifiers::default())
         }
-        (Input::Activate(_, Some(focus)), "press" | "focus") => {
+        (Input::Activate(_, Some(focus)) | Input::Keyboard(focus), "press" | "focus") => {
             cx.update(|window, cx| window.focus(focus, cx));
             if op == "press" {
                 press(key()?, cx)?;
@@ -171,7 +181,8 @@ fn drive(
                 json!({"role":control.role,"name":control.name,"beforeY":before,"afterY":after,"moved":before!=after}),
             );
         }
-        (_, "expect") if action["state"] == "visible" => {}
+        (_, "expect")
+            if action["state"] == "visible" && !matches!(control.input, Input::Keyboard(_)) => {}
         (_, "expect")
             if action["state"] == "selected" && control.node.is_selected() == Some(true) => {}
         (_, "expect")

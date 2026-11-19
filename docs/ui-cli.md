@@ -70,3 +70,13 @@ npm run --silent test:ui:cli -- \
 ```
 
 [Il copione del Shell](../e2e/ui-cli/gpui-shell.jsonl) scopre i moduli della scheda, passa a **Documenti**, rientra in **Riepilogo** con Invio e verifica la tab selezionata. Poi aziona **Nuova voce**, compila **Testo della voce**, apre **Tutto il diario**, misura lo scroll del vassoio, aziona **Torna alla bozza** e verifica il testo ritrovato. Il censimento ricava ruolo, nome e geometria dai controlli osservati durante il render e riporta le azioni supportate accanto a ciascun controllo. Se l’etichetta cambia, usa `discover` sul nuovo binario di test prima di aggiornare il copione. Il banco mostra i conteggi per ruolo e le esclusioni del frame osservato. Le righe indicano le azioni AccessKit dichiarate dal controllo e quelle che la CLI può inviare attraverso il banco di input. I target composti, screenshot e download sono disponibili sul backend Web. La prova del Shell usa il client e i normali eventi GPUI su una fixture del protocollo locale in memoria. L’AccessKit della finestra installata, i gesti fisici e le conferme personali restano verifiche separate.
+
+La prova della soglia compatta usa lo stesso driver Rust. Apre **Altre azioni** con Invio anche quando il pulsante è fuori portata per il puntatore, censisce il menu e aziona **Copia bozza**. Il campo `pointerClipped` segnala i controlli raggiungibili solo con focus e tastiera nel frame corrente.
+
+```sh
+cargo +1.98.1 test --locked --manifest-path experiments/gpui-patient-pilot/Cargo.toml \
+  -p mediflow-gpui-patient-pilot --bin mediflow-gpui-patient-pilot \
+  threshold_recovery_reserves_content_with_larger_text_metrics -- --nocapture
+```
+
+Nei percorsi provati il Shell espone la navigazione tra moduli come tab e le azioni di apertura come pulsanti. Il censimento non ha incontrato nodi Link, combobox o listbox. Le voci di menu sono state provate nella soglia compatta, mentre il copione del riepilogo usa pulsanti, tab, campi di testo e il vassoio del diario.
