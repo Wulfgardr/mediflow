@@ -2,7 +2,7 @@ from pathlib import Path
 import subprocess, sys, re, os, time
 
 scratch = Path(os.environ.get('MEDIFLOW_UI_APPLE_SCRATCH', '/Volumes/Vision/mf-ui-identita-20261107-scratch/apple'))
-out = Path(os.environ.get('MEDIFLOW_UI_CAPTURE_OUTPUT', '/Users/leonardopegollo/Antigravity/mf-ui-identita-20261107'))
+out = Path(os.environ.get('MEDIFLOW_UI_CAPTURE_OUTPUT') or Path.home() / 'Antigravity' / 'mf-ui-identita-20261107')
 device, udid = sys.argv[1:]
 result = scratch / f'{device}-{time.strftime("%Y%m%d-%H%M%S")}.xcresult'
 cmd = ['xcodebuild', '-project', str(scratch/'capture-project/MediFlowAppleApp.xcodeproj'), '-scheme', 'MediFlowMobileApp', '-configuration', 'Debug', '-destination', f'platform=iOS Simulator,id={udid}', '-derivedDataPath', str(scratch/'CaptureDerivedData'), '-clonedSourcePackagesDirPath', str(scratch/'packages'), '-parallel-testing-enabled', 'NO', '-maximum-concurrent-test-simulator-destinations', '1', '-test-timeouts-enabled', 'YES', '-default-test-execution-time-allowance', '900', '-maximum-test-execution-time-allowance', '1000', '-resultBundlePath', str(result), 'CODE_SIGNING_ALLOWED=NO', 'test']
