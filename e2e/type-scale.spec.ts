@@ -2,6 +2,8 @@ import { mkdirSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
+import { test as isolatedTest } from './fixtures/isolated-runtime';
+import { switchPreset } from './fixtures/territorial-preset';
 import { bootstrapUnlockedSession, openPatientSection } from './utils';
 
 const PANES = ['quadro', 'attenzione', 'identita', 'clinica', 'amministrazione', 'parametri', 'terapie',
@@ -170,7 +172,7 @@ const ROUTES = ['/', '/?area=incarico', '/?area=turno', '/?area=diario', '/?area
   '/patients/[id]/modules', '/patients/[id]/scales', '/patients/[id]/scales/adl',
   '/patients/[id]/entries/new', '/patients/[id]/edit', '/patients/new', '/patients/import', ...settingsRoutes()];
 
-const typographyTest = test.extend<{ patientFixture: { id: string; name: string } }>({
+const typographyTest = isolatedTest.extend<{ patientFixture: { id: string; name: string } }>({
   patientFixture: async ({ page }, runTest) => {
     const fixture = await createFixture(page);
     try {
@@ -190,6 +192,7 @@ for (const theme of ['light', 'dark'] as const) {
       await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
     });
     typographyTest('tutte le pagine e i dettagli', async ({ page, patientFixture: fixture }, info) => {
+      await switchPreset(page, 'core+it+lom');
       for (const routePattern of ROUTES) await typographyTest.step(routePattern, async () => {
         const route = routePattern.replace('[id]', fixture.id);
         const response = await page.goto(route);
