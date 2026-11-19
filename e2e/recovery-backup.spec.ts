@@ -16,9 +16,7 @@ test('complete backup is encrypted in the browser and verification never claims 
         displayName: 'Medico Sintetico Recupero', ambulatoryName: 'Studio Sintetico Recupero', passphrase: phrase,
     });
     const navigation = page.getByRole('navigation', { name: 'Navigazione principale', exact: true });
-    const manual = page.getByRole('link', { name: 'Apri la cartella manualmente', exact: true });
-    await expect(navigation.or(manual).first()).toBeVisible();
-    if (await manual.isVisible()) await manual.click();
+    await expect(navigation).toBeVisible();
     await navigation.locator('summary').filter({ hasText: /^Altro$/u }).click();
     await page.getByRole('link', { name: 'Impostazioni', exact: true }).click();
     await page.locator('a[href="/settings/backup"]:visible').click();
