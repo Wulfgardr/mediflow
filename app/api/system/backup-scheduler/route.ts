@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { NextResponse } from 'next/server';
@@ -48,7 +49,7 @@ export async function GET() {
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('GET backup scheduler status failed:', error);
+        logServerError('GET backup scheduler status failed', error);
         return NextResponse.json({ error: 'Failed to load backup scheduler status.' }, { status: 500 });
     }
 }
@@ -164,9 +165,9 @@ function mutateScheduler(body: Record<string, unknown>, request: Request, sessio
                 changedFields: ['enabled', 'hour', 'minute', 'destinationDir', 'retentionKeepArtifacts'],
                 flags: [`action:${action}`],
             }),
-        }).catch(error => console.error('Audit backup scheduler write failed:', error));
+        }).catch(error => logServerError('Audit backup scheduler write failed', error));
     } catch (error) {
-        console.error('Audit backup scheduler write failed:', error);
+        logServerError('Audit backup scheduler write failed', error);
     }
 
     const observed = buildBackupSchedulerStatus(JSON.stringify(nextState));

@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { NextResponse } from 'next/server';
 import { inArray } from 'drizzle-orm';
@@ -62,7 +63,7 @@ export async function GET(request: Request) {
             },
         });
     } catch (error) {
-        console.error('[OpenMed] Health check failed:', error instanceof Error ? error.message : 'unknown');
+        logServerError('OpenMed: health check', error);
         return NextResponse.json({
             version: REDACTION_VERSION,
             provider: 'openmed',
@@ -116,7 +117,7 @@ export async function POST(request: Request) {
         });
 
         if (!response.ok) {
-            console.error(`[OpenMed] Upstream ${parsed.value.action} failed with status ${response.status}`);
+            logServerError('OpenMed: upstream request', undefined, response.status);
             return NextResponse.json(
                 { error: 'OpenMed upstream error.', code: 'REDACTION_UPSTREAM_ERROR' },
                 { status: response.status >= 500 ? 502 : response.status },
@@ -130,7 +131,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Request aborted.', code: 'REDACTION_ABORTED' }, { status: 499 });
         }
 
-        console.error('[OpenMed] Request failed:', error instanceof Error ? error.message : 'unknown');
+        logServerError('OpenMed: request', error);
         return NextResponse.json(
             { error: 'OpenMed not reachable.', code: 'REDACTION_UNAVAILABLE' },
             { status: 503 },

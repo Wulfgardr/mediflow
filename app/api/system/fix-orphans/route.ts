@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { createHash } from 'node:crypto';
@@ -71,7 +72,7 @@ export async function GET() {
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error("Fix Orphan Dry-Run Error:", error);
+        logServerError("Fix Orphan Dry-Run Error", error);
         return NextResponse.json({ error: 'Failed to inspect orphan patients' }, { status: 500 });
     }
 }
@@ -182,7 +183,7 @@ export async function POST(request: Request) {
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error("Fix Orphan Error:", error);
+        logServerError("Fix Orphan Error", error);
         return NextResponse.json({ error: 'Failed to fix orphan patients' }, { status: 500 });
     }
 }

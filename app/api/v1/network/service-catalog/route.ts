@@ -1,4 +1,5 @@
 /* @Codex */
+import { logServerError } from '@/lib/server-error-log';
 import { NextResponse } from 'next/server';
 /* @Codex */
 import {
@@ -14,7 +15,7 @@ export async function GET(request: Request) {
         if (!resolved.ok) return resolved.response;
         return NextResponse.json(await readServiceCatalog(new URL(request.url).searchParams));
     } catch (error) {
-        console.error('API GET /api/v1/network/service-catalog error:', error);
+        logServerError('API GET /api/v1/network/service-catalog error', error);
         return NextResponse.json({ error: 'Failed to fetch service catalog' }, { status: 500 });
     }
 }

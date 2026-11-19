@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { readNativeNetworkJson, jsonBodyTooLargeResponse } from '@/lib/native-network-json-body';
 import { NextResponse } from 'next/server';
 import {
@@ -26,7 +27,7 @@ export async function GET(
 
         return NextResponse.json(observation);
     } catch (error) {
-        console.error('API GET /api/v1/network/patients/[id]/observations/[observationId] error:', error);
+        logServerError('API GET /api/v1/network/patients/[id]/observations/[observationId] error', error);
         return NextResponse.json({ error: 'Failed to fetch observation' }, { status: 500 });
     }
 }
@@ -56,7 +57,7 @@ export async function PUT(
     } catch (error) {
         const sizeError = jsonBodyTooLargeResponse(error);
         if (sizeError) return sizeError;
-        console.error('API PUT /api/v1/network/patients/[id]/observations/[observationId] error:', error);
+        logServerError('API PUT /api/v1/network/patients/[id]/observations/[observationId] error', error);
         return NextResponse.json({ error: 'Failed to update observation' }, { status: 500 });
     }
 }

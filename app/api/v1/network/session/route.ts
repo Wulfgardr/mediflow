@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { NextResponse } from 'next/server';
 import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 /* @Codex */
@@ -12,7 +13,7 @@ export async function GET(request: Request) {
         const summary = await getNetworkSessionSummary();
         return NextResponse.json(summary);
     } catch (error) {
-        console.error('API GET /api/v1/network/session error:', error);
+        logServerError('API GET /api/v1/network/session error', error);
         return NextResponse.json({ error: 'Failed to load network session summary' }, { status: 500 });
     }
 }

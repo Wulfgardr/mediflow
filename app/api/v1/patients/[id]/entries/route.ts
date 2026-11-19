@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { rejectUnsealedV1Write } from '@/lib/api/v1/sealed-write';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 // Codex: created 2026-02-01
@@ -69,7 +70,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('API GET /api/v1/patients/[id]/entries error:', error);
+        logServerError('API GET /api/v1/patients/[id]/entries error', error);
         return NextResponse.json({ error: 'Failed to fetch entries' }, { status: 500 });
     }
 }
@@ -97,7 +98,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('API POST /api/v1/patients/[id]/entries error:', error);
+        logServerError('API POST /api/v1/patients/[id]/entries error', error);
         return NextResponse.json({ error: 'Failed to create entry' }, { status: 500 });
     }
 }
