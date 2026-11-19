@@ -40,7 +40,7 @@ test('WCAG primitives match known reference values', () => {
 test('committed token source passes the whole contract', () => {
   const result = evaluateContract(loadTokens());
   assert.equal(result.pass, true);
-  assert.equal(result.checks.length, 90); 
+  assert.equal(result.checks.length, 134);
   assert.ok(result.checks.every((c) => c.ratio >= c.minRatio));
   const bind = result.checks.find(
     (c) => c.register === 'giorno' && c.label === 'ink.muted on surface.chrome',
@@ -105,7 +105,7 @@ test('parseCssBlocks strips comments and reads namespaced + alias declarations',
 test('committed CSS mirror matches the committed token source', () => {
   const summary = verifyCssMirror(loadTokens(), loadCssMirror());
   assert.equal(summary.tokens, expectedMirror(loadTokens()).size);
-  assert.equal(summary.tokens, 64);
+  assert.equal(summary.tokens, 84);
   assert.equal(summary.aliases, ACTIVE_ALIASES.length);
 });
 

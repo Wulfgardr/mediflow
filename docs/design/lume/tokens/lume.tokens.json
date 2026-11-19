@@ -102,6 +102,32 @@
       }
     }
   },
+  "record": {
+    "giorno": {
+      "tray": { "$value": "#f0f2f4" },
+      "tray-rule": { "$value": "#dfe1e5" },
+      "tray-light": { "$value": "#ffffff" },
+      "tray-shadow": { "$value": "#d9dce1" },
+      "island": { "$value": "#ffffff" },
+      "compact-island": { "$value": "#f3f4f6" },
+      "island-rule": { "$value": "#e7e8eb" },
+      "change": { "$value": "#e3ebfa" },
+      "change-rule": { "$value": "#bccbe8" },
+      "proposal-rule": { "$value": "#2b8098" }
+    },
+    "grafite": {
+      "tray": { "$value": "#101216" },
+      "tray-rule": { "$value": "#24262b" },
+      "tray-light": { "$value": "#1d1f23" },
+      "tray-shadow": { "$value": "#08090b" },
+      "island": { "$value": "#1f2228" },
+      "compact-island": { "$value": "#1f2228" },
+      "island-rule": { "$value": "#2f3238" },
+      "change": { "$value": "#1c273d" },
+      "change-rule": { "$value": "#364566" },
+      "proposal-rule": { "$value": "#4a97ad" }
+    }
+  },
   "signal": {
     "warning": { "$value": "#9a6a2f" },
     "critical": { "$value": "#a33a2f" },

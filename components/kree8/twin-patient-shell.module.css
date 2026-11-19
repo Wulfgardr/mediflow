@@ -104,4 +104,4 @@
  .patientBody[data-folder-section='quadro'] { padding-block-start: 18px; }
 }
 
-.patientCanvas[data-folder-section='quadro'] .identity h1 { font: var(--type-record-person); }
+.patientCanvas[data-folder-section='quadro'] .patientHeader h1 { font: var(--type-record-person); }
