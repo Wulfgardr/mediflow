@@ -96,7 +96,7 @@ async function expectSurfaceHierarchyAndNeutralChrome(page: Page, header: Locato
   }
   expect(evidence.title).toBeGreaterThan(evidence.atoms);
   expect(evidence.title).toBe(28);
-  await expect(header.locator('h1')).toHaveCSS('font-weight', '700');
+  await expect(header.locator('h1')).toHaveCSS('font-weight', '600');
   await expect(header.locator('h1')).toHaveCSS('font-family', /system-ui/);
   expect(evidence.leftPadding).toBeGreaterThanOrEqual(16);
   expect(evidence.rightPadding).toBeGreaterThanOrEqual(16);
