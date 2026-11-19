@@ -4,7 +4,7 @@ import { generateKeyPairSync, randomUUID, sign } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { AGENT_OPERATIONS } from './agent-mandate-contract';
+import { AGENT_OPERATIONS, type AgentMandateInput } from './agent-mandate-contract';
 import { agentBase64 } from './agent-cassette-crypto';
 import { sealAgentItemNode } from '../packages/agent-client/src/cassette-crypto';
 import { encryptData, generateMasterKey } from './security/security';
@@ -33,12 +33,12 @@ const snapshot = () => tables.map(table => database.prepare(`SELECT * FROM ${tab
 const version = () => (database.prepare('SELECT version FROM patients WHERE id=?').get(fixture.patientId) as { version: number }).version;
 test.after(() => { database.close(); rmSync(directory, { recursive: true, force: true }); });
 
-async function visit() {
+async function visit(provider: AgentMandateInput['provider'] = 'local', allowsClinicalEgress = false) {
     const keys = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
     const publicKey = agentBase64(new Uint8Array(await crypto.subtle.exportKey('raw', keys.publicKey)));
     const mandates = createAgentMandateStore(database), pairings = createAgentPairingStore(database), store = createAgentCassetteStore(database);
     const generation = archiveGenerationForSession(fixture.session)!;
-    const mandate = mandates.create({ id: randomUUID(), durationMs: 43200000, operations: [...AGENT_OPERATIONS], provider: 'local', allowsClinicalEgress: false,
+    const mandate = mandates.create({ id: randomUUID(), durationMs: 43200000, operations: [...AGENT_OPERATIONS], provider, allowsClinicalEgress,
         publicKey, wrappedPrivateKey: 'ENC:' + 'A'.repeat(16) + ':' + 'A'.repeat(64) }, fixture.session.userId, generation);
     const pairing = pairings.request('Synthetic apply agent', [...AGENT_OPERATIONS]);
     pairings.approve(pairing.request.id, pairing.request.code, mandate.id, fixture.session.userId, generation);
@@ -69,7 +69,8 @@ async function visit() {
     receipt = database.transaction(() => store.close(principal, id, receipt.revision)).immediate();
     return { id, mandate, mandates, principal, operations,
         input(phase: 'automatic' | 'review'): AgentApplicationInput { return { visitId: id, phase, patientId: fixture.patientId, expectedVersion: version(), cassetteRevision: receipt.revision,
-            items: items.filter(item => ['note', 'transcription', 'pdf'].includes(item.kind) === (phase === 'automatic')) }; } };
+            items: items.filter(item => ['note', 'transcription', 'pdf'].includes(item.kind) === (phase === 'automatic')) }; },
+        whole(): AgentApplicationInput { return { visitId: id, phase: 'review', patientId: fixture.patientId, expectedVersion: version(), cassetteRevision: receipt.revision, items }; } };
 }
 
 test('automatic application consumes only note and PDF, leaves all clinical proposals pending and replays without duplicates', async () => {
@@ -85,6 +86,35 @@ test('automatic application consumes only note and PDF, leaves all clinical prop
     const forged = { ...input, patientId: 'another-synthetic-patient' };
     assert.throws(() => applyAgentVisit(request, fixture.session, forged));
     assert.deepEqual(snapshot(), after);
+});
+
+for (const provider of ['openai', 'anthropic'] as const) test(`J5: the ${provider} cassette deposited without clinical egress is never applied automatically and the doctor applies it whole on review`, async () => {
+    const f = await visit(provider, false), before = snapshot();
+    assert.throws(() => applyAgentVisit(request, fixture.session, f.input('automatic')), /AGENT_APPLICATION_DENIED/);
+    assert.deepEqual(snapshot(), before);
+    assert.deepEqual(agentAppliedItemIds(f.id), []);
+    assert.ok(readAgentCassetteIndex(database, fixture.session.userId, null).visits.some(row => row.id === f.id));
+    assert.throws(() => applyAgentVisit(request, fixture.session, f.input('review')), /AGENT_APPLICATION_DENIED/);
+    assert.deepEqual(snapshot(), before);
+    const input = f.whole(), receipt = applyAgentVisit(request, fixture.session, input), after = snapshot();
+    assert.deepEqual(after.slice(0, 6).map((rows, index) => rows.length - before[index].length), [1, 1, 1, 1, 2, 1]);
+    assert.deepEqual(agentAppliedItemIds(f.id).sort(), input.items.map(item => item.id).sort());
+    assert.ok(!readAgentCassetteIndex(database, fixture.session.userId, null).visits.some(row => row.id === f.id));
+    const audit = database.prepare('SELECT * FROM audit_events WHERE event_id=?').get(receipt.eventId) as Record<string, string>;
+    assert.equal(audit.model_provider, provider);
+    assert.equal(audit.proposer_ref, f.principal.agentRef);
+    assert.deepEqual(JSON.parse(audit.redacted_metadata).flags, ['review', 'cassette_complete']);
+    assert.equal(receipt.allowsClinicalEgress, false);
+    assert.equal(applyAgentVisit(request, fixture.session, input).eventId, receipt.eventId);
+    assert.deepEqual(snapshot(), after);
+});
+
+test('J4: a cloud cassette deposited with clinical egress keeps the automatic pass and the separate review', async () => {
+    const f = await visit('openai', true);
+    assert.equal(applyAgentVisit(request, fixture.session, f.input('automatic')).allowsClinicalEgress, true);
+    assert.throws(() => applyAgentVisit(request, fixture.session, { ...f.whole(), expectedVersion: version() }), /AGENT_APPLICATION_DENIED/);
+    assert.equal(applyAgentVisit(request, fixture.session, f.input('review')).status, 'applied');
+    assert.equal(agentAppliedItemIds(f.id).length, 7);
 });
 
 test('one explicit review commits all structured proposals, service lines and proposer audit atomically', async () => {
