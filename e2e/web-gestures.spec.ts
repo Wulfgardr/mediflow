@@ -73,9 +73,12 @@ async function createFromEmptySearch(page: Page, lastName: string, mode: Mode) {
 
 async function readCreatedPatient(page: Page, url: string, lastName: string) {
   const patientId = new URL(url).pathname.split('/')[2];
-  const persisted = await page.request.get(`/api/patients/${patientId}`);
-  expect(persisted.status()).toBe(200);
-  expect(await persisted.json()).toMatchObject({ id: patientId, firstName: 'Caso', lastName, identifierType: 'none',
+  const persisted = await page.evaluate(async id => {
+    const response = await fetch(`/api/patients/${encodeURIComponent(id)}`);
+    return { status: response.status, patient: await response.json() };
+  }, patientId);
+  expect(persisted.status).toBe(200);
+  expect(persisted.patient).toMatchObject({ id: patientId, firstName: 'Caso', lastName, identifierType: 'none',
     taxCode: '', birthDatePrecision: 'estimated', birthYear: 1994, birthDate: null });
 }
 
