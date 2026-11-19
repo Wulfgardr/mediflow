@@ -1257,13 +1257,34 @@ fn live_diary_revisions_select_long_previous_text_at_narrow_width(cx: &mut gpui:
     };
     let toggle =
         Box::leak(format!("clinical-workspace-entry-history-{}", created.id).into_boxed_str());
-    let bounds = wait_for(cx, toggle);
-    cx.simulate_click(bounds.center(), gpui::Modifiers::default());
+    let click = |cx: &mut gpui::VisualTestContext, selector| {
+        for _ in 0..30 {
+            let bounds = wait_for(cx, selector);
+            if bounds.top() >= px(65.) && bounds.bottom() <= px(590.) {
+                cx.simulate_click(bounds.center(), gpui::Modifiers::default());
+                notes_recovery_tests::draw(cx);
+                return;
+            }
+            cx.simulate_event(gpui::ScrollWheelEvent {
+                position: gpui::point(px(550.), px(420.)),
+                delta: gpui::ScrollDelta::Pixels(gpui::point(
+                    px(0.),
+                    if bounds.top() < px(65.) {
+                        px(70.)
+                    } else {
+                        px(-70.)
+                    },
+                )),
+                ..Default::default()
+            });
+        }
+        panic!("control {selector} was not reachable");
+    };
+    click(cx, toggle);
     for version in 1..=3 {
         let control =
             Box::leak(format!("clinical-diary-version-{}-{version}", created.id).into_boxed_str());
-        let bounds = wait_for(cx, control);
-        cx.simulate_click(bounds.center(), gpui::Modifiers::default());
+        click(cx, control);
         let text = wait_for(cx, "clinical-diary-history-text");
         assert!(
             text.right() <= px(760.) && text.left() >= px(0.),

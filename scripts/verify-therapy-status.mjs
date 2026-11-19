@@ -18,6 +18,9 @@ if (base && /^[a-f0-9]{40}$/i.test(base)) {
   }
 }
 const sha256 = value => createHash('sha256').update(value).digest('hex');
+const orderedFileHashes = Object.entries(coverage.files).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
+const filesSha256 = sha256(orderedFileHashes.map(([file, digest]) => `${file}\t${digest}\n`).join(''));
+if (coverage.filesSha256 !== filesSha256) throw new Error('Formal coverage set hash differs from its file manifest.');
 for (const [file, expected] of Object.entries(coverage.files)) {
   if (sha256(fs.readFileSync(path.join(root, file))) !== expected) {
     throw new Error(`Formal coverage drift: ${file}. Review transitions and assumptions against ${coverage.syncCommit}; update coverage only after checking the model and code tests. See docs/formal/therapy-status/README.md.`);
@@ -58,7 +61,7 @@ function run(name, executable, args, expected, env = {}) {
   const result = { name, exit: runResult.status, elapsedMs: Math.round(performance.now() - started),
     logSha256: sha256(log), ...(counts ? { generated: Number(counts[1].replaceAll(',', '')), distinct: Number(counts[2].replaceAll(',', '')), queued: Number(counts[3].replaceAll(',', '')) } : {}) };
   results.push(result);
-  fs.writeFileSync(path.join(output, 'result.json'), JSON.stringify({ syncCommit: coverage.syncCommit, tool: coverage.tool,
+  fs.writeFileSync(path.join(output, 'result.json'), JSON.stringify({ syncCommit: coverage.syncCommit, filesSha256, tool: coverage.tool,
     bounds: coverage.bounds, results }, null, 2) + '\n');
   console.log(`${name}: expected result; ${result.elapsedMs} ms${counts ? `; ${result.distinct} distinct states` : ''}`);
   return log;

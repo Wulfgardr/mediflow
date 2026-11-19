@@ -93,6 +93,8 @@ const nextConfig: NextConfig = {
       "./lib/sqlite-maintenance-admission.mjs",
       "./lib/sqlite-durability.mjs",
       "./lib/backup-artifact.ts",
+      "./lib/entry-revision-backup.ts",
+      "./lib/attachment-payload.ts",
       "./lib/backup-audit.ts",
       "./lib/agent-cassette-contract.ts",
       "./lib/agent-cassette-crypto.ts",

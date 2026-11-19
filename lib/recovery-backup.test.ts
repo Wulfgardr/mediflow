@@ -553,25 +553,54 @@ for (const version of [11, 12, 13, 14, 15, 16]) test(`encrypted v${version} pred
 });
 
 
-test('physical recovery preserves a sealed diary revision and opens it with the recovered key', async () => {
+test('encrypted recovery preserves diary versions and clinical links, including a preexisting incoherent association', async () => {
     const f = await fixture();
+    const patient = 'synthetic-patient';
+    const other = 'synthetic-other-patient';
     try {
-        const { iv, data } = await encryptData('Prima versione sintetica', f.key);
-        const sealed = `ENC:${iv}:${data}`;
-        f.db.prepare("INSERT INTO entries (id,patient_id,type,date,content,version) VALUES ('synthetic-history-entry','synthetic-patient','note',1783000000,?,2)").run(sealed);
-        f.db.prepare("INSERT INTO audit_events(event_id,event_type,occurred_at,outcome,actor_type,actor_ref,subject_type,subject_ref,source_surface,redacted_metadata) VALUES ('synthetic-history-event','entry.updated',1783000000,'success','user',?,'entry','synthetic-history-entry','web',?)")
-            .run(actor, JSON.stringify({ resourceVersion: 2 }));
-        f.db.prepare("INSERT INTO entry_revisions(event_id,entry_id,version,content,corrected_at,corrected_by) VALUES ('synthetic-history-event','synthetic-history-entry',1,?,1783000000,'Operatore sintetico')").run(sealed);
-        const artifact = await encryptRecoveryBackup(createRecoverySnapshot(f.db, actor), f.key);
-        await f.restore({ artifact });
-        const restored = openVersionedSqliteDatabase(f.destination);
-        try {
-            const row = restored.prepare('SELECT * FROM entry_revisions').get() as { content: string; entry_id: string; version: number };
-            assert.equal(row.entry_id, 'synthetic-history-entry');
-            assert.equal(row.version, 1);
-            assert.equal(row.content, sealed);
-            const key = (await openRecoveryWrapping(f.kit.wrappedMasterKey, f.kit.salt, f.recoveryKey)).masterKey;
-            assert.equal(await decryptData(data, iv, key), 'Prima versione sintetica');
-        } finally { restored.close(); }
+        const db = f.db;
+        const sealed = async (text: string) => {
+            const { iv, data } = await encryptData(text, f.key);
+            return `ENC:${iv}:${data}`;
+        };
+        const texts = ['Prima versione sintetica', 'Seconda versione sintetica', 'Versione sintetica attuale'];
+        db.prepare("INSERT INTO entries (id,patient_id,type,date,content,version) VALUES ('synthetic-history-entry',?,'note',1783000000,?,3)").run(patient, await sealed(texts[2]));
+        for (const version of [1, 2]) {
+            const event = `synthetic-history-event-${version}`;
+            db.prepare("INSERT INTO audit_events(event_id,event_type,occurred_at,outcome,actor_type,actor_ref,subject_type,subject_ref,source_surface,redacted_metadata) VALUES (?,'entry.updated',?,'success','user',?,'entry','synthetic-history-entry','web',?)")
+                .run(event, 1783000000 + version, actor, JSON.stringify({ resourceVersion: version + 1 }));
+            db.prepare("INSERT INTO entry_revisions(event_id,entry_id,version,content,corrected_at,corrected_by) VALUES (?,'synthetic-history-entry',?,?,?,'Operatore sintetico')")
+                .run(event, version, await sealed(texts[version - 1]), 1783000000 + version);
+        }
+        db.prepare("INSERT INTO patients (id,first_name,last_name,tax_code) VALUES (?,'Altro','Sintetico','SYNTHETIC-OTHER')").run(other);
+        db.prepare("INSERT INTO service_prescriptions (id,patient_id,category,service_name,prescribed_at) VALUES ('synthetic-prescription',?,'laboratory','Prestazione sintetica',1783000000)").run(patient);
+        db.prepare("INSERT INTO service_prescription_items (id,prescription_id,patient_id,ordinal,category,service_name) VALUES ('synthetic-item','synthetic-prescription',?,0,'laboratory','Prestazione sintetica')").run(patient);
+        db.prepare("INSERT INTO observations (id,patient_id,code_system,code,display,unit_system,unit_code,value,observed_at,service_prescription_item_id) VALUES ('synthetic-observation',?,'urn:synthetic','SYN','Osservazione sintetica','urn:synthetic','u','1',1783000000,'synthetic-item')").run(patient);
+        for (const observationPatient of [patient, other]) {
+            const destination = path.join(f.root, `recovered-${observationPatient}`, 'medical.db');
+            fs.mkdirSync(path.dirname(destination), { mode: 0o700 });
+            db.prepare("UPDATE observations SET patient_id=? WHERE id='synthetic-observation'").run(observationPatient);
+            const artifact = await encryptRecoveryBackup(createRecoverySnapshot(db, actor), f.key);
+            await f.restore({ artifact, destination });
+            const restored = openVersionedSqliteDatabase(destination);
+            try {
+                const rows = restored.prepare(`
+                    SELECT r.version, r.content FROM entry_revisions r JOIN entries e ON e.id = r.entry_id
+                    WHERE e.id = 'synthetic-history-entry' AND e.patient_id = ?
+                    UNION ALL SELECT version, content FROM entries WHERE id = 'synthetic-history-entry' AND patient_id = ? ORDER BY version
+                `).all(patient, patient) as Array<{ content: string; version: number }>;
+                assert.deepEqual(rows.map(row => row.version), [1, 2, 3]);
+                const key = (await openRecoveryWrapping(f.kit.wrappedMasterKey, f.kit.salt, f.recoveryKey)).masterKey;
+                assert.deepEqual(await Promise.all(rows.map(row => {
+                    const [, iv, data] = row.content.split(':');
+                    return decryptData(data, iv, key);
+                })), texts);
+                assert.deepEqual(restored.prepare(`
+                    SELECT o.patient_id AS observation, i.patient_id AS item, p.patient_id AS prescription
+                    FROM observations o JOIN service_prescription_items i ON i.id = o.service_prescription_item_id
+                    JOIN service_prescriptions p ON p.id = i.prescription_id WHERE o.id = 'synthetic-observation'
+                `).get(), { observation: observationPatient, item: patient, prescription: patient });
+            } finally { restored.close(); }
+        }
     } finally { f.cleanup(); }
 });
