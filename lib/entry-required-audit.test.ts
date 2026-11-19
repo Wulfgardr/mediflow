@@ -143,6 +143,9 @@ async function invoke(surface: Surface, operation: Operation, ids: { patientId: 
         : networkItem.PUT(req, { params: Promise.resolve({ id: ids.patientId, entryId: ids.entryId }) });
 }
 
+const SEALED_METADATA = 'ENC:bWV0YWRhdGFpdg==:bWV0YWRhdGFjaXBoZXI=';
+const SEALED_ATTACHMENTS = 'ENC:YXR0YWNobWVudHNpdg==:YXR0YWNobWVudHNjaXBoZXI=';
+
 function validBody(surface: Surface, operation: Operation, ids: { patientId: string; entryId: string }) {
     if (operation === 'POST') return {
         id: ids.entryId, ...(surface === 'web' ? { patientId: ids.patientId } : {}),
@@ -368,15 +371,14 @@ for (const surface of ['web', 'v1', 'network'] as const) {
 test('Web legacy create accepts createdAt and normalized updatedAt without client ownership of createdAt', async () => {
     const ids = seed('web-legacy-times', false);
     const body = { ...validBody('web', 'POST', ids), createdAt: '2000-01-01T00:00:00.000Z',
-        updatedAt: '2026-05-03T10:00:00.000Z', metadata: { source: 'synthetic' },
-        attachments: [{ id: 'synthetic-ref' }] };
+        updatedAt: '2026-05-03T10:00:00.000Z', metadata: SEALED_METADATA, attachments: SEALED_ATTACHMENTS };
     const response = await invoke('web', 'POST', ids, body);
     const after = readBack(ids.patientId, ids.entryId);
     assert.equal(response.status, 201);
     assert.notEqual((after.entry as Record<string, unknown>).created_at, 946684800);
     assert.equal((after.entry as Record<string, unknown>).updated_at, Date.parse('2026-05-03T10:00:00.000Z') / 1000);
-    assert.equal((after.entry as Record<string, unknown>).metadata, '{"source":"synthetic"}');
-    assert.equal((after.entry as Record<string, unknown>).attachments, '[{"id":"synthetic-ref"}]');
+    assert.equal((after.entry as Record<string, unknown>).metadata, SEALED_METADATA);
+    assert.equal((after.entry as Record<string, unknown>).attachments, SEALED_ATTACHMENTS);
     assert.equal(after.audit.length, 1);
 });
 
@@ -544,18 +546,18 @@ test('network host boundary preserves AI, timestamp and sealed-field restriction
     }
 });
 
-test('local structured metadata and paired sealed metadata retain normalized representation', async () => {
-    const local = await capture('web-structured-metadata', 'web', 'POST', {
-        mutateBody: (body) => ({ ...body, metadata: { synthetic: true }, attachments: [{ id: 'synthetic-ref' }] }),
+test('local and paired sealed metadata are stored as sent', async () => {
+    const local = await capture('web-sealed-metadata', 'web', 'POST', {
+        mutateBody: (body) => ({ ...body, metadata: SEALED_METADATA, attachments: SEALED_ATTACHMENTS }),
     });
     assertAccepted(local, 201);
-    assert.equal((local.after.entry as Record<string, unknown>).metadata, '{"synthetic":true}');
-    assert.equal((local.after.entry as Record<string, unknown>).attachments, '[{"id":"synthetic-ref"}]');
+    assert.equal((local.after.entry as Record<string, unknown>).metadata, SEALED_METADATA);
+    assert.equal((local.after.entry as Record<string, unknown>).attachments, SEALED_ATTACHMENTS);
     const paired = await capture('network-sealed-metadata', 'network', 'POST', {
-        mutateBody: (body) => ({ ...body, metadata: 'ENC:bWV0YWRhdGFpdg==:bWV0YWRhdGFjaXBoZXI=' }),
+        mutateBody: (body) => ({ ...body, metadata: SEALED_METADATA }),
     });
     assertAccepted(paired, 201);
-    assert.equal((paired.after.entry as Record<string, unknown>).metadata, 'ENC:bWV0YWRhdGFpdg==:bWV0YWRhdGFjaXBoZXI=');
+    assert.equal((paired.after.entry as Record<string, unknown>).metadata, SEALED_METADATA);
     const metadata = JSON.parse((paired.after.audit[0] as Record<string, unknown>).redacted_metadata as string);
     assert.deepEqual(metadata.flags, ['auth:paired-client', 'paired-client:synthetic-paired', 'scope:ambulatory']);
     assert.equal(JSON.stringify(metadata).includes('bWV0YWRhdGF'), false);
@@ -788,6 +790,104 @@ test('profilo senza displayName usa lo username corrente, storico e sistema rest
     const historical = seed('autore-storico', true);
     const dto = await v1Item.GET(request('GET', undefined, 'v1'), { params: Promise.resolve({ id: historical.patientId, entryId: historical.entryId }) });
     assert.equal((await dto.json()).recordedBy, null);
+});
+
+const DIARY_SEALED_FIELDS = ['title', 'content', 'metadata', 'attachments', 'deletionReason'] as const;
+const UNSEALED_VALUES = [
+    ['plaintext', 'Nota sintetica in chiaro'],
+    ['prefix-only', 'ENC:malformed'],
+    ['single-segment', 'ENC:dGl0bGU='],
+    ['json-object', { synthetic: true }],
+] as const;
+
+for (const operation of ['POST', 'PUT'] as const) {
+    for (const field of DIARY_SEALED_FIELDS.filter(name => operation === 'PUT' || name !== 'deletionReason')) {
+        for (const [label, value] of UNSEALED_VALUES) {
+            if (typeof value === 'object' && (field === 'title' || field === 'content' || field === 'deletionReason')) continue;
+            test(`web ${operation} rejects ${label} ${field} without touching version or audit`, async () => {
+                const result = await capture(`web-${operation}-unsealed-${field}-${label}`, 'web', operation,
+                    { mutateBody: (body) => ({ ...body, [field]: value }) });
+                assertRejected(result, 422);
+                assert.deepEqual(await result.response.json(),
+                    { error: `Field ${field} must be sealed with ENC:`, code: 'ENCRYPTED_FIELD_REQUIRED' });
+            });
+        }
+    }
+}
+
+test('web POST accepts absent and null optional sealed fields', async () => {
+    const result = await capture('web-POST-optional-absent', 'web', 'POST', {
+        mutateBody: ({ title: _title, ...body }) => ({ ...body, metadata: null, attachments: null }) });
+    assertAccepted(result, 201);
+    const row = result.after.entry as Record<string, unknown>;
+    assert.equal(row.metadata, null);
+    assert.equal(row.attachments, null);
+});
+
+test('web PUT clears optional sealed fields with null', async () => {
+    const result = await capture('web-PUT-optional-null', 'web', 'PUT',
+        { body: { version: 3, metadata: null, attachments: null } });
+    assertAccepted(result, 200);
+    assert.equal((result.after.entry as Record<string, unknown>).metadata, null);
+    assert.equal((result.after.entry as Record<string, unknown>).version, 4);
+});
+
+test('web PUT keeps historical plaintext untouched and refuses to write new plaintext over it', async () => {
+    const ids = seed('web-historical-plaintext', true);
+    sql.prepare('UPDATE entries SET title=?, content=? WHERE id=?')
+        .run('Titolo storico sintetico', 'Nota storica sintetica', ids.entryId);
+    const before = readBack(ids.patientId, ids.entryId);
+    const refused = await invoke('web', 'PUT', ids, { version: 3, content: 'Nota storica sintetica modificata' });
+    assert.equal(refused.status, 422);
+    assert.deepEqual(readBack(ids.patientId, ids.entryId), before);
+    const dated = await invoke('web', 'PUT', ids, { version: 3, date: '2026-06-01T09:00:00.000Z' });
+    assert.equal(dated.status, 200);
+    const after = readBack(ids.patientId, ids.entryId);
+    assert.equal((after.entry as Record<string, unknown>).title, 'Titolo storico sintetico');
+    assert.equal((after.entry as Record<string, unknown>).content, 'Nota storica sintetica');
+    assert.equal((after.entry as Record<string, unknown>).version, 4);
+    assert.equal(after.audit.length, 1);
+});
+
+test('web client creates, edits and rereads a sealed diary note through the routes', async t => {
+    const { db } = load('./db.ts') as typeof import('./db.ts');
+    const { generateMasterKey } = load('./security/security.ts') as typeof import('./security/security.ts');
+    const ids = seed('web-client-roundtrip', false);
+    const bodies: Record<string, unknown>[] = [];
+    t.mock.method(globalThis, 'fetch', async (url: string, options: RequestInit = {}) => {
+        const method = options.method ?? 'GET';
+        const req = new Request(new URL(url, 'http://127.0.0.1/'), { method,
+            headers: { 'x-mediflow-archive-generation': archiveGeneration, 'content-type': 'application/json' },
+            ...(method === 'GET' ? {} : { body: options.body as string }) });
+        if (method !== 'GET') bodies.push(JSON.parse(options.body as string));
+        if (method === 'GET') return webCreate.GET(req);
+        if (method === 'POST') return webCreate.POST(req);
+        return webItem.PUT(req, { params: Promise.resolve({ id: url.split('/').pop()! }) });
+    });
+    db.setKey(await generateMasterKey());
+    try {
+        const date = new Date('2026-05-02T09:00:00.000Z');
+        await db.entries.add({ id: ids.entryId, patientId: ids.patientId, type: 'note', title: 'Controllo sintetico',
+            content: 'Nota sintetica protetta', metadata: { authorName: 'Medico sintetico' }, attachments: ['allegato-sintetico'],
+            date, createdAt: date, updatedAt: date });
+        const read = () => db.entries.query({ patientId: ids.patientId }).toArray();
+        const [created] = await read();
+        assert.equal(created.title, 'Controllo sintetico');
+        assert.equal(created.content, 'Nota sintetica protetta');
+        assert.deepEqual(created.metadata, { authorName: 'Medico sintetico' });
+        assert.deepEqual(created.attachments, ['allegato-sintetico']);
+        await db.entries.update(ids.entryId, { version: created.version, content: 'Nota sintetica protetta e modificata' });
+        const [edited] = await read();
+        assert.equal(edited.content, 'Nota sintetica protetta e modificata');
+        assert.equal(edited.title, 'Controllo sintetico');
+        assert.equal(edited.version, 2);
+        const stored = readBack(ids.patientId, ids.entryId);
+        for (const field of ['title', 'content', 'metadata', 'attachments']) {
+            assert.match(String((stored.entry as Record<string, unknown>)[field]), /^ENC:[A-Za-z0-9+/]+={0,2}:[A-Za-z0-9+/]+={0,2}$/);
+        }
+        assert.deepEqual(stored.audit.map(event => (event as Record<string, unknown>).event_type), ['entry.created', 'entry.updated']);
+        assert.equal(JSON.stringify(bodies).includes('Nota sintetica protetta'), false);
+    } finally { db.setKey(null); }
 });
 
 

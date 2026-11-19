@@ -50,6 +50,11 @@
     "owner": "@Wulfgardr"
   },
   {
+    "path": "e2e/fixtures/sealed-diary-entry.ts",
+    "reason": "WUL-910: cifra con la chiave della sessione sbloccata le voci di diario sintetiche create dagli spec e da scripts/build-screenshots.mjs; nessun test autonomo.",
+    "owner": "@Wulfgardr"
+  },
+  {
     "path": "e2e/fixtures/isolated-runtime.ts",
     "reason": "WUL-729: Playwright fixture/test extension consumed by the route spec, no standalone spec.",
     "owner": "@Wulfgardr"

@@ -227,9 +227,8 @@ function prebuiltArtifact(input, overrides = {}) {
   return archive;
 }
 
-// PR 910: buildFixture copiava a mano il checker senza standalone-ssr-chunks.mjs.
 test('fixture copies follow the real imports and a missing module is named', t => {
-  assert.ok(localImportClosure(repositoryRoot, ['scripts/check-standalone-runtime-bundle.mjs']).includes('scripts/standalone-ssr-chunks.mjs'));
+  assert.ok(localImportClosure(repositoryRoot, ['scripts/check-standalone-runtime-bundle.mjs']).includes('scripts/standalone-runtime-chunks.mjs'));
   const root = fs.mkdtempSync(path.join(fixture(t).directory, 'imports-'));
   write(path.join(root, 'scripts/entry.mjs'), "import { used } from './used.mjs';\nimport type { Only } from './types-only';\nexport { again } from './again.ts';\n");
   write(path.join(root, 'scripts/used.mjs'), "import data from './data.json' with { type: 'json' };\nexport const used = data;\n");
