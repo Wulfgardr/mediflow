@@ -32,6 +32,41 @@ async function write(page: Page, locator: Locator, text: string, mode: Mode) {
   await page.keyboard.type(text);
 }
 
+async function createFromEmptySearch(page: Page, lastName: string, mode: Mode) {
+  if (mode === 'puntatore') await page.getByRole('link', { name: 'Nuova scheda', exact: true }).click();
+  else { await page.keyboard.press('Tab'); await page.keyboard.press('n'); }
+  const firstName = page.getByRole('textbox', { name: /^Nome\b/u });
+  await expect(firstName).toBeFocused();
+  await write(page, firstName, 'Caso', mode);
+  await write(page, page.getByRole('textbox', { name: 'Cognome' }), lastName, mode);
+  const identifier = page.getByLabel('Identificativo', { exact: true });
+  await reach(page, identifier);
+  await page.keyboard.press('n');
+  await expect(identifier).toHaveValue('none');
+  const estimated = page.getByRole('checkbox', { name: 'Conosco solo l’anno' });
+  if (mode === 'puntatore') await estimated.click(); else { await reach(page, estimated); await page.keyboard.press('Space'); }
+  const year = page.getByRole('spinbutton', { name: 'Anno di nascita stimato' });
+  if (mode === 'puntatore') await write(page, year, '1994', mode);
+  else { await page.keyboard.press('Shift+Tab'); await expect(year).toBeFocused(); await page.keyboard.type('1994'); }
+  if (mode === 'puntatore') await page.getByRole('button', { name: 'Crea scheda', exact: true }).click();
+  else await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(url => url.pathname === '/' && url.searchParams.get('area') === 'incarico');
+  await expect(page.getByRole('complementary', { name: `Lente paziente: ${lastName} Caso`, exact: true })).toBeVisible();
+  if (mode === 'puntatore') await page.getByRole('link', { name: 'Apri scheda paziente', exact: true }).click();
+  else await activate(page, page.getByRole('link', { name: 'Apri scheda paziente', exact: true }), mode);
+  await expect(page).toHaveURL(/\/patients\/[^/]+\/modules/);
+  await expect(page.getByRole('heading', { level: 1 })).toContainText(lastName);
+  return page.url();
+}
+
+async function readCreatedPatient(page: Page, url: string, lastName: string) {
+  const patientId = new URL(url).pathname.split('/')[2];
+  const persisted = await page.request.get(`/api/patients/${patientId}`);
+  expect(persisted.status()).toBe(200);
+  expect(await persisted.json()).toMatchObject({ id: patientId, firstName: 'Caso', lastName, identifierType: 'none',
+    taxCode: '', birthDatePrecision: 'estimated', birthYear: 1994, birthDate: null });
+}
+
 test('sei compiti Web: conti di base su archivio sintetico', async ({ page }, info) => {
   test.setTimeout(360_000);
   const started = performance.now();
@@ -120,28 +155,7 @@ test('sei compiti Web: conti di base su archivio sintetico', async ({ page }, in
       await search.fill(`Nuovo${mode === 'puntatore' ? 'P' : 'T'}${suffix}`); // starting boundary: an already unsuccessful search
       await expect(page.getByRole('status').filter({ hasText: 'Nessun risultato' })).toBeVisible();
       await measure('2', mode, ['Ricerca senza esito', 'Nuova scheda', 'Nome Caso', 'Cognome Nuovo + suffisso sintetico', 'Identificativo: Nessun identificativo per ora (Tab, n)', 'Conosco solo l’anno: 1994', 'Crea scheda', 'Rilettura scheda'], async () => {
-        if (mode === 'puntatore') await page.getByRole('link', { name: 'Nuova scheda', exact: true }).click();
-        else { await page.keyboard.press('Tab'); await page.keyboard.press('n'); }
-        await write(page, page.getByRole('textbox', { name: 'Nome', exact: false }).first(), 'Caso', mode);
-        await write(page, page.getByRole('textbox', { name: 'Cognome' }), `Nuovo${mode === 'puntatore' ? 'P' : 'T'}${suffix}`, mode);
-        const identifier = page.getByLabel('Identificativo', { exact: true });
-        await reach(page, identifier);
-        await page.keyboard.press('n');
-        await expect(identifier).toHaveValue('none');
-        const estimated = page.getByRole('checkbox', { name: 'Conosco solo l’anno' });
-        if (mode === 'puntatore') await estimated.click(); else { await reach(page, estimated); await page.keyboard.press('Space'); }
-        const year = page.getByRole('spinbutton', { name: 'Anno di nascita stimato' });
-        if (mode === 'puntatore') await write(page, year, '1994', mode);
-        else { await page.keyboard.press('Shift+Tab'); await expect(year).toBeFocused(); await page.keyboard.type('1994'); }
-        if (mode === 'puntatore') await page.getByRole('button', { name: 'Crea scheda', exact: true }).click();
-        else await page.keyboard.press('Enter');
-        await expect(page).toHaveURL(url => url.pathname === '/' && url.searchParams.get('area') === 'incarico');
-        await expect(page.getByRole('complementary', { name: `Lente paziente: Nuovo${mode === 'puntatore' ? 'P' : 'T'}${suffix} Caso`, exact: true })).toBeVisible();
-        if (mode === 'puntatore') await page.getByRole('link', { name: 'Apri scheda paziente', exact: true }).click();
-        else await activate(page, page.getByRole('link', { name: 'Apri scheda paziente', exact: true }), mode);
-        await expect(page).toHaveURL(/\/patients\/[^/]+\/modules/);
-        await expect(page.getByRole('heading', { level: 1 })).toContainText(`Nuovo${mode === 'puntatore' ? 'P' : 'T'}${suffix}`);
-        createdUrl = page.url();
+        createdUrl = await createFromEmptySearch(page, `Nuovo${mode === 'puntatore' ? 'P' : 'T'}${suffix}`, mode);
       });
       await page.goto(patientUrl);
       await measure('3', mode, ['Scheda aperta', 'Nuova voce', 'Resoconto: Visita sintetica. Pressione 135/80 mmHg.', 'Rivedi', 'Conferma e registra', 'Esito e rilettura'], async () => {
@@ -215,9 +229,7 @@ test('sei compiti Web: conti di base su archivio sintetico', async ({ page }, in
       await expect(page.getByText('Visita sintetica. Pressione 135/80 mmHg.', { exact: false }).first()).toBeVisible();
       await page.goto(createdUrl);
       await expect(page.getByRole('heading', { level: 1 })).toContainText(`Nuovo${mode === 'puntatore' ? 'P' : 'T'}${suffix}`);
-      const persisted = await page.request.get(new URL(createdUrl).pathname.replace('/modules', '').replace('/patients/', '/api/patients/'));
-      expect(persisted.status()).toBe(200);
-      expect((await persisted.json()).identifierType).toBe('none');
+      await readCreatedPatient(page, createdUrl, `Nuovo${mode === 'puntatore' ? 'P' : 'T'}${suffix}`);
     }
   } finally {
     const report = { schemaVersion: 1, durationMs: Math.round(performance.now() - started), baseSHA: measuredRevision(),
@@ -238,5 +250,29 @@ test('sei compiti Web: conti di base su archivio sintetico', async ({ page }, in
         : ceiling;
       assertGestureRatchet(actual, revised, `${actual.id}/${actual.modo}`);
     }
+  }
+});
+
+test('Nuova scheda da ricerca vuota mantiene il focus sulle nuove navigazioni e n apre la voce del paziente attivo', async ({ page }) => {
+  test.setTimeout(90_000);
+  test.skip(process.env.E2E_GESTURES_SYNTHETIC !== '1', 'Usare npm run e2e:gesti con archivio sintetico posseduto.');
+  await page.setViewportSize({ width: 1440, height: 960 });
+  await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const lastName = `Rilettura${crypto.randomUUID().slice(0, 8)}`;
+    await page.goto('/?area=incarico');
+    const search = page.getByRole('searchbox', { name: 'Cerca nella lista pazienti' });
+    await search.fill(lastName);
+    await expect(page.getByRole('status').filter({ hasText: 'Nessun risultato' })).toBeVisible();
+    const createdUrl = await createFromEmptySearch(page, lastName, 'tastiera');
+    await readCreatedPatient(page, createdUrl, lastName);
+    const patientId = new URL(createdUrl).pathname.split('/')[2];
+    await page.goto(`/?area=incarico&paziente=${patientId}`);
+    await search.fill(lastName);
+    await expect(page.getByRole('option').filter({ hasText: lastName })).toHaveAttribute('aria-selected', 'true');
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('n');
+    await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/entries/new$`, 'u'));
+    await expect(page.getByRole('textbox', { name: 'Resoconto clinico' })).toBeVisible();
   }
 });
