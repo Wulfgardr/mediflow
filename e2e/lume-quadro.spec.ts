@@ -105,7 +105,12 @@ async function assertQuadroContract(page: Page, quadro: Locator, patient: LivePa
   const shadows = await quadro.evaluate((element) => [element, ...element.querySelectorAll('*')]
     .filter(node => (node as HTMLElement).offsetParent !== null && getComputedStyle(node).boxShadow !== 'none')
     .map(node => ({ tray: node.getAttribute('data-record-tray'), shadow: getComputedStyle(node).boxShadow })));
-  expect(shadows).toEqual([]);
+  for (const { tray, shadow } of shadows) {
+    expect(tray).toMatch(/^(stabile|cambiato|contesto)$/);
+    expect(shadow.match(/\binset\b/g)).toHaveLength(3);
+  }
+  if (page.viewportSize()!.width >= 1280) expect(shadows).toHaveLength(3);
+  if (page.viewportSize()!.width <= 390) expect(shadows).toHaveLength(0);
   await expect(page.getByTestId('lume-scheda-surface')).toHaveCSS('box-shadow', 'none');
 
   const measure = quadro.getByRole('region', { name: 'Parametri recenti', exact: true });

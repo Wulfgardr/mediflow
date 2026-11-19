@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { diaryEntrySealer } from './fixtures/sealed-diary-entry';
@@ -106,6 +107,15 @@ async function islandContract(page: Page) {
             changedColor: getComputedStyle(changed).color,
             trayBackground: getComputedStyle(tray).backgroundColor,
             trayShadow: getComputedStyle(tray).boxShadow,
+            trayRadius: Number.parseFloat(getComputedStyle(tray).borderRadius),
+            trayInset: Number.parseFloat(getComputedStyle(tray).paddingLeft),
+            trays: [...sheet.querySelectorAll('[data-record-tray]')].map(node => {
+                const box = node.getBoundingClientRect();
+                const title = node.querySelector(':scope > h2')!.getBoundingClientRect();
+                const first = node.querySelector(':scope > h2 + *')!.getBoundingClientRect();
+                return { zone: node.getAttribute('data-record-tray'), x: Math.round(box.x), y: Math.round(box.y), width: Math.round(box.width), bottom: Math.round(box.bottom),
+                    titleTop: Math.round(title.top - box.top), innerLeft: Math.round(first.left - box.left), innerTop: Math.round(first.top - box.top) };
+            }),
             islandBackground: getComputedStyle(island).backgroundColor,
             islandRadius: Number.parseFloat(getComputedStyle(island).borderRadius),
             posologyBelowName: cells.length === 2 ? cells[1].top >= cells[0].bottom - 1 && Math.abs(cells[1].left - cells[0].left) < 1 : null,
@@ -126,15 +136,23 @@ test('isole del riepilogo: ritorno con variazioni, dettaglio, fonte e due temi',
     for (const theme of ['light', 'dark'] as const) {
         await setTheme(page, theme);
         const contract = await islandContract(page);
-        expect(contract.zoneSize).toBe(12);
+        expect(contract.zoneSize).toBe(20);
         expect(contract.zoneText).toEqual(['Cambiato dall’ultima visita', 'Stabile', 'Contesto']);
-        expect(contract.trayBackground).toBe('rgba(0, 0, 0, 0)');
-        expect(contract.trayShadow).toBe('none');
-        expect(contract.islandBackground).not.toBe('rgba(0, 0, 0, 0)');
+        await expect(page.getByRole('heading', { name: 'Cambiato dall’ultima visita', exact: true })).toBeVisible();
+        expect(contract.trayBackground).toBe(theme === 'light' ? 'rgb(240, 242, 244)' : 'rgb(16, 18, 22)');
+        expect(contract.trayShadow.match(/\binset\b/g)).toHaveLength(3);
+        expect(contract.islandBackground).toBe(theme === 'light' ? 'rgb(255, 255, 255)' : 'rgb(31, 34, 40)');
         expect(contract.islandRadius).toBe(14);
+        expect(contract.trayInset).toBe(10);
+        expect(contract.trayRadius).toBe(contract.islandRadius + contract.trayInset);
+        for (const tray of contract.trays) expect(tray.innerLeft).toBe(10);
+        expect(new Set(contract.trays.map(tray => tray.y)).size).toBe(1);
         expect(contract.posologyBelowName).toBe(true);
         expect(contract.columns).toHaveLength(3);
-        expect(contract.columns[1] / contract.columns[0]).toBeCloseTo(1.22, 1);
+        expect(contract.columns[1] / contract.columns[0]).toBeCloseTo(1.2 / 1.04, 1);
+        expect(contract.columns[2] / contract.columns[0]).toBeCloseTo(1 / 1.04, 1);
+        await test.info().attach(`zone-1320-${theme}`, { body: JSON.stringify(contract, null, 2), contentType: 'application/json' });
+        if (shots) writeFileSync(`${shots}/misure-1320-${theme}.json`, JSON.stringify(contract, null, 2));
         await assertNoHorizontalOverflow(page, [{ label: 'Scheda', selector: '#quadro' }]);
         await shot(page, `ritorno-1320-${theme}`);
     }
@@ -161,12 +179,32 @@ test('isole del riepilogo: ritorno con variazioni, dettaglio, fonte e due temi',
     await expect(potassium).toContainText('4,8 mmol/L');
     await shot(page, 'dettaglio-1320-light');
 
-    await spironolattone.getByRole('button', { name: /Diario del.*Telefonata/ }).click();
+    const sourceButton = spironolattone.getByRole('button', { name: /Diario del.*Telefonata/ });
+    await sourceButton.click();
     await expect(page.getByRole('region', { name: 'Voce del diario' })).toContainText('sospeso spironolattone');
     await shot(page, 'fonte-1320-light');
     await page.getByRole('button', { name: 'Chiudi', exact: true }).click();
     await expect(page.getByRole('region', { name: 'Voce del diario' })).toHaveCount(0);
-    await expect(spironolattone.getByRole('button', { name: /Diario del.*Telefonata/ })).toBeVisible();
+    await expect(sourceButton).toBeVisible();
+    await expect(sourceButton).toBeFocused();
+
+    const middle = page.locator('[data-record-tray="cambiato"]');
+    const before = await middle.evaluate(node => ({ box: node.getBoundingClientRect().toJSON(), scrollable: node.scrollHeight > node.clientHeight }));
+    await middle.evaluate(node => { node.scrollTop = node.scrollHeight; });
+    const after = await middle.evaluate(node => {
+        const box = node.getBoundingClientRect();
+        const islands = [...node.querySelectorAll(':scope > .activity > section, :scope > section')].map(island => island.getBoundingClientRect());
+        const visible = islands.filter(island => island.bottom > box.top && island.top < box.bottom);
+        return { box: box.toJSON(), scrollTop: node.scrollTop, background: getComputedStyle(node).backgroundColor,
+            islandsInsideTray: visible.every(island => island.left >= box.left + 10 - 0.5 && island.right <= box.right - 10 + 0.5) };
+    });
+    expect(after.box).toEqual(before.box);
+    expect(after.background).toBe('rgb(240, 242, 244)');
+    expect(after.islandsInsideTray).toBe(true);
+    if (before.scrollable) expect(after.scrollTop).toBeGreaterThan(0);
+    await shot(page, 'cambiato-scorso-1320-light');
+    if (shots) writeFileSync(`${shots}/scorrimento-1320-light.json`, JSON.stringify({ before, after }, null, 2));
+    await middle.evaluate(node => { node.scrollTop = 0; });
     await shot(page, 'ritorno-dopo-fonte-1320-light');
 
     const measures = page.getByRole('table', { name: 'Parametri recenti', exact: true });

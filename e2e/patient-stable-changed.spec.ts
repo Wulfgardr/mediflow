@@ -139,6 +139,8 @@ async function themes(page: Page, suffix: string) {
                 tracks: getComputedStyle(grid).gridTemplateColumns.split(' ').length,
                 tray: getComputedStyle(tray).backgroundColor,
                 trayShadow: getComputedStyle(tray).boxShadow,
+                trayRadius: Number.parseFloat(getComputedStyle(tray).borderRadius),
+                inset: Number.parseFloat(getComputedStyle(tray).paddingLeft),
                 island: getComputedStyle(island).backgroundColor,
                 islandRadius: Number.parseFloat(getComputedStyle(island).borderRadius),
                 titleSize: Number.parseFloat(getComputedStyle(title).fontSize),
@@ -147,12 +149,14 @@ async function themes(page: Page, suffix: string) {
         });
         const compact = layout.width < 44 * layout.rem;
         expect(layout.tracks).toBe(layout.width >= 62 * layout.rem ? 3 : compact ? 1 : 2);
-        expect(layout.tray).toBe('rgba(0, 0, 0, 0)');
-        expect(layout.trayShadow).toBe('none');
-        expect(layout.island).toBe(theme === 'light' ? 'rgb(243, 244, 246)' : 'rgb(31, 34, 40)');
+        expect(layout.tray).toBe(compact ? 'rgba(0, 0, 0, 0)' : theme === 'light' ? 'rgb(240, 242, 244)' : 'rgb(16, 18, 22)');
+        if (compact) expect(layout.trayShadow).toBe('none');
+        else expect(layout.trayShadow.match(/\binset\b/g)).toHaveLength(3);
+        expect(layout.island).toBe(compact ? theme === 'light' ? 'rgb(243, 244, 246)' : 'rgb(31, 34, 40)' : theme === 'light' ? 'rgb(255, 255, 255)' : 'rgb(31, 34, 40)');
         expect(layout.islandRadius).toBe(14);
-        expect(layout.titleSize).toBe(0.75 * layout.rem);
-        expect(layout.islandTitleSize).toBeGreaterThan(layout.titleSize);
+        if (!compact) expect(layout.trayRadius - layout.inset).toBe(layout.islandRadius);
+        expect(layout.titleSize).toBe(1.25 * layout.rem);
+        expect(layout.titleSize).toBeGreaterThan(layout.islandTitleSize);
         if ([1320, 1180, 402, 390].includes(width)) await test.info().attach(`zone-${width}-${theme}`, {
             body: JSON.stringify(layout, null, 2), contentType: 'application/json',
         });
