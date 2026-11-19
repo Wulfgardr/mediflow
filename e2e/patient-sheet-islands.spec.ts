@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
+import { diaryEntrySealer } from './fixtures/sealed-diary-entry';
 import { assertNoHorizontalOverflow, bootstrapUnlockedSession } from './utils';
 
 test.describe.configure({ retries: 0 });
@@ -24,9 +25,9 @@ function updateSyntheticArchive(update: (database: Database.Database) => void) {
 
 async function seedReturningPatient(page: Page, { sparse = false } = {}) {
     const iso = (date: Date) => date.toISOString();
-    const fixture = await page.evaluate(async ({ sparse, visit, phone, measure, previousMeasure, weight, previousWeight }) => {
-        async function post(entity: string, body: object) {
-            const response = await fetch(`/api/${entity}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const fixture = await page.evaluate(async ({ sparse, visit, phone, measure, previousMeasure, weight, previousWeight, seal }) => {
+        async function post(entity: string, body: Record<string, unknown>) {
+            const response = await fetch(`/api/${entity}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(entity === 'entries' ? await seal(body) : body) });
             if (!response.ok) throw new Error(`Fixture ${entity}: ${response.status}`);
             return response.json() as Promise<{ id: string }>;
         }
@@ -64,7 +65,7 @@ async function seedReturningPatient(page: Page, { sparse = false } = {}) {
             await post('checkups', { patientId: patient.id, title, date: new Date(new Date(date).getTime() + 7 * 86400000).toISOString(), status: 'pending', source: 'manual' });
         }
         return { patient, visitEntry, changed: [spironolattone.id], updated: [furosemide.id], kept, measures, previous };
-    }, { sparse, visit: iso(visitAt), phone: iso(at(8)), measure: iso(at(6)), previousMeasure: iso(at(-14)), weight: iso(at(8)), previousWeight: iso(visitAt) });
+    }, { sparse, visit: iso(visitAt), phone: iso(at(8)), measure: iso(at(6)), previousMeasure: iso(at(-14)), weight: iso(at(8)), previousWeight: iso(visitAt), seal: await diaryEntrySealer(page) });
     const seconds = (date: Date) => Math.floor(date.getTime() / 1000);
     updateSyntheticArchive(database => {
         database.prepare('UPDATE entries SET created_at = ?, recorded_by = ? WHERE id = ?').run(seconds(visitAt), 'Dott. Sintetico', fixture.visitEntry.id);
