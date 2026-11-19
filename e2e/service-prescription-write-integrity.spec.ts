@@ -80,6 +80,10 @@ test('Web service prescriptions and items retain the draft on audit failure and 
     expect((await http('service-prescription-items')).every(item => item.version === 2 && item.status === 'performed')).toBe(true);
     await page.screenshot({ path: testInfo.outputPath('service-performed.png'), fullPage: false });
     const nextRemoval = () => page.waitForResponse(r => new URL(r.url()).pathname === `/api/service-prescriptions/${parentId}` && r.request().method() === 'DELETE');
+    const deletionPaths: string[] = [];
+    page.on('request', request => {
+        if (request.method() === 'DELETE') deletionPaths.push(new URL(request.url()).pathname);
+    });
     await pane.getByRole('button', { name: 'Azioni prestazione Controllo sintetico di verifica', exact: true }).click();
     await page.getByRole('menuitem', { name: 'Elimina prestazione', exact: true }).click();
     const edited = await page.evaluate(async (id) => {
@@ -91,17 +95,20 @@ test('Web service prescriptions and items retain the draft on audit failure and 
     }, itemIds[0]);
     expect(edited).toBe(200);
     const conflict = nextRemoval();
+    const refreshed = Promise.all(['service-prescriptions', 'service-prescription-items'].map(resource =>
+        page.waitForResponse(response => response.request().method() === 'GET'
+            && new URL(response.url()).pathname === `/api/${resource}` && response.ok())));
     await page.getByRole('dialog').getByRole('button', { name: 'Elimina', exact: true }).click();
     expect((await conflict).status()).toBe(409);
     await expect(pane.getByRole('alert')).toContainText('Eliminazione non confermata');
     expect(read().items.find(row => row.id === itemIds[0])).toMatchObject({ version: 3 });
-    await page.reload();
-    await openPatientSection(page, 'prestazioni');
+    await refreshed;
     await pane.getByRole('button', { name: 'Azioni prestazione Controllo sintetico di verifica', exact: true }).click();
     await page.getByRole('menuitem', { name: 'Elimina prestazione', exact: true }).click();
     const removed = nextRemoval();
     await page.getByRole('dialog').getByRole('button', { name: 'Elimina', exact: true }).click();
     expect((await removed).status()).toBe(200);
+    expect(deletionPaths).toEqual([`/api/service-prescriptions/${parentId}`, `/api/service-prescriptions/${parentId}`]);
     await expect(pane.getByText('Controllo sintetico di verifica', { exact: true })).toHaveCount(0);
     const deleted = read();
     expect(deleted.rows).toHaveLength(0); expect(deleted.items).toHaveLength(0);
