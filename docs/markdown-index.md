@@ -26,6 +26,7 @@ la data di questo indice non rinnova le prove cui rimandano.
 
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
+| [ADR 0196](./adr/0196-document-child-platform-boundary.md) | Controlli dei processi che elaborano i documenti nel runtime Web. | Per verificare estrazione del testo e lettura dei PDF su ciascuna piattaforma. |
 | [Contratto 0.9.1](./releases/0.9.1-contract.md) | U0 approvato il 23 ottobre 2026: unità chiuse, target M5 Max/48 GB dal 9 novembre, tranche intelligente e GO/NO-GO. | Per accettare W/G/C/P/I/Q e seguire le decisioni ancora aperte; non attesta rilascio o ammissione clinica. |
 | [Analisi CU](./analysis/2026-10-23-computer-use-procedures.md) | Delta, alternative privacy, dipendenze e unità del filone computer use locale. | Per valutare la proposta aggiunta in coda alla 0.9.1 e le sole decisioni sostanziali. |
 | [Contratti CU](./analysis/2026-10-23-computer-use-procedure-contracts.md) | Specialistica, farmaceutica, protesica, esenzioni e introduttivo INPS. | Per implementare simulatori e adapter senza dedurre atti o campi non autorizzati. |

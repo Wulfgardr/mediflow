@@ -5,6 +5,7 @@ import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { documentChildLaunch } from './document-child-launcher.mjs';
 import { assertStandaloneSsrChunks, copyStandaloneSsrChunks } from './standalone-ssr-chunks.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -196,13 +197,32 @@ test('standalone checker pins and smokes the isolated PDF page worker', () => {
   assert.match(source, /bundledPdfPageWorkerTraceFailure\(standaloneDir\)/u);
   assert.match(source, /standalonePdfChildDependenciesFailure\(standaloneDir, requireFromStandalone\)/u);
   assert.match(source, /framedPdfPageWorkerSmokeFailure/u);
-  assert.match(source, /--max-old-space-size=\$\{ANYDOC_PDF_CHILD_MAX_OLD_SPACE_MB\}/u);
-  assert.match(source, /--permission/u);
-  assert.match(source, /--allow-fs-read=\$\{packageRoot\}/u);
-  assert.match(source, /allowAddons \? \['--allow-addons'\] : \[\]/u);
+  const worker = path.join(root, 'scripts', 'anydoc-pdf-page-worker.mjs');
+  for (const allowAddons of [false, true]) {
+    const { args } = documentChildLaunch(root, worker, { allowAddons, networkGuard: false });
+    assert.ok(args.includes('--max-old-space-size=256'));
+    assert.ok(args.includes('--permission'));
+    assert.ok(args.includes(`--allow-fs-read=${root}`));
+    assert.equal(args.includes('--allow-addons'), allowAddons);
+  }
   assert.match(source, /missing PDF page worker passed/u);
   assert.match(source, /tampered PDF page worker passed/u);
   assert.match(source, /symlinked PDF page worker passed/u);
+});
+
+test('loads the document worker preloader from a package path containing a space and a hash', (t) => {
+  const directory = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), 'MediFlow #'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const scripts = path.join(directory, 'scripts');
+  fs.mkdirSync(scripts);
+  const guard = 'document-child-network-guard.mjs';
+  fs.copyFileSync(path.join(root, 'scripts', guard), path.join(scripts, guard));
+  const worker = path.join(scripts, 'ready.mjs');
+  fs.writeFileSync(worker, "process.stdout.write('ready');\n");
+  const launch = documentChildLaunch(directory, worker);
+  const result = spawnSync(launch.command, launch.args, { cwd: directory, encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, 'ready');
 });
 
 test('standalone Windows bootstrap check rejects a loader copied as an asset and a missing prebuild', () => {
