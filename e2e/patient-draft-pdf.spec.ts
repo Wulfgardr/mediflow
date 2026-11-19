@@ -163,6 +163,10 @@ for (const [fixture, width, height] of [
             await expect(zoom).toHaveValue(magnification);
             await assertNoHorizontalOverflow(page, [{ label: 'finestra con referto ingrandito', selector: 'document' }]);
         }
+        const resolution = await image.evaluate((element: HTMLCanvasElement) => ({
+            rasterWidth: element.width, displayWidth: element.getBoundingClientRect().width,
+        }));
+        expect(resolution.rasterWidth).toBeGreaterThanOrEqual(Math.floor(resolution.displayWidth));
         if (width === 390) {
             await scrollport.focus();
             await page.keyboard.press('ArrowRight');
@@ -239,7 +243,7 @@ for (const [fixture, width, height] of [
             return response.json() as Promise<{ patientId: string; version: number }[]>;
         }, patientId);
         expect(entries).toEqual([expect.objectContaining({ patientId, version: 1 })]);
-        console.log(JSON.stringify({ fixture: fixture.key, width, height, fitWidth: canvas.width,
+        console.log(JSON.stringify({ fixture: fixture.key, width, height, ...resolution, fitWidth: canvas.width,
             visibleHeight: port.height, stripHeight: bar.height, fitTextPx, firstPageMs, secondPageMs, resumeMs, writes: pendingWrites.length }));
     });
 }
