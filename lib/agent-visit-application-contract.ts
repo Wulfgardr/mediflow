@@ -3,6 +3,7 @@ import { dateInputSchema } from './api-schemas/common';
 import { therapyCreateSchema } from './api-schemas/clinical-writes';
 import { servicePrescriptionCreateSchema } from './api-schemas/prescriptions';
 import type { AgentCassette } from './agent-cassette-contract';
+import { clinicalContentAllowed } from './agent-mandate-contract';
 
 export type AgentCassetteIndexEntry = Pick<AgentCassette, 'id' | 'archiveGeneration' | 'status' | 'revision' | 'depositedAt'>;
 export type AgentCassetteIndexPage = { visits: AgentCassetteIndexEntry[]; next: string | null };
@@ -34,5 +35,9 @@ export const agentApplicationSchema = z.object({ visitId: id, phase: z.enum(['au
 export type AgentApplicationInput = z.input<typeof agentApplicationSchema>;
 export type AgentApplication = z.output<typeof agentApplicationSchema>;
 export const automaticAgentKind = (kind: string) => ['note', 'transcription', 'pdf'].includes(kind);
+export const agentCassetteAppliesAutomatically = (cassette: Pick<AgentCassette, 'modelProvider' | 'allowsClinicalEgress'>) =>
+    clinicalContentAllowed(cassette.modelProvider, cassette.allowsClinicalEgress);
+export const agentItemInPhase = (appliesAutomatically: boolean, phase: 'automatic' | 'review', kind: string) =>
+    phase === 'automatic' ? appliesAutomatically && automaticAgentKind(kind) : !appliesAutomatically || !automaticAgentKind(kind);
 export type AgentApplicationReceipt = { visitId: string; phase: 'automatic' | 'review'; status: 'applied'; eventId: string; itemCount: number;
     patientVersion: number; modelProvider: string; allowsClinicalEgress: boolean };

@@ -153,12 +153,7 @@ test('modificare una riga dentro un doc comment esistente resta ammesso, dentro 
     assert.ok(!got.some((line) => line.includes('Documentazione')));
 });
 
-test('un commento in coda dopo una stringa chiusa viene segnalato, un marcatore dentro una stringa no', () => {
-    assert.equal(commentKind('api.ts', 'const name = "patient"; // narrative'), 'trailing');
-    assert.equal(commentKind('api.ts', "const name = 'a'; // eslint-disable-line no-console"), 'trailing');
-    assert.equal(commentKind('api.ts', 'const s = `x ${y}`; // racconto'), 'trailing');
-    assert.equal(commentKind('api.ts', 'const s = "a // b";'), null);
-    assert.equal(commentKind('api.ts', "const s = 'it\\'s // ok';"), null);
+test('il rilevatore YAML distingue un commento in coda dal testo di una stringa', () => {
     assert.equal(commentKind('w.yml', 'key: "a # b"'), null);
     assert.equal(commentKind('w.yml', 'key: "a" # spiega'), 'trailing');
 });
@@ -169,5 +164,38 @@ test('aggiornare solo una riga di un doc comment esistente non viene segnalato',
     commit('doc');
     moveBase();
     write('doc.ts', '/**\n * Documentazione aggiornata della API pubblica.\n */\nexport function api() {}\n');
+    assert.deepEqual(flagged(), []);
+});
+
+test('blocca i commenti JS e TS anche senza spazi, dentro JSX e sulle righe interne di un blocco', (t) => {
+    const { write, commit, flagged, moveBase } = fixtureRepo(t);
+    write('edit.mjs', '/*\nvecchio testo\n*/\nexport const value = 1;\n');
+    commit('blocco esistente');
+    moveBase();
+    write('edit.mjs', '/*\nnuovo ripiego\n*/\nexport const value = 1;\n');
+    write('inline.ts', 'export const value = 1;/* ripiego in coda */\n');
+    write('view.tsx', 'export const view = <div>{/* ripiego nel JSX */}</div>;\n');
+
+    assert.deepEqual(flagged().sort(), [
+        'nuovo ripiego',
+        'export const value = 1;/* ripiego in coda */',
+        'export const view = <div>{/* ripiego nel JSX */}</div>;',
+    ].sort());
+});
+
+test('ignora testo JSX, espressioni regolari e template che contengono marcatori di commento', (t) => {
+    const { write, flagged } = fixtureRepo(t);
+    write('text.tsx', [
+        'const text = `prima',
+        '// testo del template',
+        '/* ancora testo del template */',
+        '`;',
+        'const pattern = /[/*]/;',
+        'export const view = <div>',
+        '// testo in pagina',
+        '/* ancora testo in pagina */',
+        '</div>;',
+    ].join('\n'));
+
     assert.deepEqual(flagged(), []);
 });

@@ -5,12 +5,13 @@ import { createAgentPairingStore } from '../agent-pairing-store';
 import { createAgentMandateStore } from '../agent-mandate-store';
 import { createAgentCassetteStore, readAgentCassette } from '../agent-cassette-store';
 import { readSqliteArchiveGeneration } from '../archive-generation';
-import { AGENT_OPERATIONS, type AgentOperation } from '../agent-mandate-contract';
+import { AGENT_OPERATIONS, type AgentMandateInput, type AgentOperation } from '../agent-mandate-contract';
 import { agentBase64, type AgentCipherContext } from '../agent-cassette-crypto';
 import { encryptData, generateMasterKey } from '../security/security';
 import { sealAgentItemNode } from '../../packages/agent-client/src/cassette-crypto';
 
-export async function agentCassetteFixture(operations: AgentOperation[] = [...AGENT_OPERATIONS], model: 'local' | 'openai' = 'local') {
+export async function agentCassetteFixture(operations: AgentOperation[] = [...AGENT_OPERATIONS], model: AgentMandateInput['provider'] = 'local',
+    allowsClinicalEgress = model !== 'local') {
     const database = new Database(':memory:'); database.pragma('foreign_keys=ON'); initializeSqliteSchema(database);
     const actorRef = 'synthetic-cassette-doctor';
     database.prepare('INSERT INTO users(id,username,role,password_hash,encrypted_master_key,salt) VALUES (?,?,?,?,?,?)')
@@ -21,7 +22,7 @@ export async function agentCassetteFixture(operations: AgentOperation[] = [...AG
     const wrapped = await encryptData(agentBase64(raw), masterKey); raw.fill(0);
     const publicKey = agentBase64(new Uint8Array(await crypto.subtle.exportKey('raw', keys.publicKey)));
     const mandates = createAgentMandateStore(database, () => time), pairings = createAgentPairingStore(database, () => time), store = createAgentCassetteStore(database, () => time);
-    const mandate = mandates.create({ id: randomUUID(), durationMs: 43200000, operations, provider: model, allowsClinicalEgress: model === 'openai',
+    const mandate = mandates.create({ id: randomUUID(), durationMs: 43200000, operations, provider: model, allowsClinicalEgress,
         publicKey, wrappedPrivateKey: `ENC:${wrapped.iv}:${wrapped.data}` }, actorRef, generation);
     const pair = pairings.request('Synthetic cassette client', operations); pairings.approve(pair.request.id, pair.request.code, mandate.id, actorRef, generation);
     const token = pairings.poll(pair.request.id, pair.claim).credential!.token;
