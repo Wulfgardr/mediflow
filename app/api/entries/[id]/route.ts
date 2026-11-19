@@ -1,3 +1,4 @@
+import { rejectUnsealedV1Write } from '@/lib/api/v1/sealed-write';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { NextResponse } from 'next/server';
@@ -22,6 +23,8 @@ export async function PUT(
         if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
         const prepared = prepareEntryUpdate(parsed.body, 'web');
         if (!prepared.ok) return NextResponse.json({ error: prepared.error }, { status: prepared.status });
+        const sealedError = rejectUnsealedV1Write('entries', parsed.body);
+        if (sealedError) return sealedError;
         const context = auditContextFromSession(session);
         const legacyRevisionProtection = localLegacyRevisionProtection(request, parsed.body.legacyRevisionProtection);
         const result = updateEntryOperation({ entryId: id, expectedVersion: prepared.expectedVersion, legacyRevisionProtection,
