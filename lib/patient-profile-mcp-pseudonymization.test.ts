@@ -157,6 +157,40 @@ test('M1: the MCP stdio transport serves both projections without any identity v
     assert.equal(mcp.stderr(), '');
 });
 
+test('M1: a free text longer than one preparation releases no identity piece wherever the cut falls', () => {
+    const source = { firstName: 'Ada', lastName: 'Sintetica', taxCode: 'SNTDAA48C42F205X', birthDate: '1948-03-02T00:00:00.000Z',
+        address: 'Via Sintetica 12, Milano', phone: '02 1234 5678', caregiver: 'Carlo Bianchi', diagnoses: null, exemptions: null,
+        notes: null, isAdi: null, isArchived: null, statusReason: null, archiveReason: null, archiveNote: null } as ProfileFields;
+    const values = [
+        { value: source.phone!, pieces: ['1234', '5678'] },
+        { value: source.address!, pieces: ['Sintetica', 'Milano'] },
+        { value: source.caregiver!, pieces: ['Carlo', 'Bianchi'] },
+        { value: 'figlio 347 555 0199', pieces: ['555', '0199'] },
+        { value: 'indirizzo: Via Lontana 9, Pavia', pieces: ['Lontana', 'Pavia'] },
+        { value: 'telefono della figlia tre quattro sette cinque cinque cinque zero uno nove nove', pieces: ['quattro', 'cinque', 'nove'] },
+    ];
+    const positions = [...Array.from({ length: 121 }, (_, index) => 10_900 + index), ...Array.from({ length: 51 }, (_, index) => 11_960 + index)];
+    const leaks: string[] = [];
+    for (const { value, pieces } of values) {
+        for (const position of positions) {
+            const notes = `${'pz stabile '.repeat(1_200).slice(0, position - 1)} ${value} fine nota.`;
+            for (const projection of ['profile', 'notes'] as const) {
+                const pseudonymizer = createProfilePseudonymizer();
+                try {
+                    const released = JSON.stringify(pseudonymizer.project({ ...source, notes }, projection));
+                    const leaked = pieces.filter(piece => released.includes(piece));
+                    if (leaked.length) leaks.push(`${projection} ${position} ${leaked.join('+')} of «${value}»`);
+                } finally { pseudonymizer.close(); }
+            }
+        }
+    }
+    assert.deepEqual(leaks.slice(0, 12), [], `${leaks.length} leaks`);
+    const unbroken = createProfilePseudonymizer();
+    try {
+        assert.throws(() => unbroken.project({ ...source, notes: `indirizzo: ${'Via Lontana '.repeat(1_100)}` }, 'notes'), { code: 'query_unavailable' });
+    } finally { unbroken.close(); }
+});
+
 test('M2: the substitution happens in the Web owner, so the IPC frame toward the Supervisor carries no identity value', async () => {
     reset(); const selected = await select();
     const port = await acquirePatientProfileQueryHostPort('profile', Date.now() + 60_000, 'pseudonymized'); assert.ok(port);
