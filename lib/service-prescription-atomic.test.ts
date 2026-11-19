@@ -87,7 +87,11 @@ async function invoke(op: Operation, ids: ReturnType<typeof seed>, version = 3) 
     switch (op) {
         case 'host-parent-create': return writer.createHostServicePrescription(host, parentBody);
         case 'host-parent-update': return writer.updateHostServicePrescription({ ...host, id: ids.prescriptionId }, { version, serviceName: 'ENC:synthetic:update', notes: null });
-        case 'host-parent-delete': return writer.deleteHostServicePrescription({ ...host, id: ids.prescriptionId }, version);
+        case 'host-parent-delete': {
+            const reviewed = sql.prepare('SELECT id, version FROM service_prescription_items WHERE prescription_id=?')
+                .all(ids.prescriptionId) as Array<{ id: string; version: number }>;
+            return writer.deleteHostServicePrescription({ ...host, id: ids.prescriptionId }, version, reviewed);
+        }
         case 'host-item-create': return writer.createHostServicePrescriptionItem(host, itemBody);
         case 'host-item-update': return writer.updateHostServicePrescriptionItem({ ...host, id: ids.itemId }, { version, serviceName: 'ENC:synthetic:update', notes: null });
         case 'host-item-delete': return writer.deleteHostServicePrescriptionItem({ ...host, id: ids.itemId }, version);
@@ -195,7 +199,7 @@ test('patient, parent, paired scope, stale version and retry', async () => {
         const before = snapshot(ids); assert.equal((await invoke(op, ids)).status, 404, op); assert.deepEqual(snapshot(ids), before);
     }
     for (const op of operations.filter(value => value.includes('update') || value.includes('delete'))) {
-        const ids = seed(); insertParent(ids); if (op.includes('item')) insertItem(ids);
+        const ids = seed(); insertParent(ids); if (op.includes('item') || op === 'host-parent-delete') insertItem(ids);
         const before = snapshot(ids); const stale = await invoke(op, ids, 2); assert.equal(stale.status, 409, op);
         assert.equal(stale.value.code, 'VERSION_CONFLICT'); assert.deepEqual(snapshot(ids), before);
         assert.equal((await invoke(op, ids, 3)).status, 200);

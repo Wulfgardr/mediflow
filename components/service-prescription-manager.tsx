@@ -386,6 +386,8 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
     };
 
     const deleteItem = async (item: ServicePrescription) => {
+        setError(null);
+        const reviewed = (itemsByPrescription.get(item.id) ?? []).map(({ id, version }) => ({ id, version }));
         const { confirmed } = await confirm({
             title: `Eliminare la prestazione "${item.serviceName}"?`,
             message: 'La prestazione e le sue voci verranno rimosse dalla cartella del paziente.',
@@ -394,12 +396,11 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
         });
         if (!confirmed) return;
         try {
-            await db.servicePrescriptions.delete(item.id, { version: item.version });
-        } catch (error) {
+            await db.servicePrescriptions.delete(item.id, { version: item.version, prescriptionItems: reviewed });
+        } catch {
+            setError('Eliminazione non confermata. Rileggi la prestazione e le sue voci prima di riprovare.');
             notifyDbChange('service_prescriptions');
-            throw error;
         } finally {
-            // il delete atomico del parent rimuove anche i figli lato server.
             notifyDbChange('service_prescription_items');
         }
     };
@@ -616,7 +617,6 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                             />
                         </label>
                     </div>
-                    {error && <p className="mt-3 text-xs font-medium text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">{error}</p>}
                     <div className="mt-4 flex justify-end gap-3">
                         <button
                             type="button"
@@ -638,6 +638,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
             )}
             </div>
 
+            {error && <p role="alert" className="mt-3 text-xs font-medium text-[color:color-mix(in_srgb,var(--lume-signal-critical)_60%,var(--lume-ink))]">{error}</p>}
             {prescriptions !== undefined && prescriptionsError ? <ViewState state="error" title="Impossibile aggiornare le prestazioni prescritte." action={{ label: 'Riprova', onClick: refreshPrescriptions }} /> : null}
             {!prescriptions ? (prescriptionsError
                 ? <ViewState state="error" title="Impossibile leggere le prestazioni prescritte." action={{ label: 'Riprova', onClick: refreshPrescriptions }} />
@@ -762,7 +763,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
                                         {canPerform && canBook ? <button type="button" role="menuitem" onClick={() => void markPerformed(item)}>Segna eseguita</button> : null}
                                         {canReceiveReport && (canBook || canPerform) ? <button type="button" role="menuitem" onClick={() => void markReportReceived(item)}>Referto ricevuto</button> : null}
                                         {canCancel ? <button type="button" role="menuitem" onClick={() => void cancelItem(item)}>Annulla prestazione</button> : null}
-                                        {isClosed ? <button type="button" role="menuitem" onClick={() => void deleteItem(item)}>Elimina prestazione</button> : null}
+                                        {isClosed ? <button type="button" role="menuitem" disabled={prescriptionItems === undefined} onClick={() => void deleteItem(item)}>Elimina prestazione</button> : null}
                                     </PatientSheetMenu>
                                 </div>
 
