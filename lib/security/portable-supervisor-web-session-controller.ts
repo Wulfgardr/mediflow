@@ -17,7 +17,7 @@ import {
 } from './portable-supervisor-web-ipc-bridge.ts';
 import { createPortableSupervisorCheckupWebSessionPortV1 } from
     './portable-supervisor-checkup-web-session-port.ts';
-import { acquirePatientProfileQueryHostPort, type PatientProfileQueryHostPort } from './patient-profile-query-host-port';
+import { acquirePatientProfileQueryHostPort, headlessProfileRelease, type PatientProfileQueryHostPort } from './patient-profile-query-host-port';
 import type { ProfileProjection } from '../../packages/patient-profile-contracts/src/query';
 import { createPatientProfileQueryWebDispatcher } from './patient-profile-query-web-dispatcher';
 
@@ -332,7 +332,7 @@ const productionController = createPortableSupervisorWebSessionControllerV1({
     disconnectBridge: disconnectPortableSupervisorWebIpcV1,
     checkupLifecycle: productionCheckupPort.controller,
     profileQueries: {
-        acquire: acquirePatientProfileQueryHostPort,
+        acquire: (projection, expiresAt) => acquirePatientProfileQueryHostPort(projection, expiresAt, headlessProfileRelease(process.env)),
         publish: port => { productionProfilePort = port; },
     },
 });

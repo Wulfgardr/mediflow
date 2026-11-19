@@ -179,6 +179,40 @@ import fs from 'node:fs'; fs.writeFileSync(${JSON.stringify(marker)}, 'unexpecte
   });
 }
 
+test('rejects a missing required path before running a mixed selection', (t) => {
+  const directory = fixture(t);
+  const target = path.join(directory, 'present.test.mjs');
+  const missing = path.join(directory, 'missing.test.mjs');
+  const marker = path.join(directory, 'target-ran');
+  fs.writeFileSync(target, `import fs from 'node:fs'; fs.writeFileSync(${JSON.stringify(marker)}, 'ran');`);
+  const env = { MEDIFLOW_DATA_DIR: path.join(directory, 'data') };
+  const selections = [
+    [target, missing],
+    ['--glob', `${directory}/**/*.test.mjs`, missing],
+    ['--', target, missing],
+  ];
+  for (const selection of selections) {
+    const result = run(directory, ['--test', ...selection], env);
+    assert.equal(result.status, 1, result.stderr + result.stdout);
+    assert.match(result.stderr, /missing\.test\.mjs/);
+    assert.equal(fs.existsSync(marker), false);
+  }
+});
+
+test('accepts a relative path, native glob and split Node test option together', (t) => {
+  const directory = fixture(t);
+  fs.mkdirSync(path.join(directory, 'nested'));
+  for (const file of ['present.test.mjs', 'nested/other.test.mjs']) {
+    fs.writeFileSync(path.join(directory, file), "import test from 'node:test'; test('synthetic case', () => {});");
+  }
+  const relativePath = path.relative(repoRoot, path.join(directory, 'present.test.mjs'));
+  const result = run(directory, [
+    '--test', '--test-name-pattern', 'synthetic case', relativePath, `${directory}/nested/*.test.mjs`,
+  ], { MEDIFLOW_DATA_DIR: path.join(directory, 'data') });
+  assert.equal(result.status, 0, result.stderr + result.stdout);
+  assert.match(result.stdout, /pass 2/);
+});
+
 test('a test run never copies the checkout database unless the caller opts in', (t) => {
   const directory = fixture(t);
   const target = path.join(directory, 'legacy-copy.test.ts');
