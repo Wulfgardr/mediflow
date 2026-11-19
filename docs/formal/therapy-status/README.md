@@ -1141,14 +1141,13 @@ delle cassette, che hanno prove separate.
 ### Ripristino portabile Web, WUL-908
 
 Il client del backup in `lib/db.ts` conserva la verifica fino alla conferma.
-Poi invia lo stato dell’archivio esaminato. Il writer confronta quello stato nella
-transazione SQLite prima di revocare i riferimenti agli allegati. L’unione del
-ledger delle terapie con quello della copia, l’audit e la rotazione della
-generazione restano nello stesso ordine e nella stessa transazione.
-Il controllo concorrente della versione e le transizioni del comando di stato
-terapia restano quelli già verificati.
+Poi invia lo stato dell’archivio esaminato. Il writer confronta quello stato
+nella transazione SQLite prima delle scritture. La revoca in memoria dei
+riferimenti agli allegati precede la transazione, come nel writer esistente.
+Vale anche se il controllo preliminare successivo ferma il ripristino.
 
-I digest di `lib/db.ts` e `lib/backup-restore-executor.ts` corrispondono
-al commit di implementazione `c7e573550`. Le regressioni Web coprono il
-conflitto durante il ripristino portabile e il recupero della copia precedente. TLC continua a verificare il modello
-legacy entro i limiti del manifest.
+Il raccordo registra il digest del client sul commit `ae3a41aca688`.
+Il writer, le transizioni del comando di stato terapia e il controllo
+concorrente della versione corrispondono alla base. Le regressioni Web
+coprono il conflitto durante il ripristino portabile. TLC verifica il
+modello legacy entro i limiti del manifest.
