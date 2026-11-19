@@ -4,7 +4,7 @@ import { clientArchiveGeneration } from './security/client-auth-api';
 import { db } from './db';
 import { notifyDbChange } from './live-query';
 import { openAgentVisit } from './agent-cassette-client';
-import { agentItemPhase, inspectAgentVisit, prepareAgentApplication, reopenReviewedAgentItems, type AgentVisitReview } from './agent-visit-review';
+import { inspectAgentVisit, prepareAgentApplication, reopenReviewedAgentItems, type AgentVisitReview } from './agent-visit-review';
 import { agentVisitPresentation, sealVisitConfirmationPresentation } from './agent-visit-confirmation-browser';
 import type { VisitConfirmationTicket } from './agent-visit-confirmation-contract';
 import type { AgentApplicationReceipt, AgentCassetteIndexPage, IncomingAgentCassette } from './agent-visit-application-contract';
@@ -46,8 +46,8 @@ async function reopenForApplication(review: AgentVisitReview, signal: AbortSigna
     if (!items) throw new Error(notApplied);
     return { ...review, appliedItemIds: row.appliedItemIds, visit: { ...review.visit, items } };
 }
-async function apply(review: AgentVisitReview, phase: 'automatic' | 'review', signal: AbortSignal) {
-    const input = await prepareAgentApplication(review, phase, signal);
+async function apply(review: AgentVisitReview, signal: AbortSignal) {
+    const input = await prepareAgentApplication(review, signal);
     if (!input) return review;
     signal.throwIfAborted();
     const response = await fetch(inbox, { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -55,7 +55,7 @@ async function apply(review: AgentVisitReview, phase: 'automatic' | 'review', si
     if (!response.ok) throw new Error(notApplied);
     const receipt: AgentApplicationReceipt = await response.json();
     signal.throwIfAborted();
-    if (receipt.status !== 'applied' || receipt.visitId !== input.visitId || receipt.phase !== phase || receipt.itemCount !== input.items.length) throw new Error('Ricevuta non verificabile. Rileggi la cassetta.');
+    if (receipt.status !== 'applied' || receipt.visitId !== input.visitId || receipt.phase !== input.phase || receipt.itemCount !== input.items.length) throw new Error('Ricevuta non verificabile. Rileggi la cassetta.');
     notifyDbChange();
     return { ...review, patient: review.patient ? { ...review.patient, version: receipt.patientVersion } : null,
         appliedItemIds: [...new Set([...review.appliedItemIds, ...input.items.map(item => item.id)])] };
@@ -85,10 +85,9 @@ export async function attemptNativeConfirmation(signal: AbortSignal, readPdf?: P
             || row.status !== 'closed') return;
         const { doctorTaxCode } = await profile.json();
         const review = await inspectAgentVisit(row, patients, doctorTaxCode ?? null, signal, readPdf, new Set(exemptions.map(value => value.code)));
-        if (review.visit.items.some(item => agentItemPhase(review, item) === 'automatic' && !row.appliedItemIds.includes(item.id))) return;
-        const plan = await prepareAgentApplication(review, 'review', signal);
+        const plan = await prepareAgentApplication(review, signal);
         if (!plan || plan.patientId !== existing.patient.id || plan.expectedVersion !== existing.patient.version) return;
-        const presentation = await sealVisitConfirmationPresentation(reference, agreementPublicKey, agentVisitPresentation(review, plan));
+        const presentation = await sealVisitConfirmationPresentation(reference, agreementPublicKey, await agentVisitPresentation(review, plan));
         signal.throwIfAborted();
         const shown = await send({ action: 'show', reference, plan, presentation });
         if (shown.ok) notifyDbChange();
@@ -127,18 +126,8 @@ export async function refreshAgentIncoming(signal = db.getSessionReadSignal(), r
                     const { id, archiveGeneration, status, revision, depositedAt } = review.visit.cassette;
                     if (archiveGeneration !== clientArchiveGeneration()) review = { ...review, blockers: [...review.blockers, 'Visita da un archivio precedente. Apri i PDF per recuperarla nella scheda.'] };
                     if (review.visit.items.every(item => review.appliedItemIds.includes(item.id))) continue;
-                    let current = review;
-                    if (status === 'closed' && !review.blockers.length) {
-                        try { current = await apply(review, 'automatic', signal); }
-                        catch (error) {
-                            if (signal.aborted) throw error;
-                            current = { ...review, blockers: [...review.blockers, 'Applicazione non riuscita. Rileggi la cassetta.'] };
-                        }
-                    }
-                    if (current.visit.items.some(item => !current.appliedItemIds.includes(item.id))) {
-                        visits.push({ ...current, visit: { ...current.visit, cassette: { id, archiveGeneration, status, revision, depositedAt },
-                            items: current.visit.items.map(item => item.kind === 'pdf' ? { ...item, value: { name: item.value.name } } : item) } });
-                    }
+                    visits.push({ ...review, documents: [], visit: { ...review.visit, cassette: { id, archiveGeneration, status, revision, depositedAt },
+                        items: review.visit.items.map(item => item.kind === 'pdf' ? { ...item, value: { name: item.value.name } } : item) } });
                 }
                 if (!page.next) break;
                 page = await fetchIncoming<AgentCassetteIndexPage>('?after=' + page.next, signal);
@@ -182,7 +171,7 @@ export async function applyReviewedAgentVisits(ids: string[]): Promise<void> {
                 try {
                     const reopened = await reopenForApplication(review, signal);
                     const current = expectedVersion === patient.version ? reopened : { ...reopened, patient: { ...patient, version: expectedVersion } };
-                    const applied = await apply(current, 'review', signal);
+                    const applied = await apply(current, signal);
                     if (applied === current || !applied.patient?.version) continue;
                     versions.set(patient.id, { reviewed: patient.version, committed: applied.patient.version });
                     publish({ ...snapshot, visits: snapshot.visits.map(value => value === review ? { ...applied, visit: review.visit } : value) });

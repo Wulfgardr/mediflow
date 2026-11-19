@@ -8,7 +8,7 @@ import { createAgentRegistrationStore } from './agent-registration-store';
 import { createAgentMandateStore } from './agent-mandate-store';
 import { AGENT_CASSETTE_COMPLETE, readAgentCassette } from './agent-cassette-store';
 import { AGENT_ITEM_OPERATION, cassetteItems } from './agent-cassette-contract';
-import { agentApplicationSchema, agentCassetteAppliesAutomatically, agentKindOnlyAutomatic, agentKindPhases, type AgentApplication, type AgentApplicationReceipt } from './agent-visit-application-contract';
+import { agentApplicationSchema, type AgentApplication, type AgentApplicationReceipt } from './agent-visit-application-contract';
 import { createEntryOperationInTransaction } from './entry-write-operation';
 import { createTherapyOperationInTransaction } from './therapy-write-operation';
 import { createObservationOperationInTransaction } from './observation-write-operation';
@@ -92,8 +92,6 @@ function commitAgentVisit(request: Request, session: ServerSession, value: unkno
             ? (client.revoked_at === null && client.expires_at > Date.now() ? client.operations : undefined)
             : createAgentRegistrationStore(dbServer.$client).operationsForCassette(cassette.agentRef, cassette.mandateRef);
         if (!clientOperations) throw new AgentApplicationDenied(403);
-        const appliesAutomatically = agentCassetteAppliesAutomatically(cassette);
-        if (input.phase === 'automatic' && !appliesAutomatically) throw new AgentApplicationDenied(409);
         const deposited = cassetteItems(cassette);
         const prior = tx.select().from(auditEvents).where(and(eq(auditEvents.eventType, 'agent.visit.applied'),
             eq(auditEvents.subjectRef, cassette.id), eq(auditEvents.requestId, receiptRequestId), eq(auditEvents.outcome, 'success'), eq(auditEvents.sourceSurface, 'agent'))).all();
@@ -101,20 +99,14 @@ function commitAgentVisit(request: Request, session: ServerSession, value: unkno
         const appliedIds = agentAppliedItemIds(cassette.id);
         const pending = deposited.filter(item => !appliedIds.includes(item.id));
         const selected = (replay ? deposited : pending).filter(item => input.items.some(prepared => prepared.id === item.id));
-        const required = input.phase === 'review' ? pending : pending.filter(item => agentKindOnlyAutomatic(appliesAutomatically, item.kind));
         if (selected.length !== input.items.length || selected.some(item => !input.items.some(prepared => prepared.id === item.id && prepared.kind === item.kind))
-            || selected.some(item => !agentKindPhases(appliesAutomatically, item.kind).includes(input.phase))
-            || !replay && required.some(item => !selected.includes(item))) throw new AgentApplicationDenied(409);
+            || !replay && pending.some(item => !selected.includes(item))) throw new AgentApplicationDenied(409);
         const operations: unknown = JSON.parse(clientOperations);
         for (const item of selected) {
             mandateStore.admit(cassette.mandateRef, AGENT_ITEM_OPERATION[item.kind]);
             if (!Array.isArray(operations) || !operations.includes(AGENT_ITEM_OPERATION[item.kind])) throw new AgentApplicationDenied(403);
         }
         const provenance = { proposerRef: cassette.agentRef, mandateRef: cassette.mandateRef, modelProvider: cassette.modelProvider };
-        if (input.phase === 'review' && pending.some(item => agentKindOnlyAutomatic(appliesAutomatically, item.kind))) throw new AgentApplicationDenied(409);
-        const pendingPdfs = pending.filter(item => item.kind === 'pdf');
-        if (!replay && input.phase === 'automatic' && pending.some(item => item.kind === 'note') && pendingPdfs.length
-            && pendingPdfs.every(item => selected.includes(item))) throw new AgentApplicationDenied(409);
         if (replay) {
             if (confirmation) throw new AgentApplicationDenied(409);
             if (!selected.every(item => appliedIds.includes(item.id))) throw new AgentApplicationDenied(409);
