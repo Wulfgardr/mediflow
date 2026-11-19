@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { verifyRestoreCredentials } from '@/lib/security/host-credential-verification';
 import { isCurrentServerSession } from '@/lib/security/current-session-authority';
 import { parseRestoreIntent } from '@/lib/backup-restore-receipt';
@@ -176,7 +177,7 @@ export async function GET() {
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('[MediFlow] Backup export failed:', error);
+        logServerError('[MediFlow] Backup export failed', error);
         return NextResponse.json({ success: false, error: 'Backup export failed.' }, { status: 500 });
     }
 }

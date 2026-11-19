@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { NextResponse } from 'next/server';
@@ -54,7 +55,7 @@ export async function GET(request: Request) {
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('API GET /observations error:', error);
+        logServerError('API GET /observations error', error);
         return NextResponse.json({ error: 'Failed to fetch observations' }, { status: 500 });
     }
 }
@@ -90,7 +91,7 @@ export async function POST(request: Request) {
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('API POST /observations error:', error);
+        logServerError('API POST /observations error', error);
         return NextResponse.json({ error: 'Failed to create observation' }, { status: 500 });
     }
 }

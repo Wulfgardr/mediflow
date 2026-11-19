@@ -1,5 +1,6 @@
 // ADR 0178: conservazione dei dati sanitari. Lettura della revisione, finestre del
 // titolare, blocchi e scarto confermato; sessione Web admin soltanto.
+import { logServerError } from '@/lib/server-error-log';
 import { NextResponse } from 'next/server';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { readBoundedJsonBody } from '@/lib/bounded-request-body';
@@ -22,14 +23,14 @@ type Tx = Parameters<Parameters<typeof dbServer.transaction>[0]>[0];
 
 const nowSeconds = () => Math.floor(Date.now() / 1000);
 
-function errorResponse(error: unknown, label: string): NextResponse {
+function errorResponse(error: unknown, label: 'review' | 'windows' | 'command'): NextResponse {
     if (error instanceof RetentionError) {
         const status = error.code === 'input_invalid' || error.code === 'below_minimum' ? 400 : error.code === 'not_found' ? 404 : 409;
         return NextResponse.json({ code: error.code }, { status, headers: NO_STORE });
     }
     const replacement = archiveReplacementResponse(error);
     if (replacement) return replacement;
-    console.error(`[MediFlow] Retention ${label} failed:`, error);
+    logServerError(`Retention: ${label}`, error);
     return NextResponse.json({ code: 'internal_error' }, { status: 500, headers: NO_STORE });
 }
 

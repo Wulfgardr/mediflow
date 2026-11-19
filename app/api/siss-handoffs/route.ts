@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { NextResponse } from 'next/server';
@@ -54,7 +55,7 @@ export async function GET(request: Request) {
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('API GET /siss-handoffs error:', error);
+        logServerError('API GET /siss-handoffs error', error);
         return NextResponse.json({ error: 'Failed to fetch SISS handoffs' }, { status: 500 });
     }
 }
@@ -143,7 +144,7 @@ export async function POST(request: Request) {
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('API POST /siss-handoffs error:', error);
+        logServerError('API POST /siss-handoffs error', error);
         return NextResponse.json({ error: 'Failed to create SISS handoff' }, { status: 500 });
     }
 }

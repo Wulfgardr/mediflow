@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { readNativeNetworkJson, jsonBodyTooLargeResponse } from '@/lib/native-network-json-body';
 /* baseline, Claude A18: paired ambulatory scope list */
 import { NextResponse } from 'next/server';
@@ -33,7 +34,7 @@ export async function GET(request: Request) {
     try {
         return NextResponse.json(await listAmbulatorySummaries());
     } catch (error) {
-        console.error('API GET /api/v1/network/ambulatories error:', error);
+        logServerError('API GET /api/v1/network/ambulatories error', error);
         return NextResponse.json({ error: 'Failed to fetch ambulatories' }, { status: 500 });
     }
 }
