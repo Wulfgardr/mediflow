@@ -30,7 +30,7 @@ export function createAgentVisitMcpServer(directory?: string) {
     }, (args, context) => run({ command: 'completa', ...args }, context.mcpReq.signal));
     registerAgentMandateTool(server, (agentRef, signal) => run({ command: 'ritira', agentRef }, signal));
     server.registerTool('mediflow_deposita_visita', {
-        title: 'Deposita la visita', description: 'Riusa l’estrazione preparata e i PDF riconosciuti dagli hash. La ricevuta descrive il deposito; MediFlow applica gli elementi ammessi e presenta le proposte In arrivo.',
+        title: 'Deposita la visita', description: 'Riusa l’estrazione preparata e i PDF riconosciuti dagli hash. La ricevuta descrive il deposito; nota, trascrizione, PDF e proposte attendono la conferma del medico in MediFlow.',
         inputSchema: z.object({ agentRef: z.string().uuid(), extraction: z.string().min(1), fiscalCode: z.string().length(16), visitId: z.string().uuid(), transcription: z.string().optional() }).strict(), annotations,
     }, (args, context) => run({ command: 'deposita', ...args }, context.mcpReq.signal));
     server.registerTool('mediflow_riprendi_visita', {

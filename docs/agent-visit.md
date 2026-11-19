@@ -1,10 +1,10 @@
 # Deposito della visita da un client agente
 
 Il client deposita una visita cifrata nella cassetta di MediFlow. La ricevuta
-conferma il deposito. La scheda Web sbloccata verifica l’identità nei PDF ed
-inserisce nota, trascrizione e PDF quando coincidono con il codice fiscale
-di un’unica scheda esistente. Terapie, prestazioni, diagnosi, esenzioni ed
-osservazioni restano in «In arrivo» per la revisione del medico.
+conferma il deposito. La scheda Web sbloccata verifica l’identità nei PDF e
+mostra la visita in «In arrivo». Nota, trascrizione, PDF, terapie,
+prestazioni, diagnosi, esenzioni ed osservazioni entrano in cartella solo con
+il gesto del medico ([ADR 0195](./adr/0195-materiale-dell-agente-dopo-il-gesto-del-medico.md)).
 
 Il contratto è [ADR 0190](./adr/0190-mandato-agenti-e-cassetta-della-visita.md).
 Il client richiede Node 24 e le dipendenze della checkout. I comandi seguenti
@@ -73,12 +73,13 @@ Il client rifiuta file SQLite, link simbolici e PDF con hash diversi.
 
 La ricevuta `closed` conferma che la visita è stata depositata nella cassetta
 cifrata. Quando la scheda è sbloccata, MediFlow controlla le visite in attesa
-e inserisce nota, trascrizione e PDF con codice fiscale coincidente con la scheda.
-I CF discordanti, mancanti o ambigui bloccano l’applicazione automatica.
+e verifica che il codice fiscale dei PDF coincida con un’unica scheda.
+I CF discordanti, mancanti o ambigui bloccano la visita.
 
-In «In arrivo» puoi confrontare i dati della scheda con le proposte, leggere
-il PDF originale e applicare una visita o tutte quelle senza dubbi. Le proposte
-cliniche richiedono la tua conferma.
+In «In arrivo» puoi leggere nota e trascrizione, aprire i PDF, confrontare i
+dati della scheda con le proposte e applicare una visita o tutte quelle senza
+dubbi. Nulla della visita entra in cartella prima di questo gesto o della
+conferma nativa.
 
 ## Trasporto MCP
 

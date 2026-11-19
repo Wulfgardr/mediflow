@@ -36,7 +36,7 @@ type Credential = { username: string; kind: SecretKind; secret: string };
 /* ADR 0143. 'confirmation' checks the PIN of a person who already holds a session. 'unlock' opens
    one: an account with a passphrase is opened only by its access verifier, never by the PIN.
    'recovery' proves possession of the recovery key of such an account, and opens nothing. */
-type Purpose = 'confirmation' | 'unlock' | 'recovery';
+type Purpose = 'confirmation' | 'unlock' | 'recovery' | 'restore';
 type StoredCredentials = Pick<typeof users.$inferSelect, 'id' | 'passwordHash' | 'unlockVerifierHash' | 'recoveryVerifierHash'>;
 type Denied = {
     kind: 'denied';
@@ -234,6 +234,10 @@ export async function verifyUnlockCredentials(
     return verify(readCredential(input, ['pin', 'verifier']), 'unlock', dependencies);
 }
 
+export async function verifyRestoreCredentials(input: unknown): Promise<HostCredentialVerification> {
+    return verify(readCredential(input, ['pin', 'verifier']), 'restore', {});
+}
+
 /**
  * For recovery. Takes { username, recoveryVerifier }, the value the browser derives from the recovery
  * key and the salt of the recovery kit. Only an account that unlocks with a passphrase has one.
@@ -264,7 +268,7 @@ async function verify(
         );
 
         const expected: SecretKind = purpose === 'recovery' ? 'recoveryVerifier'
-            : purpose === 'unlock' && user.unlockVerifierHash ? 'verifier' : 'pin';
+            : (purpose === 'unlock' || purpose === 'restore') && user.unlockVerifierHash ? 'verifier' : 'pin';
         if (credential.kind !== expected) return deny(user.username, dependencies);
         // An account still on its PIN has nothing to recover: its PIN is the credential.
         if (purpose === 'recovery' && !(user.unlockVerifierHash && user.recoveryVerifierHash)) return deny(user.username, dependencies);
@@ -285,12 +289,11 @@ async function verify(
             );
         }
 
-        const reset = await db.update(users).set(resetLockoutState())
-            .where(and(
-                sameCredentials(user),
-                or(isNull(users.lockedUntil), lte(users.lockedUntil, now)),
-            )).returning({ id: users.id }).get();
-        if (!reset) {
+        const eligible = and(sameCredentials(user), or(isNull(users.lockedUntil), lte(users.lockedUntil, now)));
+        const currentCredential = purpose === 'restore'
+            ? db.select({ id: users.id }).from(users).where(eligible).get()
+            : db.update(users).set(resetLockoutState()).where(eligible).returning({ id: users.id }).get();
+        if (!currentCredential) {
             const current = await db.select().from(users).where(sameCredentials(user)).get();
             const concurrentLockout = current ? isLockoutActive(current, now) : null;
             if (current && concurrentLockout) return deny(
