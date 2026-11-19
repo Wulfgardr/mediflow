@@ -48,8 +48,11 @@ test('Scheda desktop del concept con identità, tre colonne e ritorno alle sezio
         }
         expect(Math.abs(rail.width - 232)).toBeLessThanOrEqual(3);
         expect(Math.abs(main.x - 244)).toBeLessThanOrEqual(4);
-        expect(stable.x).toBeLessThan(changed.x);
-        expect(changed.x).toBeLessThan(context.x);
+        for (const [bounds, left, width] of [[stable, 269, 307], [changed, 592, 374], [context, 982, 307]] as const) {
+            expect(Math.abs(bounds.x - left)).toBeLessThanOrEqual(4);
+            expect(Math.abs(bounds.y - 235)).toBeLessThanOrEqual(5);
+            expect(Math.abs(bounds.width - width)).toBeLessThanOrEqual(4);
+        }
     }
     const prescribe = page.getByRole('button', { name: 'Prescrivi', exact: true });
     const exposed = await prescribe.evaluate(button => {
