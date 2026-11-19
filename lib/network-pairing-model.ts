@@ -5,11 +5,18 @@ import type {
     NetworkPairingConfirmationResponse,
     NetworkPairingIntentResponse,
 } from './api/v1/types';
-import { createConfirmedPairingResponse } from './network-contract';
+import { createConfirmedPairingResponse, type PairingIntentDraftResult } from './network-contract';
 
 export const NETWORK_PAIRING_STATE_KEY = 'network.pairing.state';
 export const NETWORK_PAIRED_CLIENT_ID_HEADER = 'x-mediflow-paired-client-id';
 export const NETWORK_PAIRED_CLIENT_TOKEN_HEADER = 'x-mediflow-paired-client-token';
+
+export const MAX_PENDING_PAIRING_INTENTS = 32;
+export const MAX_PENDING_PAIRING_INTENT_BYTES = 2048;
+
+type PairingIntentAdmission =
+    | { ok: true; nextState: NetworkPairingState }
+    | Extract<PairingIntentDraftResult, { ok: false }>;
 
 type NetworkPairingErrorStatus = 404 | 409;
 
@@ -159,37 +166,55 @@ export function parseNetworkPairingState(
             ? parsed.clients.map(parsePairedClient).filter((item): item is StoredNetworkPairedClient => item !== null)
             : [];
 
-        return pruneExpiredPairingIntents({ intents, clients }, now);
+        return { intents: boundPendingPairingIntents(pruneExpiredPairingIntents(intents, now)), clients };
     } catch {
         return EMPTY_NETWORK_PAIRING_STATE;
     }
 }
 
-export function serializeNetworkPairingState(state: NetworkPairingState): string {
-    return JSON.stringify(state);
+function fitsPendingPairingIntent(intent: NetworkPairingIntentResponse): boolean {
+    return Buffer.byteLength(JSON.stringify(intent), 'utf8') <= MAX_PENDING_PAIRING_INTENT_BYTES;
 }
 
-export function pruneExpiredPairingIntents(
-    state: NetworkPairingState,
-    now: Date = new Date()
-): NetworkPairingState {
+function boundPendingPairingIntents(intents: NetworkPairingIntentResponse[]): NetworkPairingIntentResponse[] {
+    const bounded: NetworkPairingIntentResponse[] = [];
+    for (const intent of intents) {
+        if (bounded.length === MAX_PENDING_PAIRING_INTENTS) break;
+        if (fitsPendingPairingIntent(intent)) bounded.push(intent);
+    }
+    return bounded;
+}
+
+export function serializeNetworkPairingState(state: NetworkPairingState): string {
+    return JSON.stringify({ intents: boundPendingPairingIntents(state.intents), clients: state.clients });
+}
+
+function pruneExpiredPairingIntents(intents: NetworkPairingIntentResponse[], now: Date): NetworkPairingIntentResponse[] {
     const cutoff = now.getTime();
-    return {
-        intents: state.intents.filter((intent) => new Date(intent.expiresAt).getTime() > cutoff),
-        clients: state.clients,
-    };
+    return intents.filter((intent) => new Date(intent.expiresAt).getTime() > cutoff);
 }
 
 export function addPendingPairingIntent(
     state: NetworkPairingState,
     intent: NetworkPairingIntentResponse,
     now: Date = new Date()
-): NetworkPairingState {
-    const next = pruneExpiredPairingIntents(state, now);
-    return {
-        intents: [...next.intents.filter((item) => item.intentId !== intent.intentId), intent],
-        clients: next.clients,
-    };
+): PairingIntentAdmission {
+    if (!fitsPendingPairingIntent(intent)) {
+        return {
+            ok: false, status: 400,
+            value: { error: 'Bad Request', code: 'PAIRING_REQUEST_INVALID', message: 'Pairing intent exceeds the permitted size.' },
+        };
+    }
+
+    const active = boundPendingPairingIntents(pruneExpiredPairingIntents(state.intents, now));
+    const remaining = active.filter((item) => item.intentId !== intent.intentId);
+    if (remaining.length >= MAX_PENDING_PAIRING_INTENTS) {
+        return {
+            ok: false, status: 409,
+            value: { error: 'Conflict', code: 'PAIRING_STATE_CONFLICT', message: 'Pending pairing capacity reached. Retry after an intent is confirmed or expires.' },
+        };
+    }
+    return { ok: true, nextState: { intents: [...remaining, intent], clients: state.clients } };
 }
 
 export function hashNetworkPairedClientToken(token: string): string {
