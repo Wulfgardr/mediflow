@@ -80,11 +80,10 @@ const reread = (result: ProfileResult, projection = result.projection): ProfileQ
 
 function ipcChain(port: Awaited<ReturnType<typeof acquirePatientProfileQueryHostPort>>) {
     const webFrames: string[] = [];
-    let supervisor: ReturnType<typeof createPatientProfileQuerySupervisorPortV1>;
     const dispatcher = createPatientProfileQueryWebDispatcher({ readPort: () => port,
         send: frame => { webFrames.push(frame); supervisor.acceptWebFrame(frame); },
         onProtocolFailure: () => { throw new Error('synthetic IPC chain must stay canonical'); } });
-    supervisor = createPatientProfileQuerySupervisorPortV1({ randomBytes,
+    const supervisor = createPatientProfileQuerySupervisorPortV1({ randomBytes,
         sendWeb: (frame, complete) => { complete(null); void dispatcher.accept(frame); },
         schedule: (delay, callback) => { const timer = setTimeout(callback, delay); return () => clearTimeout(timer); },
         onTerminal: () => undefined });
@@ -95,17 +94,19 @@ function startMcp(executeProfileQuery: (input: unknown, signal: AbortSignal) => 
     const server = fileURLToPath(new URL('../scripts/intelligent-host-mcp-stdio.mjs', import.meta.url));
     const loader = new URL('../scripts/register-strip-types-loader.mjs', import.meta.url).href;
     const child = spawn(process.execPath, ['--experimental-strip-types', '--import', loader, server], {
-        env: { ...createAipOperationRpcChildEnvironmentV1(`aipb_${'4'.repeat(32)}`) }, stdio: ['pipe', 'pipe', 'pipe', 'ipc'] });
+        env: { ...createAipOperationRpcChildEnvironmentV1(`aipb_${'4'.repeat(32)}`) } as unknown as NodeJS.ProcessEnv, stdio: ['pipe', 'pipe', 'pipe', 'ipc'] });
     const host = createAipOperationRpcHostV1({ operations: [{ operationId: 'patient-profile.read.v1', capabilityId: 'patient-profile.read.v1',
         serviceRef: 'PatientProfileQueryHostPortV1', maximumStage: 'read_only', timeoutMs: 5_000, execute: executeProfileQuery }] });
-    host.attach({ subscribe: listener => { child.on('message', listener); return () => child.off('message', listener); },
-        publish: frame => { child.send(frame); } });
+    host.attach({ subscribe: (listener: (frame: unknown) => void) => { child.on('message', listener); return () => child.off('message', listener); },
+        publish: (frame: unknown) => { child.send(frame as string); } });
+    const { stdin, stdout: output, stderr: errors } = child;
+    assert.ok(stdin && output && errors);
     let stdout = '', stderr = '', nextId = 1;
     const pending = new Map<number, (message: Record<string, unknown>) => void>();
-    child.stdout.setEncoding('utf8'); child.stderr.setEncoding('utf8');
-    child.stderr.on('data', chunk => { stderr += chunk; });
+    output.setEncoding('utf8'); errors.setEncoding('utf8');
+    errors.on('data', chunk => { stderr += chunk; });
     let buffered = '';
-    child.stdout.on('data', (chunk: string) => {
+    output.on('data', (chunk: string) => {
         stdout += chunk; buffered += chunk;
         for (let newline = buffered.indexOf('\n'); newline >= 0; newline = buffered.indexOf('\n')) {
             const line = buffered.slice(0, newline); buffered = buffered.slice(newline + 1);
@@ -121,10 +122,10 @@ function startMcp(executeProfileQuery: (input: unknown, signal: AbortSignal) => 
         const id = nextId++;
         const timer = setTimeout(() => reject(new Error(`MCP call ${id} timed out: ${stderr}`)), 15_000);
         pending.set(id, message => { clearTimeout(timer); resolve(message); });
-        child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id, method: 'tools/call',
+        stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id, method: 'tools/call',
             params: { name: 'patient-profile.read.v1', arguments: args, _meta: meta } })}\n`);
     });
-    const stop = async () => { if (child.exitCode === null) { child.stdin.end(); await new Promise(resolve => child.once('exit', resolve)); } };
+    const stop = async () => { if (child.exitCode === null) { stdin.end(); await new Promise(resolve => child.once('exit', resolve)); } };
     return { call, stop, stdout: () => stdout, stderr: () => stderr, child };
 }
 

@@ -15,7 +15,7 @@ export function acquirePatientProfileQueryHostPort(projection: ProfileProjection
     return acquireScopedPatientProfileHostPort(projection, expiresAt, release);
 }
 
-export function headlessProfileRelease(environment: NodeJS.ProcessEnv): ProfileRelease {
+export function headlessProfileRelease(environment: Readonly<Record<string, string | undefined>>): ProfileRelease {
     return environment[HEADLESS_AGENT_KIND_ENV] === 'mini' ? 'identified' : 'pseudonymized';
 }
 
