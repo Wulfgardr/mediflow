@@ -76,15 +76,17 @@
 @media (min-width: 1001px) {
   .workspace[data-patient-record='true'] {
     --twin-rail: 232px;
-    --record-chrome: #f1f3f7;
-    --record-field: #fff;
-    --record-soft: #f3f4f5;
-    --record-line: #e5e6e8;
-    --record-edge: #d1d6df;
-    --record-accent: #234eac;
-    --record-hint: #545b64;
-    --lume-record-success-bg: #e2f1e9; --lume-record-success: #246343;
-    --lume-record-critical-bg: #fae8e6; --lume-record-critical: #a82e25;
+    --record-chrome: color-mix(in srgb, var(--lume-surface-selected) 40%, var(--lume-record-compact-island));
+    --record-field: var(--lume-surface-focal);
+    --record-soft: var(--lume-record-compact-island);
+    --record-line: var(--lume-record-island-rule);
+    --record-edge: color-mix(in srgb, var(--lume-rule-strong) 70%, var(--lume-surface-canvas));
+    --record-accent: var(--lume-accent);
+    --record-hint: var(--lume-ink-muted);
+    --lume-record-success-bg: color-mix(in srgb, var(--lume-signal-success) 14%, var(--record-field));
+    --lume-record-success: var(--lume-signal-success);
+    --lume-record-critical-bg: color-mix(in srgb, var(--lume-signal-critical) 12%, var(--record-field));
+    --lume-record-critical: var(--lume-signal-critical);
     --lume-font-sans: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
     padding: 6px;
     gap: 6px;
@@ -92,18 +94,16 @@
     font-family: var(--lume-font-sans);
   }
   :global(html.dark) .workspace[data-patient-record='true'] {
-    --record-chrome: #17191d; --record-field: #17191e; --record-soft: #1f2228;
-    --record-line: #363940; --record-edge: #0d0f12; --record-accent: #9ab7ff; --record-hint: #a9afb9;
-    --lume-record-success-bg: #1b2f26; --lume-record-success: #74d1a2;
-    --lume-record-critical-bg: #3a2321; --lume-record-critical: #ff8e84;
+    --record-chrome: color-mix(in srgb, var(--lume-surface-canvas) 35%, var(--lume-surface-field));
+    --record-edge: var(--lume-record-tray-shadow);
   }
   .workspace[data-patient-record='true'][data-rail-open='false'] { --twin-rail: 60px; }
-  .workspace[data-patient-record='true'] .workarea { position: relative; border-radius: 18px; background: var(--record-field); }
+  .workspace[data-patient-record='true'] .workarea { position: relative; border-radius: 16px; background: var(--record-field); }
   .workspace[data-patient-record='true'] .rail {
     padding: 12px 8px 8px;
     gap: 2px;
     border: 1px solid var(--record-line);
-    border-radius: 18px;
+    border-radius: 16px;
     background: var(--record-chrome);
     overflow-y: auto; scrollbar-width: thin;
   }
@@ -120,24 +120,24 @@
     border-radius: 10px; border: 1px solid var(--record-line); background: var(--record-field);
     font: 400 13px/18px var(--lume-font-sans); color: var(--record-hint);
   }
-  .recordSearch kbd { margin-left: auto; padding: 0 5px; border-radius: 5px; border: 1px solid var(--record-line); background: var(--record-soft); font: inherit; font-size: 12px; }
+  .recordSearch kbd { margin-left: auto; padding: 0 5px; border-radius: 10px; border: 1px solid var(--record-line); background: var(--record-soft); font: inherit; font-size: 12px; }
   .workspace[data-patient-record='true'] .navigation { gap: 2px; }
   .workspace[data-patient-record='true'] .navigation > a,
   .workspace[data-patient-record='true'] .proposalNav > a,
   .workspace[data-patient-record='true'] .railBottom > a {
     min-height: 34px; gap: 10px; padding: 5px 10px; border-radius: 10px; font: 500 13px/18px var(--lume-font-sans); color: var(--record-hint);
   }
-  .workspace[data-patient-record='true'] .navigation a[aria-current] { background: var(--record-field); color: var(--lume-ink); box-shadow: 0 0 0 1px var(--record-line), 0 1px 2px #0000000c; }
+  .workspace[data-patient-record='true'] .navigation a[aria-current] { background: var(--record-field); color: var(--lume-ink); box-shadow: 0 0 0 1px var(--record-line), 0 1px 2px color-mix(in srgb, var(--lume-ink) 5%, transparent); }
   .workspace[data-patient-record='true'] .navigation svg, .workspace[data-patient-record='true'] .railBottom svg { width: 15px; height: 15px; }
   .workspace[data-patient-record='true'] .railGroup { display: block; padding: 12px 10px 4px; font: 600 12px/16px var(--lume-font-sans); color: var(--record-hint); }
   .workspace[data-patient-record='true'] .proposalNav { display: grid; }
   .proposalNav small { margin-left: auto; border: 1px dashed var(--lume-record-proposal-rule); border-radius: 10px; padding: 0 5px; }
   .workspace[data-patient-record='true'] .account[data-identified='true'] { display: flex; align-items: center; gap: 10px; margin-top: 5px; padding: 8px; border: 1px solid var(--record-line); border-radius: 10px; background: var(--record-field); }
-  .account .initials { display: grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: 8px; background: var(--lume-record-change); color: var(--record-accent); font: 600 12px/16px var(--lume-font-sans); }
+  .account .initials { display: grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: 10px; background: var(--lume-record-change); color: var(--record-accent); font: 600 12px/16px var(--lume-font-sans); }
   .account .operator { display: grid; min-width: 0; flex: 1; font: 500 13px/17px var(--lume-font-sans); }
   .operator > * { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   .operator small { font-size: 12px; color: var(--record-hint); }
-  .workspace[data-patient-record='true'] .account[data-identified='true'] button { min-height: 28px; height: 28px; width: 28px; display: grid; place-content: center; padding: 0; background: var(--record-soft); border: 1px solid var(--record-line); border-radius: 8px; }
+  .workspace[data-patient-record='true'] .account[data-identified='true'] button { min-height: 28px; height: 28px; width: 28px; display: grid; place-content: center; padding: 0; background: var(--record-soft); border: 1px solid var(--record-line); border-radius: 10px; }
   .workspace[data-patient-record='true'] .account[data-identified='true'] button span { display: none; }
   .workspace[data-patient-record='true'][data-rail-open='false'] :is(.brand strong, .recordSearch span, .recordSearch kbd, .railGroup, .operator, .initials, .proposalNav small) { display: none; }
   .workspace[data-patient-record='true'][data-rail-open='false'] .account { justify-content: center; padding: 3px; }
@@ -161,12 +161,12 @@
   .workspace[data-patient-record='true'] .patientNavigation {
     min-height: 42px; padding: 0 24px; gap: 10px 12px; border: 0; justify-content: space-between; background: var(--record-field);
   }
-  .workspace[data-patient-record='true'] .segment { display: inline-flex; align-items: center; flex-wrap: wrap; padding: 3px; gap: 2px; border: 1px solid var(--record-line); border-radius: 14px; background: var(--record-soft); }
+  .workspace[data-patient-record='true'] .segment { display: inline-flex; align-items: center; flex-wrap: wrap; padding: 3px; gap: 2px; border: 1px solid var(--record-line); border-radius: 12px; background: var(--record-soft); }
   .workspace[data-patient-record='true'] .segment > a, .workspace[data-patient-record='true'] .moreSections > button {
     display: inline-flex; align-items: center; gap: 7px; padding: 0 clamp(7px, .85vw, 14px); min-height: 32px; border-radius: 10px; color: var(--record-hint);
     font: 500 13px/18px var(--lume-font-sans); white-space: nowrap;
   }
-  .workspace[data-patient-record='true'] .segment > a[aria-current], .workspace[data-patient-record='true'] .moreSections > button[aria-current] { color: var(--lume-ink); background: var(--record-field); box-shadow: 0 0 0 1px var(--record-line), 0 1px 2px #00000018; }
+  .workspace[data-patient-record='true'] .segment > a[aria-current], .workspace[data-patient-record='true'] .moreSections > button[aria-current] { color: var(--lume-ink); background: var(--record-field); box-shadow: 0 0 0 1px var(--record-line), 0 1px 2px color-mix(in srgb, var(--lume-ink) 9%, transparent); }
   .workspace[data-patient-record='true'] .segment > a span { font: 400 12px/16px var(--lume-font-sans); }
   .workspace[data-patient-record='true'] .moreSections > button { padding-inline: 6px; }
   .workspace[data-patient-record='true'] .moreSections > button span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }

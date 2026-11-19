@@ -139,7 +139,8 @@ test('Quadro paziente invia un payload strict e mostra una proposta review-only'
   );
   expect(postGestureMutations).toEqual(['POST /api/ai/patient-insight/preview']);
   await openPatientSection(page, 'quadro');
-  await expect(page.getByTestId('patient-proposals-summary')).toContainText('1 proposta da rivedere');
+  await expect(page.getByTestId('patient-proposals-summary')).toContainText('Proposta · non registrata');
+  await expect(page.getByRole('navigation', { name: 'Navigazione principale' }).getByRole('link', { name: 'Quadro paziente 1' })).toBeVisible();
   await expect(proposal).not.toBeVisible();
   await expect(page.locator('#quadro [data-testid="patient-insight-review-proposal"]')).toHaveCount(0);
   await page.getByTestId('patient-proposals-summary').getByRole('link', { name: 'Apri il Quadro e le fonti', exact: true }).click();
@@ -158,6 +159,36 @@ test('Quadro paziente invia un payload strict e mostra una proposta review-only'
   await openPatientSection(page, 'quadro');
   await expect(page.getByTestId('patient-proposals-summary')).toContainText('Nessuna proposta da rivedere');
   expect(previewCalls).toBe(1);
+});
+
+test('Il riepilogo rende la sintesi, i dati mancanti e la ricevuta della proposta', async ({ page }) => {
+  await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+  await setAiLaneKillSwitch(page, 'aiPatientInsightKillSwitch', 'enabled');
+  const patientId = await createSyntheticPatient(page);
+  const summary = 'Quadro stabile, in attesa degli elettroliti.';
+  const gap = 'Esito del ricontrollo di potassio.';
+  await page.route('**/api/settings/ai/functions', route => route.fulfill({ json: PATIENT_INSIGHT_CATALOG }));
+  await page.route('**/api/ai/patient-insight/preview', route => {
+    const request = parsePatientInsightPreviewRequest(route.request().postDataJSON());
+    if (!request) throw new Error('Richiesta di anteprima non valida.');
+    const response = availablePreview(request);
+    response.preview.proposal = { ...response.preview.proposal, summary, currentState: [], alerts: [], nextSteps: [], gaps: [gap] };
+    return route.fulfill({ json: response });
+  });
+  await page.goto(`/patients/${patientId}/modules`);
+  const island = page.getByTestId('patient-proposals-summary');
+  await island.getByRole('link', { name: 'Apri il Quadro e le fonti' }).click();
+  const picker = page.getByTestId('model-picker-patient_insight');
+  await picker.getByRole('button', { name: 'Cambia', exact: true }).click();
+  await picker.getByRole('combobox', { name: 'Modello per questa proposta' }).selectOption(MODEL_OPTION_ID);
+  await page.getByRole('button', { name: 'Genera proposta' }).click();
+  await expect(page.getByTestId('patient-insight-review-proposal')).toBeVisible();
+  await openPatientSection(page, 'quadro');
+  await expect(island).toContainText('Proposta · non registrata');
+  await expect(island).toContainText(summary);
+  await expect(island.getByRole('heading', { name: 'Dati mancanti' })).toBeVisible();
+  await expect(island).toContainText(gap);
+  await expect(island).toContainText(`dal modello locale ${MODEL}. Nessuna uscita dati.`);
 });
 
 for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '390', '320', 'zoom-200', 'zoom-400']) {

@@ -5,7 +5,7 @@
 import { useEntryDraftMarker } from '@/hooks/use-entry-local-draft';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Fragment, createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { Fragment, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Activity, BookOpen, CalendarDays, CircleDashed, ChevronDown, CircleHelp, ClipboardList, FolderOpen, Inbox, LockKeyhole, Moon, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Settings2, Search, Sun, Users, X } from 'lucide-react';
 import { db } from '@/lib/db';
 import { currentWorkspaceDestination } from '@/lib/workspace-destination';
@@ -36,35 +36,31 @@ type DirectoryReturn = { patientId: string; query: string; scope: 'ambulatorio' 
 const DirectoryReturnContext = createContext<{ current: DirectoryReturn | null } | null>(null);
 export const useDirectoryReturn = () => useContext(DirectoryReturnContext);
 
+function useWorkspaceRegistration<T>(publish: ((value: T | null) => void) | null, value: T | null) {
+  useEffect(() => {
+    publish?.(value);
+    return () => publish?.(null);
+  }, [publish, value]);
+}
+
 const WorkspaceAreaContext = createContext<((area: string | null) => void) | null>(null);
 export function useRuntimeWorkspaceArea(area: string | null) {
-  const publish = useContext(WorkspaceAreaContext);
-  useEffect(() => {
-    publish?.(area);
-    return () => publish?.(null);
-  }, [area, publish]);
+  useWorkspaceRegistration(useContext(WorkspaceAreaContext), area);
 }
 
 type CommandHandler = (() => void) | null;
 const WorkspaceCommandContext = createContext<((handler: CommandHandler) => void) | null>(null);
 export function useRuntimeWorkspaceCommand(handler: CommandHandler) {
   const publish = useContext(WorkspaceCommandContext);
-  useEffect(() => {
-    publish?.(handler);
-    return () => publish?.(null);
-  }, [handler, publish]);
+  useWorkspaceRegistration(publish, handler);
   return publish !== null && handler !== null;
 }
 
 type RecordCrumb = { id: string; label: string; proposals?: number };
 const RecordCrumbContext = createContext<((value: RecordCrumb | null) => void) | null>(null);
 export function useRecordCrumb(id: string | undefined, label: string, proposals?: number) {
-  const publish = useContext(RecordCrumbContext);
-  useEffect(() => {
-    if (!id || !publish) return;
-    publish({ id, label, proposals });
-    return () => publish(null);
-  }, [id, label, proposals, publish]);
+  const crumb = useMemo(() => id ? { id, label, proposals } : null, [id, label, proposals]);
+  useWorkspaceRegistration(useContext(RecordCrumbContext), crumb);
 }
 
 export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
