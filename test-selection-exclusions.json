@@ -45,11 +45,6 @@
     "owner": "@Wulfgardr"
   },
   {
-    "path": "e2e/fixtures/sealed-diary-entry.ts",
-    "reason": "WUL-910: cifra con la chiave della sessione sbloccata le voci di diario sintetiche create dagli spec e da scripts/build-screenshots.mjs; nessun test autonomo.",
-    "owner": "@Wulfgardr"
-  },
-  {
     "path": "e2e/fixtures/secure-browser.ts",
     "reason": "Opzioni di avvio di Chromium (sandbox, rete solo loopback e canale opzionale E2E_BROWSER_CHANNEL) usate da playwright.config.ts, e2e/native-chat-access-frame.config.ts e dagli spec che avviano il browser da soli; nessun test autonomo.",
     "owner": "@Wulfgardr"
@@ -57,6 +52,11 @@
   {
     "path": "e2e/fixtures/territorial-preset.ts",
     "reason": "Cambio dell'assetto territoriale dalla UI di Impostazioni, condiviso da e2e/territorial-core.spec.ts e e2e/retention-qualification.spec.ts; nessun test autonomo.",
+    "owner": "@Wulfgardr"
+  },
+  {
+    "path": "e2e/fixtures/sealed-diary-entry.ts",
+    "reason": "WUL-910: cifra con la chiave della sessione sbloccata le voci di diario sintetiche create dagli spec e da scripts/build-screenshots.mjs; nessun test autonomo.",
     "owner": "@Wulfgardr"
   },
   {
