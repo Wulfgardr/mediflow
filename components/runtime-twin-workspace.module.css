@@ -108,7 +108,7 @@
     overflow-y: auto; scrollbar-width: thin;
   }
   .workspace[data-patient-record='true'] .brand { padding: 4px 10px 12px; gap: 9px; min-height: 38px; }
-  .workspace[data-patient-record='true'] .brand strong { font: 600 17px/22px var(--lume-font-sans); letter-spacing: -.02em; }
+  .workspace[data-patient-record='true'] .brand strong { font: 600 0.9375rem/1.375rem var(--lume-font-sans); letter-spacing: -.02em; }
   .workspace[data-patient-record='true'] .brandPoint { display: none; }
   .workspace[data-patient-record='true'] .recordBrand { display: flex; align-items: center; gap: 2px; }
   .recordBrand i { display: block; background: var(--record-accent); width: 6px; height: 6px; border-radius: 50%; }
@@ -118,25 +118,25 @@
     display: flex; align-items: center; gap: 8px; flex: none;
     height: 34px; margin: 1px 2px 8px; padding: 0 10px;
     border-radius: 10px; border: 1px solid var(--record-line); background: var(--record-field);
-    font: 400 13px/18px var(--lume-font-sans); color: var(--record-hint);
+    font: 400 0.8125rem/1.125rem var(--lume-font-sans); color: var(--record-hint);
   }
-  .recordSearch kbd { margin-left: auto; padding: 0 5px; border-radius: 10px; border: 1px solid var(--record-line); background: var(--record-soft); font: inherit; font-size: 12px; }
+  .recordSearch kbd { margin-left: auto; padding: 0 5px; border-radius: 10px; border: 1px solid var(--record-line); background: var(--record-soft); font: inherit; font-size: 0.75rem; }
   .workspace[data-patient-record='true'] .navigation { gap: 2px; }
   .workspace[data-patient-record='true'] .navigation > a,
   .workspace[data-patient-record='true'] .proposalNav > a,
   .workspace[data-patient-record='true'] .railBottom > a {
-    min-height: 34px; gap: 10px; padding: 5px 10px; border-radius: 10px; font: 500 13px/18px var(--lume-font-sans); color: var(--record-hint);
+    min-height: 34px; gap: 10px; padding: 5px 10px; border-radius: 10px; font: 400 0.8125rem/1.125rem var(--lume-font-sans); color: var(--record-hint);
   }
   .workspace[data-patient-record='true'] .navigation a[aria-current] { background: var(--record-field); color: var(--lume-ink); box-shadow: 0 0 0 1px var(--record-line), 0 1px 2px color-mix(in srgb, var(--lume-ink) 5%, transparent); }
   .workspace[data-patient-record='true'] .navigation svg, .workspace[data-patient-record='true'] .railBottom svg { width: 15px; height: 15px; }
-  .workspace[data-patient-record='true'] .railGroup { display: block; padding: 12px 10px 4px; font: 600 12px/16px var(--lume-font-sans); color: var(--record-hint); }
+  .workspace[data-patient-record='true'] .railGroup { display: block; padding: 12px 10px 4px; font: 600 0.75rem/1rem var(--lume-font-sans); color: var(--record-hint); }
   .workspace[data-patient-record='true'] .proposalNav { display: grid; }
   .proposalNav small { margin-left: auto; border: 1px dashed var(--lume-record-proposal-rule); border-radius: 10px; padding: 0 5px; }
   .workspace[data-patient-record='true'] .account[data-identified='true'] { display: flex; align-items: center; gap: 10px; margin-top: 5px; padding: 8px; border: 1px solid var(--record-line); border-radius: 10px; background: var(--record-field); }
-  .account .initials { display: grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: 10px; background: var(--lume-record-change); color: var(--record-accent); font: 600 12px/16px var(--lume-font-sans); }
-  .account .operator { display: grid; min-width: 0; flex: 1; font: 500 13px/17px var(--lume-font-sans); }
+  .account .initials { display: grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: 10px; background: var(--lume-record-change); color: var(--record-accent); font: 600 0.75rem/1rem var(--lume-font-sans); }
+  .account .operator { display: grid; min-width: 0; flex: 1; font: 400 0.8125rem/1.0625rem var(--lume-font-sans); }
   .operator > * { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-  .operator small { font-size: 12px; color: var(--record-hint); }
+  .operator small { font-size: 0.75rem; color: var(--record-hint); }
   .workspace[data-patient-record='true'] .account[data-identified='true'] button { min-height: 28px; height: 28px; width: 28px; display: grid; place-content: center; padding: 0; background: var(--record-soft); border: 1px solid var(--record-line); border-radius: 10px; }
   .workspace[data-patient-record='true'] .account[data-identified='true'] button span { display: none; }
   .workspace[data-patient-record='true'][data-rail-open='false'] :is(.brand strong, .recordSearch span, .recordSearch kbd, .railGroup, .operator, .initials, .proposalNav small) { display: none; }
@@ -148,7 +148,7 @@
   }
   .workspace[data-patient-record='true'] .workspaceBar .openRecords { align-self: stretch; gap: 4px; flex: 0 1 auto; }
   .workspace[data-patient-record='true'] .workspaceBar .directoryTab,
-  .workspace[data-patient-record='true'] .workspaceBar .recordTab > a:first-child { padding: 0; min-height: 22px; height: auto; min-width: auto; font: 400 12px/16px var(--lume-font-sans); }
+  .workspace[data-patient-record='true'] .workspaceBar .recordTab > a:first-child { padding: 0; min-height: 22px; height: auto; min-width: auto; font: 400 0.75rem/1rem var(--lume-font-sans); }
   .workspace[data-patient-record='true'] .recordTab { color: var(--record-hint); background: transparent; padding: 0; }
   .workspace[data-patient-record='true'] .directoryTab::after { content: '·'; margin-left: 4px; }
   .workspace[data-patient-record='true'] .recordWhen { display: inline; }
@@ -164,13 +164,13 @@
   .workspace[data-patient-record='true'] .segment { display: inline-flex; align-items: center; flex-wrap: wrap; padding: 3px; gap: 2px; border: 1px solid var(--record-line); border-radius: 12px; background: var(--record-soft); }
   .workspace[data-patient-record='true'] .segment > a, .workspace[data-patient-record='true'] .moreSections > button {
     display: inline-flex; align-items: center; gap: 7px; padding: 0 clamp(7px, .85vw, 14px); min-height: 32px; border-radius: 10px; color: var(--record-hint);
-    font: 500 13px/18px var(--lume-font-sans); white-space: nowrap;
+    font: 400 0.8125rem/1.125rem var(--lume-font-sans); white-space: nowrap;
   }
   .workspace[data-patient-record='true'] .segment > a[aria-current], .workspace[data-patient-record='true'] .moreSections > button[aria-current] { color: var(--lume-ink); background: var(--record-field); box-shadow: 0 0 0 1px var(--record-line), 0 1px 2px color-mix(in srgb, var(--lume-ink) 9%, transparent); }
-  .workspace[data-patient-record='true'] .segment > a span { font: 400 12px/16px var(--lume-font-sans); }
+  .workspace[data-patient-record='true'] .segment > a span { font: 400 0.75rem/1rem var(--lume-font-sans); }
   .workspace[data-patient-record='true'] .moreSections > button { padding-inline: 6px; }
   .workspace[data-patient-record='true'] .moreSections > button span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-  .workspace[data-patient-record='true'] .lastVisit { display: block; font: 400 12px/16px var(--lume-font-sans); color: var(--record-hint); }
+  .workspace[data-patient-record='true'] .lastVisit { display: block; font: 400 0.75rem/1rem var(--lume-font-sans); color: var(--record-hint); }
 }
 @media (max-width: 700px) {
   .segment { display: flex; flex-wrap: wrap; }
@@ -183,7 +183,7 @@
 :global(html.dark) .themeButton .toLight { display: block; }
 @media (min-width: 1001px) {
   .workspace[data-patient-record='true'] .railTools { display: flex; align-items: center; gap: 2px; }
-  .railTools a { flex: 1; min-width: 0; font-size: 13px; padding-inline: 8px; }
+  .railTools a { flex: 1; min-width: 0; font-size: 0.8125rem; padding-inline: 8px; }
   .workspace[data-patient-record='true'] .railTools :is(.iconButton,.privacy) { min-width: 28px !important; width: 28px !important; min-height: 28px; height: 28px !important; padding: 0; display: grid; place-items: center; }
   .workspace[data-patient-record='true'] .railTools svg { width: 14px; height: 14px; }
   .workspace[data-rail-open='false'] .railTools, .workspace[data-rail-open='false'] .account { flex-direction: column; }
