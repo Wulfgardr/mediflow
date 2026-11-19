@@ -244,7 +244,10 @@ impl ClinicalApp {
                                         cx.notify();
                                     }));
                                     #[cfg(test)]
-                                    let command = rendered_command::observe(command);
+                                    let command = rendered_command::observe_focus(
+                                        command,
+                                        self.threshold_menu_focus.clone(),
+                                    );
                                     command
                                 })
                                 .when(self.threshold_menu_open.get(), |el| {

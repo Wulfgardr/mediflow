@@ -6,12 +6,6 @@ macro_rules! text {
 }
 use super::*;
 
-fn record_command(command: Stateful<Div>) -> impl IntoElement {
-    #[cfg(test)]
-    let command = super::rendered_command::observe(command);
-    command
-}
-
 pub(super) const READING_INSET: f32 = 12.;
 const QUIET_CHROME: f32 = 221.;
 const WRITING_CHROME: f32 = 286.;
@@ -376,7 +370,7 @@ fn card_title(
                 .min_w_0()
                 .child(island_title(id, label, count, theme).justify_start()),
         )
-        .children(action.map(record_command))
+        .children(action.map(crate::components::observe_control))
 }
 
 fn link(
@@ -763,7 +757,7 @@ impl ClinicalApp {
                             .justify_end()
                             .items_center()
                             .gap(px(8.))
-                            .child(record_command(
+                            .child(crate::components::observe_control(
                                 match self.form.as_ref().map(|form| form.kind) {
                                     Some(kind) => button(
                                         "clinical-workspace-close-draft",
@@ -814,7 +808,7 @@ impl ClinicalApp {
                                     }
                                 },
                             ))
-                            .child(record_command(
+                            .child(crate::components::observe_control(
                                 button(
                                     "clinical-workspace-record-menu",
                                     "",
@@ -838,7 +832,7 @@ impl ClinicalApp {
                                 }),
                             ))
                             .when(menu, |el| {
-                                el.child(gpui::deferred(record_command(
+                                el.child(gpui::deferred(crate::components::observe_control(
                                     div()
                                         .id("clinical-workspace-record-menu-list")
                                         .accessibility_id("clinical-workspace-record-menu-list")
@@ -864,7 +858,7 @@ impl ClinicalApp {
                                             )
                                             .blur_radius(px(24.)),
                                         ])
-                                        .child(record_command(
+                                        .child(crate::components::observe_control(
                                             menu_item(
                                                 "clinical-workspace-refresh",
                                                 "Rileggi",
@@ -877,7 +871,7 @@ impl ClinicalApp {
                                                 }),
                                             ),
                                         ))
-                                        .child(record_command(
+                                        .child(crate::components::observe_control(
                                             menu_item(
                                                 "clinical-workspace-copy-profile",
                                                 "Copia scheda",
@@ -890,7 +884,7 @@ impl ClinicalApp {
                                                 }),
                                             ),
                                         ))
-                                        .child(record_command(
+                                        .child(crate::components::observe_control(
                                             menu_item(
                                                 "clinical-workspace-edit-profile",
                                                 "Modifica anagrafica",
@@ -906,7 +900,7 @@ impl ClinicalApp {
                                                 },
                                             ),
                                         ))
-                                        .child(record_command(
+                                        .child(crate::components::observe_control(
                                             menu_item(
                                                 "clinical-workspace-current-profile",
                                                 "Altri dati della scheda…",
@@ -1047,8 +1041,9 @@ impl ClinicalApp {
                                 .iter()
                                 .position(|item| *item == section)
                                 .unwrap();
-                            super::rendered_command::observe(
+                            super::rendered_command::observe_focus(
                                 section_tab.track_focus(&self.ui_cli_section_focus[index]),
+                                self.ui_cli_section_focus[index].clone(),
                             )
                         };
                         section_tab
@@ -1182,11 +1177,13 @@ impl ClinicalApp {
                 .child(title)
                 .map(|el| {
                     if scroll == "clinical-record-changed-scroll" {
-                        el.child(record_command(
-                            body.accessibility_id(scroll)
-                                .role(Role::Region)
-                                .aria_label("Cambiato"),
-                        ))
+                        let body = body
+                            .accessibility_id(scroll)
+                            .role(Role::Region)
+                            .aria_label("Cambiato");
+                        #[cfg(test)]
+                        let body = super::rendered_command::observe_scroll(body, handle.clone());
+                        el.child(body)
                     } else {
                         el.child(body)
                     }
