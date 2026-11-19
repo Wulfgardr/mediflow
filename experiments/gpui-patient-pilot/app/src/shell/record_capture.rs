@@ -1177,3 +1177,536 @@ fn capture_record_d_on_the_synthetic_bench() {
     )
     .unwrap();
 }
+
+mod concept {
+    use super::super::*;
+    use super::context;
+    use gpui::{AnyWindowHandle, HeadlessAppContext};
+    use serde_json::{Value, json};
+
+    macro_rules! rows {
+        ($values:expr $(,)?) => {
+            $values
+                .into_iter()
+                .map(|value| serde_json::from_value(value).unwrap())
+                .collect::<Vec<_>>()
+        };
+    }
+
+    pub(super) struct Fixture {
+        detail: Value,
+        entries: Vec<Value>,
+        therapies: Vec<Value>,
+        observations: Vec<Value>,
+        checkups: Vec<Value>,
+    }
+
+    pub(super) fn returning_patient() -> Fixture {
+        use chrono::TimeZone;
+        let now = chrono::Local::now();
+        let at = |days: i64, hour: u32| {
+            chrono::Local
+                .from_local_datetime(
+                    &(now - chrono::Duration::days(days))
+                        .date_naive()
+                        .and_hms_opt(hour, 0, 0)
+                        .unwrap(),
+                )
+                .unwrap()
+                .with_timezone(&chrono::Utc)
+                .to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
+        };
+        let day = |days: i64| at(days, 8)[..10].to_owned();
+        let patient = "patient-a";
+        let entry =
+            |id: &str, kind: &str, title: &str, content: &str, days: i64, hour: u32, by: &str| {
+                json!({"id":id,"patientId":patient,"type":kind,"title":title,"date":at(days, hour),
+                "content":content,"version":1,"recordedBy":by,"createdAt":at(days, hour)})
+            };
+        let therapy = |id: &str, name: &str, dosage: &str, status: &str, updated: bool| {
+            json!({"id":id,"patientId":patient,"drugName":name,"dosage":dosage,"status":status,
+                "motivation": (status == "suspended").then_some("Potassio 5,6 mmol/L"),
+                "startDate":day(130),"version":if updated { 2 } else { 1 },"createdAt":at(130, 12),
+                "updatedAt":at(if updated { 7 } else { 130 }, 12)})
+        };
+        let observation = |code: &str,
+                           display: &str,
+                           unit: &str,
+                           value: f64,
+                           high: Option<&str>,
+                           days: i64| {
+            json!({"id":format!("{code}-{days}"),"patientId":patient,"codeSystem":"LOINC","code":code,"display":display,
+                "unitSystem":"UCUM","unitCode":unit,"value":value.to_string(),"refHigh":high,
+                "observedAt":at(days, 12),"source":"manual","version":1,"createdAt":at(days, 12)})
+        };
+        let mut observations = vec![];
+        for (code, display, unit, earlier, recent, high) in [
+            ("2823-3", "Potassio", "mmol/L", 4.7, 5.6, Some("5.1")),
+            ("2160-0", "Creatinina", "mg/dL", 1.21, 1.32, None),
+            ("29463-7", "Peso", "kg", 70.2, 71.4, None),
+        ] {
+            observations.push(observation(code, display, unit, earlier, high, 22));
+            observations.push(observation(code, display, unit, recent, high, 9));
+        }
+        Fixture {
+            detail: json!({"id":patient,"firstName":"Bianca","lastName":"Sintetica","birthDate":"1947-06-12",
+                "taxCode":"SNTBNC47H52Z000K","identifierType":"cf","birthDatePrecision":"exact",
+                "exemptions":"[\"013\",\"021\"]","isAdi":true,"version":3,
+                "diagnoses": serde_json::to_string(&json!([
+                    {"code":"I50.9","date":"2019-09-03","description":"Scompenso cardiaco","system":"ICD-10"},
+                    {"code":"I48.91","date":"2020-02-14","description":"Fibrillazione atriale","system":"ICD-10"},
+                    {"code":"E11.9","date":"2018-03-28","description":"Diabete mellito tipo 2","system":"ICD-10"},
+                    {"code":"N18.3","date":"2023-11-09","description":"Malattia renale cronica","system":"ICD-10"}])).unwrap()}),
+            entries: vec![
+                entry(
+                    "e-visit",
+                    "visit",
+                    "Visita ambulatoriale",
+                    "Rilevati i parametri per il controllo successivo.",
+                    15,
+                    9,
+                    "Dott. Sintetico",
+                ),
+                entry(
+                    "e-access",
+                    "access",
+                    "Nota ADI",
+                    "Edemi declivi. Peso 71,4 kg. Concordato il prossimo accesso.",
+                    7,
+                    10,
+                    "Inf. Sintetica",
+                ),
+                entry(
+                    "e-phone",
+                    "phone",
+                    "Telefonata",
+                    "Potassio 5,6. Sospeso spironolattone. Ricontrollo elettroliti tra 7 giorni.",
+                    7,
+                    16,
+                    "Dott.ssa Prova",
+                ),
+            ],
+            therapies: vec![
+                therapy(
+                    "t-furo",
+                    "Furosemide 25 mg cpr",
+                    "1 cp ore 8 · ½ cp ore 14",
+                    "active",
+                    true,
+                ),
+                therapy(
+                    "t-apix",
+                    "Apixaban 5 mg cpr",
+                    "1 cp ogni 12 ore",
+                    "active",
+                    false,
+                ),
+                therapy(
+                    "t-biso",
+                    "Bisoprololo 2,5 mg cpr",
+                    "1 cp al mattino",
+                    "active",
+                    false,
+                ),
+                therapy(
+                    "t-metf",
+                    "Metformina 500 mg cpr",
+                    "1 cp a pranzo e cena",
+                    "active",
+                    false,
+                ),
+                therapy(
+                    "t-spiro",
+                    "Spironolattone 25 mg cpr",
+                    "1 cp al mattino",
+                    "suspended",
+                    true,
+                ),
+            ],
+            observations,
+            checkups: vec![],
+        }
+    }
+
+    pub(super) fn apply(app: &mut ClinicalApp, fixture: &Fixture) {
+        let entries: Vec<Entry> = rows!(fixture.entries.clone());
+        app.patient.detail =
+            ReadLoad::Ready(serde_json::from_value(fixture.detail.clone()).unwrap());
+        app.patient.record.anchor = None;
+        app.patient.record.fix_anchor(&entries);
+        app.patient.entries = ReadLoad::Ready(entries);
+        app.patient.therapies = ReadLoad::Ready(rows!(fixture.therapies.clone()));
+        app.patient.observations = ReadLoad::Ready(rows!(fixture.observations.clone()));
+        app.patient.checkups = ReadLoad::Ready(rows!(fixture.checkups.clone()));
+        app.patient.attachments = ReadLoad::Ready(vec![]);
+    }
+
+    pub(super) fn synthetic_proposal(app: &mut ClinicalApp) {
+        let patient = app.patient.detail.ready().unwrap().clone();
+        let sources = mediflow_runtime_client::patient_insight_sources(
+            &patient,
+            app.scope.as_deref(),
+            app.patient.therapies.ready().unwrap(),
+            app.patient.entries.ready().unwrap(),
+        )
+        .unwrap();
+        let cite = |needle: &str| {
+            let index = sources
+                .iter()
+                .position(|source| source.text.contains(needle))
+                .unwrap_or_else(|| panic!("source {needle}"));
+            format!("S{}", index + 1)
+        };
+        let now = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+        let proposal = mediflow_runtime_client::PatientInsightProposal {
+            summary: String::new(),
+            current_state: vec![],
+            alerts: vec![format!(
+                "Potassio 5,6: spironolattone già sospeso [{}]",
+                cite("Potassio 5,6")
+            )],
+            next_steps: vec![
+                format!(
+                    "Ricontrollo degli elettroliti tra 7 giorni [{}]",
+                    cite("Ricontrollo elettroliti")
+                ),
+                format!(
+                    "Peso 71,4 kg all’accesso ADI: rivalutare al prossimo accesso [{}]",
+                    cite("Edemi declivi")
+                ),
+            ],
+            gaps: vec![],
+            generated_at: now.clone(),
+            selection_epoch: 0,
+            patient_revision: patient.version,
+            captured_at: now.clone(),
+            verified_at: now,
+            provider: "banco sintetico".into(),
+            model: "proposta scritta per la cattura".into(),
+            venue: "local".into(),
+            egress: "none".into(),
+            preprocessing: vec![],
+            attempts: None,
+            review_ref: "sintetico".into(),
+            writes_performed: 0,
+        };
+        let request = mediflow_runtime_client::PatientInsightRequest {
+            body: Value::Null,
+            sources,
+            patient_id: patient.id.clone(),
+            patient_revision: patient.version,
+        };
+        app.patient.insight.phase = patient_insight::InsightPhase::Proposal {
+            request: Box::new(request),
+            proposal: Box::new(proposal),
+        };
+    }
+
+    struct Shots<'a> {
+        cx: &'a mut HeadlessAppContext,
+        window: AnyWindowHandle,
+        directory: String,
+    }
+
+    impl Shots<'_> {
+        fn app<R>(
+            &mut self,
+            f: impl FnOnce(&mut ClinicalApp, &mut Window, &mut Context<ClinicalApp>) -> R,
+        ) -> R {
+            self.cx
+                .update_window(self.window, |root, window, cx| {
+                    root.downcast::<ClinicalApp>()
+                        .unwrap()
+                        .update(cx, |app, cx| f(app, window, cx))
+                })
+                .unwrap()
+        }
+
+        fn settle(&mut self) {
+            for _ in 0..12 {
+                self.cx
+                    .update_window(self.window, |_, window, cx| {
+                        window.refresh();
+                        window.draw(cx).clear(cx);
+                    })
+                    .unwrap();
+                self.cx.run_until_parked();
+            }
+        }
+
+        fn shot(&mut self, name: &str) {
+            self.settle();
+            self.cx
+                .capture_screenshot(self.window)
+                .unwrap()
+                .save(format!("{}/{name}.png", self.directory))
+                .unwrap();
+        }
+    }
+
+    fn zone_receipt(app: &ClinicalApp) -> Value {
+        let zone = |handle: &gpui::ScrollHandle| {
+            let bounds = handle.bounds();
+            json!({"x": f32::from(bounds.origin.x), "y": f32::from(bounds.origin.y),
+                "w": f32::from(bounds.size.width), "h": f32::from(bounds.size.height),
+                "scrollY": f32::from(handle.offset().y)})
+        };
+        let record = &app.patient.record;
+        if record.stable_column.bounds().size.width > px(0.) {
+            json!({"area": "scorrimento interno a ciascun vassoio",
+                "stabile": zone(&record.stable_column),
+                "cambiato": zone(&record.changed_column),
+                "contesto": zone(&record.composer_column)})
+        } else {
+            json!({"area": "scorrimento interno al vassoio Cambiato e della colonna laterale",
+                "cambiato": zone(&record.changed_column),
+                "laterale con Stabile e Contesto": zone(&record.composer_column)})
+        }
+    }
+
+    #[gpui::test]
+    fn wide_trays_keep_the_scroll_and_the_focus_of_a_change(cx: &mut gpui::TestAppContext) {
+        let mut native = gpui::TestAppContext::build_with_text_system(
+            cx.dispatcher.clone(),
+            None,
+            std::sync::Arc::new(gpui_apple::AppleTextSystem::new()),
+        );
+        let host = notes_recovery_tests::Host::new();
+        let session = host.session.clone();
+        let (view, cx) = native.add_window_view(|window, cx| {
+            let mut app = ClinicalApp::new(String::new(), window, cx);
+            app.session = Some(session);
+            app.scope = Some("scope-a".into());
+            app.area = Area::Patients;
+            app
+        });
+        cx.simulate_resize(gpui::size(px(1320.), px(880.)));
+        view.update(cx, |app, cx| app.select_patient("patient-a", true, cx));
+        cx.run_until_parked();
+        let fixture = returning_patient();
+        view.update(cx, |app, cx| {
+            apply(app, &fixture);
+            cx.notify();
+        });
+        notes_recovery_tests::draw(cx);
+        let stable = cx.debug_bounds("clinical-record-stable").unwrap();
+        let changed = cx.debug_bounds("clinical-record-changed").unwrap();
+        let context = cx.debug_bounds("clinical-record-context").unwrap();
+        let reference = [
+            (259., 209., 326.109),
+            (597.109, 209., 376.297),
+            (985.406, 209., 313.594),
+        ];
+        for (zone, (x, y, width)) in [stable, changed, context].into_iter().zip(reference) {
+            let measured = (
+                f32::from(zone.origin.x),
+                f32::from(zone.origin.y),
+                f32::from(zone.size.width),
+            );
+            assert!(
+                (measured.0 - x).abs() <= 0.75
+                    && (measured.1 - y).abs() <= 0.75
+                    && (measured.2 - width).abs() <= 0.75,
+                "the trays follow geometria-concept-v2.json: {measured:?} vs {:?}",
+                (x, y, width)
+            );
+        }
+        assert!(changed.size.width > stable.size.width);
+        assert_eq!(
+            (stable.top(), stable.bottom()),
+            (changed.top(), changed.bottom())
+        );
+        assert_eq!(
+            (context.top(), context.bottom()),
+            (changed.top(), changed.bottom())
+        );
+        let therapies = cx.debug_bounds("clinical-record-active-therapies").unwrap();
+        assert_eq!(
+            therapies.left() - stable.left(),
+            px(super::super::patient_record::TRAY_INSET + 1.)
+        );
+        let row = "clinical-record-change-therapy-t-spiro";
+        let rest = cx.debug_bounds(row).unwrap();
+        cx.simulate_event(gpui::ScrollWheelEvent {
+            position: changed.center(),
+            delta: gpui::ScrollDelta::Pixels(gpui::point(px(0.), px(-120.))),
+            ..Default::default()
+        });
+        notes_recovery_tests::draw(cx);
+        let scrolled = cx.debug_bounds(row).unwrap();
+        assert!(
+            scrolled.top() < rest.top(),
+            "the change zone scrolls: {rest:?} → {scrolled:?}"
+        );
+        assert!(
+            scrolled.top() > changed.top(),
+            "the row stays inside its tray"
+        );
+        assert_eq!(
+            cx.debug_bounds("clinical-record-active-therapies").unwrap(),
+            therapies,
+            "the stable zone does not move"
+        );
+        cx.simulate_click(scrolled.center(), gpui::Modifiers::default());
+        notes_recovery_tests::draw(cx);
+        let anchored = cx.debug_bounds(row).unwrap();
+        assert_eq!(
+            anchored.top(),
+            scrolled.top(),
+            "opening the change keeps the scroll"
+        );
+        let (open, focused) = cx.update(|window, app| {
+            (
+                view.read(app).patient.record.open.clone(),
+                window.focused(app).is_some(),
+            )
+        });
+        assert_eq!(open.as_deref(), Some("therapy-t-spiro"));
+        assert!(focused, "the opened change holds the keyboard focus");
+        let receipt = view.read_with(cx, |app, _| zone_receipt(app));
+        eprintln!(
+            "RICEVUTA {}",
+            json!({"finestra": [1320, 880], "riga": row,
+                "riposo": [f32::from(rest.origin.x), f32::from(rest.origin.y)],
+                "dopoScroll": [f32::from(scrolled.origin.x), f32::from(scrolled.origin.y)],
+                "click": [f32::from(scrolled.center().x), f32::from(scrolled.center().y)],
+                "zone": receipt})
+        );
+        view.update(cx, |app, cx| app.disconnect(cx));
+    }
+
+    #[test]
+    fn capture_concept_on_the_fixture_host() {
+        let Ok(directory) = std::env::var("MEDIFLOW_CONCEPT_CAPTURES") else {
+            return;
+        };
+        std::fs::create_dir_all(&directory).unwrap();
+        let fixture = returning_patient();
+        for (dark, theme) in [(false, "giorno"), (true, "grafite")] {
+            for (width, height) in [(1320., 880.), (1180., 660.)] {
+                let host = notes_recovery_tests::Host::new();
+                let mut cx = context();
+                let session = host.session.clone();
+                let window: AnyWindowHandle = cx
+                    .open_window(gpui::size(px(width), px(height)), move |window, cx| {
+                        cx.new(|cx| {
+                            let mut app = ClinicalApp::new(String::new(), window, cx);
+                            app.dark_override = Some(dark);
+                            app.session = Some(session);
+                            app.scope = Some("scope-a".into());
+                            app.area = Area::Patients;
+                            app
+                        })
+                    })
+                    .unwrap()
+                    .into();
+                let mut run = Shots {
+                    cx: &mut cx,
+                    window,
+                    directory: directory.clone(),
+                };
+                run.app(|app, _, cx| app.select_patient("patient-a", true, cx));
+                run.settle();
+                run.app(|app, _, cx| {
+                    apply(app, &fixture);
+                    cx.notify();
+                });
+                let label = format!("{theme}-{width}");
+                run.shot(&format!("{label}-riepilogo"));
+                let rest = run.app(|app, _, _| zone_receipt(app));
+                let center =
+                    run.app(|app, _, _| app.patient.record.changed_column.bounds().center());
+                run.cx
+                    .update_window(run.window, |_, window, cx| {
+                        window.dispatch_event(
+                            gpui::PlatformInput::MouseMove(gpui::MouseMoveEvent {
+                                position: center,
+                                ..Default::default()
+                            }),
+                            cx,
+                        );
+                        window.dispatch_event(
+                            gpui::PlatformInput::ScrollWheel(gpui::ScrollWheelEvent {
+                                position: center,
+                                delta: gpui::ScrollDelta::Pixels(gpui::point(px(0.), px(-240.))),
+                                ..Default::default()
+                            }),
+                            cx,
+                        );
+                    })
+                    .unwrap();
+                run.shot(&format!("{label}-riepilogo-dopo-scroll"));
+                let scrolled = run.app(|app, _, _| zone_receipt(app));
+                std::fs::write(
+                    format!("{}/{label}-ricevuta-zone.json", run.directory),
+                    serde_json::to_string_pretty(&json!({"riposo": rest, "dopoScroll": scrolled,
+                        "evento": {"rotella": -240, "punto": [f32::from(center.x), f32::from(center.y)]}}))
+                    .unwrap(),
+                )
+                .unwrap();
+                run.cx
+                    .update_window(run.window, |_, window, cx| {
+                        window.dispatch_event(
+                            gpui::PlatformInput::MouseMove(gpui::MouseMoveEvent {
+                                position: gpui::point(px(1.), px(1.)),
+                                ..Default::default()
+                            }),
+                            cx,
+                        );
+                    })
+                    .unwrap();
+                run.app(|app, _, cx| {
+                    app.patient
+                        .record
+                        .changed_column
+                        .set_offset(gpui::point(px(0.), px(0.)));
+                    cx.notify();
+                });
+                run.app(|app, _, cx| {
+                    synthetic_proposal(app);
+                    cx.notify();
+                });
+                run.shot(&format!("{label}-riepilogo-quadro-sintetico"));
+                let spiro = run.app(|app, _, _| {
+                    let anchor = app.patient.record.anchor.clone().flatten()?;
+                    record_changes::changes_since(
+                        &anchor,
+                        app.patient.therapies.ready()?,
+                        app.patient.observations.ready()?,
+                        &chrono::Local,
+                    )
+                    .into_iter()
+                    .find(|change| change.subject.starts_with("Spironolattone"))
+                    .map(|change| change.key)
+                });
+                assert!(spiro.is_some(), "suspension is a documented change");
+                run.app(move |app, _, cx| {
+                    app.patient.record.open = spiro;
+                    cx.notify();
+                });
+                run.shot(&format!("{label}-variazione-aperta"));
+                run.app(|app, _, cx| {
+                    app.patient.record.more = app.patient.record.open.clone();
+                    cx.notify();
+                });
+                run.shot(&format!("{label}-altri-dettagli"));
+                run.app(|app, _, cx| {
+                    app.patient.record.more = None;
+                    app.patient.record.menu = true;
+                    cx.notify();
+                });
+                run.shot(&format!("{label}-menu-scheda"));
+                run.app(|app, _, cx| {
+                    app.patient.record.menu = false;
+                    app.section_selected(PatientSection::Therapies, cx);
+                });
+                run.shot(&format!("{label}-terapie"));
+                run.app(|app, _, cx| app.section_selected(PatientSection::Overview, cx));
+                run.app(|app, window, cx| app.open_form(FormKind::Entry, window, cx));
+                run.shot(&format!("{label}-nuova-voce"));
+                run.app(|app, _, cx| app.disconnect(cx));
+                run.settle();
+            }
+        }
+    }
+}
