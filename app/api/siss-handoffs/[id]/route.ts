@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { NextResponse } from 'next/server';
@@ -125,7 +126,7 @@ export async function PUT(request: Request, context: RouteContext) {
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('API PUT /siss-handoffs/[id] error:', error);
+        logServerError('API PUT /siss-handoffs/[id] error', error);
         return NextResponse.json({ error: 'Failed to update SISS handoff' }, { status: 500 });
     }
 }
@@ -179,7 +180,7 @@ export async function DELETE(request: Request, context: RouteContext) {
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('API DELETE /siss-handoffs/[id] error:', error);
+        logServerError('API DELETE /siss-handoffs/[id] error', error);
         return NextResponse.json({ error: 'Failed to delete SISS handoff' }, { status: 500 });
     }
 }

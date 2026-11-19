@@ -1,4 +1,5 @@
 /* @Codex */
+import { logServerError } from '@/lib/server-error-log';
 import { NextResponse } from 'next/server';
 /* @Codex */
 import { requireLocalApiToken } from '@/lib/security/local-api-auth';
@@ -15,7 +16,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ int
         const result = await confirmNetworkPairingIntent(intentId);
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
-        console.error('API POST /api/v1/network/pairing-intents/[intentId]/confirm error:', error);
+        logServerError('API POST /api/v1/network/pairing-intents/[intentId]/confirm error', error);
         return NextResponse.json({ error: 'Failed to confirm pairing intent' }, { status: 500 });
     }
 }

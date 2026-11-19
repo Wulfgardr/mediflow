@@ -1,0 +1,9 @@
+{"op":"discover"}
+{"op":"click","target":{"role":"button","name":"Apri la scheda di Conti Luca"}}
+{"op":"expect","target":{"role":"main","name":"Scheda di prova di Conti Luca"},"state":"visible"}
+{"op":"focus","target":{"role":"textbox","name":"Note della scheda"}}
+{"op":"fill","target":{"role":"textbox","name":"Note della scheda"},"value":"Bozza sintetica del renderer."}
+{"op":"click","target":{"role":"button","name":"Registra 1 elemento"}}
+{"op":"click","target":{"role":"button","name":"Torna alla bozza"}}
+{"op":"expect","target":{"role":"textbox","name":"Note della scheda"},"state":"focused"}
+{"op":"expectValue","target":{"role":"textbox","name":"Note della scheda"},"value":"Bozza sintetica del renderer."}

@@ -1,4 +1,5 @@
 /* @Codex */
+import { logServerError } from '@/lib/server-error-log';
 import { NextResponse } from 'next/server';
 /* @Codex */
 import { parseApiV1Limit, parseApiV1NullableDate } from '@/lib/api-v1-route-helpers';
@@ -27,7 +28,7 @@ export async function GET(request: Request) {
 
         return NextResponse.json(checkups);
     } catch (error) {
-        console.error('API GET /api/v1/network/checkups error:', error);
+        logServerError('API GET /api/v1/network/checkups error', error);
         return NextResponse.json({ error: 'Failed to fetch checkups' }, { status: 500 });
     }
 }

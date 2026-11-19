@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { dbServer } from '@/lib/db-server';
@@ -111,7 +112,7 @@ export async function POST(request: Request) {
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error("Duplicate patients error:", error);
+        logServerError("Duplicate patients error", error);
         return NextResponse.json({ error: "Failed to duplicate patients" }, { status: 500 });
     }
 }

@@ -1,3 +1,4 @@
+import { logServerWarning } from '@/lib/server-error-log';
 import { NextRequest, NextResponse } from 'next/server';
 /* @Codex */
 import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/security/server-auth';
@@ -48,7 +49,7 @@ export async function GET(req: NextRequest) {
         const localityResponse = ollamaLocalityErrorResponse(error);
         if (localityResponse) return localityResponse;
         // Without AI, an absent, refused or silent local provider is an expected state.
-        console.warn('Ollama non raggiungibile durante la lettura dei modelli:', error instanceof Error ? error.name : 'unknown');
+        logServerWarning('Ollama: list models', error);
         return ollamaLocalityErrorResponse(new OllamaLocalityError('provider_unready'))!;
     }
 }

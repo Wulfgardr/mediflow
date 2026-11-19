@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { readAmbulatoryJsonObject } from '@/lib/ambulatory-json-body';
@@ -22,7 +23,7 @@ export async function POST(request: Request) {
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('Clear ambulatory error:', error);
+        logServerError('Clear ambulatory error', error);
         return NextResponse.json({ error: 'Failed to clear ambulatory' }, { status: 500 });
     }
 }
