@@ -83,6 +83,8 @@
     --record-edge: #d1d6df;
     --record-accent: #234eac;
     --record-hint: #545b64;
+    --lume-record-success-bg: #e2f1e9; --lume-record-success: #246343;
+    --lume-record-critical-bg: #fae8e6; --lume-record-critical: #a82e25;
     --lume-font-sans: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
     padding: 6px;
     gap: 6px;
@@ -92,6 +94,8 @@
   :global(html.dark) .workspace[data-patient-record='true'] {
     --record-chrome: #17191d; --record-field: #17191e; --record-soft: #1f2228;
     --record-line: #363940; --record-edge: #0d0f12; --record-accent: #9ab7ff; --record-hint: #a9afb9;
+    --lume-record-success-bg: #1b2f26; --lume-record-success: #74d1a2;
+    --lume-record-critical-bg: #3a2321; --lume-record-critical: #ff8e84;
   }
   .workspace[data-patient-record='true'][data-rail-open='false'] { --twin-rail: 60px; }
   .workspace[data-patient-record='true'] .workarea { position: relative; border-radius: 18px; background: var(--record-field); }
@@ -138,7 +142,8 @@
   .workspace[data-patient-record='true'][data-rail-open='false'] :is(.brand strong, .recordSearch span, .recordSearch kbd, .railGroup, .operator, .initials, .proposalNav small) { display: none; }
   .workspace[data-patient-record='true'][data-rail-open='false'] .account { justify-content: center; padding: 3px; }
   .workspace[data-patient-record='true'] .workspaceBar {
-    height: 36px; flex: 0 0 36px; padding: 11px 24px 0;
+    position: absolute; z-index: 3; top: 0; left: 0; max-width: calc(100% - 335px); width: max-content;
+    height: 36px; padding: 11px 24px 0;
     gap: 4px; background: var(--record-field); color: var(--record-hint); border: 0;
   }
   .workspace[data-patient-record='true'] .workspaceBar .openRecords { align-self: stretch; gap: 4px; flex: 0 1 auto; }

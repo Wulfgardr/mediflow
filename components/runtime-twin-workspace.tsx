@@ -5,7 +5,7 @@
 import { useEntryDraftMarker } from '@/hooks/use-entry-local-draft';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Fragment, createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Fragment, createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Activity, BookOpen, CalendarDays, CircleDashed, ChevronDown, CircleHelp, ClipboardList, FolderOpen, Inbox, LockKeyhole, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Settings2, Search, Users, X } from 'lucide-react';
 import { db } from '@/lib/db';
 import { currentWorkspaceDestination } from '@/lib/workspace-destination';
@@ -144,6 +144,23 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
     return (await Promise.all(key.split('|').filter(Boolean).map(id => db.patients.get(id)))).filter(p => !!p);
   }, [key, proposal], [], ['patients']) ?? [];
 
+  const workspaceBar = (
+    <header className={styles.workspaceBar}>
+          <button type="button" className={styles.iconButton} aria-label={railOpen ? 'Riduci navigazione' : 'Espandi navigazione'} aria-expanded={railOpen} onClick={() => setRailOpen(value => !value)}>
+            {railOpen ? <PanelLeftClose size={18} aria-hidden /> : <PanelLeftOpen size={18} aria-hidden />}
+          </button>
+          <nav className={styles.openRecords} aria-label="Cartelle aperte">
+            <Link className={styles.directoryTab} href={activeDestination.href} aria-current={!patientId && currentDestinationHref !== null ? 'page' : undefined}>{activeDestination.label}</Link>
+            {records.map((patient, index) => <span className={styles.recordTab} key={patient.id} data-active={patient.id === patientId}>
+              <Link href={`/patients/${patient.id}/modules`} aria-current={patient.id === patientId ? 'page' : undefined}><span className={currentRecord && patient.id === patientId ? styles.recordName : undefined}><PrivacyBlur>{patient.lastName} {patient.firstName}</PrivacyBlur></span>{currentRecord && patient.id === patientId ? <span className={styles.recordWhen} aria-hidden="true">{currentRecord.label}</span> : null}<DraftMarker patientId={patient.id} /></Link>
+              {patient.id === patientId ? <Link href="/?area=incarico" aria-label={`Chiudi cartella ${index + 1}`} onClick={() => setOpened(value => value.filter(id => id !== patient.id))}><X size={13} aria-hidden /></Link>
+                : <button type="button" aria-label={`Chiudi cartella ${index + 1}`} onClick={() => setOpened(value => value.filter(id => id !== patient.id))}><X size={13} aria-hidden /></button>}
+            </span>)}
+          </nav>
+          <PrivacyModeToggle className={styles.privacy} />
+        </header>
+  );
+
   return (
     <RecordCrumbContext.Provider value={setRecordLabel}>
     <WorkspaceAreaContext.Provider value={setArea}>
@@ -189,21 +206,8 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
         </div>
       </aside>
       <div className={styles.workarea}>
-        <header className={styles.workspaceBar}>
-          <button type="button" className={styles.iconButton} aria-label={railOpen ? 'Riduci navigazione' : 'Espandi navigazione'} aria-expanded={railOpen} onClick={() => setRailOpen(value => !value)}>
-            {railOpen ? <PanelLeftClose size={18} aria-hidden /> : <PanelLeftOpen size={18} aria-hidden />}
-          </button>
-          <nav className={styles.openRecords} aria-label="Cartelle aperte">
-            <Link className={styles.directoryTab} href={activeDestination.href} aria-current={!patientId && currentDestinationHref !== null ? 'page' : undefined}>{activeDestination.label}</Link>
-            {records.map((patient, index) => <span className={styles.recordTab} key={patient.id} data-active={patient.id === patientId}>
-              <Link href={`/patients/${patient.id}/modules`} aria-current={patient.id === patientId ? 'page' : undefined}><span className={currentRecord && patient.id === patientId ? styles.recordName : undefined}><PrivacyBlur>{patient.lastName} {patient.firstName}</PrivacyBlur></span>{currentRecord && patient.id === patientId ? <span className={styles.recordWhen} aria-hidden="true">{currentRecord.label}</span> : null}<DraftMarker patientId={patient.id} /></Link>
-              {patient.id === patientId ? <Link href="/?area=incarico" aria-label={`Chiudi cartella ${index + 1}`} onClick={() => setOpened(value => value.filter(id => id !== patient.id))}><X size={13} aria-hidden /></Link>
-                : <button type="button" aria-label={`Chiudi cartella ${index + 1}`} onClick={() => setOpened(value => value.filter(id => id !== patient.id))}><X size={13} aria-hidden /></button>}
-            </span>)}
-          </nav>
-          <PrivacyModeToggle className={styles.privacy} />
-        </header>
-        <div className={styles.page}>{children}</div>
+        {!patientId ? workspaceBar : null}
+        <div className={styles.page}>{patientId ? workspaceBar : null}{children}</div>
       </div>
     </div>
     </DirectoryReturnContext.Provider>
@@ -217,7 +221,16 @@ function DraftMarker({ patientId }: { patientId: string }) {
   return useEntryDraftMarker(patientId) ? <span className={styles.draftMarker} aria-label="Bozza conservata" title="Bozza conservata">●</span> : null;
 }
 
-const patientPrimaryDestinations = ['#quadro', '#diario', '#terapie', '#documenti', '#parametri', '#follow-up'];
+const widePatientDestinations = ['#quadro', '#diario', '#terapie', '#documenti', '#parametri', '#follow-up'];
+const compactPatientDestinations = ['#quadro', '#terapie', '#parametri', '#documenti'];
+const desktopRecordWidth = '(min-width: 1001px)';
+const desktopRecord = () => window.matchMedia(desktopRecordWidth).matches;
+function watchRecordWidth(notify: () => void) {
+  const media = window.matchMedia(desktopRecordWidth);
+  media.addEventListener('change', notify);
+  return () => media.removeEventListener('change', notify);
+}
+const serverRecordWidth = () => false;
 const patientTabLabels: Record<string, string> = { '#quadro': 'Riepilogo', '#parametri': 'Parametri', '#follow-up': 'Controlli' };
 
 export function RuntimeTwinPatientNavigation({ items, active, lastVisit }: {
@@ -225,6 +238,8 @@ export function RuntimeTwinPatientNavigation({ items, active, lastVisit }: {
   active: string;
   lastVisit?: { date: Date; author?: string };
 }) {
+  const wide = useSyncExternalStore(watchRecordWidth, desktopRecord, serverRecordWidth);
+  const patientPrimaryDestinations = wide ? widePatientDestinations : compactPatientDestinations;
   const primary = patientPrimaryDestinations.flatMap(href => items.filter(item => item.href === href));
   const secondary = items.filter(item => !patientPrimaryDestinations.includes(item.href));
   return <nav className={styles.patientNavigation} aria-label="Sezioni della vista">
