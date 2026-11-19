@@ -93,7 +93,7 @@ test('abort during rasterization cancels render and clears canvas, late completi
 });
 test('timeout is distinct from cancellation and terminates an unresolved open', async () => {
     const f = fixture(), target = canvas();
-    await assert.rejects(paintPdfPage(bytes, 1, target, new AbortController().signal, f.factory, 10), fails('timeout'));
+    await assert.rejects(paintPdfPage(bytes, 1, target, new AbortController().signal, f.factory, { timeoutMs: 10 }), fails('timeout'));
     assert.equal(f.calls.dispose, 1); assert.equal(target.width, 0);
     f.opened.reject(new Error('late synthetic error')); await tick();
 });
@@ -143,12 +143,14 @@ test('auxiliary resource failure is typed and terminal even while render is pend
     assert.equal(f.calls.dispose, 1); assert.equal(target.width, 0);
 });
 test('viewport/pixel bounds, including tiny/fractional/invalid dimensions', () => {
-    for (const dimensions of [[600, 800], [14400, 14400], [0.001, 1], [10, 12000]]) {
-        const size = previewCanvasSize(dimensions[0], dimensions[1], true);
-        assert.ok(size.width >= 1 && size.height >= 1);
-        assert.ok(size.width <= 2048 && size.height <= 2048 && size.width * size.height <= 4_000_000);
+    for (const mode of ['pdf', 'zoomable-pdf'] as const) {
+        for (const [width, height] of [[600, 800], [14400, 14400], [0.001, 1], [10, 12000]]) {
+            const size = previewCanvasSize(width, height, mode);
+            assert.ok(size.width >= 1 && size.height >= 1);
+            assert.ok(size.width <= 2048 && size.height <= 2048 && size.width * size.height <= 4_000_000);
+        }
+        for (const n of [0, -1, NaN, Infinity, 14401]) assert.throws(() => previewCanvasSize(n, 10, mode), fails('page_dimensions'));
     }
-    for (const n of [0, -1, NaN, Infinity, 14401]) assert.throws(() => previewCanvasSize(n, 10, true), fails('page_dimensions'));
 });
 test('operand depth, decoded-image pixels and data bytes are bounded after materialization', () => {
     assert.throws(() => checkPdfOperators({ fnArray: [ops.image], argsArray: [['id', 10000, 2]] }, ops), fails('image_limit'));

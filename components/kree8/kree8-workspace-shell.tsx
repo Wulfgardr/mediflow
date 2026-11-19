@@ -114,6 +114,7 @@ export function Kree8WorkspaceShell({
   const [folderNavOpen, setFolderNavOpen] = useState(false);
   const folderToggleRef = useRef<HTMLButtonElement>(null);
   const folderMode = isClinical && proposal;
+  const visibleFolder = folderMode ? (writing ? 'quadro' : folderSection) : undefined;
 
   /* a patient route may unmount the invoking control before the title
      mounts. Treat only body or that detached control as unowned focus, once per
@@ -409,9 +410,9 @@ export function Kree8WorkspaceShell({
   }, [isClinical, overviewMode, navKey]);
 
   return (
-    <RuntimeTwinFolderContext.Provider value={folderMode ? writing ? 'quadro' : folderSection : null}>
+    <RuntimeTwinFolderContext.Provider value={visibleFolder ?? null}>
     <div className={`${sectionRecipe.sections} ${folderMode ? twin.patientShell : `${styles.shell} ${isClinical ? styles.clinicalShell : ''} ${overviewMode ? styles.overviewShell : ''}`}`} ref={rootRef}>
-      <main className={`${layout.container} ${folderMode ? twin.patientCanvas : `${styles.canvas} ${isClinical ? styles.clinicalCanvas : ''}`}`} data-writing={writing} data-folder-section={folderMode ? folderSection : undefined} data-testid={isClinical ? 'lume-scheda-scroll' : undefined}>
+      <main className={`${layout.container} ${folderMode ? twin.patientCanvas : `${styles.canvas} ${isClinical ? styles.clinicalCanvas : ''}`}`} data-writing={writing} data-folder-section={visibleFolder} data-testid={isClinical ? 'lume-scheda-scroll' : undefined}>
         <header
           className={`${layout.plane} ${folderMode ? twin.patientHeader : `${styles.chrome} ${isClinical ? styles.clinicalChrome : ''}`}`}
           data-testid={isClinical ? 'lume-scheda-header' : undefined}
@@ -555,7 +556,7 @@ export function Kree8WorkspaceShell({
           </nav>
         ) : null}
 
-        <div key="workspace-body" className={`${layout.plane} ${folderMode ? twin.patientBody : `${styles.workspaceBody} ${isClinical ? styles.clinicalBody : ''}`}`} data-folder-section={folderMode ? folderSection : undefined}>
+        <div key="workspace-body" className={`${layout.plane} ${folderMode ? twin.patientBody : `${styles.workspaceBody} ${isClinical ? styles.clinicalBody : ''}`}`} data-folder-section={visibleFolder}>
           {isClinical ? (
             <article
               className={folderMode ? twin.readingPane : styles.clinicalSurface}

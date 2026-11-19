@@ -29,9 +29,7 @@
 .overview.overview .sectionTitle {
     margin: 0;
     color: var(--lume-ink-muted);
-    font: var(--type-section);
-    font-variant-caps: all-small-caps;
-    letter-spacing: 0.08em;
+    font: var(--type-section-heading);
 }
 .overview .status { margin-top: 0.5rem; font: var(--type-body); }
 .overview .status p { margin: 0; }
@@ -46,7 +44,7 @@
     overflow-wrap: anywhere;
 }
 .overview .details { margin-top: 0.25rem; }
-.overview .details :global([data-disclosure-control]) { font: var(--type-strong); }
+.overview .details :global([data-disclosure-control]) { font: var(--type-section-heading); }
 .overview .actions { display: flex; flex-direction: column; align-items: stretch; gap: 0.5rem; min-width: 0; }
 .overview .actions > :is(button, a),
 .overview .indexLink { min-height: var(--lume-control-height, 44px); min-width: 44px; white-space: normal; }
@@ -69,7 +67,7 @@
 }
 .list > li:last-child .indexLink { border-bottom: 0; }
 .indexLink strong, .indexLink small { display: block; }
-.indexLink strong { font: var(--type-strong); }
+.indexLink strong { font: var(--type-section-heading); }
 .indexLink small { margin-top: 0.2rem; color: var(--lume-ink-muted); font: var(--type-meta); }
 .indexLink svg { width: 1rem; height: 1rem; color: var(--lume-ink-muted); }
 .indexLink:hover strong { text-decoration: underline; text-underline-offset: 4px; }

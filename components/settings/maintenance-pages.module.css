@@ -2,7 +2,7 @@
 .page.page .intro h2, .page.page .heading,
 .page.page :global([data-disclosure]) > div:first-child h3,
 .page.page :global([data-disclosure]) > div:first-child :global([data-disclosure-control]) {
-    margin: 0; color: var(--lume-ink-muted); font: var(--type-section); font-variant-caps: all-small-caps; letter-spacing: 0.05em;
+    margin: 0; color: var(--lume-ink-muted); font: var(--type-section-heading);
 }
 .page p { margin: 0; max-width: 64ch; line-height: 1.6; }
 .intro p { margin-top: 8px; color: var(--lume-ink-muted); }
@@ -17,11 +17,11 @@
 .actions > * { max-width: 100%; min-width: 0; }
 .siteRow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; border-top: 1px solid var(--lume-rule); padding-block: 20px; align-items: center; }
 .siteIdentity { min-width: 0; overflow-wrap: anywhere; }
-.page .siteIdentity h3 { margin: 0; font: var(--type-strong); }
+.page .siteIdentity h3 { margin: 0; font: var(--type-section-heading); }
 .siteIdentity p { margin-top: 4px; color: var(--lume-ink-muted); font: var(--type-meta); }
 .siteActions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
-.textAction { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; border: 0; background: transparent; color: var(--lume-ink); font: var(--type-strong); cursor: pointer; }
-.menuTrigger { display: inline-flex; justify-content: center; align-items: center; min-height: 44px; min-width: 44px; border: 0; background: transparent; color: var(--lume-ink); font: var(--type-strong); cursor: pointer; }
+.textAction { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; border: 0; background: transparent; color: var(--lume-ink); font: var(--type-section-heading); cursor: pointer; }
+.menuTrigger { display: inline-flex; justify-content: center; align-items: center; min-height: 44px; min-width: 44px; border: 0; background: transparent; color: var(--lume-ink); font: var(--type-section-heading); cursor: pointer; }
 .textAction:focus-visible, .menuTrigger:focus-visible { outline: 2px solid var(--lume-accent); outline-offset: 3px; }
 .textAction:disabled, .menuTrigger:disabled { opacity: 0.5; cursor: default; }
 .seederForm { display: grid; gap: 20px; min-width: 0; padding-top: 16px; }

@@ -79,13 +79,17 @@ export function assertImageSize(width: number, height: number): void {
     if (width > PREVIEW_LIMITS.imageDimension || height > PREVIEW_LIMITS.imageDimension
         || width * height > PREVIEW_LIMITS.imagePixels) throw new PreviewError('image_limit');
 }
-export function previewCanvasSize(width: number, height: number, pdf = false) {
+export type PdfCanvasMode = 'pdf' | 'zoomable-pdf';
+
+export function previewCanvasSize(width: number, height: number, mode: 'image' | PdfCanvasMode = 'image') {
+    const pdf = mode !== 'image';
     if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0
         || (pdf && (width > PREVIEW_LIMITS.pdfPoints || height > PREVIEW_LIMITS.pdfPoints))) {
         throw new PreviewError(pdf ? 'page_dimensions' : 'image_limit');
     }
     // Never round up beyond the budget; tiny positive viewports still get one pixel.
-    const scale = Math.min(pdf ? 1.5 : 1, PREVIEW_LIMITS.canvasDimension / width,
+    const preferredScale = { image: 1, pdf: 1.5, 'zoomable-pdf': 3 }[mode];
+    const scale = Math.min(preferredScale, PREVIEW_LIMITS.canvasDimension / width,
         PREVIEW_LIMITS.canvasDimension / height, Math.sqrt(PREVIEW_LIMITS.canvasPixels / width / height));
     const w = Math.max(1, Math.floor(width * scale));
     const h = Math.max(1, Math.floor(height * scale));

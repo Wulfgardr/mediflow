@@ -13,7 +13,7 @@
 .readingPane { max-width: 1160px; margin: 0 auto; }
 .readingPane > div { display: flex; flex-direction: column; gap: 28px; }
 .readingPane :global([data-folder-pane][data-folder-active='false']) { display: none; }
-.patientBody:not([data-folder-section='quadro']) :global(#quadro),
+.patientBody:not([data-folder-section='quadro']):not([data-folder-section='diario']) :global(#quadro),
 .patientBody:not([data-folder-section='quadro']):not([data-folder-section='attenzione']) :global(#attenzione) { display: none; }
 .patientBody[data-folder-section='quadro'] :global(#attenzione[data-has-attention='false']) { display: none; }
 .patientBody :global(#attenzione) { order: 2; padding: 18px 0; border-radius: 0; border: 0; border-top: 1px solid color-mix(in srgb, var(--lume-ink) 13%, transparent); background: transparent; }
@@ -24,7 +24,7 @@
 :global(html[data-twin-composition='stream']) .patientBody { max-width: 1020px; margin: auto; }
 :global(html[data-twin-composition='stream']) .patientHeader { max-width: 1020px; margin: auto; }
 
-@media (max-width: 750px) { .patientHeader { padding: 22px var(--ink-plane-inset) 18px; flex-direction: column; align-items: stretch; gap: 16px; } .actions { justify-content: flex-start; } .patientBody { padding: 24px var(--ink-plane-inset) 40px; } .actions > :is(a,button) { min-height: 44px; } }
+@media (max-width: 750px) { .patientHeader { padding: 14px var(--ink-plane-inset); flex-direction: column; align-items: stretch; gap: 12px; } .actions { justify-content: flex-start; } .patientBody { padding: 24px var(--ink-plane-inset) 40px; } .actions > :is(a,button) { min-height: 44px; } }
 
 .patientShell {
   --k8-surface: var(--lume-surface-field);
@@ -69,31 +69,20 @@
 }
 .patientCanvas { min-height: 100%; container-name: patient-canvas; }
 
-/* The overview places the existing diary beside the clinical context. */
-.patientBody[data-folder-section='quadro'] .readingPane > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px; align-items: start; }
-.patientBody[data-folder-section='quadro'] :global(#diario) { display: block; }
-.patientBody[data-folder-section='quadro'] :global(#attenzione) { grid-column: 1 / -1; }
+.patientBody[data-folder-section='diario'] :global(#quadro[data-overview]:not([data-writing])) { display: block; }
+.patientBody[data-folder-section='diario'] :global(#quadro[data-overview]:not([data-writing]) > :not(:has(> #diario))) { display: none; }
+.patientBody[data-folder-section='diario'] :global(#quadro[data-overview]:not([data-writing]) > :has(> #diario) > :not(#diario)) { display: none; }
 .patientBody :global([data-folder-pane] > div) { padding-inline: 0; }
-@media (max-width: 1000px) {
- .patientBody[data-folder-section='quadro'] .readingPane > div { display: flex; gap: 28px; }
-}
 @media (max-width: 700px) {
- .patientHeader { padding: 20px var(--ink-plane-inset); }
+ .patientHeader { padding: 14px var(--ink-plane-inset); }
  .identity h1 { font: var(--type-person-compact); }
- .patientBody { padding: 20px var(--ink-plane-inset) 32px; }
+ .patientBody { padding: 16px var(--ink-plane-inset) 32px; }
 }
 
 .patientCanvas[data-writing='true'] .patientHeader { position: sticky; top: 0; z-index: 20; background: var(--lume-surface-focal); border-bottom: 1px solid var(--lume-rule); }
 .patientCanvas[data-writing='true'] > nav { display: none; }
-.patientCanvas[data-writing='true'] .patientBody { padding-bottom: 160px; }
-.patientCanvas[data-writing='true'] .readingPane > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px; align-items: start; }
-.patientCanvas[data-writing='true'] .patientBody :global(#quadro),
 .patientCanvas[data-writing='true'] .patientBody :global(#diario) { display: block; }
 .patientCanvas[data-writing='true'] .patientBody :global(#attenzione) { display: none; }
-@media (max-width: 1000px) {
- .patientCanvas[data-writing='true'] .readingPane > div { display: flex; flex-direction: column; align-items: stretch; gap: 28px; }
- .patientCanvas[data-writing='true'] :global(#diario) { order: -1; }
-}
 @media (max-width: 700px) {
  .patientCanvas[data-writing='true'] .patientHeader { flex-direction: row; align-items: flex-start; gap: 12px; padding-block: 12px; }
  .patientCanvas[data-writing='true'] .actions { max-width: 120px; justify-content: flex-end; }
@@ -104,4 +93,13 @@
 @media (max-width: 700px) {
  .patientCanvas[data-writing='true'] .actions > a { min-width: 44px; }
  .patientCanvas[data-writing='true'] .actions > a > span { display: none; }
+}
+
+@media (min-width: 1280px) {
+ :global(html[data-twin-composition='stream']) .patientCanvas .patientBody[data-folder-section='quadro'] { max-width: 1180px; }
+}
+
+@media (min-width: 1000px) {
+ .patientCanvas[data-folder-section='quadro'] .patientHeader { padding-block: 14px; }
+ .patientBody[data-folder-section='quadro'] { padding-block-start: 18px; }
 }

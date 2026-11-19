@@ -1,5 +1,5 @@
 /* testable lifecycle, without importing a runtime engine into unit tests. */
-import { assertSourceSize, clearPreviewCanvas, PREVIEW_LIMITS, PreviewError, previewCanvasSize } from './document-viewer-policy.ts';
+import { assertSourceSize, clearPreviewCanvas, PREVIEW_LIMITS, PreviewError, previewCanvasSize, type PdfCanvasMode } from './document-viewer-policy.ts';
 import { PreviewScope } from './document-viewer-scope.ts';
 import { checkPdfOperators, type PreviewImageOps, type PreviewOperatorList } from './document-viewer-pdf-resources.ts';
 
@@ -31,7 +31,7 @@ export type PreviewPdfEngineFactory = (bytes: Uint8Array, fail: (error: PreviewE
 export async function paintPdfPage(
     bytes: Uint8Array, number: number, canvas: HTMLCanvasElement, signal: AbortSignal,
     createEngine: PreviewPdfEngineFactory,
-    timeoutMs: number = PREVIEW_LIMITS.pageTimeoutMs,
+    { timeoutMs = PREVIEW_LIMITS.pageTimeoutMs, mode = 'pdf' }: { timeoutMs?: number; mode?: PdfCanvasMode } = {},
 ): Promise<{ pages: number; page: number; width: number; height: number }> {
     const scope = new PreviewScope(signal, timeoutMs);
     let engine: PreviewPdfEngine | undefined;
@@ -72,7 +72,7 @@ export async function paintPdfPage(
         page = await scope.wait(document.page(number), (late) => late.cleanup());
         scope.check();
         const measured = page.measure();
-        const size = previewCanvasSize(measured.width, measured.height, true);
+        const size = previewCanvasSize(measured.width, measured.height, mode);
         const operators = await scope.wait(page.operators());
         scope.check();
         // Post-materialization admission, NOT a hard cap on parser allocations.

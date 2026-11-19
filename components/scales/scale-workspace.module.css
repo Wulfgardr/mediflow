@@ -1,4 +1,3 @@
-/* WUL-678: scale-only presentation, shared 44px targets and 12px controls. */
 .workspace {
     --scale-control-radius: var(--lume-radius-control);
     font: 0.875rem/1.5 var(--lume-font-sans);
@@ -42,13 +41,13 @@
 .choice input { width: 1.125rem; height: 1.125rem; margin: 0; accent-color: var(--lume-ink-fresh); }
 .choice > span { min-width: 0; }
 .choice:has(input:disabled) { opacity: .5; cursor: not-allowed; }
-.choice:has(input:focus-visible) { outline: 2px solid var(--lume-ink-fresh); outline-offset: 3px; }
+.choice:has(input:focus-visible) { outline: 2px solid var(--lume-ink-fresh); outline-offset: -2px; }
 .choice[data-selected='true'], .catalogLink[aria-pressed='true'] {
     border-color: var(--lume-ink-fresh);
     background: var(--lume-surface-selected);
 }
 .choice > span[aria-hidden] { flex-shrink: 0; color: var(--lume-ink-fresh); }
-.control:hover:not(:disabled), .choice:hover:not(:has(input:disabled)), .catalogLink:hover { background: var(--lume-surface-field); }
+.control:hover:not(:disabled), .choice:hover:not([data-selected='true'], :has(input:disabled)), .catalogLink:hover { background: var(--lume-surface-field); }
 .control:focus-visible, .choice:focus-visible, .catalogLink:focus-visible, .question:focus-visible, .details summary:focus-visible, .context select:focus-visible, .input:focus-visible {
     outline: 2px solid var(--lume-ink-fresh); outline-offset: 3px;
 }
@@ -58,7 +57,7 @@
 .actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding-top: 24px; border-top: 1px solid color-mix(in srgb, var(--lume-ink) 16%, transparent); }
 .navigation { display: flex; flex-wrap: wrap; gap: 12px; }
 .context { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 16px; }
-.context select, .input { box-sizing: border-box; min-width: 0; min-height: 44px; max-width: 100%; padding: 10px 12px; border: 1px solid var(--lume-rule-strong); border-radius: var(--scale-control-radius, 12px); background: var(--lume-surface-field); color: var(--lume-ink); font: inherit; }
+.context select, .input { box-sizing: border-box; min-width: 0; min-height: 44px; max-width: 100%; padding: 10px 12px; border: 1px solid var(--lume-ink-muted); border-radius: var(--scale-control-radius, 12px); background: var(--lume-surface-field); color: var(--lume-ink); font: inherit; }
 .details { margin-bottom: 24px; color: var(--lume-ink-muted); line-height: 1.6; }
 .details summary { display: list-item; width: fit-content; min-height: 44px; padding-block: 10px; cursor: pointer; color: var(--lume-ink); }
 .details p { margin: 8px 0; }
@@ -86,8 +85,8 @@
 .formColumns { display: grid; grid-template-columns: minmax(0,1.2fr) minmax(0,.8fr); gap: 40px; align-items: start; }
 .formColumns > div { min-width: 0; }
 .formColumns .progress { padding-bottom: 16px; border-bottom: 1px solid var(--lume-rule); margin-bottom: 20px; font-size: 0.8125rem; }
-.answers { gap: 0; }
-.choice { border: 0; border-bottom: 1px solid var(--lume-rule); border-radius: 0; padding: 14px 0; min-height: 44px; }
+.answers { gap: 4px; }
+.choice { border: 1px solid transparent; padding: 14px 11px 13px; }
 .draftSummary { min-width: 0; padding-left: 24px; border-left: 1px solid var(--lume-rule); font-size: 0.8125rem; }
 .draftSummary h3 { margin: 0; font: 600 0.875rem/1.5 var(--lume-font-sans); }
 .draftSummary > p { margin: 12px 0; }

@@ -19,6 +19,7 @@ export const TYPE_ROLES = Object.freeze({
   strong: '600 0.875rem/1.5 var(--lume-font-sans)',
   threshold: '600 0.9375rem/1.5 var(--lume-font-sans)',
   meta: '400 0.8125rem/1.5 var(--lume-font-sans)',
+  'section-heading': '600 0.9375rem/1.5 var(--lume-font-sans)',
   section: '600 0.75rem/1.5 var(--lume-font-sans)',
   code: '400 0.75rem/1.5 var(--font-registro), monospace',
 });

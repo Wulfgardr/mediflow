@@ -202,6 +202,7 @@ function IncaricoArea({
   ] : [];
 
   const patientListParentRef = useRef<HTMLDivElement>(null);
+  const pendingRowPatientId = useRef<string | null>(null);
   const rowFocusRequest = useRef(0);
   const rowFocusFrame = useRef<number | null>(null);
   useEffect(() => () => {
@@ -228,25 +229,32 @@ function IncaricoArea({
     // virtualisation may defer focus. A later key command, focus outside
     // the list or unmount owns the destination before this frame can run.
     const request = ++rowFocusRequest.current;
-    const origin = document.activeElement;
+    const list = patientListParentRef.current;
+    if (!list) return;
     if (rowFocusFrame.current !== null) window.cancelAnimationFrame(rowFocusFrame.current);
+    pendingRowPatientId.current = patient.id;
+    list.focus({ preventScroll: true });
     onSelectPatient(patient.id);
     patientRowVirtualizer.scrollToIndex(index, { align: 'auto' });
 
     const focusRenderedRow = (attempts: number) => {
       rowFocusFrame.current = null;
-      const active = document.activeElement;
-      if (rowFocusRequest.current !== request || (active !== origin && active !== document.body)) return;
-      const row = patientListParentRef.current?.querySelector<HTMLButtonElement>(
-        `[data-patient-index="${index}"]`,
+      if (rowFocusRequest.current !== request) return;
+      if (document.activeElement !== list) {
+        pendingRowPatientId.current = null;
+        return;
+      }
+      const row = list.querySelector<HTMLButtonElement>(
+        `[data-patient-id="${CSS.escape(patient.id)}"]`,
       );
       if (row) {
+        pendingRowPatientId.current = null;
         row.focus();
         return;
       }
       if (attempts > 0) rowFocusFrame.current = window.requestAnimationFrame(() => focusRenderedRow(attempts - 1));
     };
-    rowFocusFrame.current = window.requestAnimationFrame(() => focusRenderedRow(2));
+    focusRenderedRow(3);
   }, [onSelectPatient, patientRowVirtualizer, visible]);
 
   // The unlocked workspace owns this view context; locking clears it with the frame.
@@ -264,7 +272,8 @@ function IncaricoArea({
       : null;
     const parsed = focusedRow ? Number(focusedRow.dataset.patientIndex) : Number.NaN;
     if (Number.isInteger(parsed)) return parsed;
-    const selectedIndex = visible.findIndex((patient) => patient.id === selectedPatientId);
+    const pending = target === patientListParentRef.current ? pendingRowPatientId.current : null;
+    const selectedIndex = visible.findIndex((patient) => patient.id === (pending ?? selectedPatientId));
     return selectedIndex >= 0 ? selectedIndex : 0;
   }, [selectedPatientId, visible]);
 
@@ -289,7 +298,8 @@ function IncaricoArea({
       return;
     }
     if (event.key !== 'Enter') return;
-    const patient = visible[currentRowIndex(event.target)];
+    const row = event.target instanceof HTMLElement ? event.target.closest<HTMLElement>('[data-patient-id]') : null;
+    const patient = visible.find(item => item.id === (row?.dataset.patientId ?? pendingRowPatientId.current));
     if (!patient) return;
     event.preventDefault();
     onSelectPatient(patient.id);
@@ -386,6 +396,7 @@ function IncaricoArea({
                 ref={patientListParentRef}
                 className={patientStyles.patientListViewport}
                 role="listbox"
+                tabIndex={-1}
                 aria-label="Elenco pazienti in carico"
                 data-testid="lume-patient-list"
                 onKeyDown={handleListKeyDown}
@@ -429,6 +440,7 @@ function IncaricoArea({
                           aria-selected={isSelected}
                           tabIndex={isSelected ? 0 : -1}
                           data-patient-index={virtualRow.index}
+                          data-patient-id={p.id}
                           data-testid="lume-patient-row"
                         >
                           <span className={patientStyles.recordIdentity} title={p.name}><strong>{p.name}</strong><span className="sr-only">{diagnosisDescription || 'Diagnosi non registrata'}</span></span>

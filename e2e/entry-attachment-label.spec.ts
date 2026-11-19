@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow } from './utils';
@@ -72,14 +72,42 @@ test('Allegati del Diario: etichetta neutra senza dedurre generazione dalla sint
             if (directory) await page.screenshot({ path: `${directory}/originale-${source.name}.png`, animations: 'disabled' });
             await viewer.getByRole('button', { name: 'Chiudi', exact: true }).click(); await expect(viewer).toHaveCount(0);
         }
-        await page.getByRole('link', { name: 'Nuova voce', exact: true }).click();
-        const context = page.getByRole('form', { name: 'Nuova voce clinica', exact: true }).locator(':scope > details').filter({ has: page.locator('summary').filter({ hasText: 'Consulta cartella' }) });
-        await context.locator(':scope > summary').click();
-        const documents = context.getByRole('region', { name: 'Documenti in cartella', exact: true });
-        for (const source of sources) {
-            const row = documents.locator('details').filter({ has: page.locator('summary').filter({ hasText: source.name }) });
-            await row.locator(':scope > summary').click(); await expect(row).toContainText(source.summary ?? 'Sintesi non disponibile.');
+        const verifySummaries = async (context: Locator, view: string) => {
+            const documents = context.getByRole('region', { name: 'Documenti in cartella', exact: true });
+            for (const source of sources) {
+                const row = documents.locator('details').filter({ has: page.locator('summary').filter({ hasText: source.name }) });
+                const summary = row.getByText(source.summary ?? 'Sintesi non disponibile.', { exact: true });
+                await expect(summary).toBeHidden();
+                await row.locator(':scope > summary').press('Enter');
+                await expect(summary).toBeVisible();
+                await expect(row.getByText(/· Allegato$/u)).toBeVisible();
+                await summary.scrollIntoViewIfNeeded();
+                if (directory) await page.screenshot({ path: `${directory}/${view}-sintesi-${source.name}.png`, animations: 'disabled' });
+                await row.locator(':scope > summary').press('Enter');
+            }
+        };
+        await page.getByRole('link', { name: 'Nuova voce', exact: true }).press('Enter');
+        const form = page.getByRole('form', { name: 'Nuova voce clinica', exact: true });
+        const recent = form.getByRole('region', { name: 'Documenti recenti', exact: true });
+        for (const source of sources) await expect(recent.getByRole('button', { name: `Apri originale: ${source.name}`, exact: true })).toBeVisible();
+        const review = form.getByRole('button', { name: 'Rivedi', exact: true });
+        const originals = recent.getByRole('button', { name: /^Apri originale:/u });
+        const summaries = recent.locator('summary').filter({ hasText: /^Sintesi dei documenti$/u });
+        await review.focus();
+        const reviewBox = await review.boundingBox();
+        const firstOriginalBox = await originals.first().boundingBox();
+        expect(reviewBox!.y + reviewBox!.height).toBeLessThanOrEqual(firstOriginalBox!.y);
+        for (const original of await originals.all()) {
+            await page.keyboard.press('Tab');
+            await expect(original).toBeFocused();
         }
+        await page.keyboard.press('Tab');
+        await expect(summaries).toBeFocused();
+        await page.keyboard.press('Enter');
+        await verifySummaries(recent, 'scheda');
+        await page.goto(`/patients/${fixture.patientId}/entries/new`);
+        await form.locator('summary').filter({ hasText: 'Consulta cartella' }).press('Enter');
+        await verifySummaries(form, 'separato');
         expect(await snapshot()).toEqual(before); expect(writes).toEqual([]); expect(preparations).toEqual([]); expect(external).toEqual([]); expect(errors).toEqual([]);
         if (directory) await writeFile(`${directory}/readback.json`, JSON.stringify({ fixture, attachments: before, unchanged: true, preparations, errors, external }, null, 2));
     } finally { await zoom.close(); }

@@ -27,7 +27,7 @@ async function alignedHeader(pane: Locator) {
     expect(Math.abs(boxes.left)).toBeLessThanOrEqual(1);
     expect(Math.abs(boxes.right)).toBeLessThanOrEqual(1);
     expect(boxes.rule).toBe('1px');
-    await expect(heading).toHaveCSS('font-size', '12px');
+    await expect(heading).toHaveCSS('font-size', '15px');
 }
 
 for (const section of ['diario', 'prestazioni'] as const) for (const populated of [false, true]) {

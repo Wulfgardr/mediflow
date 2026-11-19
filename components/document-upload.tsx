@@ -51,8 +51,8 @@ function rejectionMessages(rejected: FileRejection[]): string[] {
 type OriginalResult = Readonly<{ metadata: Attachment; signal: AbortSignal }> &
     (Readonly<{ file: Attachment }> | Readonly<{ error: string; refreshList?: boolean }>);
 
-function DocumentOriginal({ patientId, attachment, onClose, onRefreshList }: {
-    patientId: string; attachment: Attachment; onClose: () => void; onRefreshList: () => void;
+export function DocumentOriginal({ patientId, attachment, onClose, onRefreshList, inline = true, closeLabel, draftPreview }: {
+    patientId: string; attachment: Attachment; onClose: () => void; onRefreshList: () => void; inline?: boolean; closeLabel?: string; draftPreview?: ReactNode;
 }) {
     const [result, setResult] = useState<OriginalResult | null>(null);
     const [attempt, setAttempt] = useState(0);
@@ -97,15 +97,17 @@ function DocumentOriginal({ patientId, attachment, onClose, onRefreshList }: {
     // A list refresh unmounts this view; it never promotes old bytes to new metadata.
     const current = result?.metadata === attachment && !result.signal.aborted ? result : null;
     if (current && 'file' in current)
-        return <DocumentViewer inline file={current.file.data!} fileName={current.file.name} signal={current.signal} onClose={onClose} />;
-    return <>
+        return <DocumentViewer inline={inline} closeLabel={closeLabel} file={current.file.data!} fileName={current.file.name}
+            signal={current.signal} onClose={onClose} draftPreview={draftPreview} />;
+    const status = <>
         <p role={current ? 'alert' : 'status'} className={styles.empty}>{current?.error ?? 'Caricamento originale…'}</p>
         {current && <button type="button" className={disclosure.documentAction} data-lume-action="quiet"
             onClick={() => { setResult(null); setAttempt(value => value + 1); }}>Riprova originale</button>}
         {current?.refreshList && <button type="button" className={disclosure.documentAction} data-lume-action="quiet"
             onClick={onRefreshList}>Rileggi elenco</button>}
-        <button type="button" className={disclosure.documentAction} data-lume-action="quiet" onClick={onClose}>Chiudi</button>
     </>;
+    if (draftPreview) return <DocumentViewer fileName={attachment.name} onClose={onClose} draftPreview={draftPreview} pending={status} />;
+    return <>{status}<button type="button" className={disclosure.documentAction} data-lume-action="quiet" onClick={onClose}>{closeLabel ?? 'Chiudi'}</button></>;
 }
 
 function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {

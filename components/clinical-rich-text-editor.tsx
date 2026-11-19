@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useImperativeHandle, useRef, useState, type Ref } from 'react';
 import { Bold, Ellipsis, Heading1, Heading2, IndentDecrease, IndentIncrease, Italic, List, ListOrdered, Pilcrow, Strikethrough, Underline } from 'lucide-react';
 
 import { clinicalRichTextToPlainText } from '@/lib/clinical-rich-text';
@@ -49,11 +49,33 @@ const BLOCK_ACTIONS: Array<ToolbarAction & { icon: typeof Heading1 }> = [
     { command: 'insertOrderedList', label: 'Elenco numerato', icon: ListOrdered },
 ];
 
+export type ClinicalEditorFocus = { resume: () => void };
+export type ClinicalSelectionExcerpt = { before: string; selected: string; after: string };
+
+function selectionExcerpt(editor: HTMLElement, range: Range): ClinicalSelectionExcerpt {
+    const before = document.createRange();
+    before.selectNodeContents(editor);
+    before.setEnd(range.startContainer, range.startOffset);
+    const after = document.createRange();
+    after.selectNodeContents(editor);
+    after.setStart(range.endContainer, range.endOffset);
+    const left = Array.from(before.toString());
+    const right = Array.from(after.toString());
+    const selected = Array.from(range.toString());
+    return {
+        before: (left.length > 72 ? '…' : '') + left.slice(-72).join(''),
+        selected: selected.slice(0, 48).join('') + (selected.length > 48 ? '…' : ''),
+        after: right.slice(0, 48).join('') + (right.length > 48 ? '…' : ''),
+    };
+}
+
 interface ClinicalRichTextEditorProps {
+    ref?: Ref<ClinicalEditorFocus>;
     className?: string;
     description?: string;
     label?: string;
     onChange: (value: string) => void;
+    onLeaveSelection?: (excerpt: ClinicalSelectionExcerpt) => void;
     placeholder?: string;
     value: string;
 }
@@ -68,14 +90,38 @@ function updateEditorEmptyState(node: HTMLDivElement | null) {
 }
 
 export function ClinicalRichTextEditor({
+    ref,
     className,
     description = 'Editor su più righe. Usa la barra degli strumenti per formattare il resoconto; Tab sposta il focus al controllo successivo.',
     label = 'Resoconto clinico',
     onChange,
+    onLeaveSelection,
     placeholder = '',
     value,
 }: ClinicalRichTextEditorProps) {
     const editorRef = useRef<HTMLDivElement | null>(null);
+    const selectionRef = useRef<{ anchor: Node; anchorOffset: number; focus: Node; focusOffset: number }>(null);
+    useImperativeHandle(ref, () => ({
+        resume() {
+            const editor = editorRef.current;
+            if (!editor) return;
+            editor.focus();
+            const saved = selectionRef.current;
+            if (saved && editor.contains(saved.anchor) && editor.contains(saved.focus)) {
+                window.getSelection()?.setBaseAndExtent(saved.anchor, saved.anchorOffset, saved.focus, saved.focusOffset);
+            }
+        },
+    }), []);
+    const rememberSelection = () => {
+        const selection = window.getSelection();
+        const editor = editorRef.current;
+        if (selection?.anchorNode && selection.focusNode
+            && editor?.contains(selection.anchorNode) && editor.contains(selection.focusNode)) {
+            selectionRef.current = { anchor: selection.anchorNode, anchorOffset: selection.anchorOffset,
+                focus: selection.focusNode, focusOffset: selection.focusOffset };
+            onLeaveSelection?.(selectionExcerpt(editor, selection.getRangeAt(0)));
+        }
+    };
     const descriptionId = useId();
     const editorId = useId();
     const [isFocused, setIsFocused] = useState(false);
@@ -227,6 +273,7 @@ export function ClinicalRichTextEditor({
                     data-placeholder={placeholder}
                     className="clinical-rich-editor min-h-[320px] min-w-0 max-w-full break-words bg-[color:var(--lume-surface-focal)] outline-none"
                     onBlur={() => {
+                        rememberSelection();
                         setIsFocused(false);
                         syncValue();
                     }}

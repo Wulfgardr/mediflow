@@ -8,6 +8,8 @@ export type EntryLocalDraft = {
     setting: 'ambulatory' | 'home';
     entryDate: string;
     dictatedDraft: string;
+    sheetStep?: 'review';
+    entryAttempt?: string;
 };
 type Scope = { archive: string; user: string; patient: string };
 type Cipher = { sealLocalDraft(value: unknown): Promise<string>; openLocalDraft(value: string): Promise<unknown> };
@@ -23,8 +25,12 @@ export function restoreEntryDraftDate(draft: EntryLocalDraft, defaultDate: strin
     return draft.dateSource === 'user' ? draft.entryDate : defaultDate;
 }
 
+export function entryDraftStorageKey(scope: Scope) {
+    return `mediflow:entry-draft:v1:${JSON.stringify(scope)}`;
+}
+
 export function createEntryLocalDraft(scope: Scope, storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>, cipher: Cipher, locks: LockManager) {
-    const key = `mediflow:entry-draft:v1:${JSON.stringify(scope)}`;
+    const key = entryDraftStorageKey(scope);
     let observed: string | null = null, tail = Promise.resolve(), disposed = false;
     const exclusive = async <T>(work: () => Promise<T>): Promise<T> => await locks.request(key, work) as T;
     const save = (draft: EntryLocalDraft | null, retire = false) => {

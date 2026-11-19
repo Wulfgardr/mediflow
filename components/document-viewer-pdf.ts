@@ -1,6 +1,6 @@
 /* PDF.js adapter. Imported only by the local preview, never by an API. */
 import type { RenderTask } from 'pdfjs-dist';
-import { assertImageSize, PREVIEW_LIMITS, PreviewError } from './document-viewer-policy.ts';
+import { assertImageSize, PREVIEW_LIMITS, PreviewError, type PdfCanvasMode } from './document-viewer-policy.ts';
 import { PreviewScope } from './document-viewer-scope.ts';
 import { OwnedStandardFontDataFactory } from './document-viewer-pdf-fonts.ts';
 import { boundedCanvasFactory, checkPdfOperators } from './document-viewer-pdf-resources.ts';
@@ -66,7 +66,7 @@ export async function preparePdfPreviewInput(bytes: Uint8Array, scope: PreviewSc
     }
 }
 
-export async function renderPdfPreview(bytes: Uint8Array, number: number, canvas: HTMLCanvasElement, signal: AbortSignal) {
+export async function renderPdfPreview(bytes: Uint8Array, number: number, canvas: HTMLCanvasElement, signal: AbortSignal, mode: PdfCanvasMode = 'pdf') {
     const moduleScope = new PreviewScope(signal, PREVIEW_LIMITS.pageTimeoutMs);
     let checkedBytes: Uint8Array | undefined;
     try {
@@ -223,7 +223,7 @@ export async function renderPdfPreview(bytes: Uint8Array, number: number, canvas
         };
         // One total deadline spans import and paint; the inner scope additionally
         // owns cancellation of every PDF API operation and its native worker.
-        return await paintPdfPage(checkedBytes, number, canvas, moduleScope.signal, createEngine);
+        return await paintPdfPage(checkedBytes, number, canvas, moduleScope.signal, createEngine, { mode });
     } finally {
         checkedBytes?.fill(0);
         moduleScope.finish();

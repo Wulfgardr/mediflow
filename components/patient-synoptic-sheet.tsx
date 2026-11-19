@@ -1,10 +1,10 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import type { ReactNode, Ref } from 'react';
 import type { Checkup, Diagnosis, Observation, Therapy } from '@/lib/db';
 import { formatCountLabel } from '@/lib/format-count';
 import { projectQuadroMeasures } from '@/lib/patient-quadro';
-import { projectLastRecordedTherapyChanges, THERAPY_CHANGE_LABELS } from '@/lib/patient-therapy-changes';
+import PrivacyBlur from './privacy-blur';
 import { InkSectionHeading } from '@/components/ui/ink-state';
 import register from './clinical-register.module.css';
 import reading from './twin-synoptic-sheet.module.css';
@@ -20,7 +20,11 @@ export interface PatientSynopticSheetProps {
     notesContent?: ReactNode;
     problems: QuadroRead<Diagnosis>;
     therapies: QuadroRead<Therapy>;
-    therapyRecords?: QuadroRead<Therapy>;
+    diary?: ReactNode;
+    diaryTools?: { full: boolean; control: Ref<HTMLButtonElement>; show: () => void; resume: () => void };
+    composer?: ReactNode;
+    sources?: ReactNode;
+    activity?: ReactNode;
     measures: QuadroRead<Observation>;
     checkups: QuadroRead<Checkup>;
 }
@@ -46,41 +50,33 @@ function DateCell({ date }: { date?: Date }) {
     return <time dateTime={new Date(date).toISOString()}>{new Date(date).toLocaleDateString('it-IT')}</time>;
 }
 
-export function PatientSynopticSheet({ clinicalSupport, notesContent, problems, therapies, therapyRecords, measures, checkups }: PatientSynopticSheetProps) {
+export function PatientSynopticSheet({ clinicalSupport, notesContent, problems, therapies, measures, checkups, diary, diaryTools, composer, sources, activity }: PatientSynopticSheetProps) {
     const measureRows = projectQuadroMeasures(measures.data ?? []);
-    const therapyChanges = projectLastRecordedTherapyChanges(therapyRecords?.data ?? [], 3);
-    return <section id="quadro" aria-label="Riepilogo clinico" className={`${register.register} ${reading.sheet}`}>
-        {clinicalSupport}
+    const stable = <>
         <Section name="Problemi" read={problems} count={formatCountLabel(problems.data?.length ?? 0, 'problema', 'problemi')} empty="Nessun problema registrato.">
             <table className={`${register.table} ${reading.problems}`} aria-label="Problemi">
-                <thead><tr><th scope="col">Codice</th><th scope="col">Descrizione</th><th scope="col" className={register.secondaryColumn}>Da quando</th></tr></thead>
+                <thead><tr><th scope="col">Codice</th><th scope="col">Descrizione</th><th scope="col" className={`${register.secondaryColumn} ${reading.secondaryColumn}`}>Da quando</th></tr></thead>
                 <tbody>{problems.data?.map((problem, index) => <tr key={`${problem.system}-${problem.code}-${index}`}>
-                    <td className="lume-code">{problem.code}</td><td>{problem.description}</td><td className={register.secondaryColumn}><DateCell date={problem.date} /></td>
+                    <td className="lume-code">{problem.code}</td><td><PrivacyBlur>{problem.description}</PrivacyBlur>{diary && problem.date ? <small><DateCell date={problem.date} /></small> : null}</td><td className={`${register.secondaryColumn} ${reading.secondaryColumn}`}><DateCell date={problem.date} /></td>
                 </tr>)}</tbody>
             </table>
         </Section>
-        {therapyRecords ? <Section name="Ultime modifiche di terapia" read={{ ...therapyRecords, data: therapyRecords.data === undefined ? undefined : therapyChanges }} count={formatCountLabel(therapyChanges.length, 'evento registrato', 'eventi registrati')} empty="Nessuna modifica di terapia registrata.">
-            <table className={`${register.table} ${reading.changes}`} aria-label="Ultime modifiche di terapia">
-                <thead><tr><th scope="col">Data</th><th scope="col">Farmaco</th><th scope="col">Evento</th></tr></thead>
-                <tbody>{therapyChanges.map(change => <tr key={change.id}>
-                    <td><DateCell date={change.date} /></td><td>{change.drugName}</td><td>{THERAPY_CHANGE_LABELS[change.kind]}</td>
-                </tr>)}</tbody>
-            </table>
-        </Section> : null}
         <Section name="Terapie attive" read={therapies} count={formatCountLabel(therapies.data?.length ?? 0, 'attiva', 'attive')} empty="Nessuna terapia attiva.">
             <table className={`${register.table} ${reading.therapies}`} aria-label="Terapie attive">
-                <thead><tr><th scope="col">Nome e dose</th><th scope="col">Posologia</th><th scope="col" className={register.secondaryColumn}>ATC</th></tr></thead>
+                <thead><tr><th scope="col">Nome e dose</th><th scope="col">Posologia</th><th scope="col" className={`${register.secondaryColumn} ${reading.secondaryColumn}`}>ATC</th></tr></thead>
                 <tbody>{therapies.data?.map(therapy => <tr key={therapy.id}>
-                    <td>{therapy.drugName}</td><td>{therapy.dosage}</td><td className={`${register.secondaryColumn} lume-code`}>{therapy.atc}</td>
+                    <td><PrivacyBlur>{therapy.drugName}</PrivacyBlur>{diary && therapy.atc ? <small className="lume-code">{therapy.atc}</small> : null}</td><td><PrivacyBlur>{therapy.dosage}</PrivacyBlur></td><td className={`${register.secondaryColumn} ${reading.secondaryColumn} lume-code`}>{therapy.atc}</td>
                 </tr>)}</tbody>
             </table>
         </Section>
+    </>;
+    const context = <>
         <Section name="Parametri recenti" read={{ ...measures, data: measures.data === undefined ? undefined : measureRows }} count={formatCountLabel(measureRows.length, 'parametro', 'parametri')} empty="Nessuna misura registrata.">
             <table className={`${register.table} ${reading.measures}`} aria-label="Parametri recenti">
-                <thead><tr><th scope="col">Nome</th><th scope="col" className={reading.value}>Valore</th><th scope="col">Data</th><th scope="col" className={register.secondaryColumn}>Variazione</th></tr></thead>
+                <thead><tr><th scope="col">Nome</th><th scope="col" className={reading.value}>Valore</th><th scope="col">Data</th><th scope="col" className={`${register.secondaryColumn} ${reading.secondaryColumn}`}>Variazione</th></tr></thead>
                 <tbody>{measureRows.map(measure => <tr key={measure.id}>
-                    <td>{measure.display}</td><td className={`${reading.value} ${measure.outOfRange ? register.critical : ''}`}>{measure.valueLabel}{measure.outOfRange ? ` · ${measure.outOfRange}` : ''}</td>
-                    <td><DateCell date={measure.date} /></td><td className={register.secondaryColumn}>{measure.delta}</td>
+                    <td>{measure.display}</td><td className={`${reading.value} ${measure.outOfRange ? register.critical : ''}`}>{measure.valueLabel}{measure.outOfRange ? ` · ${measure.outOfRange}` : ''}{diary && measure.delta ? <small>{measure.delta}</small> : null}</td>
+                    <td><DateCell date={measure.date} /></td><td className={`${register.secondaryColumn} ${reading.secondaryColumn}`}>{measure.delta}</td>
                 </tr>)}</tbody>
             </table>
         </Section>
@@ -90,6 +86,30 @@ export function PatientSynopticSheet({ clinicalSupport, notesContent, problems, 
                 <tbody>{checkups.data?.map(checkup => <tr key={checkup.id}><td>{checkup.title}</td><td><DateCell date={checkup.date} /></td></tr>)}</tbody>
             </table>
         </Section>
-        {notesContent ? <div className={reading.notes}>{notesContent}</div> : null}
+    </>;
+    const stableWithNotes = <>{stable}{notesContent ? <div className={reading.notes}>{notesContent}</div> : null}</>;
+    return <section id="quadro" aria-label="Riepilogo clinico" className={`${register.register} ${reading.sheet}`} data-overview={diary ? 'true' : undefined} data-writing={composer ? 'true' : undefined} data-full-diary={diaryTools?.full ? 'true' : undefined}>
+        {diary ? <>
+            <div className={reading.middle}>
+                <div className={reading.activity}>{activity}</div>
+                {diaryTools ? <div className={reading.diaryTools} data-reading={diaryTools.full}>
+                    <button ref={diaryTools.control} type="button" aria-controls="diario"
+                        aria-label={diaryTools.full ? 'Torna alla bozza dal diario' : undefined}
+                        onClick={diaryTools.full ? diaryTools.resume : diaryTools.show}>
+                        {diaryTools.full ? 'Torna alla bozza' : 'Tutto il diario'}
+                    </button>
+                </div> : null}
+                {diary}
+                {diaryTools ? null : <a href="#diario" className={`mf-button-text ${reading.fullDiary}`}>Tutto il diario</a>}
+            </div>
+            <div className={reading.side}>
+                <div className={reading.stable}>{stableWithNotes}</div>
+                <aside aria-label="Contesto della cartella" className={reading.context}>
+                    {composer ? <div className={reading.composer}>{composer}</div> : null}
+                    <div className={reading.support}>{clinicalSupport}</div>
+                    <div className={reading.contextRows}>{context}{composer ? null : sources}</div>
+                </aside>
+            </div>
+        </> : <>{stableWithNotes}{context}</>}
     </section>;
 }

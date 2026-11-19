@@ -5,6 +5,7 @@ import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { secureLaunch } from '../../e2e/fixtures/secure-browser.ts';
 
 export async function createHarness() {
     if (Number(process.versions.node.split('.')[0]) !== 24) throw new Error(`UI06 browser suite requires Node 24.x; found ${process.version}. No test was executed.`);
@@ -32,11 +33,11 @@ export async function createHarness() {
     try {
         const boundaryFile = path.join(root, 'tests/ui06/browser-boundaries.tsx');
         const boundaries = new Map([
-            ['next/link', 'FixtureLink as default'], ['next/navigation', 'usePathname'],
+            ['next/link', 'FixtureLink as default'], ['next/navigation', 'usePathname, useParams, useSearchParams, useRouter'],
             ['@/components/kree8/kree8-workspace-shell', 'Kree8WorkspaceShell'],
             ['@/components/settings/settings-search', 'SettingsSearchOverlay, useSettingsSearch'],
             ['@/components/privacy-blur', 'FixturePrivacy as default'],
-            ['@/components/security-provider', 'useSecurity'],
+            ['@/components/security-provider', 'useSecurity'], ['./security-provider', 'useSecurity'],
             ['@/components/function-models/function-model-picker', 'FunctionModelPicker, useFunctionModelPicker'],
             ['@/lib/ai-providers/fabric/document-synthesis-review-browser-controller', 'createDocumentSynthesisReviewBrowserController, DocumentSynthesisReviewBrowserControllerError'],
             ['@/lib/ai-providers/fabric/document-synthesis-browser-orchestrator', 'DocumentSynthesisBrowserOrchestratorError'],
@@ -74,7 +75,7 @@ export async function createHarness() {
         const address = server.address();
         if (!address || typeof address === 'string') throw new Error('UI06 loopback address missing');
         const origin = `http://127.0.0.1:${address.port}`;
-        browser = await chromium.launch({ headless: true });
+        browser = await chromium.launch(secureLaunch({ headless: true }));
         return { origin, browser, expect, close: restore };
     } catch (error) { await restore(); throw error; }
 }

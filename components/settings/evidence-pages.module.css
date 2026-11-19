@@ -5,9 +5,7 @@
 .page.page .section:global([data-disclosure]) > div:first-child :global([data-disclosure-control]) {
     margin: 0;
     color: var(--lume-ink-muted);
-    font: var(--type-section);
-    font-variant-caps: all-small-caps;
-    letter-spacing: 0.05em;
+    font: var(--type-section-heading);
 }
 .page p { margin: 0; }
 .intro p, .section > p, .definition, .updateValues { font-size: 0.875rem; line-height: 1.6; max-width: 64ch; }

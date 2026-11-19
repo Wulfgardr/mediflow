@@ -47,6 +47,9 @@ test('K4: tastiera cross-packet attraversa worklist, comandi e ricerca senza dup
   const lastRow = page.locator('[data-patient-index="119"]');
   await expect(lastRow).toBeFocused();
   await expect(lastRow).toHaveAttribute('aria-selected', 'true');
+  const lastRowName = await lastRow.locator('strong').innerText();
+  const selectedPatient = patients.find(patient => patient.name === lastRowName);
+  if (!selectedPatient) throw new Error('La riga attiva non corrisponde a una fixture K4 sintetica.');
 
   await page.keyboard.press('PageUp');
   await expect.poll(() => page.evaluate(() => Number(document.activeElement?.getAttribute('data-patient-index'))))
@@ -57,11 +60,11 @@ test('K4: tastiera cross-packet attraversa worklist, comandi e ricerca senza dup
   await page.keyboard.press('ArrowUp');
   await expect.poll(() => page.evaluate(() => Number(document.activeElement?.getAttribute('data-patient-index'))))
     .toBe(pageUpIndex - 1);
-  await page.keyboard.press('End');
-  const lastRowText = await lastRow.textContent();
-  const selectedPatient = patients.find((patient) => lastRowText?.includes(patient.name));
-  if (!selectedPatient) throw new Error('La riga attiva non corrisponde a una fixture K4 sintetica.');
-  await page.keyboard.press('Enter');
+  await page.evaluate(() => {
+    for (const key of ['End', 'Enter']) {
+      document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+    }
+  });
   await expect(page).toHaveURL(new RegExp(`/patients/${selectedPatient.id}/modules$`));
   await expect(page.getByTestId('lume-scheda-header')).toHaveCount(1);
   await expect(page.getByRole('heading', { name: selectedPatient.name, level: 1 })).toHaveCount(1);
