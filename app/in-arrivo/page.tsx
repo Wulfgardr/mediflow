@@ -4,6 +4,7 @@ import { useState, useSyncExternalStore } from 'react';
 import { useSecurity } from '@/components/security-provider';
 import { agentIncomingSnapshot, agentIncomingServerSnapshot, subscribeAgentIncoming, refreshAgentIncoming, applyReviewedAgentVisits, readIncomingAgentPdf } from '@/lib/agent-incoming';
 import { automaticAgentKind } from '@/lib/agent-visit-application-contract';
+import { agentVisitAwaitsReview } from '@/lib/agent-visit-review';
 import { SETTINGS_PRIMARY_BUTTON_CLASS, SETTINGS_SECONDARY_BUTTON_CLASS } from '@/components/settings/settings-ui';
 import DocumentViewer from '@/components/document-viewer';
 import { agentReviewFieldLabels as fieldLabels, agentReviewFieldValues as fieldValues, agentReviewItemLabels } from '@/lib/agent-visit-review-labels';
@@ -21,9 +22,7 @@ function UnlockedIncoming() {
             if (!(error instanceof DOMException && error.name === 'AbortError')) setPdfError(error instanceof Error ? error.message : 'PDF non disponibile.');
         } finally { setOpeningPdf(false); }
     };
-    const applicable = visits.filter(review => review.visit.cassette.status === 'closed' && !review.blockers.length && !review.proposalBlockers.length
-        && review.visit.items.filter(item => automaticAgentKind(item.kind)).every(item => review.appliedItemIds.includes(item.id))
-        && review.visit.items.some(item => !automaticAgentKind(item.kind) && !review.appliedItemIds.includes(item.id)));
+    const applicable = visits.filter(agentVisitAwaitsReview);
     return <main className="mx-auto max-w-4xl space-y-6 p-6">
         <h1 className="type-page-title">In arrivo</h1>
         <div className="flex flex-wrap gap-3">
