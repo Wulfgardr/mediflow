@@ -33,7 +33,7 @@ function OwnedDocumentPreviewCanvas({ source, signal, fitWidth }: CanvasProps) {
     const [page, setPage] = useState(1);
     const [zoom, setZoom] = useState(100);
     const [attempt, setAttempt] = useState(0);
-    const job = useMemo(() => ({ source, page, attempt }), [source, page, attempt]);
+    const job = useMemo(() => ({ source, page, attempt, fitWidth }), [source, page, attempt, fitWidth]);
     const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
     const [pageCount, setPageCount] = useState<{ source: CanvasPreview; count: number } | null>(null);
     const current = snapshot?.job === job ? snapshot : null;
@@ -53,7 +53,7 @@ function OwnedDocumentPreviewCanvas({ source, signal, fitWidth }: CanvasProps) {
         active.current = controller;
         clearPreviewCanvas(target);
         const work = source.kind === 'pdf'
-            ? renderPdfPreview(source.bytes, page, target, controller.signal)
+            ? renderPdfPreview(source.bytes, page, target, controller.signal, job.fitWidth ? 'zoomable-pdf' : 'pdf')
             : renderRasterPreview(source, target, controller.signal).then(() => ({ pages: 1 }));
         void work.then((result) => {
             if (controller.signal.aborted) return;
