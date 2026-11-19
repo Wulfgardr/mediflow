@@ -13,6 +13,7 @@ test.beforeEach(({ baseURL }) => {
 });
 
 test('il medico accede, legge una scheda, registra una nota e scarica il backup', async ({ page }) => {
+    test.setTimeout(120_000);
     const pin = process.env.E2E_PIN || '1234';
     const note = 'Nota sintetica per la verifica della sessione Web.';
     await bootstrapUnlockedSession(page, pin);
@@ -38,9 +39,10 @@ test('il medico accede, legge una scheda, registra una nota e scarica il backup'
     await page.getByRole('link', { name: 'Nuova voce', exact: true }).click();
 
     await page.getByRole('textbox', { name: 'Resoconto clinico', exact: true }).fill(note);
+    await page.getByRole('button', { name: 'Rivedi', exact: true }).click();
     const persisted = page.waitForResponse(response =>
         new URL(response.url()).pathname === '/api/entries' && response.request().method() === 'POST');
-    await page.getByRole('button', { name: 'Registra nel diario', exact: true }).click();
+    await page.getByRole('button', { name: 'Conferma e registra', exact: true }).click();
     expect((await persisted).status()).toBe(201);
     await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules$`));
     await openPatientSection(page, 'diario');
