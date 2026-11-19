@@ -27,9 +27,12 @@ test('due rettifiche e rilettura selettiva nella scheda del paziente', async ({ 
     await page.getByRole('button', { name: 'Rivedi', exact: true }).click();
     await page.getByRole('button', { name: 'Conferma e registra', exact: true }).click();
     await page.getByRole('link', { name: 'Chiudi la voce', exact: true }).click();
-    const note = page.locator('#diario article').filter({ hasText: 'Fine prima versione.' });
-    await expect(note).toHaveCount(1);
-    const row = page.locator('#diario article').first();
+    await expect(page.getByRole('link', { name: 'Chiudi la voce', exact: true })).toBeHidden();
+    await openPatientSection(page, 'diario');
+    const rows = page.locator('#diario article');
+    await expect(rows).toHaveCount(1);
+    const row = rows.first();
+    await expect(row).toContainText('Fine prima versione.');
     const historyToggle = row.getByRole('button', { name: 'Storico delle rettifiche' });
     await historyToggle.click();
     await expect(row.getByText('Lo storico inizia con la prima rettifica registrata dalla versione 0.9.1.')).toBeVisible();
