@@ -6,6 +6,7 @@ import type { Checkup, Diagnosis, Observation, Therapy } from '@/lib/db';
 import { formatCountLabel } from '@/lib/format-count';
 import { projectQuadroMeasures } from '@/lib/patient-quadro';
 import PrivacyBlur from './privacy-blur';
+import { DrugLabel } from './drug-label';
 import { InkSectionHeading } from '@/components/ui/ink-state';
 import register from './clinical-register.module.css';
 import reading from './twin-synoptic-sheet.module.css';
@@ -82,7 +83,7 @@ export function PatientSynopticSheet({ clinicalSupport, notesContent, problems, 
                 <tbody role="rowgroup">{therapies.data?.map(therapy => {
                     const change = therapyChanges?.get(therapy.id);
                     return <tr role="row" key={therapy.id} data-changed={change ? 'true' : undefined}>
-                        <td role="cell"><PrivacyBlur>{therapy.drugName}</PrivacyBlur>{overview && therapy.atc ? <small className="lume-code">{therapy.atc}</small> : null}</td>
+                        <td role="cell">{overview ? <DrugLabel name={therapy.drugName} /> : <PrivacyBlur>{therapy.drugName}</PrivacyBlur>}{overview && therapy.atc ? <small className="lume-code">{therapy.atc}</small> : null}</td>
                         <td role="cell"><PrivacyBlur>{therapy.dosage}</PrivacyBlur></td>
                         <td role="cell" className={`${secondary} lume-code`}>{therapy.atc}</td>
                         {overview && change ? <td role="cell" className={reading.rowStatus}><span className={reading.chipChange}>{change}</span></td> : null}
