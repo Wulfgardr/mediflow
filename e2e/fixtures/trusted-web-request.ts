@@ -1,4 +1,5 @@
-import { expect, type Page, type Route } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
+import { expect, type APIRequestContext, type Page, type Route } from '@playwright/test';
 
 /* APIRequestContext does not synthesize browser Origin or Fetch Metadata, so a
    test that wants a Web mutation admitted passes these headers on that call.
@@ -42,4 +43,18 @@ export function fetchInterceptedRequest(route: Route, options: Parameters<Route[
     headers['sec-fetch-site'] = 'same-origin';
   }
   return route.fetch({ ...options, headers });
+}
+
+export async function reviewedRestoreHeaders(request: APIRequestContext, headers: Record<string, string>, data: string | Buffer) {
+  const response = await request.post('/api/system/backup-restore/verify', {
+    headers: { ...headers, 'Content-Type': 'application/json' }, data,
+  });
+  expect(response.status(), await response.text()).toBe(200);
+  const { expectedSnapshot, sourceChecksum } = await response.json();
+  return {
+    'x-mediflow-restore-id': randomUUID(),
+    'x-mediflow-restore-snapshot': expectedSnapshot,
+    'x-mediflow-restore-source-checksum': sourceChecksum,
+    'x-mediflow-restore-confirmation': 'RIPRISTINA',
+  };
 }

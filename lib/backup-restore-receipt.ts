@@ -4,18 +4,20 @@ import { openDbServer } from './db-server';
 import { readSqliteArchiveGeneration } from './archive-generation';
 
 import { RESTORE_RECEIPT_PREFIX as PREFIX } from './backup-restore-receipt-contract';
-export type RestoreIntent = { id: string; expectedSnapshot: string };
+export type RestoreIntent = { id: string; expectedSnapshot: string; expectedSourceChecksum?: string };
 export type RestoreReceipt = { id: string; sourceChecksum: string; archiveGeneration: string; completedAt: string };
 export function parseRestoreIntent(request: Request): RestoreIntent | null {
     const id = request.headers.get('x-mediflow-restore-id');
     const expectedSnapshot = request.headers.get('x-mediflow-restore-snapshot');
     const confirmation = request.headers.get('x-mediflow-restore-confirmation');
-    if (id === null && expectedSnapshot === null && confirmation === null) return null;
+    const expectedSourceChecksum = request.headers.get('x-mediflow-restore-source-checksum');
+    if (id === null && expectedSnapshot === null && confirmation === null && expectedSourceChecksum === null) return null;
     if (!id || !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u.test(id)
-        || !expectedSnapshot || !/^[a-f0-9]{64}$/u.test(expectedSnapshot) || confirmation !== 'RIPRISTINA') {
+        || !expectedSnapshot || !/^[a-f0-9]{64}$/u.test(expectedSnapshot) || confirmation !== 'RIPRISTINA'
+        || (expectedSourceChecksum !== null && !/^[a-f0-9]{64}$/u.test(expectedSourceChecksum))) {
         throw new Error('INVALID_RESTORE_INTENT');
     }
-    return { id, expectedSnapshot };
+    return { id, expectedSnapshot, ...(expectedSourceChecksum === null ? {} : { expectedSourceChecksum }) };
 }
 function quote(value: string): string { return '"' + value.replaceAll('"', '""') + '"'; }
 export function readRestorePreviewSnapshot(): string {

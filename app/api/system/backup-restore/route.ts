@@ -1,4 +1,4 @@
-import { verifyUnlockCredentials } from '@/lib/security/host-credential-verification';
+import { verifyRestoreCredentials } from '@/lib/security/host-credential-verification';
 import { isCurrentServerSession } from '@/lib/security/current-session-authority';
 import { parseRestoreIntent } from '@/lib/backup-restore-receipt';
 import { isLocalClientSession } from '@/lib/security/loopback-ingress.mjs';
@@ -47,6 +47,7 @@ import {
 } from '@/lib/security/server-auth';
 import { isWebAdminSession } from '@/lib/security/server-auth-policy';
 import {
+    backupArtifactInputChecksum,
     type BackupDataset,
     serializeBackupArtifact,
 } from '@/lib/backup-artifact';
@@ -187,7 +188,9 @@ export async function POST(request: Request) {
     try {
         let intent;
         try { intent = parseRestoreIntent(request); } catch { return apiFailure('invalid_restore_intent', 'Confirmation and snapshot required.', 400); }
-        if (isLocalClientSession(session.id) && !intent) return apiFailure('restore_intent_required', 'Confirmation and snapshot required.', 400);
+        if (!intent || (!intent.expectedSourceChecksum && !isLocalClientSession(session.id))) {
+            return apiFailure('restore_intent_required', 'Verifica il file prima di confermare il ripristino.', 400);
+        }
         const body = await request.json();
         const { artifact, result: preflight } = await runBackupRestorePreflight(body);
         if (!preflight.ok || !artifact) {
@@ -197,6 +200,9 @@ export async function POST(request: Request) {
             );
         }
 
+        if (intent.expectedSourceChecksum && intent.expectedSourceChecksum !== backupArtifactInputChecksum(artifact)) {
+            throw new BackupRestoreBlockedError('source', 'backup differs from preview.');
+        }
         assertArchiveGeneration(dbServer, archiveGeneration);
         let credential: unknown;
         try { credential = JSON.parse(request.headers.get('x-mediflow-restore-credential') ?? 'null'); }
@@ -205,7 +211,7 @@ export async function POST(request: Request) {
             || Object.keys(credential).length !== 1 || !['pin', 'verifier'].includes(Object.keys(credential)[0])) {
             return apiFailure('restore_credential_required', 'Inserisci di nuovo la credenziale amministrativa.', 401);
         }
-        const verified = await verifyUnlockCredentials({ ...credential, username: session.username });
+        const verified = await verifyRestoreCredentials({ ...credential, username: session.username });
         if (verified.kind === 'denied') return NextResponse.json(verified.body, { status: verified.status });
         if (verified.account.id !== session.userId || verified.account.role !== 'admin'
             || !isCurrentServerSession(session)) return forbiddenResponse();
@@ -213,7 +219,7 @@ export async function POST(request: Request) {
         const restored = restoreBackupArtifact(artifact, () => {
             assertArchiveGeneration(dbServer, archiveGeneration);
             return disposeCheckupStatusTransitionForHostV1();
-        }, intent ?? undefined, session.userId);
+        }, intent, session.userId);
 
         return NextResponse.json({
             success: true,
