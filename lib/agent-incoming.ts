@@ -4,7 +4,7 @@ import { clientArchiveGeneration } from './security/client-auth-api';
 import { db } from './db';
 import { notifyDbChange } from './live-query';
 import { openAgentVisit } from './agent-cassette-client';
-import { inspectAgentVisit, prepareAgentApplication, type AgentVisitReview } from './agent-visit-review';
+import { inspectAgentVisit, prepareAgentApplication, reopenReviewedAgentItems, type AgentVisitReview } from './agent-visit-review';
 import { automaticAgentKind } from './agent-visit-application-contract';
 import { agentVisitPresentation, sealVisitConfirmationPresentation } from './agent-visit-confirmation-browser';
 import type { VisitConfirmationTicket } from './agent-visit-confirmation-contract';
@@ -37,13 +37,23 @@ export async function readIncomingAgentPdf(visitId: string, revision: number, it
     return { name: item.value.name, base64: item.value.base64 };
 }
 
+const notApplied = 'La visita non è stata applicata. Rileggi la cassetta.';
+async function reopenForApplication(review: AgentVisitReview, signal: AbortSignal): Promise<AgentVisitReview> {
+    const { id, revision } = review.visit.cassette;
+    const row = await fetchIncoming<IncomingAgentCassette>('?visit=' + encodeURIComponent(id), signal);
+    if (row.id !== id || row.revision !== revision || row.status !== 'closed' || row.archiveGeneration !== clientArchiveGeneration()) throw new Error(notApplied);
+    const items = await reopenReviewedAgentItems(review, row);
+    signal.throwIfAborted();
+    if (!items) throw new Error(notApplied);
+    return { ...review, appliedItemIds: row.appliedItemIds, visit: { ...review.visit, items } };
+}
 async function apply(review: AgentVisitReview, phase: 'automatic' | 'review', signal: AbortSignal) {
     const input = await prepareAgentApplication(review, phase, signal);
     if (!input) return review;
     signal.throwIfAborted();
     const response = await fetch(inbox, { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input), signal });
-    if (!response.ok) throw new Error('La visita non è stata applicata. Rileggi la cassetta.');
+    if (!response.ok) throw new Error(notApplied);
     const receipt: AgentApplicationReceipt = await response.json();
     signal.throwIfAborted();
     if (receipt.status !== 'applied' || receipt.visitId !== input.visitId || receipt.phase !== phase || receipt.itemCount !== input.items.length) throw new Error('Ricevuta non verificabile. Rileggi la cassetta.');
@@ -88,7 +98,7 @@ async function attemptNativeConfirmation(signal: AbortSignal) {
     }
 }
 
-export async function refreshAgentIncoming(signal = db.getSessionReadSignal()): Promise<void> {
+export async function refreshAgentIncoming(signal = db.getSessionReadSignal(), readPdf?: Parameters<typeof inspectAgentVisit>[4]): Promise<void> {
     if (inFlight) return inFlight;
     const task = (async () => {
         publish({ ...snapshot, busy: true, error: null });
@@ -109,7 +119,7 @@ export async function refreshAgentIncoming(signal = db.getSessionReadSignal()): 
                     let review: AgentVisitReview;
                     try {
                         const row = await fetchIncoming<IncomingAgentCassette>('?visit=' + summary.id, signal);
-                        review = await inspectAgentVisit(row, patients, profile.doctorTaxCode ?? null, signal, undefined, codes);
+                        review = await inspectAgentVisit(row, patients, profile.doctorTaxCode ?? null, signal, readPdf, codes);
                     } catch (error) {
                         if (signal.aborted) throw error;
                         unreadable = true;
@@ -170,12 +180,13 @@ export async function applyReviewedAgentVisits(ids: string[]): Promise<void> {
                 if (!review || !patient?.version || review.blockers.length || review.proposalBlockers.length) continue;
                 const known = versions.get(patient.id);
                 const expectedVersion = known?.reviewed === patient.version ? known.committed : patient.version;
-                const current = expectedVersion === patient.version ? review : { ...review, patient: { ...patient, version: expectedVersion } };
                 try {
+                    const reopened = await reopenForApplication(review, signal);
+                    const current = expectedVersion === patient.version ? reopened : { ...reopened, patient: { ...patient, version: expectedVersion } };
                     const applied = await apply(current, 'review', signal);
                     if (applied === current || !applied.patient?.version) continue;
                     versions.set(patient.id, { reviewed: patient.version, committed: applied.patient.version });
-                    publish({ ...snapshot, visits: snapshot.visits.map(value => value === review ? applied : value) });
+                    publish({ ...snapshot, visits: snapshot.visits.map(value => value === review ? { ...applied, visit: review.visit } : value) });
                 } catch (error) {
                     if (!signal.aborted && !snapshot.error) publish({ ...snapshot, error: error instanceof Error ? error.message : 'Visita non applicata.' });
                 }

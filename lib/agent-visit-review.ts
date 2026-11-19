@@ -111,6 +111,19 @@ export async function inspectAgentVisit(row: IncomingAgentCassette, patients: Pa
     }
     return { visit, patient, appliesAutomatically: agentCassetteAppliesAutomatically(row), appliedItemIds: row.appliedItemIds, currentSummary, blockers, proposalBlockers };
 }
+export async function reopenReviewedAgentItems(review: AgentVisitReview, row: IncomingAgentCassette): Promise<AgentVisitReview['visit']['items'] | null> {
+    const visit = await openAgentVisit(row);
+    const deposited = cassetteItems(row);
+    if (visit.items.length !== review.visit.items.length
+        || visit.items.some((item, index) => item.id !== review.visit.items[index]!.id || item.kind !== review.visit.items[index]!.kind)) return null;
+    for (const item of visit.items.filter(item => item.kind === 'pdf')) {
+        const bytes = agentBytes(text(item.value.base64));
+        try {
+            if (hex(await crypto.subtle.digest('SHA-256', bytes)) !== deposited.find(value => value.id === item.id)?.documentHash) return null;
+        } finally { bytes.fill(0); }
+    }
+    return visit.items;
+}
 export function agentVisitAwaitsReview(review: AgentVisitReview): boolean {
     const pending = (phase: 'automatic' | 'review') => review.visit.items.some(item => agentItemInPhase(review.appliesAutomatically, phase, item.kind)
         && !review.appliedItemIds.includes(item.id));
