@@ -1204,43 +1204,29 @@ fn live_diary_revisions_select_long_previous_text_at_narrow_width(cx: &mut gpui:
         setting: None,
         content: content.into(),
     };
-    let created = session
-        .create_entry(&scope, patient, &draft(&original))
-        .unwrap();
+    let id = match pairing["legacyEntryId"].as_str() {
+        Some(id) => id.to_owned(),
+        None => {
+            session
+                .create_entry(&scope, patient, &draft(&original))
+                .unwrap()
+                .id
+        }
+    };
     let second = "Seconda versione sintetica.";
     let third = "Terza versione sintetica.";
-    for text in [second, third] {
-        let current = session.read_entry(&scope, patient, &created.id).unwrap();
-        session
-            .update_entry(&scope, patient, &created.id, current.version, &draft(text))
-            .unwrap();
+    let first = session.read_entry(&scope, patient, &id).unwrap();
+    assert_eq!(first.version, 1);
+    assert_eq!(first.content, original);
+    if pairing["legacyEntryId"].is_string() {
+        assert_eq!(first.recorded_by, None);
     }
-    let current = session.read_entry(&scope, patient, &created.id).unwrap();
-    assert_eq!(current.version, 3);
-    let history = session
-        .read_entry_revisions(&scope, patient, &created.id, current.version, 0)
-        .unwrap();
-    assert_eq!(
-        history
-            .revisions
-            .iter()
-            .map(|row| row.content.as_deref().unwrap())
-            .collect::<Vec<_>>(),
-        [original.as_str(), second]
-    );
-    assert!(
-        history
-            .revisions
-            .iter()
-            .all(|row| row.correction.corrected_by.is_some())
-    );
-    assert!(history.available_since.is_some());
 
     let (view, cx) = cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
     cx.simulate_resize(gpui::size(px(760.), px(610.)));
     view.update(cx, |app, cx| {
-        app.session = Some(session);
-        app.scope = Some(scope);
+        app.session = Some(session.clone());
+        app.scope = Some(scope.clone());
         app.area = Area::Patients;
         app.select_patient(patient, true, cx);
         app.section_selected(PatientSection::Diary, cx);
@@ -1255,8 +1241,6 @@ fn live_diary_revisions_select_long_previous_text_at_narrow_width(cx: &mut gpui:
         }
         panic!("control {selector} was not rendered");
     };
-    let toggle =
-        Box::leak(format!("clinical-workspace-entry-history-{}", created.id).into_boxed_str());
     let click = |cx: &mut gpui::VisualTestContext, selector| {
         for _ in 0..30 {
             let bounds = wait_for(cx, selector);
@@ -1280,10 +1264,93 @@ fn live_diary_revisions_select_long_previous_text_at_narrow_width(cx: &mut gpui:
         }
         panic!("control {selector} was not reachable");
     };
+    let edit: &'static str =
+        Box::leak(format!("clinical-workspace-edit-entry-{id}").into_boxed_str());
+    let toggle = Box::leak(format!("clinical-workspace-entry-history-{id}").into_boxed_str());
+    let content = "clinical-workspace-edit-entry-content";
+    let set_text = |cx: &mut gpui::VisualTestContext, text: &'static str| {
+        click(cx, edit);
+        wait_for(cx, content);
+        view.update(cx, |app, cx| {
+            app.form
+                .as_mut()
+                .unwrap()
+                .fields
+                .iter()
+                .find(|field| field.label == "Contenuto della voce")
+                .unwrap()
+                .editor
+                .update(cx, |input, cx| input.set_content(text, cx));
+        });
+    };
+
+    set_text(cx, "Testo sintetico annullato.");
+    click(cx, "clinical-workspace-review-save");
+    click(cx, "threshold-back");
+    let before = session
+        .read_entry_revisions(&scope, patient, &id, 1, 0)
+        .unwrap();
+    assert!(before.revisions.is_empty());
+
+    for (index, text) in [second, third].into_iter().enumerate() {
+        view.update(cx, |app, cx| {
+            app.form
+                .as_mut()
+                .unwrap()
+                .fields
+                .iter()
+                .find(|field| field.label == "Contenuto della voce")
+                .unwrap()
+                .editor
+                .update(cx, |input, cx| input.set_content(text, cx));
+        });
+        click(cx, "clinical-workspace-review-save");
+        click(cx, "clinical-workspace-confirm-save");
+        for _ in 0..120 {
+            notes_recovery_tests::draw(cx);
+            if view.read_with(cx, |app, _| app.form.is_none()) {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        assert_eq!(
+            session.read_entry(&scope, patient, &id).unwrap().version,
+            index as u64 + 2
+        );
+        if index == 0 {
+            click(cx, edit);
+            wait_for(cx, content);
+        }
+    }
+    let retry = session.update_entry(&scope, patient, &id, first.version, &draft(second));
+    assert_eq!(retry, Err(RuntimeError::ReadRequired));
+    let current = session.read_entry(&scope, patient, &id).unwrap();
+    assert_eq!(current.content, third);
+    let history = session
+        .read_entry_revisions(&scope, patient, &id, current.version, 0)
+        .unwrap();
+    assert_eq!(
+        history
+            .revisions
+            .iter()
+            .map(|row| row.content.as_deref().unwrap())
+            .collect::<Vec<_>>(),
+        [original.as_str(), second]
+    );
+    assert_eq!(
+        history.revisions[0].title.as_deref(),
+        Some("Nota sintetica con rettifiche")
+    );
+    assert!(
+        history
+            .revisions
+            .iter()
+            .all(|row| row.correction.corrected_by.is_some())
+    );
+    assert!(history.available_since.is_some());
     click(cx, toggle);
     for version in 1..=3 {
-        let control =
-            Box::leak(format!("clinical-diary-version-{}-{version}", created.id).into_boxed_str());
+        let control = Box::leak(format!("clinical-diary-version-{id}-{version}").into_boxed_str());
         click(cx, control);
         let text = wait_for(cx, "clinical-diary-history-text");
         assert!(

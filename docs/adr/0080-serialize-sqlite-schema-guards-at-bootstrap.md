@@ -146,7 +146,7 @@ lock persistente o schema non riconosciuto impediscono l'apertura operativa.
 | 14 | 17 novembre 2026 | Abbinamenti e credenziali agenti limitate al mandato, con originale v13 verificato e recuperabile. ADR 0190. |
 | 15 | 17 novembre 2026 | Cassette cifrate degli agenti con chiave avvolta conservata nel backup, originale v14 verificato e recuperabile. ADR 0190. |
 | 16 | 18 novembre 2026 | Registrazioni degli agenti e mandati emessi allo sblocco. Originale v15 verificato e recuperabile. ADR 0190. |
-| 17 | 19 novembre 2026 | `entry_revisions`: storico di titolo e testo del diario con originale v16 verificato e recuperabile. La migrazione crea la tabella vuota. [ADR 0183](0183-autore-delle-voci-di-diario.md). |
+| 17 | 19 novembre 2026 | `entry_revisions`: storico di titolo e testo del diario con originale v16 verificato e recuperabile. La migrazione crea la tabella vuota. La prima rettifica conserva il testo esistente in una busta cifrata, anche quando la nota proviene da un archivio con valori in chiaro. [ADR 0183](0183-autore-delle-voci-di-diario.md). |
 
 Poiché la versione corrente è validata senza DDL, **ogni modifica allo schema
 canonico richiede un numero nuovo**: altrimenti gli archivi già marcati con il

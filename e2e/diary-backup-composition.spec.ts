@@ -47,7 +47,24 @@ test('il backup ripristina insieme rettifiche, osservazione e prestazione dello 
         await page.getByRole('button', { name: 'Rivedi', exact: true }).click();
         await page.getByRole('button', { name: 'Conferma e registra', exact: true }).click();
         await page.getByRole('link', { name: 'Chiudi la voce', exact: true }).click();
+        const entry = db.prepare('SELECT id, content FROM entries WHERE patient_id=?').get(patient) as { id: string; content: string };
+        const legacyTitle = 'Nota sintetica da un archivio precedente';
+        db.prepare('UPDATE entries SET title=?, content=?, recorded_by=NULL WHERE id=?').run(legacyTitle, texts[0], entry.id);
+        await page.reload();
         const row = page.locator('#diario article').first();
+        await expect(row).toContainText(texts[0]);
+        const oldRequest = await page.request.put(`/api/entries/${entry.id}`, {
+            headers: await trustedArchiveWebRequestHeaders(page), data: { version: 1, content: entry.content },
+        });
+        expect(oldRequest.status(), await oldRequest.text()).toBe(409);
+        expect((await oldRequest.json()).code).toBe('ENTRY_LEGACY_REVISION_REQUIRED');
+        await row.getByRole('button', { name: 'Rettifica', exact: true }).click();
+        await row.getByRole('textbox', { name: 'Testo della rettifica' }).fill('Testo sintetico annullato.');
+        await row.getByRole('button', { name: 'Annulla', exact: true }).click();
+        expect(db.prepare('SELECT version, content, recorded_by FROM entries WHERE id=?').get(entry.id))
+            .toEqual({ version: 1, content: texts[0], recorded_by: null });
+        expect(db.prepare('SELECT count(*) FROM entry_revisions WHERE entry_id=?').pluck().get(entry.id)).toBe(0);
+        expect(db.prepare("SELECT count(*) FROM audit_events WHERE subject_ref=? AND event_type='entry.updated'").pluck().get(entry.id)).toBe(0);
         for (const text of texts.slice(1)) {
             await row.getByRole('button', { name: 'Rettifica', exact: true }).click();
             await row.getByRole('textbox', { name: 'Testo della rettifica' }).fill(text);
@@ -59,6 +76,10 @@ test('il backup ripristina insieme rettifiche, osservazione e prestazione dello 
         const body = await source.body();
         const { payload } = JSON.parse(body.toString());
         expect(payload.entryRevisions.map((entry: { version: number }) => entry.version).sort()).toEqual([1, 2]);
+        expect(payload.entryRevisions.find((revision: { version: number }) => revision.version === 1)).toMatchObject({
+            entryId: entry.id, title: expect.stringMatching(/^ENCD1:/), content: expect.stringMatching(/^ENCD1:/),
+        });
+        expect(JSON.stringify(payload.entryRevisions)).not.toContain(texts[0]);
         expect(payload.observations).toContainEqual(expect.objectContaining({ id: observation, patientId: patient, servicePrescriptionItemId: item }));
         expect(payload.servicePrescriptionItems).toContainEqual(expect.objectContaining({ id: item, patientId: patient, prescriptionId: prescription }));
         expect(payload.servicePrescriptions).toContainEqual(expect.objectContaining({ id: prescription, patientId: patient }));
@@ -95,6 +116,7 @@ test('il backup ripristina insieme rettifiche, osservazione e prestazione dello 
         for (const [index, label] of ['Versione 1', 'Versione 2', 'Versione attuale 3'].entries()) {
             await history.getByRole('button', { name: label, exact: true }).click();
             await expect(history).toContainText(texts[index]);
+            if (index === 0) await expect(history).toContainText(legacyTitle);
         }
     } finally { db.close(); }
 });

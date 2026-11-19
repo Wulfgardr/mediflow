@@ -3321,7 +3321,10 @@ paths:
         mutation and mandatory audit share one transaction. For ordinary entries,
         missing or soft-deleted parents return 404; archived-only parents remain eligible. Restoring an
         entry with deletedAt:null does not restore its parent. Audit failure rolls
-        back all entry changes and the version increment.
+        back all entry changes and the version increment. Replacing legacy
+        plaintext in the title or content requires an updated client on attested
+        loopback with version-bound legacyRevisionProtection. Other clients get
+        ENTRY_LEGACY_REVISION_REQUIRED before any change.
         ADR0153 additionally rechecks archive generation, pairing/token, mode,
         capability, original session, current account role and scope inside the
         same IMMEDIATE transaction before mutation, including ordinary entry lifecycle.
@@ -3374,7 +3377,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: Entry compare-on-write conflict or inactive scale patient; no effects.
+          description: Entry version conflict, inactive scale patient or missing local protection for legacy diary text. No effects.
           content:
             application/json:
               schema:
@@ -3387,7 +3390,7 @@ paths:
                         type: string
                       code:
                         type: string
-                        const: SCALE_PATIENT_INACTIVE
+                        enum: [SCALE_PATIENT_INACTIVE, ENTRY_LEGACY_REVISION_REQUIRED]
         '413':
           $ref: '#/components/responses/NetworkJsonBodyTooLarge'
         '500':
@@ -7844,6 +7847,28 @@ components:
         version:
           type: integer
           minimum: 1
+        legacyRevisionProtection:
+          type: object
+          additionalProperties: false
+          description: Required to replace legacy diary plaintext on attested loopback. The single-use key seals the existing SQLite value. The archive key stays with the client.
+          required: [patientId, entryId, version, key, wrapIv, wrappedKey]
+          properties:
+            patientId:
+              type: string
+            entryId:
+              type: string
+            version:
+              type: integer
+              minimum: 1
+            key:
+              type: string
+              format: byte
+            wrapIv:
+              type: string
+              format: byte
+            wrappedKey:
+              type: string
+              format: byte
         type:
           type: string
         title:

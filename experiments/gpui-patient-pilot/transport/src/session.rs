@@ -2542,11 +2542,40 @@ impl RuntimeSession {
             &[("afterVersion", &after)],
             JSON_LIMIT,
         )?;
+        if response.value["patientId"].as_str() != Some(patient)
+            || response.value["entryId"].as_str() != Some(id)
+        {
+            return Err(RuntimeError::InvalidResponse);
+        }
         let rows = response.value["revisions"]
             .as_array_mut()
             .ok_or(RuntimeError::InvalidResponse)?;
-        for row in rows {
-            self.decrypt_fields(row, &[("title", false, false), ("content", false, false)])?;
+        {
+            let secrets = self
+                .inner
+                .secrets
+                .lock()
+                .map_err(|_| RuntimeError::Locked)?;
+            let master = secrets.master.as_ref().ok_or(RuntimeError::Locked)?;
+            for row in rows {
+                let version = row["version"]
+                    .as_u64()
+                    .ok_or(RuntimeError::InvalidResponse)?;
+                for field in ["title", "content"] {
+                    let value = &row[field];
+                    let opened = value.as_str().and_then(|text| {
+                        if text.starts_with(crypto::LEGACY_DIARY_PREFIX) {
+                            crypto::open_legacy_diary_revision(
+                                text, master, patient, id, version, field,
+                            )
+                            .ok()
+                        } else {
+                            crypto::open(text, master).ok()?.as_str().map(str::to_owned)
+                        }
+                    });
+                    row[field] = opened.map(Value::String).unwrap_or(Value::Null);
+                }
+            }
         }
         let page: EntryRevisionPage = decode(response.value)?;
         if page.patient_id != patient
@@ -3755,6 +3784,19 @@ impl RuntimeSession {
             encrypted,
         )?;
         body["version"] = json!(version);
+        if domain == "entries"
+            && body["type"].as_str() != Some("scale")
+            && self.can_access_local_host()
+        {
+            let secrets = self
+                .inner
+                .secrets
+                .lock()
+                .map_err(|_| RuntimeError::Locked)?;
+            let master = secrets.master.as_ref().ok_or(RuntimeError::Locked)?;
+            body["legacyRevisionProtection"] =
+                crypto::prepare_legacy_diary_revision(master, patient, id, version)?;
+        }
         self.forget(scope, patient, domain, id)?;
         self.update(
             scope,

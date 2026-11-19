@@ -65,18 +65,43 @@ test('the client tells a blocked restore from a failed one and verifies through 
 });
 
 test('the Web restore checks prior diary text with the same archive key before sending', async t => {
-    const { db, importRawDatabase } = await import('./db.ts');
+    const { db, verifyRawDatabase } = await import('./db.ts');
     let calls = 0;
-    t.mock.method(globalThis, 'fetch', async () => { calls += 1; return Response.json({ success: true }); });
+    t.mock.method(globalThis, 'fetch', async () => { calls += 1; return Response.json({ success: true, createdAt: '2026-10-10T08:00:00.000Z', collections: ['entryRevisions'], counts: { entryRevisions: 1 } }); });
     const key = await generateMasterKey();
     const current = await seal(key);
     const foreign = await seal(await generateMasterKey());
     const backup = (content: string) => artifact({ entries: [{ content: current }], entryRevisions: [{ content }] });
     db.setKey(key);
     try {
-        await assert.rejects(importRawDatabase(backup(foreign)), BackupRestoreKeyError);
+        await assert.rejects(verifyRawDatabase(backup(foreign)), BackupRestoreKeyError);
         assert.equal(calls, 0);
-        await importRawDatabase(backup(current));
+        await verifyRawDatabase(backup(current));
         assert.equal(calls, 1);
+    } finally { db.setKey(null); }
+});
+
+test('Web restore admits legacy history only with the same key and patient binding', async t => {
+    const { prepareLegacyRevisionProtection } = await import('./diary-revision-envelope.ts');
+    const { sealPreviousDiaryText } = await import('./diary-revision-legacy-write.ts');
+    const { db, verifyRawDatabase } = await import('./db.ts');
+    const key = await generateMasterKey();
+    const binding = { patientId: 'synthetic-patient', entryId: 'synthetic-entry', version: 1 };
+    const revision = sealPreviousDiaryText(binding, { title: 'Titolo sintetico', content: 'Nota legacy sintetica' },
+        await prepareLegacyRevisionProtection(binding, key));
+    const backup = (patientId = binding.patientId) => artifact({
+        entries: [{ id: binding.entryId, patientId }],
+        entryRevisions: [{ ...revision, version: binding.version, entryId: binding.entryId }],
+    });
+    let requests = 0;
+    t.mock.method(globalThis, 'fetch', async () => { requests += 1; return Response.json({ success: true, createdAt: '2026-10-10T08:00:00.000Z', collections: ['entryRevisions'], counts: { entryRevisions: 1 } }); });
+    try {
+        db.setKey(await generateMasterKey());
+        await assert.rejects(verifyRawDatabase(backup()), BackupRestoreKeyError);
+        db.setKey(key);
+        await assert.rejects(verifyRawDatabase(backup('synthetic-other-patient')), BackupRestoreKeyError);
+        assert.equal(requests, 0);
+        await verifyRawDatabase(backup());
+        assert.equal(requests, 1);
     } finally { db.setKey(null); }
 });

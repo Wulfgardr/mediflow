@@ -1,5 +1,9 @@
 import type { EntryRevisionPage } from './entry-revision-view';
 import { PatientIdentifierConflictError, PATIENT_IDENTIFIER_DUPLICATE, type PatientIdentifierType, type BirthDatePrecision } from './patient-identity';
+import {
+    DIARY_REVISION_PREFIX, LEGACY_REVISION_MESSAGE, LEGACY_REVISION_REQUIRED,
+    openLegacyDiaryRevision, prepareLegacyRevisionProtection, type LegacyRevisionProtection,
+} from './diary-revision-envelope';
 import { decodeBase64, encodeBase64, openPatientDocumentFile, sealPatientDocumentFile } from './security/attachment-file-envelope';
 import type { PatientAllergy } from './patient-allergies';
 import backupEncryptedFields from './backup-encrypted-fields.json';
@@ -513,24 +517,36 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
         return this.add(item, options as AddOptions);
     }
 
-    async update(id: string, changes: Partial<T>, options?: { suppressNotify?: boolean; signal?: AbortSignal; attachmentPrecondition?: AttachmentWritePrecondition; sissPrecondition?: SissHandoffWritePrecondition }): Promise<void> {
+    async update(id: string, changes: Partial<T>, options?: {
+        suppressNotify?: boolean; signal?: AbortSignal;
+        attachmentPrecondition?: AttachmentWritePrecondition; sissPrecondition?: SissHandoffWritePrecondition;
+        legacyRevisionProtection?: LegacyRevisionProtection;
+    }): Promise<void> {
         const precondition = this.sissWritePayload(id, options?.sissPrecondition) ?? this.attachmentWritePayload(id, options?.attachmentPrecondition);
         const maybeVersion = (changes as Record<string, unknown> | undefined)?.version;
         if (this.requiresVersionedWrite() && typeof maybeVersion !== 'number') {
             throw new Error(`Missing required version for ${this.versionedEntityLabel()} update`);
         }
 
+        const key = this.getMasterKey();
+        const protection = this.tableName === 'entries' ? options?.legacyRevisionProtection : undefined;
         const encryptedChanges = await this.encryptItem(changes as T, true);
+        options?.signal?.throwIfAborted();
+        if (protection && this.getMasterKey() !== key) throw new Error(LEGACY_REVISION_MESSAGE);
         const res = await fetch(`${this.endpoint}/${id}`, {
             method: 'PUT',
             ...(options?.signal ? { signal: options.signal } : {}),
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...encryptedChanges, ...precondition })
+            ...(protection ? { redirect: 'error' } : {}),
+            body: JSON.stringify({ ...encryptedChanges, ...precondition, ...(protection ? { legacyRevisionProtection: protection } : {}) })
         });
         if (!res.ok) {
             const payload = await res.json().catch(() => null);
             if (res.status === 409 && isApiVersionConflictPayload(payload)) {
                 throw this.buildVersionConflictError(payload);
+            }
+            if (this.tableName === 'entries' && res.status === 409 && payload?.code === LEGACY_REVISION_REQUIRED) {
+                throw new Error(LEGACY_REVISION_MESSAGE);
             }
             if (this.tableName === 'patients' && res.status === 409 && payload?.code === PATIENT_IDENTIFIER_DUPLICATE.code) throw new PatientIdentifierConflictError();
             if (this.tableName === 'therapies' && [400, 401, 403, 404, 409, 413, 422, 423].includes(res.status)) throw new ApiWriteRejectedError(res.status);
@@ -965,6 +981,20 @@ class MedicalApiClient {
         this.patientsToAmbulatories = new ApiTable<PatientAmbulatory>('/api/patients/assign', 'patients_to_ambulatories', getKey, getReadSession);
     }
 
+    async correctDiaryEntry(entry: Pick<ClinicalEntry, 'id' | 'patientId'>, changes: {
+        version: number; title?: string; content?: string;
+    }, signal: AbortSignal): Promise<void> {
+        const master = this.masterKey;
+        if (!master) throw new Error(LEGACY_REVISION_MESSAGE);
+        const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
+        const protection = loopback ? await prepareLegacyRevisionProtection({
+            patientId: entry.patientId, entryId: entry.id, version: changes.version,
+        }, master) : undefined;
+        signal.throwIfAborted();
+        if (this.masterKey !== master) throw new Error(LEGACY_REVISION_MESSAGE);
+        await this.entries.update(entry.id, changes, { signal, legacyRevisionProtection: protection });
+    }
+
     async readEntryRevisions(patientId: string, entryId: string, version: number, afterVersion: number): Promise<EntryRevisionPage> {
         const signal = this.getSessionReadSignal();
         signal.throwIfAborted();
@@ -981,7 +1011,13 @@ class MedicalApiClient {
         }
         for (const row of page.revisions) {
             for (const field of ['title', 'content'] as const) {
-                if (row[field] === null) continue;
+                const value = row[field];
+                if (value === null) continue;
+                if (value.startsWith(DIARY_REVISION_PREFIX)) {
+                    row[field] = await openLegacyDiaryRevision(value, { patientId, entryId, version: row.version }, field, key)
+                        .catch(() => null);
+                    continue;
+                }
                 const [prefix, iv, ciphertext, ...rest] = row[field].split(':');
                 const opened = prefix === 'ENC' && iv && ciphertext && !rest.length
                     ? await decryptData(ciphertext, iv, key) : null;

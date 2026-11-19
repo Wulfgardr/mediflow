@@ -1,4 +1,5 @@
 import { decryptData, encryptData, generateMasterKey } from './security/security';
+import { LEGACY_REVISION_REQUIRED, openLegacyDiaryRevision, prepareLegacyRevisionProtection } from './diary-revision-envelope';
 import { syntheticLoopbackRequest } from './security/loopback-ingress-test-fixture';
 import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
 /* real SQLite candidate oracle for the eight ordinary diary mutations. */
@@ -853,11 +854,54 @@ test('two corrections read back in order and share the identity and time of the 
     assert.equal(readBack(ids.patientId, ids.entryId).revisions.length, 0);
 });
 
-test('a legacy plain-text value is not copied to the history table', async () => {
-    const ids = seed('legacy-history', true);
-    sql.prepare('UPDATE entries SET content=? WHERE id=?').run('SYNTHETIC_PLAINTEXT_DIARY', ids.entryId);
-    assert.equal((await invoke('web', 'PUT', ids, { version: 3, content: 'ENC:Test:Test' })).status, 200);
-    const page = readEntryRevisionPage(ids.patientId, ids.entryId, 0, archiveGeneration);
-    assert.equal(page?.revisions[0].content, null);
-    assert.ok(page?.availableSince);
-});
+for (const surface of ['web', 'network'] as const) {
+    test(`${surface} protects the authoritative legacy title and text before the first correction`, async () => {
+        const ids = seed(`legacy-history-${surface}`, true);
+        const legacy = { title: 'Titolo precedente — prova', content: 'Testo sintetico precedente é.\n\nUltima riga.' };
+        sql.prepare('UPDATE entries SET title=?, content=?, recorded_by=NULL WHERE id=?')
+            .run(legacy.title, legacy.content, ids.entryId);
+        const before = readBack(ids.patientId, ids.entryId);
+        const key = await generateMasterKey();
+        const binding = { ...ids, version: 3 };
+        const protection = await prepareLegacyRevisionProtection(binding, key);
+        const { iv, data: encrypted } = await encryptData('Nuovo testo sintetico', key);
+        const change = { version: 3, content: `ENC:${iv}:${encrypted}` };
+        for (const rejected of [change, { ...change, legacyRevisionProtection: { ...protection, version: 2 } },
+            { ...change, legacyRevisionProtection: { ...protection, patientId: 'un-altro-paziente' } },
+            { ...change, legacyRevisionProtection: { ...protection, entryId: 'altra-nota' } },
+            { ...change, legacyRevisionProtection: { ...protection, wrappedKey: 'non disponibile' } }]) {
+            const admitted = syntheticLoopbackRequest(request('PUT', rejected, surface));
+            const response = await invoke(surface, 'PUT', ids, rejected, undefined, {}, admitted);
+            assert.equal(response.status, 409);
+            assert.equal((await response.json()).code, LEGACY_REVISION_REQUIRED);
+            assert.deepEqual(readBack(ids.patientId, ids.entryId), before);
+        }
+        const update = { ...change, legacyRevisionProtection: protection };
+        assert.equal((await invoke(surface, 'PUT', ids, update)).status, 409);
+        assert.deepEqual(readBack(ids.patientId, ids.entryId), before);
+        const commit = () => invoke(surface, 'PUT', ids, update, undefined, {},
+            syntheticLoopbackRequest(request('PUT', update, surface)));
+        sql.exec("CREATE TRIGGER synthetic_legacy_rollback BEFORE INSERT ON entry_revisions BEGIN SELECT RAISE(IGNORE); END");
+        try {
+            assert.equal((await commit()).status, 500);
+            assert.deepEqual(readBack(ids.patientId, ids.entryId), before);
+        } finally { sql.exec('DROP TRIGGER synthetic_legacy_rollback'); }
+        assert.equal((await commit()).status, 200);
+        const saved = readBack(ids.patientId, ids.entryId);
+        assert.equal((saved.entry as { recorded_by: unknown }).recorded_by, null);
+        assert.equal(saved.audit.length, 1);
+        assert.equal(saved.revisions.length, 1);
+        const revision = readEntryRevisionPage(ids.patientId, ids.entryId, 0, archiveGeneration)?.revisions[0];
+        assert.ok(revision?.title && revision?.content);
+        for (const field of ['title', 'content'] as const) {
+            const sealed = revision[field]!;
+            assert.match(sealed, /^ENCD1:/);
+            assert.ok(!sealed.includes(legacy[field]) && !sealed.includes(protection.key));
+            assert.equal(await openLegacyDiaryRevision(sealed, binding, field, key), legacy[field]);
+            await assert.rejects(openLegacyDiaryRevision(sealed, { ...binding, version: 4 }, field, key));
+            await assert.rejects(openLegacyDiaryRevision(sealed, { ...binding, patientId: 'un-altro-paziente' }, field, key));
+        }
+        assert.equal((await commit()).status, 409);
+        assert.deepEqual(readBack(ids.patientId, ids.entryId), saved);
+    });
+}

@@ -180,7 +180,7 @@ locali salvano ciò che ricevono.
 
 - Cifrate: `title`, `content`
 - In chiaro: `event_id`, `entry_id`, `version`, `corrected_at`, `corrected_by`
-- Leggibile senza chiave: collegamento alla nota e all'audit, versione sostituita, data e nome dell'operatore. Titolo e testo conservano la busta cifrata della nota. Se un campo legacy era in chiaro, lo storico conserva un valore nullo per quel campo.
+- Leggibile senza chiave: collegamento alla nota e all'audit, versione sostituita, data e nome dell'operatore. Titolo e testo sono entrambi cifrati. Un campo già protetto conserva la propria busta. Il valore legacy ancora in chiaro nella nota corrente viene cifrato alla prima rettifica locale con una chiave monouso avvolta dalla chiave dell'archivio (`ENCD1`), vincolata a paziente, nota e versione. Il writer riceve la chiave monouso solo via loopback attestata, la usa in memoria e non la salva. Il client conserva la chiave dell'archivio. I backup e il recupero conservano le buste.
 
 ### `entries`: diario clinico
 

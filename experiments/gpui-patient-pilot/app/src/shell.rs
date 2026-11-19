@@ -3983,6 +3983,7 @@ impl ClinicalApp {
                         .child(crate::components::writing_dot(WritingInk::Dry, WritingSurface::Plane, theme))
                         .child(div().min_w_0().flex_1().debug_selector(|| format!("clinical-workspace-entry-registration-{id}")).child(text!(diary_registration(entry.recorded_by.as_deref(), entry.created_at.as_deref(), &chrono::Local)))))
                     .when(!currently_reading_prior, |el| el.child(button(format!("clinical-workspace-edit-entry-{id}"), "Modifica voce", theme, false, editable)
+                        .debug_selector(|| format!("clinical-workspace-edit-entry-{id}"))
                         .when(editable, |el| el.on_click(cx.listener(move |this, _, _, cx| this.edit_record(editing::Kind::Entry, &edit_id, cx))))))
                     .when(!unavailable && !currently_reading_prior, |el| el.child(div().flex().child(button(format!("clinical-workspace-copy-entry-{id}"), "Copia voce", theme, false, true)
                         .on_click(cx.listener(move |this, _, _, cx| {

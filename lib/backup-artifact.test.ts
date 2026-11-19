@@ -471,7 +471,7 @@ test('portable diary history rejects clear text, mismatched events and cross-ent
         occurredAt: 1783000000, outcome: 'success', actorType: 'user', actorRef: 'synthetic-author',
         subjectType: 'entry', subjectRef: entry.id, sourceSurface: 'web', requestId: null,
         redactedMetadata: JSON.stringify({ resourceVersion: 2 }), createdAt: 1783000000 };
-    const row = { entryId: entry.id, eventId: event.eventId, version: 1, title: null, content: 'ENC:iv:cipher',
+    const row = { entryId: entry.id, eventId: event.eventId, version: 1, title: 'ENC:iv:title', content: 'ENC:iv:cipher',
         correctedAt: new Date(event.occurredAt * 1000).toISOString(), correctedBy: 'Operatore sintetico' };
     const payload = { ...basePayload, entries: [entry], auditEvents: [event] };
     const good = await createBackupArtifact({ ...payload, entryRevisions: [row] });
