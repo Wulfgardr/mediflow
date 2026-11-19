@@ -179,8 +179,14 @@ async function enableHomeBaseMode() {
 }
 
 async function seedCatalogs(webHeaders) {
+    const writeHeaders = {
+        ...localApiHeaders(),
+        ...webHeaders,
+        Origin: new URL(BASE_URL).origin,
+        'Sec-Fetch-Site': 'same-origin',
+    };
     const legacyBody = await request('POST', '/api/v1/drugs', {
-        headers: { ...localApiHeaders(), ...webHeaders },
+        headers: writeHeaders,
         body: [TERMINOLOGY_PARITY.webDrug],
     });
     assert.equal(legacyBody.response.status, 400);
@@ -189,7 +195,7 @@ async function seedCatalogs(webHeaders) {
     const status = await request('GET', '/api/drugs?count=1', { headers: webHeaders });
     assert.equal(status.response.status, 200);
     const drugs = await request('POST', '/api/v1/drugs', {
-        headers: { ...localApiHeaders(), ...webHeaders },
+        headers: writeHeaders,
         body: {
             items: [TERMINOLOGY_PARITY.webDrug],
             expectedSnapshot: status.json?.snapshot,
