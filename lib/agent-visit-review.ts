@@ -4,7 +4,7 @@ import { db, type Patient } from './db';
 import { cassetteItems } from './agent-cassette-contract';
 import { agentBytes } from './agent-cassette-crypto';
 import { openAgentVisit, type OpenedAgentVisit } from './agent-cassette-client';
-import { agentApplicationSchema, automaticAgentKind, type AgentApplicationInput, type AgentCassetteIndexEntry,
+import { agentApplicationSchema, agentCassetteAppliesAutomatically, agentItemInPhase, automaticAgentKind, type AgentApplicationInput, type AgentCassetteIndexEntry,
     type IncomingAgentCassette } from './agent-visit-application-contract';
 import { collectDossierTaxCodes, evaluateDossierGroupIdentity, dossierFactBlockers } from './domain/documents/dossier-import';
 import { verifyPreparedFields, preparedTokens } from './domain/documents/dossier-prepared';
@@ -14,7 +14,7 @@ import { isValidItalianTaxCode } from './patient-identity';
 import { agentVisitPdfText } from './agent-visit-pdf-text';
 
 export type AgentVisitReview = { visit: Omit<OpenedAgentVisit, 'cassette'> & { cassette: AgentCassetteIndexEntry }; patient: Patient | null;
-    appliedItemIds: string[]; currentSummary: Map<string, string>; blockers: string[]; proposalBlockers: string[] };
+    appliesAutomatically: boolean; appliedItemIds: string[]; currentSummary: Map<string, string>; blockers: string[]; proposalBlockers: string[] };
 const proposalLabels: Record<string, string> = { therapy: 'la terapia', service: 'la prestazione', diagnosis: 'la diagnosi', exemption: 'l’esenzione', observation: 'l’osservazione' };
 const hex = (value: ArrayBuffer) => [...new Uint8Array(value)].map(byte => byte.toString(16).padStart(2, '0')).join('');
 const text = (value: unknown) => typeof value === 'string' ? value.trim() : '';
@@ -109,7 +109,25 @@ export async function inspectAgentVisit(row: IncomingAgentCassette, patients: Pa
             currentSummary.set(item.id, before.join('; ') || 'Non presente');
         }
     }
-    return { visit, patient, appliedItemIds: row.appliedItemIds, currentSummary, blockers, proposalBlockers };
+    return { visit, patient, appliesAutomatically: agentCassetteAppliesAutomatically(row), appliedItemIds: row.appliedItemIds, currentSummary, blockers, proposalBlockers };
+}
+export async function reopenReviewedAgentItems(review: AgentVisitReview, row: IncomingAgentCassette): Promise<AgentVisitReview['visit']['items'] | null> {
+    const visit = await openAgentVisit(row);
+    const deposited = cassetteItems(row);
+    if (visit.items.length !== review.visit.items.length
+        || visit.items.some((item, index) => item.id !== review.visit.items[index]!.id || item.kind !== review.visit.items[index]!.kind)) return null;
+    for (const item of visit.items.filter(item => item.kind === 'pdf')) {
+        const bytes = agentBytes(text(item.value.base64));
+        try {
+            if (hex(await crypto.subtle.digest('SHA-256', bytes)) !== deposited.find(value => value.id === item.id)?.documentHash) return null;
+        } finally { bytes.fill(0); }
+    }
+    return visit.items;
+}
+export function agentVisitAwaitsReview(review: AgentVisitReview): boolean {
+    const pending = (phase: 'automatic' | 'review') => review.visit.items.some(item => agentItemInPhase(review.appliesAutomatically, phase, item.kind)
+        && !review.appliedItemIds.includes(item.id));
+    return review.visit.cassette.status === 'closed' && !review.blockers.length && !review.proposalBlockers.length && !pending('automatic') && pending('review');
 }
 
 export async function prepareAgentApplication(review: AgentVisitReview, phase: 'automatic' | 'review', signal: AbortSignal): Promise<AgentApplicationInput | null> {
@@ -117,7 +135,7 @@ export async function prepareAgentApplication(review: AgentVisitReview, phase: '
     const patient = await db.patients.get(review.patient.id, { signal });
     if (!patient || patient.deletedAt || patient.isArchived || patient.taxCode !== review.visit.anchor.fiscalCode || !patient.version) return null;
     if (patient.version !== review.patient.version) throw new Error('La scheda è cambiata. Rileggi le differenze prima di applicare la visita.');
-    const selected = review.visit.items.filter(item => !review.appliedItemIds.includes(item.id) && automaticAgentKind(item.kind) === (phase === 'automatic'));
+    const selected = review.visit.items.filter(item => !review.appliedItemIds.includes(item.id) && agentItemInPhase(review.appliesAutomatically, phase, item.kind));
     if (!selected.length) return null;
     const diagnoses = [...(patient.diagnoses ?? [])], exemptions = [...(patient.exemptions ?? [])];
     for (const item of selected) {

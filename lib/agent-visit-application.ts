@@ -8,7 +8,7 @@ import { createAgentRegistrationStore } from './agent-registration-store';
 import { createAgentMandateStore } from './agent-mandate-store';
 import { AGENT_CASSETTE_COMPLETE, readAgentCassette } from './agent-cassette-store';
 import { AGENT_ITEM_OPERATION, cassetteItems } from './agent-cassette-contract';
-import { agentApplicationSchema, automaticAgentKind, type AgentApplication, type AgentApplicationReceipt } from './agent-visit-application-contract';
+import { agentApplicationSchema, agentCassetteAppliesAutomatically, agentItemInPhase, type AgentApplication, type AgentApplicationReceipt } from './agent-visit-application-contract';
 import { createEntryOperationInTransaction } from './entry-write-operation';
 import { createTherapyOperationInTransaction } from './therapy-write-operation';
 import { createObservationOperationInTransaction } from './observation-write-operation';
@@ -92,8 +92,16 @@ function commitAgentVisit(request: Request, session: ServerSession, value: unkno
             ? (client.revoked_at === null && client.expires_at > Date.now() ? client.operations : undefined)
             : createAgentRegistrationStore(dbServer.$client).operationsForCassette(cassette.agentRef, cassette.mandateRef);
         if (!clientOperations) throw new AgentApplicationDenied(403);
+        const appliesAutomatically = agentCassetteAppliesAutomatically(cassette);
+        if (input.phase === 'automatic' && !appliesAutomatically) throw new AgentApplicationDenied(409);
         const deposited = cassetteItems(cassette);
-        const selected = deposited.filter(item => automaticAgentKind(item.kind) === (input.phase === 'automatic'));
+        const prior = tx.select().from(auditEvents).where(and(eq(auditEvents.eventType, 'agent.visit.applied'),
+            eq(auditEvents.subjectRef, cassette.id), eq(auditEvents.requestId, receiptRequestId), eq(auditEvents.outcome, 'success'), eq(auditEvents.sourceSurface, 'agent'))).all();
+        const replay = prior.find(row => row.actorRef === session.userId && row.mandateRef === cassette.mandateRef && row.proposerRef === cassette.agentRef);
+        const appliedIds = agentAppliedItemIds(cassette.id);
+        const phaseItems = deposited.filter(item => agentItemInPhase(appliesAutomatically, input.phase, item.kind));
+        const selected = replay ? phaseItems.filter(item => input.items.some(prepared => prepared.id === item.id))
+            : phaseItems.filter(item => !appliedIds.includes(item.id));
         if (selected.length !== input.items.length || selected.some(item => !input.items.some(prepared => prepared.id === item.id && prepared.kind === item.kind))) throw new AgentApplicationDenied(409);
         const operations: unknown = JSON.parse(clientOperations);
         for (const item of selected) {
@@ -101,11 +109,7 @@ function commitAgentVisit(request: Request, session: ServerSession, value: unkno
             if (!Array.isArray(operations) || !operations.includes(AGENT_ITEM_OPERATION[item.kind])) throw new AgentApplicationDenied(403);
         }
         const provenance = { proposerRef: cassette.agentRef, mandateRef: cassette.mandateRef, modelProvider: cassette.modelProvider };
-        const prior = tx.select().from(auditEvents).where(and(eq(auditEvents.eventType, 'agent.visit.applied'),
-            eq(auditEvents.subjectRef, cassette.id), eq(auditEvents.requestId, receiptRequestId), eq(auditEvents.outcome, 'success'), eq(auditEvents.sourceSurface, 'agent'))).all();
-        const appliedIds = agentAppliedItemIds(cassette.id);
-        if (input.phase === 'review' && deposited.some(item => automaticAgentKind(item.kind) && !appliedIds.includes(item.id))) throw new AgentApplicationDenied(409);
-        const replay = prior.find(row => row.actorRef === session.userId && row.mandateRef === cassette.mandateRef && row.proposerRef === cassette.agentRef);
+        if (input.phase === 'review' && deposited.some(item => agentItemInPhase(appliesAutomatically, 'automatic', item.kind) && !appliedIds.includes(item.id))) throw new AgentApplicationDenied(409);
         if (replay) {
             if (confirmation) throw new AgentApplicationDenied(409);
             if (!selected.every(item => appliedIds.includes(item.id))) throw new AgentApplicationDenied(409);
@@ -114,7 +118,6 @@ function commitAgentVisit(request: Request, session: ServerSession, value: unkno
             return { visitId: cassette.id, phase: input.phase, status: 'applied', eventId: replay.eventId, itemCount: selected.length,
                 patientVersion: metadata.resourceVersion, modelProvider: cassette.modelProvider, allowsClinicalEgress: Boolean(cassette.allowsClinicalEgress) };
         }
-        if (selected.some(item => appliedIds.includes(item.id))) throw new AgentApplicationDenied(409);
         const patient = tx.select().from(patients).where(and(eq(patients.id, input.patientId), activePatients())).get();
         if (!patient || patient.isArchived) throw new AgentApplicationDenied(404);
         if (patient.version !== input.expectedVersion) throw new AgentApplicationDenied(409);
