@@ -4,9 +4,11 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 
+const TYPESCRIPT_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts']);
 const LINE_COMMENT = new Map([
-    ...['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts', '.rs', '.swift', '.kt', '.java', '.go', '.c', '.cc', '.cpp', '.h', '.m', '.mm', '.scss']
+    ...['.rs', '.swift', '.kt', '.java', '.go', '.c', '.cc', '.cpp', '.h', '.m', '.mm', '.scss']
         .map((ext) => [ext, '//']),
     ['.css', null],
     ...['.py', '.sh', '.zsh', '.bash', '.rb', '.toml', '.yml', '.yaml'].map((ext) => [ext, '#']),
@@ -89,7 +91,7 @@ function sourceReader(repo) {
             const text = revision
                 ? execFileSync('git', ['-C', repo, 'show', `${revision}:${file}`], { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 })
                 : fs.readFileSync(path.join(repo, file), 'utf8');
-            cache.set(key, text.split('\n'));
+            cache.set(key, text);
         }
         return cache.get(key);
     };
@@ -104,14 +106,60 @@ function insideDocBlock(lines, lineNumber) {
     return false;
 }
 
+function typescriptCommentLines(file, source) {
+    const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
+    const scanner = ts.createScanner(ts.ScriptTarget.Latest, false);
+    const lines = new Set();
+    let tokenEnd = 0;
+
+    function scanTrivia(end) {
+        if (tokenEnd >= end) return;
+        scanner.setText(source, tokenEnd, end - tokenEnd);
+        for (let kind = scanner.scan(); kind !== ts.SyntaxKind.EndOfFileToken; kind = scanner.scan()) {
+            if (kind !== ts.SyntaxKind.SingleLineCommentTrivia && kind !== ts.SyntaxKind.MultiLineCommentTrivia) continue;
+            const comment = scanner.getTokenText();
+            if (DOC_BLOCK.test(comment) || comment.startsWith('///') || ALLOWED.test(comment)) continue;
+
+            const firstLine = ast.getLineAndCharacterOfPosition(scanner.getTokenPos()).line;
+            const lastLine = ast.getLineAndCharacterOfPosition(scanner.getTextPos() - 1).line;
+            for (let line = firstLine; line <= lastLine; line += 1) lines.add(line + 1);
+        }
+    }
+
+    function visit(node) {
+        if (ts.isJSDoc(node)) return;
+        const children = node.getChildren(ast);
+        if (children.length > 0) {
+            children.forEach(visit);
+            return;
+        }
+        scanTrivia(node.getStart(ast));
+        tokenEnd = node.end;
+    }
+
+    visit(ast);
+    scanTrivia(source.length);
+    return lines;
+}
+
 export function findNewComments(repo, base) {
     const found = [];
     const readSource = sourceReader(repo);
+    const typescriptLines = new Map();
     for (const { file, lineNumber, text, revision } of addedLines(repo, base)) {
+        const report = () => found.push({ file, lineNumber, text: text.trim().slice(0, 120) });
+        if (TYPESCRIPT_EXTENSIONS.has(path.extname(file))) {
+            const key = `${revision ?? 'worktree'}:${file}`;
+            if (!typescriptLines.has(key)) {
+                typescriptLines.set(key, typescriptCommentLines(file, readSource(revision, file)));
+            }
+            if (typescriptLines.get(key).has(lineNumber)) report();
+            continue;
+        }
         const kind = commentKind(file, text);
         if (kind === null || kind === 'doc') continue;
-        if (kind === 'continuation' && insideDocBlock(readSource(revision, file), lineNumber)) continue;
-        if (!ALLOWED.test(text)) found.push({ file, lineNumber, text: text.trim().slice(0, 120) });
+        if (kind === 'continuation' && insideDocBlock(readSource(revision, file).split('\n'), lineNumber)) continue;
+        if (!ALLOWED.test(text)) report();
     }
     return found;
 }
