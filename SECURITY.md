@@ -77,6 +77,8 @@ Gli scrittori esistenti usano il formato:
 ENC:<iv_b64>:<cipher_b64>
 ```
 
+Per il diario clinico il server fa rispettare questo formato in creazione e modifica, sul writer Web come su `/api/v1` e sulla rete abbinata: rifiuta `title`, `content`, `metadata`, `attachments` e `deletionReason` se non sono buste `ENC:` complete, prima di qualunque scrittura. I valori assenti o nulli restano ammessi e i dati storici in chiaro non vengono riscritti finché non li si modifica. Le altre tabelle non hanno ancora questo controllo sul writer Web.
+
 Il solo `attachments.data` della creazione del paziente da documento usa `ENC2:<wrap_iv_b64>:<wrapped_key_b64>:<iv_b64>:<cipher_b64>`, cifrato dal client con chiave casuale per file avvolta dalla master key e AAD dell’appendice di [ADR 0042](./docs/adr/0042-document-driven-new-patient-review-and-prudent-therapy-persistence.md); nome, percorso e altri campi mantengono `ENC:<iv_b64>:<cipher_b64>`, senza migrare gli allegati preesistenti.
 
 ### Decifratura fallita e conservazione del ciphertext

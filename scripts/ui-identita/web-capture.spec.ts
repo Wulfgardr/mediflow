@@ -1,7 +1,9 @@
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { openPatientSection, unlockIfNeeded, isVisible } from '../../e2e/utils';
-const output = process.env.MF_BANCO_CAPTURES || process.env.MF_BANCO_CAPTURE_DIR || '/Users/leonardopegollo/Antigravity/mf-ui-identita-20261107/web';
+const output = process.env.MF_BANCO_CAPTURES || process.env.MF_BANCO_CAPTURE_DIR || join(homedir(), 'Antigravity', 'mf-ui-identita-20261107', 'web');
 const data = process.env.MEDIFLOW_DATA_DIR || '/Volumes/Vision/mf-ui-identita-20261107-scratch/apfs/banco';
 test('sequenza canonica 01-07', async ({ page }, info) => {
   if (!data.startsWith('/Volumes/Vision/mf-ui-identita-20261107-scratch/') || !fs.existsSync(`${data}/SYNTHETIC_ONLY`)) throw new Error('Solo banco sintetico');

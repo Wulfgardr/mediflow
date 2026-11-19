@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { bootstrapUnlockedSession, openPatientSection, unlockIfNeeded } from './utils';
+import { sealDiaryEntry } from './fixtures/sealed-diary-entry';
 
 async function reopenSession(page: Page) {
   await expect(page.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeVisible();
@@ -249,10 +250,10 @@ test('web smoke: live decision CTAs always open their declared patient context',
   const rows = latest.data;
   const date = new Date(Math.max(Date.now(), ...rows.map(row => Date.parse(row.date)).filter(Number.isFinite)) + 1_000).toISOString();
   const entryTitle = `Follow-up sintetico ${marker}`;
-  const entryResponse = await webRequest<{ id: string; version: number }>(page, '/api/entries', 'POST', {
+  const entryResponse = await webRequest<{ id: string; version: number }>(page, '/api/entries', 'POST', await sealDiaryEntry(page, {
     patientId: quadroPatient.id, type: 'note', title: entryTitle,
     content: 'Voce sintetica per verificare la destinazione della CTA.', date, setting: 'ambulatory',
-  });
+  }));
   expect(entryResponse.status).toBe(201);
   const entry = entryResponse.data;
 

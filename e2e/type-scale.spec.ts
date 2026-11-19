@@ -3,6 +3,7 @@ import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { bootstrapUnlockedSession, openPatientSection } from './utils';
+import { sealDiaryEntry } from './fixtures/sealed-diary-entry';
 
 const PANES = ['quadro', 'attenzione', 'identita', 'clinica', 'amministrazione', 'parametri', 'terapie',
   'prestazioni', 'protesica', 'scale', 'documenti', 'siss', 'timeline', 'diario', 'follow-up'];
@@ -122,7 +123,7 @@ async function screenshot(page: Page, name: string, theme: string) {
 }
 
 async function createFixture(page: Page) {
-  return page.evaluate(async suffix => {
+  const fixture = await page.evaluate(async suffix => {
     async function post(route: string, body: unknown) {
       const response = await fetch(route, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       if (!response.ok) throw new Error(`${route}: HTTP ${response.status}`);
@@ -134,11 +135,16 @@ async function createFixture(page: Page) {
       diagnoses: [{ system: 'ICD-11', code: 'SC00', description: 'Diagnosi sintetica', date: '2026-10-15T08:00:00.000Z' }],
     });
     await post('/api/therapies', { patientId: patient.id, drugName: 'Farmaco sintetico', dosage: '5 mg', status: 'active', startDate: '2026-10-15T08:00:00.000Z' });
-    await post('/api/entries', { patientId: patient.id, type: 'note', title: 'Visita sintetica',
-      content: 'Prosa clinica sintetica con **enfasi** e `SC00`.\n\n## Valutazione\n\nControllo programmato.',
-      date: new Date().toISOString(), setting: 'ambulatory', metadata: { workflowStatus: 'draft' } });
     return { id: patient.id as string, name: `Tipografia${suffix} Ada` };
   }, `${Date.now()}`.slice(-10) + Math.random().toString(36).slice(2, 5));
+  const entry = await sealDiaryEntry(page, { patientId: fixture.id, type: 'note', title: 'Visita sintetica',
+    content: 'Prosa clinica sintetica con **enfasi** e `SC00`.\n\n## Valutazione\n\nControllo programmato.',
+    date: new Date().toISOString(), setting: 'ambulatory', metadata: { workflowStatus: 'draft' } });
+  await page.evaluate(async body => {
+    const response = await fetch('/api/entries', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (!response.ok) throw new Error(`/api/entries: HTTP ${response.status}`);
+  }, entry);
+  return fixture;
 }
 
 async function cleanupFixture(page: Page, id: string) {

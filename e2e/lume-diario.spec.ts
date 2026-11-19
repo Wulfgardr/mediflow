@@ -7,6 +7,7 @@ import {
   REFLOW_PROXY_VIEWPORTS,
   type ReflowProxyViewport,
 } from './utils';
+import { sealDiaryEntry } from './fixtures/sealed-diary-entry';
 
 type DiaryCase = {
   register: 'giorno' | 'grafite';
@@ -86,26 +87,27 @@ async function createEntry(
   patientId: string,
   fixture: { title: string; date: string; status: 'draft' | 'signed'; source: string; author?: string },
 ): Promise<void> {
-  await page.evaluate(async ({ patientId: id, fixture: entry }) => {
+  const body = await sealDiaryEntry(page, {
+    patientId,
+    type: fixture.status === 'draft' ? 'note' : 'visit',
+    title: fixture.title,
+    content: `Contenuto ${fixture.title.toLocaleLowerCase('it-IT')}, esclusivamente sintetico.`,
+    date: fixture.date,
+    setting: 'ambulatory',
+    metadata: {
+      workflowStatus: fixture.status,
+      sourceLabel: fixture.source,
+      authorName: fixture.author,
+    },
+  });
+  await page.evaluate(async (entry) => {
     const response = await fetch('/api/entries', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        patientId: id,
-        type: entry.status === 'draft' ? 'note' : 'visit',
-        title: entry.title,
-        content: `Contenuto ${entry.title.toLocaleLowerCase('it-IT')}, esclusivamente sintetico.`,
-        date: entry.date,
-        setting: 'ambulatory',
-        metadata: {
-          workflowStatus: entry.status,
-          sourceLabel: entry.source,
-          authorName: entry.author,
-        },
-      }),
+      body: JSON.stringify(entry),
     });
     if (!response.ok) throw new Error(`Creazione voce diario fallita: ${response.status}`);
-  }, { patientId, fixture });
+  }, body);
 }
 
 type DiaryBaseline = { signatures: string[]; nextDate: number };

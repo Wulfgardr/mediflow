@@ -160,6 +160,7 @@ const nextConfig: NextConfig = {
       // Keep source tests and historical evidence, not their copies in the Web runtime.
       "./{app,components,hooks,lib,packages,scripts}/**/*.test.*",
       "./{test,tests,screenshots}/**/*",
+      "./lib/fixtures/archive-v090/**/*",
       // Next matches common excludes by substring: e2e/** also removes .next-e2e server chunks.
       "./e2e/**/*.ts", "./e2e/fixtures/**/*", "./e2e/quarantine.json",
     ],

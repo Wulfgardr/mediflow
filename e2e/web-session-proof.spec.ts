@@ -90,7 +90,8 @@ standalone('al primo avvio il medico accede, legge una scheda, registra una nota
         for await (const chunk of stream) chunks.push(Buffer.from(chunk));
         const artifact = JSON.parse(Buffer.concat(chunks).toString('utf8'));
         expect(artifact.payload.patients.some((record: { id: string }) => record.id === patientId)).toBe(true);
-        expect(artifact.payload.entries.some((record: { id: string; type: string }) => record.id === entryId && record.type === 'note')).toBe(true);
+        const exportedNote = artifact.payload.entries.find((record: { id: string }) => record.id === entryId);
+        expect(exportedNote).toMatchObject({ id: entryId, type: 'note', content: expect.stringMatching(/^ENC:/u) });
     } finally { await backup.delete(); }
 
     const peer = await page.context().newPage();
