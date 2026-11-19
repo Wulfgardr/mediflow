@@ -74,7 +74,35 @@ pub(super) fn insight_lines(
         .collect()
 }
 
+pub(super) fn without_citations(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(start) = rest.find('[') {
+        let (before, after) = rest.split_at(start);
+        match after.find(']') {
+            Some(end) if !cited_sources(&after[..=end]).is_empty() || after[1..end].starts_with("DATI-INCOMPLETI") => {
+                out.push_str(before.trim_end());
+                rest = &after[end + 1..];
+            }
+            _ => {
+                out.push_str(&rest[..=start]);
+                rest = &rest[start + 1..];
+            }
+        }
+    }
+    out.push_str(rest);
+    out.trim().to_owned()
+}
+
 impl ClinicalApp {
+    pub(super) fn current_insight(&self) -> Option<(Vec<InsightLine>, &PatientInsightProposal)> {
+        let InsightPhase::Proposal { request, proposal } = &self.patient.insight.phase else {
+            return None;
+        };
+        self.insight_is_current(request, proposal)
+            .then(|| (insight_lines(request, proposal), proposal.as_ref()))
+    }
+
     fn insight_patient(&self) -> Option<&PatientDetail> {
         let detail = self.patient.detail.ready()?;
         (self.selected_id.as_deref() == Some(detail.id.as_str())).then_some(detail)
