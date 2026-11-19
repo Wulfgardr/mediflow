@@ -1,4 +1,5 @@
 /* @Codex */
+import { logServerError } from '@/lib/server-error-log';
 import { NextResponse } from 'next/server';
 import { requireLocalApiToken } from '@/lib/security/local-api-auth';
 /* @Codex */
@@ -14,7 +15,7 @@ export async function POST(request: Request) {
         const result = await validateFseDocumentPayload(body);
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
-        console.error('API POST /api/v1/fse/validate-document error:', error);
+        logServerError('API POST /api/v1/fse/validate-document error', error);
         return NextResponse.json({ error: 'Failed to validate profile document' }, { status: 500 });
     }
 }

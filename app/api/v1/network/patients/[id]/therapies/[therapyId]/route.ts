@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { readNativeNetworkJson, jsonBodyTooLargeResponse } from '@/lib/native-network-json-body';
 import { therapyJsonObject } from '@/lib/therapy-write-input';
 import { NextResponse } from 'next/server';
@@ -27,7 +28,7 @@ export async function GET(
 
         return NextResponse.json(therapy);
     } catch (error) {
-        console.error('API GET /api/v1/network/patients/[id]/therapies/[therapyId] error:', error);
+        logServerError('API GET /api/v1/network/patients/[id]/therapies/[therapyId] error', error);
         return NextResponse.json({ error: 'Failed to fetch therapy' }, { status: 500 });
     }
 }
@@ -57,7 +58,7 @@ export async function PUT(
     } catch (error) {
         const sizeError = jsonBodyTooLargeResponse(error);
         if (sizeError) return sizeError;
-        console.error('API PUT /api/v1/network/patients/[id]/therapies/[therapyId] error:', error);
+        logServerError('API PUT /api/v1/network/patients/[id]/therapies/[therapyId] error', error);
         return NextResponse.json({ error: 'Failed to update therapy' }, { status: 500 });
     }
 }

@@ -6,12 +6,20 @@ macro_rules! text {
 }
 use super::*;
 
+fn record_command(command: Stateful<Div>) -> impl IntoElement {
+    #[cfg(test)]
+    let command = super::rendered_command::observe(command);
+    command
+}
+
 pub(super) const READING_INSET: f32 = 12.;
 const QUIET_CHROME: f32 = 195.;
 const WRITING_CHROME: f32 = 260.;
 
 #[derive(Clone, Default)]
 pub(super) struct RecordState {
+    #[cfg(test)]
+    pub(super) diary_scroll_probe: ScrollHandle,
     pub(super) anchor: Option<Option<VisitAnchor>>,
     pub(super) open: Option<String>,
     pub(super) reading: Option<Source>,
@@ -362,35 +370,39 @@ impl ClinicalApp {
                             .flex_wrap()
                             .justify_end()
                             .gap(px(8.))
-                            .child(match self.form.as_ref().map(|form| form.kind) {
-                                Some(kind) => button(
-                                    "clinical-workspace-close-draft",
-                                    if kind == FormKind::Notes {
-                                        "Chiudi la nota"
-                                    } else {
-                                        "Chiudi la voce"
-                                    },
-                                    theme,
-                                    false,
-                                    true,
-                                )
-                                .on_click(cx.listener(|this, _, _, cx| this.close_clean_notes(cx))),
-                                None => button(
-                                    "clinical-workspace-new-entry",
-                                    "Nuova voce",
-                                    theme,
-                                    true,
-                                    writable && self.can_write(FormKind::Entry),
-                                )
-                                .when(
-                                    writable && self.can_write(FormKind::Entry),
-                                    |el| {
-                                        el.on_click(cx.listener(|this, _, window, cx| {
-                                            this.open_form(FormKind::Entry, window, cx)
-                                        }))
-                                    },
-                                ),
-                            })
+                            .child(record_command(
+                                match self.form.as_ref().map(|form| form.kind) {
+                                    Some(kind) => button(
+                                        "clinical-workspace-close-draft",
+                                        if kind == FormKind::Notes {
+                                            "Chiudi la nota"
+                                        } else {
+                                            "Chiudi la voce"
+                                        },
+                                        theme,
+                                        false,
+                                        true,
+                                    )
+                                    .on_click(
+                                        cx.listener(|this, _, _, cx| this.close_clean_notes(cx)),
+                                    ),
+                                    None => button(
+                                        "clinical-workspace-new-entry",
+                                        "Nuova voce",
+                                        theme,
+                                        true,
+                                        writable && self.can_write(FormKind::Entry),
+                                    )
+                                    .when(
+                                        writable && self.can_write(FormKind::Entry),
+                                        |el| {
+                                            el.on_click(cx.listener(|this, _, window, cx| {
+                                                this.open_form(FormKind::Entry, window, cx)
+                                            }))
+                                        },
+                                    ),
+                                },
+                            ))
                             .when(!layout.compact, |el| {
                                 el.child(
                                     button(
@@ -471,6 +483,15 @@ impl ClinicalApp {
                 .gap(px(24.))
         };
         let zone = |id: &'static str| column(id).max_h(px(zone_height)).overflow_y_scroll();
+        let diary_zone = || {
+            let tray = zone("clinical-record-changed")
+                .accessibility_id("clinical-record-changed")
+                .role(Role::Region)
+                .aria_label("Ultime voci del diario");
+            #[cfg(test)]
+            let tray = tray.track_scroll(&self.patient.record.diary_scroll_probe);
+            tray
+        };
         match zones {
             Zones::Three => div()
                 .min_w_0()
@@ -484,8 +505,8 @@ impl ClinicalApp {
                         .child(zone_label("Stabile", theme))
                         .child(self.record_stable(patient, true, cx)),
                 )
-                .child(
-                    zone("clinical-record-changed")
+                .child(record_command(
+                    diary_zone()
                         .flex_1()
                         .min_w(px(360.))
                         .px(px(20.))
@@ -494,7 +515,7 @@ impl ClinicalApp {
                         .border_color(theme.rule)
                         .child(self.record_band(cx))
                         .child(self.record_diary(cx)),
-                )
+                ))
                 .child(
                     zone("clinical-record-context")
                         .track_scroll(&self.patient.record.composer_column)
@@ -511,13 +532,13 @@ impl ClinicalApp {
                 .min_w_0()
                 .flex()
                 .items_start()
-                .child(
-                    zone("clinical-record-changed")
+                .child(record_command(
+                    diary_zone()
                         .flex_1()
                         .pr(px(20.))
                         .child(self.record_band(cx))
                         .child(self.record_diary(cx)),
-                )
+                ))
                 .child(
                     zone("clinical-record-side")
                         .track_scroll(&self.patient.record.composer_column)
@@ -1668,11 +1689,11 @@ impl ClinicalApp {
                 reading_all || total.is_some_and(|total| total > BAND_ROWS),
                 |el| {
                     el.child(
-                        div().flex().child(
+                        div().flex().child(record_command(
                             button("clinical-record-diary-all", label, theme, false, true)
                                 .debug_selector(|| "clinical-record-diary-all".into())
                                 .on_click(cx.listener(move |this, _, _, cx| action(this, cx))),
-                        ),
+                        )),
                     )
                 },
             )
