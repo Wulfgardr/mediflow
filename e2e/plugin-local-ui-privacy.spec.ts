@@ -65,6 +65,7 @@ test.describe('IPC-connected plugin runtime', () => {
     const subscribed = page.waitForResponse(response => new URL(response.url()).pathname === '/api/plugin-local-ui/events');
     const landing = await page.goto('/plugin-local-ui');
     expect(landing?.headers()['cache-control']).toContain('no-store');
+    await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
     const events = await subscribed;
     expect(events.status()).toBe(200);
     expect(events.headers()['cache-control']).toContain('no-store');
@@ -93,6 +94,7 @@ test('ordinary runtime makes no plugin event requests and has no console errors'
   await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
   await expect(page.getByTestId('patient-profile-notes')).not.toContainText('Lettura delle note in corso…');
   await page.goto('/plugin-local-ui');
+  await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
   await expect(page.getByRole('heading', { name: 'Continua in MediFlow', exact: true })).toBeVisible();
   const disabled = await page.request.get('/api/plugin-local-ui/events');
   expect(disabled.status()).toBe(404);
