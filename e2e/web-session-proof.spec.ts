@@ -38,12 +38,17 @@ test('il medico accede, legge una scheda, registra una nota e scarica il backup'
     await openPatientSection(page, 'diario');
     await page.getByRole('link', { name: 'Nuova voce', exact: true }).click();
 
+    await page.getByRole('combobox', { name: 'Tipo di voce' }).selectOption('note');
     await page.getByRole('textbox', { name: 'Resoconto clinico', exact: true }).fill(note);
     await page.getByRole('button', { name: 'Rivedi', exact: true }).click();
     const persisted = page.waitForResponse(response =>
         new URL(response.url()).pathname === '/api/entries' && response.request().method() === 'POST');
     await page.getByRole('button', { name: 'Conferma e registra', exact: true }).click();
-    expect((await persisted).status()).toBe(201);
+    const saved = await persisted;
+    expect(saved.status()).toBe(201);
+    const entryId = (await saved.json()).id as string;
+    await expect(page.getByRole('region', { name: 'Esito della registrazione' })).toContainText(note);
+    await page.getByRole('link', { name: 'Chiudi la voce', exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules$`));
     await openPatientSection(page, 'diario');
     await expect(page.locator('#diario')).toContainText(note);
@@ -62,6 +67,7 @@ test('il medico accede, legge una scheda, registra una nota e scarica il backup'
         for await (const chunk of stream) chunks.push(Buffer.from(chunk));
         const artifact = JSON.parse(Buffer.concat(chunks).toString('utf8'));
         expect(artifact.payload.patients.some((record: { id: string }) => record.id === patientId)).toBe(true);
+        expect(artifact.payload.entries.some((record: { id: string; type: string }) => record.id === entryId && record.type === 'note')).toBe(true);
     } finally { await backup.delete(); }
 
     const peer = await page.context().newPage();
