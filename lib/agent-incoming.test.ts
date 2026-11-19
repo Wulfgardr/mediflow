@@ -357,3 +357,59 @@ test('K5: a cassette whose note entered under the previous rule keeps it and com
     assert.equal(applyAgentVisit(new Request('http://127.0.0.1' + inbox, { method: 'POST' }), fixture.session, posts[0]).eventId, visitApplied(f.visitId)[1]!.event_id);
     assert.deepEqual(snapshot(), after);
 });
+
+test('K2: a note that no deposited PDF reproduces sends every PDF of the cassette to the doctor, together with the note', async () => {
+    posts.length = 0;
+    const lines = soap.split('\n'), paged = syntheticPdf('Codice fiscale paziente: ' + cf + '\n' + lines.slice(0, 2).join('\n') + '\nPagina 1 di 2\n' + lines.slice(2).join('\n'));
+    const f = await depositCassette('local', false, [
+        { kind: 'note', value: { text: soap, date: '2026-11-19', quote: soap.slice(0, 600) } },
+        { kind: 'transcription', value: { text: dictation } },
+        { kind: 'pdf', value: { name: 'nota-visita.pdf' }, pdf: paged },
+    ]);
+    const [noteId, transcriptionId, pdfId] = f.ids as [string, string, string], before = snapshot(), withPhrase = await diaryWithPhrase();
+    await refreshAgentIncoming(db.getSessionReadSignal(), contentReadPdf);
+    assert.deepEqual(posts.map(body => body.phase), ['automatic']);
+    assert.deepEqual((posts[0]!.items as { id: string }[]).map(item => item.id), [transcriptionId]);
+    assert.deepEqual(added(snapshot(), before), [1, 0, 0]);
+    assert.ok(!attachmentIds().includes(pdfId));
+    const shown = shownVisit(f.visitId);
+    assert.ok(shown && agentVisitAwaitsReview(shown));
+    assert.equal(shown.notesReproduced, false);
+    assert.equal(agentItemPhase(shown, { id: pdfId, kind: 'pdf' }), 'review');
+    assert.deepEqual(await diaryWithPhrase(), withPhrase);
+    await applyReviewedAgentVisits([f.visitId]);
+    assert.equal(agentIncomingSnapshot().error, null);
+    assert.deepEqual((posts[1]!.items as { id: string }[]).map(item => item.id).sort(), [noteId, pdfId].sort());
+    assert.ok(attachmentIds().includes(pdfId));
+    assert.deepEqual(await diaryWithPhrase(), [...withPhrase, noteId]);
+    assert.deepEqual(visitApplied(f.visitId).map(event => JSON.parse(event.redacted_metadata).flags), [['automatic'], ['review', 'cassette_complete']]);
+});
+
+test('K2: a note without any PDF, or a PDF whose text cannot be read, lets nothing of the cassette in automatically', async () => {
+    posts.length = 0;
+    const unreadable = syntheticPdf('SYNTHETIC_UNREADABLE_PDF');
+    const readPdf = async (bytes: Uint8Array) => { const value = await contentReadPdf(bytes); if (value.includes('SYNTHETIC_UNREADABLE_PDF')) throw new Error('SYNTHETIC_PDF_TEXT_UNAVAILABLE'); return value; };
+    const withoutPdf = await depositCassette('local', false, [{ kind: 'note', value: { text: soap, quote: soap.slice(0, 600) } }, { kind: 'transcription', value: { text: dictation } }]);
+    const withUnreadable = await modelNoteVisit(undefined, undefined, [{ kind: 'pdf', value: { name: 'scansione.pdf' }, pdf: unreadable }]);
+    const before = snapshot();
+    await refreshAgentIncoming(db.getSessionReadSignal(), readPdf);
+    assert.deepEqual(posts, []);
+    assert.deepEqual(snapshot(), before);
+    for (const visitId of [withoutPdf.visitId, withUnreadable.visitId]) {
+        const shown = shownVisit(visitId);
+        assert.ok(shown?.blockers.length);
+        assert.equal(agentVisitAwaitsReview(shown!), false);
+        assert.deepEqual(agentAppliedItemIds(visitId), []);
+    }
+});
+
+test('K2: a cassette without a note keeps every original PDF in the automatic pass', async () => {
+    posts.length = 0;
+    const pdfs = ['primo', 'secondo'].map(name => syntheticPdf('Paziente CF ' + cf + '\nReferto sintetico ' + name));
+    const f = await depositCassette('local', false, [{ kind: 'transcription', value: { text: dictation } },
+        ...pdfs.map((pdf, index) => ({ kind: 'pdf' as const, value: { name: 'referto-' + index + '.pdf' }, pdf }))]);
+    await refreshAgentIncoming(db.getSessionReadSignal(), contentReadPdf);
+    assert.deepEqual(posts.map(body => body.phase), ['automatic']);
+    assert.deepEqual((posts[0]!.items as { id: string }[]).map(item => item.id).sort(), [...f.ids].sort());
+    assert.ok(!shownVisit(f.visitId));
+});
