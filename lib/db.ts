@@ -259,6 +259,7 @@ export function resolveSissHandoffDraftPrecondition(
 }
 
 type ApiDeleteOptions = {
+    prescriptionItems?: ReadonlyArray<{ id: string; version: number }>;
     sissPrecondition?: SissHandoffWritePrecondition;
     attachmentPrecondition?: AttachmentWritePrecondition;
     /** The patient's documents as the user reviewed them; refused with AttachmentCollectionChangedError if they changed. */
@@ -572,6 +573,7 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
                 init.headers = { 'Content-Type': 'application/json' };
                 init.body = JSON.stringify({
                     ...precondition,
+                    ...(this.tableName === 'service_prescriptions' && options?.prescriptionItems ? { items: options.prescriptionItems } : {}),
                     ...(collection ? { expectedCollection: collection.expected() } : {}),
                     ...(this.tableName !== 'siss_handoff_events' && typeof options?.version === 'number' ? { version: options.version } : {}),
                     ...(typeof deletionReason === 'string' ? { deletionReason } : {}),
@@ -598,7 +600,10 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
                 throw new Error(`Failed to delete item: ${res.status} ${res.statusText}`);
             }
             collection?.recordDeleted(id);
-            if (!options?.suppressNotify) this.emitChange();
+            if (!options?.suppressNotify) {
+                this.emitChange();
+                if (this.tableName === 'service_prescriptions' || this.tableName === 'service_prescription_items') notifyDbChange('observations');
+            }
         } catch (error) {
             if (fenced && !(error instanceof ApiConflictError)) {
                 throw new Error('Therapy delete was not confirmed.');

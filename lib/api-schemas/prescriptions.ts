@@ -103,14 +103,14 @@ export const servicePrescriptionCreateSchema = z.object({
  * Voci da portare allo stesso stato della prescrizione nella stessa transazione
  * (WUL-800). Il client elenca tutte le voci correnti con la versione che ha letto.
  */
-const servicePrescriptionCascadeItemsSchema = z.array(z.object({
+export const reviewedServicePrescriptionItemsSchema = z.array(z.object({
     id: requiredTextSchema,
     version: z.number().int().positive(),
-}).strict()).max(500);
+}).strict());
 
 export const servicePrescriptionUpdateSchema = z.object({
     version: z.number().int().positive(),
-    items: servicePrescriptionCascadeItemsSchema.optional(),
+    items: reviewedServicePrescriptionItemsSchema.max(500).optional(),
     prescribedAt: optionalDateInputSchema,
     status: serviceStatusSchema.optional(),
     category: serviceCategorySchema.optional(),
