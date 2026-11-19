@@ -12,7 +12,7 @@ npm run --silent test:ui:cli -- \
   --out "$PROVE" --file e2e/ui-cli/web-091.jsonl
 ```
 
-[La sequenza della candidata 0.9.1](../e2e/ui-cli/web-091.jsonl) configura e sblocca l’archivio di prova con passphrase e PIN sintetici. Crea Adele Collaudo dalla UI, la cerca e apre la scheda. Aggiunge un documento di testo, attende la conferma di salvataggio, apre l’originale e ne verifica il contenuto. Torna al riepilogo, scrive una bozza, chiude il compositore e riapre la bozza via tastiera verificando lo stesso testo. Sulla candidata, usa il percorso e lo SHA della relativa build. Le etichette appartengono alla build eseguita. Dopo una variazione della UI, usa `discover` per aggiornare le azioni.
+[La sequenza della candidata 0.9.1](../e2e/ui-cli/web-091.jsonl) configura e sblocca l’archivio di prova con passphrase e PIN sintetici. Crea Adele Collaudo dalla UI, la cerca e apre la scheda. Aggiunge un documento di testo, attende la conferma di salvataggio, apre l’originale e ne verifica il contenuto. Torna al riepilogo e scrive una bozza. Restringe la vista da 1320 a 390 px, apre **Altro** e usa **In arrivo**. Torna alla bozza, ripristina 1320 px, chiude il compositore e riapre la bozza via tastiera verificando lo stesso testo. Sulla candidata, usa il percorso e lo SHA della relativa build. Le etichette appartengono alla build eseguita. Dopo una variazione della UI, usa `discover` per aggiornare le azioni.
 
 Per guidare il banco dal terminale, ometti `--file` e invia singole righe come queste. Per riprodurre la sequenza via pipe, passa le stesse righe a stdin.
 
@@ -22,10 +22,11 @@ Per guidare il banco dal terminale, ometti `--file` e invia singole righe come q
 {"op":"expectValue","target":{"role":"textbox","name":"Nome e cognome"},"value":"Dottore Sintetico"}
 ```
 
-Un target è `{"role":"button","name":"Avanti"}` o `{"label":"Passphrase"}`. Ruolo e nome sono quelli del censimento, con corrispondenza esatta. Un array di target restringe il controllo in successione, per esempio una navigazione e poi un link al suo interno. Ogni livello deve identificare un solo controllo. La CLI si arresta sul primo target assente o ambiguo, prima di azionarlo. L’asserzione `hidden` può riuscire anche quando il controllo è assente.
+Un target è `{"role":"button","name":"Avanti"}` o `{"label":"Passphrase"}`. Sul Web usa `{"text":"Altro"}` per testo visibile esatto quando il censimento mostra testo senza un nome di ruolo. Ruolo e nome sono quelli del censimento, con corrispondenza esatta. Un array di target restringe il controllo in successione, per esempio una navigazione e poi un link al suo interno. Ogni livello deve identificare un solo controllo. La CLI si arresta sul primo target assente o ambiguo, prima di azionarlo. L’asserzione `hidden` può riuscire anche quando il controllo è assente.
 
 | Azioni | Parametri oltre a `op` |
 | --- | --- |
+| `resize` | `width` e `height` interi in pixel CSS, rispettivamente 280–3840 e 240–2160. La ricevuta riporta il viewport osservato. |
 | `discover` | `target` facoltativo per restringere il censimento |
 | `click`, `focus`, `check` | `target` |
 | `scroll` | `target`, con `deltaY` opzionale per la rotella in pixel |
@@ -41,6 +42,16 @@ Un target è `{"role":"button","name":"Avanti"}` o `{"label":"Passphrase"}`. Ruo
 La cartella della singola esecuzione contiene `ricevuta.jsonl`, i log e le catture richieste. La prima riga identifica la build verificata, il browser e l’archivio inizialmente vuoto. Le verifiche registrano lo stato osservato. Al termine il banco chiude il suo Chrome effimero e il suo server e rimuove la copia della build, l’archivio di prova e i download.
 
 Il browser usa Chrome sandboxato e può raggiungere soltanto l’origine loopback assegnata al banco. Le azioni passano dai controlli del prodotto, comprese le conferme di primo avvio. Usa esclusivamente dati inventati. La CLI accetta i testi sintetici degli allegati in linea, senza percorsi di file da caricare. I gesti fisici, Touch ID, le operazioni riservate al medico e il collaudo su postazioni personali restano manuali. Il plugin `mediflow-local-ui` conserva il proprio mandato di navigazione.
+
+## Capacità per superficie
+
+| Capacità | Web | Dimostrazione GPUI | Shell GPUI |
+| --- | --- | --- | --- |
+| Censimento | Albero della pagina | Controlli strumentati della demo | Nodi AccessKit strumentati, conteggi ed esclusioni |
+| Target composti, testo visibile esatto | Sì | Ruolo/nome o label singoli | Ruolo/nome o label singoli |
+| `resize` nella stessa sessione | Sì | No, finestra di test fissa | No, finestra di test fissa |
+| Scroll | Porta un controllo in vista o invia una rotella | No | Rotella sul vassoio del diario, con misura dello spostamento |
+| Screenshot, trasferimenti file | Sì | No | No |
 
 ## Dimostrazione GPUI nel renderer di test
 

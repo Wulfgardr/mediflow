@@ -40,7 +40,9 @@ async function control(page: Page, target: Target, allowAbsent: boolean): Promis
   for (const part of Array.isArray(target) ? target : [target]) {
     const match: Locator = 'role' in part
       ? within.getByRole(part.role as Parameters<Page['getByRole']>[0], { name: part.name, exact: true })
-      : within.getByLabel(part.label, { exact: true });
+      : 'label' in part
+        ? within.getByLabel(part.label, { exact: true })
+        : within.getByText(part.text, { exact: true });
     if (!allowAbsent) await until(async () => await match.count() > 0,
       () => `Controllo assente: ${JSON.stringify(part)}`);
     const count = await match.count();
@@ -70,6 +72,14 @@ export async function drive(page: Page, action: Action, output: string): Promise
     ? await control(page, action.target, action.op === 'expect' && action.state === 'hidden')
     : undefined;
   switch (action.op) {
+    case 'resize': {
+      await page.setViewportSize({ width: action.width, height: action.height });
+      const dimensions = await page.evaluate(() => ({ width: window.innerWidth, height: window.innerHeight }));
+      if (dimensions.width !== action.width || dimensions.height !== action.height) {
+        throw new Error(`Viewport osservato diverso da quello richiesto: ${JSON.stringify(dimensions)}`);
+      }
+      return { view: pageAddress(page), viewport: dimensions };
+    }
     case 'discover':
       return { view: pageAddress(page), tree: await (target ?? page.locator('body')).ariaSnapshot() };
     case 'click':

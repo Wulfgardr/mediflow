@@ -49,10 +49,25 @@
 {"op":"expect","target":{"role":"textbox","name":"Resoconto clinico"},"state":"visible"}
 {"op":"fill","target":{"role":"textbox","name":"Resoconto clinico"},"value":"Bozza sintetica della prova CLI."}
 {"op":"expectText","target":{"role":"form","name":"Nuova voce clinica"},"contains":true,"value":"Testo e dati della bozza conservati cifrati"}
+{"op":"resize","width":1320,"height":880}
+{"op":"expect","target":[{"role":"navigation","name":"Navigazione principale"},{"text":"Altro"}],"state":"hidden"}
+{"op":"resize","width":390,"height":880}
+{"op":"expectText","target":{"role":"textbox","name":"Resoconto clinico"},"value":"Bozza sintetica della prova CLI."}
+{"op":"expect","target":[{"role":"navigation","name":"Navigazione principale"},{"role":"link","name":"In arrivo"}],"state":"hidden"}
+{"op":"click","target":[{"role":"navigation","name":"Navigazione principale"},{"text":"Altro"}]}
+{"op":"discover","target":{"role":"navigation","name":"Navigazione principale"}}
+{"op":"click","target":[{"role":"navigation","name":"Navigazione principale"},{"role":"link","name":"In arrivo"}]}
+{"op":"expect","target":{"role":"heading","name":"In arrivo"},"state":"visible"}
+{"op":"back"}
+{"op":"expectText","target":{"role":"textbox","name":"Resoconto clinico"},"value":"Bozza sintetica della prova CLI."}
+{"op":"scroll","target":{"role":"textbox","name":"Resoconto clinico"}}
+{"op":"screenshot","file":"03-compatto-bozza"}
+{"op":"resize","width":1320,"height":880}
+{"op":"expectText","target":{"role":"textbox","name":"Resoconto clinico"},"value":"Bozza sintetica della prova CLI."}
 {"op":"click","target":{"role":"link","name":"Chiudi la voce"}}
 {"op":"expect","target":{"role":"textbox","name":"Resoconto clinico"},"state":"hidden"}
 {"op":"focus","target":{"role":"link","name":"Torna alla bozza"}}
 {"op":"expect","target":{"role":"link","name":"Torna alla bozza"},"state":"focused"}
 {"op":"press","key":"Enter"}
 {"op":"expectText","target":{"role":"textbox","name":"Resoconto clinico"},"value":"Bozza sintetica della prova CLI."}
-{"op":"screenshot","file":"03-bozza-ritrovata"}
+{"op":"screenshot","file":"04-bozza-ritrovata"}
