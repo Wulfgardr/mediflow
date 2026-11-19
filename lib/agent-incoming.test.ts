@@ -63,13 +63,16 @@ mock.method(globalThis, 'fetch', async (input: RequestInfo | URL, init?: Request
 const unsubscribe = subscribeAgentIncoming(() => { published.push(JSON.stringify(agentIncomingSnapshot())); });
 test.after(() => { unsubscribe(); db.setKey(null); mock.restoreAll(); database.close(); rmSync(directory, { recursive: true, force: true }); });
 
-async function cloudCassette() {
+type DepositedItem = { kind: Exclude<AgentItemKind, 'anchor'>; value: unknown; pdf?: Buffer };
+const syntheticPdf = (text: string) => Buffer.from('%PDF-1.4\n' + text + '\n%%EOF');
+const pdfHash = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
+async function depositCassette(provider: 'openai' | 'local', allowsClinicalEgress: boolean, items: DepositedItem[]) {
     const keys = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
     const raw = new Uint8Array(await crypto.subtle.exportKey('pkcs8', keys.privateKey));
     const wrapped = await encryptData(agentBase64(raw), masterKey); raw.fill(0);
     const publicKey = agentBase64(new Uint8Array(await crypto.subtle.exportKey('raw', keys.publicKey)));
     const mandates = createAgentMandateStore(database), pairings = createAgentPairingStore(database), store = createAgentCassetteStore(database);
-    const mandate = mandates.create({ id: randomUUID(), durationMs: 43200000, operations: [...AGENT_OPERATIONS], provider: 'openai', allowsClinicalEgress: false,
+    const mandate = mandates.create({ id: randomUUID(), durationMs: 43200000, operations: [...AGENT_OPERATIONS], provider, allowsClinicalEgress,
         publicKey, wrappedPrivateKey: `ENC:${wrapped.iv}:${wrapped.data}` }, actor, generation);
     const pairing = pairings.request('Synthetic incoming agent', [...AGENT_OPERATIONS]);
     pairings.approve(pairing.request.id, pairing.request.code, mandate.id, actor, generation);
@@ -81,24 +84,28 @@ async function cloudCassette() {
         return { bytes, envelope: sealAgentItemNode(publicKey, { mandateRef: mandate.id, visitId, itemId: id, kind }, bytes) };
     };
     let receipt = run(() => store.open(principal, visitId, seal(visitId, 'anchor', { fiscalCode: cf }).envelope));
-    const pdfs = ['originale', 'nota'].map(name => Buffer.from(`%PDF-1.4\nSYNTHETIC_INCOMING_${name}_${visitId}\n%%EOF`));
-    const hashes = pdfs.map(bytes => createHash('sha256').update(bytes).digest('hex'));
-    const values: [Exclude<AgentItemKind, 'anchor'>, unknown, string | null][] = [
-        ['note', { text: 'Nota sintetica della visita' }, null],
-        ['transcription', { text: 'Trascrizione sintetica della visita' }, null],
-        ['pdf', { name: 'originale.pdf', base64: pdfs[0]!.toString('base64') }, hashes[0]!],
-        ['pdf', { name: 'nota.pdf', base64: pdfs[1]!.toString('base64') }, hashes[1]!],
-        ['observation', { values: { code: '2345-7', display: 'Glucosio', value: '100', unitCode: 'mg/dL', unit: 'mg/dL', observedAt: '2026-11-17',
-            refLow: '70', refHigh: '110', refText: '70 110' }, quote, source: { sha256: hashes[0], fileName: 'originale.pdf' } }, null],
-    ];
     const ids: string[] = [];
-    for (const [kind, value, documentHash] of values) {
-        const id = randomUUID(), sealed = seal(id, kind, value);
+    for (const { kind, value, pdf } of items) {
+        const id = randomUUID(), sealed = seal(id, kind, pdf ? { ...(value as object), base64: pdf.toString('base64') } : value);
         ids.push(id);
-        receipt = run(() => store.add(principal, visitId, receipt.revision, { id, kind, envelope: sealed.envelope, byteLength: sealed.bytes.length, documentHash }));
+        receipt = run(() => store.add(principal, visitId, receipt.revision, { id, kind, envelope: sealed.envelope, byteLength: sealed.bytes.length,
+            documentHash: pdf ? pdfHash(pdf) : null }));
     }
     run(() => store.close(principal, visitId, receipt.revision));
-    return { visitId, ids, pdfs, setEgress: (value: 0 | 1) => database.prepare('UPDATE agent_cassettes SET allows_clinical_egress=? WHERE id=?').run(value, visitId) };
+    return { visitId, ids, principal, setEgress: (value: 0 | 1) => database.prepare('UPDATE agent_cassettes SET allows_clinical_egress=? WHERE id=?').run(value, visitId) };
+}
+async function cloudCassette() {
+    const visitId = randomUUID();
+    const pdfs = ['originale', 'nota'].map(name => syntheticPdf(`SYNTHETIC_INCOMING_${name}_${visitId}`));
+    const cassette = await depositCassette('openai', false, [
+        { kind: 'note', value: { text: 'Nota sintetica della visita' } },
+        { kind: 'transcription', value: { text: 'Trascrizione sintetica della visita' } },
+        { kind: 'pdf', value: { name: 'originale.pdf' }, pdf: pdfs[0] },
+        { kind: 'pdf', value: { name: 'nota.pdf' }, pdf: pdfs[1] },
+        { kind: 'observation', value: { values: { code: '2345-7', display: 'Glucosio', value: '100', unitCode: 'mg/dL', unit: 'mg/dL', observedAt: '2026-11-17',
+            refLow: '70', refHigh: '110', refText: '70 110' }, quote, source: { sha256: pdfHash(pdfs[0]!), fileName: 'originale.pdf' } } },
+    ]);
+    return { ...cassette, pdfs };
 }
 const readPdf = async () => 'Paziente CF ' + cf + '\n' + quote;
 const visitApplied = (visitId: string) => database.prepare("SELECT * FROM audit_events WHERE event_type='agent.visit.applied' AND subject_ref=? ORDER BY rowid")

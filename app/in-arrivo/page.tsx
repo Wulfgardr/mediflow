@@ -3,8 +3,7 @@
 import { useState, useSyncExternalStore } from 'react';
 import { useSecurity } from '@/components/security-provider';
 import { agentIncomingSnapshot, agentIncomingServerSnapshot, subscribeAgentIncoming, refreshAgentIncoming, applyReviewedAgentVisits, readIncomingAgentPdf } from '@/lib/agent-incoming';
-import { automaticAgentKind } from '@/lib/agent-visit-application-contract';
-import { agentVisitAwaitsReview } from '@/lib/agent-visit-review';
+import { agentItemPhase, agentVisitAwaitsReview } from '@/lib/agent-visit-review';
 import { SETTINGS_PRIMARY_BUTTON_CLASS, SETTINGS_SECONDARY_BUTTON_CLASS } from '@/components/settings/settings-ui';
 import DocumentViewer from '@/components/document-viewer';
 import { agentReviewFieldLabels as fieldLabels, agentReviewFieldValues as fieldValues, agentReviewItemLabels } from '@/lib/agent-visit-review-labels';
@@ -39,7 +38,7 @@ function UnlockedIncoming() {
                 <h2 className="[font:var(--type-section-heading)]">{typeof visit.anchor.fiscalCode === 'string' ? visit.anchor.fiscalCode : 'Identità da confermare'}</h2>
                 {review.patient && <p>{review.patient.lastName} {review.patient.firstName}</p>}
                 <p>{visit.cassette.status === 'closed' ? 'Visita chiusa' : 'Deposito in corso'}</p>
-                {pending.some(item => !automaticAgentKind(item.kind)) ? <p className="type-meta">◇ Proposte da rivedere</p> : null}
+                {pending.some(item => agentItemPhase(review, item) === 'review') ? <p className="type-meta">◇ Da rivedere</p> : null}
                 {[...review.blockers, ...review.proposalBlockers].map((message, index) => <p role="alert" key={index}>{message}</p>)}
                 <div className="flex flex-wrap gap-3">{visit.items.filter(item => item.kind === 'pdf').map(item =>
                     typeof item.value.name === 'string' && <button key={item.id} className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={openingPdf}
