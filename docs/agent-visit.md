@@ -2,9 +2,11 @@
 
 Il client deposita una visita cifrata nella cassetta di MediFlow. La ricevuta
 conferma il deposito. La scheda Web sbloccata verifica l’identità nei PDF ed
-inserisce nota, trascrizione e PDF quando coincidono con il codice fiscale
-di un’unica scheda esistente. Terapie, prestazioni, diagnosi, esenzioni ed
-osservazioni restano in «In arrivo» per la revisione del medico.
+inserisce trascrizione e PDF originali quando coincidono con il codice fiscale
+di un’unica scheda esistente. La nota scritta dal modello, il PDF che la
+riproduce, terapie, prestazioni, diagnosi, esenzioni ed osservazioni restano
+in «In arrivo» per la revisione del medico
+([ADR 0195](./adr/0195-nota-del-modello-dopo-il-gesto-del-medico.md)).
 
 Il contratto è [ADR 0190](./adr/0190-mandato-agenti-e-cassetta-della-visita.md).
 Il client richiede Node 24 e le dipendenze della checkout. I comandi seguenti
@@ -73,7 +75,8 @@ Il client rifiuta file SQLite, link simbolici e PDF con hash diversi.
 
 La ricevuta `closed` conferma che la visita è stata depositata nella cassetta
 cifrata. Quando la scheda è sbloccata, MediFlow controlla le visite in attesa
-e inserisce nota, trascrizione e PDF con codice fiscale coincidente con la scheda.
+e inserisce trascrizione e PDF originali con codice fiscale coincidente con la scheda.
+La nota e il PDF che ne riproduce il testo aspettano il gesto del medico.
 I CF discordanti, mancanti o ambigui bloccano l’applicazione automatica.
 
 In «In arrivo» puoi confrontare i dati della scheda con le proposte, leggere

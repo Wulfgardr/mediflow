@@ -13,7 +13,8 @@ il deposito dall'applicazione. CLI e MCP depositano buste cifrate via loopback c
 un token associato a un mandato. In `packages/agent-client` il token serve
 per il deposito e la ripresa. Il browser sbloccato apre le buste, verifica
 l'identità del paziente e prepara i valori per i writer. Su `main` nota,
-trascrizione e PDF verificati possono già entrare così. Terapie, diagnosi,
+trascrizione e PDF verificati possono già entrare così (per la nota vedi
+l'[ADR 0195](0195-nota-del-modello-dopo-il-gesto-del-medico.md)). Terapie, diagnosi,
 prestazioni, esenzioni ed osservazioni attendono il gesto in «In arrivo».
 Il percorso Web autentica la sessione e distingue le due fasi, ma il
 `POST` di «In arrivo» non verifica oggi una prova nativa del gesto.
@@ -225,7 +226,9 @@ master key aperta nella propria memoria per al massimo 8 ore, finché
 valgono le condizioni sotto. Chiudere la finestra o il browser lascia
 lavorare il servizio. Il mandato resta distinto: si apre come oggi e
 definisce operazioni e fornitore. Il servizio può applicare nota,
-trascrizione e PDF verificati per un mandato corrente autorizzato. Per le
+trascrizione e PDF verificati per un mandato corrente autorizzato. Con
+l'[ADR 0195](0195-nota-del-modello-dopo-il-gesto-del-medico.md) la nota
+del modello e il suo PDF passano alla conferma insieme alle proposte. Per le
 voci strutturate attende la conferma del punto 1 o il percorso Web già
 previsto. Finché la conferma da chat non è implementata e provata, la
 modalità senza finestra riguarda il solo passaggio automatico.
