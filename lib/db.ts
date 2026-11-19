@@ -259,6 +259,7 @@ export function resolveSissHandoffDraftPrecondition(
 }
 
 type ApiDeleteOptions = {
+    prescriptionItems?: ReadonlyArray<{ id: string; version: number }>;
     sissPrecondition?: SissHandoffWritePrecondition;
     attachmentPrecondition?: AttachmentWritePrecondition;
     /** The patient's documents as the user reviewed them; refused with AttachmentCollectionChangedError if they changed. */
@@ -572,6 +573,7 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
                 init.headers = { 'Content-Type': 'application/json' };
                 init.body = JSON.stringify({
                     ...precondition,
+                    ...(this.tableName === 'service_prescriptions' && options?.prescriptionItems ? { items: options.prescriptionItems } : {}),
                     ...(collection ? { expectedCollection: collection.expected() } : {}),
                     ...(this.tableName !== 'siss_handoff_events' && typeof options?.version === 'number' ? { version: options.version } : {}),
                     ...(typeof deletionReason === 'string' ? { deletionReason } : {}),
@@ -598,7 +600,10 @@ class ApiTable<T, AddOptions extends ApiAddOptions = ApiAddOptions> {
                 throw new Error(`Failed to delete item: ${res.status} ${res.statusText}`);
             }
             collection?.recordDeleted(id);
-            if (!options?.suppressNotify) this.emitChange();
+            if (!options?.suppressNotify) {
+                this.emitChange();
+                if (this.tableName === 'service_prescriptions' || this.tableName === 'service_prescription_items') notifyDbChange('observations');
+            }
         } catch (error) {
             if (fenced && !(error instanceof ApiConflictError)) {
                 throw new Error('Therapy delete was not confirmed.');
@@ -1144,13 +1149,25 @@ export class BackupRestoreBlockedError extends Error {
     }
 }
 
-export type BackupVerification = { createdAt: string | null; collections: number; records: number };
+export type BackupVerification = {
+    expectedSnapshot: string;
+    sourceChecksum: string;
+    createdAt: string | null;
+    collections: number;
+    records: number;
+};
 
-async function postBackup(url: string, jsonString: string, failure: string, credential?: { pin: string } | { verifier: string }): Promise<Response> {
+export type PreparedBackupRestore = {
+    id: string;
+    json: string;
+    verification: BackupVerification;
+};
+
+async function postBackup(url: string, jsonString: string, failure: string, headers?: Record<string, string>): Promise<Response> {
     await db.assertBackupReadable(jsonString);
     const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(credential ? { 'x-mediflow-restore-credential': JSON.stringify(credential) } : {}) },
+        headers: { 'Content-Type': 'application/json', ...headers },
         body: jsonString,
     });
     if (response.ok) return response;
@@ -1171,16 +1188,30 @@ async function postBackup(url: string, jsonString: string, failure: string, cred
     throw new Error(errorMessage);
 }
 
-export async function importRawDatabase(jsonString: string, credential?: { pin: string } | { verifier: string }) {
-    await postBackup('/api/system/backup-restore', jsonString, 'Restore failed', credential);
+export async function importRawDatabase(decision: PreparedBackupRestore, credential: { pin: string } | { verifier: string }) {
+    await postBackup('/api/system/backup-restore', decision.json, 'Restore failed', {
+        'x-mediflow-restore-credential': JSON.stringify(credential),
+        'x-mediflow-restore-id': decision.id,
+        'x-mediflow-restore-snapshot': decision.verification.expectedSnapshot,
+        'x-mediflow-restore-source-checksum': decision.verification.sourceChecksum,
+        'x-mediflow-restore-confirmation': 'RIPRISTINA',
+    });
 }
 
 /* Same key check and preflight as a restore, through a route that cannot write. */
 export async function verifyRawDatabase(jsonString: string): Promise<BackupVerification> {
     const response = await postBackup('/api/system/backup-restore/verify', jsonString, 'Verify failed');
-    const payload = await response.json() as { createdAt?: unknown; collections?: unknown; counts?: unknown };
+    const payload = await response.json() as { expectedSnapshot?: unknown; sourceChecksum?: unknown; createdAt?: unknown; collections?: unknown; counts?: unknown };
+    const { expectedSnapshot, sourceChecksum } = payload;
+    const digest = /^[a-f0-9]{64}$/u;
+    if (typeof expectedSnapshot !== 'string' || !digest.test(expectedSnapshot)
+        || typeof sourceChecksum !== 'string' || !digest.test(sourceChecksum)) {
+        throw new Error('Verifica del file incompleta.');
+    }
     const counts = payload.counts && typeof payload.counts === 'object' ? Object.values(payload.counts as Record<string, unknown>) : [];
     return {
+        expectedSnapshot,
+        sourceChecksum,
         createdAt: typeof payload.createdAt === 'string' ? payload.createdAt : null,
         collections: Array.isArray(payload.collections) ? payload.collections.length : 0,
         records: counts.reduce<number>((total, count) => total + (typeof count === 'number' ? count : 0), 0),
