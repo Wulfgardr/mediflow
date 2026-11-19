@@ -4,8 +4,7 @@ import { clientArchiveGeneration } from './security/client-auth-api';
 import { db } from './db';
 import { notifyDbChange } from './live-query';
 import { openAgentVisit } from './agent-cassette-client';
-import { inspectAgentVisit, prepareAgentApplication, reopenReviewedAgentItems, type AgentVisitReview } from './agent-visit-review';
-import { automaticAgentKind } from './agent-visit-application-contract';
+import { agentItemPhase, inspectAgentVisit, prepareAgentApplication, reopenReviewedAgentItems, type AgentVisitReview } from './agent-visit-review';
 import { agentVisitPresentation, sealVisitConfirmationPresentation } from './agent-visit-confirmation-browser';
 import type { VisitConfirmationTicket } from './agent-visit-confirmation-contract';
 import type { AgentApplicationReceipt, AgentCassetteIndexPage, IncomingAgentCassette } from './agent-visit-application-contract';
@@ -61,7 +60,7 @@ async function apply(review: AgentVisitReview, phase: 'automatic' | 'review', si
     return { ...review, patient: review.patient ? { ...review.patient, version: receipt.patientVersion } : null,
         appliedItemIds: [...new Set([...review.appliedItemIds, ...input.items.map(item => item.id)])] };
 }
-async function attemptNativeConfirmation(signal: AbortSignal) {
+export async function attemptNativeConfirmation(signal: AbortSignal, readPdf?: Parameters<typeof inspectAgentVisit>[4]) {
     const endpoint = '/api/agent-mandates/confirmation';
     const offer = await fetch(endpoint, { cache: 'no-store', signal });
     if (!offer.ok) return;
@@ -85,8 +84,8 @@ async function attemptNativeConfirmation(signal: AbortSignal) {
         if (!profile.ok || row.id !== ticket.visitId || row.revision !== ticket.revision || row.archiveGeneration !== clientArchiveGeneration()
             || row.status !== 'closed') return;
         const { doctorTaxCode } = await profile.json();
-        const review = await inspectAgentVisit(row, patients, doctorTaxCode ?? null, signal, undefined, new Set(exemptions.map(value => value.code)));
-        if (review.visit.items.some(item => automaticAgentKind(item.kind) && !row.appliedItemIds.includes(item.id))) return;
+        const review = await inspectAgentVisit(row, patients, doctorTaxCode ?? null, signal, readPdf, new Set(exemptions.map(value => value.code)));
+        if (review.visit.items.some(item => agentItemPhase(review, item) === 'automatic' && !row.appliedItemIds.includes(item.id))) return;
         const plan = await prepareAgentApplication(review, 'review', signal);
         if (!plan || plan.patientId !== existing.patient.id || plan.expectedVersion !== existing.patient.version) return;
         const presentation = await sealVisitConfirmationPresentation(reference, agreementPublicKey, agentVisitPresentation(review, plan));

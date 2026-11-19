@@ -34,10 +34,12 @@ export const agentApplicationSchema = z.object({ visitId: id, phase: z.enum(['au
 }).strict().refine(value => new Set(value.items.map(item => item.id)).size === value.items.length);
 export type AgentApplicationInput = z.input<typeof agentApplicationSchema>;
 export type AgentApplication = z.output<typeof agentApplicationSchema>;
-export const automaticAgentKind = (kind: string) => ['note', 'transcription', 'pdf'].includes(kind);
+export type AgentApplicationPhase = 'automatic' | 'review';
+export const agentStructuredKind = (kind: string) => !['note', 'transcription', 'pdf'].includes(kind);
 export const agentCassetteAppliesAutomatically = (cassette: Pick<AgentCassette, 'modelProvider' | 'allowsClinicalEgress'>) =>
     clinicalContentAllowed(cassette.modelProvider, cassette.allowsClinicalEgress);
-export const agentItemInPhase = (appliesAutomatically: boolean, phase: 'automatic' | 'review', kind: string) =>
-    phase === 'automatic' ? appliesAutomatically && automaticAgentKind(kind) : !appliesAutomatically || !automaticAgentKind(kind);
-export type AgentApplicationReceipt = { visitId: string; phase: 'automatic' | 'review'; status: 'applied'; eventId: string; itemCount: number;
+export const agentKindPhases = (appliesAutomatically: boolean, kind: string): readonly AgentApplicationPhase[] =>
+    !appliesAutomatically ? ['review'] : kind === 'transcription' ? ['automatic'] : kind === 'pdf' ? ['automatic', 'review'] : ['review'];
+export const agentKindOnlyAutomatic = (appliesAutomatically: boolean, kind: string) => !agentKindPhases(appliesAutomatically, kind).includes('review');
+export type AgentApplicationReceipt = { visitId: string; phase: AgentApplicationPhase; status: 'applied'; eventId: string; itemCount: number;
     patientVersion: number; modelProvider: string; allowsClinicalEgress: boolean };

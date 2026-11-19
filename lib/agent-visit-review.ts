@@ -4,8 +4,8 @@ import { db, type Patient } from './db';
 import { cassetteItems } from './agent-cassette-contract';
 import { agentBytes } from './agent-cassette-crypto';
 import { openAgentVisit, type OpenedAgentVisit } from './agent-cassette-client';
-import { agentApplicationSchema, agentCassetteAppliesAutomatically, agentItemInPhase, automaticAgentKind, type AgentApplicationInput, type AgentCassetteIndexEntry,
-    type IncomingAgentCassette } from './agent-visit-application-contract';
+import { agentApplicationSchema, agentCassetteAppliesAutomatically, agentStructuredKind, type AgentApplicationInput, type AgentApplicationPhase,
+    type AgentCassetteIndexEntry, type IncomingAgentCassette } from './agent-visit-application-contract';
 import { collectDossierTaxCodes, evaluateDossierGroupIdentity, dossierFactBlockers } from './domain/documents/dossier-import';
 import { verifyPreparedFields, preparedTokens } from './domain/documents/dossier-prepared';
 import { clinicalFactContext, contextReview, isHistoricalTherapy } from './domain/documents/clinical-context-lexicon';
@@ -13,12 +13,14 @@ import { servicePrescriptionCreateSchema } from './api-schemas/prescriptions';
 import { isValidItalianTaxCode } from './patient-identity';
 import { agentVisitPdfText } from './agent-visit-pdf-text';
 
+export type AgentNoteDocument = { id: string; noteId: string; name: string; hash: string };
 export type AgentVisitReview = { visit: Omit<OpenedAgentVisit, 'cassette'> & { cassette: AgentCassetteIndexEntry }; patient: Patient | null;
-    appliesAutomatically: boolean; appliedItemIds: string[]; currentSummary: Map<string, string>; blockers: string[]; proposalBlockers: string[] };
+    appliesAutomatically: boolean; noteDocuments: AgentNoteDocument[]; appliedItemIds: string[]; currentSummary: Map<string, string>; blockers: string[]; proposalBlockers: string[] };
 const proposalLabels: Record<string, string> = { therapy: 'la terapia', service: 'la prestazione', diagnosis: 'la diagnosi', exemption: 'l’esenzione', observation: 'l’osservazione' };
 const hex = (value: ArrayBuffer) => [...new Uint8Array(value)].map(byte => byte.toString(16).padStart(2, '0')).join('');
 const text = (value: unknown) => typeof value === 'string' ? value.trim() : '';
 const normalized = (value: string) => value.replace(/\s+/gu, ' ').trim().toLocaleLowerCase('it-IT');
+const compact = (value: string) => value.normalize('NFKC').replace(/\s+/gu, '');
 function locateQuote(source: string, quote: string): RegExpExecArray | null {
     if (quote.length < 12 || quote.length > 600) return null;
     const pattern = quote.split(/\s+/u).map(part => part.replace(/[.*+?^$(){}|[\]\\]/gu, '\\$&')).join('\\s+');
@@ -48,6 +50,8 @@ export async function inspectAgentVisit(row: IncomingAgentCassette, patients: Pa
     const blockers: string[] = [], proposalBlockers: string[] = [];
     if (!patient) blockers.push(matches.length > 1 ? 'Più schede hanno questo codice fiscale.' : 'Codice fiscale non confermato in una scheda esistente.');
     const documents = new Map<string, { text: string; name: string }>();
+    const noteDocuments: AgentNoteDocument[] = [];
+    const notes = visit.items.filter(item => item.kind === 'note').map(item => ({ id: item.id, text: compact(text(item.value.text)) })).filter(note => note.text);
     const deposited = cassetteItems(row);
     for (const item of visit.items.filter(item => item.kind === 'pdf')) {
         const bytes = agentBytes(text(item.value.base64));
@@ -57,6 +61,8 @@ export async function inspectAgentVisit(row: IncomingAgentCassette, patients: Pa
             const documentText = await readPdf(bytes, signal), codes = collectDossierTaxCodes(documentText);
             signal.throwIfAborted();
             documents.set(hash, { text: documentText, name: text(item.value.name) });
+            const flat = compact(documentText), reproduced = notes.find(note => flat.includes(note.text));
+            if (reproduced) noteDocuments.push({ id: item.id, noteId: reproduced.id, name: text(item.value.name), hash });
             const identity = evaluateDossierGroupIdentity([{ taxCodes: codes }], patient ? [patient] : [], patient?.id, physicianTaxCode);
             const foreign = codes.filter(code => code.checksumValid && code.value !== physicianTaxCode
                 && !(code.role === 'professional_cf' && code.explicitProfessional));
@@ -68,7 +74,7 @@ export async function inspectAgentVisit(row: IncomingAgentCassette, patients: Pa
         } finally { bytes.fill(0); }
     }
     if (documents.size === 0) blockers.push('Manca un PDF con il codice fiscale del paziente.');
-    for (const item of visit.items.filter(item => !automaticAgentKind(item.kind))) {
+    for (const item of visit.items.filter(item => agentStructuredKind(item.kind))) {
         const source = documents.get(sourceHash(item));
         const quote = text(item.value.quote);
         const match = source ? locateQuote(source.text, quote) : null;
@@ -98,7 +104,7 @@ export async function inspectAgentVisit(row: IncomingAgentCassette, patients: Pa
             visit.items.some(item => item.kind === 'observation') ? db.observations.query({ patientId: patient.id }).toArray({ signal, rejectAuthUnavailable: true }) : [],
         ]);
         const status = (value: string) => ({ active: 'in corso', suspended: 'sospesa', completed: 'conclusa', prescribed: 'prescritta', booked: 'prenotata', performed: 'eseguita', report_received: 'referto ricevuto', cancelled: 'annullata' }[value] ?? value);
-        for (const item of visit.items.filter(item => !automaticAgentKind(item.kind))) {
+        for (const item of visit.items.filter(item => agentStructuredKind(item.kind))) {
             const value = values(item);
             let before: string[] = [];
             if (item.kind === 'therapy') before = therapies.filter(stored => !stored.deletedAt && normalized(stored.drugName) === normalized(value.drugName ?? '')).map(stored => stored.drugName + ': ' + stored.dosage + ' (' + status(stored.status) + ')');
@@ -109,7 +115,7 @@ export async function inspectAgentVisit(row: IncomingAgentCassette, patients: Pa
             currentSummary.set(item.id, before.join('; ') || 'Non presente');
         }
     }
-    return { visit, patient, appliesAutomatically: agentCassetteAppliesAutomatically(row), appliedItemIds: row.appliedItemIds, currentSummary, blockers, proposalBlockers };
+    return { visit, patient, appliesAutomatically: agentCassetteAppliesAutomatically(row), noteDocuments, appliedItemIds: row.appliedItemIds, currentSummary, blockers, proposalBlockers };
 }
 export async function reopenReviewedAgentItems(review: AgentVisitReview, row: IncomingAgentCassette): Promise<AgentVisitReview['visit']['items'] | null> {
     const visit = await openAgentVisit(row);
@@ -124,18 +130,22 @@ export async function reopenReviewedAgentItems(review: AgentVisitReview, row: In
     }
     return visit.items;
 }
+export function agentItemPhase(review: Pick<AgentVisitReview, 'appliesAutomatically' | 'noteDocuments'>, item: { id: string; kind: string }): AgentApplicationPhase {
+    const faithfulCopy = item.kind === 'transcription' || item.kind === 'pdf' && !review.noteDocuments.some(document => document.id === item.id);
+    return review.appliesAutomatically && faithfulCopy ? 'automatic' : 'review';
+}
 export function agentVisitAwaitsReview(review: AgentVisitReview): boolean {
-    const pending = (phase: 'automatic' | 'review') => review.visit.items.some(item => agentItemInPhase(review.appliesAutomatically, phase, item.kind)
+    const pending = (phase: AgentApplicationPhase) => review.visit.items.some(item => agentItemPhase(review, item) === phase
         && !review.appliedItemIds.includes(item.id));
     return review.visit.cassette.status === 'closed' && !review.blockers.length && !review.proposalBlockers.length && !pending('automatic') && pending('review');
 }
 
-export async function prepareAgentApplication(review: AgentVisitReview, phase: 'automatic' | 'review', signal: AbortSignal): Promise<AgentApplicationInput | null> {
+export async function prepareAgentApplication(review: AgentVisitReview, phase: AgentApplicationPhase, signal: AbortSignal): Promise<AgentApplicationInput | null> {
     if (!review.patient || review.blockers.length || phase === 'review' && review.proposalBlockers.length || review.visit.cassette.status !== 'closed') return null;
     const patient = await db.patients.get(review.patient.id, { signal });
     if (!patient || patient.deletedAt || patient.isArchived || patient.taxCode !== review.visit.anchor.fiscalCode || !patient.version) return null;
     if (patient.version !== review.patient.version) throw new Error('La scheda è cambiata. Rileggi le differenze prima di applicare la visita.');
-    const selected = review.visit.items.filter(item => !review.appliedItemIds.includes(item.id) && agentItemInPhase(review.appliesAutomatically, phase, item.kind));
+    const selected = review.visit.items.filter(item => !review.appliedItemIds.includes(item.id) && agentItemPhase(review, item) === phase);
     if (!selected.length) return null;
     const diagnoses = [...(patient.diagnoses ?? [])], exemptions = [...(patient.exemptions ?? [])];
     for (const item of selected) {

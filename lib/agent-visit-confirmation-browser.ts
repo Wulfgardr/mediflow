@@ -8,9 +8,21 @@ import type { AgentApplicationInput } from './agent-visit-application-contract';
 
 export function agentVisitPresentation(review: AgentVisitReview, plan: AgentApplicationInput): VisitConfirmationPresentation {
     if (!review.patient || typeof review.visit.anchor.fiscalCode !== 'string') throw new Error('VISIT_PRESENTATION_UNAVAILABLE');
-    const proposals = plan.items.map(prepared => {
+    const planned = (id: string) => plan.items.some(item => item.id === id);
+    const proposals = plan.items.flatMap((prepared): VisitConfirmationPresentation['proposals'] => {
         const sourceItem = review.visit.items.find(item => item.id === prepared.id && item.kind === prepared.kind);
         if (!sourceItem) throw new Error('VISIT_PRESENTATION_UNAVAILABLE');
+        if (sourceItem.kind === 'pdf') {
+            if (!review.noteDocuments.some(document => document.id === sourceItem.id && planned(document.noteId))) throw new Error('VISIT_PRESENTATION_UNAVAILABLE');
+            return [];
+        }
+        if (sourceItem.kind === 'note') {
+            const documents = review.noteDocuments.filter(document => document.noteId === sourceItem.id && planned(document.id));
+            const note = sourceItem.value.text;
+            if (documents.length !== 1 || typeof note !== 'string' || !note.trim()) throw new Error('VISIT_PRESENTATION_UNAVAILABLE');
+            return [{ title: agentReviewItemLabels.note, fields: [{ label: 'Testo', value: note }], current: 'Non presente',
+                sourceName: documents[0]!.name, sourceQuote: 'Scritta dal modello', sourceHash: documents[0]!.hash }];
+        }
         const { source, quote, values } = sourceItem.value;
         if (!source || typeof source !== 'object' || !('fileName' in source) || typeof source.fileName !== 'string'
             || !('sha256' in source) || typeof source.sha256 !== 'string' || typeof quote !== 'string' || !values || typeof values !== 'object') {
@@ -21,8 +33,8 @@ export function agentVisitPresentation(review: AgentVisitReview, plan: AgentAppl
             if (!label || typeof value !== 'string') throw new Error('VISIT_PRESENTATION_UNAVAILABLE');
             return { label, value: agentReviewFieldValues[field]?.[value] ?? value };
         });
-        return { title: agentReviewItemLabels[sourceItem.kind], fields,
-            current: review.currentSummary.get(sourceItem.id) ?? 'Non presente', sourceName: source.fileName, sourceQuote: quote, sourceHash: source.sha256 };
+        return [{ title: agentReviewItemLabels[sourceItem.kind], fields,
+            current: review.currentSummary.get(sourceItem.id) ?? 'Non presente', sourceName: source.fileName, sourceQuote: quote, sourceHash: source.sha256 }];
     });
     return { patient: review.patient.lastName + ' ' + review.patient.firstName, fiscalCode: review.visit.anchor.fiscalCode, proposals };
 }
