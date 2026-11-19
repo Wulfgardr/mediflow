@@ -10,3 +10,9 @@ export function syntheticLoopbackRequest(input: string | URL | Request, init?: R
     request.headers.set('x-mediflow-server-loopback', ingress.headers['x-mediflow-server-loopback']);
     return request;
 }
+
+export function syntheticWebClientRequest(input: string | URL | Request, init?: RequestInit): Request {
+    const request = syntheticLoopbackRequest(input, init);
+    request.headers.set('x-mediflow-local-client-instance', 'bc'.repeat(32));
+    return request;
+}

@@ -17,6 +17,7 @@ import { snapshotBackupAudit } from '../backup-audit';
 import { archiveGenerationForSession } from './archive-session-generation';
 import { isCurrentServerSession, type PairedNativeBinding } from './current-session-authority';
 import type { ServerSession } from './server-session';
+import { presentedWebSessionProof, webSessionProofBindings } from './web-session-proof';
 import { resolve, type WebSessionProjection } from './web-auth-lifecycle-owner-adapter';
 import { bootstrapWebAuthControl, retireWebAuthControlForLock, webAuthControlIdFromRequest, webAuthSessionIdFromRequest } from './web-auth-control-transport';
 import { completeExactWebP3Logout } from './web-auth-logout-server';
@@ -75,6 +76,7 @@ export function createAmbulatoryDestructiveService(options: { now?: () => number
     function web(request: Request, flow: Flow): WebSessionProjection | null {
         const id = webAuthSessionIdFromRequest(request), controlId = webAuthControlIdFromRequest(request);
         if (!id || controlId !== flow.controlId || (flow.webId !== null && id !== flow.webId)) return null;
+        if (!webSessionProofBindings.admits(controlId, id, presentedWebSessionProof(request.headers))) return null;
         const resolved = resolve(id, controlId);
         if (resolved.status !== 'active' || resolved.projection.authChannel !== 'web') return null;
         const session = resolved.projection;
@@ -219,6 +221,7 @@ export function createAmbulatoryDestructiveService(options: { now?: () => number
         async retire(request: Request): Promise<Response> {
             const flow = locate(request), controlId = webAuthControlIdFromRequest(request), id = webAuthSessionIdFromRequest(request);
             if (!flow || controlId !== flow.controlId || !id || (flow.webId !== null && flow.webId !== id)) return new Response(null, { status: 401 });
+            if (!webSessionProofBindings.admits(controlId, id, presentedWebSessionProof(request.headers))) return new Response(null, { status: 401 });
             const resolution = resolve(id, controlId);
             if (resolution.status !== 'active' || resolution.projection.userId !== flow.native.userId
                 || resolution.projection.createdAt < flow.createdAt) return new Response(null, { status: 401 });

@@ -1,3 +1,4 @@
+import { presentedWebSessionProof, webSessionProofBindings } from '@/lib/security/web-session-proof';
 import { hasAttestedLoopbackIngress } from '@/lib/security/loopback-ingress.mjs';
 import { NextResponse } from 'next/server';
 import { requiresLocalUiDocumentLease } from '@/lib/security/plugin-local-ui-runtime';
@@ -13,7 +14,7 @@ import { currentArchiveGeneration } from '@/lib/security/archive-session-generat
 import {
     bootstrapWebAuthControl,
     resolveWebAuthControlSession,
-    setWebAuthControlCookie,
+    setWebAuthControlLocator,
     setWebAuthControlEtag,
     webAuthControlIdFromRequest,
     webAuthSessionIdFromRequest,
@@ -71,8 +72,12 @@ function finalizeControlResponse(
     response: NextResponse,
     request: Request,
     presentedControlId: string | null,
-    control: WebAuthControlBootstrap,
+    control: WebAuthControlBootstrap | null,
 ) {
+    if (control === null) {
+        response.headers.set('Cache-Control', 'no-store');
+        return response;
+    }
     // Resolving an archive-A session can retire it and advance its control fence.
     // Return the post-resolution fence, not the one observed before retirement.
     const currentControl = bootstrapWebAuthControl(control.controlId);
@@ -83,14 +88,19 @@ function finalizeControlResponse(
     }
     response.headers.set('Cache-Control', 'no-store');
     setWebAuthControlEtag(response, currentControl.etag);
-    if (presentedControlId !== control.controlId) setWebAuthControlCookie(response, request, control.controlId);
+    if (presentedControlId !== control.controlId) setWebAuthControlLocator(response, request, control.controlId);
     return response;
 }
 
 export async function GET(request: Request) {
     const presentedControlId = webAuthControlIdFromRequest(request);
-    const control = bootstrapWebAuthControl(presentedControlId);
-    if (!control) {
+    const proof = presentedWebSessionProof(request.headers);
+    const local = hasAttestedLoopbackIngress(request);
+    const exposeControl = local && proof !== null;
+    const controlAllowed = exposeControl && presentedControlId !== null
+        && webSessionProofBindings.controlAvailable(presentedControlId, proof);
+    const control = exposeControl ? bootstrapWebAuthControl(controlAllowed ? presentedControlId : null) : null;
+    if (exposeControl && !control) {
         const response = NextResponse.json({
             status: 'error',
             isSetup: false,
@@ -120,7 +130,7 @@ export async function GET(request: Request) {
         console.error('[auth-check]', dbHealthClassification.code, dbHealthClassification.message);
     }
     const sessionId = webAuthSessionIdFromRequest(request);
-    const resolution = sessionId && hasAttestedLoopbackIngress(request) ? resolveWebAuthControlSession(sessionId, control.controlId) : null;
+    const resolution = sessionId && controlAllowed && control ? resolveWebAuthControlSession(sessionId, control.controlId, request) : null;
     const session = resolution?.status === 'active' ? resolution.projection as WebSessionProjection : null;
     const hasSession = session !== null;
     if (!dbHealth) {

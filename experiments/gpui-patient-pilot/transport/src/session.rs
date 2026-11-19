@@ -8703,6 +8703,7 @@ mod tests {
                 let request = read_request(&mut stream);
                 assert!(request.starts_with("POST /api/auth/local-client/logout "));
                 assert!(!request.starts_with("POST /api/auth/logout "));
+                assert!(request.contains("x-mediflow-local-client-instance: "));
                 assert!(request.contains(&format!("mediflow_auth_control={}", "c".repeat(43))));
                 assert!(!request.contains("x-mediflow-paired"));
                 if status == 204 {
