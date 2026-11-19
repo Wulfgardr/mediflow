@@ -10,6 +10,7 @@ import { assertNodeRuntime, readNodeContract, standaloneDirectory } from './node
 import { assertScheduledBackupRuntime } from './scheduled-backup-runtime-contract.mjs';
 import { assertStandaloneRuntimeChunks } from './standalone-runtime-chunks.mjs';
 import { formatPdfSmokeFailure } from './anydoc-pdf-smoke-diagnostics.mjs';
+import { countWindowsIcuPngInk } from './anydoc-windows-icu-png-oracle.mjs';
 import { documentChildLaunch } from './document-child-launcher.mjs';
 
 import http from 'node:http';
@@ -81,7 +82,7 @@ class PdfPageWorkerSmokeError extends Error {}
 const ANYDOC_WORKER_FILE = 'anydoc-local-extraction-worker.mjs';
 const ANYDOC_WORKER_SHA256 = '5d6e2e60f1d71f3fd45065961258a7debe8a96e017abdcee92823986c8f08c67';
 const ANYDOC_PDF_PAGE_WORKER_FILE = 'anydoc-pdf-page-worker.mjs';
-const ANYDOC_PDF_PAGE_WORKER_SHA256 = '72e7f91ddef9569a9ff0acae8f91893ec7218b4750d0f4886ca162913e1526d9';
+const ANYDOC_PDF_PAGE_WORKER_SHA256 = '8019436fa83815e96f43e6371181650a272a0bb397145f10b39a37b754fc35a0';
 const PDFJS_STANDARD_FONT_FILES = Object.freeze([
   'FoxitDingbats.pfb', 'FoxitFixed.pfb', 'FoxitFixedBold.pfb', 'FoxitFixedBoldItalic.pfb', 'FoxitFixedItalic.pfb',
   'FoxitSerif.pfb', 'FoxitSerifBold.pfb', 'FoxitSerifBoldItalic.pfb', 'FoxitSerifItalic.pfb', 'FoxitSymbol.pfb',
@@ -340,11 +341,13 @@ function decodePdfChildFrame(output) {
 }
 
 function syntheticPdfPage() {
+  const stream = 'BT /F1 14 Tf 8 10 Td (MediFlow 012345) Tj ET';
   const objects = [
     '<< /Type /Catalog /Pages 2 0 R >>',
     '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 72 36] /Resources << >> /Contents 4 0 R >>',
-    '<< /Length 3 >>\nstream\nq Q\nendstream',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 128 32] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
+    `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>',
   ];
   const parts = [Buffer.from('%PDF-1.4\n')];
   const offsets = [];
@@ -354,7 +357,7 @@ function syntheticPdfPage() {
   }
   const xrefOffset = parts.reduce((total, part) => total + part.byteLength, 0);
   const xref = offsets.map((offset) => `${String(offset).padStart(10, '0')} 00000 n \n`).join('');
-  parts.push(Buffer.from(`xref\n0 5\n0000000000 65535 f \n${xref}trailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`));
+  parts.push(Buffer.from(`xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${xref}trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`));
   return Buffer.concat(parts);
 }
 
@@ -421,20 +424,21 @@ function framedPdfPageWorkerSmokeFailure(workerPath) {
     return formatPdfSmokeFailure('materialize', 'response', materialize);
   }
 
+  const profiles = JSON.parse(fs.readFileSync(path.join(path.dirname(workerPath), 'anydoc-pdf-renderer-profiles.json'), 'utf8'));
+  const glibcVersion = process.platform === 'linux' ? process.report.getReport().header.glibcVersionRuntime : undefined;
+  const supported = supportsPdfRendering(profiles, process.platform, process.arch, glibcVersion);
   const render = runPdfChild(workerPath, encodePdfChildFrame({
     schemaVersion: ANYDOC_PDF_CHILD_SCHEMA_VERSION,
     operation: 'render',
     pages: [{ page: 1, byteLength: materialized.body.byteLength }],
     bodyByteLength: materialized.body.byteLength,
-  }, [materialized.body]), { allowAddons: true });
+  }, [materialized.body]), { allowAddons: true, args: supported ? ['--smoke-renderer-init'] : [] });
   if (render.error || render.status !== 0 || render.signal !== null
       || !Buffer.isBuffer(render.stderr) || render.stderr.byteLength !== 0) {
     return formatPdfSmokeFailure('render', 'transport', render);
   }
   const rendered = decodePdfChildFrame(render.stdout);
-  const profiles = JSON.parse(fs.readFileSync(path.join(path.dirname(workerPath), 'anydoc-pdf-renderer-profiles.json'), 'utf8'));
-  const glibcVersion = process.platform === 'linux' ? process.report.getReport().header.glibcVersionRuntime : undefined;
-  if (!supportsPdfRendering(profiles, process.platform, process.arch, glibcVersion)) {
+  if (!supported) {
     return rendered?.header?.schemaVersion === ANYDOC_PDF_CHILD_SCHEMA_VERSION
       && rendered.header.status === 'error' && rendered.header.reason === 'engine_unavailable'
       && rendered.header.bodyByteLength === 0 && rendered.body.byteLength === 0
@@ -448,10 +452,19 @@ function framedPdfPageWorkerSmokeFailure(workerPath) {
       || rendered.header.bodyByteLength !== rendered.body.byteLength
       || !Array.isArray(rendered.header.pages) || rendered.header.pages.length !== 1
       || raster?.page !== 1 || raster?.byteLength !== rendered.body.byteLength
-      || raster?.width !== 144 || raster?.height !== 72
+      || raster?.width !== 256 || raster?.height !== 64
       || !Number.isSafeInteger(raster?.durationMs) || raster.durationMs < 0
       || !rendered.body.subarray(0, pngSignature.byteLength).equals(pngSignature)) {
     return formatPdfSmokeFailure('render', 'response', render);
+  }
+  try {
+    const inkPixels = countWindowsIcuPngInk(rendered.body);
+    if (process.env.MEDIFLOW_PDF_SMOKE_TIMINGS === '1') {
+      console.log(JSON.stringify({ type: 'pdf-smoke-rendered-text', width: raster.width, height: raster.height, inkPixels,
+        pngSha256: createHash('sha256').update(rendered.body).digest('hex') }));
+    }
+  } catch {
+    return formatPdfSmokeFailure('render', 'text_pixels', render);
   }
   return null;
 }
@@ -1309,6 +1322,12 @@ const anyDocRun = runDocumentSmoke(standaloneDir, anyDocWorkerPath, SYNTHETIC_RT
 if (anyDocRun.error || anyDocRun.status !== 0 || !Buffer.isBuffer(anyDocRun.stdout)
     || anyDocRun.stdout.toString('utf8') !== 'Synthetic standalone note.\n') {
   fail('Standalone runtime AnyDoc worker did not extract the synthetic RTF through the production launcher.');
+}
+
+const anyDocPdfRun = runDocumentSmoke(standaloneDir, anyDocWorkerPath, syntheticPdfPage(), { allowAddons: true }, 15_000);
+if (anyDocPdfRun.error || anyDocPdfRun.status !== 0 || anyDocPdfRun.signal !== null
+    || !Buffer.isBuffer(anyDocPdfRun.stdout) || anyDocPdfRun.stdout.toString('utf8') !== '## MediFlow 012345\n') {
+  fail('Standalone runtime AnyDoc worker did not extract the synthetic PDF text through the production launcher.');
 }
 
 let databaseEntry;
