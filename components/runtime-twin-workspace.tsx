@@ -6,11 +6,12 @@ import { useEntryDraftMarker } from '@/hooks/use-entry-local-draft';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Fragment, createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { Activity, BookOpen, CalendarDays, CircleDashed, ChevronDown, CircleHelp, ClipboardList, FolderOpen, Inbox, LockKeyhole, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Settings2, Search, Users, X } from 'lucide-react';
+import { Activity, BookOpen, CalendarDays, CircleDashed, ChevronDown, CircleHelp, ClipboardList, FolderOpen, Inbox, LockKeyhole, Moon, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Settings2, Search, Sun, Users, X } from 'lucide-react';
 import { db } from '@/lib/db';
 import { currentWorkspaceDestination } from '@/lib/workspace-destination';
 import { useLiveQuery } from '@/lib/live-query';
 import { useSecurity } from '@/components/security-provider';
+import { useTheme } from '@/components/theme-provider';
 import PrivacyBlur from '@/components/privacy-blur';
 import { PrivacyModeToggle } from '@/components/privacy-mode-toggle';
 import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
@@ -71,8 +72,11 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
   const confirm = useConfirm();
   const { showToast } = useToast();
   const { lock, user } = useSecurity();
+  const { setTheme } = useTheme();
+  const desktop = useSyncExternalStore(watchRecordWidth, desktopRecord, serverRecordWidth);
   const pathname = usePathname();
   const patientId = pathname.match(/^\/patients\/([^/]+)\//)?.[1] ?? null;
+  const wideRecord = !!patientId && proposal && desktop;
   const [opened, setOpened] = useState<string[]>([]);
   const [area, setArea] = useState<string | null>(null);
   const [openCommands, setOpenCommands] = useState<CommandHandler>(null);
@@ -144,11 +148,14 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
     return (await Promise.all(key.split('|').filter(Boolean).map(id => db.patients.get(id)))).filter(p => !!p);
   }, [key, proposal], [], ['patients']) ?? [];
 
-  const workspaceBar = (
-    <header className={styles.workspaceBar}>
-          <button type="button" className={styles.iconButton} aria-label={railOpen ? 'Riduci navigazione' : 'Espandi navigazione'} aria-expanded={railOpen} onClick={() => setRailOpen(value => !value)}>
+  const railToggle = (
+    <button type="button" className={styles.iconButton} aria-label={railOpen ? 'Riduci navigazione' : 'Espandi navigazione'} aria-expanded={railOpen} onClick={() => setRailOpen(value => !value)}>
             {railOpen ? <PanelLeftClose size={18} aria-hidden /> : <PanelLeftOpen size={18} aria-hidden />}
           </button>
+  );
+  const workspaceBar = (
+    <header className={styles.workspaceBar}>
+          {!wideRecord ? railToggle : null}
           <nav className={styles.openRecords} aria-label="Cartelle aperte">
             <Link className={styles.directoryTab} href={activeDestination.href} aria-current={!patientId && currentDestinationHref !== null ? 'page' : undefined}>{activeDestination.label}</Link>
             {records.map((patient, index) => <span className={styles.recordTab} key={patient.id} data-active={patient.id === patientId}>
@@ -157,7 +164,7 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
                 : <button type="button" aria-label={`Chiudi cartella ${index + 1}`} onClick={() => setOpened(value => value.filter(id => id !== patient.id))}><X size={13} aria-hidden /></button>}
             </span>)}
           </nav>
-          <PrivacyModeToggle className={styles.privacy} />
+          {!wideRecord ? <PrivacyModeToggle className={styles.privacy} /> : null}
         </header>
   );
 
@@ -197,10 +204,14 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
           </details>
         </nav>
         <div className={styles.railBottom}>
-          <Link href="/settings" aria-label="Impostazioni" title="Impostazioni" aria-current={currentDestinationHref === '/settings' ? 'page' : undefined}><Settings2 size={17} aria-hidden /><span>Impostazioni</span></Link>
-          <div className={styles.account} data-identified={!!operator}>
+          <div className={styles.railTools}>
+            <Link href="/settings" aria-label="Impostazioni" title="Impostazioni" aria-current={currentDestinationHref === '/settings' ? 'page' : undefined}><Settings2 size={17} aria-hidden /><span>Impostazioni</span></Link>
+            {wideRecord ? <>{railToggle}<PrivacyModeToggle className={styles.privacy} /></> : null}
+          </div>
+          <div className={styles.account} data-identified={wideRecord && !!operator}>
             {patientId && proposal && operator ? <><span className={styles.initials} aria-hidden="true">{operator.split(/\s+/).filter(Boolean).slice(-2).map(part => part[0]).join('').toLocaleUpperCase('it-IT')}</span>
               <div className={styles.operator}><span>{operator}</span>{user?.ambulatoryName ? <small>{user.ambulatoryName}</small> : null}</div></> : null}
+            {wideRecord ? <button type="button" className={styles.themeButton} aria-label="Cambia tema" title="Cambia tema" onClick={() => setTheme(document.documentElement.classList.contains('dark') ? 'light' : 'dark')}><Moon className={styles.toDark} size={15} aria-hidden /><Sun className={styles.toLight} size={15} aria-hidden /></button> : null}
             <button type="button" onClick={lock} aria-label="Blocca" title="Blocca"><LockKeyhole size={17} aria-hidden /><span>Blocca</span></button>
           </div>
         </div>
