@@ -182,8 +182,8 @@
     font: var(--type-section);
     white-space: nowrap;
 }
-.chipChange { background: color-mix(in oklab, var(--lume-signal-warning) 16%, var(--lume-record-island)); color: var(--lume-signal-warning); }
-.chipCritical { background: color-mix(in oklab, var(--lume-signal-critical) 13%, var(--lume-record-island)); color: var(--lume-signal-critical); }
+.chipChange { background: var(--lume-record-warning-fill); color: var(--lume-signal-warning); }
+.chipCritical { background: var(--lume-record-critical-fill); color: var(--lume-signal-critical); }
 .chipNeutral, .chipNeutralStatic { background: var(--lume-record-island); color: var(--lume-ink); }
 .chipNeutral:hover { text-decoration: underline; }
 .diaryTools { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }

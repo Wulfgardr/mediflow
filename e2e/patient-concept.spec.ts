@@ -56,6 +56,10 @@ test('Scheda desktop del concept con identità, tre colonne e ritorno alle sezio
     });
     for (const theme of ['light', 'dark']) {
         await setTheme(theme);
+        const dark = theme === 'dark';
+        await expect(page.locator('aside[aria-label="MediFlow"]')).toHaveCSS('background-color', dark ? 'rgb(22, 25, 29)' : 'rgb(242, 244, 247)');
+        await expect(page.getByTestId('lume-scheda-scroll').locator('..')).toHaveCSS('background-color', dark ? 'rgb(23, 25, 30)' : 'rgb(255, 255, 255)');
+        await expect(change.getByText('1 valore fuori intervallo', { exact: true })).toHaveCSS('background-color', dark ? 'rgb(58, 35, 33)' : 'rgb(251, 232, 230)');
         await assertNoHorizontalOverflow(page, [{ label: 'Scheda', selector: '#quadro' }]);
         const rail = await rect('aside[aria-label="MediFlow"]');
         const main = await rect('[data-testid="lume-scheda-header"]');
@@ -70,8 +74,9 @@ test('Scheda desktop del concept con identità, tre colonne e ritorno alle sezio
         }
         expect(Math.abs(rail.width - 232)).toBeLessThanOrEqual(3);
         expect(Math.abs(main.x - 244)).toBeLessThanOrEqual(4);
-        for (const [tray, left, width] of [[trays[0], 268, 320], [trays[1], 600, 370], [trays[2], 982, 308]] as const) {
+        for (const [tray, left, width] of [[trays[0], 259, 326], [trays[1], 597, 376], [trays[2], 985, 314]] as const) {
             expect(Math.abs(tray.x - left)).toBeLessThanOrEqual(4);
+            expect(Math.abs(tray.y - 209)).toBeLessThanOrEqual(2);
             expect(Math.abs(tray.y - trays[0].y)).toBeLessThanOrEqual(1);
             expect(Math.abs(tray.width - width)).toBeLessThanOrEqual(4);
         }

@@ -113,6 +113,10 @@
   .patientCanvas .patientBody, :global(html[data-twin-composition='stream']) .patientCanvas .patientBody[data-folder-section] {
     margin: 0; padding: 12px 24px 24px; max-width: none;
   }
+  .patientCanvas:not([data-writing='true']) .patientBody[data-folder-section='quadro'],
+  :global(html[data-twin-composition='stream']) .patientCanvas:not([data-writing='true']) .patientBody[data-folder-section='quadro'] {
+    padding: 18px 15px 14px;
+  }
   .patientCanvas .readingPane { max-width: none; }
   .patientCanvas .actions { position: relative; margin-top: -20px; z-index: 2; }
   .patientCanvas .actions :is(a, button):not([role='menuitem']) { min-height: 36px; height: 36px; }

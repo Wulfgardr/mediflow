@@ -34,11 +34,11 @@
 .identifierLabel { margin-right: 4px; color: var(--lume-ink-muted); font: var(--type-meta); text-decoration: none; }
 
 .alerts { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
-.adi { padding: 2px 8px; border-radius: 8px; background: var(--lume-record-success-bg, var(--k8-pill-success-bg)); color: var(--lume-record-success, var(--k8-pill-success-fg)); font: 600 .75rem/1.125rem var(--lume-font-sans); }
+.adi { padding: 2px 8px; border-radius: 8px; background: var(--lume-record-success-bg, var(--k8-pill-success-bg)); color: var(--lume-record-success, var(--k8-pill-success-fg)); font: var(--type-record-label); }
 @media (min-width: 1001px) {
-  .identity .details { gap: 0 6px; color: var(--record-hint, var(--lume-ink-muted)); font: 400 0.8125rem/1.125rem var(--lume-font-sans); }
+  .identity .details { gap: 0 6px; color: var(--record-hint, var(--lume-ink-muted)); font: var(--type-record-data); }
   .identity .details > :not(:last-child)::after { content: '·'; margin-left: 6px; }
   .identity .alerts { margin-top: 9px; }
   .identity .alerts :is(ul,p) { margin: 0; }
-  .identity .allergy { padding: 2px 8px; border: 0; background: var(--lume-record-critical-bg, var(--k8-pill-critical-bg)); color: var(--lume-record-critical, var(--k8-pill-critical-fg)); border-radius: 8px; font: 600 0.75rem/1.125rem var(--lume-font-sans); }
+  .identity .allergy { padding: 2px 8px; border: 0; background: var(--lume-record-critical-bg, var(--k8-pill-critical-bg)); color: var(--lume-record-critical, var(--k8-pill-critical-fg)); border-radius: 8px; font: var(--type-record-label); }
 }

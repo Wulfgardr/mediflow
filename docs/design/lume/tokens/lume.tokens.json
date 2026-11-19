@@ -104,6 +104,14 @@
   },
   "record": {
     "giorno": {
+      "canvas": { "$value": "#e4e7ec" },
+      "ink": { "$value": "#14161a" },
+      "accent": { "$value": "#2450b4" },
+      "warning-fill": { "$value": "#fbebd9" },
+      "critical-fill": { "$value": "#fbe8e6" },
+      "success-fill": { "$value": "#e2f1e9" },
+      "panel": { "$value": "#ffffff" },
+      "rail": { "$value": "#f2f4f7" },
       "tray": { "$value": "#f0f2f4" },
       "tray-rule": { "$value": "#dfe1e5" },
       "tray-light": { "$value": "#ffffff" },
@@ -116,6 +124,14 @@
       "proposal-rule": { "$value": "#2b8098" }
     },
     "grafite": {
+      "canvas": { "$value": "#0d0f12" },
+      "ink": { "$value": "#eceef1" },
+      "accent": { "$value": "#8cabf7" },
+      "warning-fill": { "$value": "#33281e" },
+      "critical-fill": { "$value": "#3a2321" },
+      "success-fill": { "$value": "#1b2f26" },
+      "panel": { "$value": "#17191e" },
+      "rail": { "$value": "#16191d" },
       "tray": { "$value": "#101216" },
       "tray-rule": { "$value": "#24262b" },
       "tray-light": { "$value": "#1d1f23" },
