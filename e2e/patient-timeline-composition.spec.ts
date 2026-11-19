@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow } from './utils';
-import { sealDiaryEntry } from './fixtures/sealed-diary-entry';
+import { diaryEntrySealer, sealDiaryEntry } from './fixtures/sealed-diary-entry';
 
 test('Timeline paziente: indice cronologico e accessi allo storico senza duplicare il Diario', async ({ baseURL }) => {
     test.setTimeout(180_000);
@@ -22,9 +22,9 @@ test('Timeline paziente: indice cronologico e accessi allo storico senza duplica
     const surfaces: unknown[] = [];
     try {
         await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-        const fixture = await page.evaluate(async () => {
-            const post = async (path: string, body: unknown) => {
-                const response = await fetch(`/api/${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+        const fixture = await page.evaluate(async seal => {
+            const post = async (path: string, body: Record<string, unknown>) => {
+                const response = await fetch(`/api/${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(path === 'entries' ? await seal(body) : body) });
                 if (!response.ok) throw new Error(`${path}: ${response.status}`); return response.json();
             };
             const empty = await post('patients', { firstName: 'Timeline', lastName: 'Vuota sintetica', taxCode: `T15${crypto.randomUUID().replaceAll('-', '').slice(0, 13).toUpperCase()}`, birthDate: '1980-01-01', diagnoses: [] });
@@ -40,7 +40,7 @@ test('Timeline paziente: indice cronologico e accessi allo storico senza duplica
             const update = await fetch(`/api/patients/${patient.id}`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ version: current.version, documentInsights: JSON.stringify(insights) }) });
             if (!update.ok) throw new Error(`Archive seed: ${update.status}`);
             return { patientId: patient.id as string, emptyId: empty.id as string, entries };
-        });
+        }, await diaryEntrySealer(page));
         if (directory) await mkdir(directory, { recursive: true });
         const capture = async (state: string) => {
             if (causal) return;
