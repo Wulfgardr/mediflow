@@ -2946,7 +2946,11 @@ impl ClinicalApp {
             .cursor_pointer()
             .when(!active, move |el| el.hover(move |s| s.bg(theme.hover)))
             .focus(move |s| s.shadow(vec![theme.focus_ring(false)]))
-            .child(icon(Icon::for_area(area), color, if compact { 20. } else { 16. }))
+            .child(icon(
+                Icon::for_area(area),
+                color,
+                if compact { 20. } else { 16. },
+            ))
             .child(
                 div()
                     .min_w_0()
@@ -3122,17 +3126,28 @@ impl ClinicalApp {
                     )
                     .child(
                         button("clinical-workspace-appearance", "", theme, false, true)
-                            .aria_label(if self.dark { "Passa al tema Giorno" } else { "Passa al tema Grafite" })
+                            .aria_label(if self.dark {
+                                "Passa al tema Giorno"
+                            } else {
+                                "Passa al tema Grafite"
+                            })
                             .min_h(px(32.))
                             .size(px(32.))
                             .px(px(0.))
                             .py(px(0.))
                             .rounded(px(10.))
                             .border_color(gpui::transparent_black())
-                            .child(icon(if self.dark { Icon::Sun } else { Icon::Moon }, theme.secondary, 15.))
+                            .child(icon(
+                                if self.dark { Icon::Sun } else { Icon::Moon },
+                                theme.secondary,
+                                15.,
+                            ))
                             .on_click(cx.listener(|this, _, _, cx| {
                                 let dark = !this.dark;
-                                this.change_local_preference(PreferenceChange::Appearance(Some(dark)), cx)
+                                this.change_local_preference(
+                                    PreferenceChange::Appearance(Some(dark)),
+                                    cx,
+                                )
                             })),
                     )
                     .child(
@@ -3909,6 +3924,10 @@ impl ClinicalApp {
         pane
     }
 
+    fn wide_overview(&self, layout: Layout) -> bool {
+        !layout.compact && (self.form.is_some() || self.patient_section == PatientSection::Overview)
+    }
+
     fn profile_view(&self, layout: Layout, cx: &Context<Self>) -> Stateful<Div> {
         let theme = self.theme;
         let mut pane = div()
@@ -4007,9 +4026,12 @@ impl ClinicalApp {
         let mut content = div()
             .id("clinical-workspace-profile-scroll")
             .min_w_0()
-            .px(px(layout.margin))
-            .pb(px(layout.margin))
-            .pt(px(if layout.compact { layout.margin } else { 8. }));
+            .when(self.wide_overview(layout), |el| el.px(px(15.)).pt(px(9.)))
+            .when(!self.wide_overview(layout), |el| {
+                el.px(px(layout.margin))
+                    .pb(px(layout.margin))
+                    .pt(px(if layout.compact { layout.margin } else { 8. }))
+            });
         if self.form.is_some() {
             content = content.child(self.record_overview(patient, layout, cx));
         } else {

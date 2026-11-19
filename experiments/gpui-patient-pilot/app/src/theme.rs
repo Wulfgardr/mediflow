@@ -32,6 +32,7 @@ pub struct Theme {
     pub success: Hsla,
     pub threshold_text: Hsla,
     pub rail: Hsla,
+    pub sheet: Hsla,
     pub control_radius: f32,
     pub paper_radius: f32,
     pub scale: f32,
@@ -111,7 +112,8 @@ impl Theme {
             critical: color("signal", "critical"),
             success: color("signal", "success"),
             threshold_text: color("ink", "threshold"),
-            rail: token_color(&tokens["record"][register][if dark { "island" } else { "tray" }]),
+            rail: token_color(&tokens["record"][register]["rail"]),
+            sheet: token_color(&tokens["record"][register]["panel"]),
             control_radius: if cfg!(any(target_os = "ios", target_os = "macos")) {
                 12.
             } else if cfg!(target_os = "windows") {
@@ -194,6 +196,7 @@ impl Theme {
             TypeRole::Section => (SYSTEM, 12., FontWeight::SEMIBOLD, 1.5, true),
             TypeRole::Title => (SYSTEM, 15., FontWeight::SEMIBOLD, 1.4, true),
             TypeRole::RecordPerson => (SYSTEM, 28., FontWeight::SEMIBOLD, 1.15, false),
+            TypeRole::RecordZone => (SYSTEM, 20., FontWeight::SEMIBOLD, 1.2, false),
             TypeRole::RecordIsland => (SYSTEM, 17., FontWeight::SEMIBOLD, 1.3, false),
             TypeRole::RecordRow => (SYSTEM, 15., FontWeight::SEMIBOLD, 1.35, false),
             TypeRole::Code => (SYSTEM, 12., FontWeight::MEDIUM, 1.5, false),
@@ -225,6 +228,7 @@ pub enum TypeRole {
     Section,
     Title,
     RecordPerson,
+    RecordZone,
     RecordIsland,
     RecordRow,
     Code,
@@ -292,6 +296,7 @@ pub enum TitleRole {
     Section,
     SectionTitle,
     RecordPerson,
+    RecordZone,
     RecordIsland,
     Threshold,
 }
@@ -305,6 +310,7 @@ impl From<TitleRole> for TypeRole {
             TitleRole::Section => Self::Section,
             TitleRole::SectionTitle => Self::Title,
             TitleRole::RecordPerson => Self::RecordPerson,
+            TitleRole::RecordZone => Self::RecordZone,
             TitleRole::RecordIsland => Self::RecordIsland,
             TitleRole::Threshold => Self::Threshold,
         }
@@ -312,7 +318,7 @@ impl From<TitleRole> for TypeRole {
 }
 pub trait TypeStyle: Styled + Sized {
     fn reading_surface(self, theme: Theme) -> Self {
-        self.bg(theme.paper)
+        self.bg(theme.sheet)
             .text_color(theme.ink)
             .type_role(theme, TextRole::Body)
     }
