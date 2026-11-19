@@ -5,22 +5,22 @@ import os from 'node:os';
 import path from 'node:path';
 import Database from 'better-sqlite3';
 import { initializeSqliteSchema } from './sqlite-schema';
-import { openVersionedSqliteDatabase } from './sqlite-schema-open';
+import { CURRENT_SQLITE_SCHEMA_VERSION, openVersionedSqliteDatabase } from './sqlite-schema-open';
 import { assertAmbulatoryCommandPredecessorRecoverySchema } from './ambulatory-destructive-command-recovery-schema';
 
-test('v15 admission preserves its original and migrates to v16 with empty registration authority', () => {
+test('v15 admission preserves its original and migrates to the current version with empty registration authority', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-schema-'));
     const file = path.join(root, 'medical.db');
     try {
         const predecessor = new Database(file);
         initializeSqliteSchema(predecessor);
-        predecessor.exec('DROP TABLE agent_unlock_grants; DROP TABLE agent_registrations');
+        predecessor.exec('DROP TABLE entry_revisions; DROP TABLE agent_unlock_grants; DROP TABLE agent_registrations');
         predecessor.pragma('user_version=15');
         assertAmbulatoryCommandPredecessorRecoverySchema(predecessor);
         predecessor.close();
         const migrated = openVersionedSqliteDatabase(file);
         try {
-            assert.equal(migrated.pragma('user_version', { simple: true }), 16);
+            assert.equal(migrated.pragma('user_version', { simple: true }), CURRENT_SQLITE_SCHEMA_VERSION);
             assert.equal(migrated.prepare('SELECT count(*) FROM agent_registrations').pluck().get(), 0);
             assert.equal(migrated.prepare('SELECT count(*) FROM agent_unlock_grants').pluck().get(), 0);
         } finally { migrated.close(); }
