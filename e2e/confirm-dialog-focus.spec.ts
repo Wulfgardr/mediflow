@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { bootstrapUnlockedSession, openPatientSection, unlockIfNeeded } from './utils';
+import { sealDiaryEntry } from './fixtures/sealed-diary-entry';
 
 async function patient(page: Page) {
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
@@ -37,13 +38,14 @@ test('conferma senza campi: focus sul ritorno, Escape e chiusura restituiscono i
 test('conferma con motivazione: focus sul campo, guardia e ritorno al trigger', async ({ page }) => {
     test.setTimeout(90_000);
     const id = await patient(page);
-    await page.evaluate(async patientId => {
+    const entry = await sealDiaryEntry(page, { patientId: id, type: 'visit', date: '2026-10-27', title: 'Voce sintetica focus', content: 'Contenuto sintetico da conservare.' });
+    await page.evaluate(async body => {
         const response = await fetch('/api/entries', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ patientId, type: 'visit', date: '2026-10-27', title: 'Voce sintetica focus', content: 'Contenuto sintetico da conservare.' }),
+            body: JSON.stringify(body),
         });
         if (!response.ok) throw new Error(`Synthetic entry: ${response.status}`);
-    }, id);
+    }, entry);
     await page.goto(`/patients/${id}/modules`);
     await expect(page.getByRole('navigation', { name: 'Sezioni della vista', exact: true }).or(page.getByRole('heading', { name: 'Sblocca MediFlow', exact: true }))).toBeVisible({ timeout: 45_000 });
     await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
