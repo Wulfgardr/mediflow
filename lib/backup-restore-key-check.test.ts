@@ -67,7 +67,10 @@ test('the client tells a blocked restore from a failed one and verifies through 
 test('the Web restore checks prior diary text with the same archive key before sending', async t => {
     const { db, verifyRawDatabase } = await import('./db.ts');
     let calls = 0;
-    t.mock.method(globalThis, 'fetch', async () => { calls += 1; return Response.json({ success: true, createdAt: '2026-10-10T08:00:00.000Z', collections: ['entryRevisions'], counts: { entryRevisions: 1 } }); });
+    t.mock.method(globalThis, 'fetch', async () => { calls += 1; return Response.json({
+        success: true, createdAt: '2026-10-10T08:00:00.000Z', collections: ['entryRevisions'], counts: { entryRevisions: 1 },
+        expectedSnapshot: 'a'.repeat(64), sourceChecksum: 'b'.repeat(64),
+    }); });
     const key = await generateMasterKey();
     const current = await seal(key);
     const foreign = await seal(await generateMasterKey());
@@ -94,7 +97,10 @@ test('Web restore admits legacy history only with the same key and patient bindi
         entryRevisions: [{ ...revision, version: binding.version, entryId: binding.entryId }],
     });
     let requests = 0;
-    t.mock.method(globalThis, 'fetch', async () => { requests += 1; return Response.json({ success: true, createdAt: '2026-10-10T08:00:00.000Z', collections: ['entryRevisions'], counts: { entryRevisions: 1 } }); });
+    t.mock.method(globalThis, 'fetch', async () => { requests += 1; return Response.json({
+        success: true, createdAt: '2026-10-10T08:00:00.000Z', collections: ['entryRevisions'], counts: { entryRevisions: 1 },
+        expectedSnapshot: 'a'.repeat(64), sourceChecksum: 'b'.repeat(64),
+    }); });
     try {
         db.setKey(await generateMasterKey());
         await assert.rejects(verifyRawDatabase(backup()), BackupRestoreKeyError);
