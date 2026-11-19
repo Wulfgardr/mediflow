@@ -24,7 +24,7 @@ import type { ClinicalEditorFocus } from '@/components/clinical-rich-text-editor
 import { PatientSynopticSheet } from '@/components/patient-synoptic-sheet';
 import { PatientSheetSources, type SheetSource } from '@/components/patient-sheet-sources';
 import { projectVisitReference } from '@/lib/patient-therapy-changes';
-import { PatientSheetActivity } from '@/components/patient-sheet-activity';
+import { PatientSheetActivity, therapyChangesSinceVisit } from '@/components/patient-sheet-activity';
 import { CollapsibleSection } from '@/components/kree8/collapsible-section';
 import DocumentInsightsPanel from '@/components/document-insights-panel';
 import DocumentUpload from '@/components/document-upload';
@@ -744,9 +744,10 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
 
                 <PluginLocalUiNavigation key={id} patientId={id} patientVersion={patient.version} patientLabel={`${patient.firstName} ${patient.lastName}`} />
                 <PatientSynopticSheet
-                    clinicalSupport={<PatientProposalsSummary hasInsightProposal={hasInsightProposal} patientId={patient.id} preview={currentInsightPreview}
+                    clinicalSupport={<PatientProposalsSummary hasInsightProposal={hasInsightProposal} patientId={patient.id} proposal={currentInsightPreview}
                             hasSmartImportProposal={smartImportProposalCapture !== null && smartImportProposalCapture === smartImportFabricCaptureInput}
                             smartImportAvailable={smartImportSourceCount > 0} />}
+                    therapyChanges={therapyChangesSinceVisit(id, therapiesError ? undefined : therapies, visitReference, comparisonReadAt)}
                     notesContent={<PatientProfileNotes patientId={id} patientVersion={patient.version} />}
                     problems={{ data: diagnosisItems, loading: patientLoading, error: patientError }}
                     therapies={{ data: activeTherapies, loading: therapiesLoading, error: therapiesError }}
