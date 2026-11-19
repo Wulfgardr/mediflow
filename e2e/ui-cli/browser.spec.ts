@@ -25,6 +25,10 @@ test('blocca un controllo ambiguo, anche se il primo sarebbe azionabile', async 
 
 test('rifiuta azioni, percorsi e selettori fuori dal formato', () => {
   for (const input of [
+    { op: 'resize', width: 390.5, height: 880 },
+    { op: 'resize', width: 0, height: 880 },
+    { op: 'resize', width: 390, height: 5000 },
+    { op: 'resize', width: '390', height: 880 },
     { op: 'goto', url: 'http://127.0.0.1' },
     { op: 'eval', code: '1+1' },
     { op: 'click', target: { css: 'button' } },
@@ -32,4 +36,27 @@ test('rifiuta azioni, percorsi e selettori fuori dal formato', () => {
     { op: 'uploadText', target: { role: 'button', name: 'Carica' }, file: '../file', value: 'Test' },
     { op: 'screenshot', file: '../file' },
   ]) expect(actionSchema.safeParse(input).success).toBe(false);
+});
+
+
+test('ridimensiona la stessa pagina, aziona il menu compatto e conserva il campo', async ({ page }, info) => {
+  await page.setViewportSize({ width: 1320, height: 880 });
+  await page.setContent(`
+    <style>@media (min-width: 600px) { details { display: none; } }</style>
+    <label for="draft">Bozza</label><textarea id="draft">Testo di prova</textarea>
+    <details><summary>Altro</summary><details><summary>Apri dettaglio</summary>Dettaglio disponibile</details></details>
+  `);
+  const output = info.outputDir;
+  const menu = { text: 'Altro' };
+  await drive(page, { op: 'expect', target: menu, state: 'hidden' }, output);
+  await expect(drive(page, { op: 'resize', width: 390, height: 880 }, output)).resolves.toMatchObject({
+    viewport: { width: 390, height: 880 },
+  });
+  await drive(page, { op: 'click', target: menu }, output);
+  await drive(page, { op: 'click', target: { text: 'Apri dettaglio' } }, output);
+  await expect(page.getByText('Dettaglio disponibile')).toBeVisible();
+  await expect(drive(page, { op: 'resize', width: 1320, height: 880 }, output)).resolves.toMatchObject({
+    viewport: { width: 1320, height: 880 },
+  });
+  await drive(page, { op: 'expectValue', target: { role: 'textbox', name: 'Bozza' }, value: 'Testo di prova' }, output);
 });
