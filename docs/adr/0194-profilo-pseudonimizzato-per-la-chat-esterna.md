@@ -57,8 +57,16 @@ neurale: costerebbe secondi su ogni lettura.
   con gli identificativi dell'anagrafica e senza entità neurali. Lo stesso
   valore riceve lo stesso segnaposto del campo strutturato. Le date cliniche
   diventano scostamenti in giorni come nell'ADR 0192.
-- Un testo più lungo di 12.000 caratteri si prepara a pezzi, tagliati a fine
-  riga o fra due parole.
+- Un testo più lungo di 12.000 caratteri, il limite di una preparazione, si
+  prepara a finestre nella stessa sessione. Ogni finestra porta 1024 caratteri
+  di contesto a sinistra e a destra e se ne tiene solo il tratto centrale. Il
+  taglio cade a fine riga o fra due parole, ma solo in un punto che nessuno
+  span della finestra attraversa, altrimenti si sposta all'inizio dello span.
+  Se il punto non esiste la lettura viene rifiutata con `query_unavailable`.
+  Il motivo è che anche i valori fuori dall'anagrafica (il telefono di un
+  familiare, un indirizzo dopo «indirizzo:», un numero dettato dopo
+  «telefono») si riconoscono solo interi e con il testo che li precede, e un
+  taglio che evita i soli valori noti non basta.
 
 ### Durata della corrispondenza
 
@@ -103,6 +111,7 @@ riservata dei segnaposto fa fallire la lettura con `query_unavailable`.
 | Invariante | Prova nel repository |
 |---|---|
 | M1. Nessuna identità nei byte serviti dal trasporto MCP `stdio`, per le due proiezioni | `lib/patient-profile-mcp-pseudonymization.test.ts`, M1: porto Web reale, IPC reale e server MCP `stdio` in un processo figlio, sentinella sui byte di stdout |
+| M1 per i testi lunghi. Nessun valore che il livello deterministico copre esce, intero o a pezzi, perché cade a cavallo di un taglio | stesso file, M1 sui testi lunghi: tutte le posizioni attorno ai due tagli possibili, per tre valori dell'anagrafica con spazi e tre riconosciuti solo dal livello deterministico, sulle due proiezioni. Sulla versione precedente dava 202 fughe |
 | M2. Sostituzione prima dell'IPC | stesso file, M2, sentinella sui frame verso il Supervisor |
 | M3. Mini e HTTP invariati | stesso file, M3, `portable-supervisor-child-processes.test.ts`, e con le stesse attese `patient-profile-scoped.test.ts` e `patient-profile-mini-integration.test.ts` |
 | M4. Corrispondenza per handle, chiusa al ritiro | stesso file, M4 |
@@ -119,6 +128,12 @@ riservata dei segnaposto fa fallire la lettura con `query_unavailable`.
   passo successivo, se la chat ne ha bisogno.
 - È pseudonimizzazione, non anonimizzazione: il contesto clinico può bastare a
   riconoscere una persona ed il GDPR resta applicabile, come dice l'ADR 0160.
+- In un testo lungo la data di riferimento per gli scostamenti è la più
+  recente della prima finestra, non dell'intero testo. Può cambiare se una data
+  esce come scostamento o come `DAT` opaco, mai se esce in chiaro.
+- Uno span più lungo di una finestra (per esempio un indirizzo dopo
+  «indirizzo:» senza punto né a capo per migliaia di caratteri) fa rifiutare
+  la lettura.
 - Un valore del caregiver molto corto o generico (una parola comune) viene
   sostituito ovunque compaia nei testi liberi.
 
