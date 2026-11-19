@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { readPrescriptionJsonObject } from '@/lib/prescription-json-body';
 import { NextResponse } from 'next/server';
 import {
@@ -20,7 +21,7 @@ export async function PUT(request: Request, context: RouteContext) {
         const result = await updateNetworkScopedProstheticPrescription({ ...resolved.context, prescriptionId: id }, body);
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
-        console.error('API PUT /api/v1/network/prosthetic-prescriptions/[id] error:', error);
+        logServerError('API PUT /api/v1/network/prosthetic-prescriptions/[id] error', error);
         return NextResponse.json({ error: 'Failed to update prosthetic prescription' }, { status: 500 });
     }
 }

@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { NextResponse } from 'next/server';
@@ -38,7 +39,7 @@ export async function PUT(
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('API PUT /conversations/[id] error:', error);
+        logServerError('API PUT /conversations/[id] error', error);
         return NextResponse.json({ error: 'Update Failed' }, { status: 500 });
     }
 }
@@ -62,7 +63,7 @@ export async function DELETE(
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('API DELETE /conversations/[id] error:', error);
+        logServerError('API DELETE /conversations/[id] error', error);
         return NextResponse.json({ error: 'Delete Failed' }, { status: 500 });
     }
 }

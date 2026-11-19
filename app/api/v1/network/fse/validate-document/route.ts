@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { readNativeNetworkJson, jsonBodyTooLargeResponse } from '@/lib/native-network-json-body';
 import { NextResponse } from 'next/server';
 import { validateFseDocumentPayload } from '@/lib/fse-validate-document';
@@ -15,7 +16,7 @@ export async function POST(request: Request) {
     } catch (error) {
         const sizeError = jsonBodyTooLargeResponse(error);
         if (sizeError) return sizeError;
-        console.error('API POST /api/v1/network/fse/validate-document error:', error);
+        logServerError('API POST /api/v1/network/fse/validate-document error', error);
         return NextResponse.json({ error: 'Failed to validate profile document' }, { status: 500 });
     }
 }

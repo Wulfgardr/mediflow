@@ -183,7 +183,7 @@ export class OllamaProviderAdapter implements ProviderAdapter {
                 console.error(`AI Service Chat Timeout dopo ${this.chatTimeoutMs} ms`);
                 throw new Error(`Timeout del provider AI dopo ${Math.round(this.chatTimeoutMs / 1000)}s. Verifica che il modello sia caricato e riprova.`);
             }
-            console.error('AI Service Chat Error:', e);
+            console.error('Ollama chat failed');
             throw e;
         }
     }
@@ -206,9 +206,9 @@ export class OllamaProviderAdapter implements ProviderAdapter {
             return browserRuntime
                 ? models
                 : models.filter(isLocalOllamaModelDescriptor);
-        } catch (e) {
-            console.error('List Models Error:', e);
-            throw e;
+        } catch (error) {
+            console.error('Ollama model list failed');
+            throw error;
         }
     }
 
