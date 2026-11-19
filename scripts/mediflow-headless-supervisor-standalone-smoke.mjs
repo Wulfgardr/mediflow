@@ -112,11 +112,10 @@ const META = Object.freeze({
   'io.modelcontextprotocol/clientCapabilities': {},
   'io.modelcontextprotocol/clientInfo': { name: 'mediflow-production-smoke', version: '1.0.0' },
 });
-function webMutationHeaders(cookieHeader, archiveGeneration, hasJsonBody = true) {
-  assert.match(archiveGeneration, /^[0-9a-f-]{36}$/u);
+function webMutationHeaders(webHeaders, hasJsonBody = true) {
+  assert.match(webHeaders['x-mediflow-archive-generation'], /^[0-9a-f-]{36}$/u);
   return {
-    Cookie: cookieHeader,
-    'x-mediflow-archive-generation': archiveGeneration,
+    ...webHeaders,
     ...(hasJsonBody ? { 'Content-Type': 'application/json' } : {}),
     Origin: BASE_URL,
     'Sec-Fetch-Site': 'same-origin',
@@ -296,10 +295,10 @@ async function concurrentSupervisors(foreignCwd) {
 async function activateSyntheticSelection() {
   const login = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: '1234' });
   assert.equal(login.response.status, 200);
-  assert.ok(login.cookieHeader);
-  const jsonHeaders = webMutationHeaders(login.cookieHeader, login.json.archiveGeneration);
+  assert.ok(login.webHeaders);
+  const jsonHeaders = webMutationHeaders(login.webHeaders);
   const ambulatoryResponse = await fetch(new URL('/api/ambulatories', BASE_URL),
-    { headers: { Cookie: login.cookieHeader } });
+    { headers: login.webHeaders });
   assert.equal(ambulatoryResponse.status, 200);
   const ambulatories = await ambulatoryResponse.json();
   const ambulatoryId = ambulatories.find((item) => item.isDefault)?.id ?? ambulatories[0]?.id;
@@ -332,11 +331,11 @@ async function activateSyntheticSelection() {
   });
   assert.equal(itemResponse.status, 201);
   const sourceResponse = await fetch(new URL(`/api/service-prescriptions?patientId=${PATIENT_ID}`, BASE_URL),
-    { headers: { Cookie: login.cookieHeader } });
+    { headers: login.webHeaders });
   assert.equal(sourceResponse.status, 200);
   assert.ok(JSON.stringify(await sourceResponse.json()).includes(DISCLOSURE_SENTINEL));
   const epochResponse = await fetch(new URL('/api/ai/smart-import/selection', BASE_URL),
-    { headers: { Cookie: login.cookieHeader } });
+    { headers: login.webHeaders });
   assert.equal(epochResponse.status, 200);
   const { selectionEpoch: expectedEpoch } = await epochResponse.json();
   const selectionResponse = await fetch(new URL('/api/ai/smart-import/selection', BASE_URL), {
@@ -375,7 +374,7 @@ async function activateSyntheticSelection() {
   assert.match(uiBindingRef, /^hcub_[0-9a-f]{64}$/u);
   assert.equal(resourceTitle, CHECKUP_TITLE);
   assert.equal(resourceRevision, 1);
-  return Object.freeze({ cookieHeader: login.cookieHeader, archiveGeneration: login.json.archiveGeneration, checkupRef, uiBindingRef,
+  return Object.freeze({ webHeaders: login.webHeaders, archiveGeneration: login.json.archiveGeneration, checkupRef, uiBindingRef,
     resourceTitle, resourceRevision });
 }
 function verifyCommittedTransition(dataDir, receipt) {
@@ -392,9 +391,9 @@ function verifyCommittedTransition(dataDir, receipt) {
     assert.deepEqual(audit.receipt, receipt);
   } finally { database.close(); }
 }
-async function verifyOrdinaryWeb(child, cookieHeader, archiveGeneration) {
+async function verifyOrdinaryWeb(child, webHeaders) {
   assert.equal(child.exitCode, null, 'Agent teardown interrupted independent Web');
-  const headers = { ...webMutationHeaders(cookieHeader, archiveGeneration), Origin: ORDINARY_URL };
+  const headers = { ...webMutationHeaders(webHeaders), Origin: ORDINARY_URL };
   const response = await fetch(new URL('/api/patients', ORDINARY_URL), {
     method: 'POST', headers,
     body: JSON.stringify({ id: 'patient.synthetic.independent-web', firstName: 'Synthetic',
@@ -436,7 +435,7 @@ async function main() {
     await verifyBackendIdentity(ORDINARY_URL);
     const ordinaryLogin = await loginWithWebAuthControl(ORDINARY_URL, { username: USERNAME, password: '1234' });
     assert.equal(ordinaryLogin.response.status, 200);
-    assert.ok(ordinaryLogin.cookieHeader);
+    assert.ok(ordinaryLogin.webHeaders);
     child = launch(dataDir, foreignCwd);
     const exit = new Promise((resolve) => child.once('exit', (code) => resolve(code)));
     child.stderr.setEncoding('utf8');
@@ -452,8 +451,8 @@ async function main() {
     assert.equal(prebind.result.content[0].text, 'MediFlow operation denied: host_unbound.');
     const selection = await activateSyntheticSelection();
     assert.equal(ordinaryLogin.json.archiveGeneration, selection.archiveGeneration, 'Independent Web must use the same archive');
-    const { cookieHeader, checkupRef, uiBindingRef, resourceTitle, resourceRevision } = selection;
-    const jsonHeaders = webMutationHeaders(cookieHeader, selection.archiveGeneration);
+    const { webHeaders, checkupRef, uiBindingRef, resourceTitle, resourceRevision } = selection;
+    const jsonHeaders = webMutationHeaders(webHeaders);
     const cloudProbe = await fetch(new URL('/api/system/cloud-provider-probe', BASE_URL), {
       method: 'POST', headers: jsonHeaders,
       body: JSON.stringify({ intent: 'run_synthetic_nonclinical_probe' }),
@@ -521,7 +520,7 @@ async function main() {
     const proposalResponse = await fetch(new URL(
       `/api/patients/${PATIENT_ID}/intelligent-host/checkup-status/proposals/${preview.proposalRef}`,
       BASE_URL,
-    ), { headers: { Cookie: cookieHeader, 'Cache-Control': 'no-store',
+    ), { headers: { ...webHeaders, 'Cache-Control': 'no-store',
       'x-mediflow-checkup-ui-binding': uiBindingRef } });
     assert.equal(proposalResponse.status, 200);
     assert.deepEqual(await proposalResponse.json(), {
@@ -549,7 +548,7 @@ async function main() {
     assert.match(receipt.receiptRefHash, /^sha256:[0-9a-f]{64}$/u);
     assert.deepEqual(await confirm('9999'), receipt);
     const checkupsResponse = await fetch(new URL(`/api/checkups?patientId=${PATIENT_ID}`, BASE_URL), {
-      headers: { Cookie: cookieHeader, 'Cache-Control': 'no-store' },
+      headers: { ...webHeaders, 'Cache-Control': 'no-store' },
     });
     assert.equal(checkupsResponse.status, 200);
     const committedCheckup = (await checkupsResponse.json()).find((item) => item.id === CHECKUP_ID);
@@ -557,11 +556,11 @@ async function main() {
     assert.equal(committedCheckup.version, 2);
     const operationRevocationResponse = await fetch(
       new URL(`/api/patients/${PATIENT_ID}/intelligent-host/checkup-status`, BASE_URL),
-      { method: 'DELETE', headers: webMutationHeaders(cookieHeader, selection.archiveGeneration, false) },
+      { method: 'DELETE', headers: webMutationHeaders(webHeaders, false) },
     );
     assert.equal(operationRevocationResponse.status, 200);
     assert.deepEqual(await operationRevocationResponse.json(), { state: 'revoked' });
-    const retiredProposal = await fetch(confirmationUrl, { headers: { Cookie: cookieHeader,
+    const retiredProposal = await fetch(confirmationUrl, { headers: { ...webHeaders,
       'x-mediflow-checkup-ui-binding': uiBindingRef } });
     assert.equal(retiredProposal.status, 401);
     const postOperationStatus = await rpc.send('tools/call', tool('mediflow.system.headless_status.v1'));
@@ -579,18 +578,18 @@ async function main() {
     const postRoleStatus = await rpc.send('tools/call', tool('mediflow.system.headless_status.v1'));
     assert.equal(postRoleStatus.result.structuredContent.writes, 0);
     const authenticatedCheck = await fetch(new URL('/api/auth/check', BASE_URL), {
-      headers: { Cookie: cookieHeader, 'Cache-Control': 'no-store' },
+      headers: { ...webHeaders, 'Cache-Control': 'no-store' },
     });
     assert.equal(authenticatedCheck.status, 200);
     assert.equal((await authenticatedCheck.json()).hasSession, true);
     const logout = await fetch(new URL('/api/auth/logout', BASE_URL), {
-      method: 'POST', headers: webMutationHeaders(cookieHeader, selection.archiveGeneration, false),
+      method: 'POST', headers: webMutationHeaders(webHeaders, false),
     });
     assert.equal(logout.status, 204);
     assert.equal(await withTimeout(exit, 'Supervisor terminal exit'), 0);
     verifyCommittedTransition(dataDir, receipt);
     await prebindShutdown(dataDir, foreignCwd, 'EOF');
-    await verifyOrdinaryWeb(ordinary, ordinaryLogin.cookieHeader, ordinaryLogin.json.archiveGeneration);
+    await verifyOrdinaryWeb(ordinary, ordinaryLogin.webHeaders);
     if (APP) await assertReaped();
     rpc.assertHealthy();
     assert.equal(rpc.pending.size, 0);

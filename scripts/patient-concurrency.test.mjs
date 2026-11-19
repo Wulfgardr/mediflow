@@ -327,8 +327,7 @@ async function createAuthContext() {
 
     return {
         web: new LaneClient('web', '/api/patients', {
-            Cookie: auth.cookieHeader,
-            'x-mediflow-archive-generation': auth.json.archiveGeneration,
+            ...auth.webHeaders,
             Origin: new URL(BASE_URL).origin,
             'Sec-Fetch-Site': 'same-origin',
         }),
@@ -340,7 +339,7 @@ async function createAuthContext() {
 async function login() {
     const result = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: PIN });
     assert.equal(result.response.status, 200, 'web concurrency lane should authenticate');
-    assert.ok(result.cookieHeader, 'login should return the mediflow_session cookie');
+    assert.ok(result.webHeaders, 'login should return the authenticated client headers');
     assert.equal(typeof result.json?.archiveGeneration, 'string');
     return result;
 }
