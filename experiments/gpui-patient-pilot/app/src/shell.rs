@@ -7932,6 +7932,49 @@ mod tests {
                 assert_eq!(app.threshold_mode.get(), ThresholdMode::Compact)
             });
         }
+        let region = cx.debug_bounds("threshold-recovery-region").unwrap();
+        cx.simulate_event(gpui::ScrollWheelEvent {
+            position: region.center(),
+            delta: gpui::ScrollDelta::Pixels(gpui::point(px(0.), px(1000.))),
+            modifiers: gpui::Modifiers::default(),
+            touch_phase: gpui::TouchPhase::Moved,
+        });
+        render_clinical_window(cx);
+        let discover = serde_json::json!({"op":"discover"});
+        eprintln!(
+            "MEDIFLOW_MENU_UI_CLI_BEFORE {}",
+            ui_cli::drive(&discover, &app, cx).unwrap()
+        );
+        let other_actions = serde_json::json!({"role":"button", "name":"Altre azioni"});
+        ui_cli::drive(
+            &serde_json::json!({"op":"press", "target":other_actions, "key":"Enter"}),
+            &app,
+            cx,
+        )
+        .unwrap();
+        render_clinical_window(cx);
+        let open = ui_cli::drive(&discover, &app, cx).unwrap();
+        let controls = open["tree"].as_array().unwrap();
+        assert!(
+            controls
+                .iter()
+                .any(|node| node["role"] == "menu" && node["name"] == "Altre azioni")
+        );
+        let item = controls
+            .iter()
+            .find(|node| {
+                node["role"] == "menuitem"
+                    && node["name"]
+                        .as_str()
+                        .is_some_and(|name| name.starts_with("Copia"))
+            })
+            .expect("voce Copia esposta dal menu");
+        let item = serde_json::json!({"role":"menuitem", "name":item["name"]});
+        ui_cli::drive(&serde_json::json!({"op":"click", "target":item}), &app, cx).unwrap();
+        render_clinical_window(cx);
+        let closed = ui_cli::drive(&discover, &app, cx).unwrap();
+        assert!(closed["byRole"].get("menu").is_none());
+        eprintln!("MEDIFLOW_MENU_UI_CLI {open}");
     }
 
     #[gpui::test]
