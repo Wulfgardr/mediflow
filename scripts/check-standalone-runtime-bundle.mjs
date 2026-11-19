@@ -8,7 +8,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { assertNodeRuntime, readNodeContract, standaloneDirectory } from './node-runtime-contract.mjs';
 import { assertScheduledBackupRuntime } from './scheduled-backup-runtime-contract.mjs';
-import { assertStandaloneSsrChunks } from './standalone-ssr-chunks.mjs';
+import { assertStandaloneRuntimeChunks } from './standalone-runtime-chunks.mjs';
 import { formatPdfSmokeFailure } from './anydoc-pdf-smoke-diagnostics.mjs';
 import { documentChildLaunch } from './document-child-launcher.mjs';
 
@@ -1143,6 +1143,7 @@ const runtimeContractPath = path.join(standaloneDir, 'mediflow-runtime-contract.
 
 const forbiddenMatchers = [
   (relativePath) => /^medical\.db$/i.test(relativePath),
+  (relativePath) => relativePath.startsWith('lib/fixtures/archive-v090/'),
   (relativePath) => /\.(db|sqlite|sqlite3)$/i.test(relativePath),
   (relativePath) => /^tmp[-_/]/.test(relativePath),
   (relativePath) => /^docs\//.test(relativePath),
@@ -1174,7 +1175,7 @@ const requireFromStandalone = createRequire(serverPath);
 // require the raw scheduler closure before any runtime smoke is attempted.
 await assertScheduledBackupRuntime(standaloneDir);
 const nextDistDir = process.env.MEDIFLOW_NEXT_DIST_DIR || '.next';
-assertStandaloneSsrChunks(path.join(root, nextDistDir), path.join(standaloneDir, nextDistDir));
+assertStandaloneRuntimeChunks(path.join(root, nextDistDir), path.join(standaloneDir, nextDistDir));
 
 function fail(message) {
   console.error(message);

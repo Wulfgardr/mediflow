@@ -328,3 +328,41 @@ test('only a pure status echo of an applied change passes with an old version', 
     assert.equal(otherStatus.value.code, 'VERSION_CONFLICT');
     assert.deepEqual(itemRows(ids).map((row) => [row.status, row.version]), [['booked', 3]]);
 });
+
+test('prescription deletion requires exactly the reviewed items and their versions', async () => {
+    const ids = seed('report_received', ['report_received', 'report_received']);
+    const reviewed = listed(ids);
+    const [first, second] = reviewed;
+    const context = { ...host, id: ids.prescriptionId };
+    await writer.updateHostServicePrescriptionItem({ ...host, id: first.id }, { version: first.version, outcomeNote: 'ENC:synthetic:new' });
+    const before = { parent: parentRow(ids), items: itemRows(ids), audit: auditCount(ids) };
+    const fresh = [{ ...first, version: first.version + 1 }, second];
+    for (const snapshot of [reviewed, [], [fresh[0]], [...fresh, { id: 'removed', version: 1 }], [fresh[0], fresh[0]]]) {
+        const refused = await writer.deleteHostServicePrescription(context, 3, snapshot);
+        assert.equal(refused.status, 409);
+        assert.deepEqual({ parent: parentRow(ids), items: itemRows(ids), audit: auditCount(ids) }, before);
+    }
+    assert.equal((await writer.deleteHostServicePrescription(context, 3, fresh)).status, 200);
+    assert.ok(itemRows(ids).every(row => row === undefined));
+});
+
+test('a stale date is accepted only as the exact echo of the previous implicit cascade', async () => {
+    const ids = seed('booked', ['booked']);
+    const item = { ...paired, itemId: ids.itemIds[0] };
+    const booked = { status: 'booked', scheduledAt: '2026-11-21T09:00:00Z' };
+    assert.equal((await writer.updateNetworkScopedServicePrescriptionItem(item, { version: 2, ...booked })).status, 200);
+    const before = auditCount(ids);
+    for (const date of [booked.scheduledAt, '2026-11-25T09:00:00Z', null]) {
+        assert.equal((await writer.updateNetworkScopedServicePrescriptionItem(item, { version: 2, status: 'booked', scheduledAt: date })).status, 409);
+    }
+    assert.equal(auditCount(ids), before);
+
+    const performed = { status: 'performed', performedAt: '2026-11-22T09:00:00.123Z' };
+    assert.equal((await writer.updateNetworkScopedServicePrescription({ ...paired, prescriptionId: ids.prescriptionId }, { version: 3, ...performed })).status, 200);
+    const afterCascade = auditCount(ids);
+    assert.equal((await writer.updateNetworkScopedServicePrescriptionItem(item, { version: 3, status: 'performed', performedAt: '2026-11-22T10:00:00.123+01:00' })).status, 200);
+    for (const body of [{ version: 2, ...performed }, { version: 3, ...performed, scheduledAt: null }, { version: 3, ...performed, performedAt: '2026-11-23' }]) {
+        assert.equal((await writer.updateNetworkScopedServicePrescriptionItem(item, body)).status, 409);
+    }
+    assert.equal(auditCount(ids), afterCascade);
+});
