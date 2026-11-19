@@ -1,41 +1,13 @@
 import { existsSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
-import { expect, test } from '@playwright/test';
-import { bootstrapUnlockedSession, openPatientSection, unlockIfNeeded } from './utils';
+import { expect, test, type Page } from '@playwright/test';
+import { test as standalone } from './fixtures/isolated-runtime';
+import { bootstrapUnlockedSession, openPatientSection } from './utils';
 
 test.use({ trace: 'off', video: 'off', screenshot: 'off' });
+standalone.use({ trace: 'off', video: 'off', screenshot: 'off' });
 
-test.beforeEach(({ baseURL }) => {
-    const dataDirectory = process.env.MEDIFLOW_DATA_DIR;
-    test.skip(!baseURL || new URL(baseURL).hostname !== '127.0.0.1' || !dataDirectory || !isAbsolute(dataDirectory)
-        || process.env.MEDIFLOW_E2E_DISABLE_LEGACY_COPY !== '1' || !existsSync(join(dataDirectory, 'SYNTHETIC_ONLY')),
-    'Richiede un runtime locale con archivio sintetico.');
-});
-
-test('il medico accede, legge una scheda, registra una nota e scarica il backup', async ({ page }) => {
-    test.setTimeout(120_000);
-    const pin = process.env.E2E_PIN || '1234';
-    const note = 'Nota sintetica per la verifica della sessione Web.';
-    await bootstrapUnlockedSession(page, pin);
-
-    const patientId = await page.evaluate(async () => {
-        const marker = crypto.randomUUID().replaceAll('-', '').slice(0, 12).toUpperCase();
-        const response = await fetch('/api/patients', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                firstName: 'Medica', lastName: 'Sintetica', taxCode: `TST${marker}A`, birthDate: '1980-01-01',
-            }),
-        });
-        if (response.status !== 201) throw new Error(`Synthetic patient: HTTP ${response.status}`);
-        return (await response.json()).id as string;
-    });
-
-    await page.goto(`/patients/${patientId}/modules`);
-    await expect(page.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeVisible();
-    await unlockIfNeeded(page, pin);
-    await expect(page.getByTestId('lume-scheda-header')).toContainText('Medica');
-    await openPatientSection(page, 'diario');
+async function recordNote(page: Page, note: string): Promise<string> {
     await page.getByRole('link', { name: 'Nuova voce', exact: true }).click();
 
     await page.getByRole('combobox', { name: 'Tipo di voce' }).selectOption('note');
@@ -49,6 +21,48 @@ test('il medico accede, legge una scheda, registra una nota e scarica il backup'
     const entryId = (await saved.json()).id as string;
     await expect(page.getByRole('region', { name: 'Esito della registrazione' })).toContainText(note);
     await page.getByRole('link', { name: 'Chiudi la voce', exact: true }).click();
+    return entryId;
+}
+
+standalone('al primo avvio il medico accede, legge una scheda, registra una nota e scarica il backup', async ({ page }) => {
+    standalone.setTimeout(120_000);
+    const pin = process.env.E2E_PIN || '1234';
+    const note = 'Nota sintetica per la verifica della sessione Web.';
+    const operator = { displayName: 'Ada E2E', ambulatoryName: 'Studio E2E Sessione' };
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: 'Chi sei?' })).toBeVisible();
+    await bootstrapUnlockedSession(page, pin, operator);
+    const profile = await page.evaluate(async () => {
+        const response = await fetch('/api/auth/profile');
+        if (!response.ok) throw new Error(`Synthetic profile: HTTP ${response.status}`);
+        return response.json();
+    });
+    expect(profile).toMatchObject(operator);
+    await page.getByRole('button', { name: 'Blocca', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeVisible();
+    await bootstrapUnlockedSession(page, pin, operator);
+
+    const { id: patientId, taxCode } = await page.evaluate(async () => {
+        const marker = crypto.randomUUID().replaceAll('-', '').slice(0, 12).toUpperCase();
+        const response = await fetch('/api/patients', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                firstName: 'Medica', lastName: 'Sintetica', taxCode: `TST${marker}A`, birthDate: '1980-01-01',
+            }),
+        });
+        if (response.status !== 201) throw new Error(`Synthetic patient: HTTP ${response.status}`);
+        return { id: (await response.json()).id as string, taxCode: `TST${marker}A` };
+    });
+
+    const navigation = page.getByRole('navigation', { name: 'Navigazione principale', exact: true });
+    await navigation.getByRole('link', { name: 'Agenda', exact: true }).click();
+    await navigation.getByRole('link', { name: 'Pazienti', exact: true }).click();
+    await page.getByRole('searchbox', { name: 'Cerca nella lista pazienti' }).fill(taxCode);
+    await page.getByRole('option').filter({ hasText: 'Sintetica Medica' }).press('Enter');
+    await expect(page.getByTestId('lume-scheda-header')).toContainText('Medica');
+    await openPatientSection(page, 'diario');
+    const entryId = await recordNote(page, note);
     await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules$`));
     await openPatientSection(page, 'diario');
     await expect(page.locator('#diario')).toContainText(note);
@@ -74,6 +88,12 @@ test('il medico accede, legge una scheda, registra una nota e scarica il backup'
     await peer.goto(`/patients/${patientId}/modules`);
     await peer.getByRole('button', { name: 'Rinnova accesso', exact: true }).click();
     await expect(peer.getByTestId('lume-scheda-header')).toContainText('Medica');
+    await openPatientSection(peer, 'diario');
+    await expect(peer.locator('#diario')).toContainText(note);
+    const peerNote = 'Nota sintetica dalla seconda scheda.';
+    await recordNote(peer, peerNote);
+    await openPatientSection(peer, 'diario');
+    await expect(peer.locator('#diario')).toContainText(peerNote);
     await peer.getByRole('button', { name: 'Blocca', exact: true }).click();
     await expect(peer.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeVisible();
@@ -81,7 +101,9 @@ test('il medico accede, legge una scheda, registra una nota e scarica il backup'
 
 test('il client API locale autorizzato legge la lista pazienti', async ({ baseURL }) => {
     const token = process.env.MEDIFLOW_SESSION_PROOF_SYNTHETIC_API_TOKEN;
-    if (!token || !baseURL) {
+    const dataDirectory = process.env.MEDIFLOW_DATA_DIR;
+    if (!token || !baseURL || new URL(baseURL).hostname !== '127.0.0.1' || !dataDirectory || !isAbsolute(dataDirectory)
+        || process.env.MEDIFLOW_E2E_DISABLE_LEGACY_COPY !== '1' || !existsSync(join(dataDirectory, 'SYNTHETIC_ONLY'))) {
         test.skip(true, 'Richiede il token generato dal runner sintetico.');
         return;
     }

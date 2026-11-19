@@ -363,10 +363,10 @@ test('production HTTP adapter admits only the dedicated control and named confir
     cookieState.cookies.set('mediflow_session', native.session.id); cookieState.cookies.set('ambulatory_id', 'scope');
     const base = { ...Object.fromEntries(native.request.headers), origin, 'sec-fetch-site': 'same-origin', 'content-type': 'application/json' };
     async function httpBegin(body: unknown, scoped: boolean) {
-        const req = new Request(`${origin}/api/auth/ambulatory-commands/begin`, { method: 'POST', headers: { ...base, ...(scoped ? { 'x-mediflow-expected-ambulatory-id': 'scope' } : {}) }, body: JSON.stringify(body) });
+        const req = localRequest(`${origin}/api/auth/ambulatory-commands/begin`, { method: 'POST', headers: { ...base, ...(scoped ? { 'x-mediflow-expected-ambulatory-id': 'scope' } : {}) }, body: JSON.stringify(body) });
         const response = await ambulatoryDestructiveHttp(req, 'begin'); assert.equal(response.status, 200, await response.clone().text());
         const opened = await response.json(), control = /mediflow_auth_control=([^;]+)/u.exec(response.headers.get('set-cookie')!)![1];
-        const attempt = beginWebAuthControl('login', Object.freeze({ controlId: control, ifMatch: response.headers.get('etag')!.slice(1, -1), idempotencyKey: randomUUID() }), localRequest(req)); assert.ok(attempt);
+        const attempt = beginWebAuthControl('login', Object.freeze({ controlId: control, ifMatch: response.headers.get('etag')!.slice(1, -1), idempotencyKey: randomUUID() }), req); assert.ok(attempt);
         const issued = issueWebAuthControl(attempt, { id: native.session.userId, username: native.session.username, role: 'admin' }); assert.ok(issued);
         return { [AMBULATORY_COMMAND_REFERENCE_HEADER]: opened.reference, cookie: `mediflow_session=${issued.sessionId}; mediflow_auth_control=${control}` };
     }
