@@ -7,8 +7,8 @@ read_when:
 
 # Matrice dei dati a riposo
 
-**Versione 16.** C06 / [WUL-721](https://linear.app/wulfgardr/issue/WUL-721),
-criterio 1. Dal 19 novembre 2026 la matrice descrive anche il controllo del server sui campi del diario Web.
+**Versione 17.** C06 / [WUL-721](https://linear.app/wulfgardr/issue/WUL-721),
+criterio 1. Il 20 novembre 2026 è stato aggiunto lo storico delle rettifiche del diario. La versione precedente documenta il controllo del server sui campi del diario Web.
 La revisione dell’8 novembre segue la rimozione delle tabelle di review durevole e scrittura SOAP headless (schema 11).
 A novembre sono entrate le allergie cifrate (7 novembre, ADR 0182) e le finestre con i blocchi della conservazione (3 novembre, ADR 0178).
 In ottobre si sono aggiunti il marker Web del cambio di stato terapia (21 ottobre, ADR 0156), i permessi del database adottato dalla cartella dell’applicazione (13 ottobre), le credenziali v3, la generazione dell’archivio, il recupero cifrato completo e i permessi delle copie di riparazione (11 ottobre).
@@ -234,7 +234,7 @@ di un allegato verificano i formati previsti per quei percorsi.
 
 - Cifrate: `address`, `phone`, `caregiver`, `exemptions`, `diagnoses`, `allergies`, `status_reason`, `notes`, `ai_summary`, `document_insights`, `archive_reason`, `archive_note`, `deletion_reason`
 - In chiaro: `id`, `first_name`, `last_name`, `tax_code`, `identifier_type`, `identifier_history`, `birth_date_precision`, `birth_year`, `birth_date`, `is_adi`, `is_archived`, `ambulatory_id`, `created_at`, `updated_at`, `monitoring_profile`, `version`, `deleted_at`, `ai_summary_generated_at`, `ai_summary_context_hash`
-- Leggibile senza chiave: nome, cognome, codice fiscale, data di nascita, profilo di monitoraggio, ADI e stato di archiviazione.
+- Leggibile senza chiave: nome, cognome, codice fiscale, data di nascita, profilo di monitoraggio, ADI e stato di archiviazione. Quando cambia l’identificativo del paziente, lo storico conserva in chiaro il tipo e il valore prima e dopo la modifica, la versione, la data e il riferimento all’operatore.
 
 ### `patients_to_ambulatories`: appartenenza dei pazienti alle sedi
 
@@ -425,3 +425,5 @@ cambia una classificazione.
 
 | 12 | Indice locale di provenienza: identificativi e classificazione leggibili in chiaro, esclusione dal portabile e inclusione nel recupero completo. |
 | 15 | Escono le sette tabelle di review durevole e scrittura SOAP headless, mai scritte dal prodotto: lo schema 11 le elimina, la copia originale dell'aggiornamento le conserva. |
+| 16 | Il server verifica la cifratura dei campi clinici nelle scritture del diario Web. |
+| 17 | Aggiunto lo storico delle rettifiche. Titolo e testo precedenti sono cifrati. Data, operatore, versione sostituita e collegamenti alla nota e all’audit sono leggibili senza la chiave. |
