@@ -1,0 +1,13 @@
+{"op":"press","key":"Enter","target":{"role":"tab","name":"Diario"}}
+{"op":"expect","state":"selected","target":{"role":"tab","name":"Diario"}}
+{"op":"resize","width":760,"height":610}
+{"op":"discover"}
+{"op":"click","target":{"role":"button","name":"Storico delle rettifiche, Nota sintetica con rettifiche"}}
+{"op":"expect","state":"expanded","target":{"role":"button","name":"Storico delle rettifiche, Nota sintetica con rettifiche"}}
+{"op":"discover"}
+{"op":"discover"}
+{"op":"press","key":"Tab"}
+{"op":"press","key":"Enter"}
+{"op":"expect","state":"selected","target":{"role":"button","name":"Versione 1"}}
+{"op":"scroll","deltaY":475,"target":{"role":"region","name":"Contenuto della scheda"}}
+{"op":"discover"}

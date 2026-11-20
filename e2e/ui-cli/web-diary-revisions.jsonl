@@ -1,0 +1,82 @@
+{"op":"expect","target":{"role":"heading","name":"Chi sei?"},"state":"visible"}
+{"op":"discover"}
+{"op":"fill","target":{"role":"textbox","name":"Nome e cognome"},"value":"Dottore Sintetico CLI"}
+{"op":"fill","target":{"role":"textbox","name":"Nome dell’ambulatorio"},"value":"Ambulatorio Sintetico CLI"}
+{"op":"focus","target":{"role":"button","name":"Avanti"}}
+{"op":"press","key":"Enter"}
+{"op":"expect","target":{"role":"heading","name":"Proteggi l’accesso"},"state":"visible"}
+{"op":"fill","target":{"label":"Passphrase di accesso"},"value":"Archivio sintetico del collaudo 091"}
+{"op":"fill","target":{"label":"Conferma passphrase"},"value":"Archivio sintetico del collaudo 091"}
+{"op":"fill","target":{"label":"PIN di conferma"},"value":"collaudo091"}
+{"op":"fill","target":{"label":"Conferma PIN"},"value":"collaudo091"}
+{"op":"click","target":{"role":"button","name":"Prepara il kit di recupero"}}
+{"op":"expect","target":{"role":"heading","name":"Conserva il nuovo kit prima di continuare"},"state":"visible"}
+{"op":"download","target":{"role":"button","name":"Scarica kit di recupero"}}
+{"op":"check","target":{"role":"checkbox","name":"Ho salvato il kit e scritto la chiave su carta; li conserverò separati."}}
+{"op":"click","target":{"role":"button","name":"Attiva la nuova passphrase"}}
+{"op":"fill","target":{"label":"Passphrase"},"value":"Archivio sintetico del collaudo 091"}
+{"op":"click","target":{"role":"button","name":"Sblocca"}}
+{"op":"click","target":{"role":"link","name":"Apri la cartella manualmente"}}
+{"op":"click","target":[{"role":"navigation","name":"Navigazione principale"},{"role":"link","name":"Pazienti"}]}
+{"op":"click","target":{"role":"link","name":"Nuova scheda"}}
+{"op":"expect","target":{"role":"heading","name":"Nuova scheda"},"state":"visible"}
+{"op":"discover"}
+{"op":"fill","target":{"role":"textbox","name":"Nome *"},"value":"Adele"}
+{"op":"fill","target":{"role":"textbox","name":"Cognome *"},"value":"Collaudo"}
+{"op":"fill","target":{"role":"textbox","name":"Codice fiscale"},"value":"SMOQKU80A01H501J"}
+{"op":"click","target":{"role":"button","name":"Crea scheda"}}
+{"op":"discover"}
+{"op":"expect","target":{"role":"searchbox","name":"Cerca nella lista pazienti"},"state":"visible"}
+{"op":"fill","target":{"role":"searchbox","name":"Cerca nella lista pazienti"},"value":"Collaudo"}
+{"op":"click","target":{"role":"link","name":"Apri scheda paziente"}}
+{"op":"expect","target":{"role":"region","name":"Riepilogo clinico"},"state":"visible"}
+{"op":"discover","target":{"role":"navigation","name":"Sezioni della vista"}}
+{"op":"click","target":[{"role":"navigation","name":"Sezioni della vista"},{"role":"link","name":"Diario"}]}
+{"op":"click","target":{"role":"link","name":"Nuova voce"}}
+{"op":"select","target":{"role":"combobox","name":"Tipo di voce"},"value":"Nota"}
+{"op":"fill","target":{"role":"textbox","name":"Resoconto clinico"},"value":"Inizio della nota sintetica. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Riga clinica inventata per verificare la rilettura. Fine prima versione."}
+{"op":"click","target":{"role":"button","name":"Rivedi"}}
+{"op":"click","target":{"role":"button","name":"Conferma e registra"}}
+{"op":"click","target":{"role":"link","name":"Chiudi la voce"}}
+{"op":"expect","state":"hidden","target":{"role":"link","name":"Chiudi la voce"}}
+{"op":"discover","target":{"role":"navigation","name":"Sezioni della vista"}}
+{"op":"click","target":[{"role":"navigation","name":"Sezioni della vista"},{"role":"link","name":"Diario 1"}]}
+{"op":"discover"}
+{"op":"click","target":{"role":"button","name":"Rettifica"}}
+{"op":"fill","target":{"role":"textbox","name":"Testo della rettifica"},"value":"Seconda versione sintetica e leggibile."}
+{"op":"click","target":{"role":"button","name":"Salva rettifica"}}
+{"op":"expect","target":{"role":"textbox","name":"Testo della rettifica"},"state":"hidden"}
+{"op":"click","target":{"role":"button","name":"Rettifica"}}
+{"op":"fill","target":{"role":"textbox","name":"Testo della rettifica"},"value":"Terza versione sintetica e leggibile."}
+{"op":"click","target":{"role":"button","name":"Salva rettifica"}}
+{"op":"expect","target":{"role":"textbox","name":"Testo della rettifica"},"state":"hidden"}
+{"op":"discover","target":{"role":"navigation","name":"Sezioni della vista"}}
+{"op":"click","target":[{"role":"navigation","name":"Sezioni della vista"},{"role":"link","name":"Riepilogo"}]}
+{"op":"click","target":{"role":"link","name":"Nuova voce"}}
+{"op":"fill","target":{"role":"textbox","name":"Resoconto clinico"},"value":"Bozza sintetica della seduta. Da rivedere."}
+{"op":"expectText","target":{"role":"form","name":"Nuova voce clinica"},"contains":true,"value":"Testo e dati della bozza conservati cifrati"}
+{"op":"resize","width":760,"height":660}
+{"op":"click","target":{"role":"button","name":"Tutto il diario"}}
+{"op":"discover"}
+{"op":"focus","target":{"role":"button","name":"Storico delle rettifiche"}}
+{"op":"expect","target":{"role":"button","name":"Storico delle rettifiche"},"state":"focused"}
+{"op":"press","key":"Enter"}
+{"op":"expect","target":{"role":"button","name":"Storico delle rettifiche"},"state":"expanded"}
+{"op":"discover","target":{"role":"region","name":"Versioni della nota"}}
+{"op":"focus","target":[{"role":"region","name":"Versioni della nota"},{"role":"button","name":"Versione 1"}]}
+{"op":"expect","target":[{"role":"region","name":"Versioni della nota"},{"role":"button","name":"Versione 1"}],"state":"focused"}
+{"op":"press","key":"Enter"}
+{"op":"expectText","target":{"role":"region","name":"Versioni della nota"},"contains":true,"value":"Fine prima versione."}
+{"op":"scroll","target":{"role":"region","name":"Versioni della nota"},"deltaY":475}
+{"op":"screenshot","file":"01-prima-versione"}
+{"op":"click","target":[{"role":"region","name":"Versioni della nota"},{"role":"button","name":"Versione 2"}]}
+{"op":"expectText","target":{"role":"region","name":"Versioni della nota"},"contains":true,"value":"Seconda versione sintetica e leggibile."}
+{"op":"click","target":[{"role":"region","name":"Versioni della nota"},{"role":"button","name":"Versione attuale 3"}]}
+{"op":"expectText","target":{"role":"region","name":"Versioni della nota"},"contains":true,"value":"Terza versione sintetica e leggibile."}
+{"op":"scroll","target":{"role":"region","name":"Versioni della nota"},"deltaY":475}
+{"op":"focus","target":{"role":"button","name":"Torna alla bozza dal diario"}}
+{"op":"expect","target":{"role":"button","name":"Torna alla bozza dal diario"},"state":"focused"}
+{"op":"press","key":"Enter"}
+{"op":"expect","target":{"role":"textbox","name":"Resoconto clinico"},"state":"focused"}
+{"op":"expectText","target":{"role":"textbox","name":"Resoconto clinico"},"value":"Bozza sintetica della seduta. Da rivedere."}
+{"op":"screenshot","file":"02-bozza-ritrovata"}

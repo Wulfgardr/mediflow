@@ -62,17 +62,65 @@ pub(super) struct RenderedControl {
 }
 
 thread_local! {
-    static CONTROLS: std::cell::RefCell<Option<Vec<RenderedControl>>> = const { std::cell::RefCell::new(None) };
+    static CONTROLS: std::cell::RefCell<Option<FrameControls>> = const { std::cell::RefCell::new(None) };
 }
 
-pub(super) fn controls(render: impl FnOnce()) -> Vec<RenderedControl> {
+#[derive(Default)]
+pub(super) struct FrameControls {
+    pub observed: Vec<RenderedControl>,
+    pub shared_buttons: Vec<SharedButton>,
+}
+
+pub(super) struct SharedButton {
+    pub id: String,
+    pub label: String,
+    pub enabled: bool,
+}
+
+pub(crate) fn record_shared_button(
+    id: &str,
+    label: &str,
+    enabled: bool,
+    bounds: &[gpui::Bounds<gpui::Pixels>],
+    window: &Window,
+) {
+    CONTROLS.with(|capture| {
+        let mut capture = capture.borrow_mut();
+        let Some(frame) = capture.as_mut() else {
+            return;
+        };
+        let mask = window
+            .content_mask()
+            .bounds
+            .intersect(&window.visual_viewport_bounds());
+        if bounds
+            .iter()
+            .any(|bounds| !bounds.intersect(&mask).is_empty())
+        {
+            frame.shared_buttons.push(SharedButton {
+                id: id.to_owned(),
+                label: label.to_owned(),
+                enabled,
+            });
+        }
+    });
+}
+
+pub(super) fn controls(render: impl FnOnce()) -> FrameControls {
     struct Capture;
     impl Drop for Capture {
         fn drop(&mut self) {
             CONTROLS.with(|items| *items.borrow_mut() = None);
         }
     }
-    CONTROLS.with(|items| assert!(items.borrow_mut().replace(Vec::new()).is_none()));
+    CONTROLS.with(|items| {
+        assert!(
+            items
+                .borrow_mut()
+                .replace(FrameControls::default())
+                .is_none()
+        )
+    });
     let _capture = Capture;
     render();
     CONTROLS.with(|items| items.borrow_mut().take().unwrap())
@@ -149,7 +197,7 @@ impl gpui::Element for Observed {
         CONTROLS.with(|items| {
             if let Some(items) = items.borrow_mut().as_mut() {
                 let viewport = window.visual_viewport_bounds();
-                items.push(RenderedControl {
+                items.observed.push(RenderedControl {
                     node: node.clone(),
                     bounds: bounds
                         .intersect(&window.content_mask().bounds)

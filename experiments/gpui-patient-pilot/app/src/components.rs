@@ -153,7 +153,18 @@ pub fn button(
     let label = label.into();
     #[cfg(test)]
     crate::shell::rendered_command::record_button_id(&id);
-    div()
+    let control = div();
+    #[cfg(test)]
+    let control = {
+        let id = id.clone();
+        let label = label.clone();
+        control.on_children_prepainted(move |bounds, window, _| {
+            crate::shell::rendered_command::record_shared_button(
+                &id, &label, enabled, &bounds, window,
+            )
+        })
+    };
+    control
         .id(id.clone())
         .accessibility_id(id)
         .role(Role::Button)
