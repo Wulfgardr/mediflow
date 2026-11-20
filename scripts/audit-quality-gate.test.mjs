@@ -36,7 +36,18 @@ test('diary required-audit guard follows all eight handlers and rejects detached
         assert.deepEqual(validate(), [], `${mode} ${handler}`);
         const change = (source, before, after) => {
             assert.ok(source.includes(before), before);
-            const mutated = source.replaceAll(before, after);
+            if (operation === 'update' && before === 'writeAuditEventInTransaction(tx, {') {
+                if (after.startsWith('if (')) {
+                    before = 'const auditEventId = ' + before;
+                    after = 'const auditEventId = input.audit.actorRef && writeAuditEventInTransaction(tx, {';
+                } else if (after.startsWith('return ')) {
+                    before = 'const auditEventId = ' + before;
+                    after = 'return { status: 200, value: {} }; const auditEventId = writeAuditEventInTransaction(tx, {';
+                }
+            }
+            const creationControl = operation === 'create' && before === 'writeAuditEventInTransaction(tx, {'
+                && (after.startsWith('if (') || after.startsWith('return '));
+            const mutated = creationControl ? source.replace(before, after) : source.replaceAll(before, after);
             assert.equal(ts.createSourceFile('mutant.ts', mutated, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
                 .parseDiagnostics.length, 0);
             return mutated;
@@ -65,6 +76,13 @@ test('diary required-audit guard follows all eight handlers and rejects detached
         }
         const source = original[sourceKey];
         assert.notDeepEqual(validate({ [sourceKey]: change(source, `mode: '${mode}'`, "mode: 'unadmitted'") }), []);
+        if (operation === 'update') {
+            const append = 'retainEntryRevision(tx, input, existing, auditEventId, correctedAt, previous);';
+            for (const bad of ['', 'retainEntryRevision(dbServer, input, existing, auditEventId, correctedAt, previous);',
+                'retainEntryRevision(tx, input, existing, input.entryId, correctedAt, previous);']) {
+                assert.notDeepEqual(validate({ coreSource: change(coreSource, append, bad) }), []);
+            }
+        }
         const callee = mode === 'network' ? spec.bridgeExport : spec.ownerName;
         assert.notDeepEqual(validate({ routeSource: change(original.routeSource,
             `${callee}(`, `unapprovedDiaryWrite(`) }), []);

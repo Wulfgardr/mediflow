@@ -18,7 +18,7 @@ const canonical = new Map([
 ]);
 for (const version of [4, 5, 6, 9, 10]) {
     function predecessor() {
-        const db = new Database(':memory:'); initializeSqliteSchema(db); db.exec('DROP TABLE agent_unlock_grants; DROP TABLE agent_registrations; DROP TABLE agent_cassettes; DROP TABLE agent_clients; DROP TABLE agent_pairing_requests; DROP TABLE agent_mandates');
+        const db = new Database(':memory:'); initializeSqliteSchema(db); db.exec('DROP TABLE entry_revisions; DROP TABLE agent_unlock_grants; DROP TABLE agent_registrations; DROP TABLE agent_cassettes; DROP TABLE agent_clients; DROP TABLE agent_pairing_requests; DROP TABLE agent_mandates');
         for (const column of ['proposer_ref', 'mandate_ref', 'model_provider']) db.exec(`ALTER TABLE audit_events DROP COLUMN ${column}`);
         for (const sql of RETIRED_FEATURE_TABLES_SQL) db.exec(sql);
         if (version < 9) db.exec('DROP TABLE portable_import_origins');
@@ -54,7 +54,7 @@ for (const version of [4, 5, 6, 9, 10]) {
 }
 test('false predecessor stamps cannot hide later or missing terminal ledgers', () => {
     for (const mutation of ['v4-with-v5-ledger', 'v5-with-v6-ledger', 'v5-missing-v5-ledger']) {
-        const db = new Database(':memory:'); initializeSqliteSchema(db); db.exec('DROP TABLE agent_unlock_grants; DROP TABLE agent_registrations; DROP TABLE agent_cassettes; DROP TABLE agent_clients; DROP TABLE agent_pairing_requests; DROP TABLE agent_mandates');
+        const db = new Database(':memory:'); initializeSqliteSchema(db); db.exec('DROP TABLE entry_revisions; DROP TABLE agent_unlock_grants; DROP TABLE agent_registrations; DROP TABLE agent_cassettes; DROP TABLE agent_clients; DROP TABLE agent_pairing_requests; DROP TABLE agent_mandates');
         try {
             if (mutation !== 'v5-with-v6-ledger') db.exec('DROP TABLE ambulatory_destructive_commands');
             if (mutation === 'v5-missing-v5-ledger') db.exec('DROP TABLE therapy_status_commands');
@@ -69,7 +69,7 @@ test('failure after the new v6 DDL rolls back the predecessor ledger, account by
     const original = openVersionedSqliteDatabase(file);
     for (const column of ['identifier_type', 'identifier_history', 'birth_date_precision', 'birth_year', 'allergies']) original.exec(`ALTER TABLE patients DROP COLUMN ${column}`);
     original.exec('ALTER TABLE entries DROP COLUMN recorded_by');
-    original.exec('DROP TABLE agent_unlock_grants; DROP TABLE agent_registrations; DROP TABLE agent_cassettes; DROP TABLE agent_clients; DROP TABLE agent_pairing_requests; DROP TABLE agent_mandates; DROP TABLE portable_import_origins; DROP TABLE ambulatory_destructive_commands; PRAGMA user_version=5;');
+    original.exec('DROP TABLE entry_revisions; DROP TABLE agent_unlock_grants; DROP TABLE agent_registrations; DROP TABLE agent_cassettes; DROP TABLE agent_clients; DROP TABLE agent_pairing_requests; DROP TABLE agent_mandates; DROP TABLE portable_import_origins; DROP TABLE ambulatory_destructive_commands; PRAGMA user_version=5;');
     for (const column of ['proposer_ref', 'mandate_ref', 'model_provider']) original.exec(`ALTER TABLE audit_events DROP COLUMN ${column}`);
     for (const sql of RETIRED_FEATURE_TABLES_SQL) original.exec(sql);
     original.prepare("INSERT INTO users(id,username,role,password_hash,encrypted_master_key,salt) VALUES ('synthetic-v5','synthetic-v5','admin','synthetic-hash','v3:synthetic-wrapped-key','synthetic-salt')").run();

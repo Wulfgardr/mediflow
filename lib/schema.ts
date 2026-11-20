@@ -214,6 +214,19 @@ export const entries = sqliteTable('entries', {
     dateIdx: index('entries_date_idx').on(t.date),
 }));
 
+export const entryRevisions = sqliteTable('entry_revisions', {
+    eventId: text('event_id').primaryKey(),
+    entryId: text('entry_id').notNull().references(() => entries.id, { onDelete: 'cascade' }),
+    version: integer('version').notNull(),
+    title: text('title').notNull(),
+    content: text('content').notNull(),
+    correctedAt: integer('corrected_at', { mode: 'timestamp' }).notNull(),
+    correctedBy: text('corrected_by'),
+}, (table) => [
+    uniqueIndex('entry_revisions_entry_version_idx').on(table.entryId, table.version),
+    check('entry_revisions_version_positive', sql`${table.version} > 0`),
+]);
+
 // --- Therapies ---
 export const therapies = sqliteTable('therapies', {
     id: text('id').primaryKey(),

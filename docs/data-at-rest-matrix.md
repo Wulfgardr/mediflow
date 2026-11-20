@@ -176,6 +176,12 @@ locali salvano ciò che ricevono.
 - In chiaro: `aic`, `name`, `active_principle`, `company`, `packaging`, `class`, `price`, `atc`, `aic_search`, `name_search`, `active_principle_search`, `packaging_search`
 - Leggibile senza chiave: dato pubblico di riferimento.
 
+### `entry_revisions`: rettifiche del diario
+
+- Cifrate: `title`, `content`
+- In chiaro: `event_id`, `entry_id`, `version`, `corrected_at`, `corrected_by`
+- Leggibile senza chiave: collegamento alla nota e all'audit, versione sostituita, data e nome dell'operatore. Titolo e testo sono entrambi cifrati. Un campo già protetto conserva la propria busta. Il valore legacy ancora in chiaro nella nota corrente viene cifrato alla prima rettifica locale con una chiave monouso avvolta dalla chiave dell'archivio (`ENCD1`), vincolata a paziente, nota e versione. Il writer riceve la chiave monouso solo via loopback attestata, la usa in memoria e non la salva. Il client conserva la chiave dell'archivio. I backup e il recupero conservano le buste.
+
 ### `entries`: diario clinico
 
 - Cifrate: `title`, `content`, `metadata`, `attachments`, `deletion_reason`
