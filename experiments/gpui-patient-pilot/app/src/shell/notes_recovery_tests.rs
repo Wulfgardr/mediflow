@@ -39,6 +39,25 @@ pub(super) struct Host {
     responses: Arc<Mutex<std::collections::VecDeque<PlannedResponse>>>,
 }
 impl Host {
+    const DEVICE: &'static str = "synthetic-device";
+    const TOKEN_CHARACTER: &'static str = "x";
+
+    fn client(socket: std::net::SocketAddr) -> RuntimeClient {
+        RuntimeClient::new(RuntimeConfig {
+            base_url: format!("http://{socket}"),
+            tls_pin_sha256: None,
+        })
+        .unwrap()
+    }
+
+    pub(super) fn stored_pairing(&self) -> StoredPairing {
+        StoredPairing {
+            client: Self::client(self.socket),
+            id: Self::DEVICE.to_owned(),
+            token: Zeroizing::new(Self::TOKEN_CHARACTER.repeat(64)),
+        }
+    }
+
     pub(super) fn new() -> Self {
         Self::with_diary_and_documents(json!([]), json!([]))
     }
@@ -204,14 +223,9 @@ impl Host {
                 worker.join().unwrap();
             }
         });
-        let client = RuntimeClient::new(RuntimeConfig {
-            base_url: format!("http://{socket}"),
-            tls_pin_sha256: None,
-        })
-        .unwrap();
-        let session = client
+        let session = Self::client(socket)
             .login(
-                PairingCredentials::new("synthetic-device", "x".repeat(64)).unwrap(),
+                PairingCredentials::new(Self::DEVICE, Self::TOKEN_CHARACTER.repeat(64)).unwrap(),
                 "synthetic",
                 "Synthetic scales fixture passphrase",
             )

@@ -42,7 +42,7 @@ pub(super) fn observe_scroll(element: Stateful<Div>, scroll: ScrollHandle) -> gp
     Observed(element, Some(InputProbe::Scroll(scroll))).into_any_element()
 }
 
-pub(super) fn observe_focus(element: Stateful<Div>, focus: FocusHandle) -> gpui::AnyElement {
+pub(crate) fn observe_focus(element: Stateful<Div>, focus: FocusHandle) -> gpui::AnyElement {
     Observed(element, Some(InputProbe::Focus(focus))).into_any_element()
 }
 
