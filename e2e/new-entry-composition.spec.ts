@@ -228,7 +228,7 @@ for (const status of [401, 403, 503, 200]) test(`Nuova voce: lettura precedente 
     page.on('pageerror', error => errors.push(error.message));
     page.on('request', request => { if (request.method() === 'POST' && /\/api\/(entries|attachments)$/u.test(new URL(request.url()).pathname)) writes.push(request.url()); });
     await openUnlockedDocument(page, `/?area=incarico&paziente=${patientId}`);
-    await page.getByRole('button', { name: 'Azioni paziente', exact: true }).click();
+    await page.getByRole('button', { name: 'Altre azioni paziente', exact: true }).click();
     await page.route('**/api/entries?**', route => {
         if (new URL(route.request().url()).searchParams.get('patientId') !== patientId) return route.continue();
         reads++;

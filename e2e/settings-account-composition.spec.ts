@@ -176,6 +176,9 @@ test('access and profile settings preserve form drafts and denied outcomes', asy
                 && response.request().method() === 'GET');
             await unlockIfNeeded(page, '1234');
             expect((await readback).status()).toBe(200);
+            await expect(name).toHaveValue('Bozza W19 inventata non salvata');
+            await expect(save).toBeDisabled();
+            await page.getByRole('button', { name: 'Rileggi profilo mantenendo la bozza', exact: true }).click();
             await expect(save).toBeEnabled(); await keepDraft();
         } finally { await sibling.close(); }
         await save.click(); await expect(profile.getByRole('status')).toHaveText('Profilo aggiornato.');
