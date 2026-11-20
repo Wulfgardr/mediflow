@@ -13,12 +13,13 @@ release](https://github.com/Wulfgardr/mediflow/releases) raccoglie i pacchetti p
 
 ### Aggiornamento dalla 0.9.0
 
-- Prima dell’aggiornamento, salva un backup completo cifrato e conserva la
-  passphrase di recupero. Al primo avvio l’archivio passa dallo schema 3 al
+- Prima dell’aggiornamento, salva un backup completo cifrato e conserva il
+  kit e la chiave di recupero. Al primo avvio l’archivio passa dallo schema 3 al
   17. MediFlow conserva una copia dell’archivio di partenza.
 - Per tornare alla 0.9.0, conserva a parte l’archivio aggiornato e riapri
-  la copia iniziale oppure ripristina il backup precedente. Le voci scritte
-  dopo l’aggiornamento si trovano nell’archivio in formato 17.
+  la copia iniziale oppure ripristina il backup precedente. La 0.9.0 rifiuta
+  in anteprima un backup portabile `.mediflow` esportato dalla 0.9.1.
+  Per rileggere le voci scritte dopo l’aggiornamento, usa la 0.9.1.
 
 ### Avvio
 
