@@ -24,8 +24,16 @@ del chiamante. Il worker parte senza le interfacce e le rotte IP del guest.
 Il sistema deve permettere a un utente ordinario di creare questi namespace.
 Un avvio negato rende indisponibile l'elaborazione del documento.
 
-Windows 11 ARM richiede un confine di rete del sistema operativo per AnyDoc e
-il lettore PDF. Il launcher usa un AppContainer senza capacità, tramite
+Il 19 novembre 2026 Leonardo ha approvato il requisito di consegna per Web e
+Headless su Windows 11 ARM. Il sistema operativo deve imporre l'isolamento di
+rete ai processi di AnyDoc e del lettore PDF, anche quando caricano moduli nativi.
+L'esecuzione senza questo confine blocca la consegna.
+
+La ricetta di avvio resta `Proposed` fino alla chiusura delle prove richieste.
+Ogni prova vale per il pacchetto e il profilo in cui è stata eseguita. Il guest
+Windows 11 ARM con Node x64 emulato e il runner CI Windows x64 hanno esiti distinti.
+
+Il launcher usa un AppContainer senza capacità, tramite
 `PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES` e `CreateProcessW`. Il
 bootstrap verifica il token prima di avviare il worker. Un errore durante
 la preparazione o la verifica rende indisponibile l'elaborazione.
@@ -36,9 +44,10 @@ le sole pipe standard. Il Job Object termina il worker se il bootstrap
 termina prima di lui.
 Il bootstrap verifica che il token del figlio sospeso abbia il SID atteso e
 zero capacità. Node conserva i permessi applicativi e il guard JavaScript.
-La copia contiene solo asset documentali fisici. Node risolve i moduli al
-suo interno conservando i percorsi delle copie, senza richiedere accesso
-alle directory superiori.
+Il launcher prepara una copia fisica degli asset documentali. Il renderer usa
+i file del pacchetto nella copia e verifica l'identità del binario e dei dati
+ICU prima del caricamento. La risoluzione dei file su Windows resta dentro la
+copia, dove il token del worker ha accesso in lettura.
 
 ## Conseguenze
 

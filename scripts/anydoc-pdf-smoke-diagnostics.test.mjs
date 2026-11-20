@@ -12,7 +12,7 @@ import { localImportClosure } from './fixtures/local-import-closure.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const SCHEMA = 'mediflow.anydoc_pdf_child_protocol.v1';
-const WORKER_HASH = '8019436fa83815e96f43e6371181650a272a0bb397145f10b39a37b754fc35a0';
+const WORKER_HASH = '76c33a3e4c68e6db85fd2dab2d189a7fdb8f4d0e4cf91a40468900ed8038bf09';
 const SENTINEL = 'SYNTHETIC_PRIVATE_FIELD_NOT_FOR_DIAGNOSTICS';
 // Match the production runner's explicit test-data rule before invoking any child.
 if (!process.env.MEDIFLOW_DATA_DIR?.trim()) {

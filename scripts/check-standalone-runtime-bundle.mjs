@@ -82,7 +82,7 @@ class PdfPageWorkerSmokeError extends Error {}
 const ANYDOC_WORKER_FILE = 'anydoc-local-extraction-worker.mjs';
 const ANYDOC_WORKER_SHA256 = '5d6e2e60f1d71f3fd45065961258a7debe8a96e017abdcee92823986c8f08c67';
 const ANYDOC_PDF_PAGE_WORKER_FILE = 'anydoc-pdf-page-worker.mjs';
-const ANYDOC_PDF_PAGE_WORKER_SHA256 = '8019436fa83815e96f43e6371181650a272a0bb397145f10b39a37b754fc35a0';
+const ANYDOC_PDF_PAGE_WORKER_SHA256 = '76c33a3e4c68e6db85fd2dab2d189a7fdb8f4d0e4cf91a40468900ed8038bf09';
 const PDFJS_STANDARD_FONT_FILES = Object.freeze([
   'FoxitDingbats.pfb', 'FoxitFixed.pfb', 'FoxitFixedBold.pfb', 'FoxitFixedBoldItalic.pfb', 'FoxitFixedItalic.pfb',
   'FoxitSerif.pfb', 'FoxitSerifBold.pfb', 'FoxitSerifBoldItalic.pfb', 'FoxitSerifItalic.pfb', 'FoxitSymbol.pfb',
@@ -401,7 +401,7 @@ function supportsPdfRendering(profiles, platform, arch, glibcVersion) {
   return major > 2 || (major === 2 && minor >= 18);
 }
 
-function framedPdfPageWorkerSmokeFailure(workerPath) {
+function framedPdfPageWorkerSmokeFailure(workerPath, observePng) {
   const source = syntheticPdfPage();
   const materialize = runPdfChild(workerPath, encodePdfChildFrame({
     schemaVersion: ANYDOC_PDF_CHILD_SCHEMA_VERSION,
@@ -466,6 +466,7 @@ function framedPdfPageWorkerSmokeFailure(workerPath) {
   } catch {
     return formatPdfSmokeFailure('render', 'text_pixels', render);
   }
+  observePng?.(rendered.body);
   return null;
 }
 
@@ -1221,8 +1222,10 @@ const pdfPageWorkerFailure = bundledPdfPageWorkerFailure(standaloneDir);
 if (pdfPageWorkerFailure) fail(pdfPageWorkerFailure);
 const pdfPageWorkerTraceFailure = bundledPdfPageWorkerTraceFailure(standaloneDir);
 if (pdfPageWorkerTraceFailure) fail(pdfPageWorkerTraceFailure);
+let syntheticPdfPng;
 const pdfPageWorkerSmokeFailure = framedPdfPageWorkerSmokeFailure(
   path.join(standaloneDir, 'scripts', ANYDOC_PDF_PAGE_WORKER_FILE),
+  png => { syntheticPdfPng = png; },
 );
 if (pdfPageWorkerSmokeFailure) fail(pdfPageWorkerSmokeFailure);
 const windowsBootstrapFailure = await windowsBootstrapBundleFailure(standaloneDir);
@@ -1328,6 +1331,19 @@ const anyDocPdfRun = runDocumentSmoke(standaloneDir, anyDocWorkerPath, synthetic
 if (anyDocPdfRun.error || anyDocPdfRun.status !== 0 || anyDocPdfRun.signal !== null
     || !Buffer.isBuffer(anyDocPdfRun.stdout) || anyDocPdfRun.stdout.toString('utf8') !== '## MediFlow 012345\n') {
   fail('Standalone runtime AnyDoc worker did not extract the synthetic PDF text through the production launcher.');
+}
+
+if (process.env.MEDIFLOW_PDF_SMOKE_TIMINGS === '1') {
+  console.log(JSON.stringify({ type: 'pdf-smoke-extracted-text', text: 'MediFlow 012345' }));
+}
+const documentSmokeOutput = process.env.MEDIFLOW_PDF_SMOKE_OUTPUT_DIR;
+if (documentSmokeOutput) {
+  if (!path.isAbsolute(documentSmokeOutput) || !syntheticPdfPng) {
+    fail('Standalone PDF smoke output needs an absolute directory and a rendered synthetic PNG.');
+  }
+  fs.mkdirSync(documentSmokeOutput, { recursive: true });
+  fs.writeFileSync(path.join(documentSmokeOutput, 'synthetic-text.md'), anyDocPdfRun.stdout);
+  fs.writeFileSync(path.join(documentSmokeOutput, 'synthetic-page.png'), syntheticPdfPng);
 }
 
 let databaseEntry;
