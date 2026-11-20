@@ -869,7 +869,7 @@ mod tests {
     #[test]
     fn an_older_measure_names_its_year_and_a_missing_date_says_so() {
         let older = measure("a", "2823-3", "mmol/L", "4,8", "2025-11-10T08:00:00Z");
-        let rows = measure_rows(&[older.clone()], today(), &Utc);
+        let rows = measure_rows(std::slice::from_ref(&older), today(), &Utc);
         assert_eq!(rows[0].day, "10/11/2025");
         assert!(
             rows[0].spoken.contains("misura del 10/11/2025"),
