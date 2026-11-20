@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow, assertNotClippedInViewport } from './utils';
+import { openUnlockedDocument, bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow, assertNotClippedInViewport } from './utils';
 
 type SchedaCase = { register: 'giorno' | 'grafite'; viewport: 'wide' | 'narrow'; width: number; height: number };
 const CASES: SchedaCase[] = [
@@ -169,7 +169,7 @@ test('la route legacy paziente converge sulla sola Scheda', async ({ page }) => 
   await page.setViewportSize({ width: 1440, height: 900 });
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   const patient = await createFixture(page);
-  await page.goto(`/patients/${patient.id}`);
+  await openUnlockedDocument(page, `/patients/${patient.id}`);
   await expect(page).toHaveURL(new RegExp(`/patients/${patient.id}/modules$`));
   await expect(page.getByTestId('lume-scheda-header')).toHaveCount(1);
   await expect(page.getByRole('heading', { name: patient.name, level: 1 })).toHaveCount(1);
@@ -180,7 +180,7 @@ test('il controllo back della Scheda torna alla lista pazienti', async ({ page }
   await page.setViewportSize({ width: 1440, height: 900 });
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   const patient = await createFixture(page);
-  await page.goto(`/patients/${patient.id}/modules`);
+  await openUnlockedDocument(page, `/patients/${patient.id}/modules`);
   const backControl = page.getByRole('navigation', { name: 'Cartelle aperte' })
     .getByRole('link', { name: 'Pazienti', exact: true });
   await expect(backControl).toHaveAttribute('href', '/?area=incarico');
@@ -194,7 +194,7 @@ test('le quindici sezioni restano raggiungibili con una sola destinazione corren
   await page.setViewportSize({ width: 1440, height: 900 });
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   const patient = await createFixture(page);
-  await page.goto(`/patients/${patient.id}/modules`);
+  await openUnlockedDocument(page, `/patients/${patient.id}/modules`);
   const nav = page.getByRole('navigation', { name: 'Sezioni della vista' });
   const sections = ['quadro', 'attenzione', 'identita', 'clinica', 'amministrazione', 'parametri', 'terapie', 'prestazioni',
     'protesica', 'scale', 'documenti', 'siss', 'timeline', 'diario', 'follow-up'];
@@ -233,7 +233,7 @@ test('il follow-up apre il pianificatore canonico dalla cartella', async ({ page
   await page.setViewportSize({ width: 390, height: 844 });
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   const patient = await createFixture(page);
-  await page.goto(`/patients/${patient.id}/modules`);
+  await openUnlockedDocument(page, `/patients/${patient.id}/modules`);
   await openPatientSection(page, 'follow-up');
 
   const action = page.getByRole('link', { name: 'Aggiungi follow-up', exact: true });
@@ -269,7 +269,7 @@ for (const schedaCase of CASES) {
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
     const patient = await createFixture(page);
     const insightHydration = await prepareStableInsightHydration(page);
-    await page.goto(`/patients/${patient.id}/modules`);
+    await openUnlockedDocument(page, `/patients/${patient.id}/modules`);
     await insightHydration.loaded;
     await setRegister(page, schedaCase.register);
     await expect(page.locator('html')).toHaveClass(schedaCase.register === 'grafite' ? /dark/ : /light/);
@@ -307,12 +307,12 @@ for (const schedaCase of CASES) {
     await page.getByTestId('privacy-mode-header-toggle').click();
     await expectPatientIdentityPrivate(header, patient);
     await expect(records.getByRole('link', { name: patient.name, exact: true }).locator('.liquid-blur')).toHaveCount(1);
-    await page.goto(`/patients/${patient.id}/entries/new`);
+    await openUnlockedDocument(page, `/patients/${patient.id}/entries/new`);
     const label = page.getByTestId('progressive-entry-composer').locator('header p').filter({ hasText: patient.name });
     await expect(label).toHaveCount(1);
     await expect(label).toContainText(patient.name);
     await expect(label.locator('.liquid-blur')).toHaveCount(1);
-    await page.goto(`/patients/${patient.id}/modules`);
+    await openUnlockedDocument(page, `/patients/${patient.id}/modules`);
     await expectPatientIdentityPrivate(header, patient);
 
     const nav = page.getByRole('navigation', { name: 'Sezioni della vista' });

@@ -1,7 +1,7 @@
 import type { Page, APIRequestContext } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { expect } from '@playwright/test';
-import { bootstrapUnlockedSession } from './utils';
+import { bootstrapUnlockedSession, onboardingPassphrase } from './utils';
 import { AGENT_OPERATIONS, type AgentOperation } from '../lib/agent-mandate-contract';
 
 export const agentVisitPin = '24682468';
@@ -13,7 +13,7 @@ export async function createSyntheticAgentMandate(page: Page, credential: 'passp
     await page.getByRole('complementary', { name: 'MediFlow', exact: true }).getByRole('link', { name: 'Impostazioni', exact: true }).click();
     if (credential === 'passphrase') {
         await page.getByRole('link', { name: 'Accesso', exact: true }).click();
-        await page.getByLabel('PIN attuale', { exact: true }).first().fill(pin);
+        await page.getByLabel('Passphrase attuale', { exact: true }).fill(onboardingPassphrase(pin));
         await page.getByLabel('Nuova passphrase', { exact: true }).fill(passphrase);
         await page.getByLabel('Conferma nuova passphrase', { exact: true }).fill(passphrase);
         await page.getByRole('button', { name: 'Prepara il nuovo kit', exact: true }).click();

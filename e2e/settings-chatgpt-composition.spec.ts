@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { emptyReceipt, type ProductSnapshot } from '../lib/chatgpt-product/product-contract';
-import { bootstrapUnlockedSession, assertNoHorizontalOverflow } from './utils';
+import { openUnlockedDocument, bootstrapUnlockedSession, assertNoHorizontalOverflow } from './utils';
 import { installFunctionsEgressGuard } from './fixtures/settings-functions';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 
@@ -73,7 +73,7 @@ test('ChatGPT composition: closed/open account, keyboard and retained child', as
     });
     try {
         await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-        await page.goto('/settings/ai/chatgpt');
+        await openUnlockedDocument(page, '/settings/ai/chatgpt');
         await expect(page.getByTestId('synthesis-state')).toContainText('Prova sospesa');
         const control = baseline ? page.locator('summary').filter({ hasText: accountTitle }) : page.getByRole('button', { name: accountTitle, exact: true });
         const account = page.getByTestId('chatgpt-account-panel');
@@ -118,7 +118,7 @@ test('ChatGPT composition: closed/open account, keyboard and retained child', as
             await assertNoHorizontalOverflow(page, [{ label: 'document', selector: 'document' },
                 { label: 'ChatGPT page', selector: '[data-testid="chatgpt-synthesis-panel"]' }]);
         }
-        await page.goto('/settings');
+        await openUnlockedDocument(page, '/settings');
         expect(guard.blocked).toEqual([]); expect(errors).toEqual([]);
         expect(calls.filter(call => call.method !== 'GET').every(call => call.path.endsWith('/synthesis/cancel'))).toBe(true);
     } finally {

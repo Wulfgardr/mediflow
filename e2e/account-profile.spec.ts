@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
-import { bootstrapUnlockedSession, lockAllTabsAndSignIn } from './utils';
+import { openUnlockedDocument, unlockIfNeeded, bootstrapUnlockedSession, lockAllTabsAndSignIn } from './utils';
 import { fetchInterceptedRequest } from './fixtures/trusted-web-request';
 
 test('two profile editors retain a conflicting draft, reread explicitly and save canonical values', async ({ browser, baseURL }, testInfo) => {
@@ -11,8 +11,8 @@ test('two profile editors retain a conflicting draft, reread explicitly and save
         const b = await contextB.newPage();
         await bootstrapUnlockedSession(a, '1234');
         await bootstrapUnlockedSession(b, '1234');
-        await a.goto('/settings/profilo');
-        await b.goto('/settings/profilo');
+        await openUnlockedDocument(a, '/settings/profilo');
+        await openUnlockedDocument(b, '/settings/profilo');
         const saveA = a.getByRole('button', { name: 'Salva profilo', exact: true });
         const saveB = b.getByRole('button', { name: 'Salva profilo', exact: true });
         await expect(saveA).toBeEnabled();
@@ -38,7 +38,7 @@ test('two profile editors retain a conflicting draft, reread explicitly and save
         await expect(b.getByLabel('Nome medico', { exact: true })).toHaveValue('Bozza sintetica secondo client');
         await saveB.click();
         await expect(b.getByRole('status').filter({ hasText: 'Profilo aggiornato.' })).toBeVisible();
-        await b.reload();
+        await b.reload(); await unlockIfNeeded(b, process.env.E2E_PIN || '1234');
         await expect(b.getByLabel('Nome medico', { exact: true })).toHaveValue('Bozza sintetica secondo client');
         await expect(saveB).toBeEnabled();
         await saveB.click();
@@ -55,7 +55,7 @@ test('two profile editors retain a conflicting draft, reread explicitly and save
 
 test('a lost save response preserves draft and requires reread without a second PUT', async ({ page }) => {
     await bootstrapUnlockedSession(page, '1234');
-    await page.goto('/settings/profilo');
+    await openUnlockedDocument(page, '/settings/profilo');
     const save = page.getByRole('button', { name: 'Salva profilo', exact: true });
     await expect(save).toBeEnabled();
     const draft = `Bozza con risposta persa ${randomUUID()}`;
@@ -88,7 +88,7 @@ test('a lost save response preserves draft and requires reread without a second 
 
 test('same-account login in another tab preserves draft and requires an explicit profile read', async ({ page, context }) => {
     await bootstrapUnlockedSession(page, '1234');
-    await page.goto('/settings/profilo');
+    await openUnlockedDocument(page, '/settings/profilo');
     const save = page.getByRole('button', { name: 'Salva profilo', exact: true });
     await expect(save).toBeEnabled();
     await page.getByLabel('Nome medico', { exact: true }).fill('Bozza prima del cambio sessione');
@@ -124,7 +124,7 @@ test('same-account login in another tab preserves draft and requires an explicit
 
 test('physician tax code is validated, saved and reread from the profile', async ({ page }, testInfo) => {
     await bootstrapUnlockedSession(page, '1234');
-    await page.goto('/settings/profilo');
+    await openUnlockedDocument(page, '/settings/profilo');
     const code = page.getByLabel('Codice fiscale', { exact: true });
     const save = page.getByRole('button', { name: 'Salva profilo', exact: true });
     await expect(save).toBeEnabled();
@@ -134,12 +134,12 @@ test('physician tax code is validated, saved and reread from the profile', async
     await code.fill('rssmra85t10a562s');
     await save.click();
     await expect(page.getByRole('status').filter({ hasText: 'Profilo aggiornato.' })).toBeVisible();
-    await page.reload();
+    await page.reload(); await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
     await expect(code).toHaveValue('RSSMRA85T10A562S');
     await testInfo.attach('physician-tax-code', { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
     await code.fill('');
     await save.click();
     await expect(page.getByRole('status').filter({ hasText: 'Profilo aggiornato.' })).toBeVisible();
-    await page.reload();
+    await page.reload(); await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
     await expect(code).toHaveValue('');
 });

@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page, type Route } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { assertNoHorizontalOverflow, bootstrapUnlockedSession, unlockIfNeeded } from './utils';
+import { openUnlockedDocument, assertNoHorizontalOverflow, bootstrapUnlockedSession, unlockIfNeeded } from './utils';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 
 const readErrorTitle = 'Schede non leggibili';
@@ -174,7 +174,7 @@ for (const scenario of ['initial', 'refresh', 'context'] as const) test(`Analyti
     }
     const beforeInitialRead = fixture.calls.filter(call => call.path === '/api/patients').length;
     const initialFailure = scenario === 'initial' ? failedPatientRead() : null;
-    await page.goto('/analytics');
+    await openUnlockedDocument(page, '/analytics');
     if (scenario === 'initial') {
       await expect.poll(() => fixture.calls.filter(call => call.path === '/api/patients').length).toBeGreaterThan(beforeInitialRead);
       expect(fixture.calls.filter(call => call.path === '/api/patients').at(-1)?.status).toBe(503);
@@ -182,7 +182,7 @@ for (const scenario of ['initial', 'refresh', 'context'] as const) test(`Analyti
       await expect(loading).toBeVisible(); await expect(primary).not.toBeVisible(); await shot('pending', loading);
       fixture.state.hold = null; release();
       await visibleError(initialFailure!); fixture.state.status = 200;
-      if (baseline) await page.reload(); else await error.getByRole('button', { name: 'Riprova', exact: true }).click();
+      if (baseline) { await page.reload(); await unlockIfNeeded(page, '1234'); } else await error.getByRole('button', { name: 'Riprova', exact: true }).click();
       await expect(primary).toBeVisible(); await shot('recovered', primary);
       await narrowShots('count', primary);
       const minimum = page.getByLabel('Età minima', { exact: true });
@@ -191,10 +191,10 @@ for (const scenario of ['initial', 'refresh', 'context'] as const) test(`Analyti
       await expect(page.getByText(noAnalyticsPatients, { exact: true })).toHaveCount(0);
       await expect(page.getByText('Nessuna scheda attiva con età nota rientra nel filtro corrente.', { exact: true })).toBeVisible();
       await shot('filter-zero', primary);
-      fixture.state.patients = [fixture.archived]; await page.reload();
+      fixture.state.patients = [fixture.archived]; await page.reload(); await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
       if (!baseline) await expect(page.getByText(noAnalyticsPatients, { exact: true })).toBeVisible();
       await shot('no-active-sheets', baseline ? primary : page.getByText(noAnalyticsPatients, { exact: true }));
-      fixture.state.patients = [fixture.missingAge]; await page.reload(); await expect(primary).toBeVisible();
+      fixture.state.patients = [fixture.missingAge]; await page.reload(); await unlockIfNeeded(page, process.env.E2E_PIN || '1234'); await expect(primary).toBeVisible();
       await expect(page.getByText(noAnalyticsPatients, { exact: true })).toHaveCount(0);
       await expect(page.locator('#indicatori dt').filter({ hasText: 'Senza data di nascita, escluse dal filtro' }).locator('..')).toContainText('1 scheda');
       await shot('unknown-age', primary);
@@ -224,7 +224,7 @@ for (const scenario of ['initial', 'refresh', 'context'] as const) test(`Analyti
       expect(fixture.calls.filter(call => call.path === '/api/patients').at(-1)?.patientIds).toEqual(['B']);
       await page.getByRole('button', { name: 'Blocca', exact: true }).click(); fixture.state.hold = null; release();
       await expect(page.getByLabel('MediFlow lock screen')).toBeVisible(); await expect(primary).not.toBeVisible();
-      await unlockIfNeeded(page, '1234'); await page.goto('/analytics');
+      await unlockIfNeeded(page, '1234'); await openUnlockedDocument(page, '/analytics');
       await expect(page.getByText('Categoria sintetica B', { exact: true })).toBeVisible(); await shot('session-renewed', primary);
     }
   } finally {

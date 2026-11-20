@@ -2,7 +2,7 @@ import { expect, test, type Page, type Locator, type Response } from '@playwrigh
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
-import { bootstrapUnlockedSession, assertNotClippedInViewport } from './utils';
+import { openUnlockedDocument, bootstrapUnlockedSession, assertNotClippedInViewport } from './utils';
 import { installFunctionsEgressGuard } from './fixtures/settings-functions';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 
@@ -261,7 +261,7 @@ test('Scales library: search pending, error, empty, long identity and stale-term
             for (const mode of ['error', 'ready'] as const) {
                 mock.state.list = mode;
                 await mock.observeRead('/api/patients', mode, async () => {
-                    await page.goto('/scales');
+                    await openUnlockedDocument(page, '/scales');
                     await page.locator('#catalogo').getByRole('button', { name: /ADL \(Indice di Katz\)/u }).click();
                 });
                 const section = page.locator('#paziente');
@@ -276,7 +276,7 @@ test('Scales library: search pending, error, empty, long identity and stale-term
         for (const mode of ['pending', 'error', 'empty', 'ready'] as const) {
             mock.state.list = mode;
             await mock.observeRead('/api/patients', mode, async () => {
-                await page.goto('/scales');
+                await openUnlockedDocument(page, '/scales');
                 await page.getByRole('button', { name: /ADL \(Indice di Katz\)/u }).click();
             });
             const section = page.locator('#paziente'), start = section.getByRole('button', { name: /^Avvia /u });
