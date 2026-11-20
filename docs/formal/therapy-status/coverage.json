@@ -1,5 +1,5 @@
 {
-  "syncCommit": "8883b92eaa0e8a2289108baa0b15ce37a3e3fb39",
+  "syncCommit": "c5afee06031615f9f2ab0134d0b8288e029f8c76",
   "tool": {
     "release": "v1.7.4",
     "url": "https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar",
@@ -33,13 +33,13 @@
   "files": {
     "lib/therapy-status-confirmation.ts": "33eebc3197e988f3f1c134f1ac8499da1de95171e21d0ac7e3396c2a202c6486",
     "components/therapy-manager.tsx": "636419e0533f0368add66f0321d30ecfb0c99e69e02b1359d1ff1c7c513e6579",
-    "lib/db.ts": "2530bf0da456155bf96b2bbba4f23118e1e34da2e096c5e4b5246247cec6b0f4",
+    "lib/db.ts": "635366dd87c81f20a3c91da42b40d20beb1a1de78bf0fef1e25a2fd686c4b8ad",
     "lib/security/client-auth-api.ts": "bdb5f00811f03d0c694a16e95a58670d51c234b2029fd864e4f59f4647174baf",
-    "lib/therapy-write-operation.ts": "81716a464a1a5271b16687b4152cf2a11a1b4968c44fc93c3a17c31b53a54b6f",
+    "lib/therapy-write-operation.ts": "8fa4abf13ad501bdb1d199b2abeaee5e18331f84e6dcdb19caa0b040b5c63345",
     "app/api/therapies/[id]/route.ts": "ecc8f661c1f2521e567a6666c4c9da89097ef8da2874281285066b266f6fdcc1",
     "app/api/therapies/route.ts": "e13c48abb76cb0461eb1a9c1f23cf8724ec9cf34d32a7bd54909e58d4e251dac",
     "lib/locked-field-guard.ts": "a4b64b4db1968423169937a2b491add2d2a19b6fba2489b1515e37b358a55d3a",
-    "lib/therapy-status-command-service.ts": "7b3c04d18b3f504d4a78b48466787a81d09cd75a07ebb8f793edd611eca57238",
+    "lib/therapy-status-command-service.ts": "2e27218f4d0f6f4efbf9466ed783e43852254217a0623186ade3252438c09dd3",
     "lib/therapy-status-command-confirmation.ts": "86682b47ca7eeadaa91065511e44c72951414e5bfe7a5d7b2001224bb424db1e",
     "lib/therapy-status-command-contract.ts": "3432124d9b5f8b3113265d9779fa12e1411e508b0964cfd2e1bc532f49f4a7fe",
     "lib/therapy-status-command-client.ts": "e2f833b062db819108f9ffddc6443e4bfce321a7d8a359666b84bc6b9b4ad30f",
@@ -155,5 +155,5 @@
     }
   },
   "legacyModelSyncCommit": "64e190438da8287928f0903b9b719c18b329a7ec",
-  "filesSha256": "77321baa35036c3bc3f19447013039d5e1ff5fa1b1b6fd43ebacfebd7ed1be80"
+  "filesSha256": "4289cd8340616971c31aafc2355252573b6929df0ef92b74df316bfb2f739844"
 }

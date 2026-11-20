@@ -133,7 +133,7 @@ export default function DocumentInsightsPanel({ patient }: DocumentInsightsPanel
                             onToggle={() => setExpandedId(expandedId === insight.id ? null : insight.id)}>
                             <span className={disclosure.archiveLabel}>
                                 <span className={styles.documentName}>{insight.fileName}</span>
-                                <span className={disclosure.hint}>Archiviata il {formatDate(insight.date)}</span>
+                                <span className={disclosure.hint}>{insight.date ? `Archiviata il ${formatDate(insight.date)}` : 'Data di archiviazione sconosciuta'}</span>
                                 <span className={disclosure.archiveMetadata}>
                                     {insight.quality?.level && (
                                         <span className={`inline-flex rounded-md border px-2 py-0.5 text-sm font-medium ${qualityTone(insight.quality.level)}`}>
