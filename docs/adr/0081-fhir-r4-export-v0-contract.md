@@ -159,6 +159,21 @@ appartiene al dominio locale, l'export si arresta:
 `MedicationStatement.status` è obbligatorio e non ammette un fallback
 inventato.
 
+### Percorso Web con DTO legacy
+
+Il Web legge ancora `diagnosis.date` dall'archivio. La esporta come `recordedDate`
+quando è valida, senza attribuire esordio o stato clinico. Il precheck blocca
+il file quando una diagnosi è priva di una data valida oppure quando un
+incontro ha una data non valida o una coppia tipo-luogo non rappresentabile.
+Gli incontri ammessi seguono la matrice. Note e scale non generano `Encounter`.
+Anche un periodo terapeutico invertito blocca la produzione del file.
+
+ID, riferimenti, ordine delle risorse e conferma delle codifiche sconosciute
+seguono il percorso Web esistente. Il golden v1 del client Apple resta la
+fotografia storica. Il generatore Web scrive i propri campioni in
+`tmp-fhir-web-reference/`. DTO v2, parità dei client e verifica per lo scambio
+restano nel progetto FHIR.
+
 ### Versione e parità
 
 - Il golden v1 resta una fotografia storica del client Apple. Non è la baseline

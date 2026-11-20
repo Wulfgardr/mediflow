@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { afterEach, test } from 'node:test';
 
 import { OllamaProviderAdapter } from '../ollama.ts';
 import { admitDocumentSynthesisFabric, beginDocumentSynthesisFabricExecution } from './document-synthesis-fabric-admission.ts';
 import { cancelDocumentSynthesisFabricExecutionPrepare, disposeDocumentSynthesisFabricPreparedExecution, finalizeDocumentSynthesisFabricPreparedExecution, prepareDocumentSynthesisFabricExecution, setDocumentSynthesisFabricExecutionPrepareTimeoutForTest } from './document-synthesis-fabric-execution-prepare.ts';
+import { readDocumentSynthesisPromptSources } from './document-synthesis-multi-source-prompt.ts';
 import { createDocumentSynthesisProviderBindingForTest } from './document-synthesis-provider-binding.ts';
 import { captureDocumentSynthesisSourceSet } from './document-synthesis-source-set-contract.ts';
 import { createDocumentSynthesisSourceSetCurrentnessOwner } from './document-synthesis-source-set-currentness-owner.ts';
@@ -153,6 +155,91 @@ const REAL = JSON.parse(await readFile('lib/ai-providers/fabric/fixtures/documen
 const ITALIAN_SUMMARY = REAL.summaries.find((item) => !item.english)!.summary;
 function realBody(summary: string, quote: string) { return JSON.stringify({ schemaVersion: 'mediflow.document-synthesis.provider-envelope.v2', output: { schemaVersion: 'mediflow.ai.extract.v1', task: 'document_synthesis', summary, data: { qualityLevel: 'green', medications: [], diagnoses: [], problemStatements: [], therapyCandidates: [], servicePrescriptions: [] } }, citations: [{ label: 'S1', quote }], claims: [{ claimPath: 'summary', labels: ['S1'] }, { claimPath: 'data.qualityLevel', labels: ['S1'] }] }); }
 const EXACT_LAB_QUOTE = 'Emoglobina glicata HbA1c: 8,1% (65 mmol/mol)';
+
+const PDF_LINES = ['Cefalea lieve riferita.', 'Ibuprofene sospeso.', 'Nessuna terapia attiva.', 'Rivalutazione clinica da concordare.'];
+const CLINICAL_QUOTE = PDF_LINES[0]!;
+const SCAN_QUOTE = `Fonte sintetica, pagina 1\n${CLINICAL_QUOTE}`;
+const SCAN_SOURCE = Array.from({ length: 10 }, (_, index) => {
+    const page = index + 1;
+    return [`## Pagina ${page}\n`, `Fonte sintetica, pagina ${page}`, ...PDF_LINES].join('\n');
+}).join('\n\n---\n\n');
+const TEXT_PDF_SOURCE = ['Fonte sintetica, pagina 1', ...PDF_LINES.map((line) => `## ${line}`)].join('\n\n');
+
+function pdfBody(quotes: readonly string[]) {
+    const envelope = JSON.parse(realBody('Il documento riferisce una cefalea lieve.', CLINICAL_QUOTE));
+    envelope.citations = quotes.map((quote) => ({ label: 'S1', quote }));
+    return JSON.stringify(envelope);
+}
+
+for (const [name, firstQuotes, correction] of [
+    ['ambiguous quotation', [CLINICAL_QUOTE], /copy the nearest literal context/u],
+    ['wrong citation count', [SCAN_QUOTE, SCAN_QUOTE], /match SOURCE_COUNT/u],
+] as const) {
+    test(`local scanned PDF: ${name} can be corrected once using the same source`, async () => {
+        assert.equal(createHash('sha256').update(SCAN_SOURCE).digest('hex'), '03bd00a527cf4300d8df17357efc75188877406cb82d7bce0b51139767b3e04f');
+        const prompts: string[] = [];
+        const budgets: unknown[] = [];
+        const chat = scriptedChat([pdfBody(firstQuotes), pdfBody([SCAN_QUOTE])], prompts);
+        const fixture = await handoff(async (...args) => {
+            budgets.push(args[2]);
+            return chat(...args);
+        }, undefined, SCAN_SOURCE);
+        try {
+            const result = await prepareDocumentSynthesisFabricExecution(fixture.value);
+            assert.equal(prompts.length, 2);
+            assert.equal(result.status, 'available');
+            const publication = finalizeDocumentSynthesisFabricPreparedExecution(result.preparedToken);
+            assert.ok(publication);
+            assert.equal(publication.citations.length, 1);
+            const citation = publication.citations[0]!;
+            assert.equal(citation.quote, SCAN_QUOTE);
+            assert.equal(Buffer.from(SCAN_SOURCE).subarray(citation.startByte, citation.endByte).toString(), SCAN_QUOTE);
+            assert.equal(publication.provenance.fabricProvenance.receipt.egressProfile.egress, 'none');
+            assert.match(prompts[0]!, /\nEND_SOURCE_SET\nQuote one continuous passage/u);
+            assert.match(prompts[0]!, /Do not cite a heading alone/u);
+            assert.match(prompts[0]!, /choose another supporting passage/u);
+            assert.ok(prompts[1]!.startsWith(prompts[0]!));
+            assert.match(prompts[1]!.slice(prompts[0]!.length), correction);
+            assert.deepEqual(prompts.map(readDocumentSynthesisPromptSources), [[SCAN_SOURCE], [SCAN_SOURCE]]);
+            assert.equal(budgets[0], budgets[1]);
+            assert.equal(finalizeDocumentSynthesisFabricPreparedExecution(result.preparedToken), null);
+            exact(await prepareDocumentSynthesisFabricExecution(fixture.value), 'handoff_unavailable');
+        } finally { fixture.restore(); }
+    });
+}
+
+for (const [name, sourceText, quotes, code] of [
+    ['ambiguity without disambiguating context', `${CLINICAL_QUOTE}\n${CLINICAL_QUOTE}`, [CLINICAL_QUOTE], 'citation_not_literal'],
+    ['too many citations', SCAN_SOURCE, [SCAN_QUOTE, SCAN_QUOTE], 'response_invalid'],
+    ['too few citations', SCAN_SOURCE, [], 'response_invalid'],
+    ['invented quotation', SCAN_SOURCE, ['Cefalea intensa riferita.'], 'citation_not_literal'],
+] as const) {
+    test(`local citation correction: ${name} is denied after two calls`, async () => {
+        const prompts: string[] = [];
+        const answer = pdfBody(quotes);
+        const fixture = await handoff(scriptedChat([answer, answer, pdfBody([SCAN_QUOTE])], prompts), undefined, sourceText);
+        try {
+            const result = await prepareDocumentSynthesisFabricExecution(fixture.value);
+            assert.equal(prompts.length, 2);
+            exact(result, code);
+            exact(await prepareDocumentSynthesisFabricExecution(fixture.value), 'handoff_unavailable');
+        } finally { fixture.restore(); }
+    });
+}
+
+test('local text PDF: a unique clinical quote needs no heading or retry', async () => {
+    assert.equal(createHash('sha256').update(TEXT_PDF_SOURCE).digest('hex'), 'aae983ed2edb8cc8f65ff45c1d6fb6e2bfd7defa064cfaa96e0e50b564cc3c22');
+    const prompts: string[] = [];
+    const fixture = await handoff(scriptedChat([pdfBody([CLINICAL_QUOTE])], prompts), undefined, TEXT_PDF_SOURCE);
+    try {
+        const result = await prepareDocumentSynthesisFabricExecution(fixture.value);
+        assert.equal(result.status, 'available');
+        const publication = finalizeDocumentSynthesisFabricPreparedExecution(result.preparedToken);
+        assert.equal(publication?.citations[0]?.quote, CLINICAL_QUOTE);
+        assert.equal(prompts.length, 1);
+        assert.deepEqual(readDocumentSynthesisPromptSources(prompts[0]), [TEXT_PDF_SOURCE]);
+    } finally { fixture.restore(); }
+});
 
 test('local: the six English summaries accepted on main are retried once and never prepared', { concurrency: false }, async () => {
     const english = REAL.summaries.filter((item) => item.english && item.outcomeOnMain === 'proposta');

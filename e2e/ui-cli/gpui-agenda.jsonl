@@ -1,0 +1,12 @@
+{"op":"click","target":{"role":"button","name":"Agenda"}}
+{"op":"expect","target":{"role":"button","name":"Agenda"},"state":"selected"}
+{"op":"expect","target":{"role":"heading","name":"Agenda"},"state":"visible"}
+{"op":"discover"}
+{"op":"focus","target":{"role":"textbox","name":"Dal (AAAA-MM-GG)"}}
+{"op":"expect","target":{"role":"textbox","name":"Dal (AAAA-MM-GG)"},"state":"focused"}
+{"op":"focus","target":{"role":"textbox","name":"Cerca nei risultati caricati"}}
+{"op":"expect","target":{"role":"textbox","name":"Cerca nei risultati caricati"},"state":"focused"}
+{"op":"fill","target":{"role":"textbox","name":"Cerca nei risultati caricati"},"value":"Controllo sintetico"}
+{"op":"expectValue","target":{"role":"textbox","name":"Cerca nei risultati caricati"},"value":"Controllo sintetico"}
+{"op":"press","target":{"role":"textbox","name":"Cerca nei risultati caricati"},"key":"Shift+ArrowLeft"}
+{"op":"discover"}

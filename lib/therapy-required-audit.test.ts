@@ -36,7 +36,8 @@ exports.forbiddenResponse=()=>Response.json({error:'Forbidden'},{status:403});`)
 const token = seam('token.cjs', `exports.requireLocalApiToken=(request)=>request.headers.get('authorization')==='Bearer c05-therapy-synthetic-token'?null:Response.json({error:'Unauthorized'},{status:401});
 exports.hasValidLocalApiToken=(request)=>request.headers.get('authorization')==='Bearer c05-therapy-synthetic-token';`);
 const network = seam('network.cjs', `const state=globalThis[Symbol.for(${JSON.stringify(`c05-therapy-seam-${dataDir}`)})];
-exports.requireNetworkWriteContext=async(request)=>({ok:true,context:{...state.networkAuthority,request,scopeAmbulatoryId:state.scopeAmbulatoryId}});`);
+exports.requireNetworkWriteContext=async(request)=>({ok:true,context:{...state.networkAuthority,request,scopeAmbulatoryId:state.scopeAmbulatoryId}});
+exports.requireNetworkCapabilityContext=exports.requireNetworkWriteContext;`);
 const { registerHooks } = load('node:module') as {
     registerHooks: (hooks: { resolve: (specifier: string, context: unknown,
         next: (specifier: string, context: unknown) => { url: string }) => { url: string; shortCircuit?: boolean } }) => { deregister: () => void };
@@ -342,9 +343,9 @@ test('therapy date edge compatibility and local timestamp authority stay surface
             else assert.deepEqual(zeroStart.after, zeroStart.before);
             const zeroEnd = await capture(`${surface}-${operation}-endDate-zero`, surface, operation,
                 { change: (body) => ({ ...body, endDate: 0 }) });
-            assert.equal(zeroEnd.status, surface === 'web' ? operation === 'POST' ? 201 : 200 : 400);
-            if (surface === 'web') assert.equal((zeroEnd.after.therapy as Record<string, unknown>).end_date,
-                operation === 'POST' ? null : 0);
+            const legacyWebCreate = surface === 'web' && operation === 'POST';
+            assert.equal(zeroEnd.status, legacyWebCreate ? 201 : 400);
+            if (legacyWebCreate) assert.equal((zeroEnd.after.therapy as Record<string, unknown>).end_date, null);
             else assert.deepEqual(zeroEnd.after, zeroEnd.before);
             for (const endDate of [null, ''] as const) {
                 const result = await capture(`${surface}-${operation}-endDate-${String(endDate)}`,
@@ -665,3 +666,47 @@ for (const interveningNoOp of [false, true]) {
         assert.equal(after.audit.length, 1);
     });
 }
+
+test('therapy routes reject impossible dates and inverted persisted intervals without effects', async () => {
+    for (const surface of ['web', 'v1', 'network'] as const) {
+        for (const [operation, fields] of [
+            ['POST', { startDate: '2025-02-29' }],
+            ['POST', { endDate: '2026-04-30' }],
+            ['PUT', { endDate: '2025-12-31' }],
+        ] as const) {
+            const result = await capture('invalid-period', surface, operation,
+                { change: (body) => ({ ...body, ...fields }) });
+            assert.equal(result.status, 400, `${surface} ${operation} ${JSON.stringify(fields)}`);
+            assert.deepEqual(result.after, result.before);
+        }
+    }
+});
+
+
+test('Web and GPUI archive reads include the old active therapy behind 100 completed rows', async () => {
+    const { patientId, therapyId } = seed('active-outside-preview', true);
+    dbServer.insert(therapies).values(Array.from({ length: 100 }, (_, index) => ({
+        id: `${patientId}-completed-${index}`, patientId, drugName: 'Synthetic drug',
+        dosage: 'Synthetic dose', status: 'completed', startDate: new Date('2026-02-01'),
+    }))).run();
+
+    const params = { params: Promise.resolve({ id: patientId }) };
+    const pairedURL = `http://127.0.0.1/api/v1/network/patients/${patientId}/therapies`;
+    const web = await webCreate.GET(new Request(`http://127.0.0.1/api/therapies?patientId=${patientId}`));
+    const gpui = await networkCreate.GET(new Request(pairedURL), params);
+    for (const response of [web, gpui]) {
+        assert.equal(response.status, 200);
+        const rows = await response.json() as Array<{ id: string; status: string }>;
+        assert.equal(rows.length, 101);
+        assert.deepEqual(rows.filter(row => row.status === 'active').map(row => row.id), [therapyId]);
+    }
+
+    const limited = await networkCreate.GET(new Request(`${pairedURL}?limit=100`), params);
+    assert.equal(limited.status, 200);
+    const recent = await limited.json() as Array<{ status: string }>;
+    assert.equal(recent.length, 100);
+    assert.ok(recent.every(row => row.status === 'completed'));
+    const filtered = await networkCreate.GET(new Request(`${pairedURL}?limit=100&status=active`), params);
+    assert.equal(filtered.status, 200);
+    assert.deepEqual((await filtered.json() as Array<{ id: string }>).map(row => row.id), [therapyId]);
+});

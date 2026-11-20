@@ -379,12 +379,21 @@ impl ClinicalApp {
                                     |el| el.child(div().p(px(layout.margin)).child(detail)),
                                 );
                             let mut plane = div().size_full().flex().flex_col().min_w_0();
-                            if decision.scrolls_with_content {
+                            let outside_threshold = if decision.scrolls_with_content {
                                 scrolling = scrolling.child(threshold);
-                                plane = plane.child(scrolling);
+                                None
                             } else {
-                                plane = plane.child(scrolling).child(threshold);
-                            }
+                                Some(threshold)
+                            };
+                            #[cfg(test)]
+                            let scrolling = rendered_command::observe_scroll(
+                                scrolling
+                                    .accessibility_id("clinical-workspace-plane-scroll")
+                                    .role(Role::Region)
+                                    .aria_label("Contenuto della scheda"),
+                                scroll.clone(),
+                            );
+                            plane = plane.child(scrolling).children(outside_threshold);
                             plane.into_any_element()
                         };
                         plane.layout_as_root(

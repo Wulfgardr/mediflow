@@ -6,7 +6,7 @@ type DateInput = Date | string;
 type CheckupStatus = 'pending' | 'completed' | 'cancelled';
 type CheckupSource = 'manual' | 'ai_suggestion';
 
-type DiagnosisInput = { code: string; description: string; system: string; date: DateInput;
+type DiagnosisInput = { code: string; description: string; system: string; date?: DateInput | null;
     canonicalUri?: string | null; reference?: WhoReference | null };
 export type CheckupFormInput = {
     id?: string;
@@ -64,7 +64,7 @@ function diagnosisFormValue(diagnosis: DiagnosisInput) {
         code: diagnosis.code,
         description: diagnosis.description,
         system: diagnosis.system,
-        date: isoDate(diagnosis.date),
+        date: diagnosis.date == null ? null : isoDate(diagnosis.date),
         ...(diagnosis.canonicalUri != null ? { canonicalUri: diagnosis.canonicalUri } : {}),
         ...(diagnosis.reference != null ? { reference: referenceFormValue(diagnosis.reference) } : {}),
     };
@@ -102,7 +102,7 @@ function diagnosesForWrite(initial: DiagnosisInput[], next: ReturnType<typeof di
     }
     return next.map(row => {
         const original = byValue.get(JSON.stringify(row))?.shift();
-        return { ...structuredClone(original ?? {}), ...row, date: new Date(row.date) };
+        return { ...structuredClone(original ?? {}), ...row, date: row.date === null ? null : new Date(row.date) };
     });
 }
 

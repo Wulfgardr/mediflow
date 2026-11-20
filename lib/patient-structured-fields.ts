@@ -1,3 +1,7 @@
+import { parseClinicalDate } from './clinical-date';
+
+export type PatientDatedRecord<T> = Omit<T, 'date'> & { date: Date | null };
+
 type ParsedStructuredRecord = Record<string, unknown>;
 
 function parseJsonField<T>(value: unknown): T | undefined {
@@ -21,16 +25,16 @@ export function parsePatientExemptions(value: unknown): string[] {
     return parsed.filter((code): code is string => typeof code === 'string');
 }
 
-export function parsePatientDatedRecords<T extends object>(value: unknown): Array<T & { date: Date }> {
+export function parsePatientDatedRecords<T extends object>(value: unknown): PatientDatedRecord<T>[] {
     const parsed = parseArrayField(value);
     if (!parsed) return [];
 
     return parsed
-        .filter((item): item is ParsedStructuredRecord => Boolean(item) && typeof item === 'object')
+        .filter((item): item is ParsedStructuredRecord => item !== null && typeof item === 'object' && !Array.isArray(item))
         .map((item) => ({
             ...item,
-            date: item.date ? new Date(item.date as string | number | Date) : new Date(),
-        } as T & { date: Date }));
+            date: parseClinicalDate(item.date),
+        } as PatientDatedRecord<T>));
 }
 
 export function revivePatientStructuredFields<T extends object>(item: T): T {
