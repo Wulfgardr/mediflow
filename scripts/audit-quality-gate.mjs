@@ -21,7 +21,7 @@ const REQUIRED_ROUTE_AUDIT = [
                     handler: 'POST', serviceModule: '@/lib/security/web-auth-logout-server', serviceExport: 'completeExactWebP3Logout',
                     ownerFile: 'lib/security/web-auth-logout-server.ts', ownerName: 'completeExactWebP3Logout',
                     writerModule: './audit', writerExport: 'writeAuditEvent', hashExport: 'hashAuditRef',
-                    ownerModule: './web-auth-lifecycle-owner-adapter', resolveExport: 'resolve', retireExport: 'retire',
+                    ownerModule: './web-auth-lifecycle-owner-adapter', resolveExport: 'resolveProvenWebSession', retireExport: 'retire',
                     transportModule: './web-auth-control-transport', etagExport: 'strongWebAuthControlEtag',
                     eventType: 'auth.logout', sourcesName: 'productionSources', receiptValidator: 'retirementReceipt',
                 },
@@ -2426,19 +2426,14 @@ function exactArguments(call, expected) {
     });
 }
 
-function isNullOrUndefined(expression) {
-    const value = unwrap(expression);
-    return value.kind === ts.SyntaxKind.NullKeyword || ts.isIdentifier(value) && value.text === 'undefined';
-}
-
-function exactNamedImport(statement, moduleName, exportName) {
+function exactNamedImport(statement, moduleName, ...exportNames) {
     if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)
         || statement.moduleSpecifier.text !== moduleName || !statement.importClause
         || statement.importClause.isTypeOnly || statement.importClause.name
         || !statement.importClause.namedBindings || !ts.isNamedImports(statement.importClause.namedBindings)) return false;
-    const [element] = statement.importClause.namedBindings.elements;
-    return statement.importClause.namedBindings.elements.length === 1 && !element.isTypeOnly
-        && (element.propertyName?.text ?? element.name.text) === exportName && element.name.text === exportName;
+    const elements = statement.importClause.namedBindings.elements;
+    return elements.length === exportNames.length && elements.every((element, index) =>
+        !element.isTypeOnly && !element.propertyName && element.name.text === exportNames[index]);
 }
 
 function exactIdentifierBinding(checker, node, binding) {
@@ -2466,28 +2461,19 @@ function bindingIsWritten(root, checker, binding) {
     return found;
 }
 
-function exactCookieLookup(expression, checker, cookieStore, sessionCookieName) {
-    const value = unwrap(expression);
-    return ts.isCallExpression(value) && !value.questionDotToken && ts.isPropertyAccessExpression(value.expression)
-        && !value.expression.questionDotToken
-        && exactIdentifierBinding(checker, value.expression.expression, cookieStore)
-        && value.expression.name.text === 'get' && value.arguments.length === 1
-        && exactIdentifierBinding(checker, unwrap(value.arguments[0]), sessionCookieName);
-}
-
 function validateExactServiceOwnedLogoutRoute(sourceFile, checker, spec) {
     const delegated = spec.modes.delegated;
+    const locatorModule = '@/lib/security/web-auth-control-transport';
     const lifecycleModule = '@/lib/security/portable-supervisor-web-lifecycle';
     const lifecycleExport = 'completePortableSupervisorWebLifecycleMutationV1';
-    const [cookiesImport, serviceImport, lifecycleImport, sessionConstant, controlConstant, handler] = sourceFile.statements;
+    const [locatorImport, serviceImport, lifecycleImport, sessionConstant, controlConstant, handler] = sourceFile.statements;
     const problems = [];
-    const cookiesBinding = importedBinding(sourceFile, checker, 'next/headers', 'cookies')?.symbol;
-    const serviceBinding = importedBinding(
-        sourceFile, checker, delegated.serviceModule, delegated.serviceExport,
-    )?.symbol;
+    const sessionLocator = importedBinding(sourceFile, checker, locatorModule, 'webAuthSessionIdFromRequest')?.symbol;
+    const controlLocator = importedBinding(sourceFile, checker, locatorModule, 'webAuthControlIdFromRequest')?.symbol;
+    const serviceBinding = importedBinding(sourceFile, checker, delegated.serviceModule, delegated.serviceExport)?.symbol;
     const lifecycleBinding = importedBinding(sourceFile, checker, lifecycleModule, lifecycleExport)?.symbol;
     const exactStringConstant = (statement, name, value) => {
-        if (!ts.isVariableStatement(statement) || !(statement.declarationList.flags & ts.NodeFlags.Const)
+        if (!statement || !ts.isVariableStatement(statement) || !(statement.declarationList.flags & ts.NodeFlags.Const)
             || statement.declarationList.declarations.length !== 1) return null;
         const [declaration] = statement.declarationList.declarations;
         return ts.isIdentifier(declaration.name) && declaration.name.text === name
@@ -2497,73 +2483,47 @@ function validateExactServiceOwnedLogoutRoute(sourceFile, checker, spec) {
     const sessionCookieBinding = exactStringConstant(sessionConstant, 'SESSION_COOKIE_NAME', 'mediflow_session');
     const controlCookieBinding = exactStringConstant(controlConstant, 'CONTROL_COOKIE_NAME', 'mediflow_auth_control');
     if (sourceFile.statements.length !== 6
-        || !exactNamedImport(cookiesImport, 'next/headers', 'cookies')
+        || !exactNamedImport(locatorImport, locatorModule, 'webAuthControlIdFromRequest', 'webAuthSessionIdFromRequest')
         || !exactNamedImport(serviceImport, delegated.serviceModule, delegated.serviceExport)
         || !exactNamedImport(lifecycleImport, lifecycleModule, lifecycleExport)
         || !sessionCookieBinding || !controlCookieBinding
         || !handler || !ts.isFunctionDeclaration(handler) || !handler.name || handler.name.text !== delegated.handler
         || !ts.getModifiers(handler)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)) {
-        problems.push('logout route must expose only cookies, the terminal service, both fixed cookie names, and POST');
+        problems.push('logout route must import the canonical locator readers and terminal service and expose POST');
         return problems;
     }
     const [request] = handler.parameters;
-    const statements = handler.body ? [...handler.body.statements] : [];
-    const exactInertCookie = (statement, name) => {
-        if (!ts.isVariableStatement(statement) || !(statement.declarationList.flags & ts.NodeFlags.Let)
+    const requestBinding = request && ts.isIdentifier(request.name) && checker.getSymbolAtLocation(request.name);
+    const [bearerStatement, controlStatement, terminal] = handler.body?.statements ?? [];
+    const locatorEnvelope = (statement, name, locatorName, locatorReader) => {
+        if (!statement || !ts.isVariableStatement(statement) || !(statement.declarationList.flags & ts.NodeFlags.Const)
             || statement.declarationList.declarations.length !== 1) return null;
         const [declaration] = statement.declarationList.declarations;
-        return ts.isIdentifier(declaration.name) && declaration.name.text === name
-            && declaration.initializer && isNullOrUndefined(declaration.initializer)
-            ? { name, symbol: checker.getSymbolAtLocation(declaration.name) } : null;
+        const object = declaration.initializer && unwrap(declaration.initializer);
+        const fields = object && ts.isObjectLiteralExpression(object) ? exactPropertyAssignments(object, ['name', 'value']) : null;
+        const read = fields && unwrap(fields.get('value')?.initializer);
+        if (!ts.isIdentifier(declaration.name) || declaration.name.text !== name
+            || !fields || !exactIdentifierBinding(checker, fields.get('name')?.initializer, locatorName)
+            || !read || !ts.isCallExpression(read) || read.questionDotToken
+            || !exactIdentifierBinding(checker, read.expression, locatorReader) || read.arguments.length !== 1
+            || !exactIdentifierBinding(checker, unwrap(read.arguments[0]), requestBinding)) return null;
+        return checker.getSymbolAtLocation(declaration.name);
     };
-    const bearer = exactInertCookie(statements[0], 'bearerCookie');
-    const control = exactInertCookie(statements[1], 'controlCookie');
-    const acquisition = statements[2] && ts.isTryStatement(statements[2]) ? statements[2] : null;
-    const acquisitionStatements = acquisition?.tryBlock ? [...acquisition.tryBlock.statements] : [];
-    const cookieStoreDeclaration = acquisitionStatements[0] && ts.isVariableStatement(acquisitionStatements[0])
-        ? acquisitionStatements[0] : null;
-    const [cookieStore] = cookieStoreDeclaration?.declarationList.declarations ?? [];
-    const cookieStoreBinding = cookieStore && ts.isIdentifier(cookieStore.name) ? cookieStore.name.text : null;
-    const cookieStoreSymbol = cookieStore && ts.isIdentifier(cookieStore.name)
-        ? checker.getSymbolAtLocation(cookieStore.name) : null;
-    const cookieStoreInitializer = cookieStore?.initializer && unwrap(cookieStore.initializer);
-    const cookiesCall = cookieStoreInitializer && ts.isAwaitExpression(cookieStoreInitializer)
-        ? unwrap(cookieStoreInitializer.expression) : null;
-    const bearerRead = acquisitionStatements[1] && ts.isExpressionStatement(acquisitionStatements[1])
-        ? unwrap(acquisitionStatements[1].expression) : null;
-    const controlRead = acquisitionStatements[2] && ts.isExpressionStatement(acquisitionStatements[2])
-        ? unwrap(acquisitionStatements[2].expression) : null;
-    const returnStatement = statements[3] && ts.isReturnStatement(statements[3]) ? statements[3] : null;
-    const lifecycleCall = returnStatement?.expression && unwrap(returnStatement.expression);
-    const delegateCall = lifecycleCall && ts.isCallExpression(lifecycleCall)
-        ? unwrap(lifecycleCall.arguments[0]) : null;
-    const lifecycleReason = lifecycleCall && ts.isCallExpression(lifecycleCall)
-        ? unwrap(lifecycleCall.arguments[1]) : null;
-    const exactDelegate = Boolean(lifecycleCall && ts.isCallExpression(lifecycleCall)
-        && !lifecycleCall.questionDotToken && exactIdentifierBinding(checker, lifecycleCall.expression, lifecycleBinding)
-        && lifecycleCall.arguments.length === 2 && ts.isStringLiteral(lifecycleReason) && lifecycleReason.text === 'logout'
-        && delegateCall && ts.isCallExpression(delegateCall) && !delegateCall.questionDotToken
-        && exactIdentifierBinding(checker, delegateCall.expression, serviceBinding)
-        && exactArguments(delegateCall, [
-            { identifier: bearer?.name ?? '' }, { identifier: control?.name ?? '' },
-            { identifier: request?.name && ts.isIdentifier(request.name) ? request.name.text : '' },
-        ]));
-    const exactRead = (read, target, cookieName) => Boolean(read && ts.isBinaryExpression(read)
-        && read.operatorToken.kind === ts.SyntaxKind.EqualsToken
-        && exactIdentifierBinding(checker, read.left, target?.symbol)
-        && exactCookieLookup(read.right, checker, cookieStoreSymbol, cookieName));
-    if (handler.parameters.length !== 1 || !request || !ts.isIdentifier(request.name) || request.name.text !== 'request'
-        || statements.length !== 4 || !bearer || !control
-        || !acquisition || acquisition.finallyBlock || !acquisition.catchClause || acquisition.catchClause.variableDeclaration
-        || acquisition.catchClause.block.statements.length !== 0 || acquisitionStatements.length !== 3
-        || !cookieStoreBinding || !cookieStoreDeclaration || !(cookieStoreDeclaration.declarationList.flags & ts.NodeFlags.Const)
-        || cookieStoreDeclaration.declarationList.declarations.length !== 1
-        || !cookiesCall || !ts.isCallExpression(cookiesCall) || cookiesCall.questionDotToken || !ts.isIdentifier(cookiesCall.expression)
-        || !exactIdentifierBinding(checker, cookiesCall.expression, cookiesBinding)
-        || cookiesCall.arguments.length !== 0
-        || !exactRead(bearerRead, bearer, sessionCookieBinding)
-        || !exactRead(controlRead, control, controlCookieBinding) || !exactDelegate) {
-        problems.push('POST must read both fixed cookies inertly and directly return the exact service-owned response');
+    const bearer = locatorEnvelope(bearerStatement, 'bearerCookie', sessionCookieBinding, sessionLocator);
+    const control = locatorEnvelope(controlStatement, 'controlCookie', controlCookieBinding, controlLocator);
+    const lifecycle = terminal && ts.isReturnStatement(terminal) && terminal.expression && unwrap(terminal.expression);
+    const lifecycleCall = lifecycle && ts.isCallExpression(lifecycle) ? lifecycle : null;
+    const delegate = lifecycleCall?.arguments[0] && unwrap(lifecycleCall.arguments[0]);
+    const reason = lifecycleCall?.arguments[1] && unwrap(lifecycleCall.arguments[1]);
+    if (handler.parameters.length !== 1 || handler.body?.statements.length !== 3 || !bearer || !control
+        || !lifecycleCall || lifecycleCall.questionDotToken || !exactIdentifierBinding(checker, lifecycleCall.expression, lifecycleBinding)
+        || lifecycleCall.arguments.length !== 2 || !reason || !ts.isStringLiteral(reason) || reason.text !== 'logout'
+        || !delegate || !ts.isCallExpression(delegate) || delegate.questionDotToken
+        || !exactIdentifierBinding(checker, delegate.expression, serviceBinding) || delegate.arguments.length !== 3
+        || !exactIdentifierBinding(checker, unwrap(delegate.arguments[0]), bearer)
+        || !exactIdentifierBinding(checker, unwrap(delegate.arguments[1]), control)
+        || !exactIdentifierBinding(checker, unwrap(delegate.arguments[2]), requestBinding)) {
+        problems.push('POST must pass both canonical locators and the same request to the terminal logout service');
     }
     return problems;
 }
@@ -2771,7 +2731,7 @@ export function validateLogoutAuditModes({ spec, routeSource, serviceSource = nu
     const writer = importedName(service.sourceFile, delegated.writerModule, delegated.writerExport);
     const hash = importedName(service.sourceFile, delegated.writerModule, delegated.hashExport);
     const writerBinding = importedBinding(service.sourceFile, service.checker, delegated.writerModule, delegated.writerExport);
-    const resolveBinding = importedBinding(service.sourceFile, service.checker, delegated.ownerModule, delegated.resolveExport);
+    const resolveBinding = importedBinding(service.sourceFile, service.checker, delegated.transportModule, delegated.resolveExport);
     const retireBinding = importedBinding(service.sourceFile, service.checker, delegated.ownerModule, delegated.retireExport);
     const etagBinding = importedBinding(service.sourceFile, service.checker, delegated.transportModule, delegated.etagExport);
     const sourcesDeclaration = service.sourceFile.statements.flatMap((statement) => ts.isVariableStatement(statement)
@@ -2874,7 +2834,7 @@ export function validateLogoutAuditModes({ spec, routeSource, serviceSource = nu
         && ts.isIdentifier(resolveCall.parent.expression) && resolveCall.parent.expression.text === 'exactActiveWebProjection'
         ? resolveCall.parent : null;
     if (!resolveCall || !isUnconditionalOwnerCall(owner, resolveCall)
-        || !exactArguments(resolveCall, [{ identifier: 'sessionId' }, { identifier: 'controlId' }])
+        || !exactArguments(resolveCall, [{ identifier: 'sessionId' }, { identifier: 'controlId' }, { identifier: 'request' }])
         || !projectionCall || projectionCall.arguments.length !== 2 || projectionCall.arguments[0] !== resolveCall
         || !ts.isIdentifier(unwrap(projectionCall.arguments[1])) || unwrap(projectionCall.arguments[1]).text !== 'sessionId') {
         problems.push('owner must resolve exactly once with both ids and validate the ACTIVE Web projection');

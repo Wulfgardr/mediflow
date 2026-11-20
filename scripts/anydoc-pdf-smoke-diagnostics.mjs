@@ -85,7 +85,7 @@ function frameObservation(output) {
  */
 export function formatPdfSmokeFailure(operation, failedCheck, result) {
   const stage = operation === 'materialize' || operation === 'render' ? operation : 'unknown';
-  const check = ['transport', 'response', 'unsupported_host'].includes(failedCheck) ? failedCheck : 'unknown';
+  const check = ['transport', 'response', 'unsupported_host', 'text_pixels'].includes(failedCheck) ? failedCheck : 'unknown';
   const child = result && typeof result === 'object' ? result : {};
   const exitCode = Number.isSafeInteger(child.status) && child.status >= -2_147_483_648 && child.status <= 4_294_967_295
     ? child.status : null;
@@ -97,10 +97,14 @@ export function formatPdfSmokeFailure(operation, failedCheck, result) {
       : child.status !== 0 ? 'nonzero_or_missing_exit'
         : stderrBytes === null ? 'stderr_unavailable'
           : stderrBytes !== 0 ? 'stderr_present' : 'completed';
+  const rendererInit = stage === 'render' && typeof stderrBytes === 'number' && stderrBytes <= 128
+    ? /^renderer-init:(profile|package_versions|binary_path|binary_identity|icu_path|icu_identity|canvas_import|pdfjs_import|renderer_api):(ERR_DLOPEN_FAILED|ERR_ACCESS_DENIED|EACCES|EPERM|ENOENT|MODULE_NOT_FOUND|ERR_MODULE_NOT_FOUND|unavailable)\r?\n$/
+      .exec(child.stderr.toString('utf8')) : null;
   const observation = {
     stage, check, completion, exitCode, signal, spawnError,
     stdoutBytes: byteCount(child.stdout), stderrBytes,
     ...frameObservation(child.stdout),
+    ...(rendererInit ? { rendererInit: { stage: rendererInit[1], code: rendererInit[2] } } : {}),
     node: /^\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(process.versions.node) ? process.versions.node : 'other',
     platform: PLATFORMS.has(process.platform) ? process.platform : 'other',
     arch: ARCHITECTURES.has(process.arch) ? process.arch : 'other',

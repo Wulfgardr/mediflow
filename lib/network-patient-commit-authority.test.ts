@@ -1,6 +1,7 @@
+import { issueSyntheticWebSessionContext } from './security/web-auth-lifecycle-owner-test-fixture';
 import { syntheticTaxCode } from './patient-identity.test-support.ts';
-import { syntheticLoopbackRequest } from './security/loopback-ingress-test-fixture';
-import { bindSessionToArchive, currentArchiveGeneration } from './security/archive-session-generation';
+import { syntheticLoopbackRequest, syntheticWebClientRequest } from './security/loopback-ingress-test-fixture';
+import { currentArchiveGeneration } from './security/archive-session-generation';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -20,7 +21,7 @@ import { retireServerSessionForLogout, clearAllSessions } from './security/serve
 const load = createRequire(import.meta.url);
 const dataDir = mkdtempSync(join(tmpdir(), 'mediflow-patient-authority-synthetic-'));
 process.env.MEDIFLOW_DATA_DIR = dataDir;
-const cookieState = { cookies: new Map<string, string>(), headers: syntheticLoopbackRequest('http://127.0.0.1').headers, onCookies: undefined as (() => void) | undefined };
+const cookieState = { cookies: new Map<string, string>(), headers: syntheticWebClientRequest('http://127.0.0.1').headers, onCookies: undefined as (() => void) | undefined };
 const cleanupCookies = installNetworkPatientCookieFixture(dataDir, cookieState);
 const { dbServer } = load('./db-server.ts') as typeof import('./db-server');
 const collection = load('../app/api/v1/network/patients/route.ts') as typeof import('../app/api/v1/network/patients/route');
@@ -41,14 +42,9 @@ function fixture(operation: Operation, channel: 'native' | 'web' = 'native') {
     const native = syntheticNetworkPatientAuthority(dbServer, 'synthetic-a');
     let session = native.session;
     if (channel === 'web') {
-        const control = owner.bootstrapControl(); assert.ok(control);
-        const attempt = owner.begin('login', { controlId: control.controlId, ifMatch: control.etag, idempotencyKey: randomUUID() }); assert.ok(attempt);
-        const issued = owner.issue(attempt, { id: session.userId, username: session.username, role: session.role }); assert.ok(issued);
-        const resolved = owner.resolve(issued.sessionId, control.controlId); assert.equal(resolved.status, 'active');
-        if (resolved.status !== 'active') throw new Error('synthetic Web session missing');
-        session = resolved.projection;
-        bindSessionToArchive(session, currentArchiveGeneration());
-        cookieState.cookies.set('mediflow_auth_control', control.controlId);
+        const web = issueSyntheticWebSessionContext({ id: session.userId, username: session.username, role: session.role }, randomUUID());
+        session = web.session;
+        cookieState.cookies.set('mediflow_auth_control', web.controlId);
     }
     cookieState.cookies.set('mediflow_session', session.id);
     const id = 'synthetic-patient';

@@ -24,13 +24,14 @@ function fixture({ correlated = false, archiveTransport = false } = {}) {
   let called;
   const nativeFetch = function(...args) { called = { receiver: this, args }; return fetchPromise; };
   const listeners = new Map();
-  const context = vm.createContext({ exports: {}, require, URL, Request, Headers, Uint8Array,
+  const context = vm.createContext({ exports: {}, require, URL, Request, Headers, Uint8Array, crypto: globalThis.crypto,
     location: { href: 'http://127.0.0.1:3000/synthetic', origin: 'http://127.0.0.1:3000' }, fetch: nativeFetch,
     addEventListener(name, fn) { listeners.set(name, fn); },
     removeEventListener(name) { listeners.delete(name); },
   });
   if (archiveTransport) {
-    const transport = fs.readFileSync(new URL('../lib/security/client-auth-api.ts', import.meta.url), 'utf8');
+    const transport = fs.readFileSync(new URL('../lib/security/client-auth-api.ts', import.meta.url), 'utf8')
+      .replace("'./web-session-proof-header'", "'../lib/security/web-session-proof-header.ts'");
     vm.runInContext('window = globalThis', context);
     vm.runInContext(ts.transpileModule(transport, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, context);
     context.exports.observeArchiveGeneration('11111111-1111-4111-8111-111111111111');
@@ -59,6 +60,8 @@ test('correlation composes with the real archive transport without changing proj
     for (const key of ['method', 'body', 'signal', 'cache', 'credentials', 'keepalive']) assert.strictEqual(forwarded[key], init[key], key);
     const request = new Request(new URL(f.called().args[0], f.context.location.href), forwarded);
     assert.equal(request.method, method);
+    assert.equal(request.redirect, 'error');
+    assert.equal(/^[a-f0-9]{64}$/u.test(request.headers.get('x-mediflow-web-instance') ?? ''), true);
     assert.deepEqual(new Uint8Array(await request.arrayBuffer()), init.body ?? new Uint8Array());
     assert.equal(request.headers.get('x-mediflow-archive-generation'), '11111111-1111-4111-8111-111111111111');
     assert.match(request.headers.get('x-mediflow-anydoc-diagnostic'), /^ad1-[a-f0-9]{32}-1-[12]$/u);
@@ -133,7 +136,7 @@ function streamFixture({ delayedResponse = false } = {}) {
   const response = new Response(stream);
   let resolveResponse;
   const responsePromise = delayedResponse ? new Promise(resolve => { resolveResponse = resolve; }) : Promise.resolve(response);
-  const context = vm.createContext({ exports: {}, require, URL, Request, Headers, Uint8Array,
+  const context = vm.createContext({ exports: {}, require, URL, Request, Headers, Uint8Array, crypto: globalThis.crypto,
     location: { href: 'http://synthetic.invalid/' }, fetch: () => responsePromise,
     addEventListener() {}, removeEventListener() {},
   });

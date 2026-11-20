@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
-import { bootstrapUnlockedSession, openAiModelsSettings } from './utils';
+import { openUnlockedDocument, bootstrapUnlockedSession, openAiModelsSettings } from './utils';
 import {
   ensureAiRolloutReadinessArtifactDirectory,
   type RolloutReadinessArtifactLane,
@@ -107,7 +107,7 @@ for (const route of ['modelli', 'funzioni'] as const) {
       await request.fulfill({ response });
     });
     try {
-      await page.goto(`/settings/ai/${route}`);
+      await openUnlockedDocument(page, `/settings/ai/${route}`);
       await pendingRead;
       const controls = page.getByTestId('ai-settings-controls');
       const save = page.getByRole('button', { name: route === 'modelli' ? 'Salva configurazione' : 'Salva parametri avanzati', exact: true });
@@ -196,7 +196,7 @@ test('AI settings stay unavailable when the initial configuration cannot be read
   await page.route('**/api/settings/aiModelDefaultVersion', (request) => request.fulfill({
     status: 500, json: { error: 'Synthetic settings read failure' },
   }));
-  await page.goto('/settings/ai/modelli');
+  await openUnlockedDocument(page, '/settings/ai/modelli');
   const readFailure = page.getByTestId('settings-ai-models-section').getByRole('alert');
   await expect(readFailure).toBeVisible();
   await expect(readFailure).toContainText('Impossibile leggere le impostazioni.');

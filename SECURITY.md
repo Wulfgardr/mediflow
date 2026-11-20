@@ -140,7 +140,7 @@ separati, non una conseguenza della password.
 Ho separato l’accesso della UI web da quello dei client nativi e dei
 dispositivi abbinati all’host. MediFlow espone tre superfici API:
 
-- `/api/*` (web UI): protetta da sessione
+- `/api/*` (web UI): le operazioni riservate richiedono una sessione attiva e la prova della scheda o del client locale autenticato.
 - `/api/v1/*` (client native): protetta da token, versionata
 - `/api/v1/network/*` (home-base opt-in): richiede un dispositivo abbinato, o paired, e parte dalla sola lettura. Le scritture sono limitate a profilo/status paziente, diario, terapie, checkup e osservazioni. La protezione richiede credenziale del dispositivo e sessione dell’operatore
 
@@ -148,8 +148,7 @@ Regole minime:
 - Non esporre endpoint sensibili senza autenticazione.
 - Mantieni `/api/v1/*` stabile e retrocompatibile.
 - Il bearer token locale non equivale a una sessione amministrativa umana:
-  route di sistema distruttive o amministrative richiedono session cookie con
-  admin web. In particolare audit, backup export/restore, backup scheduler,
+  le route di sistema distruttive o amministrative richiedono una sessione Web amministrativa con la prova del client. In particolare audit, backup export/restore, backup scheduler,
   repair DB, purge e restore paziente e start/stop MLX non devono accettare
   solo il token locale.
 - Le eccezioni che riconoscono il token fuori da `/api/v1/*` servono soltanto al supporto e all’avvio locale: cataloghi locali, settings/native bootstrap, proxy AI locale, controlli locali di salute e oscuramento dei dati identificativi, panoramica di rete e stato MLX in sola lettura. Non conferiscono privilegi amministrativi generali. Ogni nuova eccezione deve documentare perché non richieda una sessione admin web.
@@ -193,7 +192,14 @@ non un accesso remoto generale. Restano valide le seguenti condizioni:
 - `/api/v1/network/patients/{id}/observations*` richiede capability osservazioni
   dedicate, sessione operatore e `observations.version`. Abilita solo
   create/update/soft-delete delle osservazioni LOINC/UCUM
-- restano esclusi cancellazione fisica remota, scritture remote di allegati/documenti, cataloghi, sincronizzazione per record, campi AI/documentali e ripieghi automatici su percorsi alternativi
+- per creare un allegato per un paziente del proprio ambulatorio, il dispositivo
+  abbinato usa la sessione operatore e la capability `network.replica.write-documents`.
+  Nome, percorso e contenuto del file devono essere cifrati. La lettura richiede
+  la capability distinta `network.replica.readonly-documents`. Modifica e
+  cancellazione degli allegati si eseguono sul Web locale. [ADR 0076](./docs/adr/0076-paired-document-domain-write-policy.md)
+- restano esclusi cancellazione fisica remota, cataloghi, sincronizzazione per
+  record, scrittura dei campi AI o derivati dai documenti e ripieghi automatici
+  su percorsi alternativi
 
 ### Lockout autenticazione PIN
 
@@ -283,14 +289,34 @@ pacchetti. Il launcher `uvx` predefinito forza la modalità offline: se la cache
 necessaria manca, interrompe l’operazione invece di cercare un’alternativa.
 Avere il runner non dimostra quindi che ATHENA sia pronta in ogni ambiente.
 
-AnyDoc è il primo passaggio automatico locale degli allegati e lavora in un
-processo figlio con limiti di esecuzione e senza rete. Per i PDF supportati,
-vengono classificate e materializzate soltanto le pagine `needsOcr`, poi
-renderizzate e trattate da Apple Vision in locale, con rete negata. Il risultato
-viene ricomposto conservando ordine, provenienza e hash e pubblicato soltanto
-se la sorgente è ancora corrente. In presenza di errori, formati ambigui,
-documenti cifrati o motore indisponibile, il percorso si arresta senza aggirare
-i controlli.
+### Processi documentali
+
+AnyDoc elabora gli allegati in un processo figlio con limiti di esecuzione.
+I worker di estrazione e PDF bloccano le API JavaScript di rete. Il modello
+dei permessi Node limita le operazioni Node, mentre i renderer e i parser
+nativi operano fuori da quei controlli JavaScript.
+
+Nel runtime Web condiviso con Headless, la protezione di rete del figlio
+dipende dal profilo.
+
+| Profilo | Controlli di sistema del launcher documentale |
+| --- | --- |
+| macOS Apple Silicon | `sandbox-exec` applica la policy Seatbelt che nega `network*`, scritture su file e fork ai worker AnyDoc/PDF. Il launcher non ripiega su Node diretto. Il processo Apple Vision ha una policy Seatbelt separata che nega `network*`. |
+| Omarchy ARM | `prlimit` impone il limite dati. `unshare` avvia il figlio in un namespace di rete distinto, senza interfacce e rotte IP del guest. Il kernel deve consentire la creazione di namespace all'utente ordinario. Se l'avvio fallisce, l'elaborazione resta indisponibile. |
+| Windows 11 ARM, Node x64 emulato | Il launcher Win32 richiede un AppContainer senza capacità di rete e verifica il token prima di avviare Node x64. Il figlio riceve soltanto le pipe standard e una copia temporanea degli asset documentali. Se il confinamento è indisponibile, l’elaborazione si arresta. |
+
+Il namespace Linux riguarda la rete IP e i socket Unix astratti. I socket
+Unix nel filesystem restano soggetti ai permessi del processo. Sulle altre
+architetture Linux il launcher impone il limite dati tramite `prlimit`.
+
+Per i PDF supportati, il passaggio OCR riguarda soltanto le pagine `needsOcr`.
+Il riconoscimento locale usa Apple Vision sul Mac e Tesseract WASM su Linux
+e Windows, quando sono disponibili gli artefatti previsti. Il risultato
+conserva ordine, provenienza e hash ed è pubblicato soltanto se la sorgente
+è ancora corrente. Errori, formati ambigui, documenti cifrati e motori
+indisponibili fermano il percorso. La qualifica GPUI riguarda il client
+installato sul Mac fissato dal contratto. Queste policy appartengono ai
+worker del runtime Web. Vedi [ADR 0196](docs/adr/0196-document-child-platform-boundary.md).
 
 DeepSeek-OCR 2/CUDA, benchmark di qualifica e readiness universale hanno stato
 `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`. Le route OCR legacy, dopo

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
+  openUnlockedDocument,
   assertKeyboardFocusProgresses,
   assertNoHorizontalOverflow,
   assertNotClippedInViewport,
@@ -41,7 +42,7 @@ async function resolveColorVariable(page: Page, variable: string): Promise<strin
 
 async function openSyntheticFrame(page: Page, register: FrameCase['register']): Promise<void> {
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-  await page.goto('/?area=turno');
+  await openUnlockedDocument(page, '/?area=turno');
   await page.waitForLoadState('domcontentloaded');
   await setRegister(page, register);
   await expect(page.getByTestId('lume-frame')).toBeVisible();

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { bootstrapUnlockedSession } from './utils';
+import { openUnlockedDocument, bootstrapUnlockedSession } from './utils';
 
 const EVIDENCE_RECORD_IDS = [
   'data_protection_by_design',
@@ -34,7 +34,7 @@ test.afterEach(async ({ page }, info) => {
 
 test('Compliance settings renders the technical evidence inventory without a legal verdict', async ({ page }) => {
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-  await page.goto('/settings/compliance');
+  await openUnlockedDocument(page, '/settings/compliance');
   await expect(page).toHaveURL(/\/settings\/compliance$/);
 
   const surface = page.getByTestId('settings-compliance-section');

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { bootstrapUnlockedSession } from './utils';
+import { openUnlockedDocument, bootstrapUnlockedSession } from './utils';
 
 const destinations = [
     '/settings/profilo', '/settings/aspetto', '/settings/ambulatories', '/settings/accesso', '/settings/agenti',
@@ -18,7 +18,7 @@ for (const width of [1440, 768, 390]) test(`Impostazioni: una navigazione e dest
     const writes: string[] = [];
     page.on('request', request => { if (['PUT', 'PATCH', 'DELETE'].includes(request.method()) || (request.method() === 'POST' && /^\/api\/(patients|ambulatories)(\/|$)/u.test(new URL(request.url()).pathname))) writes.push(`${request.method()} ${new URL(request.url()).pathname}`); });
     for (const theme of ['giorno', 'grafite']) {
-        await page.goto('/settings');
+        await openUnlockedDocument(page, '/settings');
         await page.getByRole('button', { name: theme === 'giorno' ? 'Tema Chiaro' : 'Tema Scuro', exact: true }).click();
         const content = page.getByTestId('settings-subroute-content');
         const sidebar = page.getByTestId('settings-nav-sidebar');
@@ -68,16 +68,16 @@ test('Fabric: titolo del piano unico e titoli interni secondo la scala di sezion
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.route('**/api/siss/session-status', route => route.fulfill({ json: { status: 'unavailable', source: 'synthetic', checkpoints: [] } }));
     await bootstrapUnlockedSession(page, '1234');
-    await page.goto('/settings/ai/fabric');
+    await page.getByRole('link', { name: 'Impostazioni', exact: true }).click();
+    await page.locator('a[href="/settings/ai/fabric"]:visible').first().click();
     await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
     for (const name of ['Sintesi, importazione e revisione del trattamento', 'Lettura dei documenti']) {
         const heading = page.getByRole('heading', { level: 3, name, exact: true });
         await expect(heading).toBeVisible();
-        const type = await heading.evaluate(element => {
+        await expect.poll(() => heading.evaluate(element => {
             const style = getComputedStyle(element);
             return { size: Number.parseFloat(style.fontSize), weight: style.fontWeight,
                 spacing: Number.parseFloat(style.letterSpacing), caps: style.fontVariantCaps };
-        });
-        expect(type).toEqual({ size: 12, weight: '600', spacing: 0.6, caps: 'all-small-caps' });
+        })).toEqual({ size: 12, weight: '600', spacing: 0.6, caps: 'all-small-caps' });
     }
 });

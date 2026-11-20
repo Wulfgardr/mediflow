@@ -1,4 +1,4 @@
-import { syntheticLoopbackRequest } from './security/loopback-ingress-test-fixture';
+import { syntheticLoopbackRequest, syntheticWebClientRequest } from './security/loopback-ingress-test-fixture';
 /* WUL-579: the real notes writer and complete C15 recovery, with synthetic data only. */
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -31,7 +31,7 @@ const sourceDir = mkdtempSync(join(tmpdir(), 'mediflow-profile-review-recovery-s
 process.env.MEDIFLOW_DATA_DIR = sourceDir;
 const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server');
 openDbServer();
-const cookieState = { cookies: new Map<string, string>(), headers: syntheticLoopbackRequest('http://127.0.0.1').headers };
+const cookieState = { cookies: new Map<string, string>(), headers: syntheticWebClientRequest('http://127.0.0.1').headers };
 const cleanupCookies = installNetworkPatientCookieFixture(sourceDir, cookieState);
 const commitRoute = load('../app/api/patients/[id]/notes-commit/route.ts') as typeof import('../app/api/patients/[id]/notes-commit/route');
 const ordinaryRoute = load('../app/api/patients/[id]/route.ts') as typeof import('../app/api/patients/[id]/route');

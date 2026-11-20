@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { bootstrapUnlockedSession } from './utils';
+import { openUnlockedDocument, bootstrapUnlockedSession } from './utils';
 
 test('la navigazione globale annuncia la destinazione nelle sottoroute e nel menu compatto', async ({ page }) => {
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
@@ -14,7 +14,7 @@ test('la navigazione globale annuncia la destinazione nelle sottoroute e nel men
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 960 });
     for (const [path, name] of [[`/patients/${patientId}/modules`, 'Pazienti'], ['/?area=incarico', 'Pazienti'], ['/?area=turno', 'Agenda'], ['/?area=diario', 'Diario'], ['/?area=repertori', 'Repertori'], ['/analytics', 'Analisi'], ['/scales', 'Scale'], ['/settings/accesso', 'Impostazioni'], ['/settings/ai/modelli/?q=/settings-x#analytics-x', 'Impostazioni']]) {
-      await page.goto(path);
+      await openUnlockedDocument(page, path);
       const shell = page.locator('aside').filter({ has: page.getByRole('navigation', { name: 'Navigazione principale', exact: true }) });
       const current = shell.locator('[aria-current="page"]:visible');
       await expect(current).toHaveCount(1);
@@ -35,7 +35,7 @@ test('A1: nessuna voce corrente per falsi prefissi o route senza destinazione', 
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 960 });
-    await page.goto('/settings/accesso');
+    await openUnlockedDocument(page, '/settings/accesso');
     const shell = page.locator('aside').filter({ has: page.getByRole('navigation', { name: 'Navigazione principale', exact: true }) });
     await expect(shell.locator('[aria-current="page"]:visible')).toHaveCount(1);
     for (const path of ['/settings-x', '/analytics-x', '/scales-x', '/patients-x', '/unknown']) {
@@ -56,7 +56,7 @@ test('la disclosure mantiene il bersaglio minimo nelle impostazioni', async ({ p
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   for (const width of [1440, 700, 390]) {
     await page.setViewportSize({ width, height: 960 });
-    await page.goto('/settings/accesso');
+    await openUnlockedDocument(page, '/settings/accesso');
     const controls = page.locator('[data-disclosure-control]:visible');
     await expect(controls.first()).toBeVisible();
     for (const control of await controls.all()) {
@@ -68,7 +68,7 @@ test('la disclosure mantiene il bersaglio minimo nelle impostazioni', async ({ p
   try {
     const touchPage = await context.newPage();
     await bootstrapUnlockedSession(touchPage, process.env.E2E_PIN || '1234');
-    await touchPage.goto('/settings/accesso');
+    await openUnlockedDocument(touchPage, '/settings/accesso');
     const controls = touchPage.locator('[data-disclosure-control]:visible');
     await expect(controls.first()).toBeVisible();
     for (const control of await controls.all()) {

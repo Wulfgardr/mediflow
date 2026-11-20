@@ -1,6 +1,7 @@
 import { hasAttestedLoopbackIngress } from './loopback-ingress.mjs';
 import { isTrustedWebMutationRequest } from './request-transport';
 import { webAuthControlIdFromRequest, webAuthSessionIdFromRequest } from './web-auth-control-transport';
+import { presentedWebSessionProof } from './web-session-proof';
 import { completeExactWebP3Logout } from './web-auth-logout-server';
 
 function localRequest(request: Request): boolean {
@@ -14,7 +15,7 @@ function localRequest(request: Request): boolean {
 export function createLocalClientLogout(complete: typeof completeExactWebP3Logout = completeExactWebP3Logout) {
     return async (request: Request): Promise<Response> => {
         const reply = (status: number) => new Response(null, { status, headers: { 'Cache-Control': 'no-store' } });
-        if (!localRequest(request)) return reply(403);
+        if (!localRequest(request) || presentedWebSessionProof(request.headers)?.kind !== 'local-client') return reply(403);
         const session = webAuthSessionIdFromRequest(request);
         const control = webAuthControlIdFromRequest(request);
         if (!session || !control) return reply(401);

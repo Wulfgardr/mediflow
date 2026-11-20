@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { presentedWebSessionProof, webSessionProofBindings } from './web-session-proof';
+import { LOCAL_CLIENT_SESSION_PROOF_HEADER } from './web-session-proof-header';
 import { readFileSync } from 'node:fs';
 import Module, { createRequire } from 'node:module';
 import test, { describe } from 'node:test';
@@ -26,6 +28,7 @@ type State = {
     getCalls: number;
     acquireArgs: unknown[];
     onCookies: Hook;
+    rejectedCookies: boolean;
     onCookieGet: Hook;
     onResolve: Hook;
     onEq: Hook;
@@ -53,6 +56,11 @@ const projection = sealed({
     createdAt: 1,
     expiresAt: 9_999_999_999_999,
 });
+const requestHeaders = new Headers({ [LOCAL_CLIENT_SESSION_PROOF_HEADER]: 'b'.repeat(64) });
+const proof = presentedWebSessionProof(requestHeaders);
+assert.ok(proof);
+webSessionProofBindings.bind(CONTROL_ID, SESSION_ID, projection.expiresAt, proof);
+
 const owner = {
     snapshotSelectionEpoch() { return 1; },
     snapshotReviewContextEpoch() { return 1; },
@@ -82,6 +90,7 @@ const state = {
     getCalls: 0,
     acquireArgs: [],
     onCookies: undefined,
+    rejectedCookies: false,
     onCookieGet: undefined,
     onResolve: undefined,
     onEq: undefined,
@@ -119,8 +128,12 @@ moduleApi._load = function (request, parent, isMain) {
     };
     if (request === './loopback-ingress.mjs') return { hasAttestedLoopbackIngress: () => state.ingressAllowed };
     if (request === 'next/headers') return {
-        headers: async () => new Headers(),
-        cookies: () => { state.cookiesCalls += 1; state.onCookies?.(); return state.cookieResult; },
+        headers: async () => requestHeaders,
+        cookies: () => {
+            state.cookiesCalls += 1;
+            state.onCookies?.();
+            return state.rejectedCookies ? Promise.reject(new Error('synthetic canonical cookie rejection')) : state.cookieResult;
+        },
     };
     if (request === 'next/server') return { NextResponse: { json: () => null } };
     if (request === 'drizzle-orm') return { eq: () => { state.onEq?.(); return {}; } };
@@ -192,6 +205,7 @@ function reset(): void {
     state.bearerCookie = { name: 'mediflow_session', value: SESSION_ID };
     state.controlCookie = { name: 'mediflow_auth_control', value: CONTROL_ID };
     state.cookieResult = Promise.resolve(cookieStore);
+    state.rejectedCookies = false;
     state.userResult = state.user;
     state.ownerResult = owner;
     state.tokenError = null;
@@ -432,7 +446,7 @@ describe('external Web owner server-auth boundary', { concurrency: 1 }, () => {
         assert.equal(proxyTraps, 0);
 
         reset();
-        state.cookieResult = Promise.reject(new Error('synthetic canonical cookie rejection'));
+        state.rejectedCookies = true;
         const rejected = await noUnhandled(acquire);
         assert.equal(rejected.value, null);
         assert.deepEqual(rejected.unhandled, []);

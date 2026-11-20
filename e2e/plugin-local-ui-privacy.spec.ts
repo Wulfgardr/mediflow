@@ -1,7 +1,7 @@
 import { expect, test } from './fixtures/isolated-runtime';
 import { randomUUID } from 'node:crypto';
-import { bootstrapUnlockedSession } from './utils';
-import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
+import { unlockIfNeeded, bootstrapUnlockedSession } from './utils';
+import { documentRequests } from './fixtures/trusted-web-request';
 
 test.describe('IPC-connected plugin runtime', () => {
   test.use({ pluginLocalUiRuntime: true });
@@ -18,15 +18,15 @@ test.describe('IPC-connected plugin runtime', () => {
       };
     });
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-    const headers = await trustedArchiveWebRequestHeaders(page);
     const suffix = randomUUID().replaceAll('-', '').slice(0, 10).toUpperCase();
     const firstName = 'Privacy R1', lastName = `Sintetico ${suffix}`;
-    const created = await page.request.post('/api/patients', { headers, data: {
+    const created = await documentRequests(page).post('/api/patients', { data: {
       firstName, lastName, taxCode: `R1P${suffix}XXX`,
     } });
     expect(created.status()).toBe(201);
     const patient = await created.json() as { id: string };
     await page.goto(`/patients/${patient.id}/modules`);
+    await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
     await expect(page.getByTestId('patient-profile-notes')).not.toContainText('Lettura delle note in corso…');
     await expect.poll(() => page.evaluate(() => (window as any).localUiTestEvents?.some((event: any) => !event.closed))).toBe(true);
     const off = page.getByRole('button', { name: 'Disattiva Privacy Mode', exact: true });
@@ -65,6 +65,7 @@ test.describe('IPC-connected plugin runtime', () => {
     const subscribed = page.waitForResponse(response => new URL(response.url()).pathname === '/api/plugin-local-ui/events');
     const landing = await page.goto('/plugin-local-ui');
     expect(landing?.headers()['cache-control']).toContain('no-store');
+    await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
     const events = await subscribed;
     expect(events.status()).toBe(200);
     expect(events.headers()['cache-control']).toContain('no-store');
@@ -83,16 +84,17 @@ test('ordinary runtime makes no plugin event requests and has no console errors'
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
   page.on('pageerror', error => errors.push(error.message));
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-  const headers = await trustedArchiveWebRequestHeaders(page);
   const suffix = randomUUID().replaceAll('-', '').slice(0, 10).toUpperCase();
-  const created = await page.request.post('/api/patients', { headers, data: {
+  const created = await documentRequests(page).post('/api/patients', { data: {
     firstName: 'Navigazione', lastName: `Sintetico ${suffix}`, taxCode: `NAV${suffix}XXX`,
   } });
   expect(created.status()).toBe(201);
   const patient = await created.json() as { id: string };
   await page.goto(`/patients/${patient.id}/modules`);
+  await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
   await expect(page.getByTestId('patient-profile-notes')).not.toContainText('Lettura delle note in corso…');
   await page.goto('/plugin-local-ui');
+  await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
   await expect(page.getByRole('heading', { name: 'Continua in MediFlow', exact: true })).toBeVisible();
   const disabled = await page.request.get('/api/plugin-local-ui/events');
   expect(disabled.status()).toBe(404);

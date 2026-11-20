@@ -16,6 +16,13 @@ import {
     setupSecurityRequest,
 } from './client-auth-api';
 
+function isolatedAuthApiSource(): string {
+    const headersSource = readFileSync(new URL('./web-session-proof-header.ts', import.meta.url));
+    const headersUrl = `data:text/javascript;base64,${headersSource.toString('base64')}`;
+    return readFileSync(new URL('./client-auth-api.ts', import.meta.url), 'utf8')
+        .replace("'./web-session-proof-header'", JSON.stringify(headersUrl));
+}
+
 const confirmedReceipt = { schemaVersion: APPLICATION_LOCK_RECEIPT_SCHEMA_VERSION, state: 'server_invalidation_confirmed' };
 const unconfirmedReceipt = { schemaVersion: APPLICATION_LOCK_RECEIPT_SCHEMA_VERSION, state: 'server_invalidation_unconfirmed' };
 
@@ -351,7 +358,7 @@ test('lock replays a post-CAS body-read failure with the same logical key', asyn
 });
 
 test('application lock confirmation rejects forbidden Object.prototype keys present before import', () => {
-    const source = readFileSync(new URL('./client-auth-api.ts', import.meta.url), 'utf8');
+    const source = isolatedAuthApiSource();
     for (const key of ['then', 'value', 'schemaVersion', 'state']) {
         const script = `import ts from 'typescript'; const output = ts.transpileModule(${JSON.stringify(source)}, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText; Object.defineProperty(Object.prototype, ${JSON.stringify(key)}, { configurable: true, value: undefined }); globalThis.fetch = async (input) => input === '/api/auth/check' ? new Response('{"status":"ok","archiveGeneration":"00000000-0000-4000-8000-000000000001"}', { status: 200, headers: { ETag: '"fence-poison"' } }) : new Response(${JSON.stringify(JSON.stringify(confirmedReceipt))}, { status: 200, headers: { ETag: '"fence-poison-next"' } }); const api = await import('data:text/javascript;base64,' + Buffer.from(output).toString('base64')); await api.checkAuthHealthRequest(); if (await api.requestApplicationLockConfirmation()) process.exitCode = 1;`;
         execFileSync(process.execPath, ['--input-type=module', '--eval', script]);
@@ -463,7 +470,7 @@ test('restored PIN authority reconciles a concurrent recovery check without bypa
         compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 },
     }).outputText;
 
-    for (const { outcome, leaseRequired } of (['restored', 'locked', 'missing', 'passphrase'] as const)
+    for (const { outcome, leaseRequired } of (['restored', 'locked', 'missing', 'passphrase', 'no-session'] as const)
         .flatMap(outcome => [false, true].map(leaseRequired => ({ outcome, leaseRequired })))) {
         const state = { authenticated: false, locked: true, user: null as { id: string } | null };
         const authorityAttemptGenerationRef = { current: 0 };
@@ -479,7 +486,6 @@ test('restored PIN authority reconciles a concurrent recovery check without bypa
         const callbacks = runInNewContext(output, {
             authorityAttemptGenerationRef, authRecoveryStateRef, masterKeyRef, wrappingRef,
             tabKeyShareRef: { current: { publish: async (value: (typeof publishedKeys)[number]) => { publishedKeys.push(value); } } },
-            askUnlockParameters: async () => ({ credential: outcome === 'passphrase' ? 'passphrase' : 'pin' }),
             restoreSecuritySession: () => restored,
             clearSecuritySession: () => undefined,
             setActiveMasterKey: (key: object) => { masterKeyRef.current = key; },
@@ -488,7 +494,8 @@ test('restored PIN authority reconciles a concurrent recovery check without bypa
             setIsLocked: (value: boolean) => { state.locked = value; },
             updateAuthRecoveryState: (value: string) => { authRecoveryStateRef.current = value; },
             checkAuthHealthRequest: async () => ({ response: { ok: true }, controlState: 'accepted',
-                payload: { status: 'ok', isSetup: true, hasSession: true, localUiLeaseRequired: leaseRequired, unlock: { credential: 'pin' } } }),
+                payload: { status: 'ok', isSetup: true, hasSession: outcome !== 'no-session',
+                    localUiLeaseRequired: leaseRequired, unlock: { credential: outcome === 'passphrase' ? 'passphrase' : 'pin' } } }),
             readUnlockParameters: (value: unknown) => value,
             showUnlockCredential: () => undefined,
             setAuthHealth: () => undefined,
@@ -499,7 +506,7 @@ test('restored PIN authority reconciles a concurrent recovery check without bypa
         const leaseUpdates: boolean[] = [];
         await callbacks.checkAuthStatus(required => { leaseUpdates.push(required); });
         assert.deepEqual(leaseUpdates, [leaseRequired]);
-        assert.equal(authRecoveryStateRef.current, 'required');
+        assert.equal(authRecoveryStateRef.current, outcome === 'no-session' ? 'ready' : 'required');
         if (outcome === 'locked') {
             authorityAttemptGenerationRef.current += 1;
             authRecoveryStateRef.current = 'pending';
@@ -519,7 +526,7 @@ test('restored PIN authority reconciles a concurrent recovery check without bypa
         } else {
             assert.deepEqual(state, { authenticated: false, locked: true, user: null });
             assert.equal(masterKeyRef.current, null);
-            assert.equal(authRecoveryStateRef.current, outcome === 'locked' ? 'pending' : 'required');
+            assert.equal(authRecoveryStateRef.current, outcome === 'locked' ? 'pending' : outcome === 'no-session' ? 'ready' : 'required');
             assert.equal(publishedKeys.length, 0);
             assert.equal(wrappingRef.current, null);
         }
@@ -528,7 +535,7 @@ test('restored PIN authority reconciles a concurrent recovery check without bypa
 
 
 test('one document stays on A after observing B and stamps A even over caller-supplied B', () => {
-    const source = readFileSync(new URL('./client-auth-api.ts', import.meta.url), 'utf8');
+    const source = isolatedAuthApiSource();
     const script = `import assert from 'node:assert/strict'; import ts from 'typescript';
 const output = ts.transpileModule(${JSON.stringify(source)}, {compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText;
 const api = await import('data:text/javascript;base64,' + Buffer.from(output).toString('base64'));
@@ -547,7 +554,7 @@ assert.equal(reloads,2); dispose();`;
 });
 
 test('archive transport fences only the exact scoped epoch GET and rejects archive replacement', () => {
-    const source = readFileSync(new URL('./client-auth-api.ts', import.meta.url), 'utf8');
+    const source = isolatedAuthApiSource();
     const script = `import assert from 'node:assert/strict'; import ts from 'typescript';
 const output=ts.transpileModule(${JSON.stringify(source)},{compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText;
 const api=await import('data:text/javascript;base64,'+Buffer.from(output).toString('base64'));
@@ -564,7 +571,10 @@ for(const url of ['/api/patient-profile/selection-epoch/','/api/patient-profile/
 }
 await window.fetch('/api/patient-profile/selection-epoch',{method:'HEAD'});
 assert.equal(new Headers(calls.at(-1).init?.headers).has('x-mediflow-archive-generation'),false);
-replaced=true;await assert.rejects(window.fetch('/api/patient-profile/selection-epoch',{method:'GET'}),/ARCHIVE_REPLACED/);
+replaced=true;
+assert.equal((await window.fetch('/api/patients')).status,409);
+assert.equal(reloads,0);
+await assert.rejects(window.fetch('/api/patient-profile/selection-epoch',{method:'GET'}),/ARCHIVE_REPLACED/);
 assert.equal(reloads,1);assert.deepEqual(events,['mediflow:archive-replaced']);dispose();`;
     execFileSync(process.execPath, ['--input-type=module', '--eval', script]);
 });

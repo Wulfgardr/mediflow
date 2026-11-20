@@ -1,5 +1,5 @@
 'use client';
-import { ARCHIVE_REPLACED_EVENT, installArchiveGenerationTransport } from '@/lib/security/client-auth-api';
+import { ARCHIVE_REPLACED_EVENT, installArchiveGenerationTransport, documentProofDigest, requestTabAccess } from '@/lib/security/client-auth-api';
 
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import {
@@ -214,11 +214,18 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         const uninstall = installArchiveGenerationTransport();
-        const shared = typeof BroadcastChannel === 'undefined' ? null : createTabKeyShare<User>(new BroadcastChannel('mediflow.tab-key.v1'), async () => {
-            const result = await checkAuthHealthRequest({ fresh: true });
-            return result.response.ok && result.controlState === 'accepted' && result.payload?.status === 'ok' && result.payload.hasSession === true
-                ? clientTabAuthorityBinding() : null;
-        }, clientTabAuthorityBinding);
+        const shared = typeof BroadcastChannel === 'undefined' ? null : createTabKeyShare<User>(new BroadcastChannel('mediflow.tab-key.v2'), {
+            currentBinding: clientTabAuthorityBinding,
+            recipient: documentProofDigest,
+            offer: recipient => requestTabAccess({ offer: recipient }),
+            async accept() {
+                if (!await requestTabAccess({ accept: true })) return null;
+                const result = await checkAuthHealthRequest({ fresh: true });
+                return result.response.ok && result.controlState === 'accepted' && result.payload?.status === 'ok' && result.payload.hasSession === true
+                    ? clientTabAuthorityBinding() : null;
+            },
+            reconcile: () => { void checkAuthStatus(setLocalUiLeaseRequired); },
+        });
         tabKeyShareRef.current = shared;
         const replaced = () => {
             ++authorityAttemptGenerationRef.current;
@@ -236,6 +243,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     const lock = (reason: 'manual' | 'inactivity' = 'manual') => {
         const attemptGeneration = ++authorityAttemptGenerationRef.current;
         const receiptGeneration = ++lockReceiptGenerationRef.current;
+        const retiredBinding = clientTabAuthorityBinding();
         updateAuthRecoveryState('pending');
         setAuthErrorMessage(null);
         clearClientAuthority();
@@ -244,6 +252,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             // A late receipt cannot reopen the form during a newer lock.
             if (lockReceiptGenerationRef.current !== receiptGeneration) return;
             updateAuthRecoveryState(confirmed ? 'ready' : 'failed');
+            if (confirmed && retiredBinding) tabKeyShareRef.current?.announceRetirement(retiredBinding);
             if (!confirmed && authorityAttemptGenerationRef.current === attemptGeneration) {
                 setAuthErrorMessage('Chiusura della sessione non confermata. Riprova il blocco.');
             }
@@ -328,17 +337,14 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             } else {
                 // Setup exists.
                 setRequiresSetup(false);
-                // if server session is missing, lock and clear local session
-                if (data.hasSession === false) {
-                    /* no key here and the lock already confirmed (or a Recovery Kit being saved on the
-                       lock screen): nothing to close, and locking again would discard the kit. */
-                    if (masterKeyRef.current === null && authRecoveryStateRef.current === 'ready'
-                        && (lockReceiptGenerationRef.current > 0 || preparedAccessRef.current !== null)) return;
-                    lock();
+                if (!data.hasSession) {
+                    if (masterKeyRef.current !== null) {
+                        ++authorityAttemptGenerationRef.current;
+                        clearClientAuthority();
+                        updateAuthRecoveryState('ready');
+                    }
                     return;
                 }
-                /* a shared active cookie cannot restore this tab's key.
-                   Offer an explicit renewal; mounting a tab must not lock its peers. */
                 if (data.hasSession === true && masterKeyRef.current === null
                     && authRecoveryStateRef.current !== 'pending') {
                     updateAuthRecoveryState('required');
@@ -359,25 +365,18 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         const attempt = ++authorityAttemptGenerationRef.current;
         updateAuthRecoveryState('pending');
         setAuthErrorMessage(null);
-        let health;
-        try {
-            health = await checkAuthHealthRequest({ fresh: true });
-            if (!health.response.ok || health.controlState !== 'accepted' || health.payload?.status !== 'ok') throw new Error('AUTH_CHECK_FAILED');
-        } catch {
-            if (authorityAttemptGenerationRef.current === attempt) {
-                updateAuthRecoveryState('required');
-                setAuthErrorMessage('Verifica dell’accesso non riuscita. Riprova.');
-            }
+        const shared = await tabKeyShareRef.current?.request().catch(() => null);
+        if (authorityAttemptGenerationRef.current !== attempt) return;
+        if (!shared || typeof shared.user?.id !== 'string' || typeof shared.user.username !== 'string' || typeof shared.user.role !== 'string') {
+            updateAuthRecoveryState('ready');
+            setAuthErrorMessage('Apri una scheda già sbloccata oppure accedi di nuovo.');
             return;
         }
-        if (authorityAttemptGenerationRef.current !== attempt) return;
-        if (health.payload.hasSession === false) { updateAuthRecoveryState('ready'); return; }
         const currentAuthority = captureClientAccountAuthority();
-        const shared = await tabKeyShareRef.current?.request();
+        const health = await checkAuthHealthRequest({ fresh: true }).catch(() => null);
         if (authorityAttemptGenerationRef.current !== attempt) return;
-        if (!currentAuthority() || !shared || typeof shared.user?.id !== 'string' || typeof shared.user.username !== 'string' || typeof shared.user.role !== 'string') {
-            updateAuthRecoveryState('required');
-            setAuthErrorMessage('Apri una scheda già sbloccata oppure blocca tutte le schede per accedere di nuovo.');
+        if (!currentAuthority() || !health?.response.ok || health.controlState !== 'accepted' || !health.payload?.hasSession) {
+            updateAuthRecoveryState('ready');
             return;
         }
         const etag = health.response.headers.get('ETag');
@@ -436,8 +435,12 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
     const restoreSession = async (): Promise<boolean> => {
         const attemptGeneration = ++authorityAttemptGenerationRef.current;
         try {
-            const parameters = await askUnlockParameters();
-            if (parameters?.credential !== 'pin') { clearSecuritySession(); return false; }
+            const { response, payload, controlState } = await checkAuthHealthRequest();
+            if (!response.ok || controlState !== 'accepted' || payload?.status !== 'ok'
+                || !payload.hasSession || readUnlockParameters(payload.unlock)?.credential !== 'pin') {
+                clearSecuritySession();
+                return false;
+            }
             const session = await restoreSecuritySession<User>();
             if (!session) return false;
             if (authorityAttemptGenerationRef.current !== attemptGeneration) return false;

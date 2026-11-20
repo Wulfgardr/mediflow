@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 
 const STRONG_ETAG = /^"[A-Za-z0-9_-]{32,256}"$/u;
 const CONTROL_COOKIE = /^[A-Za-z0-9_-]{32,256}$/u;
@@ -38,9 +38,10 @@ async function responseJson(response) {
 
 /** Synthetic-only helper for test clients that cannot inherit the browser auth-control transport. */
 export async function loginWithWebAuthControl(baseUrl, credentials, fetchImplementation = fetch) {
+    const proofHeaders = { 'x-mediflow-local-client-instance': randomBytes(32).toString('hex') };
     const checkResponse = await fetchImplementation(new URL('/api/auth/check', baseUrl), {
         cache: 'no-store',
-        headers: { 'Cache-Control': 'no-store' },
+        headers: { 'Cache-Control': 'no-store', ...proofHeaders },
     });
     const controlEtag = strongEtag(checkResponse, 'Auth check');
     const controlCookie = exactCookie(checkResponse, 'mediflow_auth_control', CONTROL_COOKIE, true);
@@ -49,6 +50,7 @@ export async function loginWithWebAuthControl(baseUrl, credentials, fetchImpleme
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
+            ...proofHeaders,
             Cookie: controlCookie,
             'If-Match': controlEtag,
             'Idempotency-Key': randomUUID(),
@@ -60,7 +62,7 @@ export async function loginWithWebAuthControl(baseUrl, credentials, fetchImpleme
     const sessionCookie = exactCookie(response, 'mediflow_session', SESSION_COOKIE, false);
     const cookieHeader = sessionCookie ? `${sessionCookie}; ${controlCookie}` : null;
     const webHeaders = sessionCookie ? Object.freeze({
-        Cookie: cookieHeader, 'x-mediflow-archive-generation': json?.archiveGeneration,
+        ...proofHeaders, Cookie: cookieHeader, 'x-mediflow-archive-generation': json?.archiveGeneration,
     }) : null;
     if (webHeaders && !/^[0-9a-f-]{36}$/u.test(webHeaders['x-mediflow-archive-generation'] ?? '')) {
         throw new Error('Authenticated synthetic client lacks its archive generation.');

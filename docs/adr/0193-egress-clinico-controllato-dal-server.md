@@ -42,9 +42,11 @@ ciò che contraddice la dichiarazione del mandato.
    fase di revisione, con l'audit di oggi. Nessuna migrazione e nessuna
    riga cancellata.
 
-Mandati `local` e mandati cloud con egress dichiarato si comportano come
-prima, compresa l'applicazione automatica di nota, trascrizione e PDF
-descritta dall'[ADR 0190](0190-mandato-agenti-e-cassetta-della-visita.md).
+Questo controllo riguarda il consenso nel mandato. Per i mandati locali e
+quelli cloud con consenso, il successivo
+[ADR 0195](0195-materiale-dell-agente-dopo-il-gesto-del-medico.md) regola
+l’ingresso dei contenuti in cartella. Nota, trascrizione, PDF e proposte
+restano in «In arrivo» fino alla revisione del medico.
 
 ## Cosa resta fuori
 

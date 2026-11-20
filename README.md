@@ -8,7 +8,7 @@ MediFlow è una cartella clinica gratuita e a codice aperto per l'ambulatorio e 
 
 ## Stato della versione
 
-Sto preparando la 0.9.1, che è la versione raccontata qui. Oggi la versione pubblicata è la 0.9.0.
+Qui descrivo MediFlow 0.9.1. Se vuoi installarlo, nella pagina dell’ultima versione pubblicata trovi il tag da usare, i file disponibili per il tuo sistema e i risultati del collaudo. [Ultima release](https://github.com/Wulfgardr/mediflow/releases/latest)
 
 Pubblicare il codice è un inizio. Per l’uso clinico, il professionista o l’organizzazione responsabile deve valutare l’installazione e i flussi. Il pulsante «pubblica» non fa quella valutazione.
 
@@ -28,9 +28,9 @@ Nasce dal mio lavoro di medico di distretto. Inizialmente per me. Poi, se viene 
 
 Il medico sei tu e restano tue le decisioni su diagnosi, prescrizione e triage. Le funzioni intelligenti preparano proposte e non scrivono da sole nella cartella.
 
-Ho misurato le tre funzioni intelligenti locali su dati sintetici, ma non sono qualificate. Fra le tre, l’import assistito è l’unica ad essere rientrata nei limiti previsti di tempo e memoria. Il [registro della 0.9.1](./docs/quality/intelligence/registro-0.9.1.json) racconta le misure.
+Nelle prove del 14 novembre 2026 su dati sintetici, solo l’import assistito è rientrato nei limiti di tempo e memoria. Per ciascuna funzione il registro riporta le misure, il modello e lo stato di qualifica. [Registro della 0.9.1](./docs/quality/intelligence/registro-0.9.1.json)
 
-Per il Web ho previsto Mac, Windows e Linux. Sul MacBook Pro M5 Max ho installato il client e ne ho controllato l’host. L’interfaccia non è stata ancora collaudata. Sugli altri Mac non ho prove di compatibilità.
+Per il Web ho previsto Mac, Windows e Linux. Il MacBook Pro M5 Max con 48 GB è il computer scelto per collaudare il client GPUI della 0.9.1. Le note di ogni release indicano architettura, versione del sistema e prove svolte. [Versioni pubblicate](https://github.com/Wulfgardr/mediflow/releases)
 
 ## Dove stanno i dati
 
@@ -40,19 +40,18 @@ L’uso parte dal computer. Un invio al cloud è previsto solo per una funzione 
 
 ## Provalo
 
-Per partire servono Git e Node.js 24.x.
+I comandi seguenti avviano il Web dal tag `v0.9.1` e richiedono Git e Node.js 24.x. Il launcher usa la copia Git per verificare la revisione. Per installare la 0.9.0 trovi i suoi comandi nel README del tag. [Istruzioni per la 0.9.0](https://github.com/Wulfgardr/mediflow/blob/v0.9.0/README.md#provalo)
 
 ```sh
-git clone https://github.com/Wulfgardr/mediflow
+git clone --branch v0.9.1 --single-branch https://github.com/Wulfgardr/mediflow.git
 cd mediflow
-nvm use
+node --version
 npm ci
 npm run prepare:dependencies
+node scripts/mediflow.mjs --scegli
 ```
 
-Il comando di avvio è `node scripts/mediflow.mjs --scegli`. Se usi nvm, `nvm use` seleziona la versione prevista. Altrimenti seleziona Node 24 con il tuo gestore.
-
-Per la versione pubblicata, la 0.9.0, segui il [README del tag](https://github.com/Wulfgardr/mediflow/blob/v0.9.0/README.md). Se decidi di aggiornare, tieni pronti backup, kit e chiave di recupero.
+Prima di `npm ci`, controlla che `node --version` mostri la versione 24. Se usi nvm su Mac o Linux, dalla cartella del progetto puoi selezionarla con `nvm use`. Prima di aggiornare, prepara il backup completo cifrato, il kit e la chiave di recupero.
 
 Il manuale spiega come [aggiornare il catalogo farmaci AIFA](./docs/MANUALE.md#catalogo-farmaci-aifa) e [gestire le fonti personali della protesica](./docs/MANUALE.md#fonti-personali-della-protesica).
 

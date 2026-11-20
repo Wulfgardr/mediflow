@@ -3,7 +3,10 @@ import 'server-only';
 import { types } from 'node:util';
 import type { NextResponse } from 'next/server';
 
+import { hasAttestedLoopbackIngress } from './loopback-ingress.mjs';
 import { sessionCookieOptionsForRequest } from './request-transport';
+import { WEB_CONTROL_LOCATOR_HEADER, WEB_SESSION_LOCATOR_HEADER, WEB_SESSION_PROOF_HEADER } from './web-session-proof-header';
+import { presentedWebSessionProof, webSessionProofBindings } from './web-session-proof';
 import * as lifecycleOwner from './web-auth-lifecycle-owner-adapter';
 import { bindSessionToArchive, currentArchiveGeneration, sessionMatchesArchive } from './archive-session-generation';
 
@@ -62,7 +65,11 @@ type LifecycleOwnerTransportPort = Readonly<{
 type ExactRecord = Readonly<Record<string, unknown>>;
 
 const owner = lifecycleOwner as unknown as Partial<LifecycleOwnerTransportPort>;
-const archiveAttempts = new WeakMap<object, { generation: string; controlId: string }>();
+const archiveAttempts = new WeakMap<object, {
+    generation: string;
+    controlId: string;
+    proof: NonNullable<ReturnType<typeof presentedWebSessionProof>>;
+}>();
 
 function frozenRecord<Value extends object>(value: Value): Readonly<Value> {
     return ObjectFreeze(value) as Readonly<Value>;
@@ -101,14 +108,18 @@ function cookieValue(request: Request, name: string, pattern: RegExp): string | 
     return match;
 }
 
-/** Reads only one exact opaque control cookie; duplicates and decorated values deny. */
+/** Reads the document control locator or the single control cookie of a local client. */
 export function webAuthControlIdFromRequest(request: Request): string | null {
-    return cookieValue(request, WEB_AUTH_CONTROL_COOKIE_NAME, CONTROL_TOKEN);
+    if (!request.headers.has(WEB_SESSION_PROOF_HEADER)) return cookieValue(request, WEB_AUTH_CONTROL_COOKIE_NAME, CONTROL_TOKEN);
+    const value = request.headers.get(WEB_CONTROL_LOCATOR_HEADER);
+    return value && CONTROL_TOKEN.test(value) ? value : null;
 }
 
-/** Reads the fixed Web bearer as a locator, never as authority. */
+/** Reads the session locator from the document or the local client. */
 export function webAuthSessionIdFromRequest(request: Request): string | null {
-    return cookieValue(request, SESSION_COOKIE_NAME, SESSION_ID);
+    if (!request.headers.has(WEB_SESSION_PROOF_HEADER)) return cookieValue(request, SESSION_COOKIE_NAME, SESSION_ID);
+    const value = request.headers.get(WEB_SESSION_LOCATOR_HEADER);
+    return value && SESSION_ID.test(value) ? value : null;
 }
 
 /** Dequotes the one accepted strong ETag representation at the HTTP boundary. */
@@ -149,13 +160,15 @@ export function bootstrapWebAuthControl(controlId: string | null): WebAuthContro
     return value as WebAuthControlBootstrap;
 }
 
-export function beginWebAuthControl(kind: 'login' | 'setup', mutation: WebAuthControlMutation): unknown | null {
-    if (!isWebAuthControlMutation(mutation) || typeof owner.begin !== 'function') return null;
+export function beginWebAuthControl(kind: 'login' | 'setup', mutation: WebAuthControlMutation, request: Request): unknown | null {
+    const proof = presentedWebSessionProof(request.headers);
+    if (!proof || !isWebAuthControlMutation(mutation) || typeof owner.begin !== 'function'
+        || !webSessionProofBindings.controlAvailable(mutation.controlId, proof)) return null;
     try {
         const generation = currentArchiveGeneration();
         const attempt = owner.begin(kind, mutation);
         if (!attempt || typeof attempt !== 'object') return null;
-        archiveAttempts.set(attempt, { generation, controlId: mutation.controlId });
+        archiveAttempts.set(attempt, { generation, controlId: mutation.controlId, proof });
         return attempt;
     } catch { return null; }
 }
@@ -172,8 +185,21 @@ export function issueWebAuthControl(attempt: unknown, user: unknown): WebAuthCon
         || typeof record.etag !== 'string' || !CONTROL_TOKEN.test(record.etag)) return null;
     const resolved = lifecycleOwner.resolve(record.sessionId, archive.controlId);
     if (resolved.status !== 'active') return null;
-    try { bindSessionToArchive(resolved.projection, archive.generation); }
-    catch {
+    if (webSessionProofBindings.admits(archive.controlId, record.sessionId, archive.proof))
+        return value as WebAuthControlIssue;
+    const port = lifecycleOwner.mintResourcePort(resolved.projection);
+    try {
+        if (!port) throw new Error('Web session proof port unavailable');
+        bindSessionToArchive(resolved.projection, archive.generation);
+        const sessionId = record.sessionId;
+        const revoke = webSessionProofBindings.bind(archive.controlId, sessionId, resolved.projection.expiresAt, archive.proof,
+            () => { lifecycleOwner.resolve(sessionId, archive.controlId); });
+        if (!lifecycleOwner.registerPrivateResource(port, revoke)) {
+            revoke();
+            throw new Error('Web session proof registration failed');
+        }
+    } catch {
+        if (port) lifecycleOwner.releaseResourcePort(port);
         lifecycleOwner.retire(resolved.projection, 'dispose');
         return null;
     }
@@ -186,10 +212,18 @@ export function abortWebAuthControl(attempt: unknown): boolean {
     try { return owner.abort(attempt) === true; } catch { return false; }
 }
 
-export function resolveWebAuthControlSession(sessionId: unknown, controlId: unknown): WebAuthControlResolution | null {
+export function resolveProvenWebSession(sessionId: unknown, controlId: unknown, request: Request): lifecycleOwner.WebSessionResolution {
+    if (typeof sessionId !== 'string' || typeof controlId !== 'string' || !hasAttestedLoopbackIngress(request)
+        || !webSessionProofBindings.admits(controlId, sessionId, presentedWebSessionProof(request.headers))) {
+        return frozenRecord({ status: 'owned_denied' });
+    }
+    return lifecycleOwner.resolve(sessionId, controlId);
+}
+
+export function resolveWebAuthControlSession(sessionId: unknown, controlId: unknown, request: Request): WebAuthControlResolution | null {
     if (typeof owner.resolve !== 'function') return null;
     let value: unknown;
-    try { value = owner.resolve(sessionId, controlId); } catch { return null; }
+    try { value = resolveProvenWebSession(sessionId, controlId, request); } catch { return null; }
     const denied = exactFrozenRecord(value, ['status']);
     if (denied && (denied.status === 'owned_denied' || denied.status === 'absent')) {
         return value as WebAuthControlResolution;
@@ -236,4 +270,20 @@ export function setWebAuthControlCookie(
     if (typeof controlId !== 'string' || !CONTROL_TOKEN.test(controlId)) return false;
     response.cookies.set(WEB_AUTH_CONTROL_COOKIE_NAME, controlId, sessionCookieOptionsForRequest(request));
     return true;
+}
+
+export function setWebAuthControlLocator(response: NextResponse, request: Request, controlId: string): void {
+    if (request.headers.has(WEB_SESSION_PROOF_HEADER)) {
+        response.headers.set(WEB_CONTROL_LOCATOR_HEADER, controlId);
+    } else {
+        setWebAuthControlCookie(response, request, controlId);
+    }
+}
+
+export function setWebAuthSessionLocator(response: NextResponse, request: Request, sessionId: string): void {
+    if (request.headers.has(WEB_SESSION_PROOF_HEADER)) {
+        response.headers.set(WEB_SESSION_LOCATOR_HEADER, sessionId);
+    } else {
+        response.cookies.set(SESSION_COOKIE_NAME, sessionId, sessionCookieOptionsForRequest(request));
+    }
 }

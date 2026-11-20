@@ -1,8 +1,22 @@
 import { expect, test, type Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
-import { bootstrapUnlockedSession, openPatientSection } from './utils';
-import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
+import { bootstrapUnlockedSession, openPatientSection, unlockIfNeeded } from './utils';
 import { sealDiaryEntry } from './fixtures/sealed-diary-entry';
+
+async function reopenSession(page: Page) {
+  await expect(page.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeVisible();
+  await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
+}
+
+function webRequest<T>(page: Page, path: string, method: 'GET' | 'POST' | 'DELETE' = 'GET', body?: unknown) {
+  return page.evaluate(async ({ path, method, body }) => {
+    const response = await fetch(path, { method, ...(body === undefined ? {} : {
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    }) });
+    const payload = await response.text();
+    return { status: response.status, data: (payload ? JSON.parse(payload) : null) as T };
+  }, { path, method, body });
+}
 
 type ObservedConsoleError = Readonly<{ text: string; url: string }>;
 const errorsByPage = new WeakMap<Page, ObservedConsoleError[]>();
@@ -134,7 +148,8 @@ test('web smoke: unlock/setup + patients filters + settings navigation', async (
     if (response.status !== 201) throw new Error(`Synthetic patient: HTTP ${response.status}`);
     return { ...(await response.json()), taxCode } as { id: string; taxCode: string };
   });
-  await page.reload(); // Real route rereads the newly prepared fixture.
+  await page.reload();
+  await reopenSession(page);
   await patientsSearch.fill(patient.taxCode);
   const row = page.getByRole('option').filter({ hasText: 'Percorso Sintetico' });
   await row.focus();
@@ -158,10 +173,11 @@ test('web smoke: unlock/setup + patients filters + settings navigation', async (
   await update.focus(); await page.keyboard.press('Enter');
   await expect(page).toHaveURL(new RegExp(`/patients/${patient.id}/modules$`));
   await page.reload();
+  await reopenSession(page);
   await expect(page.getByTestId('lume-scheda-header')).toContainText('Modificato');
-  const stored = await page.request.get(`/api/patients/${patient.id}`);
-  expect(stored.status()).toBe(200);
-  expect(await stored.json()).toMatchObject({ firstName: 'Modificato', taxCode: patient.taxCode, version: 2 });
+  const stored = await webRequest(page, `/api/patients/${patient.id}`);
+  expect(stored.status).toBe(200);
+  expect(stored.data).toMatchObject({ firstName: 'Modificato', taxCode: patient.taxCode, version: 2 });
 
   const settingsNav = page.getByRole('link', { name: 'Impostazioni', exact: true });
   await expect(settingsNav).toBeVisible();
@@ -194,6 +210,7 @@ test('web smoke: unlock/setup + patients filters + settings navigation', async (
 test('web smoke: Rivedi agenda focuses its controlled heading without leaving turno', async ({ page }) => {
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   await page.goto('/?area=turno');
+  await reopenSession(page);
 
   const reviewAgenda = page.getByRole('button', { name: 'Rivedi agenda', exact: true });
   const agendaHeading = page.getByRole('heading', { name: 'Appuntamenti', exact: true, level: 2 });
@@ -214,34 +231,34 @@ test('web smoke: Rivedi agenda focuses its controlled heading without leaving tu
 
 test('web smoke: live decision CTAs always open their declared patient context', async ({ page }) => {
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-  const archiveHeaders = await trustedArchiveWebRequestHeaders(page);
   const marker = randomUUID().replaceAll('-', '').slice(0, 10).toUpperCase();
   const createPatient = async (firstName: string, exemptions: string[]) => {
     const lastName = `Smoke${marker}`;
     const taxCode = `SMK${firstName[0]}${marker}00`;
-    const response = await page.request.post('/api/patients', { headers: archiveHeaders, data: {
+    const response = await webRequest<{ id: string }>(page, '/api/patients', 'POST', {
       firstName, lastName, taxCode, birthDate: '1980-01-01T00:00:00.000Z', exemptions,
       notes: `Contesto sintetico ${firstName}. Nessun dato reale.`, diagnoses: [],
-    } });
-    expect(response.status()).toBe(201);
-    const patient = await response.json() as { id: string };
+    });
+    expect(response.status).toBe(201);
+    const patient = response.data;
     return { id: patient.id, name: `${lastName} ${firstName}`, taxCode };
   };
   const quadroPatient = await createPatient('Quadro', []);
   const documentsPatient = await createPatient('Documenti', ['031']);
-  const latest = await page.request.get('/api/entries?limit=1&orderBy=date&orderDir=desc');
-  expect(latest.status()).toBe(200);
-  const rows = await latest.json() as Array<{ date: string }>;
+  const latest = await webRequest<Array<{ date: string }>>(page, '/api/entries?limit=1&orderBy=date&orderDir=desc');
+  expect(latest.status).toBe(200);
+  const rows = latest.data;
   const date = new Date(Math.max(Date.now(), ...rows.map(row => Date.parse(row.date)).filter(Number.isFinite)) + 1_000).toISOString();
   const entryTitle = `Follow-up sintetico ${marker}`;
-  const entryResponse = await page.request.post('/api/entries', { headers: archiveHeaders, data: await sealDiaryEntry(page, {
+  const entryResponse = await webRequest<{ id: string; version: number }>(page, '/api/entries', 'POST', await sealDiaryEntry(page, {
     patientId: quadroPatient.id, type: 'note', title: entryTitle,
     content: 'Voce sintetica per verificare la destinazione della CTA.', date, setting: 'ambulatory',
-  }) });
-  expect(entryResponse.status()).toBe(201);
-  const entry = await entryResponse.json() as { id: string; version: number };
+  }));
+  expect(entryResponse.status).toBe(201);
+  const entry = entryResponse.data;
 
   await page.goto(`/?area=turno&paziente=${documentsPatient.id}`);
+  await reopenSession(page);
   const navigation = page.getByRole('navigation', { name: 'Navigazione principale', exact: true });
   await expect(page.getByRole('button', { name: 'Vai alla revisione', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Apri esenzioni', exact: true })).toHaveCount(0);
@@ -292,13 +309,12 @@ test('web smoke: live decision CTAs always open their declared patient context',
   await expect(page.getByTestId('lume-scheda-header')).toContainText(quadroPatient.taxCode);
   await expect(page.getByRole('region', { name: 'Riepilogo clinico', exact: true })).toContainText('Contesto sintetico Quadro.');
 
-  const removedEntry = await page.request.delete(`/api/entries/${entry.id}`, { headers: archiveHeaders, data: { version: entry.version } });
-  expect(removedEntry.status()).toBe(200);
+  const removedEntry = await webRequest(page, `/api/entries/${entry.id}`, 'DELETE', { version: entry.version });
+  expect(removedEntry.status).toBe(200);
   for (const resource of [`/api/patients/${documentsPatient.id}`, `/api/patients/${quadroPatient.id}`]) {
-    const current = await page.request.get(resource);
-    expect(current.status()).toBe(200);
-    const { version } = await current.json() as { version: number };
-    const removed = await page.request.delete(resource, { headers: archiveHeaders, data: { version } });
-    expect(removed.status()).toBe(200);
+    const current = await webRequest<{ version: number }>(page, resource);
+    expect(current.status).toBe(200);
+    const removed = await webRequest(page, resource, 'DELETE', { version: current.data.version });
+    expect(removed.status).toBe(200);
   }
 });

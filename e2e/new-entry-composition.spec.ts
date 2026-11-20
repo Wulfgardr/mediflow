@@ -2,7 +2,7 @@ import { diaryEntrySealer } from './fixtures/sealed-diary-entry';
 import { expect, test, type Locator } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
-import { bootstrapUnlockedSession, assertNoHorizontalOverflow, openPatientSection } from './utils';
+import { unlockIfNeeded, openUnlockedDocument, bootstrapUnlockedSession, assertNoHorizontalOverflow, openPatientSection } from './utils';
 
 test('Nuova voce: Quadro, bozza unica, uscita protetta e registrazione con fonte', async ({ baseURL }) => {
     test.setTimeout(180_000);
@@ -35,7 +35,7 @@ test('Nuova voce: Quadro, bozza unica, uscita protetta e registrazione con fonte
             return { patientId: patient.id as string, oldEntryId: old.id as string };
         }, await diaryEntrySealer(page));
         writes.length = 0;
-        await page.goto(`/patients/${fixture.patientId}/entries/new`);
+        await openUnlockedDocument(page, `/patients/${fixture.patientId}/entries/new`);
         const composer = page.getByTestId('progressive-entry-composer'), form = page.locator('form[aria-label="Nuova voce clinica"]');
         const editor = page.getByRole('textbox', { name: 'Resoconto clinico', exact: true });
         await expect(form).toBeVisible(); await expect(editor).toHaveCount(1);
@@ -182,7 +182,7 @@ test('Quadro in scrittura distingue lettura, errore e paziente non disponibile',
         await pending; return route.fulfill({ status: name === 'entries' ? 503 : 500, json: { error: 'Lettura sintetica indisponibile' } });
     });
     try {
-        await page.setViewportSize({ width: 1440, height: 1000 }); await page.goto(`/patients/${patientId}/entries/new`);
+        await page.setViewportSize({ width: 1440, height: 1000 }); await openUnlockedDocument(page, `/patients/${patientId}/entries/new`);
         const quadro = page.getByRole('region', { name: 'Riepilogo clinico', exact: true });
         for (const name of ['Terapie attive', 'Parametri recenti', 'Controlli aperti']) {
             const section = quadro.getByRole('region', { name, exact: true });
@@ -207,6 +207,7 @@ test('Quadro in scrittura distingue lettura, errore e paziente non disponibile',
         }
         await page.route(`**/api/patients/${patientId}`, route => route.fulfill({ status: 404, json: { error: 'Synthetic not found' } }));
         await page.reload();
+        await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
         await expect(page.getByRole('alert').filter({ hasText: 'Paziente non disponibile. Il Quadro non può essere letto.' })).toBeVisible();
         await expect(page.getByRole('region', { name: 'Riepilogo clinico', exact: true })).toHaveCount(0);
         await expect(page.getByTestId('progressive-entry-composer').locator('header')).toContainText('Paziente non disponibile.');
@@ -226,12 +227,14 @@ for (const status of [401, 403, 503, 200]) test(`Nuova voce: lettura precedente 
     const writes: string[] = [], errors: string[] = [];
     page.on('pageerror', error => errors.push(error.message));
     page.on('request', request => { if (request.method() === 'POST' && /\/api\/(entries|attachments)$/u.test(new URL(request.url()).pathname)) writes.push(request.url()); });
+    await openUnlockedDocument(page, `/?area=incarico&paziente=${patientId}`);
+    await page.getByRole('button', { name: 'Altre azioni paziente', exact: true }).click();
     await page.route('**/api/entries?**', route => {
         if (new URL(route.request().url()).searchParams.get('patientId') !== patientId) return route.continue();
         reads++;
         return route.fulfill({ status, json: status === 200 ? [] : { error: 'Lettura sintetica indisponibile' } });
     });
-    await page.goto(`/patients/${patientId}/entries/new`);
+    await page.getByRole('menuitem', { name: 'Nuova voce', exact: true }).click();
     const history = page.getByRole('region', { name: 'Ultime voci registrate', exact: true });
     if (status === 401 || status === 403) {
         await expect(page.getByLabel('MediFlow lock screen')).toBeVisible();

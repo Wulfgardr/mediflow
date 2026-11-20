@@ -2,7 +2,7 @@ import { seedTreatmentReasoningSetting } from './fixtures/treatment-reasoning-de
 import { expect, test } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
-import { bootstrapUnlockedSession } from './utils';
+import { openUnlockedDocument, bootstrapUnlockedSession } from './utils';
 import {
   ensureAiRolloutReadinessArtifactDirectory,
   type RolloutReadinessArtifactLane,
@@ -90,7 +90,7 @@ test('settings shows rollout readiness lanes, missing artifacts and markdown pre
 
   });
 
-  await page.goto('/settings/ai/governance');
+  await openUnlockedDocument(page, '/settings/ai/governance');
   await expect(page).toHaveURL(/\/settings\/ai\/governance$/);
 
   const panel = page.getByTestId('ai-rollout-readiness-panel');

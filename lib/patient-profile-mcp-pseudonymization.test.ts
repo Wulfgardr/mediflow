@@ -1,4 +1,4 @@
-import { syntheticLoopbackRequest } from './security/loopback-ingress-test-fixture';
+import { syntheticLoopbackRequest, syntheticWebClientRequest } from './security/loopback-ingress-test-fixture';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import crypto, { randomBytes } from 'node:crypto';
@@ -23,7 +23,7 @@ const dataDir = mkdtempSync(join(tmpdir(), 'mediflow-profile-pseudonyms-'));
 process.env.MEDIFLOW_DATA_DIR = dataDir;
 const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server');
 openDbServer();
-const cookieState: { cookies: Map<string, string>; headers: Headers; onCookies?: () => Promise<void> | void } = { cookies: new Map(), headers: syntheticLoopbackRequest('http://127.0.0.1').headers };
+const cookieState: { cookies: Map<string, string>; headers: Headers; onCookies?: () => Promise<void> | void } = { cookies: new Map(), headers: syntheticWebClientRequest('http://127.0.0.1').headers };
 const cleanup = installNetworkPatientCookieFixture(dataDir, cookieState);
 const web = load('../app/api/patients/[id]/profile-query/route.ts') as typeof import('../app/api/patients/[id]/profile-query/route');
 const { acquirePatientProfileQueryHostPort, headlessProfileRelease } = load('./security/patient-profile-query-host-port.ts') as typeof import('./security/patient-profile-query-host-port');

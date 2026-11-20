@@ -277,7 +277,7 @@ test('pins the isolated local engine graph and excludes direct engine imports fr
     assert.equal(ANYDOC_PDF_PAGE_RENDERER_RUNTIME_PROFILE_ID, `mediflow.pdfjs_png.node24.${process.platform}_${process.arch}.v1`);
     assert.equal(sha256(ANYDOC_PDF_PAGE_RENDERER_ENGINE_DESCRIPTOR), ANYDOC_PDF_PAGE_RENDERER_ENGINE_SHA256);
     if (process.platform === 'darwin' && process.arch === 'arm64')
-        assert.equal(ANYDOC_PDF_PAGE_RENDERER_ENGINE_SHA256, '0d0cae109da7e1a91cdfbff66773e6bf208c05753fc74ff6ca3cdfefc73b6c94');
+        assert.equal(ANYDOC_PDF_PAGE_RENDERER_ENGINE_SHA256, 'adc37d128deba43b02f3d56ce5fcbb44fb9b9bae9ff4091ec664807b9717ab9f');
     assert.equal(profiles.find((entry) => entry.platform === 'darwin')?.tarballSha256,
         'c7c8dcb69aae6ddb58fe23e5f20d1c772a8065b077560f5a18336307779add91');
     for (const entry of profiles) {

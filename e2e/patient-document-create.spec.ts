@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto';
 import type { Locator, Page } from '@playwright/test';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { expect, test } from './fixtures/isolated-runtime';
-import { bootstrapUnlockedSession, openPatientSection } from './utils';
-import { fetchInterceptedRequest } from './fixtures/trusted-web-request';
+import { bootstrapUnlockedSession, openPatientSection, openUnlockedDocument, unlockIfNeeded } from './utils';
+import { documentRequests, fetchInterceptedRequest } from './fixtures/trusted-web-request';
 import { syntheticTaxCode } from '../lib/patient-identity.test-support';
 
 test.describe.configure({ retries: 0 });
@@ -19,13 +19,13 @@ async function syntheticPdf(lastName: string): Promise<Buffer> {
 }
 
 async function patientCount(page: Page): Promise<number> {
-    const response = await page.request.get('/api/patients?limit=500');
+    const response = await documentRequests(page).get('/api/patients?limit=500');
     expect(response.status()).toBe(200);
     return (await response.json() as unknown[]).length;
 }
 
-async function stage(page: Page, lastName: string) {
-    await page.goto('/patients/new');
+async function stage(page: Page, lastName: string, pin = PIN) {
+    await openUnlockedDocument(page, '/patients/new', pin);
     const panel = page.getByTestId('patient-document-create');
     await panel.locator('input[type="file"]').setInputFiles({ name: `referto-${lastName}.pdf`, mimeType: 'application/pdf', buffer: await syntheticPdf(lastName) });
     await expect(panel.getByRole('heading', { name: 'Revisione dei dati' })).toBeFocused({ timeout: 60_000 });
@@ -61,7 +61,8 @@ async function assertCreated(page: Page, panel: Locator, lastName: string, ident
     await expect(page).toHaveURL(/\/patients\/[0-9a-f-]{36}(\/modules)?$/u);
     const patientId = new URL(page.url()).pathname.split('/')[2]!;
     await page.reload();
-    const patient = await page.request.get(`/api/patients/${patientId}`);
+    await unlockIfNeeded(page, isolatedPin);
+    const patient = await documentRequests(page).get(`/api/patients/${patientId}`);
     expect(patient.status()).toBe(200);
     expect(await patient.json()).toMatchObject({ firstName: 'Lucia', lastName, ...identity });
     await openPatientSection(page, 'documenti');
@@ -71,7 +72,7 @@ async function assertCreated(page: Page, panel: Locator, lastName: string, ident
     await attachment.getByRole('button', { name: `Visualizza referto-${lastName}.pdf`, exact: true }).click();
     await expect(page.getByTestId('document-preview-pdf-page')).toBeVisible();
 
-    const audited = await page.request.get('/api/system/audit');
+    const audited = await documentRequests(page).get('/api/system/audit');
     expect(audited.status()).toBe(200);
     const rows = await audited.json() as Array<{ subjectRef: string; requestId: string; redactedMetadata: unknown }>;
     const patientEvents = rows.filter(row => row.subjectRef === patientId);
@@ -88,7 +89,7 @@ test('nuova scheda da documento senza identificativo, con data di nascita esatta
     test.setTimeout(90_000);
     await bootstrapUnlockedSession(page, isolatedPin);
     const lastName = 'SenzaCodiceEsatta';
-    const panel = await stage(page, lastName);
+    const panel = await stage(page, lastName, isolatedPin);
     await fillName(panel, lastName);
     const birthDate = panel.getByLabel('Data di nascita', { exact: true });
     await expect(birthDate).toHaveValue('');
@@ -115,7 +116,7 @@ test('nuova scheda senza identificativo con anno stimato, controllo omonimi e PI
         await panel.getByLabel('Conosco solo l’anno di nascita', { exact: true }).check();
         await panel.getByLabel('Anno di nascita stimato', { exact: true }).fill(year);
     };
-    const first = await stage(page, lastName);
+    const first = await stage(page, lastName, isolatedPin);
     await enterYear(first, '1980');
     await expect(proceedButton(first)).toBeDisabled();
     await fillName(first, lastName);
@@ -123,7 +124,7 @@ test('nuova scheda senza identificativo con anno stimato, controllo omonimi e PI
     await submitPin(first, isolatedPin);
     await expect(first.getByRole('heading', { name: 'Scheda creata', exact: true })).toBeVisible();
 
-    const panel = await stage(page, lastName);
+    const panel = await stage(page, lastName, isolatedPin);
     await fillName(panel, lastName);
     await identifierSelect(panel).selectOption('none');
     await expect(proceedButton(panel)).toBeDisabled();
@@ -140,7 +141,7 @@ test('nuova scheda senza identificativo con anno stimato, controllo omonimi e PI
     await expect(panel.getByText('PIN non confermato o lavorazione scaduta.')).toBeVisible();
     expect(await patientCount(page)).toBe(1);
 
-    await stage(page, lastName);
+    await stage(page, lastName, isolatedPin);
     await fillName(panel, lastName);
     await enterYear(panel, '1974');
     await prepareConfirmation(panel);
@@ -173,10 +174,10 @@ test('nuova scheda da documento: revisione, PIN, allegato riletto e aperto', asy
     await panel.getByRole('link', { name: 'Apri la scheda' }).click();
     await expect(page).toHaveURL(/\/patients\/[0-9a-f-]{36}(\/modules)?$/u);
     const patientId = new URL(page.url()).pathname.split('/')[2]!;
-    const patient = await page.request.get(`/api/patients/${patientId}`);
+    const patient = await documentRequests(page).get(`/api/patients/${patientId}`);
     expect(patient.status()).toBe(200);
     expect(await patient.json()).toMatchObject({ taxCode, identifierType: 'cf', birthDate: null, birthDatePrecision: 'unknown' });
-    const attachments = await page.request.get(`/api/attachments?patientId=${patientId}`);
+    const attachments = await documentRequests(page).get(`/api/attachments?patientId=${patientId}`);
     expect(attachments.status()).toBe(200);
     const rows = await attachments.json() as Array<{ patientId: string; data?: string }>;
     expect(rows.filter(row => row.patientId === patientId)).toHaveLength(1);
@@ -225,6 +226,7 @@ test('annullamento: la lavorazione si ritira e nessuna scheda viene creata', asy
     await expect(panel.getByText('Lavorazione ritirata. Nessuna scheda creata.')).toBeVisible();
     expect(await patientCount(page)).toBe(before);
     await page.reload();
+    await unlockIfNeeded(page, PIN);
     await expect(page.getByTestId('patient-document-create').getByRole('heading', { name: 'Nuova scheda da documento' })).toBeVisible();
 });
 
@@ -238,7 +240,7 @@ test('arrivo da documento e lettura tardiva rispettano il focus già scelto', as
         if ((route.request().postDataJSON() as { operation?: string }).operation === 'stage') await holdStage;
         await route.continue();
     });
-    await page.goto('/patients/new#documento');
+    await openUnlockedDocument(page, '/patients/new#documento', PIN);
     const panel = page.getByTestId('patient-document-create');
     await expect(panel.getByRole('button', { name: 'Scegli un documento' })).toBeVisible();
     await expect(page.getByRole('textbox', { name: /^Nome\b/u })).not.toBeFocused();

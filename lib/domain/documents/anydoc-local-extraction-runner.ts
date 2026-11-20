@@ -127,12 +127,17 @@ async function runWorker(bytes: Buffer): Promise<WorkerResult> {
         const worker = resolveOwnedWorker();
         if (!worker) return resolve({ signal: 'io' });
         const launch = documentChildLaunch(worker.root, worker.path, { allowAddons: true });
-        const child = spawn(launch.command, launch.args, {
+        let child;
+        try { child = spawn(launch.command, launch.args, {
             cwd: worker.directory,
-            env: { NODE_ENV: 'production', NAPI_RS_ENFORCE_VERSION_CHECK: '1' },
+            env: launch.env,
             stdio: ['pipe', 'pipe', 'pipe'],
             windowsHide: true,
-        });
+        }); } catch {
+            launch.cleanup?.();
+            resolve({ signal: 'io' });
+            return;
+        }
         const output: Buffer[] = [];
         let outputBytes = 0;
         let diagnosticBytes = 0;
@@ -148,7 +153,7 @@ async function runWorker(bytes: Buffer): Promise<WorkerResult> {
             clearTimeout(timer);
             // owned byte copies do not outlive the parsed result. Strings remain GC-managed.
             for (const chunk of output) chunk.fill(0); output.length = 0;
-            resolve(value);
+            resolve(launch.cleanup?.() === false ? { signal: 'io' } : value);
         };
         const stop = (signal: AnyDocLocalFailureSignal) => {
             forcedSignal = signal;
@@ -166,7 +171,7 @@ async function runWorker(bytes: Buffer): Promise<WorkerResult> {
             diagnosticBytes += chunk.byteLength;
             if (diagnosticBytes > MAX_DIAGNOSTIC_BYTES) stop('resourceLimit');
         });
-        child.once('error', () => finish({ signal: 'io' }));
+        child.on('error', () => { forcedSignal ??= 'io'; });
         child.once('close', (code) => {
             if (forcedSignal) return finish({ signal: forcedSignal });
             if (code === 21) {

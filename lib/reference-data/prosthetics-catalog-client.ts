@@ -16,6 +16,17 @@ export async function prostheticsRequest<T>(action: string, signal: AbortSignal,
     if (action === 'commit' || action === 'documents' && body) notifyDbChange('prosthetics_catalog_entries');
     return value as T;
 }
+export async function downloadProstheticsFile(target: { kind: 'template' } | { kind: 'document'; id: string; sha256: string }, filename: string, signal?: AbortSignal): Promise<void> {
+    const path = target.kind === 'template' ? 'template' : `documents?${new URLSearchParams({ id: target.id, sha256: target.sha256 })}`;
+    const response = await fetch(`/api/prosthetics/catalog/${path}`, { signal });
+    if (!response.ok) throw new Error('Scaricamento non riuscito.');
+    const url = URL.createObjectURL(await response.blob());
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    try { link.click(); } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000); }
+}
+
 export async function readProstheticsSource(file: File, signal: AbortSignal): Promise<ProstheticsSource> {
     if (file.size > PROSTHETICS_MAX_BYTES) throw new Error('Il file supera il limite di 2 MiB.');
     const bytes = new Uint8Array(await file.arrayBuffer());

@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { expect, type Page } from '@playwright/test';
 import { test, closureGallery } from './fixtures/patient-closure-gallery';
-import { bootstrapUnlockedSession, assertNoHorizontalOverflow, openPatientSection } from './utils';
+import { bootstrapUnlockedSession, assertNoHorizontalOverflow, openPatientSection, openUnlockedDocument } from './utils';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 import { sealDiaryEntry } from './fixtures/sealed-diary-entry';
 
@@ -29,7 +29,7 @@ async function fixture(page: Page, count = 1) {
         const response = await fetch('/api/entries', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         if (!response.ok) throw new Error(`/api/entries: ${response.status} ${await response.text()}`);
     }, entry);
-    await page.goto(`/patients/${id}/modules`);
+    await openUnlockedDocument(page, `/patients/${id}/modules`);
     await expect(quadro(page)).toBeVisible();
     await expect(page.locator('#diario')).toContainText('Voce inventata per verificare la lettura simultanea del Diario.');
     return id;
@@ -66,7 +66,7 @@ test('Parametri recenti conta i parametri e conserva lo storico completo in Para
             if (!response.ok) throw new Error(`Observation fixture: ${response.status}`);
         }
     }, id);
-    await page.goto(`/patients/${id}/modules`);
+    await openUnlockedDocument(page, `/patients/${id}/modules`);
     const measures = quadro(page).getByRole('region', { name: 'Parametri recenti', exact: true });
     await expect(measures.getByRole('heading')).toContainText('2 parametri');
     await expect(measures.locator('tbody tr')).toHaveCount(2);
@@ -93,7 +93,7 @@ for (const [route, sectionName] of [['therapies', 'Terapie attive'], ['observati
     test.setTimeout(180_000);
     const id = await fixture(page, 0);
     await page.route(`**/api/${route}?**`, route => route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Synthetic read failure' }) }));
-    await page.goto(`/patients/${id}/modules`);
+    await openUnlockedDocument(page, `/patients/${id}/modules`);
     const section = quadro(page).getByRole('region', { name: sectionName, exact: true });
     await expect(section.getByRole('alert')).toContainText('Impossibile leggere');
     await expect(section).not.toContainText(/Nessun[ao]? /);
@@ -110,7 +110,7 @@ for (const [routeName, sectionName] of [['therapies', 'Terapie attive'], ['obser
     const pending = new Promise<void>(resolve => { release = resolve; });
     await page.route(`**/api/${routeName}?**`, async route => { await pending; await route.continue(); });
     try {
-        await page.goto(`/patients/${id}/modules`);
+        await openUnlockedDocument(page, `/patients/${id}/modules`);
         const section = quadro(page).getByRole('region', { name: sectionName, exact: true });
         await expect(section.getByRole('status')).toContainText('in corso');
         await expect(section.getByRole('heading')).not.toContainText('0');
@@ -126,7 +126,7 @@ test('lettura paziente fallita non annuncia problemi assenti', async ({ page }) 
     test.setTimeout(180_000);
     const id = await fixture(page, 0);
     await page.route(`**/api/patients/${id}`, route => route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Synthetic read failure' }) }));
-    await page.goto(`/patients/${id}/modules`);
+    await openUnlockedDocument(page, `/patients/${id}/modules`);
     await expect(page.getByRole('alert').filter({ hasText: 'Impossibile leggere la scheda paziente' })).toBeVisible();
     await expect(quadro(page)).toHaveCount(0);
     await closureGallery(page, 'quadro', 'paziente-non-disponibile', page.getByRole('alert').filter({ hasText: 'Impossibile leggere la scheda paziente' }));

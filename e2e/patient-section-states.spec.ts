@@ -1,6 +1,6 @@
 import { sealDiaryEntry } from './fixtures/sealed-diary-entry';
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow } from './utils';
+import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow, openUnlockedDocument } from './utils';
 
 async function patient(page: Page) {
     page.on('pageerror', error => console.log(`HC6_PAGE_ERROR ${error.stack ?? error.message}`));
@@ -57,7 +57,7 @@ for (const section of ['diario', 'prestazioni'] as const) for (const populated o
             await route.continue();
         });
         try {
-            await page.goto(`/patients/${id}/modules`);
+            await openUnlockedDocument(page, `/patients/${id}/modules`);
             await openPatientSection(page, section);
             const pane = page.locator(`#${section}`);
             await expect(pane.locator('[data-view-state=loading]')).toBeVisible();
@@ -79,7 +79,7 @@ for (const section of ['diario', 'prestazioni'] as const) for (const populated o
 test('sezioni vuote: ricetta unica, creazione presso il titolo e Nuova voce stabile fra destinazioni', async ({ page }) => {
     test.setTimeout(180_000);
     const id = await patient(page);
-    await page.goto(`/patients/${id}/modules`);
+    await openUnlockedDocument(page, `/patients/${id}/modules`);
     for (const width of [1440, 768, 390]) for (const theme of ['light', 'dark']) {
         await page.evaluate(theme => {
             document.documentElement.classList.toggle('light', theme === 'light');
@@ -137,7 +137,7 @@ test('prestazione annullata: totale, stato e dettaglio nominano ciò che contano
         });
         if (!response.ok) throw new Error(`Synthetic prescription: ${response.status}`);
     }, id);
-    await page.goto(`/patients/${id}/modules`);
+    await openUnlockedDocument(page, `/patients/${id}/modules`);
     await openPatientSection(page, 'prestazioni');
     const pane = page.locator('#prestazioni');
     await expect(pane.getByRole('heading')).toContainText('1 prestazione totale · 1 annullata');

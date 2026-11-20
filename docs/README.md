@@ -12,7 +12,11 @@ Per conoscere il prodotto e avviarlo dai sorgenti, parti dal
 In questa mappa ho raccolto i documenti di riferimento per ogni tema e il loro ordine
 di precedenza. L'[indice completo](./markdown-index.md) elenca i singoli file.
 
-## Versione pubblicata: 0.9.0
+## Versioni pubblicate
+
+Per installare MediFlow, scegli la release e segui le istruzioni per il tuo sistema. Ogni nota identifica il tag e i profili verificati. [Ultima release](https://github.com/Wulfgardr/mediflow/releases/latest)
+
+### Versione pubblicata: 0.9.0
 
 La 0.9.0 distribuisce codice sorgente per l'applicazione Web locale e
 l'accesso per agenti (Headless), con Node 24. I profili provati sono macOS
@@ -310,7 +314,9 @@ installato, clinicamente qualificato o pubblicato.
 | Stato completo del sistema | [docs/STATE_OF_THE_SYSTEM.md](./STATE_OF_THE_SYSTEM.md) | `CANONICAL` | Distingue la release sorgente 0.8.6 pubblicata, i contratti implementativi e le prove storiche con i propri SHA. Mantiene aperta la decisione sul deployment clinico. |
 | Visione architetturale stabile | [ARCHITECTURE.md](../ARCHITECTURE.md) | `CANONICAL` | Spiega perché dati, interfacce e funzioni intelligenti abbiano responsabilità separate, fissando i principi stabili. |
 | Sicurezza e oscuramento dei dati | [SECURITY.md](../SECURITY.md) | `CANONICAL` | Definisce minacce considerate, protezione dei dati, oscuramento degli identificativi e limiti di log e audit. |
+| Processi che elaborano i documenti | [ADR 0196](./adr/0196-document-child-platform-boundary.md) | `PROPOSED` | Propone la ricetta di avvio per Web e Headless. Il 19 novembre 2026 Leonardo ha approvato l’isolamento di rete imposto dal sistema prima della consegna del profilo Windows 11 ARM. L’ADR registra le prove del pacchetto per i tre profili. |
 | Indice degli audit di sicurezza pubblici | [docs/security-audits/README.md](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/security-audits/README.md) | `CANONICAL / INDEX` | Elenca rapporti sanitizzati legati a revisioni esatte. I rapporti sono evidenze secondarie e non prevalgono su SECURITY, ADR o contratti API. |
+| Prova del client Web e rinnovo tra schede | [ADR 0197](./adr/0197-web-session-client-proof.md) | `PROPOSED` | Vincola le operazioni protette al documento Web o all’autorità Web del client locale. |
 | Lifecycle Web P3 per logout, PIN e setup | [docs/adr/0106-web-auth-logout-pin-setup-lifecycle.md](./adr/0106-web-auth-logout-pin-setup-lifecycle.md) | `CANONICAL / ACCEPTED` | Prevale sul lifecycle P3 incompatibile: logout esatto senza mutare cookie, retirement user-scoped dopo CAS PIN e setup commit-last. Non prova runtime o reset PIN. |
 | Piano canonico Headless read-only 0.8.5 | [docs/adr/0108-piano-canonico-headless-read-only-085.md](./adr/0108-piano-canonico-headless-read-only-085.md) | `CANONICAL / ACCEPTED` | Interpreta `66/66` come 66 esiti terminali fail-closed. I 32 GET network restano evidence candidate e non operation grant. |
 | Integrita del processo per l'auth web H1a | [docs/adr/0105-web-auth-process-integrity-assumption.md](./adr/0105-web-auth-process-integrity-assumption.md) | `CANONICAL / ACCEPTED` | Fissa l'assunzione process-global, il residuo di disponibilita e i gate H1b/security. Non prova la catena auth completa. |

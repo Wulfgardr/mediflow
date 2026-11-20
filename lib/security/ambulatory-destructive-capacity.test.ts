@@ -1,3 +1,4 @@
+import { syntheticWebClientRequest as localRequest } from './loopback-ingress-test-fixture';
 import assert from 'node:assert/strict';
 import { mkdtempSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -58,7 +59,7 @@ function harness() {
     return { native, clock, service, begin, fill };
 }
 function webRequest(reference: unknown, sessionId: string, controlId: string) {
-    return new Request(`${origin}/api/auth/ambulatory-commands`, { method: 'POST', headers: {
+    return localRequest(`${origin}/api/auth/ambulatory-commands`, { method: 'POST', headers: {
         origin, 'sec-fetch-site': 'same-origin', 'content-type': 'application/json', 'x-mediflow-archive-generation': currentArchiveGeneration(),
         [AMBULATORY_COMMAND_REFERENCE_HEADER]: String(reference), cookie: `mediflow_session=${sessionId}; mediflow_auth_control=${controlId}` } });
 }
@@ -80,7 +81,7 @@ test('flow scaduti e abbandonati non esauriscono il tetto di 128 comandi ambulat
 test('la potatura a tetto pieno conserva il flow la cui sessione web è attiva anche prima della prima anteprima', async () => {
     const { native, clock, service, begin, fill } = harness();
     const first = begin(); assert.equal(first.status, 200); assert.ok(first.control);
-    const attempt = beginWebAuthControl('login', Object.freeze({ controlId: first.control.controlId, ifMatch: first.control.etag, idempotencyKey: randomUUID() }));
+    const attempt = beginWebAuthControl('login', Object.freeze({ controlId: first.control.controlId, ifMatch: first.control.etag, idempotencyKey: randomUUID() }), localRequest(origin));
     assert.ok(attempt);
     const web = issueWebAuthControl(attempt, { id: native.session.userId, username: native.session.username, role: native.session.role });
     assert.ok(web);
@@ -95,13 +96,13 @@ test('la potatura a tetto pieno conserva il flow la cui sessione web è attiva a
 test('un login ancora in corso sul controllo di un flow potato non può più aprire una sessione admin', () => {
     const { native, clock, begin, fill } = harness();
     const first = begin(); assert.equal(first.status, 200); assert.ok(first.control);
-    const attempt = beginWebAuthControl('login', Object.freeze({ controlId: first.control.controlId, ifMatch: first.control.etag, idempotencyKey: randomUUID() }));
+    const attempt = beginWebAuthControl('login', Object.freeze({ controlId: first.control.controlId, ifMatch: first.control.etag, idempotencyKey: randomUUID() }), localRequest(origin));
     assert.ok(attempt);
     fill(127);
     clock.at += AMBULATORY_COMMAND_PREPARATION_MS + 1;
     assert.equal(begin().status, 200, 'il flow senza sessione attiva lascia il tetto');
     assert.equal(issueWebAuthControl(attempt, { id: native.session.userId, username: native.session.username, role: native.session.role }), null,
         'il login rimasto a metà non sopravvive al flow potato');
-    const stale = beginWebAuthControl('login', Object.freeze({ controlId: first.control.controlId, ifMatch: first.control.etag, idempotencyKey: randomUUID() }));
+    const stale = beginWebAuthControl('login', Object.freeze({ controlId: first.control.controlId, ifMatch: first.control.etag, idempotencyKey: randomUUID() }), localRequest(origin));
     assert.equal(stale, null, 'il vecchio etag del flow potato non apre un nuovo login');
 });

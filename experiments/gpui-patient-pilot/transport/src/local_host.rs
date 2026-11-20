@@ -20,7 +20,10 @@ mod territorial;
 mod who_administration;
 mod work_profile;
 use crate::RetirementNotice;
-use crate::http::{authenticate_web_p3, control_cookie, operation_uuid, sensitive_header};
+use crate::http::{
+    LOCAL_CLIENT_SESSION_PROOF_HEADER, authenticate_web_p3, control_cookie,
+    local_client_session_proof, operation_uuid, sensitive_header,
+};
 use crate::{
     Attachment, RequestContext, Result, RuntimeClient, RuntimeError, RuntimeSession, RuntimeUser,
     validate_id,
@@ -143,6 +146,7 @@ pub struct LocalHostAccess {
     native: RuntimeSession,
     cookie: Zeroizing<String>,
     control: Zeroizing<String>,
+    proof: Zeroizing<String>,
     generation: String,
     owner: Arc<()>,
     document_archives: Mutex<Vec<Weak<DocumentInsightsData>>>,
@@ -162,15 +166,17 @@ impl LocalHostAccess {
         if !client.is_local_bootstrap_origin() {
             return Err(RuntimeError::Forbidden);
         }
+        let proof = local_client_session_proof()?;
+        let mut headers = HeaderMap::new();
+        headers.insert(LOCAL_CLIENT_SESSION_PROOF_HEADER, sensitive_header(&proof)?);
         let checked = client.dedicated_web_raw(
             Method::GET,
             &["api", "auth", "check"],
-            HeaderMap::new(),
+            headers.clone(),
             None,
             false,
         )?;
         let control = control_cookie(&checked.headers, "mediflow_auth_control", 32, 256)?;
-        let mut headers = HeaderMap::new();
         headers.insert(
             COOKIE,
             sensitive_header(&format!("mediflow_auth_control={}", *control))?,
@@ -188,6 +194,7 @@ impl LocalHostAccess {
             native,
             cookie,
             control,
+            proof,
             generation: user.archive_generation.clone(),
             owner: Arc::new(()),
             document_archives: Mutex::new(vec![]),
@@ -211,6 +218,10 @@ impl LocalHostAccess {
         }
         self.client.context.check()?;
         let mut headers = HeaderMap::new();
+        headers.insert(
+            LOCAL_CLIENT_SESSION_PROOF_HEADER,
+            sensitive_header(&self.proof)?,
+        );
         headers.insert(
             COOKIE,
             sensitive_header(&format!(
@@ -399,6 +410,10 @@ impl LocalHostAccess {
         self.record_retirement();
         let client = self.client.with_request_context(RequestContext::default());
         let mut headers = HeaderMap::new();
+        headers.insert(
+            LOCAL_CLIENT_SESSION_PROOF_HEADER,
+            sensitive_header(&self.proof)?,
+        );
         headers.insert(
             COOKIE,
             sensitive_header(&format!(

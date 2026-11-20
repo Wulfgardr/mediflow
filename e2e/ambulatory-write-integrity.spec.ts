@@ -2,8 +2,8 @@ import { expect, test, type Page } from '@playwright/test';
 import Database from 'better-sqlite3';
 import { isAbsolute, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { bootstrapUnlockedSession } from './utils';
-import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
+import { unlockIfNeeded, bootstrapUnlockedSession } from './utils';
+import { documentRequests } from './fixtures/trusted-web-request';
 
 const blockedRequests = new WeakMap<Page, string[]>();
 test.beforeEach(async ({ page, baseURL }) => {
@@ -36,12 +36,11 @@ test('ambulatory clear rolls back audit failure, preserves live patients and rel
     const pageErrors: string[] = [];
     page.on('pageerror', error => pageErrors.push(error.message));
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-    const archiveHeaders = await trustedArchiveWebRequestHeaders(page);
-    const originalList = await page.request.get('/api/ambulatories');
+    const originalList = await documentRequests(page).get('/api/ambulatories');
     expect(originalList.status()).toBe(200);
     const originalRoster = (await originalList.json() as Array<{ id: string }>).map(item => item.id).sort();
     const name = `Ambulatorio di prova ${Date.now()}`;
-    const created = await page.request.post('/api/ambulatories', { headers: archiveHeaders, data: { name, type: 'test' } });
+    const created = await documentRequests(page).post('/api/ambulatories', { data: { name, type: 'test' } });
     expect(created.status()).toBe(201);
     const { id } = await created.json() as { id: string };
     type OriginalPatientDestination = {
@@ -55,14 +54,14 @@ test('ambulatory clear rolls back audit failure, preserves live patients and rel
     try {
         const sql = new Database(join(dir, 'medical.db'), { fileMustExist: true });
         cleanupConnection = sql;
-        const list = await page.request.get('/api/ambulatories');
+        const list = await documentRequests(page).get('/api/ambulatories');
         expect(list.status()).toBe(200);
         const live = (await list.json() as Array<{ id: string; type: string }>).find(item => item.type === 'live');
         expect(live).toBeTruthy();
         for (const lastName of ['SoloProva', 'Condiviso']) {
             const patientId = randomUUID();
             patientIds.push(patientId);
-            const response = await page.request.post('/api/patients', { headers: archiveHeaders, data: {
+            const response = await documentRequests(page).post('/api/patients', { data: {
                 id: patientId, firstName: 'Sintetico', lastName,
                 taxCode: `AMB${patientId.replaceAll('-', '').slice(0, 13).toUpperCase()}`,
                 isAdi: false,
@@ -76,7 +75,7 @@ test('ambulatory clear rolls back audit failure, preserves live patients and rel
             });
             expect(response.status()).toBe(201);
             expect((await response.json() as { id: string }).id).toBe(patientId);
-            expect((await page.request.get(`/api/patients/${patientId}`)).status()).toBe(200);
+            expect((await documentRequests(page).get(`/api/patients/${patientId}`)).status()).toBe(200);
         }
         sql.transaction(() => {
             for (const patientId of patientIds) {
@@ -94,6 +93,7 @@ test('ambulatory clear rolls back audit failure, preserves live patients and rel
         });
         const before = read();
         await page.goto('/settings/ambulatories');
+        await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
         const row = page.getByRole('treeitem').filter({ has: page.getByRole('heading', { name: new RegExp(name) }) });
         const actions: Array<{ submittedVersion: number; status: number }> = [];
         const clear = async () => {
@@ -154,11 +154,11 @@ test('ambulatory clear rolls back audit failure, preserves live patients and rel
         });
         expect(addedEvents.every(event => event.source_surface === 'web')).toBe(true);
         expect(addedEvents.filter(event => event.subject_ref === id).map(event => JSON.parse(String(event.redacted_metadata)).resourceVersion)).toEqual([2, 3]);
-        const readback = await page.request.get('/api/ambulatories');
+        const readback = await documentRequests(page).get('/api/ambulatories');
         expect(readback.status()).toBe(200);
         expect((await readback.json() as Array<{ id: string; version: number }>).find(item => item.id === id)?.version).toBe(3);
-        expect((await page.request.get(`/api/patients/${patientIds[0]}`)).status()).toBe(404);
-        expect((await page.request.get(`/api/patients/${patientIds[1]}`)).status()).toBe(200);
+        expect((await documentRequests(page).get(`/api/patients/${patientIds[0]}`)).status()).toBe(404);
+        expect((await documentRequests(page).get(`/api/patients/${patientIds[1]}`)).status()).toBe(200);
         expect(pageErrors).toEqual([]);
         await page.screenshot({ path: testInfo.outputPath('clear-completed.png') });
         await testInfo.attach('clear-readback.json', { contentType: 'application/json', body: JSON.stringify({ actions, after }) });
@@ -192,13 +192,13 @@ test('ambulatory clear rolls back audit failure, preserves live patients and rel
             } finally {
                 cleanupSql.close();
             }
-            const currentList = await page.request.get('/api/ambulatories');
+            const currentList = await documentRequests(page).get('/api/ambulatories');
             expect(currentList.status()).toBe(200);
             const currentAmbulatory = (await currentList.json() as Array<{ id: string; version: number }>).find(item => item.id === id);
             expect(currentAmbulatory).toBeTruthy();
-            const deleted = await page.request.delete(`/api/ambulatories/${id}`, { headers: archiveHeaders, data: { version: currentAmbulatory!.version } });
+            const deleted = await documentRequests(page).delete(`/api/ambulatories/${id}`, { data: { version: currentAmbulatory!.version } });
             expect(deleted.status()).toBe(200);
-            const finalList = await page.request.get('/api/ambulatories');
+            const finalList = await documentRequests(page).get('/api/ambulatories');
             expect(finalList.status()).toBe(200);
             const finalRoster = (await finalList.json() as Array<{ id: string }>).map(item => item.id).sort();
             expect(finalRoster).toEqual(originalRoster);

@@ -1,4 +1,4 @@
-import { syntheticLoopbackRequest } from '../../lib/security/loopback-ingress-test-fixture';
+import { syntheticWebClientRequest } from '../../lib/security/loopback-ingress-test-fixture';
 import { once } from 'node:events';
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -14,7 +14,7 @@ import { resolve as resolveWebSession } from '../../lib/security/web-auth-lifecy
 import type { AmbulatoryCommandMarker } from '../../lib/ambulatory-destructive-command-contract';
 
 const input = JSON.parse(process.argv[2]) as { action: 'clear' | 'delete' | 'close' | 'read' | 'assign' | 'child' | 'default'; marker?: AmbulatoryCommandMarker; gate?: string; crash?: string };
-const load = createRequire(import.meta.url), cookieState = { cookies: new Map<string, string>(), headers: syntheticLoopbackRequest('http://127.0.0.1').headers };
+const load = createRequire(import.meta.url), cookieState = { cookies: new Map<string, string>(), headers: syntheticWebClientRequest('http://127.0.0.1').headers };
 const cleanup = installNetworkPatientCookieFixture(process.env.MEDIFLOW_DATA_DIR!, cookieState);
 const { dbServer, openDbServer } = load('../../lib/db-server.ts') as typeof import('../../lib/db-server'); openDbServer();
 const { settings } = load('../../lib/schema.ts') as typeof import('../../lib/schema');
@@ -25,7 +25,7 @@ native.pairedClient.grantedCapabilities.push('network.ambulatories.write');
 dbServer.update(settings).set({ value: JSON.stringify({ ...JSON.parse(serializeNetworkPairingState({ clients: [native.pairedClient], intents: [] })), archiveGeneration: currentArchiveGeneration() }) })
     .where(eq(settings.key, NETWORK_PAIRING_STATE_KEY)).run();
 const origin = 'http://127.0.0.1:31997';
-const request = (headers: Record<string, string> = {}) => syntheticLoopbackRequest(`${origin}/api/auth/ambulatory-commands`, { method: 'POST', headers: {
+const request = (headers: Record<string, string> = {}) => syntheticWebClientRequest(`${origin}/api/auth/ambulatory-commands`, { method: 'POST', headers: {
     origin, 'sec-fetch-site': 'same-origin', 'content-type': 'application/json', 'x-mediflow-archive-generation': currentArchiveGeneration(), ...headers } });
 const service = createAmbulatoryDestructiveService();
 const recovery = input.action === 'close' || input.action === 'read';
@@ -33,7 +33,7 @@ const operation = input.action === 'delete' ? 'ambulatory.delete.v1' : 'ambulato
 const opened = service.begin(request({ ...Object.fromEntries(native.request.headers), 'x-mediflow-expected-ambulatory-id': 'scope' }), native.session, native.pairedClient,
     { purpose: recovery ? 'recover' : 'execute', command: recovery ? input.marker : { operation, originalScopeId: 'scope', ambulatoryId: 'target', expectedVersion: 1 } }, recovery ? null : 'scope');
 if (opened.status !== 200 || !opened.control) throw new Error(JSON.stringify(opened.value));
-const attempt = beginWebAuthControl('login', Object.freeze({ controlId: opened.control.controlId, ifMatch: opened.control.etag, idempotencyKey: randomUUID() }));
+const attempt = beginWebAuthControl('login', Object.freeze({ controlId: opened.control.controlId, ifMatch: opened.control.etag, idempotencyKey: randomUUID() }), request());
 if (!attempt) throw new Error('Synthetic authentication preparation failed');
 const issued = issueWebAuthControl(attempt, { id: native.session.userId, username: native.session.username, role: 'admin' });
 if (!issued) throw new Error('Synthetic authentication failed');
@@ -78,7 +78,7 @@ else if (input.action === 'child') result = createAmbulatory({ request: request(
 else if (input.action === 'default') result = updateAmbulatory({ request: request(), session: resolved.projection }, 'fallback', { isDefault: true, version: 1 });
 else {
     const route = load('../../app/api/patients/assign/route.ts') as typeof import('../../app/api/patients/assign/route');
-    const response = await route.POST(syntheticLoopbackRequest(`${origin}/api/patients/assign`, { method: 'POST', headers: { ...headers, 'content-type': 'application/json', 'x-mediflow-archive-generation': currentArchiveGeneration() },
+    const response = await route.POST(syntheticWebClientRequest(`${origin}/api/patients/assign`, { method: 'POST', headers: { ...headers, 'content-type': 'application/json', 'x-mediflow-archive-generation': currentArchiveGeneration() },
         body: JSON.stringify({ patientIds: ['race-patient'], patientVersions: { 'race-patient': 1 }, targetAmbulatoryId: 'scope' }) }));
     result = { status: response.status, value: await response.json() };
 }

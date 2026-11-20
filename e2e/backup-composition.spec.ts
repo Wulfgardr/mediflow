@@ -1,7 +1,8 @@
 import { expect, test } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
-import { bootstrapUnlockedSession, assertNoHorizontalOverflow } from './utils';
+import { documentRequests } from './fixtures/trusted-web-request';
+import { unlockIfNeeded, bootstrapUnlockedSession, assertNoHorizontalOverflow } from './utils';
 
 const baseline = process.env.BACKUP_COMPOSITION_BASELINE === '1';
 
@@ -46,7 +47,9 @@ test('Backup: composizione, tastiera, bozza di conferma e verifica senza riprist
         await zoom.setZoom(1); await page.setViewportSize({ width: 1440, height: 1000 });
     };
     try {
-        await bootstrapUnlockedSession(page, '1234'); await page.goto('/settings/backup');
+        await bootstrapUnlockedSession(page, '1234');
+        await page.goto('/settings/backup');
+        await unlockIfNeeded(page, '1234');
         const region = page.getByTestId('settings-backup-section'); await expect(region).toBeVisible();
         await capture('apertura');
         if (!baseline) await page.getByRole('button', { name: 'Backup automatici', exact: true }).click();
@@ -68,7 +71,7 @@ test('Backup: composizione, tastiera, bozza di conferma e verifica senza riprist
         }
         const verify = page.getByTestId('backup-verify-input');
         if (!baseline || causal) { await verify.focus(); await expect(verify).toBeFocused(); const chooser = page.waitForEvent('filechooser', { timeout: 10_000 }); await page.keyboard.press('Space'); const selected = await chooser; expect(selected.isMultiple()).toBe(false); await selected.setFiles([]); }
-        const artifact = await (await page.request.get('/api/system/backup-restore')).text();
+        const artifact = await (await documentRequests(page).get('/api/system/backup-restore')).text();
         await verify.setInputFiles({ name: 'backup-inventato.mediflow', mimeType: 'application/json', buffer: Buffer.from(artifact) });
         const outcome = page.getByTestId('backup-outcome'); await expect(outcome).toContainText('Backup verificato'); await expect(outcome).toContainText('Verificato non significa provato');
         const restore = page.getByText('Seleziona file .mediflow v1', { exact: true }).locator('input');
@@ -119,6 +122,7 @@ test('Backup automatici: il conflitto conserva la bozza e richiede rilettura pri
     });
     await bootstrapUnlockedSession(page, '1234');
     await page.goto('/settings/backup');
+    await unlockIfNeeded(page, '1234');
     await page.getByRole('button', { name: 'Backup automatici', exact: true }).click();
     const destination = page.getByRole('textbox', { name: 'Destinazione', exact: true });
     await expect(destination).toHaveValue(config.destinationDir);

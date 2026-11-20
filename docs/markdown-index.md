@@ -26,6 +26,7 @@ la data di questo indice non rinnova le prove cui rimandano.
 
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
+| [ADR 0196](./adr/0196-document-child-platform-boundary.md) | Controlli dei processi che elaborano i documenti nel runtime Web. | Per verificare estrazione del testo e lettura dei PDF su ciascuna piattaforma. |
 | [Contratto 0.9.1](./releases/0.9.1-contract.md) | U0 approvato il 23 ottobre 2026: unità chiuse, target M5 Max/48 GB dal 9 novembre, tranche intelligente e GO/NO-GO. | Per accettare W/G/C/P/I/Q e seguire le decisioni ancora aperte; non attesta rilascio o ammissione clinica. |
 | [Analisi CU](./analysis/2026-10-23-computer-use-procedures.md) | Delta, alternative privacy, dipendenze e unità del filone computer use locale. | Per valutare la proposta aggiunta in coda alla 0.9.1 e le sole decisioni sostanziali. |
 | [Contratti CU](./analysis/2026-10-23-computer-use-procedure-contracts.md) | Specialistica, farmaceutica, protesica, esenzioni e introduttivo INPS. | Per implementare simulatori e adapter senza dedurre atti o campi non autorizzati. |
@@ -96,6 +97,7 @@ raccolte consentono di ricostruire come si sia arrivati alla consegna.
 | [ADR 0124](./adr/0124-bounded-native-network-json.md) | Limiti byte per JSON native/network e risposta 413. | Per valutare budget, compatibilità e confini del lettore. |
 | [ADR 0144](./adr/0144-archive-generation.md) | Decisione C15: una generazione dell'archivio che cambia a ogni ripristino o scambio di file, lega sessioni e grant e viene confrontata dentro ogni scrittura clinica. | Prima di collegare il lifecycle Web a ripristino e repair, o di cambiare che cosa resta valido dopo un ripristino. |
 | [ADR 0143](./adr/0143-strong-unlock-credential.md) | Decisione C07: passphrase, verificatore senza segreto, chiave solo in memoria, PIN di conferma, kit di recupero e migrazione dai PIN, con misure e ordine di consegna. | Prima di cambiare sblocco, derivazione, involucro della master key o recupero. |
+| [ADR 0197](./adr/0197-web-session-client-proof.md) | Proposta per legare la sessione Web al documento o al client locale autenticato. | Per aggiornare accesso, lock e trasporto locale. |
 | [ADR 0186](./adr/0186-punto-inchiostro.md) | Evoluzione di Lume: Punto d'inchiostro, caratteri locali, piano unico, inchiostri e confini funzionali. | Modificando le superfici e i token condivisi. |
 | [ADR 0142](./adr/0142-sqlite-maintenance-admission.md) | Ammissione SQLite condivisa e drain del writer scheduler prima della manutenzione. | Per verificare lease/intento, rifiuti sicuri e residuo HOLD del lifecycle Web; non qualifica il repair online. |
 | [ADR 0126](./adr/0126-chatgpt-account-control-plane.md) | Controllo account ChatGPT isolato, senza inferenza. | Contratti API, sessione, cleanup e limiti WUL-689. |

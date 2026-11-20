@@ -2,12 +2,15 @@ import Database from 'better-sqlite3';
 import path from 'node:path';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { expect, test } from './fixtures/isolated-runtime';
+import { documentRequests } from './fixtures/trusted-web-request';
 import { agentVisitPassphrase, agentVisitPin, createSyntheticAgentMandate } from './agent-visit-utils';
 import { sealAgentItemNode } from '../packages/agent-client/src/cassette-crypto';
 
 test.describe.configure({ retries: 0 });
 
-for (const credentialKind of ['passphrase', 'pin'] as const) test(`a registered agent receives a twelve-hour mandate on ${credentialKind} unlock and tab renewal`, async ({ page, context: browserContext, isolatedRuntime, playwright }, testInfo) => {
+const pinAccount = test.extend({ existingPin: agentVisitPin });
+
+for (const credentialKind of ['passphrase', 'pin'] as const) (credentialKind === 'pin' ? pinAccount : test)(`a registered agent receives a twelve-hour mandate on ${credentialKind} unlock and tab renewal`, async ({ page, context: browserContext, isolatedRuntime, playwright }, testInfo) => {
     test.setTimeout(150000);
     const agent = await playwright.request.newContext({ baseURL: isolatedRuntime.url });
     const unlockLabel = credentialKind === 'pin' ? 'PIN operatore' : 'Passphrase';
@@ -217,7 +220,9 @@ for (const credentialKind of ['passphrase', 'pin'] as const) test(`a registered 
             }
             expect((await (await retrieve()).json()).receipt.mandateRef).toBe(shared.receipt.mandateRef);
             expect((await deposit(latest.credential.token)).status()).toBe(401);
-            expect((await (await page.request.get('/api/auth/check')).json()).hasSession).toBe(true);
+            const primary = await documentRequests(page).get('/api/auth/check');
+            expect(primary.status()).toBe(200);
+            expect((await primary.json()).hasSession).toBe(true);
             sharedToken = shared.credential.token;
         } finally { await secondTab.close(); }
         await page.getByRole('button', { name: 'Aggiorna', exact: true }).click();

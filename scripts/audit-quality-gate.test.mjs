@@ -556,7 +556,7 @@ const logoutSpec = {
             writerExport: 'writeAuditEvent',
             hashExport: 'hashAuditRef',
             ownerModule: './web-auth-lifecycle-owner-adapter',
-            resolveExport: 'resolve',
+            resolveExport: 'resolveProvenWebSession',
             retireExport: 'retire',
             transportModule: './web-auth-control-transport',
             etagExport: 'strongWebAuthControlEtag',
@@ -634,20 +634,20 @@ test('rejects route cookie, delegation, and terminal-response drift', () => {
             "const CONTROL_COOKIE_NAME = 'mediflow_auth_control';",
             "const CONTROL_COOKIE_NAME = 'forged_control';",
         ), logoutService],
-        ['control read from bearer name', replaceOnce(
+        ['control read with bearer reader', replaceOnce(
             logoutRoute,
-            'controlCookie = cookieStore.get(CONTROL_COOKIE_NAME);',
-            'controlCookie = cookieStore.get(SESSION_COOKIE_NAME);',
+            'value: webAuthControlIdFromRequest(request)',
+            'value: webAuthSessionIdFromRequest(request)',
         ), logoutService],
-        ['cookie mutation in route', replaceOnce(
+        ['different request passed to locator', replaceOnce(
             logoutRoute,
-            'bearerCookie = cookieStore.get(SESSION_COOKIE_NAME);',
-            'cookieStore.delete(SESSION_COOKIE_NAME); bearerCookie = cookieStore.get(SESSION_COOKIE_NAME);',
+            'value: webAuthSessionIdFromRequest(request)',
+            'value: webAuthSessionIdFromRequest(new Request(request.url))',
         ), logoutService],
-        ['cookie failure fabricates success', replaceOnce(
+        ['missing locator fabricates success', replaceOnce(
             logoutRoute,
-            '} catch { /* The terminal service receives only the inert denial input. */ }',
-            "} catch { return new Response(null, { status: 204 }); }",
+            delegate,
+            `if (!bearerCookie.value) return new Response(null, { status: 204 }); ${delegate}`,
         ), logoutService],
         ['wrapped delegated response', replaceOnce(
             logoutRoute,
@@ -687,7 +687,7 @@ test('rejects package owner transport and exact bearer-control drift', () => {
         )],
         ['forged production resolver', logoutRoute, replaceOnce(
             logoutService,
-            'resolve: resolveWebSession,',
+            'resolve: resolveProvenWebSession,',
             "resolve: (_sessionId: unknown, _controlId: unknown) => ({ status: 'absent' as const }),",
         )],
         ['forged production retire', logoutRoute, replaceOnce(
@@ -730,10 +730,10 @@ test('rejects package owner transport and exact bearer-control drift', () => {
             'const controlId = exactCookie(controlCookie, CONTROL_COOKIE_NAME, CONTROL_ID);',
             'const controlId = exactCookie(bearerCookie, CONTROL_COOKIE_NAME, CONTROL_ID);',
         )],
-        ['resolution omits control id', logoutRoute, replaceOnce(
+        ['resolution omits request proof', logoutRoute, replaceOnce(
             logoutService,
+            'sources.resolve(sessionId, controlId, request)',
             'sources.resolve(sessionId, controlId)',
-            'sources.resolve(sessionId)',
         )],
         ['inactive projection accepted', logoutRoute, replaceOnce(
             logoutService,

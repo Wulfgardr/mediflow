@@ -1,3 +1,4 @@
+import { documentRequests } from './fixtures/trusted-web-request';
 import type { Page, Request } from '@playwright/test';
 import { test, expect } from './fixtures/isolated-runtime';
 import { renewAccessIfNeeded } from './utils';
@@ -21,7 +22,7 @@ const isPatientCreate = (request: Request) => request.method() === 'POST' && new
 
 type WirePatient = { id: string; firstName: string; lastName: string; taxCode: string; birthDate?: string | null; address?: string | null; phone?: string | null; ambulatoryId?: string | null };
 async function list(page: Page): Promise<WirePatient[]> {
-    const response = await page.request.get('/api/patients', { headers: { 'Cache-Control': 'no-store' } });
+    const response = await documentRequests(page).get('/api/patients', { headers: { 'Cache-Control': 'no-store' } });
     expect(response.status()).toBe(200);
     const rows: unknown = await response.json();
     expect(Array.isArray(rows)).toBe(true);

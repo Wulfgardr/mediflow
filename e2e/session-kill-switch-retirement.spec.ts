@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
-import { bootstrapUnlockedSession, unlockIfNeeded } from './utils';
+import { bootstrapUnlockedSession, openUnlockedDocument, unlockIfNeeded } from './utils';
 
 const endpoint = '/api/settings/aiDocumentSynthesisKillSwitch';
 type Gate = {
@@ -32,7 +32,7 @@ async function installGate(page: Page, consumer: string, selectedRead: number) {
       state.signal = init?.signal ?? undefined;
       state.captured = true;
       await dispatchGate;
-      const response = await original(input, { ...init, signal: undefined });
+      const response = new Response(null, { status: 401 });
       state.status = response.status;
       state.denied = true;
       await deliveryGate;
@@ -42,14 +42,14 @@ async function installGate(page: Page, consumer: string, selectedRead: number) {
   }, { endpoint, consumer, selectedRead });
 }
 
-for (const [index, consumer] of ['modules', 'document-upload'].entries()) test(`${consumer}: old real 401 cannot clear the new PIN session`, async ({ page }) => {
+for (const [index, consumer] of ['modules', 'document-upload'].entries()) test(`${consumer}: a delayed read denial cannot clear the new PIN session`, async ({ page }) => {
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   const fixture = { id: randomUUID(), firstName: 'Sonda', lastName: 'Sintetica', taxCode: `UI792${randomUUID().replaceAll('-', '').slice(0, 11).toUpperCase()}` };
   expect(await page.evaluate(async fixture => (await fetch('/api/patients', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(fixture),
   })).status, fixture)).toBe(201);
   await installGate(page, consumer, index + 1);
-  await page.goto(`/patients/${fixture.id}/modules`);
+  await openUnlockedDocument(page, `/patients/${fixture.id}/modules`);
   await page.waitForFunction(() => window.killSwitchReadGate.captured);
   const receipt = page.waitForResponse(response => response.url().endsWith('/api/auth/lock') && response.request().method() === 'POST');
   await page.getByRole('button', { name: 'Blocca', exact: true }).click();

@@ -6,6 +6,7 @@ import path from 'node:path';
 import net from 'node:net';
 import { spawn, spawnSync } from 'node:child_process';
 import { chromium, expect } from '@playwright/test';
+import { secureLaunch } from '../e2e/fixtures/secure-browser.ts';
 import { archiveBrowserPort } from './local-ui-runtime.mjs';
 import { localUiArchiveLock } from './launcher-state.mjs';
 
@@ -37,7 +38,7 @@ test('real browser and plugin launcher: UI owns lease, encrypted draft survives 
     const port = await archiveBrowserPort(data); env.PORT = String(port);
     const url = `http://127.0.0.1:${port}`;
     const children = [];
-    const browser = await chromium.launch({ headless: true });
+    const browser = await chromium.launch(secureLaunch({ headless: true }));
     const context = await browser.newContext({ baseURL: url });
     let output = '';
     const outputs = new Map();
@@ -60,15 +61,16 @@ test('real browser and plugin launcher: UI owns lease, encrypted draft survives 
         fs.rmSync(archiveConfig, { recursive: true, force: true });
         fs.rmSync(data, { recursive: true, force: true });
     });
-    const login = async page => {
-        await page.goto('/');
+    const unlockDocument = async page => {
         const input = page.getByLabel('PIN operatore').first();
         await input.waitFor({ timeout: 15000 });
         const renew = page.getByRole('button', { name: 'Rinnova accesso', exact: true });
         // Il pulsante compare anche durante il controllo di avvio e sparisce da solo: si usa solo se il PIN resta bloccato.
         await expect.poll(async () => {
             if (await input.isEnabled()) return true;
-            if (await renew.isEnabled({ timeout: 250 }).catch(() => false)) await renew.click({ timeout: 1000 }).catch(() => {});
+            const noPeer = page.getByText('Apri una scheda già sbloccata oppure blocca tutte le schede per accedere di nuovo.', { exact: true });
+            if (await noPeer.isVisible()) await page.getByRole('button', { name: 'Blocca tutte le schede', exact: true }).click();
+            else if (await renew.isEnabled({ timeout: 250 }).catch(() => false)) await renew.click({ timeout: 1000 }).catch(() => {});
             return false;
         }, { timeout: 30000 }).toBe(true);
         await input.fill('1234');
@@ -77,13 +79,15 @@ test('real browser and plugin launcher: UI owns lease, encrypted draft survives 
     };
     const first = await launch();
     let page = await context.newPage();
-    await login(page);
+    await page.goto('/');
+    await unlockDocument(page);
     const patient = await page.evaluate(async () => {
         const result = await fetch('/api/patients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firstName: 'Sintetico', lastName: 'Conservazione', taxCode: 'CNS757SYNTHETIC01', birthDate: '1980-01-01' }) });
         if (result.status !== 201) throw new Error(`Patient ${result.status}`);
         return result.json();
     });
     await page.goto(`/patients/${patient.id}/entries/new`);
+    await unlockDocument(page);
     const editor = page.locator('[contenteditable="true"]').first();
     await expect(editor).toBeVisible();
     assert.equal(await page.evaluate(() => Object.keys(localStorage).some(key => key.startsWith('mediflow:entry-draft:'))), false);
@@ -94,6 +98,7 @@ test('real browser and plugin launcher: UI owns lease, encrypted draft survives 
     await expect(page.getByTestId('local-draft-status')).toContainText('conservati cifrati');
     await page.clock.setFixedTime(new Date(Date.now() + 86400000));
     await page.reload();
+    await unlockDocument(page);
     await expect(editor).toContainText('Resoconto sintetico non registrato 757');
     assert.notEqual(await date.inputValue(), openedAt, 'Default date must refresh after reopening');
     const chosenDate = '2026-10-01T09:30';
@@ -101,6 +106,7 @@ test('real browser and plugin launcher: UI owns lease, encrypted draft survives 
     await date.fill(chosenDate);
     await until(() => page.evaluate(previous => Object.entries(localStorage).find(([key]) => key.startsWith('mediflow:entry-draft:'))?.[1] !== previous, previousCipher));
     await page.reload();
+    await unlockDocument(page);
     await expect(date).toHaveValue(chosenDate);
     // Wait for a server acknowledgement from the actual root component.
     await page.waitForResponse(response => response.url().endsWith('/api/plugin-local-ui/lease') && response.status() === 204, { timeout: 10000 });
@@ -116,7 +122,9 @@ test('real browser and plugin launcher: UI owns lease, encrypted draft survives 
         if (evidence) await page.screenshot({ path: path.join(evidence, `draft-before-${theme}.png`), fullPage: true });
     }
     const headers = { Origin: url, 'Sec-Fetch-Site': 'same-origin', 'Content-Type': 'application/json' };
-    assert.equal((await context.request.post('/api/plugin-local-ui/lease', { headers: { ...headers, Origin: 'http://evil.example' }, data: { tab: crypto.randomUUID(), action: 'renew' } })).status(), 403);
+    const refusedLease = await context.request.post('/api/plugin-local-ui/lease', { headers: { ...headers, Origin: 'http://evil.example' }, data: { tab: crypto.randomUUID(), action: 'renew' } });
+    assert.equal(refusedLease.status(), 404);
+    assert.equal(await refusedLease.text(), '');
     first.disconnect();
     await pause(17000);
     assert.equal(terminal(first), false, 'Last host exit killed a browser-held runtime');
@@ -124,7 +132,9 @@ test('real browser and plugin launcher: UI owns lease, encrypted draft survives 
     for (const navigate of [() => page.reload(), () => page.goto(`/patients/${patient.id}/entries/new`)]) {
         const renewed = page.waitForResponse(response => response.url().endsWith('/api/plugin-local-ui/lease')
             && response.status() === 204 && response.request().postDataJSON().action === 'renew', { timeout: 10000 });
-        await navigate(); await renewed;
+        await navigate();
+        await unlockDocument(page);
+        await renewed;
         assert.equal(terminal(first), false, 'Document navigation killed the browser-owned runtime');
         assert.equal((await page.request.get('/api/auth/check')).status(), 200);
     }
@@ -137,16 +147,20 @@ test('real browser and plugin launcher: UI owns lease, encrypted draft survives 
         assert.equal(blocker.listening, true);
     } finally { await new Promise(resolve => blocker.close(resolve)); }
     assert.equal(await archiveBrowserPort(data), port, 'Original draft origin must return after the conflict');
-    const second = await launch(); page = await context.newPage(); await login(page);
+    const second = await launch(); page = await context.newPage();
     await page.goto(`/patients/${patient.id}/entries/new`);
+    await unlockDocument(page);
     await expect(page.locator('[contenteditable="true"]').first()).toContainText('Resoconto sintetico non registrato 757');
     await expect(page.getByTestId('local-draft-status')).toContainText('Bozza recuperata');
     for (const theme of ['light', 'dark']) {
         await page.evaluate(theme => { document.documentElement.classList.remove('light', 'dark'); document.documentElement.classList.add(theme); }, theme);
         if (evidence) await page.screenshot({ path: path.join(evidence, `draft-after-${theme}.png`), fullPage: true });
     }
-    const entries = await page.request.get(`/api/entries?patientId=${patient.id}`);
-    assert.equal(entries.status(), 200); assert.deepEqual(await entries.json(), []);
+    const entries = await page.evaluate(async id => {
+        const response = await fetch(`/api/entries?patientId=${id}`);
+        return { status: response.status, entries: await response.json() };
+    }, patient.id);
+    assert.deepEqual(entries, { status: 200, entries: [] });
     // Missing pagehide: the server must also stop with a silently lost document.
     await page.route('**/api/plugin-local-ui/lease', route => route.abort());
     second.disconnect(); await page.close();

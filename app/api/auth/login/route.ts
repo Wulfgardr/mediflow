@@ -8,16 +8,15 @@ import {
     writeAuditEvent,
 } from '@/lib/security/audit';
 import { verifyUnlockCredentials } from '@/lib/security/host-credential-verification';
-import { SESSION_COOKIE_NAME } from '@/lib/security/server-session';
 import {
     abortWebAuthControl,
     beginWebAuthControl,
     issueWebAuthControl,
     setWebAuthControlEtag,
+    setWebAuthSessionLocator,
     webAuthControlMutationFromRequest,
     type WebAuthControlMutation,
 } from '@/lib/security/web-auth-control-transport';
-import { sessionCookieOptionsForRequest } from '@/lib/security/request-transport';
 import { retirePendingPinEraResidues } from '@/lib/security/pin-era-residues';
 import { createAgentRegistrationStore } from '@/lib/agent-registration-store';
 import { beginAgentUnlock } from '@/lib/security/agent-unlock-session';
@@ -43,7 +42,7 @@ export async function POST(request: Request) {
         if (!mutation) {
             return authFailureResponse({ error: 'Login unavailable', code: 'AUTH_LOGIN_UNAVAILABLE' }, 503);
         }
-        attempt = beginWebAuthControl('login', mutation);
+        attempt = beginWebAuthControl('login', mutation, request);
         if (!attempt) {
             return authFailureResponse({ error: 'Login unavailable', code: 'AUTH_LOGIN_UNAVAILABLE' }, 503, mutation.ifMatch);
         }
@@ -119,7 +118,7 @@ export async function POST(request: Request) {
             salt: user.salt,
             ...(earlierCopiesCleared !== undefined ? { earlierCopiesCleared } : {}),
         });
-        response.cookies.set(SESSION_COOKIE_NAME, session.sessionId, sessionCookieOptionsForRequest(request));
+        setWebAuthSessionLocator(response, request, session.sessionId);
         setWebAuthControlEtag(response, session.etag);
         return response;
     } catch (error) {

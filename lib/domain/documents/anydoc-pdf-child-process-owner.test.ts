@@ -4,6 +4,7 @@ import { readFileSync, realpathSync } from 'node:fs';
 import childProcess from 'node:child_process';
 import { syncBuiltinESMExports } from 'node:module';
 import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 import test from 'node:test';
 
 import {
@@ -129,16 +130,29 @@ test('both real PDF callers pass the exact owned root, heap and conditional addo
     };
     syncBuiltinESMExports();
     try {
-        assert.equal((await runAnyDocPdfMaterializationChild(Buffer.from('%PDF-synthetic'), 1)).status, 'failed');
-        assert.equal((await runAnyDocPdfRenderingChild([{ page: 1, pdfBytes: Buffer.from('%PDF-synthetic') }])).status, 'failed');
+        const unavailable = { status: 'failed', reason: 'worker_unavailable', terminationSignal: null };
+        assert.deepEqual(await runAnyDocPdfMaterializationChild(Buffer.from('%PDF-synthetic'), 1), unavailable);
+        assert.deepEqual(await runAnyDocPdfRenderingChild([{ page: 1, pdfBytes: Buffer.from('%PDF-synthetic') }]), unavailable);
     } finally { childProcess.spawn = original; syncBuiltinESMExports(); }
     assert.equal(calls.length, 2);
     for (const [index, call] of calls.entries()) {
+        if (process.platform === 'win32') {
+            assert.equal(call.command, path.join(root, 'scripts', 'document-windows-sandbox', 'launcher-x64.exe'));
+            assert.match(call.args[0]!, /^MediFlow\.Document\.[a-f0-9]{32}$/u);
+            assert.equal(call.args[2], path.join(call.args[1]!, 'node.exe'));
+            assert.ok(call.args[3]?.includes(`"--allow-fs-read=${call.args[1]}"`));
+            assert.ok(call.args[3]?.includes(`"${path.join(call.args[1]!, 'scripts', path.basename(worker))}"`));
+            assert.equal(call.args[3]?.includes('"--allow-addons"'), index === 1);
+            continue;
+        }
         const core = ['--max-old-space-size=256', '--permission', '--disable-warning=SecurityWarning', `--allow-fs-read=${root}`,
             ...(index === 1 ? ['--allow-addons'] : []), worker];
         const command = process.platform === 'darwin' ? '/usr/bin/sandbox-exec' : process.platform === 'linux' ? '/usr/bin/prlimit' : process.execPath;
-        const prefix = process.platform === 'darwin' ? ['-p', '(version 1) (allow default) (deny network*) (deny file-write*)', process.execPath]
-            : process.platform === 'linux' ? ['--data=1073741824', '--', process.execPath] : [];
+        const networkNamespace = process.platform === 'linux' && process.arch === 'arm64'
+            ? ['/usr/bin/unshare', '--user', '--map-current-user', '--net', '--']
+            : [];
+        const prefix = process.platform === 'darwin' ? ['-p', '(version 1) (allow default) (deny network*) (deny file-write*) (deny process-fork)', process.execPath]
+            : process.platform === 'linux' ? ['--data=1073741824', '--', ...networkNamespace, process.execPath] : [];
         assert.equal(call.command, command);
         assert.deepEqual(call.args, [...prefix, ...core]);
     }

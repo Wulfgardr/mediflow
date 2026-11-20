@@ -134,6 +134,7 @@ const nextConfig: NextConfig = {
       "./scripts/node-runtime-contract.mjs",
       "./.nvmrc",
       "./scripts/document-child-launcher.mjs",
+      "./scripts/document-windows-sandbox.mjs",
       "./scripts/document-child-network-guard.mjs",
       "./scripts/anydoc-local-extraction-worker.mjs",
       "./scripts/anydoc-pdf-page-worker.mjs",
@@ -156,6 +157,7 @@ const nextConfig: NextConfig = {
       "./node_modules/@napi-rs/canvas/**/*",
       "./node_modules/@napi-rs/canvas-darwin-arm64/**/*",
       ...anyDocDesktopRendererTrace(process.platform, process.arch), // @Codex: explicit target binding closure
+      ...(process.platform === "win32" ? ["./scripts/document-windows-sandbox/launcher-x64.exe"] : []),
     ],
   },
   /* @Codex */

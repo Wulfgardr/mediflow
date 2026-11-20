@@ -1,4 +1,4 @@
-import { syntheticLoopbackRequest as localRequest } from './loopback-ingress-test-fixture';
+import { syntheticWebClientRequest as localRequest } from './loopback-ingress-test-fixture';
 import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { fork } from 'node:child_process';
@@ -48,7 +48,7 @@ function bind(service: Service, native: ReturnType<typeof seed>, payload = draft
     const initial = request('/begin', Object.fromEntries(native.request.headers));
     const result = service.begin(initial, native.session, native.pairedClient, payload);
     assert.equal(result.status, 200); assert.ok(result.control);
-    const attempt = beginWebAuthControl('login', Object.freeze({ controlId: result.control.controlId, ifMatch: result.control.etag, idempotencyKey: randomUUID() }));
+    const attempt = beginWebAuthControl('login', Object.freeze({ controlId: result.control.controlId, ifMatch: result.control.etag, idempotencyKey: randomUUID() }), localRequest(origin));
     assert.ok(attempt);
     const web = issueWebAuthControl(attempt, { id: native.session.userId, username: native.session.username, role: native.session.role });
     assert.ok(web);
@@ -99,10 +99,11 @@ const {beginWebAuthControl,issueWebAuthControl}=require(root+'/lib/security/web-
 const {currentArchiveGeneration}=require(root+'/lib/security/archive-session-generation.ts');
 const native=fixture.syntheticNetworkPatientAuthority(dbServer,'no-scope');
 const service=createAmbulatoryBootstrapService(),origin='http://127.0.0.1:31999';
-const req=(headers={})=>new Request(origin+'/api/auth/ambulatory-bootstrap',{method:'POST',headers:{origin,'content-type':'application/json','sec-fetch-site':'same-origin','x-mediflow-archive-generation':currentArchiveGeneration(),...headers}});
+const {syntheticWebClientRequest}=require(root+'/lib/security/loopback-ingress-test-fixture.ts');
+const req=(headers={})=>syntheticWebClientRequest(origin+'/api/auth/ambulatory-bootstrap',{method:'POST',headers:{origin,'content-type':'application/json','sec-fetch-site':'same-origin','x-mediflow-archive-generation':currentArchiveGeneration(),...headers}});
 const opened=service.begin(req(Object.fromEntries(native.request.headers)),native.session,native.pairedClient,{operation:'first-ambulatory.create.v1',id,name:'Sede concorrente '+workerId,address:null,description:null});
 if(!opened.control)throw new Error('prepare denied '+opened.status);
-const attempt=beginWebAuthControl('login',Object.freeze({controlId:opened.control.controlId,ifMatch:opened.control.etag,idempotencyKey:crypto.randomUUID()}));
+const attempt=beginWebAuthControl('login',Object.freeze({controlId:opened.control.controlId,ifMatch:opened.control.etag,idempotencyKey:crypto.randomUUID()}), req());
 const web=issueWebAuthControl(attempt,{id:native.session.userId,username:native.session.username,role:'admin'});
 if(!web)throw new Error('web issue denied');
 const headers={'x-mediflow-bootstrap-reference':opened.value.reference,cookie:'mediflow_session='+web.sessionId+'; mediflow_auth_control='+opened.control.controlId};
@@ -184,7 +185,7 @@ test('non-admin and different Web operator are not eligible', () => {
     dbServer.update(users).set({ role: 'admin' }).run();
     const result = service.begin(request('/begin', Object.fromEntries(native.request.headers)), native.session, native.pairedClient, draft());
     assert.ok(result.control);
-    const attempt = beginWebAuthControl('login', Object.freeze({ controlId: result.control.controlId, ifMatch: result.control.etag, idempotencyKey: randomUUID() }));
+    const attempt = beginWebAuthControl('login', Object.freeze({ controlId: result.control.controlId, ifMatch: result.control.etag, idempotencyKey: randomUUID() }), localRequest(origin));
     const web = issueWebAuthControl(attempt, { id: 'other-synthetic-user', username: ['synthetic', 'other'].join('-'), role: 'admin' }); assert.ok(web);
     const before = snapshot();
     assert.equal(service.commit(request('', { 'x-mediflow-bootstrap-reference': String(result.value.reference), cookie: `mediflow_session=${web.sessionId}; mediflow_auth_control=${result.control.controlId}` }), confirm).status, 401);
@@ -245,7 +246,7 @@ test('exact retirement preserves another Web P3, native authority and never invo
         assert.equal((await generic.completePortableSupervisorWebLifecycleMutationV1(Promise.resolve(new Response(null, { status: 204 })), 'logout')).status, 204);
         assert.equal(sentinel.calls, 1, 'positive control: generic lifecycle would reach the Supervisor boundary');
     } finally { hook.deregister(); delete (globalThis as unknown as Record<symbol, unknown>)[key]; }
-    assert.equal(resolveWebAuthControlSession(b.web.sessionId, b.control.controlId)?.status, 'active');
+    assert.equal(resolveWebAuthControlSession(b.web.sessionId, b.control.controlId, request('', b.headers))?.status, 'active');
     assert.equal(service.commit(request('', b.headers), confirm).status, 201);
 });
 
@@ -310,7 +311,7 @@ test('HTTP commit rechecks Web revocation, role and archive after a paused body'
         controller.enqueue(new TextEncoder().encode('{'));
         await new Promise<void>(resolve => setImmediate(resolve));
         if (mutation === 'web') {
-            const resolution = resolveWebAuthControlSession(flow.web.sessionId, flow.control.controlId);
+            const resolution = resolveWebAuthControlSession(flow.web.sessionId, flow.control.controlId, request('', flow.headers));
             assert.equal(resolution?.status, 'active');
             owner.retire((resolution as { projection: unknown }).projection, 'delete');
         } else if (mutation === 'role') dbServer.update(users).set({ role: 'operator' }).run();

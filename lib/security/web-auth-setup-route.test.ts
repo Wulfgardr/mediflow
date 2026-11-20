@@ -1,4 +1,4 @@
-import { syntheticLoopbackRequest as localRequest } from './loopback-ingress-test-fixture';
+import { syntheticWebClientRequest as localRequest } from './loopback-ingress-test-fixture';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';

@@ -1,5 +1,7 @@
 import 'server-only';
 
+import { WEB_CONTROL_LOCATOR_HEADER, WEB_SESSION_LOCATOR_HEADER } from './web-session-proof-header';
+import { presentedWebSessionProof, webSessionProofBindings } from './web-session-proof';
 import { types } from 'node:util';
 import { cookies, headers } from 'next/headers';
 import { hasAttestedLoopbackIngress } from './loopback-ingress.mjs';
@@ -157,9 +159,12 @@ function isProjectionOwner(value: unknown): value is ServerSessionProjectionOwne
     }
 }
 
-function activeWebProjection(sessionId: unknown, controlId: unknown): WebSessionProjection | null {
+function activeWebProjection(sessionId: unknown, controlId: unknown, requestHeaders: Pick<Headers, 'get'>): WebSessionProjection | null {
     if (typeof sessionId !== 'string' || !SESSION_ID.test(sessionId)
-        || typeof controlId !== 'string' || !CONTROL_ID.test(controlId)) return null;
+        || typeof controlId !== 'string' || !CONTROL_ID.test(controlId)
+        || !hasAttestedLoopbackIngress({ headers: requestHeaders })) return null;
+    const proof = presentedWebSessionProof(requestHeaders);
+    if (!webSessionProofBindings.admits(controlId, sessionId, proof)) return null;
     let resolution: unknown;
     try { resolution = resolveWebSession(sessionId, controlId); } catch { return null; }
     const resolved = exactFrozenOwnerRecord(resolution, ['status', 'projection']);
@@ -194,8 +199,8 @@ function retireActiveWebSessionsForProjectionUser(projection: WebSessionProjecti
     }
 }
 
-async function validateProjectionAgainstDatabase(projection: WebSessionProjection): Promise<WebSessionProjection | null> {
-    const user = await dbServer
+function validateProjectionAgainstDatabase(projection: WebSessionProjection): WebSessionProjection | null {
+    const user = dbServer
         .select({ id: users.id, username: users.username, role: users.role })
         .from(users)
         .where(eq(users.id, projection.userId))
@@ -205,17 +210,22 @@ async function validateProjectionAgainstDatabase(projection: WebSessionProjectio
     return null;
 }
 
-async function sessionIngressAllowed(): Promise<boolean> {
-    return hasAttestedLoopbackIngress({ headers: await headers() });
-}
-
 async function resolveValidatedActiveWebSession(): Promise<WebSessionProjection | null> {
     try {
-        const cookieStore = await cookies();
-        const sessionId = exactCookieValue(cookieStore.get(SESSION_COOKIE_NAME), SESSION_COOKIE_NAME, SESSION_ID);
-        const controlId = exactCookieValue(cookieStore.get(CONTROL_COOKIE_NAME), CONTROL_COOKIE_NAME, CONTROL_ID);
-        const projection = activeWebProjection(sessionId, controlId);
-        return projection && await sessionIngressAllowed() ? await validateProjectionAgainstDatabase(projection) : null;
+        const requestHeaders = await headers();
+        const proof = presentedWebSessionProof(requestHeaders);
+        if (!proof) return null;
+        let projection: WebSessionProjection | null;
+        if (proof.kind === 'web') {
+            projection = activeWebProjection(requestHeaders.get(WEB_SESSION_LOCATOR_HEADER),
+                requestHeaders.get(WEB_CONTROL_LOCATOR_HEADER), requestHeaders);
+        } else {
+            const cookieStore = await cookies();
+            const sessionId = exactCookieValue(cookieStore.get(SESSION_COOKIE_NAME), SESSION_COOKIE_NAME, SESSION_ID);
+            const controlId = exactCookieValue(cookieStore.get(CONTROL_COOKIE_NAME), CONTROL_COOKIE_NAME, CONTROL_ID);
+            projection = activeWebProjection(sessionId, controlId, requestHeaders);
+        }
+        return projection ? validateProjectionAgainstDatabase(projection) : null;
     } catch {
         return null;
     }
@@ -247,26 +257,38 @@ function authenticatedProjectionOwnerContext(
 export async function acquireAuthenticatedWebSessionProjectionOwnerContext(): Promise<AuthenticatedWebSessionProjectionOwnerContext | null> {
     try {
         if (!ambientThenSafe()) return null;
-        const cookiePromise = cookies();
-        const nativeCookiePromise = isNativePromise(cookiePromise) ? cookiePromise : null;
-        if (!ambientThenSafe()) { if (nativeCookiePromise) discardNativePromise(nativeCookiePromise); return null; }
-        if (!nativeCookiePromise) return null;
-
-        const cookieStore = await nativeCookiePromise;
-        if (!ambientThenSafe() || (typeof cookieStore !== 'object' && typeof cookieStore !== 'function') || cookieStore === null) return null;
-        const cookieGet = (cookieStore as { get?: unknown }).get;
-        if (!ambientThenSafe() || typeof cookieGet !== 'function') return null;
-        const bearerCookie = ReflectApply(cookieGet, cookieStore, [SESSION_COOKIE_NAME]);
+        const headersPromise = headers();
+        if (!isNativePromise(headersPromise)) return null;
+        if (!ambientThenSafe()) { discardNativePromise(headersPromise); return null; }
+        const requestHeaders = await headersPromise;
         if (!ambientThenSafe()) return null;
-        const controlCookie = ReflectApply(cookieGet, cookieStore, [CONTROL_COOKIE_NAME]);
-        if (!ambientThenSafe()) return null;
-        const sessionId = exactCookieValue(bearerCookie, SESSION_COOKIE_NAME, SESSION_ID);
-        const controlId = exactCookieValue(controlCookie, CONTROL_COOKIE_NAME, CONTROL_ID);
-        if (!sessionId || !controlId) return null;
+        const proof = presentedWebSessionProof(requestHeaders);
+        if (!ambientThenSafe() || !proof) return null;
+        let projection: WebSessionProjection | null;
+        if (proof.kind === 'web') {
+            projection = activeWebProjection(requestHeaders.get(WEB_SESSION_LOCATOR_HEADER),
+                requestHeaders.get(WEB_CONTROL_LOCATOR_HEADER), requestHeaders);
+        } else {
+            const cookiePromise = cookies();
+            const nativeCookiePromise = isNativePromise(cookiePromise) ? cookiePromise : null;
+            if (!ambientThenSafe()) { if (nativeCookiePromise) discardNativePromise(nativeCookiePromise); return null; }
+            if (!nativeCookiePromise) return null;
 
-        const projection = activeWebProjection(sessionId, controlId);
+            const cookieStore = await nativeCookiePromise;
+            if (!ambientThenSafe() || (typeof cookieStore !== 'object' && typeof cookieStore !== 'function') || cookieStore === null) return null;
+            const cookieGet = (cookieStore as { get?: unknown }).get;
+            if (!ambientThenSafe() || typeof cookieGet !== 'function') return null;
+            const bearerCookie = ReflectApply(cookieGet, cookieStore, [SESSION_COOKIE_NAME]);
+            if (!ambientThenSafe()) return null;
+            const controlCookie = ReflectApply(cookieGet, cookieStore, [CONTROL_COOKIE_NAME]);
+            if (!ambientThenSafe()) return null;
+            const sessionId = exactCookieValue(bearerCookie, SESSION_COOKIE_NAME, SESSION_ID);
+            const controlId = exactCookieValue(controlCookie, CONTROL_COOKIE_NAME, CONTROL_ID);
+            if (!sessionId || !controlId) return null;
+
+            projection = activeWebProjection(sessionId, controlId, requestHeaders);
+        }
         if (!ambientThenSafe() || !projection) return null;
-        if (!await sessionIngressAllowed() || !ambientThenSafe()) return null;
         const userIdPredicate = eq(users.id, projection.userId);
         if (!ambientThenSafe()) return null;
         const selected = dbServer.select({ id: users.id, username: users.username, role: users.role });

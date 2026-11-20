@@ -88,17 +88,17 @@ test('home-base read-only pairing flow works end-to-end', async () => {
 
         const login = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: PIN });
         assert.equal(login.response.status, 200);
-        const cookieHeader = login.cookieHeader;
-        assert.ok(cookieHeader);
+        const webHeaders = login.webHeaders;
+        assert.ok(webHeaders);
 
         const activeAuthCheck = await request('GET', '/api/auth/check', {
-            headers: { Cookie: cookieHeader },
+            headers: webHeaders,
         });
         assert.equal(activeAuthCheck.response.status, 200);
         assert.equal(activeAuthCheck.json?.hasSession, true);
 
         const activeContext = await request('GET', '/api/context', {
-            headers: { Cookie: cookieHeader },
+            headers: webHeaders,
         });
         assert.equal(activeContext.response.status, 200);
 
@@ -113,16 +113,14 @@ test('home-base read-only pairing flow works end-to-end', async () => {
         assert.equal(missingSession.response.status, 401);
 
         const missingPairedClient = await request('GET', '/api/v1/network/patients', {
-            headers: {
-                Cookie: cookieHeader,
-            },
+            headers: webHeaders,
         });
         assert.equal(missingPairedClient.response.status, 401);
 
         const patientList = await request('GET', '/api/v1/network/patients', {
             headers: {
                 ...pairedHeaders,
-                Cookie: cookieHeader,
+                ...webHeaders,
             },
         });
         assert.equal(patientList.response.status, 200);
@@ -133,7 +131,7 @@ test('home-base read-only pairing flow works end-to-end', async () => {
         const patientDetail = await request('GET', `/api/v1/network/patients/${seededPatientId}`, {
             headers: {
                 ...pairedHeaders,
-                Cookie: cookieHeader,
+                ...webHeaders,
             },
         });
         assert.equal(patientDetail.response.status, 200);
@@ -141,14 +139,14 @@ test('home-base read-only pairing flow works end-to-end', async () => {
         assert.equal(patientDetail.json?.ambulatoryId, ambulatoryId);
 
         const ambulatoriesMissingClient = await request('GET', '/api/v1/network/ambulatories', {
-            headers: { Cookie: cookieHeader },
+            headers: webHeaders,
         });
         assert.equal(ambulatoriesMissingClient.response.status, 401);
 
         const ambulatories = await request('GET', '/api/v1/network/ambulatories', {
             headers: {
                 ...pairedHeaders,
-                Cookie: cookieHeader,
+                ...webHeaders,
             },
         });
         assert.equal(ambulatories.response.status, 200);

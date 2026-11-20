@@ -3,7 +3,7 @@ import { mkdir } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 import type { FunctionModelPreferences } from '../lib/function-models/browser';
-import { bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch, assertNoHorizontalOverflow, assertNotClippedInViewport } from './utils';
+import { bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch, assertNoHorizontalOverflow, assertNotClippedInViewport, openUnlockedDocument, unlockIfNeeded } from './utils';
 
 const HEX = Object.freeze({
   session: '1'.repeat(32),
@@ -174,7 +174,7 @@ test('[E2E fixture] Smart Import exposes only the Fabric review preview and neve
   await page.route('**/api/ambulatories', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([{ id: 'ambulatory.synthetic', name: 'Ambulatorio di prova', address: '', version: 1 }]) }));
   await setAiLaneKillSwitch(page, 'aiSmartImportKillSwitch', 'enabled');
   const patientId = await createPatient(page);
-  await page.goto(`/patients/${patientId}/modules#quadro`);
+  await openUnlockedDocument(page, `/patients/${patientId}/modules#quadro`);
   await openPatientSection(page, 'quadro');
   await expect(page.locator('#quadro')).toBeVisible();
   await expect(page.locator('#quadro [data-testid="fabric-preview-card"]')).toHaveCount(0);
@@ -229,7 +229,7 @@ for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '3
       await page.route('**/api/ambulatories', route => route.fulfill({ json: [{ id: 'ambulatory.synthetic', name: 'Ambulatorio di prova', address: '', version: 1 }] }));
       await setAiLaneKillSwitch(page, 'aiSmartImportKillSwitch', 'enabled');
       const patientId = await createPatient(page);
-      await page.goto(`/patients/${patientId}/modules`);
+      await openUnlockedDocument(page, `/patients/${patientId}/modules`);
       await openPatientSection(page, baseline ? 'quadro' : 'documenti');
       const disclosure = page.locator('#smart-import');
       const toggle = disclosure.locator(':scope > div > [data-disclosure-control]');
@@ -300,7 +300,9 @@ for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '3
       }
       expect(runtimeErrors).toEqual([]);
       await setAiLaneKillSwitch(page, 'aiSmartImportKillSwitch', 'disabled');
-      await page.reload(); await openPatientSection(page, baseline ? 'quadro' : 'documenti'); await toggle.click();
+      await page.reload();
+      await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
+      await openPatientSection(page, baseline ? 'quadro' : 'documenti'); await toggle.click();
       await expect(prepare).toBeDisabled(); await capture('spenta');
       await test.info().attach('surface', { body: JSON.stringify({ theme, size, baseline,
         revision: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
@@ -340,7 +342,7 @@ test('Proposte combinate: un solo conteggio effettivo e due destinazioni senza r
     await setAiLaneKillSwitch(page, 'aiPatientInsightKillSwitch', 'enabled');
     await setAiLaneKillSwitch(page, 'aiSmartImportKillSwitch', 'enabled');
     const patientId = await createPatient(page);
-    await page.goto(`/patients/${patientId}/modules`); await openPatientSection(page, 'quadro');
+    await openUnlockedDocument(page, `/patients/${patientId}/modules`); await openPatientSection(page, 'quadro');
     const summary = page.getByTestId('patient-proposals-summary');
     await expect(summary).toHaveCount(1); await expect(summary).toContainText('Nessuna proposta da rivedere');
     const actions = summary.getByRole('navigation', { name: 'Azioni sulle proposte', exact: true });

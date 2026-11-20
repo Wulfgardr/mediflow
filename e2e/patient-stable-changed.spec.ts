@@ -2,7 +2,7 @@ import { diaryEntrySealer } from './fixtures/sealed-diary-entry';
 import Database from 'better-sqlite3';
 import { join } from 'node:path';
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { assertNoHorizontalOverflow, bootstrapUnlockedSession, openPatientSection } from './utils';
+import { assertNoHorizontalOverflow, bootstrapUnlockedSession, openPatientSection, unlockIfNeeded } from './utils';
 
 test.describe.configure({ retries: 0 });
 
@@ -176,6 +176,7 @@ test('D: dalla lista, primo sguardo al ritorno e cartella senza storico al cambi
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
     const { patient, other, returning, first } = await seed(page);
     await page.reload();
+    await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
     await openFromPatients(page, returning.lastName, returning.firstName, patient.id);
 
     const problems = page.getByRole('table', { name: 'Problemi', exact: true });
@@ -231,6 +232,7 @@ test('D affollata: 12 variazioni, referto durante la bozza e voce registrata e r
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
     const { patient, returning, other, first } = await seed(page, { crowded: true });
     await page.reload();
+    await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
     const openingStarted = performance.now();
     await openFromPatients(page, returning.lastName, returning.firstName, patient.id);
     const changes = page.getByRole('region', { name: 'Variazioni dall’ultima visita', exact: true });
@@ -345,6 +347,7 @@ test('D affollata: 12 variazioni, referto durante la bozza e voce registrata e r
     const readbackMs = Math.round(performance.now() - saveStarted);
     await page.getByRole('link', { name: 'Chiudi la voce', exact: true }).click();
     await page.reload();
+    await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
     await expect(page.getByText(/nessuna variazione registrata/)).toBeVisible();
     await expect(page.locator('#diario article').filter({ hasText: draft })).toHaveCount(1);
     const audit = await page.evaluate(async () => {
@@ -370,6 +373,7 @@ test('D gemella: un contatto nello stesso giorno si legge come voce, e una lettu
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
     const { patient, returning, activeName, suspendedName } = await seed(page, { crowded: true, twin: true });
     await page.reload();
+    await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
     await openFromPatients(page, returning.lastName, returning.firstName, patient.id);
     const changes = page.getByRole('region', { name: 'Variazioni dall’ultima visita', exact: true });
     const stable = page.getByRole('table', { name: 'Terapie attive', exact: true });
@@ -402,6 +406,7 @@ test('D gemella: un contatto nello stesso giorno si legge come voce, e una lettu
 
     await page.route('**/api/observations?**', route => route.fulfill({ status: 503, json: { error: 'Lettura sintetica non disponibile' } }));
     await page.reload();
+    await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
     await expect(changes).toContainText('Confronto incompleto. Alcuni dati non sono disponibili.');
     await expect(changes).not.toContainText('nessuna variazione');
 });
@@ -424,6 +429,7 @@ test('D: due misure dello stesso codice in unità diverse restano distinte nella
         }
     }, patient.id);
     await page.reload();
+    await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
     await openFromPatients(page, returning.lastName, returning.firstName, patient.id);
     const changes = page.getByRole('region', { name: 'Variazioni dall’ultima visita', exact: true });
     const grams = /Peso.*68[.]?600 g/u;
@@ -454,6 +460,7 @@ test('D: il solo referto aggiunto dopo la visita è raggiungibile e apre l’ori
         database.prepare('UPDATE entries SET created_at = ? WHERE patient_id = ? AND id != ?').run(old, patient.id, visit.id);
     });
     await page.reload();
+    await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
     await openFromPatients(page, returning.lastName, returning.firstName, patient.id);
     await expect(page.getByText(/nessuna variazione registrata/)).toBeVisible();
     const firstReadSecond = Math.floor(Date.now() / 1000);

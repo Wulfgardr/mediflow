@@ -3,15 +3,21 @@
 import { formatCountLabel } from '@/lib/format-count';
 import { Disclosure } from '@/components/disclosure';
 import { useEffect, useState } from 'react';
-import { prostheticsRequest } from '@/lib/reference-data/prosthetics-catalog-client';
+import { downloadProstheticsFile, prostheticsRequest } from '@/lib/reference-data/prosthetics-catalog-client';
 import type { ProstheticsDocument, ProstheticsSourceRecord } from '@/lib/reference-data/prosthetics-catalog-contract';
 
 export type SourceWithDocuments = ProstheticsSourceRecord & { documents: ProstheticsDocument[] };
 export function ProstheticsOriginalLinks({ documents }: { documents: ProstheticsDocument[] }) {
+    const [unavailable, setUnavailable] = useState<string | null>(null);
     return documents.length ? <ul className="space-y-2">{documents.map(doc => <li key={doc.id}>
-        <a className="inline-flex min-h-11 items-center underline" href={`/api/prosthetics/catalog/documents?id=${encodeURIComponent(doc.id)}&sha256=${doc.sha256}`}>
+        <button type="button" className="inline-flex min-h-11 items-center underline" onClick={() => {
+            setUnavailable(null);
+            void downloadProstheticsFile({ kind: 'document', id: doc.id, sha256: doc.sha256 }, doc.name)
+                .catch(() => setUnavailable(doc.id));
+        }}>
             {doc.name}{doc.page ? ` · pagina ${doc.page}` : ''}
-        </a>
+        </button>
+        {unavailable === doc.id && <p role="status">Scaricamento non riuscito.</p>}
         <Disclosure title="Integrità originale"><p className="break-all">SHA-256: {doc.sha256}</p><p>{doc.size.toLocaleString('it-IT')} byte</p></Disclosure>
     </li>)}</ul> : <p>Nessun originale allegato.</p>;
 }

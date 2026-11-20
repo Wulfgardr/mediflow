@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
-import { openDocumentActions, bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch } from './utils';
+import { openUnlockedDocument, openDocumentActions, bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch } from './utils';
 import { finishOrdinaryChatGpt, installOrdinaryChatGptTransport, remoteMetadata, selectOrdinaryChatGpt } from './ordinary-chatgpt-ui-fixture';
 import { openTreatmentReasoningDenial } from './fixtures/treatment-reasoning-denial';
 
@@ -46,7 +46,7 @@ test('Quadro paziente ordinary ChatGPT: consent, catalog, review-only source pro
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   await setAiLaneKillSwitch(page, 'aiPatientInsightKillSwitch', 'enabled');
   const patientId = await createPatient(page, 'Insight');
-  await page.goto(`/patients/${patientId}/modules#quadro`); await openPatientSection(page, 'attenzione');
+  await openUnlockedDocument(page, `/patients/${patientId}/modules#quadro`); await openPatientSection(page, 'attenzione');
   const disclosure = page.locator('#patient-insight'); await disclosure.locator(':scope > div > [data-disclosure-control]').click();
   const controls = await selectOrdinaryChatGpt(disclosure);
   remote.arm(); await disclosure.getByRole('button', { name: 'Genera proposta' }).click();
@@ -89,7 +89,7 @@ test('Smart Import ordinary ChatGPT: selected context returns a source-linked pr
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   await setAiLaneKillSwitch(page, 'aiSmartImportKillSwitch', 'enabled');
   const patientId = await createPatient(page, 'Smart', 'Diagnosi sintetica in revisione.');
-  await page.goto(`/patients/${patientId}/modules#quadro`); await openPatientSection(page, 'documenti');
+  await openUnlockedDocument(page, `/patients/${patientId}/modules#quadro`); await openPatientSection(page, 'documenti');
   await page.locator('#smart-import').getByRole('button', { name: 'Proposte', exact: true }).click();
   const card = page.getByTestId('fabric-preview-card');
   await card.getByRole('button', { name: 'Prepara proposta' }).click();
@@ -144,7 +144,7 @@ test('Document Synthesis ordinary ChatGPT: encrypted fixture, source citation an
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   await setAiLaneKillSwitch(page, 'aiDocumentSynthesisKillSwitch', 'enabled');
   const patientId = await createPatient(page, 'Document');
-  await page.goto(`/patients/${patientId}/modules`); await openPatientSection(page, 'documenti');
+  await openUnlockedDocument(page, `/patients/${patientId}/modules`); await openPatientSection(page, 'documenti');
   const fileName = `documento-ordinary-${Date.now()}.rtf`;
   const saved = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/attachments');
   await expect(page.locator('#documenti [data-document-area="list"]')).toHaveAttribute('aria-busy', 'false');
@@ -205,7 +205,7 @@ test('ordinary ChatGPT preparation closes on patient-context navigation before c
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   await setAiLaneKillSwitch(page, 'aiPatientInsightKillSwitch', 'enabled');
   const patientId = await createPatient(page, 'Cancel');
-  await page.goto(`/patients/${patientId}/modules#quadro`); await openPatientSection(page, 'attenzione');
+  await openUnlockedDocument(page, `/patients/${patientId}/modules#quadro`); await openPatientSection(page, 'attenzione');
   const disclosure = page.locator('#patient-insight'); await disclosure.locator(':scope > div > [data-disclosure-control]').click();
   const controls = await selectOrdinaryChatGpt(disclosure);
   remote.arm(); await disclosure.getByRole('button', { name: 'Genera proposta' }).click();
@@ -231,7 +231,7 @@ test('ordinary ChatGPT expiry requires explicit new preparation before fresh con
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   await setAiLaneKillSwitch(page, 'aiPatientInsightKillSwitch', 'enabled');
   const patientId = await createPatient(page, 'Expired');
-  await page.goto(`/patients/${patientId}/modules`); await openPatientSection(page, 'attenzione');
+  await openUnlockedDocument(page, `/patients/${patientId}/modules`); await openPatientSection(page, 'attenzione');
   const disclosure = page.locator('#patient-insight'); await disclosure.locator(':scope > div > [data-disclosure-control]').click();
   const controls = await selectOrdinaryChatGpt(disclosure);
   remote.arm(); await disclosure.getByRole('button', { name: 'Genera proposta' }).click();
@@ -262,7 +262,7 @@ for (const operation of ['status', 'settings'] as const) test(`ordinary ChatGPT 
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   await setAiLaneKillSwitch(page, 'aiPatientInsightKillSwitch', 'enabled');
   const patientId = await createPatient(page, `CancelRecovery${operation}`);
-  await page.goto(`/patients/${patientId}/modules`); await openPatientSection(page, 'attenzione');
+  await openUnlockedDocument(page, `/patients/${patientId}/modules`); await openPatientSection(page, 'attenzione');
   const disclosure = page.locator('#patient-insight'); await disclosure.locator(':scope > div > [data-disclosure-control]').click();
   const controls = await selectOrdinaryChatGpt(disclosure);
   remote.arm(); await disclosure.getByRole('button', { name: 'Genera proposta', exact: true }).click();
@@ -295,7 +295,7 @@ test('ordinary ChatGPT CA refusal exposes only the closed reason in Dettagli bef
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   await setAiLaneKillSwitch(page, 'aiPatientInsightKillSwitch', 'enabled');
   const patientId = await createPatient(page, 'CaDenied');
-  await page.goto(`/patients/${patientId}/modules#quadro`); await openPatientSection(page, 'attenzione');
+  await openUnlockedDocument(page, `/patients/${patientId}/modules#quadro`); await openPatientSection(page, 'attenzione');
   const disclosure = page.locator('#patient-insight'); await disclosure.locator(':scope > div > [data-disclosure-control]').click();
   const controls = await selectOrdinaryChatGpt(disclosure);
   await page.route('**/api/ai/patient-insight/preview', route => route.fulfill({ status: 503, contentType: 'application/json',

@@ -4,29 +4,34 @@ import { expect, test } from '@playwright/test';
 import { createConceptPatient } from './fixtures/concept-patient';
 import { availablePreview, MODEL_OPTION_ID, PATIENT_INSIGHT_CATALOG } from './fixtures/patient-insight-preview';
 import { parsePatientInsightPreviewRequest } from '../lib/ai-providers/fabric/patient-insight-preview-contract';
-import { assertNoHorizontalOverflow, bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch } from './utils';
+import { openSyntheticPatient, unlockSyntheticSheet } from './fixtures/synthetic-sheet';
+import { assertNoHorizontalOverflow, openPatientSection, setAiLaneKillSwitch } from './utils';
 
-test('Scheda desktop del concept con identità, tre colonne e ritorno alle sezioni', async ({ page }) => {
+test('Scheda desktop del concept con identità, tre colonne e ritorno alle sezioni', async ({ page, baseURL }) => {
     test.setTimeout(120_000);
     await page.setViewportSize({ width: 1320, height: 880 });
-    await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234', { displayName: 'Dott. Sintetico', ambulatoryName: 'Ambulatorio di prova' });
+    const fixture = await unlockSyntheticSheet(page, baseURL);
     await setAiLaneKillSwitch(page, 'aiPatientInsightKillSwitch', 'enabled');
     await page.route('**/api/settings/ai/functions', route => route.fulfill({ json: PATIENT_INSIGHT_CATALOG }));
     await page.route('**/api/ai/patient-insight/preview', route => {
         const request = parsePatientInsightPreviewRequest(route.request().postDataJSON());
         if (!request) throw new Error('Richiesta di anteprima non valida.');
+        const events = request.sources.recentEvents.map(event => event.summary).join('\n');
+        expect(events).toContain('Peso 70,2 kg');
+        expect(events).toContain('Peso 71,4 kg');
+        expect(events).toContain('Potassio 5,6. Sospeso spironolattone. Ricontrollo elettroliti tra 7 giorni.');
         const result = availablePreview(request);
         Object.assign(result.preview.proposal, {
             summary: '',
             alerts: ['Iperkaliemia lieve con IRC 3a. Spironolattone già sospeso.'],
-            currentState: ['Peso aumentato di 1,2 kg in 8 giorni.'],
+            currentState: ['Peso aumentato di 1,2 kg, da 70,2 a 71,4 kg.'],
             nextSteps: ['Ricontrollo degli elettroliti concordato nella telefonata.'],
             gaps: [],
         });
         return route.fulfill({ json: result });
     });
-    const id = await createConceptPatient(page);
-    await page.goto(`/patients/${id}/modules`);
+    const { id, taxCode } = await createConceptPatient(fixture);
+    await openSyntheticPatient(page, taxCode, 'Sintetica Bianca', id);
     const record = page.getByTestId('lume-scheda-surface');
     await expect(record.getByText('Scompenso cardiaco').first()).toBeVisible();
     await page.getByRole('link', { name: 'Nuova voce', exact: true }).click();
@@ -97,7 +102,7 @@ test('Scheda desktop del concept con identità, tre colonne e ritorno alle sezio
     await openPatientSection(page, 'quadro');
     await expect(proposal).toContainText('Proposta · non registrata');
     await expect(proposal).toContainText('Iperkaliemia lieve con IRC 3a');
-    await expect(proposal).toContainText('1,2 kg in 8 giorni');
+    await expect(proposal).toContainText('1,2 kg, da 70,2 a 71,4 kg');
     await expect(proposal).toContainText('Ricontrollo degli elettroliti');
     await expect(proposal.getByRole('link', { name: 'Diario', exact: true })).toHaveAttribute('href', `/patients/${id}/modules#diario`);
     await expect(page.locator('[data-record-tray="contesto"] > div').first()).toHaveCSS('border-top-style', 'dashed');
@@ -122,6 +127,11 @@ test('Scheda desktop del concept con identità, tre colonne e ritorno alle sezio
     await page.getByRole('link', { name: 'Torna alla bozza', exact: true }).click();
     await expect(editor).toHaveText(draft);
     await page.getByRole('link', { name: 'Chiudi la voce', exact: true }).click();
+    const tabs = page.getByRole('navigation', { name: 'Cartelle aperte' });
+    await tabs.getByRole('link', { name: 'Pazienti', exact: true }).click();
+    await expect(page.getByRole('option', { name: /^Sintetica Bianca/u })).toBeFocused();
+    await tabs.getByRole('link', { name: /^Sintetica Bianca/u }).click();
+    await expect(page).toHaveURL(new RegExp(`/patients/${id}/modules$`));
     await page.getByRole('link', { name: 'Cerca pazienti', exact: true }).click();
     await expect(page.getByRole('searchbox', { name: 'Cerca nella lista pazienti' })).toBeFocused();
 });

@@ -1,5 +1,5 @@
 import {expect,test} from '@playwright/test';
-import {bootstrapUnlockedSession,openPatientSection} from './utils';
+import { bootstrapUnlockedSession, openPatientSection, openUnlockedDocument } from './utils';
 
 for (const width of [1440, 390]) for (const theme of ['giorno', 'grafite']) test(`patient header opens prescriptions, exposes its actions and hands priority to a form ${theme} ${width}`,async({page})=>{
  await page.setViewportSize({width,height:960});
@@ -9,7 +9,7 @@ for (const width of [1440, 390]) for (const theme of ['giorno', 'grafite']) test
   if(!response.ok)throw new Error(`fixture: ${response.status}`);
   return (await response.json()).id as string;
  });
- await page.goto(`/patients/${id}/modules`);
+ await openUnlockedDocument(page, `/patients/${id}/modules`);
  await page.evaluate(theme=>{document.documentElement.classList.toggle('dark',theme==='grafite');document.documentElement.classList.toggle('light',theme==='giorno');},theme);
  const header=page.getByTestId('lume-scheda-header');
  const checkPanel=async(name:string)=>{

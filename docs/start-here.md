@@ -15,13 +15,9 @@ Il [manuale](./MANUALE.md) descrive l'uso; il
 
 ## La versione disponibile
 
-La [0.9.0](https://github.com/Wulfgardr/mediflow/releases/tag/v0.9.0) è
-pubblicata come codice sorgente per l'applicazione Web locale e l'accesso
-per agenti (Headless), con Node 24. App native e installer firmati non sono
-inclusi. I profili supportati e le condizioni di avvio sono nel
-[README del tag](https://github.com/Wulfgardr/mediflow/blob/v0.9.0/README.md#provalo) e nelle note della release.
-Le prove su dati sintetici non autorizzano l'uso clinico: l'ammissione
-spetta al professionista o all'organizzazione responsabile.
+La nota dell’ultima release indica i sistemi provati, i file da scaricare e come verificare l’installazione. Per avviare il Web dai sorgenti, usa Git per scaricare il tag indicato e seleziona Node 24. [Ultima release](https://github.com/Wulfgardr/mediflow/releases/latest) · [Avvio dai sorgenti](../README.md#provalo)
+
+Il collaudo usa dati sintetici. Per l’uso clinico, il professionista o l’organizzazione responsabile valuta l’installazione e i flussi di lavoro.
 
 Lo [stato del sistema](./STATE_OF_THE_SYSTEM.md) descrive l'implementazione;
 il [CHANGELOG](../CHANGELOG.md) distingue la versione pubblicata dalle

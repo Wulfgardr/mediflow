@@ -1,10 +1,10 @@
 import { expect, test } from '@playwright/test';
 import { completeOnboardingIfNeeded, unlockIfNeeded, assertNoHorizontalOverflow } from './utils';
-import { trustedArchiveWebRequestHeaders, trustedWebRequestHeaders, fetchInterceptedRequest } from './fixtures/trusted-web-request';
+import { documentRequests, trustedWebRequestHeaders, fetchInterceptedRequest } from './fixtures/trusted-web-request';
 
 const endpoint = '/api/onboarding/work-profile';
 
-test('onboarding: persisted preview, resume, changed recommendation, manual entry, conflict and rollback', async ({ page, context, request, browser, baseURL }) => {
+test('onboarding: persisted preview, resume, changed recommendation, manual entry, conflict and rollback', async ({ page, request, browser, baseURL }) => {
     test.setTimeout(150_000);
     const pageErrors: string[] = [];
     const consoleErrors: { text: string; url: string }[] = [];
@@ -18,7 +18,7 @@ test('onboarding: persisted preview, resume, changed recommendation, manual entr
         if (!['127.0.0.1', 'localhost'].includes(new URL(request.url()).hostname)) remoteRequests.push(request.url());
     });
     const read = async () => {
-        const response = await context.request.get(endpoint);
+        const response = await documentRequests(page).get(endpoint);
         expect(response.ok()).toBeTruthy();
         return response.json();
     };
@@ -30,7 +30,6 @@ test('onboarding: persisted preview, resume, changed recommendation, manual entr
     await expect(page).toHaveTitle(/MediFlow/);
     await completeOnboardingIfNeeded(page, process.env.E2E_PIN || '1234');
     await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
-    const archiveHeaders = await trustedArchiveWebRequestHeaders(page);
     const panel = page.getByTestId('work-profile-onboarding');
     await expect(panel.getByRole('heading', { name: 'Il tuo modo di lavorare' })).toBeVisible();
     await expect(panel).toHaveAttribute('aria-busy', 'false');
@@ -39,8 +38,8 @@ test('onboarding: persisted preview, resume, changed recommendation, manual entr
         await panel.getByRole('button', { name: 'Scarta la bozza' }).click();
         await expect(panel.getByRole('group', { name: 'Quale attività vuoi organizzare?' })).toBeVisible();
     }
-    expect((await context.request.post('/api/settings', { headers: trustedWebRequestHeaders(page.url()), data: { key: 'onboarding.workProfile', value: 'synthetic' } })).status()).toBe(403);
-    expect((await context.request.put('/api/settings/onboarding.workProfile', { headers: trustedWebRequestHeaders(page.url()), data: { value: 'synthetic' } })).status()).toBe(403);
+    expect((await documentRequests(page).post('/api/settings', { data: { key: 'onboarding.workProfile', value: 'synthetic' } })).status()).toBe(403);
+    expect((await documentRequests(page).put('/api/settings/onboarding.workProfile', { data: { value: 'synthetic' } })).status()).toBe(403);
 
     await panel.getByRole('radio', { name: 'Consultare e compilare cartelle' }).check();
     await panel.getByRole('button', { name: 'Salva e continua' }).click();
@@ -73,6 +72,7 @@ test('onboarding: persisted preview, resume, changed recommendation, manual entr
     await page.setViewportSize({ width: 1440, height: 960 });
 
     await page.goto('/settings/profilo');
+    await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
     await page.getByRole('button', { name: 'Il tuo modo di lavorare', exact: true }).click();
     await expect(panel.getByText(/Profilo salvato:/)).toContainText('Entrambi');
     const sibling = await browser.newPage();
@@ -94,10 +94,12 @@ test('onboarding: persisted preview, resume, changed recommendation, manual entr
     await panel.getByRole('button', { name: 'Conferma profilo di lavoro' }).click();
     await expect(panel.getByText(/Profilo salvato:/)).toContainText('Interactive');
     await page.goto('/');
+    await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
     await expect(page.getByRole('heading', { name: /^Pazienti$/u, level: 1 })).toBeVisible();
     await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true }).getByRole('link', { name: 'Pazienti', exact: true })).toHaveAttribute('aria-current', 'page');
     await expect(page.getByRole('searchbox', { name: 'Cerca nella lista pazienti' })).toBeVisible();
     await page.goto('/settings/profilo');
+    await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
     await page.getByRole('button', { name: 'Il tuo modo di lavorare', exact: true }).click();
     await panel.getByRole('button', { name: 'Ripristina la scelta precedente' }).click();
     expect((await read()).active.profile).toBe('interactive');
@@ -142,20 +144,26 @@ test('onboarding: persisted preview, resume, changed recommendation, manual entr
     await expect(panel.getByText(/Profilo salvato:/)).toContainText('Agent');
     expectedLostResponse = false;
     const current = await read();
-    const replay = await context.request.put(endpoint, { headers: archiveHeaders, data: current.lastCommand });
+    const replay = await documentRequests(page).put(endpoint, { data: current.lastCommand });
     expect(await replay.json()).toEqual(current);
     await panel.getByRole('link', { name: 'Apri la cartella manualmente' }).click();
     await expect(page).toHaveURL(/[?&]area=incarico/);
     await page.goto('/');
+    await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
     await expect(page.getByRole('heading', { name: /Stato operativo/, level: 1 })).toBeVisible();
     await expect(page.getByRole('complementary', { name: 'MediFlow', exact: true }).getByRole('link', { name: 'Impostazioni', exact: true })).toHaveAttribute('aria-current', 'page');
     await page.goto('/settings/profilo');
+    await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
     await page.getByRole('button', { name: 'Il tuo modo di lavorare', exact: true }).click();
     await expect(panel.getByText(/Profilo salvato:/)).toContainText('Agent');
     await page.screenshot({ path: test.info().outputPath('saved-profile.png'), fullPage: true });
     expect(pageErrors).toEqual([]);
     await test.info().attach('console-diagnostics.json', { body: JSON.stringify(consoleErrors, null, 2), contentType: 'application/json' });
-    expect(consoleErrors.filter(({ text, url }) => !(url.endsWith('/api/auth/lock') && text.includes('409 (Conflict)')))).toEqual([]);
+    const deliberateDenials = ['/api/settings', '/api/settings/onboarding.workProfile'];
+    expect(consoleErrors.filter(({ text, url }) => {
+        if (url.endsWith('/api/auth/lock') && text.includes('409 (Conflict)')) return false;
+        return !(text.includes('403 (Forbidden)') && deliberateDenials.some(path => url === new URL(path, page.url()).href));
+    })).toEqual([]);
     expect(remoteRequests).toEqual([]);
     await expect(page.locator('nextjs-error-overlay')).toHaveCount(0);
 });

@@ -1,8 +1,8 @@
 import { expect, test, type Locator } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
-import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow, assertNotClippedInViewport } from './utils';
-import { fetchInterceptedRequest } from './fixtures/trusted-web-request';
+import { openUnlockedDocument, bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow, assertNotClippedInViewport } from './utils';
+import { documentRequests, fetchInterceptedRequest } from './fixtures/trusted-web-request';
 import { sealDiaryEntry } from './fixtures/sealed-diary-entry';
 
 const PROSE = 'Racconto clinico sintetico W15a: il testo originale resta leggibile, con enfasi e riferimenti conservati.';
@@ -40,7 +40,7 @@ test('Diario paziente: prosa, provenienza e storico senza cambiare Scale o Timel
             }
             return { patientId, entryId: ids[0], scaleId: ids[3] };
         }, { patientId: parent.patientId, bodies: diaryEntries });
-        await page.goto(`/patients/${fixture.patientId}/modules`); await openPatientSection(page, 'diario');
+        await openUnlockedDocument(page, `/patients/${fixture.patientId}/modules`); await openPatientSection(page, 'diario');
         const pane = page.locator('#diario'), feed = pane.getByRole('feed', { name: 'Diario clinico del paziente', exact: true });
         await expect(feed.locator(':scope > article')).toHaveCount(3);
         const row = feed.locator(':scope > article').filter({ hasText: PROSE });
@@ -133,7 +133,7 @@ test('Diario paziente: prosa, provenienza e storico senza cambiare Scale o Timel
         const readback = await page.evaluate(async patientId => (await fetch(`/api/entries?patientId=${patientId}&includeDeleted=true`)).json(), fixture.patientId);
         expect(readback).toHaveLength(4); expect(readback.find((item: { id: string }) => item.id === fixture.entryId)).toMatchObject({ version: 3, deletedAt: null });
         const emptyPatientId = await page.evaluate(async () => { const response = await fetch('/api/patients', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ firstName: 'Diario vuoto', lastName: 'Sintetico', taxCode: `E15${crypto.randomUUID().replaceAll('-', '').slice(0,13)}`, birthDate: '1980-01-01', diagnoses: [] }) }); if (!response.ok) throw new Error(String(response.status)); return (await response.json()).id; });
-        await page.goto(`/patients/${emptyPatientId}/modules`); await openPatientSection(page, 'diario');
+        await openUnlockedDocument(page, `/patients/${emptyPatientId}/modules`); await openPatientSection(page, 'diario');
         const empty = page.locator('#diario').getByText('Nessuna voce visibile nel diario clinico.', { exact: true }); await expect(empty).toBeVisible(); await capture('vuoto', empty);
         expect(errors).toEqual([]);
         await test.info().attach('diary-surface-and-readback.json', { contentType: 'application/json', body: JSON.stringify({ baseline, zoomMechanism: 'chrome.tabs.setZoom/getZoom', surfaces, fixture, readback }) });
@@ -162,7 +162,7 @@ test('Diario paziente distingue metadata object/JSON, assenti, illeggibili e sta
         await route.fulfill({ response, json: rows.map((row: { id: string }) => row.id === fixture.entryId ? { ...row, metadata } : row) });
     });
     const row = page.locator('#diario article').filter({ hasText: 'Testo originale della stessa voce W15a.' });
-    const read = async () => { await page.goto(`/patients/${fixture.patientId}/modules`); await openPatientSection(page, 'diario'); await expect(row).toBeVisible(); };
+    const read = async () => { await openUnlockedDocument(page, `/patients/${fixture.patientId}/modules`); await openPatientSection(page, 'diario'); await expect(row).toBeVisible(); };
     await read(); await expect(row).toContainText('Ada Sintetica'); await expect(row).toContainText('Fonte inventata coerente'); await expect(row).toContainText('Firmata');
     const objectPresentation = await row.innerText();
     metadata = JSON.stringify(fixture.metadata); await read(); expect(await row.innerText()).toBe(objectPresentation);
@@ -173,7 +173,8 @@ test('Diario paziente distingue metadata object/JSON, assenti, illeggibili e sta
     }
     metadata = { ...fixture.metadata, workflowStatus: 'future-unrecognized-state' }; await read(); await expect(row).toContainText('Stato non riconosciuto'); await expect(row).toContainText('Ada Sintetica'); await expect(row.locator('[data-ink]')).toHaveCount(0);
     metadata = null; await read(); await expect(row).toContainText('Registrata'); await expect(row).not.toContainText('Metadati della voce non leggibili.'); await expect(row).not.toContainText('Autore:');
-    const response = await page.request.get(`/api/entries?patientId=${fixture.patientId}`); const stored = await response.json();
+    await page.unroute('**/api/entries?*');
+    const response = await documentRequests(page).get(`/api/entries?patientId=${fixture.patientId}`); const stored = await response.json();
     expect(stored[0]).toMatchObject({ id: fixture.entryId, version: 1 }); expect(stored[0].metadata).toMatch(/^ENC:/u);
 });
 
@@ -207,12 +208,12 @@ test('registrazione del diario: autore server, orario di creazione e storico sen
         return { patientId: patient.id as string, entryId: entry.id as string, author: expected as string,
             timestamp: `il ${at.toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })} alle ${at.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}` };
     }, registrationBody);
-    const read = async () => { await page.goto(`/patients/${fixture.patientId}/modules`); await openPatientSection(page, 'diario'); };
+    const read = async () => { await openUnlockedDocument(page, `/patients/${fixture.patientId}/modules`); await openPatientSection(page, 'diario'); };
     await read();
     const row = page.locator('#diario article').filter({ hasText: 'Prova della registrazione sintetica.' });
     await expect(row.locator('[data-ink="dry"]')).toHaveText(`Registrata da ${fixture.author} ${fixture.timestamp}`);
     await expect(row.locator('[data-ink="dry"] .lume-point')).toBeVisible();
-    await page.goto('/?area=diario');
+    await openUnlockedDocument(page, '/?area=diario');
     await expect(page.getByTestId('lume-diario-entry').filter({ hasText: 'Registrazione sintetica con autore' }).locator('[data-ink="dry"]')).toHaveText(`Registrata da ${fixture.author} ${fixture.timestamp}`);
     await page.route('**/api/entries?*', async route => {
         if (new URL(route.request().url()).searchParams.get('patientId') !== fixture.patientId) return route.continue();
@@ -236,7 +237,7 @@ test('Luogo mostra entrambe le etichette intere nella scheda a 1440 e 390', asyn
     });
     for (const width of [1440, 390]) {
         await page.setViewportSize({ width, height: 960 });
-        await page.goto(`/patients/${patientId}/modules?voce=nuova`);
+        await openUnlockedDocument(page, `/patients/${patientId}/modules?voce=nuova`);
         const select = page.getByRole('combobox', { name: 'Luogo della voce clinica' });
         await expect(select).toBeVisible();
         await page.evaluate(() => document.fonts.ready);

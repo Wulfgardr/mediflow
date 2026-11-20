@@ -1,10 +1,10 @@
 import { test, expect } from './fixtures/isolated-runtime';
-import { bootstrapUnlockedSession } from './utils';
-import { trustedArchiveWebRequestHeaders, fetchInterceptedRequest } from './fixtures/trusted-web-request';
-import { spawn } from 'node:child_process';
+import { unlockIfNeeded, bootstrapUnlockedSession } from './utils';
+import { documentRequests, fetchInterceptedRequest } from './fixtures/trusted-web-request';
+import { sealDiaryEntry } from './fixtures/sealed-diary-entry';
+import { execFileSync, spawn } from 'node:child_process';
 import path from 'node:path';
 import type { Page } from '@playwright/test';
-import { sealDiaryEntry } from './fixtures/sealed-diary-entry';
 
 test.use({ pluginLocalUiRuntime: true });
 
@@ -19,6 +19,7 @@ async function patient(page: Page, suffix: string) {
 
 async function openFolder(page: Page, id: string) {
   await page.goto(`/patients/${id}/modules`);
+  await unlockIfNeeded(page, '1234');
   await expect(page.getByTestId('patient-profile-notes')).not.toContainText('Lettura delle note in corso…');
   await expect.poll(() => page.evaluate(() => performance.getEntriesByType('resource').some(entry => entry.name.includes('/api/patient-profile/selection-epoch')))).toBe(true);
 }
@@ -34,9 +35,13 @@ async function pair(page: Page, runtime: { offerPairing(): { nonce: string; host
 const confirmation = (page: Page) => page.getByRole('button', { name: 'Apri sulla cartella aperta', exact: true });
 
 test('history exposes content and source locally, confirmation is consumed and cancellation clears it', async ({ page, isolatedRuntime }, info) => {
+  execFileSync(process.execPath, ['scripts/prepare-e2e-db.mjs'], {
+    cwd: path.resolve(__dirname, '..'), timeout: 30_000,
+    env: { ...process.env, MEDIFLOW_DATA_DIR: isolatedRuntime.dataDirectory, E2E_PIN: '1234' },
+  });
   await bootstrapUnlockedSession(page, '1234');
   const p = await patient(page, 'fonte');
-  const response = await page.request.post('/api/entries', { headers: await trustedArchiveWebRequestHeaders(page), data: await sealDiaryEntry(page, { patientId: p.id, type: 'visit', title: 'Controllo inventato',
+  const response = await documentRequests(page).post('/api/entries', { data: await sealDiaryEntry(page, { patientId: p.id, type: 'visit', title: 'Controllo inventato',
     date: '2026-10-29T10:00:00Z', content: '<p>Contenuto sintetico della storia.</p>', setting: 'ambulatory', metadata: { sourceLabel: 'Fonte sintetica verificabile' } }) });
   expect(response.status()).toBe(201);
   await openFolder(page, p.id);
@@ -59,7 +64,7 @@ test('history exposes content and source locally, confirmation is consumed and c
   await expect(confirmation(page)).toBeVisible();
   isolatedRuntime.cancelNavigation();
   await expect(confirmation(page)).toHaveCount(0);
-  expect(await page.request.get(`/api/entries?patientId=${p.id}`).then(r => r.json())).toHaveLength(1);
+  expect(await documentRequests(page).get(`/api/entries?patientId=${p.id}`).then(r => r.json())).toHaveLength(1);
 });
 
 test('patient change retires the old confirmation, revocation and lock deny subsequent requests', async ({ page, isolatedRuntime }) => {

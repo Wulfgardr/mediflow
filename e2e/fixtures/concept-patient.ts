@@ -1,31 +1,8 @@
 import Database from 'better-sqlite3';
-import { join } from 'node:path';
-import type { Page } from '@playwright/test';
-import { encryptData } from '../../lib/security/security';
+import type { unlockSyntheticSheet } from './synthetic-sheet';
 
-export async function createConceptPatient(page: Page, taxCode = 'SNTBNC47H52Z000K') {
-    const archive = process.env.MEDIFLOW_DATA_DIR;
-    const host = new URL(page.url());
-    if (!archive || process.env.MF085_SYNTHETIC_E2E !== '1' || host.hostname !== '127.0.0.1' || !host.port || host.port === '3000') {
-        throw new Error('La cartella dimostrativa richiede un archivio sintetico isolato.');
-    }
-    const jwk = await page.evaluate(() => {
-        const session = JSON.parse(sessionStorage.getItem('mediflow_session_key') ?? 'null');
-        if (!session) throw new Error('Sbloccare la sessione sintetica.');
-        return (session.jwk ?? session) as JsonWebKey;
-    });
-    const key = await crypto.subtle.importKey('jwk', jwk, { name: 'AES-GCM' }, false, ['encrypt']);
-    async function seal(value: unknown) {
-        const { iv, data } = await encryptData(value, key);
-        return `ENC:${iv}:${data}`;
-    }
-    async function post(entity: string, body: Record<string, unknown>) {
-        return page.evaluate(async ({ entity, body }) => {
-            const response = await fetch(`/api/${entity}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-            if (!response.ok) throw new Error(`Cartella dimostrativa, ${entity}: ${response.status}`);
-            return (await response.json() as { id: string }).id;
-        }, { entity, body });
-    }
+export async function createConceptPatient({ archivePath, post, seal }: Awaited<ReturnType<typeof unlockSyntheticSheet>>) {
+    const taxCode = 'SNTBNC47H52Z000K';
     const stamp = (days: number, hour = 12) => {
         const date = new Date();
         date.setDate(date.getDate() - days);
@@ -77,7 +54,7 @@ export async function createConceptPatient(page: Page, taxCode = 'SNTBNC47H52Z00
             measures.push({ id, day });
         }
     }
-    const db = new Database(join(archive, 'medical.db'), { fileMustExist: true });
+    const db = new Database(archivePath, { fileMustExist: true });
     const at = (day: number, hour?: number) => stamp(day, hour).getTime() / 1000;
     try {
         db.transaction(() => {
@@ -88,5 +65,5 @@ export async function createConceptPatient(page: Page, taxCode = 'SNTBNC47H52Z00
             for (const row of measures) db.prepare('UPDATE observations SET created_at=? WHERE id=? AND patient_id=?').run(at(row.day), row.id, patientId);
         })();
     } finally { db.close(); }
-    return patientId;
+    return { id: patientId, taxCode };
 }

@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const MANIFEST_PATH = 'docs/capability-mapping/fabric-generative-runtime-crosswalk.v1.json';
+const EXPECTED_RELEASE = '0.9.1';
 const EXPECTED_IDS = Object.freeze([
   'patient_insight',
   'smart_import',
@@ -131,8 +132,8 @@ function validateHistoricalArtifacts(manifest, sources) {
 function validateRepositoryWiring(sources) {
   const packageJson = sources.json('package.json', 'package.json');
   const packageLock = sources.json('package-lock.json', 'package-lock.json');
-  if (packageJson.version !== '0.9.0' || packageLock.version !== '0.9.0'
-    || packageLock.packages?.['']?.version !== '0.9.0') fail('package version deve essere 0.9.0 in manifest e lockfile');
+  if (packageJson.version !== EXPECTED_RELEASE || packageLock.version !== EXPECTED_RELEASE
+    || packageLock.packages?.['']?.version !== EXPECTED_RELEASE) fail(`package version deve essere ${EXPECTED_RELEASE} in manifest e lockfile`);
   if (packageJson.scripts?.['check:fabric-generative-runtime-crosswalk'] !== 'node scripts/check-fabric-generative-runtime-crosswalk.mjs'
     || packageJson.scripts?.['test:fabric-generative-runtime-crosswalk'] !== 'node --test scripts/check-fabric-generative-runtime-crosswalk.test.mjs') fail('package scripts del crosswalk non cablati');
   const workflow = ensureFile(sources, '.github/workflows/openapi-contract-guard.yml', 'workflow guard');
@@ -205,7 +206,7 @@ export function validateFabricGenerativeRuntimeCrosswalk(manifest = loadFabricGe
   const sources = sourceAccess(overrides);
   exactKeys(manifest, TOP_LEVEL_KEYS, 'manifest');
   if (manifest.schema !== 'mediflow.ai.fabric-generative-runtime-crosswalk.v1'
-    || manifest.release !== '0.9.0'
+    || manifest.release !== EXPECTED_RELEASE
     || manifest.integrationStatus !== 'local_source_integrated'
     || manifest.applyPolicy !== 'none'
     || manifest.claimCeiling !== CLAIM_CEILING
@@ -214,7 +215,7 @@ export function validateFabricGenerativeRuntimeCrosswalk(manifest = loadFabricGe
   validateRepositoryWiring(sources);
 
   if (!Array.isArray(manifest.capabilities) || manifest.capabilities.length !== EXPECTED_IDS.length
-    || JSON.stringify(manifest.capabilities.map(({ id }) => id)) !== JSON.stringify(EXPECTED_IDS)) fail('roster capability deve contenere esattamente le cinque identità 0.9.0');
+    || JSON.stringify(manifest.capabilities.map(({ id }) => id)) !== JSON.stringify(EXPECTED_IDS)) fail('roster capability deve contenere le cinque identità previste');
   for (const row of manifest.capabilities) exactKeys(row, CAPABILITY_KEYS, `capability ${row?.id ?? '<unknown>'}`);
   if (manifest.capabilities.filter(({ disposition }) => disposition === 'proposal_only').length !== 3) fail('tre capability devono essere proposal_only');
 
@@ -234,7 +235,7 @@ export function validateFabricGenerativeRuntimeCrosswalk(manifest = loadFabricGe
     if (row.id === 'ocr' || row.id === 'treatment_reasoning') validateUnavailable(row, block, sources);
     else validateAvailableCapability(row, block, sources);
   });
-  return Object.freeze({ capabilities: 5, proposalOnly: 3, unavailable: 2, release: '0.9.0' });
+  return Object.freeze({ capabilities: 5, proposalOnly: 3, unavailable: 2, release: EXPECTED_RELEASE });
 }
 
 /** Capability-local proposal. The accepted generic v1 manifest is not widened. */

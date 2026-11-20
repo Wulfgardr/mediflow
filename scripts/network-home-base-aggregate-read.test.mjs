@@ -57,10 +57,10 @@ test('paired aggregate reads cover agenda, global diary, diagnoses opt-in, and c
 
         const login = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: PIN });
         assert.equal(login.response.status, 200);
-        const cookieHeader = login.cookieHeader;
+        assert.ok(login.webHeaders);
         const authenticatedPairedHeaders = {
             ...pairedHeaders(pairedClient),
-            Cookie: cookieHeader,
+            ...login.webHeaders,
         };
 
         const capabilities = await request('GET', '/api/v1/network/capabilities', {

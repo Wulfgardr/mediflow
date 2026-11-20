@@ -8,7 +8,7 @@ import { PDFDocument, StandardFonts } from 'pdf-lib';
 import Database from 'better-sqlite3';
 import { agentVisitPassphrase, agentVisitPin, createSyntheticAgentMandate } from './agent-visit-utils';
 import { agentApplicationSchema } from '../lib/agent-visit-application-contract';
-import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
+import { documentRequests } from './fixtures/trusted-web-request';
 
 const execute = promisify(execFile);
 const repository = path.resolve(__dirname, '..');
@@ -18,6 +18,10 @@ test.describe.configure({ retries: 0 });
 
 for (const reviewed of process.env.MEDIFLOW_VISIT_MAC_TRIAL ? [false] : [false, true]) test(reviewed ? 'the physician explicitly applies the verified clinical proposals after reading the original PDF' : 'a CLI paired for twelve hours deposits a visit and the unlocked tab files nothing before the physician’s gesture', async ({ page, isolatedRuntime }, info) => {
     test.setTimeout(150000);
+    await execute(process.execPath, ['scripts/prepare-e2e-db.mjs'], {
+        cwd: repository, timeout: 30000,
+        env: { ...process.env, MEDIFLOW_DATA_DIR: isolatedRuntime.dataDirectory, E2E_PIN: agentVisitPin },
+    });
     await createSyntheticAgentMandate(page);
     const credentials = info.outputPath('private-agent');
     mkdirSync(credentials, { mode: 0o700 });
@@ -110,7 +114,7 @@ for (const reviewed of process.env.MEDIFLOW_VISIT_MAC_TRIAL ? [false] : [false, 
         const endpoints = ['entries', 'attachments', 'therapies', 'service-prescriptions'];
         const result = [];
         for (const endpoint of endpoints) {
-            const response = await page.request.get('/api/' + endpoint + '?patientId=' + patient.id);
+            const response = await documentRequests(page).get('/api/' + endpoint + '?patientId=' + patient.id);
             expect(response.status()).toBe(200);
             const rows = await response.json();
             result.push(rows.filter((row: { patientId: string }) => row.patientId === patient.id).length);
@@ -122,7 +126,7 @@ for (const reviewed of process.env.MEDIFLOW_VISIT_MAC_TRIAL ? [false] : [false, 
     await expect(page.getByRole('region', { name: 'Visita ' + visitId })).toBeVisible({ timeout: 30000 });
     expect(await counts()).toEqual([0, 0, 0, 0]);
     expect(plainBodies).toEqual([]);
-    const patientAfter = await (await page.request.get('/api/patients/' + patient.id)).json();
+    const patientAfter = await (await documentRequests(page).get('/api/patients/' + patient.id)).json();
     expect(JSON.stringify(patientAfter.diagnoses ?? [])).not.toContain('E11.9');
     expect(JSON.stringify(patientAfter.exemptions ?? [])).not.toContain('013');
     const sealed = 'ENC:AAAA:AAAA';
@@ -201,7 +205,7 @@ for (const reviewed of process.env.MEDIFLOW_VISIT_MAC_TRIAL ? [false] : [false, 
                 expect(['policy:biometrics-or-companion', 'policy:account-password']).toContain(policy);
                 if (process.env.MEDIFLOW_VISIT_EXPECTED_POLICY) expect(policy).toBe('policy:' + process.env.MEDIFLOW_VISIT_EXPECTED_POLICY);
                 expect(metadata.counts).toBe(7);
-                const { appliedItemIds } = await (await page.request.get('/api/agent-mandates/incoming?visit=' + visitId)).json();
+                const { appliedItemIds } = await (await documentRequests(page).get('/api/agent-mandates/incoming?visit=' + visitId)).json();
                 expect(appliedItemIds).toHaveLength(7);
                 expect(appliedItemIds).toEqual(expect.arrayContaining(plan.items.map(item => item.id)));
                 const patientRow = database.prepare('SELECT diagnoses, exemptions, version FROM patients WHERE id=?').get(plan.patientId);
@@ -250,10 +254,10 @@ for (const reviewed of process.env.MEDIFLOW_VISIT_MAC_TRIAL ? [false] : [false, 
     await page.screenshot({ path: info.outputPath('visita-in-attesa-del-medico.png'), fullPage: true });
     await page.getByRole('heading', { name: 'Esenzione proposta', exact: true }).scrollIntoViewIfNeeded();
     await page.screenshot({ path: info.outputPath('diagnosi-esenzione-in-attesa.png'), fullPage: true });
-    const index = await (await page.request.get('/api/agent-mandates/incoming')).json();
+    const index = await (await documentRequests(page).get('/api/agent-mandates/incoming')).json();
     expect(index.visits).toContainEqual(expect.objectContaining({ id: visitId }));
     expect(JSON.stringify(index)).not.toContain('itemsCiphertext');
-    const incoming = await (await page.request.get('/api/agent-mandates/incoming?visit=' + visitId)).json();
+    const incoming = await (await documentRequests(page).get('/api/agent-mandates/incoming?visit=' + visitId)).json();
     expect(incoming.appliedItemIds).toEqual([]);
     const replay = await cli('riprendi', '--agente', access.agentRef, '--visita', visitId);
     expect(replay.visitId).toBe(visitId);
@@ -294,15 +298,13 @@ for (const reviewed of process.env.MEDIFLOW_VISIT_MAC_TRIAL ? [false] : [false, 
         expect(await counts()).toEqual([0, 0, 0, 0]);
         expect(plainBodies).toEqual([]);
         const batchOrder: string[] = [];
-        const archiveHeaders = await trustedArchiveWebRequestHeaders(page);
         await page.route('**/api/agent-mandates/incoming', async route => {
             const request = route.request();
             if (request.method() === 'POST') {
                 const input = request.postDataJSON();
                 batchOrder.push(input.visitId);
                 if (input.visitId === concurrentId) {
-                    const update = await page.request.put('/api/patients/' + concurrentPatient.id, {
-                        headers: archiveHeaders,
+                    const update = await documentRequests(page).put('/api/patients/' + concurrentPatient.id, {
                         data: { version: input.expectedVersion, phone: '0000000000' },
                     });
                     expect(update.status()).toBe(200);
@@ -323,14 +325,14 @@ for (const reviewed of process.env.MEDIFLOW_VISIT_MAC_TRIAL ? [false] : [false, 
         await expect(secondVisit).toHaveCount(0);
         await expect(doubtfulVisit).toBeVisible();
         await expect(concurrentVisit).toBeVisible();
-        const concurrentReceipt = await (await page.request.get('/api/agent-mandates/incoming?visit=' + concurrentId)).json();
+        const concurrentReceipt = await (await documentRequests(page).get('/api/agent-mandates/incoming?visit=' + concurrentId)).json();
         expect(concurrentReceipt.appliedItemIds).toEqual([]);
-        const pendingIndex = await (await page.request.get('/api/agent-mandates/incoming')).json();
+        const pendingIndex = await (await documentRequests(page).get('/api/agent-mandates/incoming')).json();
         expect(pendingIndex.visits).not.toContainEqual(expect.objectContaining({ id: visitId }));
         expect(pendingIndex.visits).toContainEqual(expect.objectContaining({ id: doubtfulId }));
-        const applied = await (await page.request.get('/api/agent-mandates/incoming?visit=' + visitId)).json();
+        const applied = await (await documentRequests(page).get('/api/agent-mandates/incoming?visit=' + visitId)).json();
         expect(applied.appliedItemIds).toHaveLength(7);
-        const notApplied = await (await page.request.get('/api/agent-mandates/incoming?visit=' + doubtfulId)).json();
+        const notApplied = await (await documentRequests(page).get('/api/agent-mandates/incoming?visit=' + doubtfulId)).json();
         expect(notApplied.appliedItemIds).toEqual([]);
         await page.screenshot({ path: info.outputPath('proposte-applicate-dopo-conferma.png'), fullPage: true });
     }

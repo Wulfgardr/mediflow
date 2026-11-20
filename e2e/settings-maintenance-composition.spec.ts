@@ -1,7 +1,7 @@
 import { test, expect, type Page, type Locator } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
-import { bootstrapUnlockedSession, assertNoHorizontalOverflow } from './utils';
+import { openUnlockedDocument, unlockIfNeeded, bootstrapUnlockedSession, assertNoHorizontalOverflow } from './utils';
 async function installMaintenanceMocks(page: Page, baseURL: string) {
     const origin = new URL(baseURL).origin;
     if (new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).port === '3000')
@@ -104,7 +104,7 @@ test('Settings maintenance: scopes, canceled effects and uncertain reset', async
         if (!directory && captureDirectory) await page.addInitScript(() => localStorage.setItem('mediflow-theme', 'dark'));
         await bootstrapUnlockedSession(page, '1234');
         for (const route of ['ambulatories', 'sviluppo', 'zona-pericolo']) {
-            await page.goto('/settings/' + route);
+            await openUnlockedDocument(page, '/settings/' + route);
             const surface = page.getByTestId(route === 'ambulatories' ? 'settings-ambulatories-section' : route === 'sviluppo' ? 'settings-development-section' : 'settings-danger-zone-section');
             await expect(surface).toBeVisible();
             if (route === 'ambulatories')
@@ -131,7 +131,7 @@ test('Settings maintenance: scopes, canceled effects and uncertain reset', async
                 await page.setViewportSize({ width: 1440, height: 1000 });
             }
         }
-        await page.goto('/settings/ambulatories');
+        await openUnlockedDocument(page, '/settings/ambulatories');
         await expect(page.getByRole('treeitem')).toHaveCount(3);
         const testRow = page.getByRole('treeitem').filter({ has: page.getByRole('heading', { name: 'Ambulatorio Due inventato', exact: true }) });
         await cancel('clear-cancel', () => rowAction(testRow, 'Svuota ambiente di test'));
@@ -183,17 +183,17 @@ test('Settings maintenance: scopes, canceled effects and uncertain reset', async
         for (const status of [401, 403] as const) {
             f.state.readStatus = status;
             const deniedList = page.waitForResponse(response => new URL(response.url()).pathname === '/api/ambulatories' && response.status() === status);
-            await page.goto('/settings/ambulatories');
+            await openUnlockedDocument(page, '/settings/ambulatories');
             await deniedList;
             await expect(page.getByRole('heading', { name: 'Sblocca MediFlow', exact: true })).toBeVisible();
             await expect(page.getByText('Nessuna sede configurata.', { exact: true })).toHaveCount(0);
             f.state.readStatus = 200;
             await bootstrapUnlockedSession(page, '1234');
-            await page.goto('/settings/ambulatories');
+            await openUnlockedDocument(page, '/settings/ambulatories');
             await expect(page.getByRole('treeitem')).toHaveCount(5);
         }
         f.state.versionAbsent = true;
-        await page.goto('/settings/ambulatories');
+        await openUnlockedDocument(page, '/settings/ambulatories');
         await expect(testRow).toBeVisible();
         await name.fill('Bozza senza versione');
         const beforeMissingVersion = mutationCount();
@@ -208,23 +208,24 @@ test('Settings maintenance: scopes, canceled effects and uncertain reset', async
         await expect(testRow.getByRole('button', { name: 'Azioni', exact: true })).toBeEnabled();
         await expect(name).toHaveValue('Bozza senza versione');
         f.rows.splice(1);
-        await page.reload();
+        await page.reload(); await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
         await expect(page.getByText('1 sede configurata.', { exact: true })).toBeVisible();
         await expect(page.getByRole('combobox', { name: 'Sede superiore', exact: true })).toBeVisible();
         f.rows.splice(0);
         f.state.holdRead = new Promise<void>(resolve => releaseRead = resolve);
         await page.reload({ waitUntil: 'domcontentloaded' });
+        await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
         await expect(page.getByTestId('settings-ambulatories-section').getByRole('status')).toContainText('Caricamento sedi...');
         await expect(page.getByRole('button', { name: 'Aggiungi', exact: true })).toBeDisabled();
         releaseRead();
         await expect(page.getByText('Nessuna sede configurata.', { exact: true })).toBeVisible();
         await expect(page.getByText('0 sedi configurate.', { exact: true })).toBeVisible();
         f.state.readError = true;
-        await page.reload();
+        await page.reload(); await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
         await expect(page.getByTestId('settings-ambulatories-section').getByRole('alert')).toContainText('Impossibile leggere gli ambulatori.');
         await expect(page.getByText('Nessuna sede configurata.', { exact: true })).toHaveCount(0);
         await shot('list-read-denied', page.getByTestId('settings-ambulatories-section').getByRole('alert'));
-        await page.goto('/settings/sviluppo');
+        await openUnlockedDocument(page, '/settings/sviluppo');
         const seeder = page.getByTestId('settings-data-seeder'), toggle = seeder.getByRole('button', { name: 'Generatore di dati di test', exact: true });
         await toggle.focus();
         await toggle.press('Enter');
@@ -266,7 +267,7 @@ test('Settings maintenance: scopes, canceled effects and uncertain reset', async
         await native.click();
         await expect(page.getByText('Impossibile inviare la richiesta di apertura.', { exact: true })).toBeVisible();
         await shot('native-error', page.getByText('Impossibile inviare la richiesta di apertura.', { exact: true }));
-        await page.goto('/settings/zona-pericolo');
+        await openUnlockedDocument(page, '/settings/zona-pericolo');
         const field = page.getByTestId('danger-zone-confirm-input'), reset = page.getByTestId('danger-zone-reset-button');
         await expect(reset).toBeDisabled();
         await field.fill('RESET');
@@ -284,7 +285,7 @@ test('Settings maintenance: scopes, canceled effects and uncertain reset', async
         expect(mutationCount()).toBe(n);
         await expect(page.getByTestId('settings-danger-zone-section').getByRole('link', { name: 'Accesso', exact: true })).toHaveAttribute('href', '/settings/accesso');
         await shot('reset-commit-failed', page.getByTestId('settings-danger-zone-section').getByRole('alert'));
-        await page.reload();
+        await page.reload(); await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
         f.state.reset = 'abort';
         await field.fill('RESET');
         await reset.click();

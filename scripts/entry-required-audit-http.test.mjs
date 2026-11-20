@@ -60,12 +60,12 @@ test('real cookie Web and local token diary writes are audited; 4 MiB + 1 return
     assert.ok(ambulatory);
     const login = await loginWithWebAuthControl(baseUrl, { username, password: pin });
     assert.equal(login.response.status, 200);
-    assert.ok(login.cookieHeader);
+    assert.ok(login.webHeaders);
     for (const surface of ['web', 'v1']) {
         const patientId = randomUUID();
         const entryId = randomUUID();
         seedPatient(patientId, ambulatory.id);
-        const headers = surface === 'web' ? { Cookie: login.cookieHeader, 'x-mediflow-archive-generation': login.json.archiveGeneration } : { authorization: `Bearer ${token}` };
+        const headers = surface === 'web' ? { ...login.webHeaders } : { authorization: `Bearer ${token}` };
         const route = surface === 'web' ? '/api/entries' : `/api/v1/patients/${patientId}/entries`;
         const body = { id: entryId, ...(surface === 'web' ? { patientId } : {}), type: 'note',
             title: 'ENC:dGl0bGVpdg==:dGl0bGVjaXBoZXI=', content: 'ENC:Y29udGVudGl2:Y29udGVudGNpcGhlcg==',

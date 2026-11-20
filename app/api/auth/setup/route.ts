@@ -9,16 +9,15 @@ import { users, settings, ambulatories } from '@/lib/schema';
 import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcryptjs';
 import { hashAccessVerifier } from '@/lib/security/unlock-credential';
-import { SESSION_COOKIE_NAME } from '@/lib/security/server-session';
 import {
     abortWebAuthControl,
     beginWebAuthControl,
     issueWebAuthControl,
     setWebAuthControlEtag,
+    setWebAuthSessionLocator,
     webAuthControlMutationFromRequest,
     type WebAuthControlMutation,
 } from '@/lib/security/web-auth-control-transport';
-import { sessionCookieOptionsForRequest } from '@/lib/security/request-transport';
 import { authSetupSchema } from '@/lib/api-schemas/auth';
 import { parseApiBody } from '@/lib/api-schemas/parse';
 
@@ -38,7 +37,7 @@ export async function POST(request: Request) {
         if (!mutation) {
             return setupResponse({ error: 'Setup unavailable', code: 'SETUP_AUTH_UNAVAILABLE' }, 503);
         }
-        attempt = beginWebAuthControl('setup', mutation);
+        attempt = beginWebAuthControl('setup', mutation, request);
         if (!attempt) {
             return setupResponse({ error: 'Setup unavailable', code: 'SETUP_AUTH_UNAVAILABLE' }, 503, mutation.ifMatch);
         }
@@ -116,7 +115,7 @@ export async function POST(request: Request) {
             }, 409, mutation.ifMatch);
         }
         const response = NextResponse.json({ success: true, id: userId, archiveGeneration });
-        response.cookies.set(SESSION_COOKIE_NAME, session.sessionId, sessionCookieOptionsForRequest(request));
+        setWebAuthSessionLocator(response, request, session.sessionId);
         setWebAuthControlEtag(response, session.etag);
         return response;
     } catch (error) {

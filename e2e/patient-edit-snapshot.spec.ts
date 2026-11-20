@@ -1,6 +1,6 @@
 import { scopedNotesOpenInput, syntheticScopedNotesView } from './fixtures/scoped-profile-notes-query';
 import { expect, test, type Page } from '@playwright/test';
-import { bootstrapUnlockedSession } from './utils';
+import { openUnlockedDocument, bootstrapUnlockedSession } from './utils';
 
 test.describe.configure({ retries: 0 });
 test.beforeEach(async ({ baseURL }) => {
@@ -68,7 +68,7 @@ async function editorFixture(page: Page, failure: 'none' | 'once' | 'conflict' =
         }
         return route.fulfill({ status: 400, json: { error: 'Unexpected synthetic write' } });
     });
-    await page.goto(`/patients/${PATIENT_ID}/edit`);
+    await openUnlockedDocument(page, `/patients/${PATIENT_ID}/edit`);
     await expect(page.locator('input[name="firstName"]')).toHaveValue('Sintetico');
     return { writes, patientVersionsRead };
 }
@@ -151,7 +151,7 @@ test('confirmed reread updates page actions, but a later external change still r
         return route.fulfill({ json: { success: true } });
     });
 
-    await page.goto(`/patients/${PATIENT_ID}/edit`);
+    await openUnlockedDocument(page, `/patients/${PATIENT_ID}/edit`);
     await expect(page.locator('input[name="firstName"]')).toHaveValue('Apertura');
     await expect(page.getByTestId('lume-workspace-patient-label')).toContainText('Editor Apertura');
     await page.locator('input[name="firstName"]').fill('Bozza non salvata');

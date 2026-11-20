@@ -1,4 +1,4 @@
-import { syntheticLoopbackRequest as localRequest } from './loopback-ingress-test-fixture';
+import { syntheticWebClientRequest as localRequest } from './loopback-ingress-test-fixture';
 /* ADR 0155. Real SQLite, real paired admission and a real Web setup session;
    only the HTTP cookie adapter is synthetic, as in the currentness suites. */
 import assert from 'node:assert/strict';

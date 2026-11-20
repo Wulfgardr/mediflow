@@ -4,6 +4,8 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { hasRejectedIngressHost } from '@/lib/security/loopback-ingress.mjs';
 import { isTrustedWebMutationRequest } from '@/lib/security/request-transport';
 
+import { WEB_SESSION_PROOF_HEADER } from '@/lib/security/web-session-proof-header';
+
 const WEB_SESSION_COOKIE = 'mediflow_session';
 const WEB_CONTROL_COOKIE = 'mediflow_auth_control';
 
@@ -41,7 +43,7 @@ export function proxy(request: NextRequest): NextResponse {
         response.headers.set('Cache-Control', 'no-store');
         return response;
     }
-    if (!isMutationMethod(request.method) || !hasWebAuthorityCookies(request)) {
+    if (!isMutationMethod(request.method) || !(hasWebAuthorityCookies(request) || request.headers.has(WEB_SESSION_PROOF_HEADER))) {
         return NextResponse.next();
     }
     if (!isTrustedWebMutationRequest(request, false) || !hasAcceptedMutationContentType(request)) {

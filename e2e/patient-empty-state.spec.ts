@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
-import { bootstrapUnlockedSession } from './utils';
+import { openUnlockedDocument, bootstrapUnlockedSession } from './utils';
 import { installWorklistTodoFixture } from './fixtures/worklist-todo';
 
 for (const width of [1440, 1024, 768, 390]) for (const theme of ['light', 'dark']) {
@@ -11,7 +11,7 @@ for (const width of [1440, 1024, 768, 390]) for (const theme of ['light', 'dark'
     await page.addInitScript(theme => localStorage.setItem('mediflow-theme', theme), theme);
     const fixture = await installWorklistTodoFixture(page, baseURL!);
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-    await page.goto('/?area=incarico');
+    await openUnlockedDocument(page, '/?area=incarico');
     await page.addStyleTag({ content: 'nextjs-portal { display: none !important; }' });
     const search = page.getByRole('searchbox', { name: 'Cerca nella lista pazienti', exact: true });
     const list = page.getByTestId('lume-worklist');

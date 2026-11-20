@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { attribution, collectRecords, mergeHistory, codexBarFallback } from './collect-development-usage.mjs';
+import { attribution, collectRecords, mergeHistory, codexBarFallback, lastCompleteDay } from './collect-development-usage.mjs';
 const git = (cwd,...args) => execFileSync('git',['-C',cwd,...args], {stdio:'ignore'});
 function fixture(t) {
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'mf-usage-'));
@@ -63,6 +63,23 @@ test('CodexBar fallback verifies source directories and excludes overlapping raw
   const report=[{projects:[{sources:[source,{...source,path:'/foreign'}]}]}];
   assert.equal(codexBarFallback(report,[],cwd=>cwd==='/verified').reduce((n,r)=>n+r.tokens,0),10);
   assert.deepEqual(codexBarFallback(report,[{environment:'codex',date:'2026-11-01'}],()=>true),[]);
+});
+test('a new collection preserves already counted days after a checkout disappears', async t => {
+  const base = JSON.parse(fs.readFileSync(new URL('../docs/data/development-usage-2026-09-27.json', import.meta.url)));
+  const records = await sample(t);
+  const published = mergeHistory(base, records, '2026-11-06');
+  const laterRecord = { ...records[0], date: '2026-11-07' };
+  const latest = mergeHistory(published, [laterRecord], '2026-11-07');
+  for (const series of ['history', 'effort']) {
+    assert.deepEqual(latest[series].filter(row => row.date <= published.snapshotDate), published[series]);
+  }
+  assert.deepEqual(mergeHistory(latest, [laterRecord], '2026-11-07'), latest);
+  assert.throws(() => mergeHistory(latest, [], '2026-11-06'), /newer usage snapshot/);
+});
+test('counts close at the end of the last complete civil day in Rome', () => {
+  assert.equal(lastCompleteDay('2026-03-29T21:59:59Z'), '2026-03-28');
+  assert.equal(lastCompleteDay('2026-03-29T22:00:00Z'), '2026-03-29');
+  assert.equal(lastCompleteDay('2026-11-19T23:00:00Z'), '2026-11-19');
 });
 test('a foreign checkout nested inside a MediFlow worktree is excluded',t=>{
   const {repo}=fixture(t);const nested=path.join(repo,'vendor','unrelated');fs.mkdirSync(nested,{recursive:true});

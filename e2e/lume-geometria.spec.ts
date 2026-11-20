@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { bootstrapUnlockedSession } from './utils';
+import { openUnlockedDocument, bootstrapUnlockedSession } from './utils';
 
 const WEB_RADIUS_SCALE = [0, 10, 12, 16];
 const PATIENT_OVERVIEW_RADIUS_SCALE = [8, 14];
@@ -87,7 +87,7 @@ for (const viewport of VIEWPORTS) {
       ];
       const violations: string[] = [];
       for (const route of routes) {
-        await page.goto(route);
+        await openUnlockedDocument(page, route);
         await page.waitForLoadState('networkidle');
         await expect(page.locator('main').first()).toBeVisible();
         for (const item of await offScaleRadii(page)) violations.push(`${route} ${item}`);
@@ -100,7 +100,7 @@ for (const viewport of VIEWPORTS) {
 test('nuova scheda: è segnata solo la sezione corrente', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-  await page.goto('/patients/new');
+  await openUnlockedDocument(page, '/patients/new');
   const current = page.locator('a[href="#documento"]');
   const other = page.locator('a[href="#dati"]');
   await expect(current).toHaveAttribute('aria-current', 'location');

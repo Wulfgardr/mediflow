@@ -88,7 +88,7 @@ test('production registrations remain declared synchronous void callbacks', () =
 
 test('route delegates the exact cookie to the P3 application-lock service', () => {
     const route = readFileSync(new URL('../../app/api/auth/lock/route.ts', import.meta.url), 'utf8');
-    assert.match(route, /let cookie: unknown = null/u);
+    assert.match(route, /const sessionId = webAuthSessionIdFromRequest\(request\)/u);
     assert.match(route, /const mutation = webAuthControlMutationFromRequest\(request\)/u);
     assert.match(route, /completeExactWebP3ApplicationLock\(cookie, mutation, request\)/u);
     assert.doesNotMatch(route, /invalidateServerSessionForApplicationLock|evaluateApplicationLockAttempt|preserveApplicationLockReceipt/u);
@@ -96,18 +96,17 @@ test('route delegates the exact cookie to the P3 application-lock service', () =
     assert.doesNotMatch(route, /cookies\.(set|delete)|maxAge\s*:\s*0/u);
 });
 
-test('route turns a rejected cookie lookup into one inert P3 lock delegation', () => {
+test('route delegates a missing session locator without notifying the supervisor', () => {
     const routeUrl = pathToFileURL(new URL('../../app/api/auth/lock/route.ts', import.meta.url).pathname).href;
     const toDataModule = (source: string) => `data:text/javascript,${encodeURIComponent(source)}`;
     const program = `
         import { registerHooks } from 'node:module';
         const routeUrl = ${JSON.stringify(pathToFileURL(new URL('../../app/api/auth/lock/route.ts', import.meta.url).pathname).href)};
         const modules = new Map([
-            ['next/headers', ${JSON.stringify(toDataModule("export const cookies = () => Promise.reject(new Error('synthetic rejection'));"))}],
             ['@/lib/security/server-session', ${JSON.stringify(toDataModule("export const SESSION_COOKIE_NAME = 'mediflow_session';"))}],
-            ['@/lib/security/web-auth-control-transport', ${JSON.stringify(toDataModule("export function webAuthControlMutationFromRequest() { return Object.freeze({ controlId: 'synthetic-control', ifMatch: 'synthetic-etag', idempotencyKey: 'synthetic-key' }); }"))}],
+            ['@/lib/security/web-auth-control-transport', ${JSON.stringify(toDataModule("export function webAuthSessionIdFromRequest() { return null; } export function resolveWebAuthControlSession() { throw new Error('missing locator cannot resolve an active session'); } export function webAuthControlMutationFromRequest() { return Object.freeze({ controlId: 'synthetic-control', ifMatch: 'synthetic-etag', idempotencyKey: 'synthetic-key' }); }"))}],
             ['@/lib/security/web-auth-application-lock-server', ${JSON.stringify(toDataModule("export async function completeExactWebP3ApplicationLock(cookie, mutation) { globalThis.calls = (globalThis.calls ?? 0) + 1; globalThis.cookie = cookie; globalThis.mutation = mutation; return new Response(JSON.stringify({ schemaVersion: 'mediflow.application-lock-receipt.v1', state: 'server_invalidation_unconfirmed' }), { status: 409, headers: { 'Content-Type': 'application/json' } }); }"))}],
-            ['@/lib/security/portable-supervisor-web-lifecycle', ${JSON.stringify(toDataModule("export async function completePortableSupervisorWebLifecycleMutationV1(result, operation) { if (operation !== 'application_lock') throw new Error('wrong operation'); return result; }"))}],
+            ['@/lib/security/portable-supervisor-web-lifecycle', ${JSON.stringify(toDataModule("export async function completePortableSupervisorWebLifecycleMutationV1(result, operation) { throw new Error('missing locator cannot notify the supervisor'); }"))}],
         ]);
         registerHooks({ resolve(specifier, context, nextResolve) {
             if (context.parentURL === routeUrl && modules.has(specifier)) return { shortCircuit: true, url: modules.get(specifier), format: 'module' };
@@ -119,7 +118,7 @@ test('route turns a rejected cookie lookup into one inert P3 lock delegation', (
         const response = await POST(new Request('http://127.0.0.1/api/auth/lock', { method: 'POST' }));
         await new Promise((resolve) => setImmediate(resolve));
         const observed = { status: response.status, body: await response.json(), calls: globalThis.calls, cookie: globalThis.cookie, mutation: globalThis.mutation, unhandled };
-        const expected = { status: 409, body: { schemaVersion: 'mediflow.application-lock-receipt.v1', state: 'server_invalidation_unconfirmed' }, calls: 1, cookie: null, mutation: { controlId: 'synthetic-control', ifMatch: 'synthetic-etag', idempotencyKey: 'synthetic-key' }, unhandled: 0 };
+        const expected = { status: 409, body: { schemaVersion: 'mediflow.application-lock-receipt.v1', state: 'server_invalidation_unconfirmed' }, calls: 1, cookie: { name: 'mediflow_session', value: null }, mutation: { controlId: 'synthetic-control', ifMatch: 'synthetic-etag', idempotencyKey: 'synthetic-key' }, unhandled: 0 };
         if (JSON.stringify(observed) !== JSON.stringify(expected)) process.exitCode = 1;
     `;
     const child = spawnSync(process.execPath, ['--experimental-strip-types', '--input-type=module', '--eval', program], { encoding: 'utf8' });

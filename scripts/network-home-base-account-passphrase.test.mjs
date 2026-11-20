@@ -126,7 +126,7 @@ test('an account moves from its PIN to a passphrase, the PIN stops opening it, a
     const done = await recover();
     assert.deepEqual([done.response.status, done.json], [200, { success: true }]);
     assert.equal(done.response.headers.getSetCookie().some((cookie) => cookie.startsWith('mediflow_session=')), false);
-    const controlAfter = await request('GET', '/api/auth/check', { headers: { Cookie: done.controlCookie } });
+    const controlAfter = await request('GET', '/api/auth/check', { headers: done.controlHeaders });
     assert.equal(controlAfter.json.hasSession, false);
 
     for (const sessionHeaders of [still.webHeaders, afterRefusals.webHeaders]) {
@@ -147,13 +147,15 @@ function login(secret) { return loginWithWebAuthControl(BASE_URL, { username: US
 
 /** A request with no session that passes through the Web auth control, as the browser sends a login. */
 async function throughWebAuthControl(pathname, body, headers) {
-    const checked = await fetch(new URL('/api/auth/check', BASE_URL), { cache: 'no-store' });
+    const proofHeaders = { 'x-mediflow-local-client-instance': crypto.randomBytes(32).toString('hex') };
+    const checked = await fetch(new URL('/api/auth/check', BASE_URL), { cache: 'no-store', headers: proofHeaders });
     const controlCookie = /mediflow_auth_control=[^;,]+/u.exec(checked.headers.getSetCookie().join(','))?.[0];
     assert.ok(controlCookie, 'the check gives an auth control');
+    const controlHeaders = { ...proofHeaders, Cookie: controlCookie };
     const sent = await request('POST', pathname, {
-        headers: { Cookie: controlCookie, 'If-Match': checked.headers.get('etag'), 'Idempotency-Key': crypto.randomUUID(), ...headers }, body,
+        headers: { ...controlHeaders, 'If-Match': checked.headers.get('etag'), 'Idempotency-Key': crypto.randomUUID(), ...headers }, body,
     });
-    return { ...sent, controlCookie };
+    return { ...sent, controlHeaders };
 }
 
 async function request(method, pathname, { headers = {}, body } = {}) {

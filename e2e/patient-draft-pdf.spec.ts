@@ -2,7 +2,7 @@ import { mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { expect, test, type Locator } from '@playwright/test';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
-import { assertNoHorizontalOverflow, bootstrapUnlockedSession } from './utils';
+import { openUnlockedDocument, assertNoHorizontalOverflow, bootstrapUnlockedSession } from './utils';
 
 const cases = [
     { key: 'affollato', drug: 'Bisoprololo', admitted: '2,5 mg', discharged: '1,25 mg', textSize: 10,
@@ -87,7 +87,7 @@ for (const [fixture, width, height] of [
             if (request.method() === 'POST' && (pathname === '/api/entries' || pathname === '/api/attachments')) pendingWrites.push(pathname);
         });
 
-        await page.goto(`/?area=incarico&paziente=${patientId}`);
+        await openUnlockedDocument(page, `/?area=incarico&paziente=${patientId}`);
         const person = page.getByRole('option').filter({ hasText: name });
         await expect(person).toBeVisible();
         await person.press('Enter');

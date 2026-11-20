@@ -3,7 +3,7 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { diaryEntrySealer } from './fixtures/sealed-diary-entry';
-import { assertNoHorizontalOverflow, bootstrapUnlockedSession } from './utils';
+import { assertNoHorizontalOverflow, bootstrapUnlockedSession, openUnlockedDocument } from './utils';
 
 test.describe.configure({ retries: 0 });
 
@@ -128,7 +128,7 @@ test('isole del riepilogo: ritorno con variazioni, dettaglio, fonte e due temi',
     await page.setViewportSize({ width: 1320, height: 880 });
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
     const { patient } = await seedReturningPatient(page);
-    await page.goto(`/patients/${patient.id}/modules`);
+    await openUnlockedDocument(page, `/patients/${patient.id}/modules`);
     const changes = page.getByRole('region', { name: 'Variazioni dall’ultima visita', exact: true });
     await expect(changes).toContainText('Spironolattone 25 mg cpr');
     await expect(page.locator('#diario')).toContainText('sospeso spironolattone');
@@ -231,7 +231,7 @@ test('isole del riepilogo: archivio scarno senza variazioni resta leggibile', as
     await page.setViewportSize({ width: 1320, height: 880 });
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
     const { patient } = await seedReturningPatient(page, { sparse: true });
-    await page.goto(`/patients/${patient.id}/modules`);
+    await openUnlockedDocument(page, `/patients/${patient.id}/modules`);
     await expect(page.getByRole('table', { name: 'Terapie attive', exact: true })).toContainText('Amlodipina 5 mg cpr');
     await expect(page.locator('#quadro')).toContainText('nessuna variazione registrata');
     await expect(page.getByRole('region', { name: 'Variazioni dall’ultima visita', exact: true })).toHaveCount(0);
@@ -247,7 +247,7 @@ test('isole del riepilogo: la scrittura tiene il diario e le isole raggiungibili
     await page.setViewportSize({ width: 1320, height: 880 });
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
     const { patient } = await seedReturningPatient(page);
-    await page.goto(`/patients/${patient.id}/modules?voce=nuova`);
+    await openUnlockedDocument(page, `/patients/${patient.id}/modules?voce=nuova`);
     await expect(page.locator('#quadro[data-writing]')).toBeVisible();
     await expect(page.getByRole('region', { name: 'Variazioni dall’ultima visita', exact: true })).toContainText('Spironolattone 25 mg cpr');
     await assertNoHorizontalOverflow(page, [{ label: 'Scheda', selector: '#quadro' }]);

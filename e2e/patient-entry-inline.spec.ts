@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { bootstrapUnlockedSession } from './utils';
+import { openUnlockedDocument, bootstrapUnlockedSession } from './utils';
 import { fetchInterceptedRequest } from './fixtures/trusted-web-request';
 
 for (const width of [1440, 390]) test(`le allergie strutturate restano nella testata durante la scrittura inline a ${width}`, async ({ page }) => {
@@ -10,7 +10,7 @@ for (const width of [1440, 390]) test(`le allergie strutturate restano nella tes
     if (!response.ok) throw new Error(`Paziente sintetico: ${response.status}`);
     return response.json() as Promise<{ id: string }>;
   });
-  await page.goto(`/patients/${patient.id}/edit`);
+  await openUnlockedDocument(page, `/patients/${patient.id}/edit`);
   await page.getByRole('button', { name: 'Aggiungi allergia', exact: true }).click();
   await page.getByLabel('Sostanza *', { exact: true }).fill('Amoxicillina sintetica');
   await page.getByRole('button', { name: 'Aggiorna scheda', exact: true }).click();
@@ -18,9 +18,9 @@ for (const width of [1440, 390]) test(`le allergie strutturate restano nella tes
   const header = page.getByTestId('lume-scheda-header');
   const allergies = header.getByRole('list', { name: 'Allergie', exact: true });
   await expect(allergies.getByRole('listitem')).toHaveText('▲ Allergia: Amoxicillina sintetica');
-  await page.goto(`/patients/${patient.id}/entries/new`);
+  await openUnlockedDocument(page, `/patients/${patient.id}/entries/new`);
   await expect(page.getByTestId('progressive-entry-composer').getByRole('list', { name: 'Allergie', exact: true })).toContainText('Amoxicillina sintetica');
-  await page.goto(`/patients/${patient.id}/modules`);
+  await openUnlockedDocument(page, `/patients/${patient.id}/modules`);
   await header.getByRole('link', { name: 'Nuova voce', exact: true }).click();
   const editor = page.getByRole('textbox', { name: 'Resoconto clinico', exact: true });
   await editor.fill('Bozza sintetica con allergia strutturata visibile.');
@@ -50,7 +50,7 @@ test('la voce nella scheda conserva la bozza dopo un rifiuto e registra sul pazi
     if (!response.ok) throw new Error(`Paziente sintetico: ${response.status}`);
     return response.json() as Promise<{ id: string }>;
   });
-  await page.goto(`/patients/${patient.id}/modules#terapie`);
+  await openUnlockedDocument(page, `/patients/${patient.id}/modules#terapie`);
   await page.getByRole('link', { name: 'Nuova voce', exact: true }).click();
   const editor = page.getByRole('textbox', { name: 'Resoconto clinico', exact: true });
   await editor.fill('Resoconto sintetico scritto nella scheda.');
@@ -92,7 +92,7 @@ test('la voce inline dichiara il diario non leggibile senza perdere la bozza', a
     return response.json() as Promise<{ id: string }>;
   });
   await page.route('**/api/entries?**', route => route.fulfill({ status: 503, json: { error: 'Diario sintetico non leggibile' } }));
-  await page.goto(`/patients/${patient.id}/modules#diario`);
+  await openUnlockedDocument(page, `/patients/${patient.id}/modules#diario`);
   await page.getByRole('link', { name: 'Nuova voce', exact: true }).click();
   const editor = page.getByRole('textbox', { name: 'Resoconto clinico', exact: true });
   await editor.fill('Bozza sintetica conservata durante il guasto del diario.');
@@ -113,7 +113,7 @@ test('una risposta persa dopo la scrittura rilegge la stessa voce senza un secon
     if (!saved.ok) throw new Error(`Fixture ${saved.status}`);
     return (await saved.json()).id as string;
   });
-  await page.goto(`/patients/${id}/modules?voce=nuova`);
+  await openUnlockedDocument(page, `/patients/${id}/modules?voce=nuova`);
   await page.getByRole('textbox', { name: 'Resoconto clinico', exact: true }).fill('Voce sintetica con risposta persa.');
   let posts = 0;
   await page.route('**/api/entries', async route => {

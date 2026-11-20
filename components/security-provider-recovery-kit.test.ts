@@ -4,13 +4,6 @@ import { runInNewContext } from 'node:vm';
 import test from 'node:test';
 import ts from 'typescript';
 
-// Rischio #1 (censimento macchine a stati, 11/11): sulla LockScreen il recupero
-// con Recovery Kit apre RecoveryKitPanel (preparedKit). Senza sessione server
-// (hasSession === false, lo stato normale a schermo bloccato) la
-// riconciliazione ogni 15 s e su focus/visibilitychange chiama lock(), che
-// passa da clearClientAuthority() e azzera il kit preparato. Si estraggono le
-// tre funzioni reali dal componente e si esegue una riconciliazione mentre il
-// pannello è aperto.
 function extract() {
     const source = ts.createSourceFile('security-provider.tsx', readFileSync('components/security-provider.tsx', 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
     const found = new Map<string, string>();
@@ -56,12 +49,12 @@ test('una riconciliazione senza sessione server non chiude il Recovery Kit appen
 
 async function reconcileWithoutSession(options: { masterKey: unknown; receipts: number; prepared: boolean }) {
     let lockConfirmations = 0;
-    const state = { preparedKit: options.prepared ? {} as object | null : null };
+    const state = { masterKey: options.masterKey, preparedKit: options.prepared ? {} as object | null : null };
     const context = {
         console,
         preparedAccessRef: { current: options.prepared ? { generation: 1, commit: async () => ({ ok: true }) } as unknown : null },
         setPreparedKit: (value: object | null) => { state.preparedKit = value; },
-        clearSecuritySession: () => {}, setAgentRenewalFailed: () => {}, wrappingRef: { current: null }, setActiveMasterKey: () => {}, setUser: () => {},
+        clearSecuritySession: () => {}, setAgentRenewalFailed: () => {}, wrappingRef: { current: null }, setActiveMasterKey: (value: unknown) => { state.masterKey = value; }, setUser: () => {},
         setIsAuthenticated: () => {}, setIsLocked: () => {},
         authorityAttemptGenerationRef: { current: 1 }, lockReceiptGenerationRef: { current: options.receipts },
         updateAuthRecoveryState: () => {}, setAuthErrorMessage: () => {},
@@ -74,7 +67,7 @@ async function reconcileWithoutSession(options: { masterKey: unknown; receipts: 
     const { checkAuthStatus } = runInNewContext(ts.transpile(extract(), { target: ts.ScriptTarget.ESNext }), context) as
         { checkAuthStatus: (update: (required: boolean) => void) => Promise<void> };
     await checkAuthStatus(() => {});
-    return { lockConfirmations, preparedKit: state.preparedKit };
+    return { lockConfirmations, ...state };
 }
 
 test('una LockScreen con blocco già confermato non viene ribloccata a ogni riconciliazione', async () => {
@@ -83,10 +76,11 @@ test('una LockScreen con blocco già confermato non viene ribloccata a ogni rico
 
 test('senza sessione server una chiave in memoria si chiude comunque, anche con un kit preparato', async () => {
     const result = await reconcileWithoutSession({ masterKey: { synthetic: true }, receipts: 1, prepared: true });
-    assert.equal(result.lockConfirmations, 1);
+    assert.equal(result.lockConfirmations, 0);
+    assert.equal(result.masterKey, null);
     assert.equal(result.preparedKit, null);
 });
 
-test('al primo avvio senza ricevuta di blocco la riconciliazione blocca come prima', async () => {
-    assert.equal((await reconcileWithoutSession({ masterKey: null, receipts: 0, prepared: false })).lockConfirmations, 1);
+test('senza autorità locale la riconciliazione lascia disponibile l’accesso', async () => {
+    assert.equal((await reconcileWithoutSession({ masterKey: null, receipts: 0, prepared: false })).lockConfirmations, 0);
 });

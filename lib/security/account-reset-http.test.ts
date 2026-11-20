@@ -101,8 +101,9 @@ function testPhase(phase: AccountResetPhase) {
                     const auth = await loginWithWebAuthControl(base, credentials);
                     assert.equal(auth.response.status, 200, JSON.stringify(auth.json));
                     assert.ok(auth.webHeaders);
-                    assert.ok(auth.webHeaders.Cookie);
-                    const pending = fetch(base + '/api/auth/reset', { method: 'POST', headers: { Cookie: auth.webHeaders.Cookie, 'x-mediflow-archive-generation': auth.webHeaders['x-mediflow-archive-generation'],
+                    const { Cookie, ...webHeaders } = auth.webHeaders;
+                    assert.ok(Cookie);
+                    const pending = fetch(base + '/api/auth/reset', { method: 'POST', headers: { ...webHeaders, Cookie,
                         Origin: base, 'Sec-Fetch-Site': 'same-origin' }, signal: AbortSignal.timeout(120000) }).catch(() => null);
                     if (phase === 'copy-failed') {
                         const response = await pending; assert.equal(response?.status, 500);
