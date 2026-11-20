@@ -170,11 +170,14 @@ test('access and profile settings preserve form drafts and denied outcomes', asy
             await sibling.goto('/');
             await test.step('lock all tabs from the new tab and sign in', () => lockAllTabsAndSignIn(sibling, '1234'));
             await page.bringToFront();
-            await page.evaluate(() => window.dispatchEvent(new Event('focus')));
-            await expect(profile.getByRole('status')).toContainText('La sessione è cambiata');
-            await expect(save).toBeDisabled(); await keepDraft();
+            await expect(page.getByRole('heading', { name: 'Sblocca MediFlow', exact: true })).toBeVisible();
+            await expect(save).toHaveCount(0);
+            const readback = page.waitForResponse(response => new URL(response.url()).pathname === '/api/auth/profile'
+                && response.request().method() === 'GET');
+            await unlockIfNeeded(page, '1234');
+            expect((await readback).status()).toBe(200);
+            await expect(save).toBeEnabled(); await keepDraft();
         } finally { await sibling.close(); }
-        await page.getByRole('button', { name: 'Rileggi profilo mantenendo la bozza', exact: true }).click(); await expect(save).toBeEnabled();
         await save.click(); await expect(profile.getByRole('status')).toHaveText('Profilo aggiornato.');
         await back.click(); await expect(page).toHaveURL(new URL('/settings', baseURL!).href); await expect(page.getByRole('dialog')).toHaveCount(0);
         await page.getByRole('link', { name: 'Profilo', exact: true }).click(); await expect(name).toHaveValue('Bozza W19 inventata non salvata');

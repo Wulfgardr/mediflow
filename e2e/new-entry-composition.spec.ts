@@ -227,12 +227,14 @@ for (const status of [401, 403, 503, 200]) test(`Nuova voce: lettura precedente 
     const writes: string[] = [], errors: string[] = [];
     page.on('pageerror', error => errors.push(error.message));
     page.on('request', request => { if (request.method() === 'POST' && /\/api\/(entries|attachments)$/u.test(new URL(request.url()).pathname)) writes.push(request.url()); });
+    await openUnlockedDocument(page, `/?area=incarico&paziente=${patientId}`);
+    await page.getByRole('button', { name: 'Azioni paziente', exact: true }).click();
     await page.route('**/api/entries?**', route => {
         if (new URL(route.request().url()).searchParams.get('patientId') !== patientId) return route.continue();
         reads++;
         return route.fulfill({ status, json: status === 200 ? [] : { error: 'Lettura sintetica indisponibile' } });
     });
-    await openUnlockedDocument(page, `/patients/${patientId}/entries/new`);
+    await page.getByRole('menuitem', { name: 'Nuova voce', exact: true }).click();
     const history = page.getByRole('region', { name: 'Ultime voci registrate', exact: true });
     if (status === 401 || status === 403) {
         await expect(page.getByLabel('MediFlow lock screen')).toBeVisible();
