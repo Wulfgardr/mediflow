@@ -74,7 +74,7 @@ export async function openGpuiRenderer(build: string, output: string, revision: 
     return {
       identity: { revision, binarySHA256, surface, mode: surface === 'gpui-shell' ? 'Shell con archivio sintetico in memoria' : 'dimostrazione' },
       async drive(action: Action) {
-        if (action.op === 'resize') throw new Error('Resize non disponibile sul backend GPUI.');
+        if (action.op === 'resize' && surface !== 'gpui-shell') throw new Error('Resize non disponibile nella dimostrazione GPUI.');
         try {
           child.stdin.write(JSON.stringify(action) + '\n');
           return (await reply()).data;

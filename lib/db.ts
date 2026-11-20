@@ -62,7 +62,7 @@ export interface DocumentDiagnosisSuggestion {
 export interface DocumentInsight {
     id: string;
     attachmentId?: string;
-    date: Date;
+    date: Date | null;
     fileName: string;
     rawMarkdown: string;  // Immutable source text retained for historical compatibility
     summary: string;      // Historical review-only synthesis on locally extracted text
@@ -150,7 +150,7 @@ export interface Diagnosis {
     code: string;
     description: string;
     system: string;
-    date: Date;
+    date: Date | null;
     canonicalUri?: string;
     reference?: WhoReference;
 }

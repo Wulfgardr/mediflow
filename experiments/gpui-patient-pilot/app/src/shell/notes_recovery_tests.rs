@@ -40,10 +40,10 @@ pub(super) struct Host {
 }
 impl Host {
     pub(super) fn new() -> Self {
-        Self::with_diary(json!([]))
+        Self::with_diary_and_documents(json!([]), json!([]))
     }
 
-    pub(super) fn with_diary(diary: Value) -> Self {
+    pub(super) fn with_diary_and_documents(diary: Value, documents: Value) -> Self {
         let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
         let socket = listener.local_addr().unwrap();
         let requests = Arc::new(Mutex::new(Vec::new()));
@@ -66,9 +66,20 @@ impl Host {
             std::collections::VecDeque::<PlannedResponse>::new(),
         ));
         let planned = responses.clone();
+        let documents = documents.as_array().unwrap().clone();
+        let listed_documents = documents
+            .iter()
+            .cloned()
+            .map(|mut row| {
+                row.as_object_mut().unwrap().remove("data");
+                row
+            })
+            .collect::<Vec<_>>();
         let worker = thread::spawn(move || {
             let mut workers = Vec::new();
             let diary = Arc::new(diary);
+            let documents = Arc::new(documents);
+            let listed_documents = Arc::new(listed_documents);
             loop {
                 let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
                 if stopping.load(Ordering::Acquire) {
@@ -78,6 +89,8 @@ impl Host {
                 let shared = shared.clone();
                 let planned = planned.clone();
                 let diary = diary.clone();
+                let documents = documents.clone();
+                let listed_documents = listed_documents.clone();
                 workers.push(thread::spawn(move || {
                 stream
                     .set_read_timeout(Some(Duration::from_secs(10)))
@@ -154,6 +167,14 @@ impl Host {
                 }
                 "GET /api/v1/network/patients" => json!([]),
                 "GET /api/v1/network/patients/patient-a/entries" => diary.as_ref().clone(),
+                "GET /api/v1/network/patients/patient-a/attachments" => json!(listed_documents.as_ref()),
+                value if value.starts_with("GET /api/v1/network/patients/patient-a/attachments/") && !documents.is_empty() => {
+                    let id = value.rsplit('/').next().unwrap();
+                    documents.iter().find(|document| document["id"] == id).cloned().unwrap_or_else(|| {
+                        status = 404;
+                        json!({"code":"NOT_FOUND"})
+                    })
+                },
                 value if value.starts_with("GET /api/v1/network/checkups?") => json!([]),
                 "POST /api/auth/native/logout" => json!({"success":true}),
                 value if value.starts_with("GET /api/v1/network/patients/") => json!([]),

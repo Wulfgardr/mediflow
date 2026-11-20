@@ -143,6 +143,7 @@ jobs:
             [ -n "$f" ] || continue
             case "$f" in
               native/*) apple=true; continue ;;
+              scripts/ci-install-xcodegen.sh) apple=true; continue ;;
               scripts/installability-v0-macos.test.mjs | scripts/build-installability-v0-macos.sh | scripts/installability-v0-macos-launcher.sh) apple=true; continue ;;
               scripts/swift-test-selection.mjs | scripts/local-test-selection.mjs | scripts/local-test-recipes.json) apple=true; continue ;;
               scripts/macos-native-artifact.py | scripts/macos-native-artifact_test.py | scripts/build-apple-macos-app.sh) apple=true; continue ;;
@@ -213,7 +214,7 @@ jobs:
           xcodebuild -version
           xcodebuild -showsdks | grep -iE 'ios |macos ' || true
       - name: Install xcodegen
-        run: brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
+        run: bash scripts/ci-install-xcodegen.sh
       - name: Generate project + guards (structure + entitlements)
         run: scripts/generate-apple-xcodeproj.sh
       - name: Committed Xcode project matches project.yml
@@ -317,7 +318,7 @@ jobs:
       - name: Select latest stable Xcode
         run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
       - name: Install xcodegen
-        run: brew list xcodegen >/dev/null 2>&1 || brew install xcodegen
+        run: bash scripts/ci-install-xcodegen.sh
       - name: Generate project
         run: scripts/generate-apple-xcodeproj.sh
       - name: Pick an available ${{ matrix.idiom }} simulator

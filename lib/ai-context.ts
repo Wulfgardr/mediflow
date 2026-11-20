@@ -5,6 +5,7 @@ import {
     getAIInsightRuntimeSettings,
 } from '@/lib/ai-insight-settings';
 import { renderDocumentEvidencePackContext } from '@/lib/domain/documents/document-evidence-pack';
+import { compareClinicalDatesDesc as compareDatesDesc, parseClinicalDate } from './clinical-date';
 import { parsePatientDatedRecords } from '@/lib/patient-structured-fields';
 import { dedupeDocumentInsightsForContext } from '@/lib/domain/documents/document-insight-context';
 import { normalizeDocumentInput } from '@/lib/domain/documents/document-input-normalization';
@@ -193,10 +194,7 @@ function canAttemptAttachmentTextRecovery(attachment: Attachment): boolean {
 }
 
 function formatDate(value: unknown): string {
-    if (!value) return '';
-    const parsed = value instanceof Date ? value : new Date(value as string | number);
-    if (Number.isNaN(parsed.getTime())) return '';
-    return parsed.toLocaleDateString('it-IT');
+    return parseClinicalDate(value)?.toLocaleDateString('it-IT') ?? '';
 }
 
 function formatVersionTimestamp(value: unknown): string {
@@ -205,11 +203,6 @@ function formatVersionTimestamp(value: unknown): string {
     return Number.isNaN(parsed.getTime()) ? '' : parsed.toISOString();
 }
 
-function compareDatesDesc(left: unknown, right: unknown): number {
-    const leftTime = new Date(left as string | number | Date).getTime();
-    const rightTime = new Date(right as string | number | Date).getTime();
-    return rightTime - leftTime;
-}
 function buildDocumentSourceLabel(fileName: string, date: unknown): string {
     const formattedDate = formatDate(date);
     if (fileName && formattedDate) return `${fileName} (${formattedDate})`;
@@ -279,9 +272,9 @@ function shouldSuppressStaleDocumentCandidate(
 ): boolean {
     if (!sharesDocumentDomain(candidate, selected)) return false;
 
-    const selectedTime = new Date(selected.documentDate as string | number | Date).getTime();
-    const candidateTime = new Date(candidate.documentDate as string | number | Date).getTime();
-    if (!Number.isFinite(selectedTime) || !Number.isFinite(candidateTime) || selectedTime <= candidateTime) {
+    const selectedTime = parseClinicalDate(selected.documentDate)?.getTime();
+    const candidateTime = parseClinicalDate(candidate.documentDate)?.getTime();
+    if (selectedTime === undefined || candidateTime === undefined || selectedTime <= candidateTime) {
         return false;
     }
 
@@ -790,7 +783,7 @@ export async function buildPatientInsightContext(
         .map((diagnosis) => {
             const when = formatDate(diagnosis.date);
             const detail = `${diagnosis.system || 'ICD'} ${diagnosis.code}: ${compactText(diagnosis.description, 140)}`;
-            return `- ${when ? `${detail} (${when})` : detail}`;
+            return `- ${when ? `${detail} (registrata il ${when})` : detail}`;
         });
 
     const therapyLines = therapies

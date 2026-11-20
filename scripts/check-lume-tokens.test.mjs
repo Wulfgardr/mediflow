@@ -40,7 +40,7 @@ test('WCAG primitives match known reference values', () => {
 test('committed token source passes the whole contract', () => {
   const result = evaluateContract(loadTokens());
   assert.equal(result.pass, true);
-  assert.equal(result.checks.length, 90); 
+  assert.equal(result.checks.length, 134);
   assert.ok(result.checks.every((c) => c.ratio >= c.minRatio));
   const bind = result.checks.find(
     (c) => c.register === 'giorno' && c.label === 'ink.muted on surface.chrome',
@@ -105,13 +105,15 @@ test('parseCssBlocks strips comments and reads namespaced + alias declarations',
 test('committed CSS mirror matches the committed token source', () => {
   const summary = verifyCssMirror(loadTokens(), loadCssMirror());
   assert.equal(summary.tokens, expectedMirror(loadTokens()).size);
-  assert.equal(summary.tokens, 64);
+  assert.equal(summary.tokens, 100);
   assert.equal(summary.aliases, ACTIVE_ALIASES.length);
 });
 
 test('a drifted mirror value fails closed', () => {
   const css = loadCssMirror().replace('--lume-giorno-surface-canvas: #e8eaee;', '--lume-giorno-surface-canvas: #ffffff;');
   assert.throws(() => verifyCssMirror(loadTokens(), css), /mirror drift: --lume-giorno-surface-canvas/);
+  const elevatedRail = loadCssMirror().replace('--lume-grafite-record-rail: #16191d;', '--lume-grafite-record-rail: #1f2228;');
+  assert.throws(() => verifyCssMirror(loadTokens(), elevatedRail), /mirror drift: --lume-grafite-record-rail/);
   assert.throws(() => verifyCssMirror(loadTokens(), `${css}\n:root { --lume-giorno-surface-canvas: #e8eaee }`), /duplicate token/);
 });
 
