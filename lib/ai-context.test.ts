@@ -2060,3 +2060,25 @@ test('resolver: distributed candidate budget exhaustion never becomes structured
         restore();
     }
 });
+
+test('archived summaries without valid dates cannot displace dated sources in the Quadro context', async () => {
+    const archived = [
+        { id: 'undated', fileName: 'undated-synthetic.pdf', summary: 'Sintesi sintetica senza data.' },
+        { id: 'invalid', fileName: 'invalid-synthetic.pdf', summary: 'Sintesi sintetica con data impossibile.', date: '2025-02-29' },
+        ...[1, 2, 3].map(day => ({
+            id: `dated-${day}`, fileName: `dated-synthetic-${day}.pdf`,
+            summary: `Esame sintetico ${day}`, date: `2021-02-0${day}`,
+        })),
+    ];
+    const restore = await withHarness({ documentInsights: JSON.stringify(archived), attachments: [] });
+    try {
+        const { buildPatientInsightContext } = await import('./ai-context');
+        const snapshot = await buildPatientInsightContext('patient-1');
+        const documents = snapshot.sourceRefs.filter(ref => ref.section === 'Documenti recenti');
+        assert.deepEqual(documents.map(ref => ref.promptLine?.match(/dated-synthetic-\d\.pdf/)?.[0]),
+            ['dated-synthetic-3.pdf', 'dated-synthetic-2.pdf', 'dated-synthetic-1.pdf']);
+        assert.match(snapshot.prompt, /Ipertensione essenziale \(registrata il 10\/02\/2025\)/);
+    } finally {
+        restore();
+    }
+});

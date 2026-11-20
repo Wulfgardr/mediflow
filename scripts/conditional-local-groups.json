@@ -28,8 +28,8 @@
       ],
       "artifacts": [
         "native/contracts/clinical-rich-text-fixtures.v1.json",
-        "native/contracts/fhir-golden-input.v1.json",
-        "native/contracts/fhir-golden-bundle.v1.json"
+        "tmp-fhir-web-reference/input.json",
+        "tmp-fhir-web-reference/bundle.json"
       ]
     },
     "research-toolchain": {

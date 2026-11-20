@@ -1,8 +1,9 @@
+import { parsePatientDatedRecords } from './patient-structured-fields';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { scaleInterpretationVersionLabel } from './scale-history';
 import { clinicalRichTextToPlainText } from './clinical-rich-text';
-import type { Patient, ClinicalEntry, Therapy, Observation } from './db';
+import type { Patient, Diagnosis, ClinicalEntry, Therapy, Observation } from './db';
 
 // Extending jsPDF type to include lastAutoTable (added by autotable plugin)
 export interface JsPDFWithAutoTable extends jsPDF {
@@ -89,27 +90,10 @@ export const generatePatientReport = (
         currentY += 12;
     };
 
-    const formatDate = (value: Date | string | undefined) => {
+    const formatDate = (value: Date | string | null | undefined) => {
         if (!value) return 'N/D';
         const date = value instanceof Date ? value : new Date(value);
         return Number.isNaN(date.getTime()) ? 'N/D' : date.toLocaleDateString('it-IT');
-    };
-
-    const parseDiagnoses = (value: unknown) => {
-        if (Array.isArray(value)) {
-            return value;
-        }
-
-        if (typeof value !== 'string' || value.trim().length === 0) {
-            return [];
-        }
-
-        try {
-            const parsed = JSON.parse(value);
-            return Array.isArray(parsed) ? parsed : [];
-        } catch {
-            return [];
-        }
     };
 
     doc.setFontSize(10);
@@ -171,7 +155,7 @@ export const generatePatientReport = (
     }
 
     // --- ICD DIAGNOSES ---
-    const diagnoses = parseDiagnoses(patient.diagnoses);
+    const diagnoses = parsePatientDatedRecords<Diagnosis>(patient.diagnoses);
 
     startSection("Diagnosi ICD", 28);
 
@@ -185,7 +169,7 @@ export const generatePatientReport = (
 
         autoTable(doc, {
             startY: currentY + 4,
-            head: [['Sistema', 'Codice', 'Descrizione', 'Data']],
+            head: [['Sistema', 'Codice', 'Descrizione', 'Registrata il']],
             body: diagnosisData,
             theme: 'striped',
             headStyles: { fillColor: COLORS.secondary, fontStyle: 'bold' },

@@ -107,7 +107,7 @@ test('ordinary unchanged save through real patientSchema emits zero writes despi
     const parsed = patientSchema.parse(session.getDefaultValues());
     assert.deepEqual(Object.keys(parsed.diagnoses[0]), ['code', 'description', 'system', 'date']);
     assert.ok(parsed.diagnoses[0].date instanceof Date);
-    assert.equal(parsed.diagnoses[0].date.toISOString(), '2020-01-02T12:34:56.789Z');
+    assert.equal(parsed.diagnoses[0].date?.toISOString(), '2020-01-02T12:34:56.789Z');
     assert.deepEqual(await session.submit(parsed, memory.port, newId), { status: 'complete', confirmed: 0, total: 0 });
     assert.deepEqual(memory.calls, []);
 });
@@ -129,7 +129,7 @@ for (const date of [new Date('2020-01-02T12:34:56.789Z'), '2020-01-02T14:34:56.7
         const session = new PatientEditSession(fixture()); const memory = recorder();
         const values = session.getDefaultValues(); const row = values.diagnoses[0];
         const parsed = patientSchema.parse({ ...values, diagnoses: [{ date, description: row.description, code: row.code, system: row.system }] });
-        assert.equal(parsed.diagnoses[0].date.toISOString(), '2020-01-02T12:34:56.789Z');
+        assert.equal(parsed.diagnoses[0].date?.toISOString(), '2020-01-02T12:34:56.789Z');
         assert.deepEqual(await session.submit(parsed, memory.port, newId), { status: 'complete', confirmed: 0, total: 0 });
         assert.deepEqual(memory.calls, []);
     });
@@ -182,4 +182,16 @@ test('real patientSchema opaque-row edit is reported before writes, without losi
     const before = structuredClone(parsed);
     await assert.rejects(session.submit(parsed, memory.port, newId), /metadati non gestiti/);
     assert.deepEqual(memory.calls, []); assert.equal(session.locked, false); assert.deepEqual(parsed, before);
+});
+
+test('reopening and saving a legacy undated diagnosis leaves the archive field untouched', async () => {
+    const record = fixture();
+    const original = { ...record.diagnoses![0], date: undefined };
+    const reread = revivePatientStructuredFields({ ...record, diagnoses: JSON.stringify([original]) }) as unknown as PatientEditRecord;
+    const memory = recorder();
+    const session = new PatientEditSession(reread);
+    const submitted = patientSchema.parse({ ...session.getDefaultValues(), firstName: 'Updated' });
+    assert.equal(submitted.diagnoses[0].date, null);
+    assert.equal((await session.submit(submitted, memory.port, newId)).status, 'complete');
+    assert.deepEqual(memory.calls, [{ kind: 'patient', id: reread.id, changes: { version: 3, firstName: 'Updated' } }]);
 });
