@@ -127,8 +127,29 @@ done:
     return code ? 126 : exit_code;
 }
 
+static BOOL valid_profile(const wchar_t *name) {
+    const wchar_t prefix[] = L"MediFlow.Document.";
+    size_t prefix_length = sizeof(prefix) / sizeof(prefix[0]) - 1;
+    return wcslen(name) == prefix_length + 32
+        && wcsncmp(name, prefix, prefix_length) == 0
+        && wcsspn(name + prefix_length, L"0123456789abcdef") == 32;
+}
+
+static BOOL delete_profile(const wchar_t *name) {
+    HRESULT result;
+    for (int attempt = 0; attempt < 8; attempt++) {
+        if (attempt) Sleep(100);
+        result = DeleteAppContainerProfile(name);
+        if (SUCCEEDED(result)) return TRUE;
+    }
+    fwprintf(stderr, L"Windows document sandbox: profile cleanup (0x%08lx)\n", (unsigned long)result);
+    return FALSE;
+}
+
 int wmain(int argc, wchar_t **argv) {
-    if (argc != 5) return 126;
+    if (argc == 3 && wcscmp(argv[1], L"--delete-profile") == 0)
+        return valid_profile(argv[2]) && delete_profile(argv[2]) ? 0 : 126;
+    if (argc != 5 || !valid_profile(argv[1])) return 126;
     PSID sid = NULL;
     HRESULT result = CreateAppContainerProfile(argv[1], L"MediFlow document worker", L"Local PDF and AnyDoc processing", NULL, 0, &sid);
     if (FAILED(result) || !sid) {
@@ -137,9 +158,6 @@ int wmain(int argc, wchar_t **argv) {
     }
     DWORD code = launch(argv[2], argv[3], argv[4], sid);
     FreeSid(sid);
-    if (FAILED(DeleteAppContainerProfile(argv[1]))) {
-        fwprintf(stderr, L"Windows document sandbox: profile cleanup\n");
-        return 126;
-    }
+    if (!delete_profile(argv[1])) return 126;
     return code <= 255 ? (int)code : 126;
 }

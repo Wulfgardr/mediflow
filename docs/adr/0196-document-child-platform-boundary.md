@@ -40,7 +40,10 @@ la preparazione o la verifica rende indisponibile l'elaborazione.
 Il contenitore riceve in lettura ed esecuzione una copia temporanea di Node e
 degli asset necessari al worker. Il PDF e la risposta transitano attraverso
 le sole pipe standard. Il Job Object termina il worker se il bootstrap
-termina prima di lui.
+termina prima di lui. Il bootstrap cancella il proprio profilo quando il worker
+termina. Quando si chiude il bootstrap, il processo padre ritenta la pulizia
+dello stesso profilo. La pulizia vale anche per un annullamento e può essere
+ripetuta.
 Il bootstrap verifica che il token del figlio sospeso abbia il SID atteso e
 zero capacità. Node conserva i permessi applicativi e il guard JavaScript.
 Il launcher prepara una copia fisica degli asset documentali. Il renderer usa

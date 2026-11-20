@@ -171,7 +171,7 @@ async function runWorker(bytes: Buffer): Promise<WorkerResult> {
             diagnosticBytes += chunk.byteLength;
             if (diagnosticBytes > MAX_DIAGNOSTIC_BYTES) stop('resourceLimit');
         });
-        child.once('error', () => finish({ signal: 'io' }));
+        child.on('error', () => { forcedSignal ??= 'io'; });
         child.once('close', (code) => {
             if (forcedSignal) return finish({ signal: forcedSignal });
             if (code === 21) {

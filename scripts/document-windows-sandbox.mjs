@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -37,19 +38,29 @@ function quoteWindowsArgument(value) {
   return '"' + value.replace(/(\\*)"/gu, '$1$1\\"').replace(/\\+$/u, '$&$&') + '"';
 }
 
-export function stageWindowsDocumentChild(root) {
+export function stageWindowsDocumentChild(root, env) {
   const command = path.join(root, bootstrap);
   if (process.arch !== 'x64' || !fs.existsSync(command) || !physicalEntry(command) || !fs.statSync(command).isFile()
-      || createHash('sha256').update(fs.readFileSync(command)).digest('hex') !== '5c724a330e2ab1e7d601af362a89490cb39794a043adb6f0a7f24a62bff08117') {
+      || createHash('sha256').update(fs.readFileSync(command)).digest('hex') !== '8f103266ab99c957cd0b228160b5bc3ac0d0bb97a785e36edde58c6ae31a68d0') {
     throw new Error('Windows document sandbox unavailable.');
   }
   const temp = fs.realpathSync.native(os.tmpdir());
   const stage = fs.mkdtempSync(path.join(temp, 'mediflow-document-'));
+  const profile = 'MediFlow.Document.' + randomUUID().replaceAll('-', '');
+  let profileMayExist = false;
   const cleanup = () => {
+    let stageRemoved = false;
     try {
       fs.rmSync(stage, { recursive: true, force: true, maxRetries: 8, retryDelay: 200 });
-      return true;
-    } catch { return false; }
+      stageRemoved = true;
+    } catch {}
+    if (profileMayExist) {
+      const removal = spawnSync(command, ['--delete-profile', profile], {
+        env, stdio: 'ignore', windowsHide: true, timeout: 5000,
+      });
+      profileMayExist = removal.error !== undefined || removal.status !== 0;
+    }
+    return stageRemoved && !profileMayExist;
   };
   const node = path.join(stage, 'node.exe');
   try {
@@ -69,14 +80,15 @@ export function stageWindowsDocumentChild(root) {
     cleanup();
     throw error;
   }
-  const profile = 'MediFlow.Document.' + randomUUID().replaceAll('-', '');
   return {
     root: stage,
-    cleanup,
-    launch: nodeArgs => ({
-      command,
-      args: [profile, stage, node, [node, ...nodeArgs].map(quoteWindowsArgument).join(' ')],
-      cleanup,
-    }),
+    launch: nodeArgs => {
+      profileMayExist = true;
+      return {
+        command,
+        args: [profile, stage, node, [node, ...nodeArgs].map(quoteWindowsArgument).join(' ')],
+        cleanup,
+      };
+    },
   };
 }

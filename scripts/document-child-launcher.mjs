@@ -15,7 +15,8 @@ export function documentChildLaunch(root, script, { allowAddons = false, args = 
   if (process.platform === 'win32' && (!localAppData || !path.isAbsolute(localAppData))) {
     throw new Error('Windows document sandbox requires LOCALAPPDATA.');
   }
-  const windows = process.platform === 'win32' ? stageWindowsDocumentChild(root) : undefined;
+  const windowsEnv = { ...env, LOCALAPPDATA: localAppData };
+  const windows = process.platform === 'win32' ? stageWindowsDocumentChild(root, windowsEnv) : undefined;
   const workerRoot = windows?.root ?? root;
   const worker = windows && path.isAbsolute(script) ? path.join(workerRoot, path.relative(root, script)) : script;
   const nodeArgs = [`--max-old-space-size=${DOCUMENT_CHILD_HEAP_MB}`,
@@ -24,7 +25,7 @@ export function documentChildLaunch(root, script, { allowAddons = false, args = 
     '--permission', ...(networkGuard ? ['--import', pathToFileURL(path.join(workerRoot, 'scripts/document-child-network-guard.mjs')).href] : []),
     '--disable-warning=SecurityWarning', `--allow-fs-read=${workerRoot}`,
     ...(allowAddons ? ['--allow-addons'] : []), worker, ...args];
-  if (windows) return { ...windows.launch(nodeArgs), env: { ...env, LOCALAPPDATA: localAppData } };
+  if (windows) return { ...windows.launch(nodeArgs), env: windowsEnv };
   const executable = process.execPath;
   if (process.platform === 'darwin') {
     const profile = '(version 1) (allow default) (deny network*) (deny file-write*) (deny process-fork)';
