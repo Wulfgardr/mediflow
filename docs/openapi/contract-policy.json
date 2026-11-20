@@ -608,6 +608,11 @@
       "change": "PUT /api/v1/network/prosthetic-prescriptions/{id} response 412.code changed",
       "trackingIssue": "ADR-0177",
       "reason": "ADR 0177, seconda consegna del 3/11/2026, OpenAPI 1.54.0: fuori dalla Lombardia il prerequisito diventa un prontuario caricato con fonte dichiarata. Senza prontuario ritorna 412 PROSTHETICS_CATALOG_REQUIRED al posto del precedente 403 territoriale; nessuna scrittura o audit. Con Lombardia resta invariata la registrazione manuale. I client precedenti continuano a ricevere un errore con code ed error; payload e codici di conflitto della selezione restano invariati."
+    },
+    {
+      "change": "PUT /api/v1/network/patients/{id}/entries/{entryId} response 409.oneOf[1].code changed",
+      "trackingIssue": "WUL-912",
+      "reason": "The existing entry version conflict payload and SCALE_PATIENT_INACTIVE remain valid. The new ENTRY_LEGACY_REVISION_REQUIRED refusal applies to edits of still-readable legacy diary text that would otherwise replace it without retention. The client can retry through the attested local writer with version-bound protection."
     }
   ]
 }
