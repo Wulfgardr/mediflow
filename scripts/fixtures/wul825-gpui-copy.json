@@ -352,10 +352,11 @@
   {
     "file": "experiments/gpui-patient-pilot/app/src/shell/patient_record.rs",
     "removed": [
-      "Misure recenti"
+      "Misure recenti",
+      "Parametri recenti"
     ],
     "added": [
-      "Parametri recenti"
+      "Parametri"
     ]
   },
   {

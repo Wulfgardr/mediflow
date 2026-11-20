@@ -109,6 +109,7 @@ impl DocumentOperation {
 
 impl ClinicalApp {
     pub(super) fn documents_view(&self, cx: &Context<Self>) -> Div {
+        use crate::components::observe_control;
         let theme = self.theme;
         #[cfg(unix)]
         let show_import =
@@ -119,9 +120,9 @@ impl ClinicalApp {
             self.document_import_available() && self.patient.attachments.ready().is_some();
         div().min_w_0().max_w_full().flex().flex_col().gap(px(16.))
             .child(div().flex().flex_wrap().items_center().justify_between().gap(px(12.))
-                .child(heading("clinical-workspace-documents-heading", "Documenti", theme))
-                .child(button("clinical-workspace-new-document", "Aggiungi documenti…", theme, true, writable && !self.document_imports.pending())
-                    .when(writable, |el| el.on_click(cx.listener(|this, _, _, cx| this.pick_document(cx))))))
+                .child(observe_control(heading("clinical-workspace-documents-heading", "Documenti", theme)))
+                .child(observe_control(button("clinical-workspace-new-document", "Aggiungi documenti…", theme, true, writable && !self.document_imports.pending())
+                    .when(writable, |el| el.on_click(cx.listener(|this, _, _, cx| this.pick_document(cx)))))))
             .when_some(self.synthesis_chat_notice(), |el, message| el.child(notice("document-synthesis-chat-selection", message, theme, false)))
             .child(self.dossier_import_view(cx))
             .when(show_import, |el| el.child(self.smart_import_view(cx)))
@@ -149,17 +150,17 @@ impl ClinicalApp {
                     .child(div().min_w_0().max_w_full().type_role(theme, crate::theme::TextRole::Meta).text_color(theme.secondary)
                         .child(text!(format!("{} · {} · {}", row.mime_type, format_size(row.size), display_date(row.created_at.as_deref())))))
                     .child(div().min_w_0().max_w_full().flex().flex_wrap().gap(px(8.))
-                        .child(button(format!("clinical-workspace-document-details-{id}"), if details_open { "Chiudi sintesi e fonte" } else { "Sintesi e fonte" }, theme, false, can_open)
+                        .child(observe_control(button(format!("clinical-workspace-document-details-{id}"), if details_open { "Chiudi sintesi e fonte" } else { "Sintesi e fonte" }, theme, false, can_open)
                             .aria_expanded(details_open)
-                            .when(can_open, |el| el.on_click(cx.listener(move |this, _, _, cx| this.toggle_document_details(&details_id, cx)))))
-                        .child(button(format!("clinical-workspace-download-document-{id}"), "Salva una copia…", theme, false, available)
-                            .when(available, |el| el.on_click(cx.listener(move |this, _, _, cx| this.download_document(&id, cx))))))
-                    .child(button(format!("clinical-workspace-original-{original_id}"), if original_open { "Chiudi originale" } else { "Originale" }, theme, false, can_open)
+                            .when(can_open, |el| el.on_click(cx.listener(move |this, _, _, cx| this.toggle_document_details(&details_id, cx))))))
+                        .child(observe_control(button(format!("clinical-workspace-download-document-{id}"), "Salva una copia…", theme, false, available)
+                            .when(available, |el| el.on_click(cx.listener(move |this, _, _, cx| this.download_document(&id, cx)))))))
+                    .child(observe_control(button(format!("clinical-workspace-original-{original_id}"), if original_open { "Chiudi originale" } else { "Originale" }, theme, false, can_open)
                         .aria_expanded(original_open)
-                        .when(can_open, |el| el.on_click(cx.listener(move |this, _, _, cx| this.toggle_document_original(&original_id, cx)))))
+                        .when(can_open, |el| el.on_click(cx.listener(move |this, _, _, cx| this.toggle_document_original(&original_id, cx))))))
                     .when(original_open, |el| el.child(self.document_original_view(cx)))
-                    .child(button(format!("clinical-workspace-delete-document-{delete_id}"), "Elimina documento…", theme, false, can_delete)
-                        .when(can_delete,|el|el.on_click(cx.listener(move |this,_,window,cx|this.prepare_document_deletion(&delete_id,window,cx)))))
+                    .child(observe_control(button(format!("clinical-workspace-delete-document-{delete_id}"), "Elimina documento…", theme, false, can_delete)
+                        .when(can_delete,|el|el.on_click(cx.listener(move |this,_,window,cx|this.prepare_document_deletion(&delete_id,window,cx))))))
                     .when(details_open, |el| el.child(self.document_details_view(row, cx)).child(self.document_synthesis_view(row, cx)))
             }))
             .child(div().text_color(theme.secondary).child(text!("Ogni caricamento richiede revisione e conferma. Il limite per file è 10 MiB. Le copie vengono salvate soltanto nella destinazione che scegli.")))

@@ -150,5 +150,10 @@ test('prestazione annullata: totale, stato e dettaglio nominano ciò che contano
     await expect(menu.getByRole('menuitem', { name: 'Amministrazione 0 esenzioni', exact: true })).toBeVisible();
     await expect(menu.getByRole('menuitem', { name: 'Prestazioni 1 prestazione totale', exact: true })).toBeVisible();
     await expect(menu.getByRole('menuitem', { name: 'Scale 0 valutazioni', exact: true })).toBeVisible();
+    await page.keyboard.press('Escape');
+    const sections = page.getByRole('navigation', { name: 'Sezioni della vista' });
+    await expect(sections.getByRole('link', { name: 'Diario', exact: true })).toHaveAccessibleDescription('0 voci');
+    await page.setViewportSize({ width: 390, height: 844 });
+    await sections.getByRole('button', { name: 'Altro', exact: true }).click();
     await expect(menu.getByRole('menuitem', { name: 'Diario 0 voci', exact: true })).toBeVisible();
 });

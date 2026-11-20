@@ -29,11 +29,11 @@ import { currentPatientInsightSourceSignature, patientInsightSourceSignature } f
 interface AIPatientInsightProps {
     patient: Patient;
     stale?: boolean;
-    onProposalChange?: (patientKey: string | null) => void;
+    onProposalChange?: (patientKey: string | null, preview: PatientInsightCardPreview | null) => void;
 }
 
-type AvailablePreview = Extract<PatientInsightPreviewWire, { status: 'available' }>;
-type StoredPreview = Readonly<{ patientId: string; patientKey: string; sourceSignature: string; value: AvailablePreview }>;
+export type PatientInsightCardPreview = Extract<PatientInsightPreviewWire, { status: 'available' }>;
+type StoredPreview = Readonly<{ patientId: string; patientKey: string; sourceSignature: string; value: PatientInsightCardPreview }>;
 
 /* the same minimal read a generation sends, so a later read can be compared with it. */
 function readInsightSources(patientId: string) {
@@ -96,8 +96,8 @@ export default function AIPatientInsight({ patient, stale = false, onProposalCha
     const setError = (value: string | null) => setStoredError({ patientKey, value });
 
     useEffect(() => {
-        onProposalChange?.(preview ? patientKey : null);
-        return () => onProposalChange?.(null);
+        onProposalChange?.(preview ? patientKey : null, preview);
+        return () => onProposalChange?.(null, null);
     }, [onProposalChange, patientKey, preview]);
 
     useEffect(() => {
