@@ -253,6 +253,7 @@ export const REGISTERS = ['giorno', 'grafite', 'guardia'];
 export const SURFACES = ['canvas', 'field', 'focal', 'chrome'];
 const INK_ROLES = ['primary', 'muted', 'fresh', 'pencil', 'secondary'];
 const EXTRA_SURFACES = ['draft', 'selected', 'hover', 'threshold'];
+const RECORD_ROLES = ['canvas', 'ink', 'accent', 'warning-fill', 'critical-fill', 'success-fill', 'panel', 'rail', 'tray', 'tray-rule', 'tray-light', 'tray-shadow', 'island', 'compact-island', 'island-rule', 'change', 'change-rule', 'proposal-rule'];
 const RULE_ROLES = ['default', 'strong', 'draft'];
 export const SIGNALS = ['warning', 'critical', 'success', 'plum'];
 export const TEXT_MIN_RATIO = 4.5;
@@ -353,6 +354,26 @@ export function buildContract() {
       });
     }
   }
+  for (const register of ['giorno', 'grafite']) {
+    for (const surface of ['tray', 'island', 'compact-island', 'change']) {
+      for (const role of ['ink.primary', 'ink.muted', 'accent.minerale', 'signal.warning', 'signal.critical']) {
+        checks.push({
+          register, label: `${role} on record.${surface}`,
+          text: `register.${register}.${role}`,
+          background: `record.${register}.${surface}`,
+          minRatio: TEXT_MIN_RATIO,
+        });
+      }
+    }
+    for (const surface of ['tray', 'compact-island']) {
+      checks.push({
+        register, label: `record.proposal-rule on record.${surface}`,
+        text: `record.${register}.proposal-rule`,
+        background: `record.${register}.${surface}`,
+        minRatio: 3,
+      });
+    }
+  }
   return checks;
 }
 
@@ -398,6 +419,7 @@ export function loadGlobalStyles(cssPath = DEFAULT_GLOBAL_CSS_PATH) {
 }
 
 export const ACTIVE_ALIASES = [
+  ...RECORD_ROLES.map((role) => ({ alias: `--lume-record-${role}`, suffix: `record-${role}` })),
   { alias: '--lume-surface-canvas', suffix: 'surface-canvas' },
   { alias: '--lume-surface-field', suffix: 'surface-field' },
   { alias: '--lume-surface-focal', suffix: 'surface-focal' },
@@ -422,6 +444,11 @@ export function expectedMirror(tokens) {
     for (const role of RULE_ROLES) map.set(`--lume-${register}-rule-${role}`, resolveColor(tokens, `register.${register}.rule.${role}`));
     for (const role of ['warning', 'critical', 'success']) map.set(`--lume-${register}-signal-${role}`, resolveColor(tokens, `register.${register}.signal.${role}`));
     map.set(`--lume-${register}-accent-minerale`, resolveColor(tokens, `register.${register}.accent.minerale`));
+  }
+  for (const register of ['giorno', 'grafite']) {
+    for (const role of RECORD_ROLES) {
+      map.set(`--lume-${register}-record-${role}`, resolveColor(tokens, `record.${register}.${role}`));
+    }
   }
   for (const signal of ['plum']) {
     map.set(`--lume-signal-${signal}`, resolveColor(tokens, `signal.${signal}`));
