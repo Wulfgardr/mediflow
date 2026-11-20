@@ -2,7 +2,8 @@ import Database from 'better-sqlite3';
 import { existsSync, lstatSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { expect, type Page } from '@playwright/test';
-import { bootstrapUnlockedSession, openPatientSection } from '../utils';
+import { bootstrapUnlockedSession, openPatientSection, openUnlockedDocument } from '../utils';
+import { documentRequests } from './trusted-web-request';
 import { createFixture } from './treatment-reasoning';
 
 export function seedTreatmentReasoningSetting(value: 'enabled' | 'disabled') {
@@ -34,7 +35,12 @@ export async function openTreatmentReasoningDenial(page: Page, value: 'enabled' 
   try {
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
     const fixture = await createFixture(page);
-    const before = await (await page.request.get(`/api/therapies?patientId=${fixture.patientId}`)).json();
+    const readTherapies = async () => {
+      const reply = await documentRequests(page).get(`/api/therapies?patientId=${fixture.patientId}`);
+      expect(reply.status()).toBe(200);
+      return reply.json();
+    };
+    const before = await readTherapies();
     const calls: string[] = [];
     await page.route('**/*', async route => {
       const request = route.request(), url = new URL(request.url());
@@ -54,14 +60,16 @@ export async function openTreatmentReasoningDenial(page: Page, value: 'enabled' 
       }
       await route.fallback();
     });
-    await page.goto(`/patients/${fixture.patientId}/modules`);
+    await openUnlockedDocument(page, `/patients/${fixture.patientId}/modules`);
     await openPatientSection(page, 'terapie');
     const proposals = page.locator('#terapie').getByRole('button', { name: 'Proposte', exact: true });
     const panel = page.getByTestId('treatment-reasoning-panel');
     const assertNoEffects = async () => {
       expect(calls).toEqual([]);
-      expect(await (await page.request.get(`/api/therapies?patientId=${fixture.patientId}`)).json()).toEqual(before);
-      expect((await (await page.request.get('/api/settings/aiTreatmentReasoningKillSwitch')).json()).value).toBe(value);
+      expect(await readTherapies()).toEqual(before);
+      const setting = await documentRequests(page).get('/api/settings/aiTreatmentReasoningKillSwitch');
+      expect(setting.status()).toBe(200);
+      expect((await setting.json()).value).toBe(value);
     };
     const assertDenied = async () => {
       await expect(panel).toHaveCount(0);

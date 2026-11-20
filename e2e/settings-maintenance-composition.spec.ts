@@ -214,6 +214,7 @@ test('Settings maintenance: scopes, canceled effects and uncertain reset', async
         f.rows.splice(0);
         f.state.holdRead = new Promise<void>(resolve => releaseRead = resolve);
         await page.reload({ waitUntil: 'domcontentloaded' });
+        await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
         await expect(page.getByTestId('settings-ambulatories-section').getByRole('status')).toContainText('Caricamento sedi...');
         await expect(page.getByRole('button', { name: 'Aggiungi', exact: true })).toBeDisabled();
         releaseRead();

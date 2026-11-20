@@ -1,7 +1,8 @@
 import { expect, test, type Locator } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
+import { documentRequests } from './fixtures/trusted-web-request';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
-import { bootstrapUnlockedSession, assertNoHorizontalOverflow, unlockIfNeeded } from './utils';
+import { bootstrapUnlockedSession, assertNoHorizontalOverflow, openUnlockedDocument, unlockIfNeeded } from './utils';
 
 function requireSynthetic(baseURL?: string) {
     if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL
@@ -120,7 +121,8 @@ test('Repertori Impostazioni: dati, lettura pendente e negata senza servizi este
         }
     };
     try {
-        await bootstrapUnlockedSession(page, '1234'); await page.goto('/settings/repertori');
+        await bootstrapUnlockedSession(page, '1234');
+        await openUnlockedDocument(page, '/settings/repertori');
         if (!baseline) {
             const heading = section.getByRole('heading', { name: 'Repertori', level: 2, exact: true });
             await expect(heading).toHaveCSS('font-size', '15px');
@@ -148,12 +150,14 @@ test('Repertori Impostazioni: dati, lettura pendente e negata senza servizi este
             await page.evaluate(() => history.replaceState(null, '', '/settings/repertori'));
             await capture('aifa-dettaglio-bozza');
         }
-        state = 'denied'; await page.reload();
+        state = 'denied';
+        await page.reload();
+        await unlockIfNeeded(page, '1234');
         await expect(section).toContainText('Conteggio non disponibile');
         await capture('lettura-negata'); await captureManagers('lettura-negata');
         if (!baseline) {
-            await page.goto('/settings'); await page.goto('/settings/repertori#who-setup');
-            await unlockIfNeeded(page, '1234');
+            await page.goto('/settings');
+            await openUnlockedDocument(page, '/settings/repertori#who-setup');
             await expect(section.getByRole('button', { name: /^Terminologia WHO/u })).toHaveAttribute('aria-expanded', 'true');
             await expect(page.getByTestId('who-embedded-catalog')).toBeVisible(); expect(mutations).toEqual([]);
         }
@@ -188,7 +192,8 @@ test('Repertori Impostazioni: anteprima e import locali reali conservano bozza, 
             : { schemaVersion: 'mediflow.reference-data.icd11-who-readiness.v1', status: 'disabled', releaseId: '2026-01', language: 'en' } });
     });
     page.on('request', request => { if (request.method() === 'POST' && new URL(request.url()).pathname.endsWith('/commit')) commits.push(new URL(request.url()).pathname); });
-    await bootstrapUnlockedSession(page, '1234'); await page.goto('/settings/repertori');
+    await bootstrapUnlockedSession(page, '1234');
+    await openUnlockedDocument(page, '/settings/repertori');
     const section = page.getByTestId('settings-repertori-section');
     await section.getByRole('button', { name: /^Esenzioni/u }).click();
     const exemptions = page.getByRole('region', { name: 'Import esenzioni', exact: true });
@@ -207,7 +212,7 @@ test('Repertori Impostazioni: anteprima e import locali reali conservano bozza, 
     await expect(consent).toBeChecked(); await expect(exemptions).toContainText('esenzione-w18c-sintetica.txt');
     await confirm.focus(); await page.keyboard.press('Enter');
     await expect(exemptions).toContainText('Rilettura confermata.');
-    const read = await page.request.get('/api/exemptions/import/status'); expect(read.status()).toBe(200);
+    const read = await documentRequests(page).get('/api/exemptions/import/status'); expect(read.status()).toBe(200);
     const persisted = await read.json(); expect(persisted.latestReceipt.manifest.sourceName).toBe('esenzione-w18c-sintetica.txt');
     expect(persisted.latestReceipt.applied).toBe(1); expect(commits).toEqual(['/api/exemptions/import/commit']);
     await section.getByRole('button', { name: /^Protesica e ausili/u }).click();
@@ -218,7 +223,7 @@ test('Repertori Impostazioni: anteprima e import locali reali conservano bozza, 
     const confirmProsthetics = prosthetics.getByRole('button', { name: 'Conferma importazione protesica', exact: true });
     await expect(confirmProsthetics).toBeDisabled(); await prosthetics.getByRole('checkbox').check(); await confirmProsthetics.click();
     await expect(prosthetics).toContainText('Import registrato e stato del repertorio riletto.');
-    const prothRead = await page.request.get('/api/prosthetics/catalog/status'); expect(prothRead.status()).toBe(200);
+    const prothRead = await documentRequests(page).get('/api/prosthetics/catalog/status'); expect(prothRead.status()).toBe(200);
     const prothPersisted = await prothRead.json(); expect(prothPersisted.latestReceipt.manifest.metadata.source).toBe('Fonte tecnica sintetica');
     expect(prothPersisted.latestReceipt.manifest.metadata.version).toBe('fixture-1');
     expect(commits).toEqual(['/api/exemptions/import/commit', '/api/prosthetics/catalog/commit']); expect(external).toEqual([]);
