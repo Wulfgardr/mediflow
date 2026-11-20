@@ -30,10 +30,10 @@ function i4Receipt() {
     const f = { model: 'gpt', catalogSha256: 'c'.repeat(64), consent: true, sourcesShown: true, generation: 'reviewed', applied: false, cancelObserved: true, revokeObserved: true, productReceiptSha256: 'd'.repeat(64), at: '2026-11-21T10:00:00Z' };
     return { schema: I4_RECEIPT_SCHEMA, venue: 'host_subscription', ...common, path: 'web_ui_chatgpt_subscription', surface: 'web', host: { app: 'MediFlow Web' }, attestedBy: 'leonardo', functions: Object.fromEntries(fids.map(fid => [fid, { ...f }])) };
 }
-function surfaceReceipt(criterion: 'G-5' | 'C-7') {
+function surfaceReceipt(criterion: 'G-5' | 'C-7', client = criterion === 'G-5' ? 'gpui' : 'claude_desktop') {
     const f = { proposalShown: true, sourcesShown: true, consent: true, revokeObserved: true, outputChecked: true, unavailabilityShown: true, malformedRejected: true, staleContextRejected: true, applied: false, productReceiptSha256: 'e'.repeat(64), at: '2026-11-21T11:00:00Z' };
     return { schema: SURFACE_RECEIPT_SCHEMA, criterion, ...common, path: criterion === 'G-5' ? 'gpui_installed_client' : 'chat_host_channel', surface: criterion === 'G-5' ? 'gpui' : 'chat',
-        host: { client: criterion === 'G-5' ? 'GPUI' : 'Claude Desktop' }, attestedBy: 'leonardo', functions: Object.fromEntries(fids.map(fid => [fid, { ollama: { ...f }, chatgpt: { ...f } }])) };
+        host: { client }, attestedBy: 'leonardo', functions: Object.fromEntries(fids.map(fid => [fid, { ollama: { ...f }, chatgpt: { ...f } }])) };
 }
 function derive(receipts: readonly object[], cell: Record<string, unknown>) {
     const files = new Map(receipts.map((r, i) => [`r${i}.json`, Buffer.from(JSON.stringify(r))]));
@@ -44,13 +44,14 @@ function derive(receipts: readonly object[], cell: Record<string, unknown>) {
 }
 const ollama = { provider: 'ollama' };
 const chatgpt = { provider: 'chatgpt' };
-const local = () => [localReceipt(), surfaceReceipt('G-5'), surfaceReceipt('C-7')] as const;
+const chat = () => [surfaceReceipt('C-7'), surfaceReceipt('C-7', 'codex_desktop')] as const;
+const local = () => [localReceipt(), surfaceReceipt('G-5'), ...chat()] as const;
 
 test('qualifica solo con le ricevute reali di ogni criterio della sede, sulla revisione e sul profilo del registro', () => {
     const d = derive(local(), ollama);
     assert.equal(d.qualification, 'qualified');
     assert.deepEqual(d.surfaces, { web: 'not_verified', gpui: 'verified', chat: 'verified', headless: 'not_verified' });
-    assert.equal(derive([i4Receipt(), surfaceReceipt('G-5'), surfaceReceipt('C-7')], chatgpt).qualification, 'qualified');
+    assert.equal(derive([i4Receipt(), surfaceReceipt('G-5'), ...chat()], chatgpt).qualification, 'qualified');
     assert.equal(derive([localReceipt()], ollama).qualification, 'not_qualified');
 });
 
@@ -64,8 +65,8 @@ test('un caso simulato, tecnico, diagnostico, di altra revisione, profilo o mode
         ['model_mismatch', r => { r.modelIdentity = { name: 'qwen', digest: 'f'.repeat(64) }; }],
     ];
     for (const [reason, mutate] of cases) {
-        const [receipt, g5, c7] = local(); mutate(receipt);
-        const d = derive([receipt, g5, c7], ollama);
+        const [receipt, ...rest] = local(); mutate(receipt);
+        const d = derive([receipt, ...rest], ollama);
         assert.equal(d.qualification, 'not_qualified', reason);
         assert.ok(d.criteria['C-L'].reasons.includes(reason), reason);
     }
@@ -84,23 +85,40 @@ test('un percorso parziale resta espresso criterio per criterio e non qualifica'
         ['memoria', 'model_allocation_not_recorded', r => { r.functions.smart_import.memory.modelAllocation.peakBytes = null; }],
         ['memoria', 'memory_sources_summed', r => { (r.functions.smart_import.memory as Record<string, unknown>).summed = true; }],
         ['memoria', 'system_gpu_misattributed', r => { r.functions.smart_import.memory.systemGpu = { source: 'ioreg_AGXAccelerator_PerformanceStatistics', attribution: 'process', inUsePeakBytes: 700 }; }],
+        ['C-L', 'smart-import-load/warm_latency_unmeasured', r => { delete (r.functions.smart_import.cl.groups[1] as Record<string, unknown>).p95Ms; }],
+        ['C-L', 'function_budget_not_derived_from_measurements', r => { r.functions.smart_import.cl.functionBudget.latencyMs = -1; }],
+        ['C-L', 'function_budget_not_derived_from_measurements', r => { r.functions.smart_import.cl.functionBudget.latencyMs = 1199; }],
         ['memoria', 'rss_budget_absent', r => { r.functions.smart_import.cl.functionBudget.rssBytes = null as unknown as number; }],
     ];
     for (const [criterion, reason, mutate] of cases) {
-        const [receipt, g5, c7] = local(); mutate(receipt);
-        const d = derive([receipt, g5, c7], ollama);
+        const [receipt, ...rest] = local(); mutate(receipt);
+        const d = derive([receipt, ...rest], ollama);
         assert.equal(d.qualification, 'not_qualified', reason);
         assert.equal(d.criteria[criterion].status, 'not_met', reason);
         assert.ok(d.criteria[criterion].reasons.includes(reason), reason);
     }
     const unobserved = localReceipt(); unobserved.functions.smart_import.memory.systemGpu = null;
-    assert.equal(derive([unobserved, surfaceReceipt('G-5'), surfaceReceipt('C-7')], ollama).criteria.memoria.status, 'met');
+    assert.equal(derive([unobserved, surfaceReceipt('G-5'), ...chat()], ollama).criteria.memoria.status, 'met');
     const g5 = surfaceReceipt('G-5'); g5.functions.smart_import.ollama.revokeObserved = false;
-    const d = derive([localReceipt(), g5, surfaceReceipt('C-7')], ollama);
+    const d = derive([localReceipt(), g5, ...chat()], ollama);
     assert.deepEqual(d.blockedBy, ['G-5_surface_not_proved']);
     assert.equal(d.surfaces.gpui, 'not_verified');
     const swapped = { ...surfaceReceipt('G-5'), surface: 'chat' };
-    assert.ok(derive([localReceipt(), swapped, surfaceReceipt('C-7')], ollama).criteria['G-5'].reasons.includes('surface_mismatch'));
+    assert.ok(derive([localReceipt(), swapped, ...chat()], ollama).criteria['G-5'].reasons.includes('surface_mismatch'));
+});
+
+test('C-7 si chiude solo con le prove in Claude Desktop e in Codex desktop', () => {
+    const claudeOnly = derive([localReceipt(), surfaceReceipt('G-5'), surfaceReceipt('C-7')], ollama);
+    assert.equal(claudeOnly.qualification, 'not_qualified');
+    assert.ok(claudeOnly.criteria['C-7'].reasons.includes('host_missing:codex_desktop'));
+    assert.equal(claudeOnly.surfaces.chat, 'not_verified');
+    const twiceClaude = derive([localReceipt(), surfaceReceipt('G-5'), surfaceReceipt('C-7'), surfaceReceipt('C-7')], ollama);
+    assert.equal(twiceClaude.criteria['C-7'].status, 'not_met');
+    const other = derive([localReceipt(), surfaceReceipt('G-5'), surfaceReceipt('C-7'), surfaceReceipt('C-7', 'chatgpt_app')], ollama);
+    assert.ok(other.criteria['C-7'].reasons.includes('host_not_required'));
+    const codexPartial = surfaceReceipt('C-7', 'codex_desktop'); codexPartial.functions.smart_import.ollama.staleContextRejected = false;
+    assert.ok(derive([localReceipt(), surfaceReceipt('G-5'), surfaceReceipt('C-7'), codexPartial], ollama).criteria['C-7'].reasons.includes('host_missing:codex_desktop'));
+    assert.equal(derive(local(), ollama).surfaces.chat, 'verified');
 });
 
 test('una ricevuta mutata viene respinta e un\'etichetta non sostituisce il calcolo', () => {
@@ -108,10 +126,10 @@ test('una ricevuta mutata viene respinta e un\'etichetta non sostituisce il calc
     const cell = { provider: 'ollama', venue: 'local_process', functionId: 'smart_import', modelIdentity: { digest: DIGEST }, blockedBy: [], receipts: [{ path: 'r.json', sha256: createHash('sha256').update(bytes).digest('hex') }] };
     const mutated = Buffer.from(bytes.toString().replace('"errors":0', '"errors":1'));
     assert.throws(() => deriveCellQualification(register, cell, () => mutated), (e: unknown) => e instanceof ReceiptRejectedError && e.reason === 'sha256_mismatch');
-    const [labelled, g5, c7] = local();
+    const [labelled, ...rest] = local();
     labelled.functions.smart_import.cl.groups[0].errors = 3;
     Object.assign(labelled, { qualification: 'qualified', status: 'met' });
-    assert.equal(derive([labelled, g5, c7], ollama).qualification, 'not_qualified');
+    assert.equal(derive([labelled, ...rest], ollama).qualification, 'not_qualified');
     for (const schema of ['mediflow.other.v1', undefined]) assert.throws(() => derive([{ ...localReceipt(), schema }], ollama), ReceiptRejectedError);
     assert.throws(() => derive([{ ...surfaceReceipt('G-5'), criterion: 'W-1' }], ollama), ReceiptRejectedError);
 });
@@ -122,7 +140,7 @@ test('dopo la seduta una I-4 reale della sede approvata chiude il limite della c
     const onlyI4 = derive([i4Receipt()], { ...chatgpt, blockedBy: ['local_only_task', 'I-4'] });
     assert.deepEqual(onlyI4.blockedBy, ['G-5_surface_not_proved', 'C-7_surface_not_proved']);
     assert.equal(onlyI4.surfaces.web, 'verified');
-    const after = derive([i4Receipt(), surfaceReceipt('G-5'), surfaceReceipt('C-7')], { ...chatgpt, blockedBy: ['local_only_task', 'I-4'] });
+    const after = derive([i4Receipt(), surfaceReceipt('G-5'), ...chat()], { ...chatgpt, blockedBy: ['local_only_task', 'I-4'] });
     assert.equal(after.qualification, 'qualified');
     const partials: Array<[string, (r: ReturnType<typeof i4Receipt>) => void]> = [
         ['product_receipt_missing', r => { r.functions.smart_import.productReceiptSha256 = ''; }],
@@ -135,10 +153,10 @@ test('dopo la seduta una I-4 reale della sede approvata chiude il limite della c
     ];
     for (const [reason, mutate] of partials) {
         const receipt = i4Receipt(); mutate(receipt);
-        const d = derive([receipt, surfaceReceipt('G-5'), surfaceReceipt('C-7')], { ...chatgpt, blockedBy: ['local_only_task', 'I-4'] });
+        const d = derive([receipt, surfaceReceipt('G-5'), ...chat()], { ...chatgpt, blockedBy: ['local_only_task', 'I-4'] });
         assert.equal(d.qualification, 'not_qualified', reason);
         assert.deepEqual(d.blockedBy, ['local_only_task', 'I-4'], reason);
         assert.ok(d.criteria['I-4'].reasons.includes(reason), reason);
     }
-    assert.deepEqual(derive([i4Receipt(), surfaceReceipt('G-5'), surfaceReceipt('C-7')], { ...chatgpt, blockedBy: ['product_veto'] }).blockedBy, ['product_veto']);
+    assert.deepEqual(derive([i4Receipt(), surfaceReceipt('G-5'), ...chat()], { ...chatgpt, blockedBy: ['product_veto'] }).blockedBy, ['product_veto']);
 });

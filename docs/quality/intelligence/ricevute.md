@@ -20,6 +20,8 @@ Una ricevuta conta solo se è reale (`method: real`), del piano contrattuale, de
   - `surfaces_not_verified`: si chiude con G-5 e C-7.
 - **Altri blocchi.** Sono veti di prodotto e restano finché un emendamento non li toglie.
 
+C-7 si chiude solo con ricevute valide da entrambi gli host desktop richiesti dal contratto, Claude Desktop (`claude_desktop`) e Codex desktop (`codex_desktop`). Il budget C-L della funzione deve essere il p95 peggiore dei suoi gruppi, misurati e positivi, più il 20% arrotondato per eccesso: un budget che non deriva dalle misure non conta.
+
 Le superfici della cella (`surfaces`) si ricavano dalle stesse ricevute: GPUI da G-5, chat da C-7, Web da I-4 per la sede ChatGPT. Il banco locale usa le API dell'host Web di produzione, non l'interfaccia.
 
 ## Memoria
