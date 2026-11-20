@@ -193,7 +193,14 @@ non un accesso remoto generale. Restano valide le seguenti condizioni:
 - `/api/v1/network/patients/{id}/observations*` richiede capability osservazioni
   dedicate, sessione operatore e `observations.version`. Abilita solo
   create/update/soft-delete delle osservazioni LOINC/UCUM
-- restano esclusi cancellazione fisica remota, scritture remote di allegati/documenti, cataloghi, sincronizzazione per record, campi AI/documentali e ripieghi automatici su percorsi alternativi
+- per creare un allegato per un paziente del proprio ambulatorio, il dispositivo
+  abbinato usa la sessione operatore e la capability `network.replica.write-documents`.
+  Nome, percorso e contenuto del file devono essere cifrati. La lettura richiede
+  la capability distinta `network.replica.readonly-documents`. Modifica e
+  cancellazione degli allegati si eseguono sul Web locale. [ADR 0076](./docs/adr/0076-paired-document-domain-write-policy.md)
+- restano esclusi cancellazione fisica remota, cataloghi, sincronizzazione per
+  record, scrittura dei campi AI o derivati dai documenti e ripieghi automatici
+  su percorsi alternativi
 
 ### Lockout autenticazione PIN
 
