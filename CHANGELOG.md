@@ -61,6 +61,13 @@ release](https://github.com/Wulfgardr/mediflow/releases) raccoglie i pacchetti p
 
 ### Profilo paziente
 
+- Nel Quadro una diagnosi o una sintesi di documento senza data resta
+  esclusa dai cambiamenti recenti. Per le diagnosi, l’export FHIR riporta la data di
+  registrazione e omette esordio e stato clinico. Una data di registrazione
+  mancante o invalida ferma l’export. [Date cliniche e FHIR](https://github.com/Wulfgardr/mediflow/pull/1062)
+- Sul Web la cancellazione di una prescrizione di prestazioni si ferma
+  se nel frattempo una voce è cambiata. I risultati già collegati restano
+  in cartella e l’audit registra ogni collegamento rimosso. [Prescrizioni e risultati](https://github.com/Wulfgardr/mediflow/pull/1063)
 - Gli ingressi Web, API locale e client abbinati usano un comando interno
   normalizzato e un dispatch unico verso il writer Node esistente. Una stessa
   esecuzione riusa il proprio esito senza ripetere gli effetti; richieste HTTP
