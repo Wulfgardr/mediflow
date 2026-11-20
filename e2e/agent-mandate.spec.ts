@@ -1,5 +1,6 @@
 import { expect, test } from './fixtures/isolated-runtime';
-import { bootstrapUnlockedSession } from './utils';
+import { documentRequests } from './fixtures/trusted-web-request';
+import { bootstrapUnlockedSession, onboardingPassphrase, renewAccessIfNeeded } from './utils';
 import Database from 'better-sqlite3';
 import path from 'node:path';
 
@@ -13,7 +14,7 @@ test('doctor creates, reloads and revokes a mandate; inactivity preserves it and
     await bootstrapUnlockedSession(page, pin);
     await page.getByRole('complementary', { name: 'MediFlow', exact: true }).getByRole('link', { name: 'Impostazioni', exact: true }).click();
     await page.getByRole('link', { name: 'Accesso', exact: true }).click();
-    await page.getByLabel('PIN attuale', { exact: true }).first().fill(pin);
+    await page.getByLabel('Passphrase attuale', { exact: true }).fill(onboardingPassphrase(pin));
     await page.getByLabel('Nuova passphrase', { exact: true }).fill(passphrase);
     await page.getByLabel('Conferma nuova passphrase', { exact: true }).fill(passphrase);
     await page.getByRole('button', { name: 'Prepara il nuovo kit', exact: true }).click();
@@ -30,17 +31,18 @@ test('doctor creates, reloads and revokes a mandate; inactivity preserves it and
     await expect(page.getByRole('link', { name: 'Agenti', exact: true })).toBeVisible();
     await page.getByRole('link', { name: 'Agenti', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Nuovo mandato', exact: true })).toBeVisible();
+    await page.getByLabel('Autorizzo il passaggio di documenti e trascrizioni al fornitore scelto', { exact: true }).check();
     await page.getByLabel('PIN di conferma', { exact: true }).fill('0000');
     await page.getByRole('button', { name: 'Crea mandato', exact: true }).click();
     await expect(page.getByRole('alert').filter({ hasText: 'Operazione non riuscita.' })).toHaveText('Operazione non riuscita. Riprova.');
     await page.getByLabel('PIN di conferma', { exact: true }).fill(pin);
-    await page.getByLabel('Autorizzo il passaggio di documenti e trascrizioni al fornitore scelto', { exact: true }).check();
     const creation = page.waitForResponse(response => response.url().endsWith('/api/agent-mandates') && response.request().method() === 'POST');
     await page.getByRole('button', { name: 'Crea mandato', exact: true }).click();
     const response = await creation;
     expect(response.status()).toBe(201);
     const createdId = response.request().postDataJSON().mandate.id;
-    const listing = await page.request.get('/api/agent-mandates');
+    const web = documentRequests(page);
+    const listing = await web.get('/api/agent-mandates');
     expect(listing.status()).toBe(200);
     let mandate = (await listing.json()).find((value: { id: string }) => value.id === createdId);
     expect(mandate).toBeTruthy();
@@ -66,7 +68,7 @@ test('doctor creates, reloads and revokes a mandate; inactivity preserves it and
     await page.getByRole('button', { name: 'Crea mandato', exact: true }).click();
     const nextResponse = await nextCreation; expect(nextResponse.status()).toBe(201);
     const nextId = nextResponse.request().postDataJSON().mandate.id;
-    const nextListing = await page.request.get('/api/agent-mandates'); expect(nextListing.status()).toBe(200);
+    const nextListing = await web.get('/api/agent-mandates'); expect(nextListing.status()).toBe(200);
     mandate = (await nextListing.json()).find((value: { id: string }) => value.id === nextId);
     await expect(page.getByRole('button', { name: 'Revoca', exact: true })).toBeVisible();
     expect(read().revoked_at).toBeNull();
@@ -77,7 +79,10 @@ test('doctor creates, reloads and revokes a mandate; inactivity preserves it and
     expect(read().revoked_at).toBeNull();
     await page.screenshot({ path: testInfo.outputPath('blocco-inattivita.png'), fullPage: true });
     await page.reload();
-    await page.getByLabel('Passphrase', { exact: true }).fill(passphrase);
+    const credential = page.getByLabel('Passphrase', { exact: true });
+    await expect(credential).toBeVisible();
+    if (!await credential.isEnabled()) await renewAccessIfNeeded(page, credential);
+    await credential.fill(passphrase);
     await page.getByRole('button', { name: 'Sblocca', exact: true }).click();
     await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Aggiorna', exact: true }).click();
