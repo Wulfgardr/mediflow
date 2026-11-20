@@ -22,7 +22,7 @@ Per guidare il banco dal terminale, ometti `--file` e invia singole righe come q
 {"op":"expectValue","target":{"role":"textbox","name":"Nome e cognome"},"value":"Dottore Sintetico"}
 ```
 
-Un target è `{"role":"button","name":"Avanti"}` o `{"label":"Passphrase"}`. Sul Web usa `{"text":"Altro"}` per testo visibile esatto quando il censimento mostra testo senza un nome di ruolo. Ruolo e nome sono quelli del censimento, con corrispondenza esatta. Un array di target restringe il controllo in successione, per esempio una navigazione e poi un link al suo interno. Ogni livello deve identificare un solo controllo. La CLI si arresta sul primo target assente o ambiguo, prima di azionarlo. L’asserzione `hidden` può riuscire anche quando il controllo è assente.
+Un target è `{"role":"button","name":"Avanti"}` o `{"label":"Passphrase"}`. Sul Web usa `{"text":"Altro"}` per testo visibile esatto quando il censimento mostra testo senza un nome di ruolo. Ruolo e nome sono quelli del censimento, con corrispondenza esatta. Per scegliere fra omonimi aggiungi `id` al ruolo e al nome. In GPUI usa l'identificatore riportato da `discover`. Un array di target restringe il controllo in successione, per esempio una navigazione e poi un link al suo interno. Ogni livello deve identificare un solo controllo. La CLI si arresta sul primo target assente o ambiguo, prima di azionarlo. L’asserzione `hidden` può riuscire anche quando il controllo è assente.
 
 | Azioni | Parametri oltre a `op` |
 | --- | --- |
@@ -47,7 +47,7 @@ Il browser usa Chrome sandboxato e può raggiungere soltanto l’origine loopbac
 
 | Capacità | Web | Dimostrazione GPUI | Shell GPUI |
 | --- | --- | --- | --- |
-| Censimento | Albero della pagina | Controlli strumentati della demo | Nodi AccessKit strumentati, conteggi ed esclusioni |
+| Censimento | Albero della pagina | Controlli strumentati della demo | Nodi AccessKit strumentati, pulsanti condivisi visibili, conteggi ed esclusioni |
 | Target composti, testo visibile esatto | Sì | Ruolo/nome o label singoli | Ruolo/nome o label singoli |
 | `resize` nella stessa sessione | Sì | Finestra di test fissa | Sì, callback resize del backend di test |
 | Scroll | Porta un controllo in vista o invia una rotella | No | Rotella sui contenuti della scheda e sul vassoio Cambiato, con lettura dello spostamento |
@@ -85,7 +85,7 @@ npm run --silent test:ui:cli -- \
 
 `discover` riporta ruolo, nome, azioni disponibili, geometria utile al puntatore e stato dei controlli osservati nel frame. Per `focus`, `press` e `click` la ricevuta riporta il focus osservabile prima e dopo e lo stato aggiornato del controllo, se ancora presente. Per gli editor espone anche i limiti della selezione in byte UTF-8. Il resize riporta dimensioni precedenti, dimensioni lette dal renderer e identificativo della finestra. Scroll e resize passano rispettivamente dall’evento rotella e dalla callback del backend di test.
 
-Il backend GPUI simulato non attiva l’adattatore AccessKit di sistema. Il banco osserva quindi elementi GPUI effettivamente renderizzati: navigazione condivisa, tab e menu strumentati, comandi delle schede dei documenti, editor di testo e regioni di scorrimento collegate. I nodi senza nome, fuori dalla parte visibile o con un tipo non gestito sono riportati tra le esclusioni osservate. Una vista può contenere altri componenti fuori dal censimento. I ruoli usano la semantica dell’elemento, per esempio **Agenda** è un pulsante con stato selezionato e il titolo della vista è un heading. Il [copione dell’Agenda](../e2e/ui-cli/gpui-agenda.jsonl) usa la navigazione e digita nel campo di ricerca della vista. I campi riservati e quelli di sola lettura non ricevono testo dal banco.
+Il backend GPUI simulato non attiva l’adattatore AccessKit di sistema. Il banco osserva quindi elementi GPUI effettivamente renderizzati: navigazione condivisa, tab e menu strumentati, comandi delle schede dei documenti, editor di testo e regioni di scorrimento collegate. I pulsanti del componente condiviso con nome accessibile e geometria visibile sono raggiungibili con clic. La ricevuta li distingue con `nameSource: "shared-button"`. Per questi pulsanti il banco legge disponibilità e ritaglio a schermo. Il puntamento diretto via tastiera richiede una sonda di focus e si riconosce dalle azioni `focus` e `press` nella ricevuta. Tab senza target percorre l'ordine di focus reale. I nodi osservati senza nome, privi di geometria accessibile o di tipo non gestito sono nelle esclusioni. `visibleSharedButtonsOutsideCensus` nomina con l'identificatore i pulsanti condivisi con etichetta aggiunta dopo il costruttore, fra cui l'icona del tema e quelle di blocco. Il conteggio riguarda il frame corrente e può escludere altri componenti personalizzati senza sonda. I ruoli usano la semantica dell’elemento, per esempio **Agenda** è un pulsante con stato selezionato e il titolo della vista è un heading. Il [copione dell’Agenda](../e2e/ui-cli/gpui-agenda.jsonl) usa la navigazione e digita nel campo di ricerca della vista. I campi riservati e quelli di sola lettura non ricevono testo dal banco.
 
 La finestra simulata misura il comportamento del Shell con il client e l’host sintetici. La finestra installata, il suo albero AX di sistema, i gesti fisici e la conferma personale sono superfici distinte. Il backend Web offre anche target composti, screenshot e download.
 
@@ -98,3 +98,15 @@ cargo +1.98.1 test --locked --manifest-path experiments/gpui-patient-pilot/Cargo
 ```
 
 Nei percorsi provati il Shell espone la navigazione tra moduli come tab e le azioni di apertura come pulsanti. Il censimento non ha incontrato nodi Link, combobox o listbox. Le voci di menu sono state provate nella soglia compatta. Nel Shell il copione usa pulsanti, tab, titoli, campi di testo e regioni di scorrimento.
+
+## Copioni per la seduta sintetica
+
+| Copione | Verifica |
+| --- | --- |
+| [Due rettifiche sul Web](../e2e/ui-cli/web-diary-revisions.jsonl) | 82 azioni da archivio vuoto. Apre e seleziona le tre versioni della nota in vista stretta, scorre e rientra alla bozza. |
+| [Storico nel Diario GPUI](../e2e/ui-cli/gpui-shell-diary.jsonl) e [storico dalla bozza GPUI](../e2e/ui-cli/gpui-shell-diary-draft.jsonl) | Selezione della versione 1 con Tab e Invio da due viste a 760 punti. Il secondo copione risale dopo lo scroll e verifica il testo della bozza ritrovata. |
+| [Navigazione GPUI](../e2e/ui-cli/gpui-shell-navigation.jsonl) | Sette ingressi principali e sei moduli della scheda. Ogni passaggio verifica la selezione e acquisisce il censimento della vista. |
+| [Terapie GPUI](../e2e/ui-cli/gpui-shell-therapy.jsonl) e [Parametri GPUI](../e2e/ui-cli/gpui-shell-observation.jsonl) | Dalla navigazione di scheda apre i comandi condivisi **Nuova terapia** e **Nuovo parametro** e verifica il campo atteso. |
+| [Revisione GPUI](../e2e/ui-cli/gpui-shell-review.jsonl) | Apre la normale revisione, verifica il comando di conferma con il nome della paziente sintetica e torna alla bozza. Il test Rust verifica che il percorso abbia inviato solo richieste di lettura. |
+
+Usa i comandi delle sezioni precedenti sostituendo il valore di `--file`. Per stdin ometti `--file` e usa il copione come ingresso del comando.

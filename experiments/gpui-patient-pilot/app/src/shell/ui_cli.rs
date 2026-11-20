@@ -207,7 +207,11 @@ fn resolve<'a>(controls: &'a [Control], target: &Value) -> Result<&'a Control, S
             if let Some(label) = target["label"].as_str() {
                 return control.name == label;
             }
-            target["role"] == control.role && target["name"] == control.name
+            target["role"] == control.role
+                && target["name"] == control.name
+                && target["id"]
+                    .as_str()
+                    .is_none_or(|id| control.node.author_id() == Some(id))
         })
         .collect::<Vec<_>>();
     match matches.as_slice() {
@@ -507,4 +511,44 @@ fn shell_ui_cli_review_returns_without_registering(cx: &mut gpui::TestAppContext
         |action| drive(action, cx),
     );
     assert!(host.routes().iter().all(|route| route.starts_with("GET ")));
+}
+
+#[gpui::test]
+fn shell_ui_cli_requires_an_id_for_homonymous_buttons(cx: &mut gpui::TestAppContext) {
+    let (_host, cx) = shell_fixture(cx);
+    drive(
+        &json!({"op":"press","target":{"role":"tab","name":"Diario"},"key":"Enter"}),
+        cx,
+    )
+    .unwrap();
+    let ambiguous = json!({"op":"click","target":{"role":"button","name":"Copia voce"}});
+    assert!(
+        drive(&ambiguous, cx)
+            .unwrap_err()
+            .starts_with("Controllo ambiguo:")
+    );
+    let copy = json!({"op":"click","target":{"role":"button","name":"Copia voce",
+        "id":"clinical-workspace-copy-entry-synthetic-gpui-legacy-entry"}});
+    let receipt = drive(&copy, cx).unwrap();
+    assert_eq!(receipt["nameSource"], "shared-button");
+    let copied = cx.update(|_, cx| cx.read_from_clipboard().and_then(|item| item.text()));
+    assert!(copied.unwrap().contains("Nota sintetica con rettifiche"));
+}
+
+#[gpui::test]
+fn shell_ui_cli_selects_history_in_diary(cx: &mut gpui::TestAppContext) {
+    let (_host, cx) = shell_fixture(cx);
+    run(
+        include_str!("../../../../../e2e/ui-cli/gpui-shell-diary.jsonl"),
+        |action| drive(action, cx),
+    );
+}
+
+#[gpui::test]
+fn shell_ui_cli_selects_history_and_returns_to_draft(cx: &mut gpui::TestAppContext) {
+    let (_host, cx) = shell_fixture(cx);
+    run(
+        include_str!("../../../../../e2e/ui-cli/gpui-shell-diary-draft.jsonl"),
+        |action| drive(action, cx),
+    );
 }

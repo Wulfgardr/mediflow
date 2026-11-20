@@ -35,6 +35,6 @@
 {"op":"click","target":{"role":"button","name":"Impostazioni"}}
 {"op":"expect","target":{"role":"button","name":"Impostazioni"},"state":"selected"}
 {"op":"discover"}
-{"op":"click","target":{"role":"button","name":"Pazienti"}}
-{"op":"expect","target":{"role":"button","name":"Pazienti"},"state":"selected"}
+{"op":"click","target":{"role":"button","name":"Pazienti","id":"clinical-workspace-section-patients-button"}}
+{"op":"expect","target":{"role":"button","name":"Pazienti","id":"clinical-workspace-section-patients-button"},"state":"selected"}
 {"op":"discover"}
