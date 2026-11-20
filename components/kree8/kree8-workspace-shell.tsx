@@ -11,7 +11,8 @@ import PrivacyBlur from '@/components/privacy-blur';
 import { PrivacyModeToggle } from '@/components/privacy-mode-toggle';
 import { RuntimeTwinFolderContext, useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import styles from './kree8-workspace-shell.module.css';
-import { RuntimeTwinPatientNavigation } from '@/components/runtime-twin-workspace';
+import { RuntimeTwinPatientNavigation, useRecordCrumb } from '@/components/runtime-twin-workspace';
+import { RecordToolbar } from '@/components/record-toolbar';
 import twin from './twin-patient-shell.module.css';
 import layout from '@/components/ink-layout.module.css';
 import sectionRecipe from '@/components/ink-section.module.css';
@@ -51,6 +52,8 @@ type Kree8WorkspaceShellProps = {
   patientLabel?: string;
   patientAtoms?: string[];
   patientDetails?: PatientHeaderDetails;
+  recordVisit?: { id: string; reference?: { date: Date; author?: string }; today: Date; proposals?: number };
+  prescriptionAction?: ReactNode;
   statusLabel?: string;
   navItems?: Kree8WorkspaceNavItem[];
   navigationClassName?: string;
@@ -80,6 +83,8 @@ export function Kree8WorkspaceShell({
   patientLabel,
   patientAtoms = [],
   patientDetails,
+  recordVisit,
+  prescriptionAction,
   statusLabel,
   navItems = [],
   navigationClassName,
@@ -115,6 +120,12 @@ export function Kree8WorkspaceShell({
   const folderToggleRef = useRef<HTMLButtonElement>(null);
   const folderMode = isClinical && proposal;
   const visibleFolder = folderMode ? (writing ? 'quadro' : folderSection) : undefined;
+  const visit = recordVisit?.reference;
+  const civilDay = (day: Date) => Date.UTC(day.getFullYear(), day.getMonth(), day.getDate());
+  const elapsed = visit && recordVisit ? (civilDay(recordVisit.today) - civilDay(visit.date)) / 86_400_000 : undefined;
+  const breadcrumb = elapsed === undefined ? 'Scheda paziente' : elapsed === 0 ? 'Visita di oggi'
+    : elapsed === 1 ? 'Ritorno dopo un giorno' : `Ritorno dopo ${elapsed} giorni`;
+  useRecordCrumb(folderMode ? recordVisit?.id : undefined, breadcrumb, recordVisit?.proposals);
 
   /* a patient route may unmount the invoking control before the title
      mounts. Treat only body or that detached control as unowned focus, once per
@@ -422,10 +433,11 @@ export function Kree8WorkspaceShell({
               <h1 ref={patientTitleRef} tabIndex={-1} className="type-person"><PrivacyBlur>{title}</PrivacyBlur></h1>
               <p>{patientAtoms.slice(0, 2).map((atom, index) => <span key={atom}>{index > 0 ? ' · ' : ''}<PrivacyBlur>{atom}</PrivacyBlur></span>)}</p>
             </div>}
-            <div className={twin.actions}>
+            <RecordToolbar label="Comandi della scheda" className={twin.actions}>
+              {prescriptionAction}
               {primaryAction && PrimaryActionIcon ? <Link href={primaryAction.href} className={pendingForms ? 'mf-button-secondary' : 'mf-button-primary'}><PrimaryActionIcon size={16} aria-hidden />{primaryAction.label}</Link> : null}
               {headerActions}
-            </div>
+            </RecordToolbar>
           </> : <>
           {(!overviewMode || primaryAction || headerActions) && <div className={styles.chromeTopRow}>
             <Link href={backHref} className={styles.backButton} aria-label={backLabel} title={backLabel}>
@@ -483,7 +495,7 @@ export function Kree8WorkspaceShell({
           </>}
         </header>
 
-        {folderMode ? <RuntimeTwinPatientNavigation items={renderedNavItems} active={folderSection} /> : renderedNavItems.length > 0 ? (
+        {folderMode ? <RuntimeTwinPatientNavigation items={renderedNavItems} active={folderSection} lastVisit={visit} /> : renderedNavItems.length > 0 ? (
           <nav
             id={`${railId}-nav`}
             className={`${layout.plane} ${styles.sectionRail} ${navGroups ? styles.groupedSectionRail : ''} ${navigationClassName ?? ''}`}

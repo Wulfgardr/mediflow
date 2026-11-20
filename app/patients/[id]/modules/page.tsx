@@ -1,4 +1,6 @@
 'use client';
+import { PatientSheetMenu } from '@/components/patient-sheet-menu';
+import { useEntryDraftMarker, useEntryDraftWords } from '@/hooks/use-entry-local-draft';
 import { patientAgeLabel } from '@/lib/patient-identity';
 
 import { Disclosure } from '@/components/disclosure';
@@ -9,11 +11,12 @@ import Link from 'next/link';
 import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import { useEntryDraftOnOpen } from '@/lib/hooks/effects/use-entry-draft-on-open';
 import { useParams, useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, ArrowLeft, ChevronRight, Plus } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Activity, ArrowLeft, ChevronRight, ClipboardPenLine, FileText as DraftIcon, Plus } from 'lucide-react';
 
 import { PluginLocalUiNavigation, PluginPrescribingGuide } from '@/components/plugin-local-ui-navigation';
 import { PatientClinicalSupport, PatientProposalsSummary } from '@/components/patient-clinical-support';
+import type { PatientInsightCardPreview } from '@/components/ai-patient-insight';
 import { AttentionGroup } from '@/components/attention-group';
 import { ClinicalRiverTimeline } from '@/components/clinical-river-timeline';
 import { PatientEntryComposer } from '@/components/patient-entry-composer';
@@ -21,7 +24,7 @@ import type { ClinicalEditorFocus } from '@/components/clinical-rich-text-editor
 import { PatientSynopticSheet } from '@/components/patient-synoptic-sheet';
 import { PatientSheetSources, type SheetSource } from '@/components/patient-sheet-sources';
 import { projectVisitReference } from '@/lib/patient-therapy-changes';
-import { PatientSheetActivity } from '@/components/patient-sheet-activity';
+import { PatientSheetActivity, therapyChangesSinceVisit } from '@/components/patient-sheet-activity';
 import { CollapsibleSection } from '@/components/kree8/collapsible-section';
 import DocumentInsightsPanel from '@/components/document-insights-panel';
 import DocumentUpload from '@/components/document-upload';
@@ -84,6 +87,15 @@ function navigateToObservationForm(): void {
     requestAnimationFrame(() => document.getElementById('parametri')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
 }
 
+function DraftReturn({ patientId }: { patientId: string }) {
+    const count = useEntryDraftWords(patientId);
+    return <Link href={`/patients/${patientId}/modules?voce=nuova`} className="mf-draft-return"
+        aria-label="Torna alla bozza" aria-describedby={count ? 'bozza-parole' : undefined}>
+        <DraftIcon size={15} aria-hidden /> Torna alla bozza
+        {count ? <span id="bozza-parole"><span aria-hidden>· </span>{count} {count === 1 ? 'parola' : 'parole'}</span> : null}
+    </Link>;
+}
+
 export default function PatientDetailPage() {
     const { id } = useParams<{ id: string }>();
     const writing = useSearchParams().get('voce') === 'nuova';
@@ -94,6 +106,7 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
     const { proposal } = useRuntimeTwinDesign();
     const [draftOnOpen, setDraftOnOpen] = useEntryDraftOnOpen(id, proposal);
     const writing = requested || draftOnOpen;
+    const savedDraft = useEntryDraftMarker(id);
     const [fullDiary, setFullDiary] = useState(false);
     const diaryControl = useRef<HTMLButtonElement>(null);
     const composerFocus = useRef<ClinicalEditorFocus>(null);
@@ -122,7 +135,10 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
         },
     };
     const [smartImportProposalCapture, setSmartImportProposalCapture] = useState<PatientSmartImportProjectionCaptureInput | null>(null);
-    const [insightProposalKey, setInsightProposalKey] = useState<string | null>(null);
+    const [insightProposal, setInsightProposal] = useState<{ key: string; preview: PatientInsightCardPreview } | null>(null);
+    const onInsightProposalChange = useCallback((key: string | null, preview?: PatientInsightCardPreview | null) => {
+        setInsightProposal(key && preview ? { key, preview } : null);
+    }, []);
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
     /* Whether this browser can actually hand a file to the system.
        Probed rather than assumed: the Web Share API accepts files on iOS, iPadOS
@@ -461,7 +477,8 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
     const insightStale = Boolean(patient.aiSummary?.trim())
         && insightGeneratedAt !== null
         && maxClinicalTimestamp > insightGeneratedAt + 5000;
-    const hasInsightProposal = insightProposalKey === `${patient.id}:${patient.version ?? 'unknown'}`;
+    const currentInsightPreview = insightProposal?.key === `${patient.id}:${patient.version ?? 'unknown'}` ? insightProposal.preview : null;
+    const hasInsightProposal = currentInsightPreview !== null;
     const reviewQueueProjection = buildPatientReviewQueueSummary({
         insight: {
             enabled: isAiPatientInsightEnabledValue(patientInsightKillSwitch?.value),
@@ -647,9 +664,16 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
                 birthDateLabel: patient.birthDate ? birthDateLabel : patient.birthYear ? `anno stimato ${patient.birthYear}` : undefined,
                 ageLabel: patientAgeLabel(patient, new Date(currentTimestampMs)) ?? undefined,
                 taxCode: patient.taxCode || undefined,
+                exemptions: exemptionCodes,
+                adi: patient.isAdi === true,
                 identifierLabel: patientIdentifierLabel(patient.taxCode, patient.identifierType),
                 identifierAbsent: !patient.taxCode,
             }}
+            recordVisit={{ id, reference: visitReference?.latest ?? undefined, today: comparisonReadAt, proposals: Number(hasInsightProposal) }}
+            prescriptionAction={!writing ? <PatientSheetMenu label="Prescrivi" trigger={props => <button {...props} className="mf-button-secondary"><ClipboardPenLine size={15} aria-hidden />Prescrivi</button>}>
+                <a href="#prestazioni" role="menuitem" tabIndex={-1} className="mf-popover-row">Prescrizione di una prestazione</a>
+                {workspaceNavGroups.some(group => group.items.some(item => item.href === '#protesica')) ? <a href="#protesica" role="menuitem" tabIndex={-1} className="mf-popover-row">Prescrizione protesica</a> : null}
+            </PatientSheetMenu> : undefined}
             navGroups={workspaceNavGroups}
             primaryAction={writing ? undefined : { href: `/patients/${id}/modules?voce=nuova`, label: 'Nuova voce', icon: Plus }}
             headerActions={(
@@ -666,6 +690,7 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
                 </>
             )}
         >
+            {proposal && savedDraft && !writing ? <DraftReturn patientId={id} /> : null}
             <div className={workspaceStyles.clinicalStack}>
                 <section id="attenzione" className={workspaceStyles.attentionBand} data-has-attention={reviewQueueSummary.attentionCount + openLoopCount > 0 || hasInsightProposal} aria-labelledby="attention-title" data-testid="lume-scheda-attention">
                     <div className={workspaceStyles.attentionHead}>
@@ -723,14 +748,14 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
                             ) : null}
                         </div>
                     </div>
-                    <PatientClinicalSupport patient={patient} stale={insightStale} onProposalChange={setInsightProposalKey} />
+                    <PatientClinicalSupport patient={patient} stale={insightStale} onProposalChange={onInsightProposalChange} />
                 </section>
 
                 <PluginLocalUiNavigation key={id} patientId={id} patientVersion={patient.version} patientLabel={`${patient.firstName} ${patient.lastName}`} />
                 <PatientSynopticSheet
-                    clinicalSupport={<PatientProposalsSummary hasInsightProposal={hasInsightProposal}
-                            hasSmartImportProposal={smartImportProposalCapture !== null && smartImportProposalCapture === smartImportFabricCaptureInput}
-                            smartImportAvailable={smartImportSourceCount > 0} />}
+                    clinicalSupport={<PatientProposalsSummary hasInsightProposal={hasInsightProposal} patientId={patient.id} preview={currentInsightPreview}
+                            hasSmartImportProposal={smartImportProposalCapture !== null && smartImportProposalCapture === smartImportFabricCaptureInput} />}
+                    therapyChanges={therapyChangesSinceVisit(id, therapiesError ? undefined : therapies, visitReference, comparisonReadAt)}
                     notesContent={<PatientProfileNotes patientId={id} patientVersion={patient.version} />}
                     problems={{ data: diagnosisItems, loading: patientLoading, error: patientError }}
                     therapies={{ data: activeTherapies, loading: therapiesLoading, error: therapiesError }}

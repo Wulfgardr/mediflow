@@ -1,7 +1,7 @@
 import {expect,test} from '@playwright/test';
 import {bootstrapUnlockedSession,openPatientSection} from './utils';
 
-for (const width of [1440, 390]) for (const theme of ['giorno', 'grafite']) test(`patient header keeps two entrances, fixed menu destinations and hands priority to a form ${theme} ${width}`,async({page})=>{
+for (const width of [1440, 390]) for (const theme of ['giorno', 'grafite']) test(`patient header opens prescriptions, exposes its actions and hands priority to a form ${theme} ${width}`,async({page})=>{
  await page.setViewportSize({width,height:960});
  await bootstrapUnlockedSession(page,process.env.E2E_PIN||'1234');
  const id=await page.evaluate(async()=>{
@@ -27,7 +27,15 @@ for (const width of [1440, 390]) for (const theme of ['giorno', 'grafite']) test
   }
  };
  await expect(header.getByRole('link',{name:'Nuova voce',exact:true})).toHaveAttribute('href',`/patients/${id}/modules?voce=nuova`);
- await expect(header.locator('a:visible,button:visible,summary:visible')).toHaveCount(2);
+ await expect(header.locator('a:visible,button:visible,summary:visible')).toHaveCount(3);
+ const prescribe = header.getByRole('button', { name: 'Prescrivi', exact: true });
+ await prescribe.focus();
+ await page.keyboard.press('Enter');
+ const prescriptions = page.getByRole('menu', { name: 'Prescrivi', exact: true });
+ await expect(prescriptions.getByRole('menuitem', { name: 'Prescrizione di una prestazione' })).toHaveAttribute('href', '#prestazioni');
+ await page.keyboard.press('Escape');
+ await expect(prescriptions).toBeHidden();
+ await expect(prescribe).toBeFocused();
  const trigger=header.getByRole('button',{name:'Azioni',exact:true});
  await trigger.focus();await page.keyboard.press('ArrowDown');
  const menu=page.getByRole('menu',{name:'Azioni scheda',exact:true});

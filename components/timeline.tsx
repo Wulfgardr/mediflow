@@ -2,7 +2,7 @@
 
 import { db, Attachment } from '@/lib/db';
 import { Button } from '@/components/ui/button';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, NotebookText } from 'lucide-react';
 import { useEffect, useState, type ComponentProps, type ReactNode } from 'react';
 import { CollapsibleSection } from '@/components/kree8/collapsible-section';
 import { ViewState } from '@/components/ui/view-state';
@@ -14,6 +14,7 @@ import { useToast } from '@/components/ui/toast-provider';
 import { LumeFilo } from '@/components/ui/lume-filo';
 import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import twin from './twin-diary.module.css';
+import { useSheetDiaryReading } from './sheet-diary-reading';
 
 interface TimelineProps {
     entries: TimelineEntryData[] | undefined;
@@ -41,6 +42,7 @@ export default function Timeline({
     onRetry,
 }: TimelineProps) {
     const { proposal } = useRuntimeTwinDesign();
+    const reading = useSheetDiaryReading(section?.id) && patientDiary && !composer;
     const [showDeleted, setShowDeleted] = useState(false);
     const [viewingFile, setViewingFile] = useState<Attachment | null>(null);
     const sessionSignal = db.getSessionReadSignal();
@@ -110,7 +112,7 @@ export default function Timeline({
     };
 
     // Filter logic
-    const visibleEntries = (entries ?? []).filter(entry => showDeleted || !entry.deletedAt);
+    const visibleEntries = (entries ?? []).filter(entry => (showDeleted && !reading) || !entry.deletedAt);
     const resolvedActiveEntryId = visibleEntries.some((entry) => entry.id === activeEntryId)
         ? activeEntryId
         : visibleEntries[0]?.id;
@@ -133,7 +135,9 @@ export default function Timeline({
     const withHeader = (history: ReactNode) => {
         const content = <>{composer}{composer ? <div className={twin.previousEntries}>{auditToggle}{history}</div> : history}</>;
         return section
-        ? <CollapsibleSection {...section} headerAction={composer ? undefined : auditToggle}>{content}</CollapsibleSection>
+        ? reading
+            ? <CollapsibleSection {...section} icon={section.icon ?? NotebookText} headerAction={<a href={`#${section.id}`} className={twin.fullDiaryLink}>Tutto il diario</a>}>{content}</CollapsibleSection>
+            : <CollapsibleSection {...section} headerAction={composer ? undefined : auditToggle}>{content}</CollapsibleSection>
         : <>
             {heading ? <header className={sectionRecipe.header}><h4 className={sectionRecipe.heading}>{heading}</h4>{auditToggle}</header>
                 : <div className="flex justify-end">{auditToggle}</div>}
@@ -152,7 +156,7 @@ export default function Timeline({
         {refreshFailed}
         <div className={patientDiary && proposal ? twin.patientDiary : "space-y-6"}>
             <div
-                className={proposal ? twin.diary : 'relative ml-3 space-y-3 pb-8'}
+                className={proposal ? `${twin.diary} ${reading ? twin.readingDiary : ''}` : 'relative ml-3 space-y-3 pb-8'}
                 role="feed"
                 aria-label={label}
             >
@@ -167,12 +171,13 @@ export default function Timeline({
                         key={entry.id}
                         entry={entry}
                         patientDiary={patientDiary}
+                        reading={reading}
                         active={entry.id === resolvedActiveEntryId}
                         position={index + 1}
                         setSize={visibleEntries.length}
                         onActivate={() => setActiveEntryId(entry.id)}
-                        onDelete={handleDelete}
-                        onRestore={handleRestore}
+                        onDelete={reading ? undefined : handleDelete}
+                        onRestore={reading ? undefined : handleRestore}
                         onViewAttachment={setViewingFile}
                     />
                 ))}

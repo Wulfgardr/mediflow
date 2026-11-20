@@ -28,7 +28,22 @@ pub(crate) fn button_ids(render: impl FnOnce()) -> Vec<String> {
 }
 
 pub(crate) fn observe(element: Stateful<Div>) -> gpui::AnyElement {
-    Observed(element).into_any_element()
+    Observed(element, None).into_any_element()
+}
+
+pub(crate) fn observe_editor(
+    element: Stateful<Div>,
+    editor: Entity<TextInput>,
+) -> gpui::AnyElement {
+    Observed(element, Some(InputProbe::Editor(editor))).into_any_element()
+}
+
+pub(super) fn observe_scroll(element: Stateful<Div>, scroll: ScrollHandle) -> gpui::AnyElement {
+    Observed(element, Some(InputProbe::Scroll(scroll))).into_any_element()
+}
+
+pub(super) fn observe_focus(element: Stateful<Div>, focus: FocusHandle) -> gpui::AnyElement {
+    Observed(element, Some(InputProbe::Focus(focus))).into_any_element()
 }
 
 pub(super) fn clip(id: &str) -> gpui::Bounds<gpui::Pixels> {
@@ -40,7 +55,11 @@ thread_local! {
     static NODES: std::cell::RefCell<HashMap<String, (gpui::accesskit::Node, gpui::Bounds<gpui::Pixels>)>> = std::cell::RefCell::new(HashMap::new());
 }
 
-pub(super) type RenderedControl = (gpui::accesskit::Node, gpui::Bounds<gpui::Pixels>);
+pub(super) struct RenderedControl {
+    pub node: gpui::accesskit::Node,
+    pub bounds: gpui::Bounds<gpui::Pixels>,
+    pub input: Option<InputProbe>,
+}
 
 thread_local! {
     static CONTROLS: std::cell::RefCell<Option<Vec<RenderedControl>>> = const { std::cell::RefCell::new(None) };
@@ -69,7 +88,14 @@ pub(super) fn node(id: &str) -> (gpui::accesskit::Node, gpui::Bounds<gpui::Pixel
     })
 }
 
-struct Observed(Stateful<Div>);
+#[derive(Clone)]
+pub(super) enum InputProbe {
+    Editor(Entity<TextInput>),
+    Focus(FocusHandle),
+    Scroll(ScrollHandle),
+}
+
+struct Observed(Stateful<Div>, Option<InputProbe>);
 
 impl gpui::IntoElement for Observed {
     type Element = Self;
@@ -122,8 +148,14 @@ impl gpui::Element for Observed {
         self.0.write_a11y_info(&mut node);
         CONTROLS.with(|items| {
             if let Some(items) = items.borrow_mut().as_mut() {
-                let visible = bounds.intersect(&window.content_mask().bounds);
-                items.push((node.clone(), visible));
+                let viewport = window.visual_viewport_bounds();
+                items.push(RenderedControl {
+                    node: node.clone(),
+                    bounds: bounds
+                        .intersect(&window.content_mask().bounds)
+                        .intersect(&viewport),
+                    input: self.1.clone(),
+                });
             }
         });
         MASKS.with(|masks| {
