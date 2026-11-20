@@ -126,7 +126,14 @@ test.describe('Qualifica Q-8', () => {
         const [record] = await seed(page);
         await open(page, record.path);
         await addNote(page);
-        const samples = [];
+        const samples: Array<{
+          width: number;
+          height: number;
+          layout: string;
+          action: [number, number];
+          workspace: number;
+          textInset: number[];
+        }> = [];
         for (const [width, height] of [[1440, 960], [390, 844], [320, 760], [900, 620]]) {
           await page.setViewportSize({ width, height });
           for (const [label, value] of [['Barra laterale', 'workbench'], ['Barra superiore', 'stream']]) {

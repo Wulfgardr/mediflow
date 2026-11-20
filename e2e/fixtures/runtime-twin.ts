@@ -9,6 +9,7 @@ import { isolatedChromeLaunch } from './secure-browser';
 
 export const twinPin = '086086';
 const root = resolve(__dirname, '../..');
+const distName = '.next-e2e';
 
 async function loopbackPort(): Promise<number> {
     const reservation = createServer();
@@ -32,19 +33,23 @@ export async function withTwinRuntime(
     const directory = await mkdtemp(join(tmpdir(), 'mediflow-twin-'));
     const data = join(directory, 'data');
     const home = join(directory, 'home');
+    const dist = join(root, distName);
     const env = {
         PATH: process.env.PATH, SystemRoot: process.env.SystemRoot, LANG: process.env.LANG,
         HOME: home, USERPROFILE: home, TMPDIR: directory, TEMP: directory,
         MEDIFLOW_DATA_DIR: data, MEDIFLOW_E2E_DATA_DIR: data,
         MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1', E2E_DISABLE_LEGACY_COPY: '1',
         MEDIFLOW_RUNTIME_TWIN: mode === 'comparison' ? '1' : undefined,
-        MEDIFLOW_NEXT_DIST_DIR: '.next-e2e', E2E_PIN: twinPin,
+        MEDIFLOW_NEXT_DIST_DIR: distName, E2E_PIN: twinPin,
         NEXT_TELEMETRY_DISABLED: '1',
         HTTPS_PROXY: 'http://127.0.0.1:1', HTTP_PROXY: 'http://127.0.0.1:1',
         NO_PROXY: '127.0.0.1', NODE_USE_ENV_PROXY: '1',
     };
     let browser: Browser | undefined;
+    let ownsDist = false;
     try {
+        await mkdir(dist, { mode: 0o700 });
+        ownsDist = true;
         await mkdir(data, { mode: 0o700 });
         await mkdir(home, { mode: 0o700 });
         const node = (args: string[]) => execFileSync(process.execPath, args, { cwd: root, env, timeout: 30_000 });
@@ -57,8 +62,9 @@ export async function withTwinRuntime(
         }
         const child = spawn(process.execPath, [
             'node_modules/next/dist/bin/next', 'dev', '--hostname', '127.0.0.1', '--port', String(port),
-        ], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] });
+        ], { cwd: root, env });
         const closed = trackClose(child);
+        child.stdin.end();
         try {
             const ready = AbortSignal.timeout(30_000);
             let output = '';
@@ -87,6 +93,10 @@ export async function withTwinRuntime(
             try { await browser?.close(); } finally { await stopServer(child, closed); }
         }
     } finally {
-        await rm(directory, { recursive: true, force: true });
+        try {
+            if (ownsDist) await rm(dist, { recursive: true, force: true });
+        } finally {
+            await rm(directory, { recursive: true, force: true });
+        }
     }
 }
