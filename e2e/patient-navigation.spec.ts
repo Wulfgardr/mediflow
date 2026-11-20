@@ -2,7 +2,7 @@ import { chromium, expect, test, type Page } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { bootstrapUnlockedSession, openPatientSection } from './utils';
+import { bootstrapUnlockedSession, openPatientSection, openUnlockedDocument } from './utils';
 import { secureLaunch } from './fixtures/secure-browser';
 import { currentPreset } from './fixtures/territorial-preset';
 
@@ -27,7 +27,7 @@ async function seed(page: Page, count: number) {
         }
         return patient.id as string;
     }, count);
-    await page.goto(`/patients/${id}/modules`);
+    await openUnlockedDocument(page, `/patients/${id}/modules`);
     await expect(navigation(page)).toBeVisible();
     await expect(page.getByTestId('lume-scheda-header')).toContainText('Ada');
     return id;
