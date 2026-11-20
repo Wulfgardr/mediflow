@@ -18,6 +18,7 @@ struct Control {
     node: gpui::accesskit::Node,
     bounds: Bounds<Pixels>,
     input: Input,
+    shared_name: bool,
 }
 
 impl Control {
@@ -64,6 +65,8 @@ impl Control {
         json!({"role":self.role, "name":self.name, "id":self.node.author_id(),
                "actions": operations, "accessKitActions": ax_actions,
                "selected":self.node.is_selected(), "expanded":self.node.is_expanded(),
+               "enabled": !self.node.is_disabled(),
+               "nameSource": if self.shared_name { "shared-button" } else { "accesskit-node" },
                "focused":self.focused(window, cx), "selection":selection,
                "bounds": {
                    "x": f32::from(self.bounds.origin.x), "y": f32::from(self.bounds.origin.y),
@@ -85,12 +88,41 @@ fn frame(cx: &mut VisualTestContext) -> (Vec<Control>, Vec<Value>, Vec<Value>) {
         .iter()
         .filter_map(|control| control.node.author_id())
         .collect::<std::collections::BTreeSet<_>>();
-    let outside_census = painted
+    let unobserved = painted
         .shared_buttons
         .iter()
-        .filter(|button| !observed_ids.contains(button.id.as_str()))
-        .map(|button| json!({"id":button.id,"label":button.label,"enabled":button.enabled}))
+        .filter(|button| !observed_ids.contains(button.id.as_str()));
+    let outside_census = unobserved
+        .clone()
+        .filter(|button| button.label.is_empty())
+        .map(|button| {
+            json!({"id":button.id,"label":button.label,"enabled":button.enabled,
+                             "reason":"accessible-name-not-at-shared-component"})
+        })
         .collect();
+    let shared_controls = unobserved
+        .filter(|button| !button.label.is_empty())
+        .map(|button| {
+            let mut node = gpui::accesskit::Node::new(Role::Button);
+            node.set_author_id(button.id.clone());
+            node.set_label(button.label.clone());
+            if !button.enabled {
+                node.set_disabled();
+            }
+            let input = if button.enabled {
+                Input::Activate(None)
+            } else {
+                Input::Observe
+            };
+            Control {
+                role: "button",
+                name: button.label.clone(),
+                node,
+                bounds: button.bounds,
+                input,
+                shared_name: true,
+            }
+        });
     let mut controls = vec![];
     let mut excluded = vec![];
     for RenderedControl {
@@ -161,8 +193,10 @@ fn frame(cx: &mut VisualTestContext) -> (Vec<Control>, Vec<Value>, Vec<Value>) {
             node,
             bounds,
             input,
+            shared_name: false,
         });
     }
+    controls.extend(shared_controls);
     (controls, excluded, outside_census)
 }
 
@@ -254,6 +288,7 @@ pub(super) fn drive(action: &Value, cx: &mut VisualTestContext) -> Result<Value,
         }
         (_, "expect")
             if action["state"] == "visible" && !matches!(control.input, Input::Keyboard(_)) => {}
+        (_, "expect") if action["state"] == "enabled" && !control.node.is_disabled() => {}
         (_, "expect")
             if action["state"] == "selected" && control.node.is_selected() == Some(true) => {}
         (_, "expect")
@@ -432,4 +467,44 @@ fn shell_ui_cli(cx: &mut gpui::TestAppContext) {
             1
         );
     }
+}
+
+#[gpui::test]
+fn shell_ui_cli_shared_therapy_button(cx: &mut gpui::TestAppContext) {
+    let (_host, cx) = shell_fixture(cx);
+    run(
+        include_str!("../../../../../e2e/ui-cli/gpui-shell-therapy.jsonl"),
+        |action| {
+            let receipt = drive(action, cx)?;
+            if action["op"] == "click" {
+                assert_eq!(receipt["nameSource"], "shared-button");
+            }
+            Ok(receipt)
+        },
+    );
+}
+
+#[gpui::test]
+fn shell_ui_cli_shared_observation_button(cx: &mut gpui::TestAppContext) {
+    let (_host, cx) = shell_fixture(cx);
+    run(
+        include_str!("../../../../../e2e/ui-cli/gpui-shell-observation.jsonl"),
+        |action| {
+            let receipt = drive(action, cx)?;
+            if action["op"] == "click" {
+                assert_eq!(receipt["nameSource"], "shared-button");
+            }
+            Ok(receipt)
+        },
+    );
+}
+
+#[gpui::test]
+fn shell_ui_cli_review_returns_without_registering(cx: &mut gpui::TestAppContext) {
+    let (host, cx) = shell_fixture(cx);
+    run(
+        include_str!("../../../../../e2e/ui-cli/gpui-shell-review.jsonl"),
+        |action| drive(action, cx),
+    );
+    assert!(host.routes().iter().all(|route| route.starts_with("GET ")));
 }

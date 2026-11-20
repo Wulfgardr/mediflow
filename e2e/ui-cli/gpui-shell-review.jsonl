@@ -1,0 +1,7 @@
+{"op":"click","target":{"role":"button","name":"Nuova voce"}}
+{"op":"fill","target":{"role":"textbox","name":"Titolo della voce"},"value":"Nota sintetica da rivedere"}
+{"op":"fill","target":{"role":"textbox","name":"Testo della voce"},"value":"Bozza sintetica che resta da confermare."}
+{"op":"click","target":{"role":"button","name":"Rivedi"}}
+{"op":"expect","target":{"role":"button","name":"Conferma e registra nella scheda di Sintetica Amina"},"state":"enabled"}
+{"op":"click","target":{"role":"button","name":"Torna alla bozza"}}
+{"op":"expectValue","target":{"role":"textbox","name":"Testo della voce"},"value":"Bozza sintetica che resta da confermare."}
