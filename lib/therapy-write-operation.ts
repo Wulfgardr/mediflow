@@ -11,7 +11,7 @@ import { parseTherapyStatus } from './status-normalization';
 
 type Tx = Parameters<Parameters<typeof dbServer.transaction>[0]>[0];
 type Mode = 'web' | 'v1' | 'network';
-type Result = { status: 200 | 201 | 401 | 403 | 404 | 409; value: Record<string, unknown> };
+type Result = { status: 200 | 201 | 400 | 401 | 403 | 404 | 409; value: Record<string, unknown> };
 type CreateInput = {
     patientId: string; therapyId: string; values: typeof therapies.$inferInsert; changedFields: string[];
     mode: Mode; scopeAmbulatoryId?: string; audit: RequiredAuditContext; authorizeCommit?: NetworkPatientCommitGuard;
@@ -21,6 +21,13 @@ export type TherapyUpdateInput = {
     values: Partial<typeof therapies.$inferInsert>; changedFields: string[];
     mode: Mode; scopeAmbulatoryId?: string; audit: RequiredAuditContext; authorizeCommit?: NetworkPatientCommitGuard; occurredAt?: Date;
 };
+
+function invalidTherapyPeriod(startDate: Date, endDate: Date | null | undefined): Result | null {
+    if (endDate && endDate < startDate) {
+        return { status: 400, value: { error: 'La fine della terapia precede l’inizio.' } };
+    }
+    return null;
+}
 
 function networkScopeContains(tx: Tx, patientId: string, ambulatoryId: string): boolean {
     return Boolean(tx.select({ patientId: patientsToAmbulatories.patientId })
@@ -51,6 +58,8 @@ export function createTherapyOperationInTransaction(tx: Tx, input: CreateInput):
     if (duplicate) return { status: 409, value: { error: 'Conflict' } };
     const values = parseTherapyStatus(input.values.status) === 'completed' && !input.values.endDate
         ? { ...input.values, endDate: new Date() } : input.values;
+    const invalidPeriod = invalidTherapyPeriod(values.startDate, values.endDate);
+    if (invalidPeriod) return invalidPeriod;
     const inserted = tx.insert(therapies).values(values).run();
     if (inserted.changes !== 1) throw new Error('Therapy create did not write exactly one row');
     writeAuditEventInTransaction(tx, {
@@ -87,6 +96,12 @@ export function updateTherapyOperationInTransaction(tx: Tx, input: TherapyUpdate
         input.occurredAt ?? new Date());
     if (!plan.ok) return plan.denial;
     const values = plan.endDate === undefined ? input.values : { ...input.values, endDate: plan.endDate };
+    const startDate = values.startDate ?? existing.startDate;
+    const endDate = values.endDate === undefined ? existing.endDate : values.endDate;
+    if (startDate.getTime() !== existing.startDate.getTime() || endDate?.getTime() !== existing.endDate?.getTime()) {
+        const invalidPeriod = invalidTherapyPeriod(startDate, endDate);
+        if (invalidPeriod) return invalidPeriod;
+    }
     const changedFields = plan.endDate === undefined || input.changedFields.includes('endDate')
         ? input.changedFields : [...input.changedFields, 'endDate'];
 

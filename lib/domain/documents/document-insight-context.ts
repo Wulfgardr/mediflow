@@ -1,3 +1,4 @@
+import { compareClinicalDatesDesc, parseClinicalDate } from '../../clinical-date';
 import type { DocumentInsight } from '../../db';
 
 export type DedupedDocumentInsightsResult = {
@@ -14,8 +15,8 @@ function normalizeDocumentContextText(value: string | null | undefined): string 
 }
 
 function buildDateKey(value: unknown): string {
-    const parsed = value instanceof Date ? value : new Date(value as string | number | Date);
-    if (Number.isNaN(parsed.getTime())) return 'unknown-day';
+    const parsed = parseClinicalDate(value);
+    if (!parsed) return 'unknown-day';
     return parsed.toISOString().slice(0, 10);
 }
 
@@ -110,7 +111,7 @@ export function dedupeDocumentInsightsForContext(insights: DocumentInsight[]): D
 
     const deduped = Array.from(buckets.values())
         .map((item) => item.insight)
-        .sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime());
+        .sort((left, right) => compareClinicalDatesDesc(left.date, right.date));
 
     return {
         insights: deduped,

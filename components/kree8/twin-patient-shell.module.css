@@ -70,8 +70,8 @@
 .patientCanvas { min-height: 100%; container-name: patient-canvas; }
 
 .patientBody[data-folder-section='diario'] :global(#quadro[data-overview]:not([data-writing])) { display: block; }
-.patientBody[data-folder-section='diario'] :global(#quadro[data-overview]:not([data-writing]) > :not(:has(> #diario))) { display: none; }
-.patientBody[data-folder-section='diario'] :global(#quadro[data-overview]:not([data-writing]) > :has(> #diario) > :not(#diario)) { display: none; }
+.patientBody[data-folder-section='diario'] :global(#quadro[data-overview]:not([data-writing]) > div > :not(:has(> #diario))) { display: none; }
+.patientBody[data-folder-section='diario'] :global(#quadro[data-overview]:not([data-writing]) > div > :has(> #diario) > :not(#diario)) { display: none; }
 .patientBody :global([data-folder-pane] > div) { padding-inline: 0; }
 @media (max-width: 700px) {
  .patientHeader { padding: 14px var(--ink-plane-inset); }
@@ -102,4 +102,24 @@
 @media (min-width: 1000px) {
  .patientCanvas[data-folder-section='quadro'] .patientHeader { padding-block: 14px; }
  .patientBody[data-folder-section='quadro'] { padding-block-start: 18px; }
+}
+
+.patientCanvas[data-folder-section='quadro'] .patientHeader h1 { font: var(--type-record-person); }
+
+@media (min-width: 1001px) {
+  .patientCanvas .patientHeader, :global(html[data-twin-composition='stream']) .patientCanvas .patientHeader {
+    position: relative; max-width: none; margin: 0; padding: 39px 24px 16px; align-items: flex-start;
+  }
+  .patientCanvas .patientBody, :global(html[data-twin-composition='stream']) .patientCanvas .patientBody[data-folder-section] {
+    margin: 0; padding: 12px 24px 24px; max-width: none;
+  }
+  .patientCanvas:not([data-writing='true']) .patientBody[data-folder-section='quadro'],
+  :global(html[data-twin-composition='stream']) .patientCanvas:not([data-writing='true']) .patientBody[data-folder-section='quadro'] {
+    padding: 18px 15px 14px;
+  }
+  .patientCanvas .readingPane { max-width: none; }
+  .patientCanvas .actions { position: relative; margin-top: -20px; z-index: 2; }
+  .patientCanvas .actions :is(a, button):not([role='menuitem']) { min-height: 36px; height: 36px; }
+  .patientCanvas .actions :is(a,button):not([role='menuitem'],[aria-label='Azioni']) { padding-inline: 14px; }
+  .patientCanvas .actions button[aria-label='Azioni'] { padding: 0; width: 36px; }
 }

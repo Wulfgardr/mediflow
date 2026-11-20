@@ -49,8 +49,9 @@ Il browser usa Chrome sandboxato e può raggiungere soltanto l’origine loopbac
 | --- | --- | --- | --- |
 | Censimento | Albero della pagina | Controlli strumentati della demo | Nodi AccessKit strumentati, conteggi ed esclusioni |
 | Target composti, testo visibile esatto | Sì | Ruolo/nome o label singoli | Ruolo/nome o label singoli |
-| `resize` nella stessa sessione | Sì | No, finestra di test fissa | No, finestra di test fissa |
-| Scroll | Porta un controllo in vista o invia una rotella | No | Rotella sul vassoio del diario, con misura dello spostamento |
+| `resize` nella stessa sessione | Sì | Finestra di test fissa | Sì, callback resize del backend di test |
+| Scroll | Porta un controllo in vista o invia una rotella | No | Rotella sui contenuti della scheda e sul vassoio Cambiato, con lettura dello spostamento |
+| Testo e tastiera | Tastiera, campi ed esiti via Playwright | Campi della dimostrazione | Editor visibili e non riservati, tab e controlli con focus esposto. Selezione del testo in byte UTF-8. |
 | Screenshot, trasferimenti file | Sì | No | No |
 
 ## Dimostrazione GPUI nel renderer di test
@@ -80,7 +81,13 @@ npm run --silent test:ui:cli -- \
   --file e2e/ui-cli/gpui-shell.jsonl
 ```
 
-[Il copione del Shell](../e2e/ui-cli/gpui-shell.jsonl) scopre i moduli della scheda, passa a **Documenti**, rientra in **Riepilogo** con Invio e verifica la tab selezionata. Poi aziona **Nuova voce**, compila **Testo della voce**, apre **Tutto il diario**, misura lo scroll del vassoio, aziona **Torna alla bozza** e verifica il testo ritrovato. Il censimento ricava ruolo, nome e geometria dai controlli osservati durante il render e riporta le azioni supportate accanto a ciascun controllo. Se l’etichetta cambia, usa `discover` sul nuovo binario di test prima di aggiornare il copione. Il banco mostra i conteggi per ruolo e le esclusioni del frame osservato. Le righe indicano le azioni AccessKit dichiarate dal controllo e quelle che la CLI può inviare attraverso il banco di input. I target composti, screenshot e download sono disponibili sul backend Web. La prova del Shell usa il client e i normali eventi GPUI su una fixture del protocollo locale in memoria. L’AccessKit della finestra installata, i gesti fisici e le conferme personali restano verifiche separate.
+[Il copione del Shell](../e2e/ui-cli/gpui-shell.jsonl) entra in **Documenti**, apre **Sintesi e fonte** e l’**Originale** di un allegato sintetico, poi torna a **Riepilogo** con Invio. Apre **Nuova voce**, compila il campo, seleziona un carattere con Maiusc+Freccia sinistra e ridimensiona la stessa finestra simulata a 640 × 880 e di nuovo a 1360 × 900. Verifica il testo dopo il resize e dopo il ritorno dal diario.
+
+`discover` riporta ruolo, nome, azioni disponibili, geometria utile al puntatore e stato dei controlli osservati nel frame. Per `focus`, `press` e `click` la ricevuta riporta il focus osservabile prima e dopo e lo stato aggiornato del controllo, se ancora presente. Per gli editor espone anche i limiti della selezione in byte UTF-8. Il resize riporta dimensioni precedenti, dimensioni lette dal renderer e identificativo della finestra. Scroll e resize passano rispettivamente dall’evento rotella e dalla callback del backend di test.
+
+Il backend GPUI simulato non attiva l’adattatore AccessKit di sistema. Il banco osserva quindi elementi GPUI effettivamente renderizzati: navigazione condivisa, tab e menu strumentati, comandi delle schede dei documenti, editor di testo e regioni di scorrimento collegate. I nodi senza nome, fuori dalla parte visibile o con un tipo non gestito sono riportati tra le esclusioni osservate. Una vista può contenere altri componenti fuori dal censimento. I ruoli usano la semantica dell’elemento, per esempio **Agenda** è un pulsante con stato selezionato e il titolo della vista è un heading. Il [copione dell’Agenda](../e2e/ui-cli/gpui-agenda.jsonl) usa la navigazione e digita nel campo di ricerca della vista. I campi riservati e quelli di sola lettura non ricevono testo dal banco.
+
+La finestra simulata misura il comportamento del Shell con il client e l’host sintetici. La finestra installata, il suo albero AX di sistema, i gesti fisici e la conferma personale sono superfici distinte. Il backend Web offre anche target composti, screenshot e download.
 
 La prova della soglia compatta usa lo stesso driver Rust. Apre **Altre azioni** con Invio anche quando il pulsante è fuori portata per il puntatore, censisce il menu e aziona **Copia bozza**. Il campo `pointerClipped` segnala i controlli raggiungibili solo con focus e tastiera nel frame corrente.
 
@@ -90,4 +97,4 @@ cargo +1.98.1 test --locked --manifest-path experiments/gpui-patient-pilot/Cargo
   threshold_recovery_reserves_content_with_larger_text_metrics -- --nocapture
 ```
 
-Nei percorsi provati il Shell espone la navigazione tra moduli come tab e le azioni di apertura come pulsanti. Il censimento non ha incontrato nodi Link, combobox o listbox. Le voci di menu sono state provate nella soglia compatta, mentre il copione del riepilogo usa pulsanti, tab, campi di testo e il vassoio del diario.
+Nei percorsi provati il Shell espone la navigazione tra moduli come tab e le azioni di apertura come pulsanti. Il censimento non ha incontrato nodi Link, combobox o listbox. Le voci di menu sono state provate nella soglia compatta. Nel Shell il copione usa pulsanti, tab, titoli, campi di testo e regioni di scorrimento.
