@@ -106,7 +106,7 @@ export function executeTherapyStatusInTransaction(tx: Tx, command: TherapyStatus
         values: { status: command.target, endDate, updatedAt: now }, changedFields: ['status', 'endDate'], mode: scopeAmbulatoryId ? 'network' : 'v1', scopeAmbulatoryId, occurredAt: now,
         audit: { archiveGeneration: command.archiveGeneration, actorType: 'user', actorRef, sourceSurface: scopeAmbulatoryId ? 'native' : 'web', requestId: command.commandId, flags: scopeAmbulatoryId ? ['auth:paired-client', 'chat:therapy-status'] : ['auth:web'] },
     });
-    if (result.status === 404) throw new TherapyStatusCommandDenied('denied');
+    if (result.status === 400 || result.status === 404) throw new TherapyStatusCommandDenied('denied');
     // Passaggio fuori tabella (WUL-800): diniego senza ricevuta, come una risorsa non ammessa.
     if (result.status === 409 && result.value.code !== 'VERSION_CONFLICT') throw new TherapyStatusCommandDenied('denied');
     if (result.status === 409) return insert(tx, { ...row, target: command.target, outcome: 'rejected', reason: 'version_conflict' });

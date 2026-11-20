@@ -14,6 +14,7 @@
  */
 
 import type { DocumentInsight } from '@/lib/db';
+import { compareClinicalDatesDesc } from './clinical-date';
 
 export interface FollowupSuggestion {
     id: string;
@@ -33,10 +34,8 @@ export interface FollowupSuggestion {
 
 const DEFAULT_MAX = 4;
 
-function insightTime(insight: DocumentInsight): number {
-    const raw = insight.evidencePack?.source?.documentDate ?? insight.date;
-    const t = raw ? new Date(raw).getTime() : 0;
-    return Number.isFinite(t) ? t : 0;
+function insightDate(insight: DocumentInsight) {
+    return insight.evidencePack?.source?.documentDate ?? insight.date;
 }
 
 function normalizeLabel(label: string): string {
@@ -56,7 +55,7 @@ export function projectFollowupSuggestions(
 
     const insights = [...documentInsights]
         .filter((insight) => insight?.evidencePack?.facts?.length)
-        .sort((a, b) => insightTime(b) - insightTime(a));
+        .sort((a, b) => compareClinicalDatesDesc(insightDate(a), insightDate(b)));
 
     const seen = new Set<string>();
     const suggestions: FollowupSuggestion[] = [];
