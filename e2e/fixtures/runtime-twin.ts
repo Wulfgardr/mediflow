@@ -34,7 +34,8 @@ export async function withTwinRuntime(
     const data = join(directory, 'data');
     const home = join(directory, 'home');
     const dist = join(root, distName);
-    const env = {
+    const env: NodeJS.ProcessEnv = {
+        NODE_ENV: 'development',
         PATH: process.env.PATH, SystemRoot: process.env.SystemRoot, LANG: process.env.LANG,
         HOME: home, USERPROFILE: home, TMPDIR: directory, TEMP: directory,
         MEDIFLOW_DATA_DIR: data, MEDIFLOW_E2E_DATA_DIR: data,
@@ -62,9 +63,8 @@ export async function withTwinRuntime(
         }
         const child = spawn(process.execPath, [
             'node_modules/next/dist/bin/next', 'dev', '--hostname', '127.0.0.1', '--port', String(port),
-        ], { cwd: root, env });
+        ], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] });
         const closed = trackClose(child);
-        child.stdin.end();
         try {
             const ready = AbortSignal.timeout(30_000);
             let output = '';
