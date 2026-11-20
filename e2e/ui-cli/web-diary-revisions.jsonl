@@ -57,7 +57,7 @@
 {"op":"expectText","target":{"role":"form","name":"Nuova voce clinica"},"contains":true,"value":"Testo e dati della bozza conservati cifrati"}
 {"op":"resize","width":760,"height":660}
 {"op":"click","target":{"role":"button","name":"Tutto il diario"}}
-{"op":"discover"}
+{"op":"scroll","target":{"role":"button","name":"Storico delle rettifiche"}}
 {"op":"focus","target":{"role":"button","name":"Storico delle rettifiche"}}
 {"op":"expect","target":{"role":"button","name":"Storico delle rettifiche"},"state":"focused"}
 {"op":"press","key":"Enter"}
