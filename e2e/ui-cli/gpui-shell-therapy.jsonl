@@ -1,0 +1,5 @@
+{"op":"press","target":{"role":"tab","name":"Terapie"},"key":"Enter"}
+{"op":"expect","target":{"role":"tab","name":"Terapie"},"state":"selected"}
+{"op":"discover"}
+{"op":"click","target":{"role":"button","name":"Nuova terapia"}}
+{"op":"expect","target":{"role":"textbox","name":"Farmaco"},"state":"visible"}

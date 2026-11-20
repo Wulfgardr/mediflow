@@ -1,0 +1,17 @@
+{"op":"click","target":{"role":"button","name":"Nuova voce"}}
+{"op":"fill","target":{"role":"textbox","name":"Titolo della voce"},"value":"Nota sintetica da rivedere"}
+{"op":"fill","target":{"role":"textbox","name":"Testo della voce"},"value":"Bozza sintetica prima del blocco."}
+{"op":"click","target":{"role":"button","name":"Rivedi"}}
+{"op":"expect","target":{"role":"button","name":"Conferma e registra nella scheda di Sintetica Amina"},"state":"enabled"}
+{"op":"click","target":{"role":"button","name":"Blocca","id":"clinical-workspace-lock"}}
+{"op":"expect","target":{"role":"heading","name":"Accedi al tuo archivio"},"state":"visible"}
+{"op":"expect","target":{"role":"button","name":"Conferma e registra nella scheda di Sintetica Amina"},"state":"hidden"}
+{"op":"expect","target":{"role":"button","name":"Nuova voce"},"state":"hidden"}
+{"op":"expect","target":{"role":"button","name":"Nuova scheda"},"state":"hidden"}
+{"op":"discover"}
+{"op":"fill","target":{"role":"textbox","name":"Nome utente"},"value":"synthetic"}
+{"op":"fill","target":{"role":"password","name":"Frase di accesso o PIN precedente"},"value":"Synthetic scales fixture passphrase"}
+{"op":"click","target":{"role":"button","name":"Accedi all'archivio"}}
+{"op":"expect","target":{"role":"heading","name":"Accedi al tuo archivio"},"state":"hidden"}
+{"op":"expect","target":{"role":"button","name":"Nuova scheda"},"state":"enabled"}
+{"op":"discover"}
