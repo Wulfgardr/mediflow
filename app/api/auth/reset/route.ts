@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { NextResponse } from 'next/server';
 import { openDbServer } from '@/lib/db-server';
@@ -70,7 +71,7 @@ export async function POST(request: Request) {
             receipt = failure.receipt;
         } else {
             abortPreparedReset(webCapability, nativeCapability);
-            console.error('Reset error:', failure?.code ?? error);
+            logServerError('Account reset', error);
             return failure?.code === 'RESET_ARCHIVE_CHANGED'
                 ? resetFailure(409, failure.code, 'Archivio modificato durante il reset. Nessun account eliminato.', failure.receipt)
                 : resetFailure(500, 'RESET_DATABASE_FAILED', 'Reset non completato. Archivio precedente intatto.', failure?.receipt ?? null);

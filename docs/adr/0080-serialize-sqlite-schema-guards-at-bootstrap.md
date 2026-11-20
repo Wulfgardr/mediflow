@@ -96,7 +96,7 @@ l'import e dell'ammissione di qualsiasi database vuoto.
 | Storia e dichiarazioni ORM | `drizzle/*.sql` resta immutato e non viene replayato dal runtime; `lib/schema.ts` descrive l'ORM e viene confrontato con il bootstrap reale. |
 | Riparazione e swap | Il protocollo esistente riconcilia i propri artefatti prima dell'apertura; il reopen usa la stessa ammissione versionata. Il lifecycle della sostituzione appartiene a C15 e ADR0142. |
 
-La versione SQLite corrente è `user_version=16` (vedi [Versioni dello schema](#versioni-dello-schema)). La prima installazione ammette
+La versione SQLite corrente è `user_version=17` (vedi [Versioni dello schema](#versioni-dello-schema)). La prima installazione ammette
 un file creato esclusivamente dal processo in una directory senza residui di
 un database precedente (sidecar, originali conservati, artefatti di swap),
 oppure la prenotazione nativa riconoscibile. Un file preesistente di zero byte o un
@@ -146,6 +146,7 @@ lock persistente o schema non riconosciuto impediscono l'apertura operativa.
 | 14 | 17 novembre 2026 | Abbinamenti e credenziali agenti limitate al mandato, con originale v13 verificato e recuperabile. ADR 0190. |
 | 15 | 17 novembre 2026 | Cassette cifrate degli agenti con chiave avvolta conservata nel backup, originale v14 verificato e recuperabile. ADR 0190. |
 | 16 | 18 novembre 2026 | Registrazioni degli agenti e mandati emessi allo sblocco. Originale v15 verificato e recuperabile. ADR 0190. |
+| 17 | 19 novembre 2026 | `entry_revisions`: storico di titolo e testo del diario con originale v16 verificato e recuperabile. La migrazione crea la tabella vuota. La prima rettifica conserva il testo esistente in una busta cifrata, anche quando la nota proviene da un archivio con valori in chiaro. [ADR 0183](0183-autore-delle-voci-di-diario.md). |
 
 Poiché la versione corrente è validata senza DDL, **ogni modifica allo schema
 canonico richiede un numero nuovo**: altrimenti gli archivi già marcati con il

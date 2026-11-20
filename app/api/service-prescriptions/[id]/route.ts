@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { reviewedServicePrescriptionItemsSchema } from '@/lib/api-schemas/prescriptions';
@@ -28,7 +29,7 @@ export async function PUT(request: Request, context: RouteContext) {
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('API PUT /service-prescriptions/[id] error:', error);
+        logServerError('API PUT /service-prescriptions/[id] error', error);
         return NextResponse.json({ error: 'Failed to update service prescription' }, { status: 500 });
     }
 }
@@ -55,7 +56,7 @@ export async function DELETE(request: Request, context: RouteContext) {
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('API DELETE /service-prescriptions/[id] error:', error);
+        logServerError('API DELETE /service-prescriptions/[id] error', error);
         return NextResponse.json({ error: 'Failed to delete service prescription' }, { status: 500 });
     }
 }

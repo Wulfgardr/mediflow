@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { readPrescriptionJsonObject } from '@/lib/prescription-json-body';
 import { NextResponse } from 'next/server';
 import {
@@ -22,7 +23,7 @@ export async function GET(request: Request) {
         if (!Array.isArray(result)) return NextResponse.json(result.value, { status: result.status });
         return NextResponse.json(result);
     } catch (error) {
-        console.error('API GET /api/v1/network/service-prescription-items error:', error);
+        logServerError('API GET /api/v1/network/service-prescription-items error', error);
         return NextResponse.json({ error: 'Failed to fetch service prescription items' }, { status: 500 });
     }
 }
@@ -38,7 +39,7 @@ export async function POST(request: Request) {
         const result = await createNetworkScopedServicePrescriptionItem(resolved.context, body);
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
-        console.error('API POST /api/v1/network/service-prescription-items error:', error);
+        logServerError('API POST /api/v1/network/service-prescription-items error', error);
         return NextResponse.json({ error: 'Failed to create service prescription item' }, { status: 500 });
     }
 }

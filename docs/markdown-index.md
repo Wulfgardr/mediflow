@@ -201,6 +201,7 @@ implementata perché è stata recuperata nell’inventario.
 | File | Scopo | Quando consultarlo |
 | --- | --- | --- |
 | [docs/capability-mapping/mediflow-0.8.5-crosswalk.md](./capability-mapping/mediflow-0.8.5-crosswalk.md) | Vista derivata del mapping WUL-522, con provenance congelata, copertura, conflitti residui e claim ceiling candidate-only. | Quando si verifica il mapping 0.8.5 senza trasformare inventari o gap in parity. |
+| [docs/ui-cli.md](./ui-cli.md) | Collaudo sintetico guidato da terminale. | Per riprodurre un percorso Web o GPUI. |
 | [docs/markdown-index.md](./markdown-index.md) | Indice completo markdown con sintesi. | Per navigazione completa e controllo copertura doc. |
 | [docs/design/punto-inchiostro/02-addendum-composizione.md](./design/punto-inchiostro/02-addendum-composizione.md) | Regole compositive D1–D16, stati di form, vuoto, proposta e overflow, sequenza delle unità Web. | Per applicare l'addendum alla specifica Punto d'inchiostro senza cambiare flussi clinici o capacità dei servizi. |
 

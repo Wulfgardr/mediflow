@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { verifyRestoreCredentials } from '@/lib/security/host-credential-verification';
 import { isCurrentServerSession } from '@/lib/security/current-session-authority';
 import { parseRestoreIntent } from '@/lib/backup-restore-receipt';
@@ -19,6 +20,7 @@ import {
     documentDiagnosisProposals,
     drugs,
     entries,
+    entryRevisions,
     exemptions,
     exemptionImportReceipts,
     prostheticsCatalogEntries,
@@ -79,7 +81,7 @@ function sortBackupRows<T extends Record<string, unknown>>(rows: T[]): T[] {
 
 function filterRowsByReference<T extends Record<string, unknown>>(
     rows: T[],
-    foreignKey: 'patientId' | 'conversationId',
+    foreignKey: 'patientId' | 'conversationId' | 'entryId',
     validRefs: Set<string>
 ): T[] {
     return rows.filter((row) => {
@@ -120,6 +122,8 @@ function buildBackupDataset(): BackupDataset {
             .map((patient) => patient.id)
             .filter((value): value is string => typeof value === 'string' && value.trim().length > 0),
     );
+    const scopedEntries = filterRowsByReference(entriesRows, 'patientId', patientIds);
+    const entryIds = new Set(scopedEntries.map(row => row.id));
     const conversationIds = new Set(
         conversationsRows
             .map((conversation) => conversation.id)
@@ -133,7 +137,8 @@ function buildBackupDataset(): BackupDataset {
             conversations: sortBackupRows(conversationsRows),
             documentDiagnosisProposals: sortBackupRows(filterRowsByReference(documentDiagnosisProposalRows, 'patientId', patientIds)),
             drugs: sortBackupRows(drugsRows),
-            entries: sortBackupRows(filterRowsByReference(entriesRows, 'patientId', patientIds)),
+            entries: sortBackupRows(scopedEntries),
+            entryRevisions: filterRowsByReference(tx.select().from(entryRevisions).all(), 'entryId', entryIds),
             exemptions: sortBackupRows(exemptionsRows),
             exemptionImportReceipts: exemptionImportReceiptRows,
             prostheticsCatalogEntries: tx.select().from(prostheticsCatalogEntries).all(),
@@ -176,7 +181,7 @@ export async function GET() {
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('[MediFlow] Backup export failed:', error);
+        logServerError('[MediFlow] Backup export failed', error);
         return NextResponse.json({ success: false, error: 'Backup export failed.' }, { status: 500 });
     }
 }

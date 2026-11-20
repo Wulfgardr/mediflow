@@ -1,5 +1,5 @@
 {
-  "syncCommit": "5d56ff5ae8837f6133b16532628ed423433f34cc",
+  "syncCommit": "089ba94f8c97fe2702eafc573c593ddbab93e8d5",
   "tool": {
     "release": "v1.7.4",
     "url": "https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar",
@@ -33,10 +33,10 @@
   "files": {
     "lib/therapy-status-confirmation.ts": "33eebc3197e988f3f1c134f1ac8499da1de95171e21d0ac7e3396c2a202c6486",
     "components/therapy-manager.tsx": "636419e0533f0368add66f0321d30ecfb0c99e69e02b1359d1ff1c7c513e6579",
-    "lib/db.ts": "98be46ca6133e5f53c0f550be1aff7135c902eb0ddb15902542970583b452589",
+    "lib/db.ts": "2530bf0da456155bf96b2bbba4f23118e1e34da2e096c5e4b5246247cec6b0f4",
     "lib/security/client-auth-api.ts": "0d1c44a438588284c8c5ab80ab727fe5c50ae29dd33b02443324a0d70f6e8678",
     "lib/therapy-write-operation.ts": "81716a464a1a5271b16687b4152cf2a11a1b4968c44fc93c3a17c31b53a54b6f",
-    "app/api/therapies/[id]/route.ts": "3f4765cd55a13360965fae38bced33cec5cc69403dd0bbfd6d67417c5c40e4e2",
+    "app/api/therapies/[id]/route.ts": "ecc8f661c1f2521e567a6666c4c9da89097ef8da2874281285066b266f6fdcc1",
     "app/api/therapies/route.ts": "e13c48abb76cb0461eb1a9c1f23cf8724ec9cf34d32a7bd54909e58d4e251dac",
     "lib/locked-field-guard.ts": "a4b64b4db1968423169937a2b491add2d2a19b6fba2489b1515e37b358a55d3a",
     "lib/therapy-status-command-service.ts": "7b3c04d18b3f504d4a78b48466787a81d09cd75a07ebb8f793edd611eca57238",
@@ -47,18 +47,20 @@
     "lib/therapy-status-command-backup.ts": "da7641d2b30548b09105dcbc0e202d25d9215a3e4768dff441b81c11bb6b5384",
     "lib/therapy-status-command-schema.ts": "98c0aba0a361ef83655a632be41a257f8b9e99a950591113683a8094e26f4c87",
     "lib/therapy-status-command-recovery-schema.ts": "8231c04d505139c63f36f9657e2a2a0c964cd48b39d4ae4b2d2a0f2c552f5f4a",
-    "lib/ambulatory-destructive-command-recovery-schema.ts": "1d89ee09390aa344cb05df735cca29c991cfb1f1f64601572ed6a35bb9f7af52",
+    "lib/ambulatory-destructive-command-recovery-schema.ts": "5fabd8c508f07dd7d8c537fb0d96e96cf592c0e74d758ebd23f1bc195bcf95cf",
     "lib/api-table-response.ts": "5f19aab147a2d4459c1d2ec96e6c6d67bb20ad8c23b0cd9f38239771ffbb602c",
-    "lib/backup-encrypted-fields.json": "1fe7775a81e0f2d2882946815e4e17840ca4661439c410b75a58c3dd0ce65998",
+    "lib/backup-encrypted-fields.json": "8009ed55c0b9f71d5968f62ea8f15fe9bb4b911c0b70b9c7d7b101635bbd1b0d",
     "lib/backup-import-provenance.ts": "13eb1cc6083b5a07489d64cc9d195b82b6b8b660cb9874e4dc46b93fdf25999e",
-    "lib/sqlite-schema.ts": "2e599cf106b4a681294351e3251e045c874e03ae169db1eb9a5fb8a6a6e2fa19",
-    "lib/sqlite-schema-open.ts": "636b407e77488d6a20ba431d79d31a1f0bb7617e900fa30a108be90d5e6e47aa",
-    "lib/backup-restore-executor.ts": "ccdee2e7155b52594d2aa4cf5250cb9a09489f0ad735ba174572a858f86a1892",
+    "lib/sqlite-schema.ts": "784fa488d11577d5ce493fde0ad84b3353fbd76c8bbe3f64f1f6d0d0c127e41d",
+    "lib/sqlite-schema-open.ts": "2ee4dcf641df086c7af8fc2a7c541a7ab147d111f078165c6125c4d709871d5d",
+    "lib/backup-restore-executor.ts": "2fda131ca62a4283cfa231dda9757f7dce2de9d2cd4a2e2660a0320b9ed0fabd",
     "lib/security/archive-maintenance-owner.ts": "57a026cca85845bf2ed3ae5b8c47dbc88caa8184b3d41639ea7ad9e90a420802",
     "lib/clinical-status-transitions.ts": "787915f339911dd4846d29d1fe3232be373242287390989d6a97d7a5dcea460f",
     "lib/status-normalization.ts": "fa2bbdeef55384ed1bf4a851f09a5d899d56e6331cde018f68f3d8a74d3a4e51",
     "docs/domain/clinical-status-transitions.json": "70233eaac55960b999f25768bb9f8897dcce27197ed99c1a692a2d98a0582f04",
-    "lib/recovery-backup-server.ts": "6bac1da41dda921a7670004360c966c006c57bbf805ba64252e6bd66ac717cfc"
+    "lib/recovery-backup-server.ts": "80357a277f7fdc5daab793b4f6d086fb1f20782b473785f7943a0439b5941dc8",
+    "lib/schema.ts": "a63799addd6217f91f39794a25881376c052b8e2012a115ff129fdd0aec5394b",
+    "lib/backup-artifact.ts": "892514e9ae5f465507560e3df6bf5594d0ddc4ee65c72f14ab6213aa995a9814"
   },
   "verificationInputs": [
     "docs/formal/therapy-status/",
@@ -112,13 +114,19 @@
           5,
           6,
           9,
-          10
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16
         ],
-        "currentVersion": 11,
+        "currentVersion": 17,
         "exactPredecessorOnly": true,
         "currentPhysicalExtensions": "preserved"
       },
-      "proof": "Causal canonical/drift and local-origin migration tests in code-current; encrypted recovery and v0.9.0 upgrade owner evidence remain separate",
+      "proof": "Causal canonical and drift tests, portable clinical links and encrypted v17 recovery of diary revisions. Formal model scope is unchanged.",
       "outsideTlc": "schema, migration, encryption, keys and durable receipts are not modeled by TherapyStatus.tla",
       "canonicalSchemaFingerprints": {
         "3": "f7a926813c169edfd7c75ce5e6a1d1b9f5b1e9201c7a20456dc557b943bbaac5",
@@ -126,7 +134,13 @@
         "5": "33ce371c41f4cb51033af18ef9a0f06bf8c81a248bca29f18b21d3db9f24ea46",
         "6": "4becef1521ec507b3da31047e01ab3e25562197c8a518472bb4cdef93ed3867b",
         "9": "85259ea3bdcbdfa286a0d8a206a04bfc5621c106a604488c0e17d8c7c37d3ba1",
-        "10": "459c212cd2d9a65e4df72df63923c64551ec530c3efe07459235af8b362d6452"
+        "10": "459c212cd2d9a65e4df72df63923c64551ec530c3efe07459235af8b362d6452",
+        "11": "0702a61e6f2a1feaca7df3350ec6597dcd5213c48339fdce723cf4531e33e8ee",
+        "12": "0839efe53ea413c80beeff2653fe1b61e29b18e889e78c30d7bc226ab31a67c1",
+        "13": "d7f4022529da290e4aa2128fba5b8a6dee38f3fdc662fa1b36ce735b16eb6789",
+        "14": "c05471c3d46b79eaf06e6ffbf92596e0398cd489a35a01dc1337949c4522fe60",
+        "15": "bec9309e8ae86ea150f291ec74cb58bcbb5e55ed49bab11e5fd67d7665a135cc",
+        "16": "ea327353130d278b5b335db78345238d6f46a46049f6009efd76686b364153bb"
       },
       "unitTestCases": {
         "v4Wrapper": 8,
@@ -140,5 +154,6 @@
       ]
     }
   },
-  "legacyModelSyncCommit": "64e190438da8287928f0903b9b719c18b329a7ec"
+  "legacyModelSyncCommit": "64e190438da8287928f0903b9b719c18b329a7ec",
+  "filesSha256": "5cc7d985618610e415e66a4b6f2867cf78adbde0b7b15706a6809d9af06e5a6a"
 }

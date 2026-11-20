@@ -1,3 +1,4 @@
+import { logServerError } from './server-error-log';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { dbServer } from '@/lib/db-server';
@@ -101,7 +102,7 @@ export async function changePatientMemberships(request: Request, operation: Memb
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error(operation === 'assign' ? 'Assign patients error:' : 'Unassign patients error:', error);
+        logServerError(operation === 'assign' ? 'Assign patients' : 'Unassign patients', error);
         return NextResponse.json({ error: operation === 'assign' ? 'Failed to assign patients' : 'Failed to unlink patients' }, { status: 500 });
     }
 }
