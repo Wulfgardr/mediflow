@@ -4,11 +4,12 @@ import { spawn, execFileSync } from 'node:child_process';
 import { randomBytes, randomUUID, createHash, X509Certificate } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import net from 'node:net';
+import { bancoPaths, validateBancoData } from './banco-paths.mjs';
 
 export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-export const visionScratch = '/Volumes/Vision/mf-ui-identita-20261107-scratch';
-export const scratch = path.resolve(process.env.MF_BANCO_SCRATCH || visionScratch);
-const needsContainer = scratch === visionScratch;
+export { visionScratch } from './banco-paths.mjs';
+const paths = bancoPaths();
+export const { scratch, data, needsContainer } = paths;
 export const httpPort = port('MF_BANCO_HTTP_PORT', 3100);
 export const tlsPort = port('MF_BANCO_TLS_PORT', 3543);
 function port(name, fallback) {
@@ -17,17 +18,6 @@ function port(name, fallback) {
   return value;
 }
 const httpURL = `http://127.0.0.1:${httpPort}`;
-export const data = path.resolve(process.env.MEDIFLOW_DATA_DIR || `${scratch}/apfs/banco`);
-fs.mkdirSync(scratch, { recursive: true });
-function validateData() {
-  if (needsContainer && !fs.existsSync(`${scratch}/apfs`)) throw new Error('Montare prima il contenitore APFS: vedere README');
-  if (!data.startsWith(`${scratch}/`)) throw new Error('SYNTHETIC_ONLY: data dir fuori dallo scratch rifiutata');
-  let existing = data;
-  while (!fs.existsSync(existing)) existing = path.dirname(existing);
-  if (fs.realpathSync(existing) !== fs.realpathSync(scratch) && !fs.realpathSync(existing).startsWith(`${fs.realpathSync(scratch)}/`)) throw new Error('SYNTHETIC_ONLY: symlink fuori scratch rifiutato');
-  if (fs.existsSync(`${data}/medical.db`) && !fs.existsSync(`${data}/SYNTHETIC_ONLY`)) throw new Error('Archivio senza SYNTHETIC_ONLY rifiutato');
-}
-validateData();
 const statePath = `${data}/banco-state.json`;
 const read = () => fs.existsSync(statePath) ? JSON.parse(fs.readFileSync(statePath)) : {};
 const alive = pid => { try { process.kill(pid, 0); return true; } catch { return false; } };
@@ -168,6 +158,8 @@ async function pair(platform) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   try {
     const action = process.argv[2];
+    if (action === 'start' && !needsContainer) fs.mkdirSync(scratch, { recursive: true });
+    validateBancoData(paths);
     if (action === 'start') await start(); else if (action === 'stop') await stop(); else if (action === 'status') await status(); else if (action === 'pair') await pair(process.argv[3]); else throw new Error('Uso: banco.mjs start|stop|status|pair <platform>');
   } catch (error) { console.error(error.message); process.exitCode = 1; }
 }

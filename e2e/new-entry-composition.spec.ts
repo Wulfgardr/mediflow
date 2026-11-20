@@ -127,6 +127,40 @@ test('Nuova voce: Quadro, bozza unica, uscita protetta e registrazione con fonte
         await leave.click(); await expect(page).toHaveURL(new RegExp(`/patients/${fixture.patientId}/modules$`));
         expect(writes).toHaveLength(2); await zoom.setZoom(1);
         await page.getByRole('link', { name: 'Nuova voce', exact: true }).click(); await expect(editor).toHaveText('');
+        if (!baseline && !causal) {
+            const draft = 'Resoconto sintetico nel modulo incorporato.';
+            await editor.fill(draft);
+            await expect(page.getByTestId('local-draft-status')).toContainText(/conservati cifrati|Bozza recuperata/);
+            await editor.press('Tab');
+            await expect(editor).not.toBeFocused();
+
+            for (const { width, height, factor } of [
+                { width: 390, height: 640, factor: 1 },
+                { width: 1440, height: 600, factor: 1 },
+                { width: 1440, height: 1000, factor: 2 },
+                { width: 1440, height: 1000, factor: 4 },
+            ]) {
+                await page.setViewportSize({ width: 1440, height });
+                await zoom.setZoom(factor);
+                await page.setViewportSize({ width, height });
+                const review = form.getByRole('button', { name: 'Rivedi', exact: true });
+                await review.scrollIntoViewIfNeeded();
+                await expect(review).toBeInViewport({ ratio: 1 });
+                await review.press('Enter');
+
+                const confirm = form.getByRole('button', { name: 'Conferma e registra', exact: true });
+                await expect(form.getByRole('region', { name: 'Riepilogo della voce', exact: true })).toContainText(draft);
+                await confirm.scrollIntoViewIfNeeded();
+                await expect(confirm).toBeInViewport({ ratio: 1 });
+                await expect(confirm).toBeEnabled();
+                if (directory) await page.screenshot({ path: `${directory}/incorporato-${width}x${height}-zoom-${factor}-rivedi.png`, animations: 'disabled' });
+
+                await confirm.press('Escape');
+                await expect(editor).toBeFocused();
+                await expect(editor).toHaveText(draft);
+            }
+            expect(writes).toHaveLength(2);
+        }
         if (directory) await writeFile(`${directory}/surfaces.json`, JSON.stringify({ fixture, savedEntryId: saved.id, surfaces, errors, external, preparations }, null, 2));
         expect(errors).toEqual([]); expect(external).toEqual([]); expect(preparations).toEqual([]);
     } catch (error) { console.log(JSON.stringify({ errors, external, preparations, writes })); throw error; } finally { await zoom.close(); }

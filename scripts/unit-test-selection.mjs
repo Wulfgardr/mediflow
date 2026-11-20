@@ -97,6 +97,7 @@ export const UNIT_SCRIPT_TESTS = Object.freeze([
   'scripts/portable-supervisor-import-urls.test.mjs',
   'scripts/run-mini-desktop-acceptance.test.mjs',
   'scripts/seed-performance-baseline-currentness.test.mjs',
+  'scripts/ui-identita/banco-paths.test.mjs',
   'scripts/web-auth-control-test-client.test.mjs',
   'scripts/web-session-resource-reclamation.test.mjs',
   'scripts/mobile-home-base-interop-cas-relay.test.mjs',

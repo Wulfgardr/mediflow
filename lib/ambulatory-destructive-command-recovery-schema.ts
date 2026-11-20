@@ -4,6 +4,7 @@ import { initializeSqliteSchema } from './sqlite-schema';
 import { schemaSnapshot, schemaDifferences } from './sqlite-schema-shape';
 
 const PREDECESSORS = new Map([
+    [16, 'ea327353130d278b5b335db78345238d6f46a46049f6009efd76686b364153bb'],
     [15, 'bec9309e8ae86ea150f291ec74cb58bcbb5e55ed49bab11e5fd67d7665a135cc'],
     [14, 'c05471c3d46b79eaf06e6ffbf92596e0398cd489a35a01dc1337949c4522fe60'],
     [3, 'f7a926813c169edfd7c75ce5e6a1d1b9f5b1e9201c7a20456dc557b943bbaac5'],
@@ -40,7 +41,8 @@ export function assertAmbulatoryCommandPredecessorRecoverySchema(probe: Database
     const canonical = new Database(':memory:');
     try {
         initializeSqliteSchema(canonical);
-        canonical.exec('DROP TABLE agent_unlock_grants; DROP TABLE agent_registrations');
+        canonical.exec('DROP TABLE entry_revisions');
+        if (version < 16) canonical.exec('DROP TABLE agent_unlock_grants; DROP TABLE agent_registrations');
         if (version < 15) canonical.exec('DROP TABLE agent_cassettes');
         if (version < 14) canonical.exec('DROP TABLE agent_clients; DROP TABLE agent_pairing_requests');
         if (version < 13) canonical.exec('DROP TABLE agent_mandates');
@@ -59,7 +61,7 @@ export function assertAmbulatoryCommandPredecessorRecoverySchema(probe: Database
         const expected = schemaSnapshot(canonical);
         if (createHash('sha256').update(JSON.stringify(expected)).digest('hex') !== fingerprint)
             throw new Error('Immutable recovery predecessor contract drift');
-        const unexpected = probe.prepare("SELECT 1 FROM sqlite_schema WHERE type='view' OR (?<9 AND name='portable_import_origins') OR (?<6 AND name='ambulatory_destructive_commands') OR (?<=4 AND name='therapy_status_commands') OR (?=3 AND name GLOB 'prosthetics_catalog_[ds]*') LIMIT 1").get(version, version, version, version);
+        const unexpected = probe.prepare("SELECT 1 FROM sqlite_schema WHERE type='view' OR name='entry_revisions' OR (?<9 AND name='portable_import_origins') OR (?<6 AND name='ambulatory_destructive_commands') OR (?<=4 AND name='therapy_status_commands') OR (?=3 AND name GLOB 'prosthetics_catalog_[ds]*') LIMIT 1").get(version, version, version, version);
         if (unexpected || schemaDifferences(expected, schemaSnapshot(probe)).length > 0)
             throw new Error('Recovery predecessor schema incompatible');
     } finally { canonical.close(); }

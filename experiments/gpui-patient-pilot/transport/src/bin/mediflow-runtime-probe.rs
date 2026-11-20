@@ -96,6 +96,7 @@ fn runtime_error(phase: &'static str, error: RuntimeError) -> ProbeError {
         RuntimeError::TerritorialPackDisabled => "territorial_pack_disabled",
         RuntimeError::Missing => "missing",
         RuntimeError::Conflict => "conflict",
+        RuntimeError::LegacyRevisionRequired => "legacy-revision-required",
         RuntimeError::ArchiveReplaced => "archive-replaced",
         RuntimeError::AnalyticsCancelled => "analytics-cancelled",
         RuntimeError::Locked => "locked",

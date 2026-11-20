@@ -6,6 +6,7 @@ export const DATE_FIELDS = new Set([
   'collaudoAt',
   'decidedAt',
   'createdAt',
+  'correctedAt',
   'date',
   'endDate',
   'importedAt',
