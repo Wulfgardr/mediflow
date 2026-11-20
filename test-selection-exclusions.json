@@ -40,6 +40,11 @@
     "owner": "@Wulfgardr"
   },
   {
+    "path": "e2e/fixtures/synthetic-sheet.ts",
+    "reason": "WUL-894: fixture di accesso e preparazione dei dati usata da patient-concept.spec.ts e patient-sheet-diary-reading.spec.ts; nessun test autonomo.",
+    "owner": "@Wulfgardr"
+  },
+  {
     "path": "e2e/fixtures/secure-browser.ts",
     "reason": "Opzioni di avvio di Chromium (sandbox, rete solo loopback e canale opzionale E2E_BROWSER_CHANNEL) usate da playwright.config.ts, e2e/native-chat-access-frame.config.ts e dagli spec che avviano il browser da soli; nessun test autonomo.",
     "owner": "@Wulfgardr"

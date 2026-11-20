@@ -2,6 +2,8 @@ import { mkdirSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
+import { test as isolatedTest } from './fixtures/isolated-runtime';
+import { switchPreset } from './fixtures/territorial-preset';
 import { bootstrapUnlockedSession, openPatientSection } from './utils';
 import { sealDiaryEntry } from './fixtures/sealed-diary-entry';
 
@@ -46,7 +48,16 @@ async function measureText(page: Page) {
       const isSize = (values: number[]) => values.some(value => Math.abs(value - size) < 0.02);
       let issue: string | null = null;
       if (family === families.system) {
-        if (![400, 600].includes(weight) || !isSize([12, 13, 14, 15])) issue = 'Sistema fuori scala';
+        const body = [400, 600].includes(weight) && isSize([12, 13, 14, 15]);
+        const heading = element.closest('h1, h2, h3');
+        const tray = heading?.closest('[data-record-tray]');
+        const person = heading?.matches('[data-folder-section="quadro"] [data-testid="lume-scheda-header"] h1');
+        const zone = heading?.tagName === 'H2' && heading.parentElement === tray;
+        const island = tray && !zone && (heading?.tagName === 'H2' || element.closest('#diario > [data-section-header] > h3 span:first-child'));
+        const recordHeading = (person && weight === 600 && isSize([28]))
+          || (zone && weight === 600 && isSize([20]))
+          || (island && weight === 600 && isSize([17]));
+        if (!body && !recordHeading) issue = 'Sistema fuori scala';
       } else if (families.voice && family === families.voice) {
         if (!(weight === 400 && isSize([17, 22, 26, 28])) && !(weight === 500 && isSize([21]))) issue = 'Newsreader fuori ruolo';
         if (element.closest('button, input, select, [role="button"], summary, table, [role="alert"]')) issue = 'Serif su comando, tabella o errore';
@@ -167,7 +178,7 @@ const ROUTES = ['/', '/?area=incarico', '/?area=turno', '/?area=diario', '/?area
   '/patients/[id]/modules', '/patients/[id]/scales', '/patients/[id]/scales/adl',
   '/patients/[id]/entries/new', '/patients/[id]/edit', '/patients/new', '/patients/import', ...settingsRoutes()];
 
-const typographyTest = test.extend<{ patientFixture: { id: string; name: string } }>({
+const typographyTest = isolatedTest.extend<{ patientFixture: { id: string; name: string } }>({
   patientFixture: async ({ page }, runTest) => {
     const fixture = await createFixture(page);
     try {
@@ -187,6 +198,7 @@ for (const theme of ['light', 'dark'] as const) {
       await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
     });
     typographyTest('tutte le pagine e i dettagli', async ({ page, patientFixture: fixture }, info) => {
+      await switchPreset(page, 'core+it+lom');
       for (const routePattern of ROUTES) await typographyTest.step(routePattern, async () => {
         const route = routePattern.replace('[id]', fixture.id);
         const response = await page.goto(route);
@@ -207,7 +219,8 @@ for (const theme of ['light', 'dark'] as const) {
           const person = page.getByRole('heading', { name: fixture.name, exact: true });
           await expect(person).toBeVisible();
           await expect(person).toHaveCSS('font-size', '28px');
-          await expect(person).toHaveCSS('font-weight', '400');
+          await expect(person).toHaveCSS('font-weight', '600');
+          await expect(person).toHaveCSS('font-family', /system-ui/);
         }
         if (route === '/settings/ai/modelli') await expect(page.getByRole('button', { name: 'Salva configurazione', exact: true })).toBeEnabled();
         await assertType(page, route, info);
@@ -286,10 +299,13 @@ test('il misuratore intercetta ereditarietà serif, controlli, stili inline e te
     body { font:400 14px system-ui } .hidden { display:none } .voice { font:400 26px Georgia }</style>
     <p>Testo valido</p><p style="font-weight:550">Peso errato</p><p style="font-size:11px">Corpo errato</p>
     <button class="voice">Comando serif</button><input value="Campo errato" style="font:600 13px Georgia">
+    <p style="font:600 20px system-ui">Titolo fuori scheda</p>
+    <section data-record-tray="stabile"><h2 style="font:600 20px system-ui">Titolo vassoio</h2>
+      <section><h2 style="font:600 20px system-ui">Corpo errato per isola</h2></section></section>
     <div class="hidden"><span style="font:700 10px Georgia">Non visibile</span></div>`);
   const measured = await measureText(page);
   expect(measured.samples.filter(sample => sample.issue).map(sample => sample.text).sort())
-    .toEqual(['Campo errato', 'Comando serif', 'Corpo errato', 'Peso errato']);
+    .toEqual(['Campo errato', 'Comando serif', 'Corpo errato', 'Corpo errato per isola', 'Peso errato', 'Titolo fuori scheda']);
   expect(measured.samples.some(sample => sample.text === 'Non visibile')).toBe(false);
 });
 

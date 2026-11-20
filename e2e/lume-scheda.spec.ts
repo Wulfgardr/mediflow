@@ -1,5 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { openUnlockedDocument, bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow, assertNotClippedInViewport } from './utils';
+import { test as isolatedTest } from './fixtures/isolated-runtime';
+import { switchPreset } from './fixtures/territorial-preset';
 
 type SchedaCase = { register: 'giorno' | 'grafite'; viewport: 'wide' | 'narrow'; width: number; height: number };
 const CASES: SchedaCase[] = [
@@ -95,8 +97,9 @@ async function expectSurfaceHierarchyAndNeutralChrome(page: Page, header: Locato
     expect.soft(target.height, `${target.label}: altezza target`).toBeGreaterThanOrEqual(minimum);
   }
   expect(evidence.title).toBeGreaterThan(evidence.atoms);
-  expect(evidence.title).toBe(await page.evaluate(() => innerWidth < 700 ? 26 : 28));
-  await expect(header.locator('h1')).toHaveCSS('font-weight', '400');
+  expect(evidence.title).toBe(28);
+  await expect(header.locator('h1')).toHaveCSS('font-weight', '600');
+  await expect(header.locator('h1')).toHaveCSS('font-family', /system-ui/);
   expect(evidence.leftPadding).toBeGreaterThanOrEqual(16);
   expect(evidence.rightPadding).toBeGreaterThanOrEqual(16);
   const surface = page.getByTestId('lume-scheda-surface');
@@ -128,7 +131,8 @@ async function expectPatientHeaderCommands(page: Page, header: Locator, patientI
   await expect(actions).toHaveAttribute('aria-haspopup', 'menu');
   await expect(actions).toHaveAttribute('aria-expanded', 'false');
   await expect(header.getByRole('link')).toHaveCount(1);
-  await expect(header.getByRole('button')).toHaveCount(1);
+  await expect(header.getByRole('button')).toHaveCount(2);
+  await expect(header.getByRole('button', { name: 'Prescrivi', exact: true })).toHaveAttribute('aria-haspopup', 'menu');
   for (const [control, background] of [[primary, '--lume-accent'], [actions, '--lume-surface-field']] as const) {
     const material = await control.evaluate((element, variable) => {
       const probe = document.createElement('span');
@@ -156,7 +160,7 @@ async function expectPatientHeaderCommands(page: Page, header: Locator, patientI
 async function expectCurrentSection(page: Page, id: string): Promise<void> {
   const nav = page.getByRole('navigation', { name: 'Sezioni della vista' });
   const link = nav.locator(`a[href="#${id}"]`);
-  if (['quadro', 'terapie', 'parametri', 'documenti'].includes(id)) {
+  if (await link.isVisible()) {
     await expect(link).toHaveAttribute('aria-current', 'location');
   } else {
     await expect(nav.getByRole('button', { name: 'Altro', exact: true })).toHaveAttribute('aria-current', 'location');
@@ -190,9 +194,10 @@ test('il controllo back della Scheda torna alla lista pazienti', async ({ page }
   await expect(page.getByTestId('lume-worklist')).toBeVisible();
 });
 
-test('le quindici sezioni restano raggiungibili con una sola destinazione corrente', async ({ page }) => {
+isolatedTest('le quindici sezioni del profilo Lombardia restano raggiungibili con una sola destinazione corrente', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+  await switchPreset(page, 'core+it+lom');
   const patient = await createFixture(page);
   await openUnlockedDocument(page, `/patients/${patient.id}/modules`);
   const nav = page.getByRole('navigation', { name: 'Sezioni della vista' });
@@ -303,7 +308,14 @@ for (const schedaCase of CASES) {
     expect(scrollEvidence!.overflow).toBeGreaterThan(100);
     expect(scrollEvidence!.offset).toBeGreaterThan(100);
     const records = page.getByRole('navigation', { name: 'Cartelle aperte' });
-    await expectInViewport(records.getByRole('link', { name: patient.name, exact: true }));
+    const recordLink = records.getByRole('link', { name: patient.name, exact: true });
+    await expectInViewport(recordLink);
+    await expect.poll(() => recordLink.getByText(patient.name, { exact: true }).evaluate(element => {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      const box = range.getBoundingClientRect();
+      return box.width > 20 && element.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2));
+    })).toBe(true);
     await page.getByTestId('privacy-mode-header-toggle').click();
     await expectPatientIdentityPrivate(header, patient);
     await expect(records.getByRole('link', { name: patient.name, exact: true }).locator('.liquid-blur')).toHaveCount(1);

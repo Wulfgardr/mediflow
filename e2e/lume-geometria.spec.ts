@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { openUnlockedDocument, bootstrapUnlockedSession } from './utils';
 
 const WEB_RADIUS_SCALE = [0, 10, 12, 16];
+const PATIENT_OVERVIEW_RADIUS_SCALE = [8, 14];
 
 const VIEWPORTS = [
   { name: 'wide', width: 1440, height: 900 },
@@ -40,7 +41,7 @@ async function createPatient(page: Page): Promise<string> {
 
 /** Superfici visibili (bordo, fondo o ombra) con raggio fuori scala. */
 async function offScaleRadii(page: Page): Promise<string[]> {
-  return page.evaluate((scale) => {
+  return page.evaluate(({ scale, overview }) => {
     const allowed = new Set(scale);
     const found = new Set<string>();
     const transparent = (value: string) => value === 'rgba(0, 0, 0, 0)' || value === 'transparent';
@@ -59,14 +60,15 @@ async function offScaleRadii(page: Page): Promise<string[]> {
         if (raw.endsWith('%')) continue;
         const radius = Math.round(Number.parseFloat(raw) * 10) / 10;
         if (radius >= Math.min(box.width, box.height) / 2 - 0.5) continue;
-        if (!allowed.has(radius)) {
-          const name = typeof element.className === 'string' ? element.className.trim().split(/\s+/)[0] : '';
-          found.add(`${element.tagName.toLowerCase()}${name ? `.${name}` : ''} ${raw}`);
-        }
+        if (allowed.has(radius)) continue;
+        if (element.matches('#quadro[data-overview] [data-record-tray]') && radius === 24) continue;
+        if (element.closest('#quadro[data-overview]') && overview.includes(radius)) continue;
+        const name = typeof element.className === 'string' ? element.className.trim().split(/\s+/)[0] : '';
+        found.add(`${element.tagName.toLowerCase()}${name ? `.${name}` : ''} ${raw}`);
       }
     }
     return [...found];
-  }, WEB_RADIUS_SCALE);
+  }, { scale: WEB_RADIUS_SCALE, overview: PATIENT_OVERVIEW_RADIUS_SCALE });
 }
 
 for (const viewport of VIEWPORTS) {
