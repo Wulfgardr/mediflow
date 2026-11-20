@@ -316,6 +316,12 @@ fn control_label(label: SharedString) -> Div {
         })
 }
 
+pub(crate) fn observe_control(element: Stateful<Div>) -> impl IntoElement {
+    #[cfg(test)]
+    let element = crate::shell::rendered_command::observe(element);
+    element
+}
+
 pub fn heading(
     id: &'static str,
     label: impl Into<crate::title::TitleText>,

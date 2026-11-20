@@ -3,4 +3,5 @@
 .summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 20px; padding-bottom: 12px; border-bottom: 1px solid var(--lume-rule); font: var(--type-body); color: var(--lume-ink-muted); }
 .summary a { color: var(--lume-ink); }
 .proposal { border-inline-start: 1px dashed var(--lume-ink-pencil); padding-inline-start: 16px; overflow-wrap: anywhere; }
-.links { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.links { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+:global(html:root[data-lume]) .links :global(.mf-button-text) { padding-inline: 8px; }
