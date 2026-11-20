@@ -12,7 +12,11 @@ Per conoscere il prodotto e avviarlo dai sorgenti, parti dal
 In questa mappa ho raccolto i documenti di riferimento per ogni tema e il loro ordine
 di precedenza. L'[indice completo](./markdown-index.md) elenca i singoli file.
 
-## Versione pubblicata: 0.9.0
+## Versioni pubblicate
+
+Per installare MediFlow, scegli la release e segui le istruzioni per il tuo sistema. Ogni nota identifica il tag e i profili verificati. [Ultima release](https://github.com/Wulfgardr/mediflow/releases/latest)
+
+### Versione pubblicata: 0.9.0
 
 La 0.9.0 distribuisce codice sorgente per l'applicazione Web locale e
 l'accesso per agenti (Headless), con Node 24. I profili provati sono macOS
