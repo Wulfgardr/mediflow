@@ -21,6 +21,10 @@
     "attachments",
     "deletionReason"
   ],
+  "entry_revisions": [
+    "title",
+    "content"
+  ],
   "therapies": [
     "motivation",
     "deletionReason"

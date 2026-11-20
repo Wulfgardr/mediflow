@@ -345,6 +345,35 @@ pub struct Entry {
 
 #[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct EntryCorrection {
+    pub corrected_at: String,
+    pub corrected_by: Option<String>,
+}
+
+#[derive(Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EntryRevision {
+    pub version: u64,
+    pub title: Option<String>,
+    pub content: Option<String>,
+    #[serde(flatten)]
+    pub correction: EntryCorrection,
+}
+
+#[derive(Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EntryRevisionPage {
+    pub patient_id: String,
+    pub entry_id: String,
+    pub current_version: u64,
+    pub available_since: Option<String>,
+    pub latest_correction: Option<EntryCorrection>,
+    pub revisions: Vec<EntryRevision>,
+    pub has_more: bool,
+}
+
+#[derive(Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Therapy {
     pub id: String,
     pub patient_id: String,

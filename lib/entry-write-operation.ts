@@ -4,7 +4,9 @@ import { dbServer } from './db-server';
 import { buildVersionConflictPayload } from './version-concurrency';
 import { activePatients } from './patient-lifecycle';
 import { writeAuditEventInTransaction, type RequiredAuditContext } from './security/audit';
-import { entries, patients, patientsToAmbulatories, users } from './schema';
+import { entries, entryRevisions, patients, patientsToAmbulatories, users } from './schema';
+import { sealPreviousDiaryText } from './diary-revision-legacy-write';
+import { LEGACY_REVISION_MESSAGE, LEGACY_REVISION_REQUIRED, type LegacyRevisionProtection } from './diary-revision-envelope';
 import type { NetworkPatientCommitGuard } from './network-patient-commit-authority';
 
 type CreateInput = {
@@ -22,6 +24,7 @@ type UpdateInput = {
     patientId?: string;
     entryId: string;
     expectedVersion: number;
+    legacyRevisionProtection?: LegacyRevisionProtection;
     values: Partial<typeof entries.$inferInsert>;
     changedFields: string[];
     mode: 'web' | 'v1' | 'network';
@@ -58,6 +61,25 @@ function sameEntryCreate(existing: typeof entries.$inferSelect, values: typeof e
         && existing.deletedAt === null;
 }
 
+function entryOperator(tx: Tx, audit: RequiredAuditContext): string | null {
+    if (audit.actorType !== 'user') return null;
+    const operator = tx.select({ displayName: users.displayName, username: users.username }).from(users)
+        .where(eq(users.id, audit.actorRef)).get();
+    return operator?.displayName?.trim() || operator?.username || null;
+}
+
+function retainEntryRevision(
+    tx: Tx, input: UpdateInput, existing: typeof entries.$inferSelect, eventId: string, correctedAt: Date,
+    previous: { title: string; content: string } | undefined,
+): void {
+    if (!previous) return;
+    const revision = tx.insert(entryRevisions).values({
+        eventId, entryId: existing.id, version: existing.version, correctedAt,
+        correctedBy: entryOperator(tx, input.audit), title: previous.title, content: previous.content,
+    }).run();
+    if (revision.changes !== 1) throw new Error('Entry revision did not write exactly one row');
+}
+
 /* IMMEDIATE acquires the writer lock before parent/scope and duplicate reads. */
 export function createEntryOperation(input: CreateInput): Result {
     return dbServer.transaction((tx) => createEntryOperationInTransaction(tx, input), { behavior: 'immediate' });
@@ -90,10 +112,7 @@ export function createEntryOperationInTransaction(tx: Tx, input: CreateInput): R
             ? 'Network diary create id already exists with different content' : 'Conflict' } };
     }
 
-    const operator = input.audit.actorType === 'user'
-        ? tx.select({ displayName: users.displayName, username: users.username }).from(users)
-            .where(eq(users.id, input.audit.actorRef)).get() : undefined;
-    const recordedBy = operator?.displayName?.trim() || operator?.username || null;
+    const recordedBy = entryOperator(tx, input.audit);
     const inserted = tx.insert(entries).values({ ...input.values, recordedBy }).run();
     if (inserted.changes !== 1) throw new Error('Entry create did not write exactly one row');
     writeAuditEventInTransaction(tx, {
@@ -135,11 +154,25 @@ export function updateEntryOperationInTransaction(tx: Tx, input: UpdateInput): R
         return { status: 409, value: buildVersionConflictPayload(
             'entry', input.expectedVersion, input.entryId, existing) as unknown as Record<string, unknown> };
     }
+    let previous: { title: string; content: string } | undefined;
+    const titleChanged = input.values.title !== undefined && input.values.title !== existing.title;
+    const contentChanged = input.values.content !== undefined && input.values.content !== existing.content;
+    if (existing.type !== 'scale' && (titleChanged || contentChanged)) {
+        const protectedText = sealPreviousDiaryText({
+            patientId: existing.patientId, entryId: existing.id, version: existing.version,
+        }, existing, input.legacyRevisionProtection);
+        if (!protectedText) {
+            return { status: 409, value: { code: LEGACY_REVISION_REQUIRED, error: LEGACY_REVISION_MESSAGE } };
+        }
+        previous = protectedText;
+    }
+    const correctedAt = new Date();
     const changed = tx.update(entries).set({ ...input.values, version: input.expectedVersion + 1 })
         .where(and(eq(entries.id, input.entryId), eq(entries.patientId, existing.patientId),
             eq(entries.version, input.expectedVersion))).run();
     if (changed.changes !== 1) throw new Error('Entry update did not write exactly one row');
-    writeAuditEventInTransaction(tx, {
+    const auditEventId = writeAuditEventInTransaction(tx, {
+        occurredAt: correctedAt,
         eventType: input.values.deletedAt ? 'entry.deleted' : 'entry.updated', outcome: 'success',
         archiveGeneration: input.audit.archiveGeneration, actorType: input.audit.actorType, actorRef: input.audit.actorRef,
         subjectType: 'entry', subjectRef: input.entryId,
@@ -147,5 +180,6 @@ export function updateEntryOperationInTransaction(tx: Tx, input: UpdateInput): R
         redactedMetadata: { changedFields: input.changedFields,
             resourceVersion: input.expectedVersion + 1, flags: input.audit.flags },
     });
+    retainEntryRevision(tx, input, existing, auditEventId, correctedAt, previous);
     return { status: 200, value: { success: true } };
 }
