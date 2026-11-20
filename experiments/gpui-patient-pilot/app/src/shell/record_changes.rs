@@ -1,4 +1,4 @@
-use chrono::{DateTime, NaiveDate, TimeZone, Utc};
+use chrono::{DateTime, Datelike, NaiveDate, TimeZone, Utc};
 use mediflow_runtime_client::{Attachment, Entry, Observation, Therapy};
 
 pub(super) const BAND_ROWS: usize = 5;
@@ -451,6 +451,134 @@ where
     rows
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub(super) struct MeasureRow {
+    pub(super) key: String,
+    pub(super) display: String,
+    pub(super) amount: String,
+    pub(super) unit: String,
+    pub(super) arrow: Option<&'static str>,
+    pub(super) day: String,
+    pub(super) trend: Option<Vec<f64>>,
+    pub(super) spoken: String,
+}
+
+pub(super) fn measured_number(value: &str) -> Option<f64> {
+    let trimmed = value.trim();
+    let mut parts = trimmed.strip_prefix('-').unwrap_or(trimmed).splitn(2, ',');
+    let digits = |part: Option<&str>| {
+        part.is_some_and(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_digit()))
+    };
+    let decimal_comma = digits(parts.next()) && digits(parts.next());
+    let normalized = if decimal_comma {
+        trimmed.replacen(',', ".", 1)
+    } else {
+        trimmed.to_owned()
+    };
+    normalized.parse::<f64>().ok().filter(|n| n.is_finite())
+}
+
+pub(super) fn measure_rows<T: TimeZone>(
+    rows: &[Observation],
+    today: NaiveDate,
+    zone: &T,
+) -> Vec<MeasureRow>
+where
+    T::Offset: std::fmt::Display,
+{
+    type Series<'a> = (String, Vec<&'a Observation>);
+    let mut series: Vec<Series> = vec![];
+    for row in rows.iter().filter(|row| row.deleted_at.is_none()) {
+        let key = serde_json::json!([
+            row.patient_id,
+            row.code_system,
+            row.code,
+            row.unit_system,
+            row.unit_code
+        ])
+        .to_string();
+        match series.iter_mut().find(|(other, _)| *other == key) {
+            Some((_, values)) => values.push(row),
+            None => series.push((key, vec![row])),
+        }
+    }
+    let order = |row: &Observation| {
+        (
+            instant(&row.observed_at),
+            row.created_at.as_deref().and_then(instant),
+            row.id.clone(),
+        )
+    };
+    for (_, values) in &mut series {
+        values.sort_by_key(|row| order(row));
+    }
+    series.sort_by(|a, b| {
+        let latest = |values: &Vec<&Observation>| values.last().map(|row| order(row));
+        latest(&b.1).cmp(&latest(&a.1))
+    });
+    series
+        .into_iter()
+        .map(|(key, values)| {
+            let latest = *values.last().expect("a series has a measure");
+            let value = measured_number(&latest.value);
+            let high = latest.ref_high.as_deref().and_then(measured_number);
+            let low = latest.ref_low.as_deref().and_then(measured_number);
+            let (arrow, side) = match value {
+                Some(value) if high.is_some_and(|high| value > high) => {
+                    (Some("↑"), ", sopra l’intervallo")
+                }
+                Some(value) if low.is_some_and(|low| value < low) => {
+                    (Some("↓"), ", sotto l’intervallo")
+                }
+                _ => (None, ""),
+            };
+            let observed = instant(&latest.observed_at);
+            let full = observed.map(|at| day_in_zone(at, zone));
+            let day = match observed {
+                Some(at) if at.with_timezone(zone).year() == today.year() => {
+                    at.with_timezone(zone).format("%d/%m").to_string()
+                }
+                Some(_) => full.clone().unwrap_or_default(),
+                None => "Data non registrata".to_owned(),
+            };
+            let trend: Vec<f64> = values
+                .iter()
+                .filter(|row| instant(&row.observed_at).is_some())
+                .filter_map(|row| measured_number(&row.value))
+                .collect();
+            let shown = crate::clinical_units::value(&latest.value, &latest.unit_code);
+            let (amount, unit) = shown
+                .rsplit_once(' ')
+                .map_or((shown.clone(), String::new()), |(amount, unit)| {
+                    (amount.to_owned(), unit.to_owned())
+                });
+            let trend = (trend.len() >= 2).then_some(trend);
+            let spoken = format!(
+                "{}: {shown}{side}, {}{}",
+                latest.display,
+                full.map_or_else(
+                    || "data non registrata".to_owned(),
+                    |day| format!("misura del {day}")
+                ),
+                trend
+                    .as_ref()
+                    .map(|values| format!(", andamento di {} misure", values.len()))
+                    .unwrap_or_default()
+            );
+            MeasureRow {
+                key,
+                display: latest.display.clone(),
+                amount,
+                unit,
+                arrow,
+                day,
+                trend,
+                spoken,
+            }
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -699,5 +827,102 @@ mod tests {
                 .collect::<Vec<_>>(),
             ["b"]
         );
+    }
+    fn measure(id: &str, code: &str, unit: &str, value: &str, at: &str) -> Observation {
+        serde_json::from_value(
+            json!({"id":id,"patientId":"p","codeSystem":"http://loinc.org","code":code,
+            "display":"Peso","unitSystem":"http://unitsofmeasure.org","unitCode":unit,"value":value,
+            "refHigh":"5.1","observedAt":at,"version":1,"createdAt":at}),
+        )
+        .unwrap()
+    }
+
+    fn today() -> NaiveDate {
+        NaiveDate::from_ymd_opt(2026, 11, 19).unwrap()
+    }
+
+    #[test]
+    fn a_series_keeps_one_unit_and_draws_a_trend_only_from_two_comparable_measures() {
+        let kg = measure("a", "29463-7", "kg", "70", "2026-10-01T08:00:00Z");
+        let lb = measure("b", "29463-7", "[lb_av]", "154", "2026-11-01T08:00:00Z");
+        let rows = measure_rows(&[kg.clone(), lb.clone()], today(), &Utc);
+        assert_eq!(rows.len(), 2, "kilograms and pounds are two series");
+        assert_eq!(rows[0].amount, "154");
+        assert!(
+            rows.iter().all(|row| row.trend.is_none()),
+            "one measure per unit: no trend"
+        );
+        let again = measure("c", "29463-7", "kg", "71,4", "2026-11-10T08:00:00Z");
+        let rows = measure_rows(&[kg, lb, again], today(), &Utc);
+        let kilograms = rows.iter().find(|row| row.unit == "kg").unwrap();
+        assert_eq!(kilograms.trend, Some(vec![70., 71.4]));
+        assert_eq!(kilograms.amount, "71,4");
+        assert!(
+            rows.iter()
+                .find(|row| row.unit != "kg")
+                .unwrap()
+                .trend
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn an_older_measure_names_its_year_and_a_missing_date_says_so() {
+        let older = measure("a", "2823-3", "mmol/L", "4,8", "2025-11-10T08:00:00Z");
+        let rows = measure_rows(&[older.clone()], today(), &Utc);
+        assert_eq!(rows[0].day, "10/11/2025");
+        assert!(
+            rows[0].spoken.contains("misura del 10/11/2025"),
+            "{}",
+            rows[0].spoken
+        );
+        let recent = measure("b", "2823-3", "mmol/L", "5,6", "2026-11-10T08:00:00Z");
+        let rows = measure_rows(&[older.clone(), recent], today(), &Utc);
+        assert_eq!(rows[0].day, "10/11");
+        assert_eq!(rows[0].arrow, Some("↑"));
+        assert!(
+            rows[0].spoken.contains("sopra l’intervallo"),
+            "{}",
+            rows[0].spoken
+        );
+        let new_year = NaiveDate::from_ymd_opt(2027, 1, 2).unwrap();
+        let december = measure("c", "2823-3", "mmol/L", "4,1", "2026-12-31T08:00:00Z");
+        assert_eq!(
+            measure_rows(&[december], new_year, &Utc)[0].day,
+            "31/12/2026"
+        );
+        let undated = measure("d", "2823-3", "mmol/L", "9,9", "");
+        let rows = measure_rows(&[older, undated.clone()], today(), &Utc);
+        assert_eq!(
+            rows[0].amount, "4,8",
+            "a dated measure wins over an undated one"
+        );
+        assert!(rows[0].trend.is_none());
+        let rows = measure_rows(&[undated], today(), &Utc);
+        assert_eq!(rows[0].day, "Data non registrata");
+        assert!(rows[0].spoken.contains("data non registrata"));
+    }
+
+    #[test]
+    fn the_latest_measure_is_chosen_by_instant_whatever_the_notation() {
+        let earlier = measure("a", "2823-3", "mmol/L", "4.0", "2026-11-10T09:00:00+02:00");
+        let later = measure("b", "2823-3", "mmol/L", "5.0", "2026-11-10T08:00:00Z");
+        let rows = measure_rows(&[later, earlier], today(), &Utc);
+        assert_eq!(
+            format!("{} {}", rows[0].amount, rows[0].unit),
+            crate::clinical_units::value("5.0", "mmol/L")
+        );
+        assert_eq!(rows[0].trend, Some(vec![4., 5.]));
+    }
+
+    #[test]
+    fn measured_numbers_follow_the_web_rules() {
+        assert_eq!(measured_number(" 5,6 "), Some(5.6));
+        assert_eq!(measured_number("-0,5"), Some(-0.5));
+        assert_eq!(measured_number("1.32"), Some(1.32));
+        assert_eq!(measured_number("1.234,5"), None);
+        assert_eq!(measured_number("120/80"), None);
+        assert_eq!(measured_number("positivo"), None);
+        assert_eq!(measured_number(""), None);
     }
 }

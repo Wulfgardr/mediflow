@@ -2881,31 +2881,11 @@ impl ClinicalApp {
 
     pub(super) fn record_measures(&self, cx: &Context<Self>) -> Div {
         let theme = self.theme;
-        let rows: Vec<_> = self
-            .patient
-            .observations
-            .ready()
-            .into_iter()
-            .flatten()
-            .filter(|row| row.deleted_at.is_none())
-            .collect();
-        let mut series: Vec<(String, Vec<&Observation>)> = vec![];
-        for row in &rows {
-            let key = format!("{}|{}", row.code_system, row.code);
-            match series.iter_mut().find(|(other, _)| *other == key) {
-                Some((_, values)) => values.push(row),
-                None => series.push((key, vec![row])),
-            }
-        }
-        for (_, values) in &mut series {
-            values.sort_by(|a, b| a.observed_at.cmp(&b.observed_at));
-        }
-        series.sort_by(|a, b| {
-            let last =
-                |values: &Vec<&Observation>| values.last().map(|row| row.observed_at.clone());
-            last(&b.1).cmp(&last(&a.1))
-        });
-        let number = |value: &str| value.trim().replace(',', ".").parse::<f64>().ok();
+        let series = record_changes::measure_rows(
+            self.patient.observations.ready().map_or(&[], Vec::as_slice),
+            chrono::Local::now().date_naive(),
+            &chrono::Local,
+        );
         block(theme)
             .gap(px(10.))
             .child(card_title(
@@ -2940,7 +2920,7 @@ impl ClinicalApp {
                 },
             )
             .when(
-                self.patient.observations.ready().is_some() && rows.is_empty(),
+                self.patient.observations.ready().is_some() && series.is_empty(),
                 |el| {
                     el.child(self.empty_read_state(
                         "clinical-overview-observations-empty",
@@ -2949,29 +2929,20 @@ impl ClinicalApp {
                     ))
                 },
             )
-            .children(series.into_iter().map(|(_, values)| {
-                let latest = *values.last().expect("series has a value");
-                let value = number(&latest.value);
-                let high = latest.ref_high.as_deref().and_then(number);
-                let low = latest.ref_low.as_deref().and_then(number);
-                let arrow = match value {
-                    Some(value) if high.is_some_and(|high| value > high) => Some("↑"),
-                    Some(value) if low.is_some_and(|low| value < low) => Some("↓"),
-                    _ => None,
-                };
-                let color = if arrow.is_some() {
+            .children(series.into_iter().map(|row| {
+                let color = if row.arrow.is_some() {
                     theme.critical
                 } else {
                     theme.ink
                 };
-                let trend: Vec<f64> = values.iter().filter_map(|row| number(&row.value)).collect();
-                let shown = crate::clinical_units::value(&latest.value, &latest.unit_code);
-                let (amount, unit) = shown
-                    .rsplit_once(' ')
-                    .map_or((shown.clone(), String::new()), |(amount, unit)| {
-                        (amount.to_owned(), unit.to_owned())
-                    });
+                let id = format!("clinical-overview-measure-{}", text_identity(&row.key));
+                let selector = id.clone();
                 div()
+                    .id(SharedString::from(id.clone()))
+                    .accessibility_id(SharedString::from(id))
+                    .debug_selector(move || selector.clone())
+                    .role(Role::Group)
+                    .aria_label(SharedString::from(row.spoken.clone()))
                     .min_w_0()
                     .py(px(4.))
                     .flex()
@@ -2986,28 +2957,27 @@ impl ClinicalApp {
                             .child(
                                 div()
                                     .type_role(theme, crate::theme::TextRole::RecordRow)
-                                    .child(text!(latest.display.clone())),
+                                    .child(text!(row.display.clone())),
                             )
                             .child(
                                 div()
                                     .type_role(theme, crate::theme::TextRole::Meta)
                                     .text_color(theme.secondary)
-                                    .child(text!(
-                                        display_instant_date(&latest.observed_at)
-                                            .get(..5)
-                                            .unwrap_or_default()
-                                            .to_owned()
-                                    )),
+                                    .child(text!(row.day.clone())),
                             ),
                     )
-                    .child(sparkline(
-                        trend,
-                        if arrow.is_some() {
-                            theme.critical
-                        } else {
-                            theme.secondary
-                        },
-                    ))
+                    .child(match row.trend {
+                        Some(values) => sparkline(
+                            values,
+                            if row.arrow.is_some() {
+                                theme.critical
+                            } else {
+                                theme.secondary
+                            },
+                        )
+                        .into_any_element(),
+                        None => div().w(px(64.)).h(px(20.)).flex_none().into_any_element(),
+                    })
                     .child(
                         div()
                             .flex_none()
@@ -3017,7 +2987,7 @@ impl ClinicalApp {
                             .items_baseline()
                             .gap(px(4.))
                             .text_color(color)
-                            .children(arrow.map(|arrow| {
+                            .children(row.arrow.map(|arrow| {
                                 div()
                                     .type_role(theme, crate::theme::TextRole::Strong)
                                     .child(text!(arrow))
@@ -3025,12 +2995,12 @@ impl ClinicalApp {
                             .child(
                                 div()
                                     .type_role(theme, crate::theme::TextRole::RecordRow)
-                                    .child(text!(amount)),
+                                    .child(text!(row.amount)),
                             )
                             .child(
                                 div()
                                     .type_role(theme, crate::theme::TextRole::Meta)
-                                    .child(text!(unit)),
+                                    .child(text!(row.unit)),
                             ),
                     )
             }))
@@ -3612,6 +3582,50 @@ mod tests {
                     assert!(therapies.right() <= column.right());
                 }
             }
+        }
+        view.update(cx, |app, cx| app.disconnect(cx));
+    }
+
+    #[gpui::test]
+    fn kilograms_and_pounds_are_drawn_as_two_parameters(cx: &mut gpui::TestAppContext) {
+        let host = notes_recovery_tests::Host::new();
+        let (view, cx) = opened_at_1180(&host, cx);
+        let rows: Vec<Observation> = [("w1", "kg", "70", "2026-10-29T08:00:00Z"), ("w2", "[lb_av]", "154", "2026-11-10T08:00:00Z")]
+            .into_iter()
+            .map(|(id, unit, value, at)| {
+                serde_json::from_value(json!({"id":id,"patientId":"patient-a","codeSystem":"LOINC","code":"29463-7",
+                    "display":"Peso","unitSystem":"UCUM","unitCode":unit,"value":value,"observedAt":at,"version":1}))
+                .unwrap()
+            })
+            .collect();
+        let expected: Vec<String> =
+            record_changes::measure_rows(&rows, chrono::Local::now().date_naive(), &chrono::Local)
+                .into_iter()
+                .map(|row| format!("clinical-overview-measure-{}", text_identity(&row.key)))
+                .collect();
+        assert_eq!(expected.len(), 2);
+        view.update(cx, |app, cx| {
+            app.patient.observations = ReadLoad::Ready(rows);
+            cx.notify();
+        });
+        notes_recovery_tests::draw(cx);
+        let side = cx.debug_bounds("clinical-record-side").unwrap();
+        for id in expected {
+            let id: &'static str = Box::leak(id.into_boxed_str());
+            let mut found = cx.debug_bounds(id);
+            for _ in 0..40 {
+                if found.is_some_and(|row| row.bottom() <= side.bottom()) {
+                    break;
+                }
+                cx.simulate_event(gpui::ScrollWheelEvent {
+                    position: side.center(),
+                    delta: gpui::ScrollDelta::Pixels(gpui::point(px(0.), px(-80.))),
+                    ..Default::default()
+                });
+                notes_recovery_tests::draw(cx);
+                found = cx.debug_bounds(id);
+            }
+            assert!(found.is_some(), "{id} drawn");
         }
         view.update(cx, |app, cx| app.disconnect(cx));
     }

@@ -1328,6 +1328,36 @@ mod concept {
         }
     }
 
+    pub(super) fn mixed_units() -> Vec<Value> {
+        use chrono::TimeZone;
+        let at = |days: i64| {
+            let day = (chrono::Local::now() - chrono::Duration::days(days)).date_naive();
+            chrono::Local
+                .from_local_datetime(&day.and_hms_opt(12, 0, 0).unwrap())
+                .unwrap()
+                .with_timezone(&chrono::Utc)
+                .to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
+        };
+        let row = |id: &str,
+                   code: &str,
+                   display: &str,
+                   unit: &str,
+                   value: &str,
+                   high: Option<&str>,
+                   days: i64| {
+            json!({"id":id,"patientId":"patient-a","codeSystem":"LOINC","code":code,"display":display,
+                "unitSystem":"UCUM","unitCode":unit,"value":value,"refHigh":high,
+                "observedAt":at(days),"source":"manual","version":1,"createdAt":at(days)})
+        };
+        vec![
+            row("k1", "2823-3", "Potassio", "mmol/L", "4.7", Some("5.1"), 22),
+            row("k2", "2823-3", "Potassio", "mmol/L", "5.6", Some("5.1"), 9),
+            row("w1", "29463-7", "Peso", "kg", "70", None, 22),
+            row("w2", "29463-7", "Peso", "[lb_av]", "154", None, 9),
+            row("c1", "2160-0", "Creatinina", "mg/dL", "1.21", None, 374),
+        ]
+    }
+
     pub(super) fn apply(app: &mut ClinicalApp, fixture: &Fixture) {
         let entries: Vec<Entry> = rows!(fixture.entries.clone());
         app.patient.detail =
@@ -1720,6 +1750,15 @@ mod concept {
                 });
                 run.shot(&format!("{label}-terapie"));
                 run.app(|app, _, cx| app.section_selected(PatientSection::Overview, cx));
+                run.app(|app, _, cx| {
+                    app.patient.observations = ReadLoad::Ready(rows!(mixed_units()));
+                    cx.notify();
+                });
+                run.shot(&format!("{label}-parametri-unita"));
+                run.app(|app, _, cx| {
+                    app.patient.observations = ReadLoad::Ready(rows!(fixture.observations.clone()));
+                    cx.notify();
+                });
                 run.app(|app, window, cx| app.open_form(FormKind::Entry, window, cx));
                 run.shot(&format!("{label}-nuova-voce"));
                 run.app(|app, _, cx| app.disconnect(cx));
