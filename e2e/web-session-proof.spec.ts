@@ -52,24 +52,20 @@ standalone('al primo avvio il medico accede, legge una scheda, registra una nota
     await lockAndWaitForConfirmation(page);
     await bootstrapUnlockedSession(page, pin, operator);
 
-    const { id: patientId, taxCode } = await page.evaluate(async () => {
-        const marker = crypto.randomUUID().replaceAll('-', '').slice(0, 12).toUpperCase();
-        const response = await fetch('/api/patients', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                firstName: 'Medica', lastName: 'Sintetica', taxCode: `TST${marker}A`, birthDate: '1980-01-01',
-            }),
-        });
-        if (response.status !== 201) throw new Error(`Synthetic patient: HTTP ${response.status}`);
-        return { id: (await response.json()).id as string, taxCode: `TST${marker}A` };
-    });
-
     const navigation = page.getByRole('navigation', { name: 'Navigazione principale', exact: true });
     await navigation.getByRole('link', { name: 'Agenda', exact: true }).click();
     await navigation.getByRole('link', { name: 'Pazienti', exact: true }).click();
-    await page.getByRole('searchbox', { name: 'Cerca nella lista pazienti' }).fill(taxCode);
-    await page.getByRole('option').filter({ hasText: 'Sintetica Medica' }).press('Enter');
+    await page.getByRole('link', { name: 'Nuova scheda', exact: true }).click();
+    await page.getByRole('textbox', { name: /^Nome\b/u }).fill('Medica');
+    await page.getByRole('textbox', { name: /^Cognome\b/u }).fill('Sintetica');
+    await page.getByLabel('Identificativo', { exact: true }).selectOption('none');
+    await page.getByRole('checkbox', { name: 'Conosco solo l’anno' }).check();
+    await page.getByRole('spinbutton', { name: 'Anno di nascita stimato' }).fill('1980');
+    await page.getByRole('button', { name: 'Crea scheda', exact: true }).click();
+    await expect(page.getByRole('complementary', { name: 'Lente paziente: Sintetica Medica', exact: true })).toBeVisible();
+    await page.getByRole('link', { name: 'Apri scheda paziente', exact: true }).click();
+    await expect(page).toHaveURL(/\/patients\/[^/]+\/modules$/u);
+    const patientId = new URL(page.url()).pathname.split('/')[2];
     await expect(page.getByTestId('lume-scheda-header')).toContainText('Medica');
     await openPatientSection(page, 'diario');
     const entryId = await recordNote(page, note);
