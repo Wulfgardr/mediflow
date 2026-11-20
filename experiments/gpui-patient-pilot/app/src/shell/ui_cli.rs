@@ -8,6 +8,7 @@ enum Input {
     Activate(Option<FocusHandle>),
     Keyboard(FocusHandle),
     Text(Entity<TextInput>),
+    Masked(FocusHandle),
     Scroll(ScrollHandle),
     Observe,
 }
@@ -25,7 +26,7 @@ impl Control {
     fn focus_handle(&self, cx: &App) -> Option<FocusHandle> {
         match &self.input {
             Input::Activate(focus) => focus.clone(),
-            Input::Keyboard(focus) => Some(focus.clone()),
+            Input::Keyboard(focus) | Input::Masked(focus) => Some(focus.clone()),
             Input::Text(editor) => Some(editor.read(cx).focus_handle(cx)),
             Input::Observe | Input::Scroll(_) => None,
         }
@@ -41,6 +42,7 @@ impl Control {
             Input::Activate(Some(_)) => &["click", "focus", "press", "expect"],
             Input::Activate(None) => &["click", "expect"],
             Input::Keyboard(_) => &["focus", "press", "expect"],
+            Input::Masked(_) => &["focus", "fill", "press", "expect"],
             Input::Text(_) => &["click", "focus", "fill", "press", "expect", "expectValue"],
             Input::Scroll(_) => &["scroll", "expect"],
             Input::Observe => &["expect"],
@@ -141,6 +143,7 @@ fn frame(cx: &mut VisualTestContext) -> (Vec<Control>, Vec<Value>, Vec<Value>) {
             Role::Region => "region",
             Role::Heading => "heading",
             Role::TextInput | Role::MultilineTextInput => "textbox",
+            Role::PasswordInput if node.author_id() == Some(UNLOCK_FIELD_ID) => "password",
             _ => "other",
         };
         let id = node.author_id().unwrap_or_default();
@@ -165,6 +168,10 @@ fn frame(cx: &mut VisualTestContext) -> (Vec<Control>, Vec<Value>, Vec<Value>) {
             continue;
         }
         let input = match role {
+            "password" => match focus {
+                Some(focus) => Input::Masked(focus),
+                None => Input::Observe,
+            },
             "textbox" => match probe {
                 Some(InputProbe::Editor(editor)) => Input::Text(editor),
                 _ => {
@@ -201,7 +208,7 @@ fn frame(cx: &mut VisualTestContext) -> (Vec<Control>, Vec<Value>, Vec<Value>) {
     (controls, excluded, outside_census)
 }
 
-fn resolve<'a>(controls: &'a [Control], target: &Value) -> Result<&'a Control, String> {
+fn resolve<'a>(controls: &'a [Control], target: &Value) -> Result<Option<&'a Control>, String> {
     let matches = controls
         .iter()
         .filter(|control| {
@@ -216,8 +223,8 @@ fn resolve<'a>(controls: &'a [Control], target: &Value) -> Result<&'a Control, S
         })
         .collect::<Vec<_>>();
     match matches.as_slice() {
-        [control] => Ok(control),
-        [] => Err(format!("Controllo assente: {target}")),
+        [control] => Ok(Some(control)),
+        [] => Ok(None),
         _ => Err(format!("Controllo ambiguo: {target}")),
     }
 }
@@ -261,6 +268,14 @@ pub(super) fn drive(action: &Value, cx: &mut VisualTestContext) -> Result<Value,
         return Ok(json!({"focusBefore":before,"focusAfter":after}));
     }
     let control = resolve(&controls, target)?;
+    if op == "expect" && action["state"] == "hidden" {
+        return if control.is_none() {
+            Ok(json!({"state":"hidden","presence":"absent"}))
+        } else {
+            Err(format!("Controllo ancora raggiungibile: {target}"))
+        };
+    }
+    let control = control.ok_or_else(|| format!("Controllo assente: {target}"))?;
     let before = cx.update(|window, cx| control.describe(window, cx));
     let focus_before = cx.update(|window, cx| focused_control(&controls, window, cx));
     match (&control.input, op) {
@@ -298,9 +313,9 @@ pub(super) fn drive(action: &Value, cx: &mut VisualTestContext) -> Result<Value,
             if action["state"] == "selected" && control.node.is_selected() == Some(true) => {}
         (_, "expect")
             if action["state"] == "expanded" && control.node.is_expanded() == Some(true) => {}
-        (Input::Text(editor), "focus" | "fill" | "press") => {
+        (Input::Text(_) | Input::Masked(_), "focus" | "fill" | "press") => {
             cx.update(|window, cx| {
-                let focus = gpui::Focusable::focus_handle(editor.read(cx), cx);
+                let focus = control.focus_handle(cx).unwrap();
                 window.focus(&focus, cx);
             });
             if op == "fill" {
@@ -419,6 +434,7 @@ fn shell_fixture(
     let (view, cx) = cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
     cx.simulate_resize(gpui::size(px(1360.), px(900.)));
     view.update(cx, |app, cx| {
+        app.pairing = Some(host.stored_pairing());
         app.session = Some(host.session.clone());
         app.scope = Some("scope-a".into());
         app.area = Area::Patients;
@@ -556,5 +572,72 @@ fn shell_ui_cli_selects_history_and_returns_to_draft(cx: &mut gpui::TestAppConte
     run(
         include_str!("../../../../../e2e/ui-cli/gpui-shell-diary-draft.jsonl"),
         |action| drive(action, cx),
+    );
+}
+
+#[gpui::test]
+fn shell_ui_cli_changes_and_reopens_appearance(cx: &mut gpui::TestAppContext) {
+    let (_host, cx) = shell_fixture(cx);
+    run(
+        include_str!("../../../../../e2e/ui-cli/gpui-shell-appearance.jsonl"),
+        |action| drive(action, cx),
+    );
+}
+
+fn lock_and_unlock(cx: &mut gpui::TestAppContext, fixture: &'static str) {
+    let (host, cx) = shell_fixture(cx);
+    let before = host.routes().len();
+    let clinical = json!({"op":"click","target":{"role":"button",
+        "name":"Conferma e registra nella scheda di Sintetica Amina"}});
+    let read_password = json!({"op":"expectValue","target":{"role":"password",
+        "name":"Frase di accesso o PIN precedente"},"value":""});
+    run(fixture, |action| {
+        let result = drive(action, cx)?;
+        if action["op"] == "expect"
+            && action["target"]["name"] == "Accedi al tuo archivio"
+            && action["state"] == "visible"
+        {
+            assert!(
+                drive(&clinical, cx)
+                    .unwrap_err()
+                    .starts_with("Controllo assente:")
+            );
+            assert!(
+                drive(&read_password, cx)
+                    .unwrap_err()
+                    .starts_with("Azione expectValue non disponibile")
+            );
+        }
+        Ok(result)
+    });
+    let routes = host.routes();
+    let mut non_reads: Vec<_> = routes[before..]
+        .iter()
+        .map(String::as_str)
+        .filter(|route| !route.starts_with("GET "))
+        .collect();
+    non_reads.sort_unstable();
+    assert_eq!(
+        non_reads,
+        [
+            "POST /api/auth/native/login",
+            "POST /api/auth/native/logout"
+        ]
+    );
+}
+
+#[gpui::test]
+fn shell_ui_cli_locks_review_and_unlocks(cx: &mut gpui::TestAppContext) {
+    lock_and_unlock(
+        cx,
+        include_str!("../../../../../e2e/ui-cli/gpui-shell-lock.jsonl"),
+    );
+}
+
+#[gpui::test]
+fn shell_ui_cli_locks_magnified_and_unlocks(cx: &mut gpui::TestAppContext) {
+    lock_and_unlock(
+        cx,
+        include_str!("../../../../../e2e/ui-cli/gpui-shell-magnified-lock.jsonl"),
     );
 }

@@ -153,6 +153,14 @@ pub fn button(
     action_button(id, label.clone(), label, theme, primary, enabled)
 }
 
+pub fn icon_button(
+    id: impl Into<SharedString>,
+    accessible_name: impl Into<SharedString>,
+    theme: Theme,
+) -> Stateful<Div> {
+    action_button(id, accessible_name.into(), "".into(), theme, false, true)
+}
+
 fn action_button(
     id: impl Into<SharedString>,
     accessible_name: SharedString,
