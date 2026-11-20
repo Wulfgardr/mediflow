@@ -1,4 +1,4 @@
-use chrono::{DateTime, NaiveDate, TimeZone, Utc};
+use chrono::{DateTime, Datelike, NaiveDate, TimeZone, Utc};
 use mediflow_runtime_client::{Attachment, Entry, Observation, Therapy};
 
 pub(super) const BAND_ROWS: usize = 5;
@@ -22,25 +22,13 @@ pub(super) enum ChangeKind {
 
 impl ChangeKind {
     const READING_ORDER: [Self; 6] = [
-        Self::Started,
-        Self::Updated,
         Self::Suspended,
         Self::Concluded,
+        Self::Updated,
+        Self::Started,
         Self::OutOfRange,
         Self::DocumentAdded,
     ];
-
-    pub(super) fn counted(self, count: usize) -> String {
-        let (one, many) = match self {
-            Self::Started => ("avviata", "avviate"),
-            Self::Updated => ("aggiornata", "aggiornate"),
-            Self::Suspended => ("sospesa", "sospese"),
-            Self::Concluded => ("conclusa", "concluse"),
-            Self::OutOfRange => ("▲ fuori intervallo", "▲ fuori intervallo"),
-            Self::DocumentAdded => ("documento aggiunto", "documenti aggiunti"),
-        };
-        format!("{count} {}", if count == 1 { one } else { many })
-    }
 
     pub(super) fn label(self) -> &'static str {
         match self {
@@ -68,7 +56,22 @@ pub(super) struct Change {
     pub(super) kind: ChangeKind,
     pub(super) subject: String,
     pub(super) at: DateTime<Utc>,
-    pub(super) detail: Vec<String>,
+    pub(super) detail: Vec<Detail>,
+    pub(super) more: Vec<Detail>,
+    pub(super) measure: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct Detail {
+    pub(super) term: &'static str,
+    pub(super) value: String,
+}
+
+fn detail(term: &'static str, value: impl Into<String>) -> Detail {
+    Detail {
+        term,
+        value: value.into(),
+    }
 }
 
 pub(super) fn instant(value: &str) -> Option<DateTime<Utc>> {
@@ -130,25 +133,35 @@ fn therapy_change(row: &Therapy, after: DateTime<Utc>) -> Option<Change> {
         _ => return None,
     };
     let date = |value: &str| crate::components::display_date(Some(value));
-    let mut detail = vec![format!(
-        "Oggi: {} · {}",
-        super::therapy_status(&row.status),
-        row.dosage
+    let status = super::therapy_status(&row.status);
+    let mut details = vec![detail(
+        "Stato attuale",
+        if row.status == "active" && !row.dosage.trim().is_empty() {
+            format!("{status} · {}", row.dosage)
+        } else {
+            status.to_owned()
+        },
     )];
+    if kind != ChangeKind::Started {
+        details.push(detail("Prima", "Valore precedente non conservato."));
+    }
+    let mut more = vec![];
+    if row.status != "active" && !row.dosage.trim().is_empty() {
+        more.push(detail("Posologia registrata", row.dosage.clone()));
+    }
     if let Some(indication) = row
         .motivation
         .as_deref()
         .map(str::trim)
         .filter(|text| !text.is_empty())
     {
-        detail.push(format!("Indicazione: {indication}"));
+        more.push(detail("Indicazione", indication));
     }
-    detail.push(match row.end_date.as_deref() {
-        Some(end) => format!("Dal {} al {}", date(&row.start_date), date(end)),
-        None => format!("Dal {}", date(&row.start_date)),
-    });
-    if kind != ChangeKind::Started {
-        detail.push("Valore precedente non conservato".into());
+    if !row.start_date.trim().is_empty() {
+        more.push(detail("Inizio", date(&row.start_date)));
+    }
+    if let Some(end) = row.end_date.as_deref().filter(|end| !end.trim().is_empty()) {
+        more.push(detail("Fine", date(end)));
     }
     Some(Change {
         key: format!("therapy-{}", row.id),
@@ -156,7 +169,9 @@ fn therapy_change(row: &Therapy, after: DateTime<Utc>) -> Option<Change> {
         kind,
         subject: row.drug_name.clone(),
         at,
-        detail,
+        detail: details,
+        more,
+        measure: None,
     })
 }
 
@@ -226,33 +241,49 @@ where
         source: ChangeSource::Observation,
         kind: ChangeKind::OutOfRange,
         subject: row.display.clone(),
+        measure: Some(unit(&row.value)),
         at,
-        detail: vec![
-            previous.map_or_else(
-                || {
+        detail: vec![previous.map_or_else(
+            || {
+                detail(
+                    "Valore",
                     format!(
                         "{} ({}) · Nessuna misura precedente",
                         unit(&row.value),
                         short(observed)
-                    )
-                },
-                |(when, other)| {
-                    let comparison = format!(
-                        "{} ({}) → {} ({})",
-                        measured(other),
-                        short(when),
-                        measured(row),
-                        short(observed)
-                    );
+                    ),
+                )
+            },
+            |(when, other)| {
+                let comparison = format!(
+                    "{} ({}) → {} ({})",
+                    measured(other),
+                    short(when),
+                    measured(row),
+                    short(observed)
+                );
+                detail(
+                    "Valori",
                     if other.unit_code == row.unit_code {
                         comparison
                     } else {
                         format!("{comparison} · unità diverse, valori non convertiti")
-                    }
-                },
-            ),
-            format!("{range} · misura del {}", day_in_zone(observed, zone)),
-        ],
+                    },
+                )
+            },
+        )],
+        more: [
+            (!range.is_empty()).then(|| {
+                detail(
+                    "Riferimento",
+                    range.trim_start_matches("Riferimento ").to_owned(),
+                )
+            }),
+            Some(detail("Misura del", day_in_zone(observed, zone))),
+        ]
+        .into_iter()
+        .flatten()
+        .collect(),
     })
 }
 
@@ -265,6 +296,8 @@ fn document_change(row: &Attachment, after: DateTime<Utc>) -> Option<Change> {
         subject: row.name.clone(),
         at,
         detail: vec![],
+        more: vec![],
+        measure: None,
     })
 }
 
@@ -343,11 +376,28 @@ where
     changes
 }
 
-const ENTRY_KINDS: [(&str, &str, &str); 3] = [
-    ("visit", "visita", "visite"),
+const ENTRY_KINDS: [(&str, &str, &str); 8] = [
+    ("phone", "telefonata", "telefonate"),
     ("remote", "contatto remoto", "contatti remoti"),
+    ("access", "accesso", "accessi"),
     ("note", "nota", "note"),
+    ("visit", "visita", "visite"),
+    ("exam", "esame", "esami"),
+    ("hospitalization", "ricovero", "ricoveri"),
+    ("scale", "scala", "scale"),
 ];
+
+pub(super) fn entry_kind_label(kind: &str) -> String {
+    let label = ENTRY_KINDS
+        .iter()
+        .find(|(known, _, _)| *known == kind)
+        .map_or("voce", |(_, one, _)| *one);
+    let mut letters = label.chars();
+    letters
+        .next()
+        .map(|first| first.to_uppercase().chain(letters).collect())
+        .unwrap_or_default()
+}
 
 fn registered(entry: &Entry) -> Option<DateTime<Utc>> {
     entry
@@ -373,12 +423,14 @@ pub(super) fn diary_after(anchor: &VisitAnchor, entries: &[Entry]) -> Option<Str
             parts.push(format!("{count} {}", if count == 1 { one } else { many }));
         }
     }
-    parts.extend(
-        counts
-            .into_iter()
-            .map(|(kind, count)| format!("{count} {kind}")),
-    );
-    (!parts.is_empty()).then(|| format!("Nel diario dopo la visita: {}", parts.join(", ")))
+    let others: usize = counts.into_values().sum();
+    if others > 0 {
+        parts.push(format!(
+            "{others} {}",
+            if others == 1 { "voce" } else { "voci" }
+        ));
+    }
+    (!parts.is_empty()).then(|| parts.join(" · "))
 }
 
 pub(super) fn entries_on_day<'a, T: TimeZone>(
@@ -397,6 +449,134 @@ where
         .collect();
     rows.sort_by_key(|entry| registered(entry));
     rows
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(super) struct MeasureRow {
+    pub(super) key: String,
+    pub(super) display: String,
+    pub(super) amount: String,
+    pub(super) unit: String,
+    pub(super) arrow: Option<&'static str>,
+    pub(super) day: String,
+    pub(super) trend: Option<Vec<f64>>,
+    pub(super) spoken: String,
+}
+
+pub(super) fn measured_number(value: &str) -> Option<f64> {
+    let trimmed = value.trim();
+    let mut parts = trimmed.strip_prefix('-').unwrap_or(trimmed).splitn(2, ',');
+    let digits = |part: Option<&str>| {
+        part.is_some_and(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_digit()))
+    };
+    let decimal_comma = digits(parts.next()) && digits(parts.next());
+    let normalized = if decimal_comma {
+        trimmed.replacen(',', ".", 1)
+    } else {
+        trimmed.to_owned()
+    };
+    normalized.parse::<f64>().ok().filter(|n| n.is_finite())
+}
+
+pub(super) fn measure_rows<T: TimeZone>(
+    rows: &[Observation],
+    today: NaiveDate,
+    zone: &T,
+) -> Vec<MeasureRow>
+where
+    T::Offset: std::fmt::Display,
+{
+    type Series<'a> = (String, Vec<&'a Observation>);
+    let mut series: Vec<Series> = vec![];
+    for row in rows.iter().filter(|row| row.deleted_at.is_none()) {
+        let key = serde_json::json!([
+            row.patient_id,
+            row.code_system,
+            row.code,
+            row.unit_system,
+            row.unit_code
+        ])
+        .to_string();
+        match series.iter_mut().find(|(other, _)| *other == key) {
+            Some((_, values)) => values.push(row),
+            None => series.push((key, vec![row])),
+        }
+    }
+    let order = |row: &Observation| {
+        (
+            instant(&row.observed_at),
+            row.created_at.as_deref().and_then(instant),
+            row.id.clone(),
+        )
+    };
+    for (_, values) in &mut series {
+        values.sort_by_key(|row| order(row));
+    }
+    series.sort_by(|a, b| {
+        let latest = |values: &Vec<&Observation>| values.last().map(|row| order(row));
+        latest(&b.1).cmp(&latest(&a.1))
+    });
+    series
+        .into_iter()
+        .map(|(key, values)| {
+            let latest = *values.last().expect("a series has a measure");
+            let value = measured_number(&latest.value);
+            let high = latest.ref_high.as_deref().and_then(measured_number);
+            let low = latest.ref_low.as_deref().and_then(measured_number);
+            let (arrow, side) = match value {
+                Some(value) if high.is_some_and(|high| value > high) => {
+                    (Some("↑"), ", sopra l’intervallo")
+                }
+                Some(value) if low.is_some_and(|low| value < low) => {
+                    (Some("↓"), ", sotto l’intervallo")
+                }
+                _ => (None, ""),
+            };
+            let observed = instant(&latest.observed_at);
+            let full = observed.map(|at| day_in_zone(at, zone));
+            let day = match observed {
+                Some(at) if at.with_timezone(zone).year() == today.year() => {
+                    at.with_timezone(zone).format("%d/%m").to_string()
+                }
+                Some(_) => full.clone().unwrap_or_default(),
+                None => "Data non registrata".to_owned(),
+            };
+            let trend: Vec<f64> = values
+                .iter()
+                .filter(|row| instant(&row.observed_at).is_some())
+                .filter_map(|row| measured_number(&row.value))
+                .collect();
+            let shown = crate::clinical_units::value(&latest.value, &latest.unit_code);
+            let (amount, unit) = shown
+                .rsplit_once(' ')
+                .map_or((shown.clone(), String::new()), |(amount, unit)| {
+                    (amount.to_owned(), unit.to_owned())
+                });
+            let trend = (trend.len() >= 2).then_some(trend);
+            let spoken = format!(
+                "{}: {shown}{side}, {}{}",
+                latest.display,
+                full.map_or_else(
+                    || "data non registrata".to_owned(),
+                    |day| format!("misura del {day}")
+                ),
+                trend
+                    .as_ref()
+                    .map(|values| format!(", andamento di {} misure", values.len()))
+                    .unwrap_or_default()
+            );
+            MeasureRow {
+                key,
+                display: latest.display.clone(),
+                amount,
+                unit,
+                arrow,
+                day,
+                trend,
+                spoken,
+            }
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -477,14 +657,23 @@ mod tests {
         assert!(
             changes[0]
                 .detail
-                .contains(&"Valore precedente non conservato".to_owned())
+                .contains(&detail("Prima", "Valore precedente non conservato."))
         );
         assert!(
             !changes[1]
                 .detail
                 .iter()
-                .any(|line| line.contains("precedente"))
+                .any(|line| line.value.contains("precedente"))
         );
+        assert_eq!(changes[0].detail[0], detail("Stato attuale", "Sospesa"));
+        assert!(
+            changes[0]
+                .more
+                .iter()
+                .any(|line| line.term == "Posologia registrata"),
+            "a suspended therapy keeps its recorded dose out of the current state"
+        );
+        assert!(changes[1].detail[0].value.starts_with("Attiva · "));
     }
 
     #[test]
@@ -522,12 +711,12 @@ mod tests {
         assert_eq!(changes.len(), 1);
         assert_eq!(changes[0].kind, ChangeKind::OutOfRange);
         assert_eq!(
-            changes[0].detail[0],
+            changes[0].detail[0].value,
             "4,8 mmol/L (02/10) → 5,6 mmol/L (10/11)"
         );
         let alone = changes_since(&anchor, &[], &rows[1..2], &Utc);
         assert_eq!(
-            alone[0].detail[0],
+            alone[0].detail[0].value,
             "5,6 mmol/L (10/11) · Nessuna misura precedente"
         );
     }
@@ -550,12 +739,15 @@ mod tests {
         );
         let changes = changes_since(&anchor, &[], &[before, after], &Utc);
         assert_eq!(
-            changes[0].detail[0],
+            changes[0].detail[0].value,
             "19 mg/dL (02/10) → 5,6 mmol/L (10/11) · unità diverse, valori non convertiti"
         );
         assert_eq!(
-            changes[0].detail[1],
-            "Riferimento 3,5 mmol/L–5,0 mmol/L · misura del 10/11/2026"
+            changes[0].more,
+            [
+                detail("Riferimento", "3,5 mmol/L–5,0 mmol/L"),
+                detail("Misura del", "10/11/2026")
+            ]
         );
     }
 
@@ -569,6 +761,8 @@ mod tests {
             subject: subject.into(),
             at,
             detail: vec![],
+            more: vec![],
+            measure: None,
         };
         let mut rows: Vec<_> = (0..7)
             .map(|index| change(&format!("Farmaco {index}"), ChangeKind::Started))
@@ -584,15 +778,15 @@ mod tests {
         let lines: Vec<_> = days[0]
             .1
             .iter()
-            .map(|(kind, named)| (kind.counted(named.len()), named.len()))
+            .map(|(kind, named)| (*kind, named.len()))
             .collect();
         assert_eq!(
             lines,
             [
-                ("7 avviate".to_owned(), 7),
-                ("1 sospesa".to_owned(), 1),
-                ("1 conclusa".to_owned(), 1),
-                ("3 ▲ fuori intervallo".to_owned(), 3),
+                (ChangeKind::Suspended, 1),
+                (ChangeKind::Concluded, 1),
+                (ChangeKind::Started, 7),
+                (ChangeKind::OutOfRange, 3),
             ]
         );
         let mut seen: Vec<_> = days[0]
@@ -622,7 +816,7 @@ mod tests {
         ];
         assert_eq!(
             diary_after(&anchor, &rows).as_deref(),
-            Some("Nel diario dopo la visita: 2 contatti remoti, 1 nota, 1 scale")
+            Some("2 contatti remoti · 1 nota · 1 scala")
         );
         assert_eq!(diary_after(&anchor, &rows[3..4]), None);
         let same_day = entries_on_day(instant("2026-11-06T18:00:00Z").unwrap(), &rows, &Utc);
@@ -633,5 +827,102 @@ mod tests {
                 .collect::<Vec<_>>(),
             ["b"]
         );
+    }
+    fn measure(id: &str, code: &str, unit: &str, value: &str, at: &str) -> Observation {
+        serde_json::from_value(
+            json!({"id":id,"patientId":"p","codeSystem":"http://loinc.org","code":code,
+            "display":"Peso","unitSystem":"http://unitsofmeasure.org","unitCode":unit,"value":value,
+            "refHigh":"5.1","observedAt":at,"version":1,"createdAt":at}),
+        )
+        .unwrap()
+    }
+
+    fn today() -> NaiveDate {
+        NaiveDate::from_ymd_opt(2026, 11, 19).unwrap()
+    }
+
+    #[test]
+    fn a_series_keeps_one_unit_and_draws_a_trend_only_from_two_comparable_measures() {
+        let kg = measure("a", "29463-7", "kg", "70", "2026-10-01T08:00:00Z");
+        let lb = measure("b", "29463-7", "[lb_av]", "154", "2026-11-01T08:00:00Z");
+        let rows = measure_rows(&[kg.clone(), lb.clone()], today(), &Utc);
+        assert_eq!(rows.len(), 2, "kilograms and pounds are two series");
+        assert_eq!(rows[0].amount, "154");
+        assert!(
+            rows.iter().all(|row| row.trend.is_none()),
+            "one measure per unit: no trend"
+        );
+        let again = measure("c", "29463-7", "kg", "71,4", "2026-11-10T08:00:00Z");
+        let rows = measure_rows(&[kg, lb, again], today(), &Utc);
+        let kilograms = rows.iter().find(|row| row.unit == "kg").unwrap();
+        assert_eq!(kilograms.trend, Some(vec![70., 71.4]));
+        assert_eq!(kilograms.amount, "71,4");
+        assert!(
+            rows.iter()
+                .find(|row| row.unit != "kg")
+                .unwrap()
+                .trend
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn an_older_measure_names_its_year_and_a_missing_date_says_so() {
+        let older = measure("a", "2823-3", "mmol/L", "4,8", "2025-11-10T08:00:00Z");
+        let rows = measure_rows(std::slice::from_ref(&older), today(), &Utc);
+        assert_eq!(rows[0].day, "10/11/2025");
+        assert!(
+            rows[0].spoken.contains("misura del 10/11/2025"),
+            "{}",
+            rows[0].spoken
+        );
+        let recent = measure("b", "2823-3", "mmol/L", "5,6", "2026-11-10T08:00:00Z");
+        let rows = measure_rows(&[older.clone(), recent], today(), &Utc);
+        assert_eq!(rows[0].day, "10/11");
+        assert_eq!(rows[0].arrow, Some("↑"));
+        assert!(
+            rows[0].spoken.contains("sopra l’intervallo"),
+            "{}",
+            rows[0].spoken
+        );
+        let new_year = NaiveDate::from_ymd_opt(2027, 1, 2).unwrap();
+        let december = measure("c", "2823-3", "mmol/L", "4,1", "2026-12-31T08:00:00Z");
+        assert_eq!(
+            measure_rows(&[december], new_year, &Utc)[0].day,
+            "31/12/2026"
+        );
+        let undated = measure("d", "2823-3", "mmol/L", "9,9", "");
+        let rows = measure_rows(&[older, undated.clone()], today(), &Utc);
+        assert_eq!(
+            rows[0].amount, "4,8",
+            "a dated measure wins over an undated one"
+        );
+        assert!(rows[0].trend.is_none());
+        let rows = measure_rows(&[undated], today(), &Utc);
+        assert_eq!(rows[0].day, "Data non registrata");
+        assert!(rows[0].spoken.contains("data non registrata"));
+    }
+
+    #[test]
+    fn the_latest_measure_is_chosen_by_instant_whatever_the_notation() {
+        let earlier = measure("a", "2823-3", "mmol/L", "4.0", "2026-11-10T09:00:00+02:00");
+        let later = measure("b", "2823-3", "mmol/L", "5.0", "2026-11-10T08:00:00Z");
+        let rows = measure_rows(&[later, earlier], today(), &Utc);
+        assert_eq!(
+            format!("{} {}", rows[0].amount, rows[0].unit),
+            crate::clinical_units::value("5.0", "mmol/L")
+        );
+        assert_eq!(rows[0].trend, Some(vec![4., 5.]));
+    }
+
+    #[test]
+    fn measured_numbers_follow_the_web_rules() {
+        assert_eq!(measured_number(" 5,6 "), Some(5.6));
+        assert_eq!(measured_number("-0,5"), Some(-0.5));
+        assert_eq!(measured_number("1.32"), Some(1.32));
+        assert_eq!(measured_number("1.234,5"), None);
+        assert_eq!(measured_number("120/80"), None);
+        assert_eq!(measured_number("positivo"), None);
+        assert_eq!(measured_number(""), None);
     }
 }

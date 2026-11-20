@@ -114,8 +114,8 @@ const geometry = async (target: Locator) => target.evaluate(element => {
 });
 
 async function themes(page: Page, suffix: string) {
-    for (const width of [1440, 1280, 1180, 1000, 999, 768, 390, 320]) for (const theme of ['light', 'dark']) {
-        await page.setViewportSize({ width, height: 660 });
+    for (const width of [1440, 1320, 1180, 1000, 999, 768, 402, 390, 320]) for (const theme of ['light', 'dark']) {
+        await page.setViewportSize({ width, height: width === 1320 ? 880 : width === 402 ? 874 : 660 });
         await page.evaluate(value => {
             localStorage.setItem('mediflow-theme', value);
             document.documentElement.classList.toggle('light', value === 'light');
@@ -123,10 +123,50 @@ async function themes(page: Page, suffix: string) {
         }, theme);
         await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
         const dir = process.env.MEDIFLOW_STABLE_CHANGED_SCREENSHOTS;
-        if (dir) await page.screenshot({ path: `${dir}/${suffix}-${width}-${theme}.png`, animations: 'disabled' });
+        if (dir && [1320, 1180, 402, 390].includes(width)) {
+            await page.screenshot({ path: `${dir}/${suffix}-${width}-${theme}.png`, animations: 'disabled' });
+        }
         await assertNoHorizontalOverflow(page, [{ label: 'Scheda', selector: '#quadro' }]);
-        const tracks = await page.locator('#quadro[data-overview]').evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length);
-        expect(tracks).toBe(width >= 1280 ? 3 : width >= 1000 ? 2 : 1);
+        const sheet = page.locator('#quadro[data-overview]');
+        const layout = await sheet.evaluate(element => {
+            const grid = element.firstElementChild!;
+            const tray = element.querySelector('[aria-labelledby="riepilogo-stabile"]')!;
+            const island = element.querySelector('#riepilogo-problemi')!;
+            const title = tray.querySelector('h2')!;
+            const islandTitle = island.querySelector('h2')!;
+            return {
+                width: element.clientWidth,
+                rem: Number.parseFloat(getComputedStyle(document.documentElement).fontSize),
+                tracks: getComputedStyle(grid).gridTemplateColumns.split(' ').length,
+                tray: getComputedStyle(tray).backgroundColor,
+                trayShadow: getComputedStyle(tray).boxShadow,
+                trayRadius: Number.parseFloat(getComputedStyle(tray).borderRadius),
+                inset: Number.parseFloat(getComputedStyle(tray).paddingLeft),
+                island: getComputedStyle(island).backgroundColor,
+                islandRadius: Number.parseFloat(getComputedStyle(island).borderRadius),
+                titleSize: Number.parseFloat(getComputedStyle(title).fontSize),
+                islandTitleSize: Number.parseFloat(getComputedStyle(islandTitle).fontSize),
+            };
+        });
+        const compact = layout.width < 44 * layout.rem;
+        expect(layout.tracks).toBe(layout.width >= 62 * layout.rem ? 3 : compact ? 1 : 2);
+        expect(layout.tray).toBe(compact ? 'rgba(0, 0, 0, 0)' : theme === 'light' ? 'rgb(240, 242, 244)' : 'rgb(16, 18, 22)');
+        if (compact) expect(layout.trayShadow).toBe('none');
+        else expect(layout.trayShadow.match(/\binset\b/g)).toHaveLength(3);
+        expect(layout.island).toBe(compact ? theme === 'light' ? 'rgb(243, 244, 246)' : 'rgb(31, 34, 40)' : theme === 'light' ? 'rgb(255, 255, 255)' : 'rgb(31, 34, 40)');
+        expect(layout.islandRadius).toBe(14);
+        if (!compact) expect(layout.trayRadius - layout.inset).toBe(layout.islandRadius);
+        expect(layout.titleSize).toBe(1.25 * layout.rem);
+        expect(layout.titleSize).toBeGreaterThan(layout.islandTitleSize);
+        if ([1320, 1180, 402, 390].includes(width)) await test.info().attach(`zone-${width}-${theme}`, {
+            body: JSON.stringify(layout, null, 2), contentType: 'application/json',
+        });
+        if (width === 390) {
+            const jump = page.getByRole('navigation', { name: 'Nel riepilogo' }).getByRole('link', { name: 'Terapie' });
+            await jump.click();
+            await expect(page.getByRole('region', { name: 'Terapie attive', exact: true })).toBeInViewport();
+            await page.getByRole('navigation', { name: 'Nel riepilogo' }).getByRole('link', { name: 'Cambiato' }).click();
+        }
     }
     await page.setViewportSize({ width: 1180, height: 660 });
 }
@@ -163,11 +203,11 @@ test('D: dalla lista, primo sguardo al ritorno e cartella senza storico al cambi
     const diary = page.locator('#diario');
     await expect(diary).toContainText('Nota sintetica del diario.');
     expect((await diary.boundingBox())!.y).toBeGreaterThan(changed.y);
-    await expect(changes).toContainText('Operatrice sintetica');
+    await expect(page.getByRole('region', { name: 'Riepilogo clinico', exact: true })).toContainText('Operatrice sintetica');
     await expect(changes.getByRole('link', { name: /1 telefonata/ })).toHaveAttribute('href', '#diario');
     await changes.getByText('Terapia sospesa sintetica', { exact: true }).click();
     await expect(changes).toContainText('Stato attuale: Sospesa');
-    await expect(changes).toContainText('Valore precedente non conservato.');
+    await expect(changes).toContainText('Prima: Non conservato.');
     await changes.getByRole('button', { name: /Diario del.*Telefonata/ }).click();
     await expect(page.getByRole('region', { name: 'Voce del diario' })).toContainText('Telefonata di archivio.');
     await page.getByRole('button', { name: 'Chiudi', exact: true }).click();
@@ -342,11 +382,11 @@ test('D gemella: un contatto nello stesso giorno si legge come voce, e una lettu
     await test.info().attach('gemella-primo-sguardo', { body: JSON.stringify({ viewport: [1180, 660], visibleChanges }),
         contentType: 'application/json' });
     await expect(stable.getByRole('row').filter({ hasText: 'Analogo 9' })).toContainText('Una compressa al mattino e mezza dopo il pasto della sera');
-    const sideBySide = await stable.getByRole('row').filter({ hasText: 'Analogo 10' }).getByRole('cell').evaluateAll(cells => {
+    const posologyBelowName = await stable.getByRole('row').filter({ hasText: 'Analogo 10' }).getByRole('cell').evaluateAll(cells => {
         const [drug, dosage] = cells.map(cell => cell.getBoundingClientRect());
-        return drug.top === dosage.top && drug.right <= dosage.left;
+        return dosage.top >= drug.bottom - 1 && Math.abs(dosage.left - drug.left) < 1;
     });
-    expect(sideBySide).toBe(true);
+    expect(posologyBelowName).toBe(true);
     await assertNoHorizontalOverflow(page, [{ label: 'Riepilogo gemello', selector: '#quadro' }]);
     const directory = process.env.MEDIFLOW_STABLE_CHANGED_SCREENSHOTS;
     if (directory) await page.screenshot({ path: `${directory}/gemella-1180.png`, animations: 'disabled' });

@@ -4,7 +4,6 @@ use gpui::{BoxShadow, FontFeatures, FontWeight, Hsla, Styled, px, rgb};
 use serde_json::Value;
 
 pub const VOICE: &str = "Newsreader";
-pub const CODES: &str = "IBM Plex Mono";
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 pub const SYSTEM: &str = ".SystemUIFont";
 #[cfg(target_os = "windows")]
@@ -32,9 +31,50 @@ pub struct Theme {
     pub critical: Hsla,
     pub success: Hsla,
     pub threshold_text: Hsla,
+    pub rail: Hsla,
+    pub sheet: Hsla,
     pub control_radius: f32,
     pub paper_radius: f32,
     pub scale: f32,
+    pub(crate) record: RecordPalette,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub(crate) struct RecordPalette {
+    pub tray: Hsla,
+    pub tray_rule: Hsla,
+    pub tray_light: Hsla,
+    pub tray_shadow: Hsla,
+    pub island: Hsla,
+    pub compact_island: Hsla,
+    pub island_rule: Hsla,
+    pub change: Hsla,
+    pub change_rule: Hsla,
+    pub proposal_rule: Hsla,
+}
+
+impl RecordPalette {
+    fn from_tokens(tokens: &Value) -> Self {
+        let color = |name: &str| token_color(&tokens[name]);
+        Self {
+            tray: color("tray"),
+            tray_rule: color("tray-rule"),
+            tray_light: color("tray-light"),
+            tray_shadow: color("tray-shadow"),
+            island: color("island"),
+            compact_island: color("compact-island"),
+            island_rule: color("island-rule"),
+            change: color("change"),
+            change_rule: color("change-rule"),
+            proposal_rule: color("proposal-rule"),
+        }
+    }
+}
+
+fn token_color(token: &Value) -> Hsla {
+    let value = token["$value"].as_str().expect("required Lume color token");
+    rgb(u32::from_str_radix(value.trim_start_matches('#'), 16).expect("hexadecimal Lume color"))
+        .into()
 }
 
 impl Theme {
@@ -46,15 +86,9 @@ impl Theme {
             ))
             .expect("versioned Punto d'inchiostro runtime tokens must be valid JSON")
         });
-        let colors = &tokens["register"][if dark { "grafite" } else { "giorno" }];
-        let color = |group: &str, name: &str| {
-            let value = colors[group][name]["$value"]
-                .as_str()
-                .expect("required Punto d'inchiostro color token");
-            rgb(u32::from_str_radix(value.trim_start_matches('#'), 16)
-                .expect("hexadecimal Punto d'inchiostro color"))
-            .into()
-        };
+        let register = if dark { "grafite" } else { "giorno" };
+        let colors = &tokens["register"][register];
+        let color = |group: &str, name: &str| token_color(&colors[group][name]);
         Self {
             shade: color("surface", "canvas"),
             paper: color("surface", "focal"),
@@ -78,6 +112,8 @@ impl Theme {
             critical: color("signal", "critical"),
             success: color("signal", "success"),
             threshold_text: color("ink", "threshold"),
+            rail: token_color(&tokens["record"][register]["rail"]),
+            sheet: token_color(&tokens["record"][register]["panel"]),
             control_radius: if cfg!(any(target_os = "ios", target_os = "macos")) {
                 12.
             } else if cfg!(target_os = "windows") {
@@ -95,6 +131,7 @@ impl Theme {
                 10.
             },
             scale: 1.,
+            record: RecordPalette::from_tokens(&tokens["record"][register]),
         }
     }
 
@@ -118,6 +155,10 @@ impl Theme {
 
     pub fn around_control(self, inset: f32) -> f32 {
         self.control_radius + inset
+    }
+
+    pub fn tint(color: Hsla, alpha: f32) -> Hsla {
+        Hsla { a: alpha, ..color }
     }
 
     pub fn nested(outer: f32, inset: f32) -> f32 {
@@ -147,14 +188,18 @@ impl Theme {
             TypeRole::PageTitle => (VOICE, 26., FontWeight::NORMAL, 1.2, false),
             TypeRole::PersonPreview => (VOICE, 22., FontWeight::NORMAL, 1.2, false),
             TypeRole::Prose => (VOICE, 17., FontWeight::NORMAL, 1.5, false),
-            TypeRole::Brand => (VOICE, 21., FontWeight::MEDIUM, 1.2, false),
+            TypeRole::Brand => (SYSTEM, 17., FontWeight::SEMIBOLD, 1.2, false),
             TypeRole::Body => (SYSTEM, 14., FontWeight::NORMAL, 1.5, true),
             TypeRole::Strong => (SYSTEM, 14., FontWeight::SEMIBOLD, 1.5, true),
             TypeRole::Threshold => (SYSTEM, 15., FontWeight::SEMIBOLD, 1.5, true),
             TypeRole::Meta => (SYSTEM, 13., FontWeight::NORMAL, 1.5, true),
             TypeRole::Section => (SYSTEM, 12., FontWeight::SEMIBOLD, 1.5, true),
             TypeRole::Title => (SYSTEM, 15., FontWeight::SEMIBOLD, 1.4, true),
-            TypeRole::Code => (CODES, 12., FontWeight::NORMAL, 1.5, false),
+            TypeRole::RecordPerson => (SYSTEM, 28., FontWeight::SEMIBOLD, 1.15, false),
+            TypeRole::RecordZone => (SYSTEM, 20., FontWeight::SEMIBOLD, 1.2, false),
+            TypeRole::RecordIsland => (SYSTEM, 17., FontWeight::SEMIBOLD, 1.3, false),
+            TypeRole::RecordRow => (SYSTEM, 15., FontWeight::SEMIBOLD, 1.35, false),
+            TypeRole::Code => (SYSTEM, 12., FontWeight::MEDIUM, 1.5, false),
         };
         let size = self.size(points * if register { native_body / 14. } else { 1. });
         Typography {
@@ -182,6 +227,10 @@ pub enum TypeRole {
     Meta,
     Section,
     Title,
+    RecordPerson,
+    RecordZone,
+    RecordIsland,
+    RecordRow,
     Code,
 }
 
@@ -221,6 +270,7 @@ pub enum TextRole {
     Body,
     Strong,
     Meta,
+    RecordRow,
     Code,
 }
 impl From<TextRole> for TypeRole {
@@ -231,6 +281,7 @@ impl From<TextRole> for TypeRole {
             TextRole::Body => Self::Body,
             TextRole::Strong => Self::Strong,
             TextRole::Meta => Self::Meta,
+            TextRole::RecordRow => Self::RecordRow,
 
             TextRole::Code => Self::Code,
         }
@@ -244,6 +295,9 @@ pub enum TitleRole {
     PersonPreview,
     Section,
     SectionTitle,
+    RecordPerson,
+    RecordZone,
+    RecordIsland,
     Threshold,
 }
 impl From<TitleRole> for TypeRole {
@@ -255,13 +309,16 @@ impl From<TitleRole> for TypeRole {
             TitleRole::PersonPreview => Self::PersonPreview,
             TitleRole::Section => Self::Section,
             TitleRole::SectionTitle => Self::Title,
+            TitleRole::RecordPerson => Self::RecordPerson,
+            TitleRole::RecordZone => Self::RecordZone,
+            TitleRole::RecordIsland => Self::RecordIsland,
             TitleRole::Threshold => Self::Threshold,
         }
     }
 }
 pub trait TypeStyle: Styled + Sized {
     fn reading_surface(self, theme: Theme) -> Self {
-        self.bg(theme.paper)
+        self.bg(theme.sheet)
             .text_color(theme.ink)
             .type_role(theme, TextRole::Body)
     }
@@ -412,20 +469,20 @@ mod tests {
     voice!(
         brand,
         TypeRole::Brand,
-        "Newsreader",
-        21.,
-        42.,
-        FontWeight::MEDIUM,
-        25.2,
-        50.4
+        SYSTEM,
+        17.,
+        34.,
+        FontWeight::SEMIBOLD,
+        20.4,
+        40.8
     );
     voice!(
         code,
         TypeRole::Code,
-        "IBM Plex Mono",
+        SYSTEM,
         12.,
         24.,
-        FontWeight::NORMAL,
+        FontWeight::MEDIUM,
         18.,
         36.
     );

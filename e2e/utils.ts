@@ -104,7 +104,10 @@ async function hasStableUnlockedShell(page: Page): Promise<boolean> {
   return (navigationVisible && lockControlVisible) || workProfileVisible;
 }
 
-export async function completeOnboardingIfNeeded(page: Page, pin: string): Promise<void> {
+type SyntheticOperator = { displayName: string; ambulatoryName: string };
+const defaultOperator: SyntheticOperator = { displayName: 'Dr. E2E Smoke', ambulatoryName: 'Ambulatorio E2E' };
+
+export async function completeOnboardingIfNeeded(page: Page, pin: string, operator = defaultOperator): Promise<void> {
   const stepProfile = page.getByRole('heading', { name: 'Chi sei?' });
   if (!(await isVisible(stepProfile))) return;
   const salt = crypto.getRandomValues(new Uint8Array(16));
@@ -115,7 +118,7 @@ export async function completeOnboardingIfNeeded(page: Page, pin: string): Promi
   expect(etag).toBeTruthy();
   const response = await page.request.post('/api/auth/setup', {
     headers: { ...trustedWebRequestHeaders(page.url()), 'If-Match': etag, 'Idempotency-Key': crypto.randomUUID() },
-    data: { username: 'admin', password: pin, displayName: 'Dr. E2E Smoke', ambulatoryName: 'Ambulatorio E2E',
+    data: { username: 'admin', password: pin, ...operator,
       encryptedMasterKey, salt: Buffer.from(salt).toString('base64') },
   });
   expect(response.status()).toBe(200);
@@ -196,7 +199,7 @@ export async function setupPinLegacyIfNeeded(page: Page, pin: string): Promise<v
   await page.waitForTimeout(300);
 }
 
-export async function bootstrapUnlockedSession(page: Page, pin: string): Promise<void> {
+export async function bootstrapUnlockedSession(page: Page, pin: string, operator = defaultOperator): Promise<void> {
   await page.goto('/');
   await page.waitForLoadState('domcontentloaded');
 
@@ -208,7 +211,7 @@ export async function bootstrapUnlockedSession(page: Page, pin: string): Promise
       return;
     }
 
-    await completeOnboardingIfNeeded(page, pin);
+    await completeOnboardingIfNeeded(page, pin, operator);
     await setupPinLegacyIfNeeded(page, pin);
     await unlockIfNeeded(page, pin);
   }
