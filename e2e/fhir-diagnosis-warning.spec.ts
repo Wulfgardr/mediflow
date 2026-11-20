@@ -2,8 +2,9 @@ import Database from 'better-sqlite3';
 import { readFile } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
 import { scopedNotesOpenInput, syntheticScopedNotesView } from './fixtures/scoped-profile-notes-query';
+import { documentRequests } from './fixtures/trusted-web-request';
 import { expect, test, type Page } from '@playwright/test';
-import { bootstrapUnlockedSession, openPatientSection } from './utils';
+import { bootstrapUnlockedSession, openPatientSection, openUnlockedDocument } from './utils';
 
 test.describe.configure({ retries: 0 });
 test.beforeEach(async ({ baseURL }) => {
@@ -52,7 +53,7 @@ async function fixture(page: Page, entry: EntryPoint) {
       therapyMedication: summary, observationVitals: summary,
     } });
   });
-  await page.goto(`/patients/${PATIENT_ID}/${entry === 'edit-download' ? 'edit' : 'modules'}`);
+  await openUnlockedDocument(page, `/patients/${PATIENT_ID}/${entry === 'edit-download' ? 'edit' : 'modules'}`);
   await expect(page).toHaveTitle(/MediFlow/);
   if (entry === 'edit-download') {
     await expect(page.getByTestId('lume-workspace-patient-label')).toContainText('Sintetico Diagnosi');
@@ -216,9 +217,9 @@ test('the module downloads recorded diagnoses and supported encounters from the 
       await page.getByRole('button', { name: 'Scarica FHIR JSON', exact: true }).click();
     };
     expect(sql.prepare('SELECT id FROM patients WHERE id = ? AND deleted_at IS NULL').get(patientId)).toEqual({ id: patientId });
-    const profile = await page.request.get(`/api/patients/${patientId}`);
+    const profile = await documentRequests(page).get(`/api/patients/${patientId}`);
     expect(profile.status(), await profile.text()).toBe(200);
-    await page.goto(`/patients/${patientId}/modules`);
+    await openUnlockedDocument(page, `/patients/${patientId}/modules`);
     await expect(page.getByRole('heading', { name: 'Sintetico Archivio', exact: true, level: 1 })).toBeVisible({ timeout: 60_000 });
     const download = page.waitForEvent('download');
     await openExport();
@@ -245,7 +246,7 @@ test('the module downloads recorded diagnoses and supported encounters from the 
     ];
     sql.prepare('UPDATE patients SET diagnoses = ?, document_insights = ? WHERE id = ?')
       .run(JSON.stringify([{ ...diagnosis, date: undefined }]), JSON.stringify(archivedSummaries), patientId);
-    await page.reload();
+    await openUnlockedDocument(page, `/patients/${patientId}/modules`);
     await expect(page.getByRole('row').filter({ hasText: diagnosis.description })).toContainText('Data sconosciuta');
     await openPatientSection(page, 'timeline');
     const timeline = page.getByRole('feed', { name: 'Timeline clinica del paziente' });
