@@ -120,7 +120,9 @@ for (const index of [0, 1, 2]) test(`TEST-ONLY admitted peer roundtrip profile $
         const expected = JSON.stringify(outputs()[index]); peer.pendingOutput = expected.replaceAll('Bea Riva', token);
         const result = await service.generate(request);
         assert.equal(contentChecks - count, 2); // pre-thread AND exact turn/start
-        const turn = peer.calls.find(call => call.method === 'turn/start')!.params;
+        const turns = peer.calls.filter(call => call.method === 'turn/start');
+        assert.equal(turns.length, 1);
+        const turn = turns[0]!.params;
         const wire = JSON.stringify({ input: turn.input, outputSchema: turn.outputSchema });
         assert.equal(wire, value.read.payload); assert.equal(sha(wire), value.consent.disclosure().payloadSha256);
         assert.equal(Buffer.byteLength(wire, 'utf8'), value.consent.disclosure().payloadBytes);
@@ -338,6 +340,7 @@ for (const index of [0, 1, 2]) {
                 assert.equal(publication, null);
                 assert.equal(service.isCurrent({} as never), false);
                 if (negative === 'unavailable') assert.equal(peer.calls.some(call => call.method === 'thread/start'), false);
+                else assert.equal(peer.calls.filter(call => call.method === 'turn/start').length, 1);
             } finally { await service?.dispose(); value.consent.close(); await value.job.close(); testOnlyAllowContent = false; }
         });
     }
