@@ -200,6 +200,30 @@ const STANDARD_FONT_FILES = new Set([
     'LiberationSans-Bold.ttf', 'LiberationSans-BoldItalic.ttf', 'LiberationSans-Italic.ttf', 'LiberationSans-Regular.ttf',
 ]);
 
+const WORKER_ROOT = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
+
+function physicalRendererFile(packageName, ...segments) {
+    const windows = process.platform === 'win32';
+    const packageRoot = windows ? path.join(WORKER_ROOT, 'node_modules', packageName)
+        : path.dirname(require.resolve(`${packageName}/package.json`));
+    const file = path.join(packageRoot, ...segments);
+    if (windows) {
+        const staged = path.relative(WORKER_ROOT, file);
+        if (!staged.startsWith(`node_modules${path.sep}`)) throw new EngineUnavailable();
+        let directory = WORKER_ROOT;
+        for (const part of path.dirname(staged).split(path.sep)) {
+            directory = path.join(directory, part);
+            if (!lstatSync(directory).isDirectory()) throw new EngineUnavailable();
+        }
+    } else {
+        const relative = path.relative(realpathSync.native(WORKER_ROOT), realpathSync.native(file));
+        if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) throw new EngineUnavailable();
+    }
+    const stat = lstatSync(file);
+    if (!stat.isFile()) throw new EngineUnavailable();
+    return { file, size: stat.size };
+}
+
 /* Non-embedded standard fonts (Helvetica, Times, Courier...) are drawn only from
    the pinned pdfjs-dist package assets; document-supplied URLs are ignored. Without
    them PDF.js silently skips the glyphs and OCR never sees overlay text. */
@@ -208,12 +232,8 @@ class PackageStandardFontDataFactory {
 
     async fetch({ filename }) {
         if (typeof filename !== 'string' || !STANDARD_FONT_FILES.has(filename)) throw new EngineUnavailable();
-        const root = realpathSync.native(fileURLToPath(new URL('..', import.meta.url)));
-        const file = path.join(path.dirname(require.resolve('pdfjs-dist/package.json')), 'standard_fonts', filename);
-        const relative = path.relative(root, realpathSync.native(file));
-        const stat = lstatSync(file);
-        if (!stat.isFile() || stat.size < 1 || stat.size > STANDARD_FONT_MAX_BYTES
-            || relative.startsWith('..') || path.isAbsolute(relative)) throw new EngineUnavailable();
+        const { file, size } = physicalRendererFile('pdfjs-dist', 'standard_fonts', filename);
+        if (size < 1 || size > STANDARD_FONT_MAX_BYTES) throw new EngineUnavailable();
         return new Uint8Array(readFileSync(file));
     }
 }
@@ -234,26 +254,22 @@ async function loadRenderer() {
             || require(`${profile.package}/package.json`).version !== CANVAS_VERSION) throw new EngineUnavailable();
         if (process.platform !== 'darwin') {
             stage = 'binary_path';
-            const binaryPath = require.resolve(`${profile.package}/${profile.binary}`);
-            const root = realpathSync.native(fileURLToPath(new URL('..', import.meta.url)));
-            const relative = path.relative(root, realpathSync.native(binaryPath));
-            if (!lstatSync(binaryPath).isFile() || relative.startsWith('..') || path.isAbsolute(relative)) throw new EngineUnavailable();
+            const binary = physicalRendererFile(profile.package, profile.binary);
             stage = 'binary_identity';
-            const binary = readFileSync(binaryPath);
-            if (binary.byteLength !== profile.binaryByteLength
-                || createHash('sha256').update(binary).digest('hex') !== profile.binarySha256) throw new EngineUnavailable();
+            const binaryBytes = readFileSync(binary.file);
+            if (binaryBytes.byteLength !== profile.binaryByteLength
+                || createHash('sha256').update(binaryBytes).digest('hex') !== profile.binarySha256) throw new EngineUnavailable();
             if (process.platform === 'win32') {
                 stage = 'icu_path';
                 const asset = profile.icuData;
                 if (asset?.file !== 'icudtl.dat') throw new EngineUnavailable();
-                const assetPath = path.join(path.dirname(binaryPath), asset.file);
-                const assetStat = lstatSync(assetPath);
-                if (!assetStat.isFile() || assetStat.isSymbolicLink() || assetStat.size !== asset.byteLength
-                    || realpathSync.native(assetPath) !== assetPath) throw new EngineUnavailable();
+                const icu = physicalRendererFile(profile.package, asset.file);
+                if (icu.size !== asset.byteLength) throw new EngineUnavailable();
                 stage = 'icu_identity';
-                const bytes = readFileSync(assetPath);
+                const bytes = readFileSync(icu.file);
                 if (bytes.byteLength !== asset.byteLength
                     || createHash('sha256').update(bytes).digest('hex') !== asset.sha256) throw new EngineUnavailable();
+                process.env.NAPI_RS_NATIVE_LIBRARY_PATH = binary.file;
             }
         }
         process.env.DISABLE_SYSTEM_FONTS_LOAD = '1';
