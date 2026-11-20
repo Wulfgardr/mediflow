@@ -610,3 +610,18 @@ scartate per una citazione non letterale, mostrata col messaggio generico.
   della fonte, mai il testo del modello. Nella misura 4 scarti su 6 erano titoli
   con i due a capo fusi in uno spazio; gli altri 2 omettevano «(65 mmol/mol)» e
   restano rifiutati.
+
+### Guida per le citazioni ripetute
+
+Il prompt chiede un passaggio clinico continuo che sostenga il riassunto. Se il
+testo si ripete, chiede di includere il contesto letterale adiacente sufficiente
+a rendere unico il brano, oppure di scegliere un altro passaggio clinico
+univoco. Una sola intestazione è insufficiente come evidenza.
+
+Nel percorso locale anche un numero errato di citazioni consuma il primo
+tentativo e consente una sola correzione, dopo la verifica di attualità e
+annullamento già prevista. In caso di citazione non localizzabile o di numero
+errato, il secondo prompt conserva le fonti e aggiunge solo l'istruzione
+pertinente. Se il secondo risultato ha ancora una citazione non localizzabile
+o un numero errato, la preparazione lo rifiuta. La validazione finale del
+lease continua a verificare tutte le risposte candidate alla pubblicazione.
