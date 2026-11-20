@@ -478,6 +478,9 @@ impl RuntimeClient {
                         };
                         return match conflict_code(&raw.body) {
                             ConflictCode::ArchiveReplaced => Err(RuntimeError::ArchiveReplaced),
+                            ConflictCode::LegacyRevisionRequired => {
+                                Err(RuntimeError::LegacyRevisionRequired)
+                            }
                             ConflictCode::AnalyticsCancelled if analytics_read => {
                                 Err(RuntimeError::AnalyticsCancelled)
                             }
@@ -1092,6 +1095,7 @@ async fn read_response_body(
 enum ConflictCode {
     ProfileVersionConflict,
     ArchiveReplaced,
+    LegacyRevisionRequired,
     AnalyticsCancelled,
     Other,
 }
@@ -1104,6 +1108,7 @@ fn conflict_code(body: &[u8]) -> ConflictCode {
     {
         Some("PROFILE_VERSION_CONFLICT") => ConflictCode::ProfileVersionConflict,
         Some("ARCHIVE_REPLACED") => ConflictCode::ArchiveReplaced,
+        Some("ENTRY_LEGACY_REVISION_REQUIRED") => ConflictCode::LegacyRevisionRequired,
         Some("ANALYTICS_CANCELLED") => ConflictCode::AnalyticsCancelled,
         _ => ConflictCode::Other,
     }

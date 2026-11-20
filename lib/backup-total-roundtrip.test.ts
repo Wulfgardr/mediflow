@@ -1,3 +1,5 @@
+import { openLegacyDiaryRevision, prepareLegacyRevisionProtection } from './diary-revision-envelope';
+import { sealPreviousDiaryText } from './diary-revision-legacy-write';
 import { prepareSyntheticBackupDestination } from './scheduled-backup.test-support.ts';
 import { isCiphertext, openPatientDocumentFile } from './security/attachment-file-envelope';
 import assert from 'node:assert/strict';
@@ -39,6 +41,7 @@ const BACKUP_TABLES = {
     documentDiagnosisProposals: 'document_diagnosis_proposals',
     drugs: 'drugs',
     entries: 'entries',
+    entryRevisions: 'entry_revisions',
     exemptions: 'exemptions',
     exemptionImportReceipts: 'exemption_import_receipts',
     prostheticsCatalogEntries: 'prosthetics_catalog_entries',
@@ -176,6 +179,20 @@ async function populateSyntheticClinicalFixture(db: Database.Database, actorRef:
         ...(await sealed('entries', ['title', 'content', 'metadata', 'attachments', 'deletion_reason'])),
         setting: 'ambulatorio', deleted_at: now + 4, version: 4, created_at: now + 3, updated_at: now + 4,
     });
+    for (const version of [2, 3]) {
+        const eventId = `w7-diary-correction-${version}`;
+        insertRow(db, 'audit_events', { event_id: eventId, schema_version: 1, event_type: 'entry.updated',
+            occurred_at: now + version + 1, created_at: now + version + 1, outcome: 'success', actor_type: 'user', actor_ref: actorRef,
+            subject_type: 'entry', subject_ref: 'w7-entry', source_surface: 'web',
+            redacted_metadata: JSON.stringify({ resourceVersion: version + 1 }) });
+        const binding = { patientId: 'w7-patient', entryId: 'w7-entry', version };
+        const previous = version === 2
+            ? sealPreviousDiaryText(binding, { title: 'Titolo sintetico legacy', content: 'synthetic:entry_revisions.content-2' },
+                await prepareLegacyRevisionProtection(binding, masterKey))!
+            : { title: await seal('entry_revisions.title'), content: await seal(`entry_revisions.content-${version}`) };
+        insertRow(db, 'entry_revisions', { event_id: eventId, entry_id: 'w7-entry', version, ...previous,
+            corrected_at: now + version + 1, corrected_by: 'Ada Sintetica' });
+    }
     insertRow(db, 'therapies', {
         id: 'w7-therapy', patient_id: 'w7-patient', drug_name: 'Farmaco sintetico', dosage: '1 unita', status: 'stopped',
         start_date: now + 5, end_date: now + 6, motivation: await seal('therapies.motivation'), deletion_reason: await seal('therapies.deletion_reason'),
@@ -572,6 +589,36 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
                     }
                 }
             }
+            const relation = (db: Database.Database) => db.prepare(`
+                SELECT e.patient_id AS diaryPatient, r.version AS revision, o.patient_id AS observationPatient,
+                    o.service_prescription_item_id AS itemId, i.patient_id AS itemPatient,
+                    i.prescription_id AS prescriptionId, p.patient_id AS prescriptionPatient
+                FROM entry_revisions AS r JOIN entries AS e ON e.id = r.entry_id
+                JOIN observations AS o ON o.patient_id = e.patient_id
+                JOIN service_prescription_items AS i ON i.id = o.service_prescription_item_id
+                JOIN service_prescriptions AS p ON p.id = i.prescription_id
+                WHERE e.id = 'w7-entry' ORDER BY r.version
+            `).all();
+            const expectedRelation = [2, 3].map(revision => ({
+                diaryPatient: 'w7-patient', revision, observationPatient: 'w7-patient',
+                itemId: 'w7-service-item', itemPatient: 'w7-patient',
+                prescriptionId: 'w7-service', prescriptionPatient: 'w7-patient',
+            }));
+            assert.deepEqual(relation(sourceDb), expectedRelation);
+            assert.deepEqual(relation(targetDb), expectedRelation);
+            const texts = targetDb.prepare(`
+                SELECT version, content FROM entry_revisions WHERE entry_id = 'w7-entry'
+                UNION ALL SELECT version, content FROM entries WHERE id = 'w7-entry' ORDER BY version
+            `).all() as Array<{ version: number; content: string }>;
+            assert.deepEqual(texts.map(row => row.version), [2, 3, 4]);
+            assert.deepEqual(await Promise.all(texts.map(row => {
+                if (row.version === 2) return openLegacyDiaryRevision(row.content, {
+                    patientId: 'w7-patient', entryId: 'w7-entry', version: 2,
+                }, 'content', cassetteMasterKey);
+                const [, iv, data] = row.content.split(':');
+                return decryptData(data, iv, cassetteMasterKey);
+            })), ['synthetic:entry_revisions.content-2', 'synthetic:entry_revisions.content-3', 'synthetic:entries.content']);
+
             const reexport = JSON.parse(runNode(['scripts/run-scheduled-backup.mjs'], {
                 MEDIFLOW_DATA_DIR: targetDataDir,
                 MEDIFLOW_BACKUP_DEST_DIR: restoredBackupDir,

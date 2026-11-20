@@ -1,5 +1,6 @@
 import { isCiphertext, openPatientDocumentFile } from './security/attachment-file-envelope';
 import { decryptData } from './security/security';
+import { DIARY_REVISION_PREFIX, openLegacyDiaryRevision } from './diary-revision-envelope';
 
 /** The restore replaces every clinical record: refuse it before the request when its ciphertext cannot be read. */
 export class BackupRestoreKeyError extends Error {
@@ -35,6 +36,9 @@ export async function assertBackupReadableWithKey(
 ): Promise<void> {
     let payload: Record<string, unknown>;
     try { payload = (JSON.parse(artifactJson) as { payload?: Record<string, unknown> })?.payload ?? {}; } catch { return; }
+    const entries = Array.isArray(payload.entries) ? payload.entries : [];
+    const patientByEntry = new Map(entries.filter(entry => entry && typeof entry.id === 'string')
+        .map(entry => [entry.id, entry.patientId]));
     for (const [table, fields] of Object.entries({ ...encryptedFields, agent_cassettes: ['wrappedPrivateKey'] })) {
         const rows = payload[COLLECTION_OF[table] ?? camel(table)];
         if (!Array.isArray(rows)) continue;
@@ -42,7 +46,15 @@ export async function assertBackupReadableWithKey(
             if (!row || typeof row !== 'object') continue;
             for (const field of fields) {
                 const value = (row as Record<string, unknown>)[field];
-                if (typeof value !== 'string' || !isCiphertext(value) || await readable(value, masterKey)) continue;
+                if (typeof value !== 'string') continue;
+                if (table === 'entry_revisions' && (field === 'title' || field === 'content') && value.startsWith(DIARY_REVISION_PREFIX)) {
+                    const { entryId, version } = row;
+                    const patientId = patientByEntry.get(entryId);
+                    const opened = masterKey && typeof patientId === 'string'
+                        ? await openLegacyDiaryRevision(value, { patientId, entryId, version }, field, masterKey).catch(() => null)
+                        : null;
+                    if (opened !== null) continue;
+                } else if (!isCiphertext(value) || await readable(value, masterKey)) continue;
                 throw new BackupRestoreKeyError(
                     'Ripristino non avviato: questo backup contiene dati cifrati con una chiave diversa da quella sbloccata. '
                     + 'I dati attuali non sono stati toccati. Sblocca con le credenziali con cui il backup è stato creato e riprova.',
