@@ -12,6 +12,7 @@ import { PrivacyModeToggle } from '@/components/privacy-mode-toggle';
 import { RuntimeTwinFolderContext, useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import styles from './kree8-workspace-shell.module.css';
 import { RuntimeTwinPatientNavigation, useRecordCrumb } from '@/components/runtime-twin-workspace';
+import { RecordToolbar } from '@/components/record-toolbar';
 import twin from './twin-patient-shell.module.css';
 import layout from '@/components/ink-layout.module.css';
 import sectionRecipe from '@/components/ink-section.module.css';
@@ -432,11 +433,11 @@ export function Kree8WorkspaceShell({
               <h1 ref={patientTitleRef} tabIndex={-1} className="type-person"><PrivacyBlur>{title}</PrivacyBlur></h1>
               <p>{patientAtoms.slice(0, 2).map((atom, index) => <span key={atom}>{index > 0 ? ' · ' : ''}<PrivacyBlur>{atom}</PrivacyBlur></span>)}</p>
             </div>}
-            <div className={twin.actions}>
+            <RecordToolbar label="Comandi della scheda" className={twin.actions}>
               {prescriptionAction}
               {primaryAction && PrimaryActionIcon ? <Link href={primaryAction.href} className={pendingForms ? 'mf-button-secondary' : 'mf-button-primary'}><PrimaryActionIcon size={16} aria-hidden />{primaryAction.label}</Link> : null}
               {headerActions}
-            </div>
+            </RecordToolbar>
           </> : <>
           {(!overviewMode || primaryAction || headerActions) && <div className={styles.chromeTopRow}>
             <Link href={backHref} className={styles.backButton} aria-label={backLabel} title={backLabel}>

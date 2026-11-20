@@ -16,11 +16,13 @@ const baselinePath = path.resolve(__dirname, '../docs/design/misura-base/conti.j
 async function reach(page: Page, locator: Locator) {
   await expect(locator).toBeVisible();
   await page.waitForLoadState('networkidle');
+  const inToolbar = await locator.evaluate(target => target.closest('[role="toolbar"]') !== null);
   for (let attempt = 0; attempt < 80; attempt++) {
     if (await locator.evaluate(target => document.activeElement === target)) return;
-    await page.keyboard.press('Tab');
+    const movesWithinToolbar = inToolbar && await locator.evaluate(target => target.closest('[role="toolbar"]')!.contains(document.activeElement));
+    await page.keyboard.press(movesWithinToolbar ? 'ArrowRight' : 'Tab');
   }
-  throw new Error('Controllo non raggiunto nel percorso Tab.');
+  throw new Error('Controllo non raggiunto nel percorso da tastiera.');
 }
 async function activate(page: Page, locator: Locator, mode: Mode) {
   if (mode === 'puntatore') await locator.click();
