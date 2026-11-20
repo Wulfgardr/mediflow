@@ -86,6 +86,7 @@ export const UNIT_SCRIPT_TESTS = Object.freeze([
   'scripts/check-fabric-operational-catalog.test.ts',
   'scripts/check-headless-semantic-plane.test.mjs',
   'scripts/check-standalone-runtime-bundle.test.mjs',
+  'scripts/document-windows-sandbox.test.mjs',
   'scripts/check-who-local-sidecar-manifest.test.mjs',
   'scripts/icd-docker-packaging-retirement.test.mjs',
   'scripts/icd-docker-runtime-retirement.test.mjs',
