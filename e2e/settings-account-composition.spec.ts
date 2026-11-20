@@ -2,7 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 import { bootstrapUnlockedSession, unlockIfNeeded, assertNoHorizontalOverflow, lockAllTabsAndSignIn } from './utils';
-import { fetchInterceptedRequest } from './fixtures/trusted-web-request';
+import { documentRequests, fetchInterceptedRequest } from './fixtures/trusted-web-request';
 
 function requireSynthetic(baseURL?: string) {
     if (process.env.MF085_SYNTHETIC_E2E !== '1' || process.env.MEDIFLOW_E2E_DISABLE_LEGACY_COPY !== '1'
@@ -251,7 +251,7 @@ test('appearance settings preserve selection and keyboard focus', async ({ baseU
         await motion.focus(); await page.keyboard.press('Space'); await expect(motion).toHaveAttribute('aria-pressed', 'true'); await expect(motion).toBeFocused();
         const privacy = page.getByTestId('settings-privacy-mode-pointer');
         await privacy.focus(); await page.keyboard.press('Space'); await expect(privacy).toHaveAttribute('aria-pressed', 'true'); await expect(privacy).toBeFocused();
-        expect((await page.request.get(new URL('/api/patients', baseURL!).href)).status()).toBe(200);
+        expect((await documentRequests(page).get('/api/patients')).status()).toBe(200);
         await page.reload(); await unlockIfNeeded(page, '1234');
         await expect(motion).toHaveAttribute('aria-pressed', 'true'); await expect(privacy).toHaveAttribute('aria-pressed', 'true');
         await motion.click(); await privacy.click(); await capture(page, zoom, 'aspetto', privacy);

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { bootstrapUnlockedSession } from './utils';
+import { unlockIfNeeded, openUnlockedDocument, bootstrapUnlockedSession } from './utils';
 
 const GIORNO_CANVAS_RGB = 'rgb(232, 234, 238)'; // #e8eaee
 const GRAFITE_CANVAS_RGB = 'rgb(16, 18, 22)'; // #101216
@@ -45,7 +45,7 @@ test('lume runtime tokens are the live default across theme changes, reload and 
   const liveCockpit = page.getByLabel('MediFlow · spazio clinico Kree8');
   await expect(liveCockpit).toBeVisible({ timeout: 20_000 });
   expect(await liveCockpit.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe(GIORNO_CANVAS_RGB);
-  await page.goto('/mockups/kree8');
+  await openUnlockedDocument(page, '/mockups/kree8');
   await page.waitForLoadState('domcontentloaded');
   await expect(html).toHaveAttribute('data-lume', 'true');
   await setThemeClass(page, 'light');
@@ -54,6 +54,7 @@ test('lume runtime tokens are the live default across theme changes, reload and 
   expect(await reviewCockpit.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe(GIORNO_CANVAS_RGB);
   await page.evaluate(() => localStorage.setItem('mediflow-theme', 'dark'));
   await page.reload();
+  await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
   await page.waitForLoadState('domcontentloaded');
   await expect(html).toHaveAttribute('data-lume', 'true');
   await expect(html).toHaveClass(/dark/);
@@ -133,7 +134,7 @@ test('lume context tokens, focal light primitive and SVG filo retain their contr
 test('lume mobile theme and privacy controls retain 44px touch targets and state', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-  await page.goto('/settings/aspetto');
+  await openUnlockedDocument(page, '/settings/aspetto');
   await expect(page.getByTestId('settings-appearance-section')).toBeVisible();
 
   const theme = page.getByRole('button', { name: 'Tema Scuro' });

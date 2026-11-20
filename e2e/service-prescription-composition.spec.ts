@@ -2,7 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
-import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow, assertNotClippedInViewport } from './utils';
+import { openUnlockedDocument, bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow, assertNotClippedInViewport } from './utils';
 
 const NAME = 'Prestazione sintetica di verifica con due voci richieste';
 
@@ -37,7 +37,7 @@ test('Prestazioni: composizione, bozza, dettagli e conferma nei due temi e allo 
     try {
         await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
         const patientId = await createPatient(page);
-        await page.goto(`/patients/${patientId}/modules`); await openPatientSection(page, 'prestazioni');
+        await openUnlockedDocument(page, `/patients/${patientId}/modules`); await openPatientSection(page, 'prestazioni');
         const pane = page.locator('#prestazioni');
         const create = pane.getByRole('button', { name: 'Nuova prestazione', exact: true });
         const headerCreate = page.getByRole('link', { name: 'Nuova voce', exact: true });

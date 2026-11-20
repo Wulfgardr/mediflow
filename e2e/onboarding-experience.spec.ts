@@ -1,6 +1,7 @@
 import type { Locator, Page, TestInfo } from '@playwright/test';
 import { test, expect } from './fixtures/isolated-runtime';
 import { assertKeyboardFocusProgresses, assertNoHorizontalOverflow, renewAccessIfNeeded } from './utils';
+import { documentRequests } from './fixtures/trusted-web-request';
 import { parseWorkProfileState } from '../lib/work-profile';
 import { syntheticTaxCode } from '../lib/patient-identity.test-support';
 
@@ -11,7 +12,7 @@ const panelSelector = '[data-testid="work-profile-onboarding"]';
 const setupSelector = '[data-testid="onboarding-setup"]';
 
 async function readProfile(page: Page) {
-    const response = await page.request.get(endpoint);
+    const response = await documentRequests(page).get(endpoint);
     expect(response.status()).toBe(200);
     return parseWorkProfileState(await response.json());
 }
@@ -303,7 +304,7 @@ test('first use: manual entry creates the first synthetic patient without saving
     await panel.getByRole('link', { name: 'Apri la cartella manualmente', exact: true }).click();
     await expect(page).toHaveURL(/[?&]area=incarico/u);
     expect(await readProfile(page)).toEqual(before);
-    const initial = await page.request.get('/api/patients');
+    const initial = await documentRequests(page).get('/api/patients');
     expect(initial.status()).toBe(200);
     expect(await initial.json()).toEqual([]);
     await page.getByRole('navigation', { name: 'Navigazione principale', exact: true })
@@ -322,7 +323,7 @@ test('first use: manual entry creates the first synthetic patient without saving
     await expect(page).toHaveURL(/\?area=incarico$/u);
     await expect(panel).toHaveCount(0);
     await expect(page.getByRole('searchbox', { name: 'Cerca nella lista pazienti', exact: true })).toBeVisible();
-    const persisted = await page.request.get('/api/patients');
+    const persisted = await documentRequests(page).get('/api/patients');
     expect(persisted.status()).toBe(200);
     const rows = await persisted.json();
     expect(rows).toHaveLength(1);
@@ -356,7 +357,7 @@ test('first use: manual entry creates the first synthetic patient without saving
     const recovery = page.waitForResponse(item => new URL(item.url()).pathname === '/api/auth/passphrase/recover');
     await recovered.activate.click(); expect((await recovery).status()).toBe(200);
     await unlockPassphrase(page, recoveredPassphrase);
-    const preserved = await page.request.get('/api/patients');
+    const preserved = await documentRequests(page).get('/api/patients');
     expect(preserved.status()).toBe(200); expect(await preserved.json()).toEqual(rows);
     for (const secret of [PASSPHRASE, nextPassphrase, recoveredPassphrase, saved.key, recovered.key]) expect(mutations.join('')).not.toContain(secret);
     await check(info);

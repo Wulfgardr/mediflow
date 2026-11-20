@@ -187,6 +187,11 @@ export async function unlockIfNeeded(page: Page, pin: string, operator = default
   } else await submitPin(page, pin);
 }
 
+export async function openUnlockedDocument(page: Page, href: string, pin = process.env.E2E_PIN || '1234'): Promise<void> {
+  await page.goto(href);
+  await unlockIfNeeded(page, pin);
+}
+
 export async function lockAllTabsAndSignIn(page: Page, pin: string): Promise<void> {
   const heading = page.getByRole('heading', { name: 'Sblocca MediFlow' });
   if (await isVisible(heading)) {
@@ -247,7 +252,7 @@ export async function bootstrapUnlockedSession(page: Page, pin: string, operator
 }
 
 async function openAiSettingsPage(page: Page, route: 'funzioni' | 'modelli'): Promise<void> {
-  await page.goto(`/settings/ai/${route}`);
+  await openUnlockedDocument(page, `/settings/ai/${route}`);
   await expect(page).toHaveURL(new RegExp(`/settings/ai/${route}$`));
   await expect(page.getByTestId('ai-settings-controls')
     .getByRole('button', { name: route === 'modelli' ? 'Salva configurazione' : 'Salva parametri avanzati', exact: true })).toBeEnabled();
