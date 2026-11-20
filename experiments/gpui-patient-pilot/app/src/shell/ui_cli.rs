@@ -73,20 +73,31 @@ impl Control {
     }
 }
 
-fn frame(cx: &mut VisualTestContext) -> (Vec<Control>, Vec<Value>) {
+fn frame(cx: &mut VisualTestContext) -> (Vec<Control>, Vec<Value>, Vec<Value>) {
     let painted = rendered_command::controls(|| {
         cx.update(|window, cx| {
             window.refresh();
             window.draw(cx).clear(cx);
         });
     });
+    let observed_ids = painted
+        .observed
+        .iter()
+        .filter_map(|control| control.node.author_id())
+        .collect::<std::collections::BTreeSet<_>>();
+    let outside_census = painted
+        .shared_buttons
+        .iter()
+        .filter(|button| !observed_ids.contains(button.id.as_str()))
+        .map(|button| json!({"id":button.id,"label":button.label,"enabled":button.enabled}))
+        .collect();
     let mut controls = vec![];
     let mut excluded = vec![];
     for RenderedControl {
         node,
         bounds,
         input: probe,
-    } in painted
+    } in painted.observed
     {
         let role = match node.role() {
             Role::Button => "button",
@@ -152,7 +163,7 @@ fn frame(cx: &mut VisualTestContext) -> (Vec<Control>, Vec<Value>) {
             input,
         });
     }
-    (controls, excluded)
+    (controls, excluded, outside_census)
 }
 
 fn resolve<'a>(controls: &'a [Control], target: &Value) -> Result<&'a Control, String> {
@@ -182,7 +193,7 @@ pub(super) fn drive(action: &Value, cx: &mut VisualTestContext) -> Result<Value,
     if op == "resize" {
         return resize(action, cx);
     }
-    let (controls, excluded) = frame(cx);
+    let (controls, excluded, outside_census) = frame(cx);
     let target = &action["target"];
     if op == "discover" && target.is_null() {
         let mut by_role = BTreeMap::new();
@@ -195,6 +206,8 @@ pub(super) fn drive(action: &Value, cx: &mut VisualTestContext) -> Result<Value,
         return Ok(cx.update(|window, cx| {
             json!({ "tree": controls.iter().map(|control| control.describe(window, cx)).collect::<Vec<_>>(),
                     "total": controls.len(), "byRole":by_role, "excluded": excluded,
+                    "visibleSharedButtonsOutsideCensus": outside_census,
+                    "visibleSharedButtonsOutsideCensusCount": outside_census.len(),
                     "focus": focused_control(&controls, window, cx), "viewport": viewport(window),
                     "accessKit": { "active": window.is_a11y_active(),
                                    "treeAvailable": window.debug_a11y_tree_json().is_some() } })
@@ -204,7 +217,7 @@ pub(super) fn drive(action: &Value, cx: &mut VisualTestContext) -> Result<Value,
         let before = cx.update(|window, cx| focused_control(&controls, window, cx));
         press(key()?, cx)?;
         notes_recovery_tests::draw(cx);
-        let (controls, _) = frame(cx);
+        let (controls, _, _) = frame(cx);
         let after = cx.update(|window, cx| focused_control(&controls, window, cx));
         return Ok(json!({"focusBefore":before,"focusAfter":after}));
     }
@@ -273,7 +286,7 @@ pub(super) fn drive(action: &Value, cx: &mut VisualTestContext) -> Result<Value,
         return Ok(before);
     }
     notes_recovery_tests::draw(cx);
-    let (painted, _) = frame(cx);
+    let (painted, _, _) = frame(cx);
     Ok(cx.update(|window, cx| {
         let mut matching = painted.iter().filter(|other| {
             control.node.author_id().is_some()
@@ -325,13 +338,20 @@ fn resize(action: &Value, cx: &mut VisualTestContext) -> Result<Value, String> {
     })
 }
 
-#[gpui::test]
-fn shell_ui_cli(cx: &mut gpui::TestAppContext) {
+const HISTORY_ROUTE: &str = "GET /api/v1/network/patients/patient-a/entries/synthetic-gpui-legacy-entry/revisions?afterVersion=0";
+
+fn shell_fixture(
+    cx: &mut gpui::TestAppContext,
+) -> (notes_recovery_tests::Host, &mut VisualTestContext) {
     cx.update(|cx| {
         bind_keys(cx);
         crate::text_input::bind_keys(cx);
     });
-    let diary: Vec<_> = (1..=14)
+    let revisions: Value = serde_json::from_str(include_str!(
+        "../../../../../e2e/ui-cli/fixtures/gpui-diary-revisions.json"
+    ))
+    .unwrap();
+    let mut diary: Vec<_> = (1..14)
         .map(|index| {
             json!({
                 "id": format!("voce-{index}"), "patientId": "patient-a", "type": "visit",
@@ -340,6 +360,7 @@ fn shell_ui_cli(cx: &mut gpui::TestAppContext) {
             })
         })
         .collect();
+    diary.push(revisions["current"].clone());
     let document = json!({
         "id": "documento-sintetico",
         "patientId": "patient-a",
@@ -352,7 +373,9 @@ fn shell_ui_cli(cx: &mut gpui::TestAppContext) {
     });
     let host =
         notes_recovery_tests::Host::with_diary_and_documents(json!(diary), json!([document]));
-    let original_route = "GET /api/v1/network/patients/patient-a/attachments/documento-sintetico";
+    host.plan(HISTORY_ROUTE)
+        .send((200, revisions["history"].clone()))
+        .unwrap();
     let (view, cx) = cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
     cx.simulate_resize(gpui::size(px(1360.), px(900.)));
     view.update(cx, |app, cx| {
@@ -367,6 +390,13 @@ fn shell_ui_cli(cx: &mut gpui::TestAppContext) {
         assert_eq!(app.patient.detail.ready().unwrap().last_name, "Sintetica");
         assert_eq!(app.patient.entries.ready().map(Vec::len), Some(14));
     });
+    (host, cx)
+}
+
+#[gpui::test]
+fn shell_ui_cli(cx: &mut gpui::TestAppContext) {
+    let (host, cx) = shell_fixture(cx);
+    let original_route = "GET /api/v1/network/patients/patient-a/attachments/documento-sintetico";
     let terminal = std::env::var_os("MEDIFLOW_UI_CLI").is_some();
     if !terminal {
         let invalid = json!({"op":"resize", "width":640.5, "height":880});

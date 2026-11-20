@@ -36,7 +36,7 @@ pub(super) mod tests {
         time::Duration,
     };
 
-    fn catalog_wire() -> Value {
+    pub(in crate::shell) fn catalog_wire() -> Value {
         json!({"contractVersion":1, "preparationVersion":"mediflow.scales.prepare.v1",
             "catalogRevision":format!("sha256:{}", "a".repeat(64)),
             "scales":ScaleId::ALL.iter().map(|id| json!({"id":id, "title":format!("Strumento sintetico {}", id.as_str()),
