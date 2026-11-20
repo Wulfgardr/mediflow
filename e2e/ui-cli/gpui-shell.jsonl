@@ -1,15 +1,38 @@
 {"op":"discover"}
+{"op":"click","target":{"role":"button","name":"Altre azioni della scheda"}}
+{"op":"expect","target":{"role":"menu","name":"Altre azioni della scheda"},"state":"visible"}
+{"op":"discover"}
+{"op":"click","target":{"role":"button","name":"Copia scheda"}}
 {"op":"click","target":{"role":"tab","name":"Documenti"}}
 {"op":"expect","target":{"role":"tab","name":"Documenti"},"state":"selected"}
+{"op":"expect","target":{"role":"heading","name":"Documenti"},"state":"visible"}
+{"op":"discover"}
+{"op":"scroll","target":{"role":"region","name":"Contenuto della scheda"},"deltaY":240}
+{"op":"discover"}
+{"op":"click","target":{"role":"button","name":"Sintesi e fonte"}}
+{"op":"expect","target":{"role":"button","name":"Chiudi sintesi e fonte"},"state":"expanded"}
+{"op":"click","target":{"role":"button","name":"Chiudi sintesi e fonte"}}
+{"op":"click","target":{"role":"button","name":"Originale"}}
+{"op":"expect","target":{"role":"button","name":"Chiudi originale"},"state":"expanded"}
+{"op":"click","target":{"role":"button","name":"Chiudi originale"}}
+{"op":"scroll","target":{"role":"region","name":"Contenuto della scheda"},"deltaY":-2500}
 {"op":"press","target":{"role":"tab","name":"Riepilogo"},"key":"Enter"}
 {"op":"expect","target":{"role":"tab","name":"Riepilogo"},"state":"selected"}
 {"op":"click","target":{"role":"button","name":"Nuova voce"}}
 {"op":"discover"}
 {"op":"fill","target":{"role":"textbox","name":"Testo della voce"},"value":"Bozza sintetica del vero Shell."}
-{"op":"scroll","target":{"role":"region","name":"Ultime voci del diario"},"deltaY":1600}
+{"op":"expect","target":{"role":"textbox","name":"Testo della voce"},"state":"focused"}
+{"op":"press","target":{"role":"textbox","name":"Testo della voce"},"key":"Shift+ArrowLeft"}
+{"op":"resize","width":640,"height":880}
+{"op":"discover"}
+{"op":"resize","width":1360,"height":900}
+{"op":"expectValue","target":{"role":"textbox","name":"Testo della voce"},"value":"Bozza sintetica del vero Shell."}
+{"op":"scroll","target":{"role":"region","name":"Cambiato"},"deltaY":1600}
 {"op":"discover"}
 {"op":"click","target":{"role":"button","name":"Tutto il diario"}}
-{"op":"scroll","target":{"role":"region","name":"Ultime voci del diario"},"deltaY":2500}
+{"op":"scroll","target":{"role":"region","name":"Cambiato"},"deltaY":2500}
+{"op":"discover"}
+{"op":"scroll","target":{"role":"region","name":"Cambiato"},"deltaY":-2500}
 {"op":"discover"}
 {"op":"click","target":{"role":"button","name":"Torna alla bozza"}}
 {"op":"expectValue","target":{"role":"textbox","name":"Testo della voce"},"value":"Bozza sintetica del vero Shell."}

@@ -118,7 +118,7 @@ export default function EditPatientPage() {
                 showToast({ tone: 'success', title: 'Esportazione FHIR completata' });
             } catch (error) {
                 if (error instanceof FhirExportPrecheckError) {
-                    const entry = await db.entries.get(error.recordId);
+                    const entry = error.category === 'scale' ? await db.entries.get(error.recordId) : undefined;
                     showToast(buildFhirExportBlockingToast(error, entry?.patientId === id ? entry : undefined));
                     return;
                 }

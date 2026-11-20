@@ -41,7 +41,7 @@ test('Allegati del Diario: etichetta neutra senza dedurre generazione dalla sint
             return { patientId: patient.id as string, historicalIds, oldEntryId: old.id as string };
         }, { sources, seal: await diaryEntrySealer(page) });
         await page.goto(`/patients/${fixture.patientId}/entries/new`);
-        await expect(page.getByTestId('progressive-entry-composer').locator('header')).toContainText('Sintetici Allegati');
+        await expect(page.getByTestId('progressive-entry-composer').locator(':scope > header')).toContainText('Sintetici Allegati');
         await page.getByRole('textbox', { name: 'Resoconto clinico', exact: true }).fill('Voce manuale inventata con originale allegato.');
         await page.locator('input[type="file"]').setInputFiles({ name: sources[0].name, mimeType: 'text/plain', buffer: Buffer.from(sources[0].text) });
         await page.getByRole('button', { name: 'Registra nel diario', exact: true }).click();

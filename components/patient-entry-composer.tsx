@@ -110,6 +110,10 @@ export function PatientEntryComposer({ embedded = false, sheetSource, focusRef }
     const editorFocus = useRef<ClinicalEditorFocus>(null);
     const [sourceExcerpt, setSourceExcerpt] = useState<ClinicalSelectionExcerpt | null>(null);
     const reviewHeading = useRef<HTMLHeadingElement>(null);
+    const focusReviewHeading = useCallback((heading: HTMLHeadingElement | null) => {
+        reviewHeading.current = heading;
+        heading?.focus();
+    }, []);
     const [reviewing, setReviewing] = useState(false);
     useImperativeHandle(focusRef, () => ({
         resume() {
@@ -168,7 +172,6 @@ export function PatientEntryComposer({ embedded = false, sheetSource, focusRef }
     const openReview = () => {
         if (!entryAttempt) setWriteFailed(false);
         setReviewing(true);
-        requestAnimationFrame(() => reviewHeading.current?.focus());
     };
     const resumeEditor = () => {
         setReviewing(false);
@@ -1008,7 +1011,7 @@ export function PatientEntryComposer({ embedded = false, sheetSource, focusRef }
                 </ol> : null}
                 {inlineSheet ? <div hidden={reviewing}>{fields}</div> : fields}
                 {reviewing ? <section className={composerStyles.review} aria-label="Riepilogo della voce">
-                    <h2 tabIndex={-1} ref={reviewHeading}>Che cosa verrà registrato</h2>
+                    <h2 tabIndex={-1} ref={focusReviewHeading}>Che cosa verrà registrato</h2>
                     <dl>
                         <dt>Paziente</dt><dd><PrivacyBlur>{patient ? `${patient.lastName} ${patient.firstName}` : 'Paziente non disponibile'}</PrivacyBlur></dd>
                         <dt>Tipo e luogo</dt><dd>{types.find(item => item.id === type)?.label} · {setting === 'home' ? 'Domicilio' : 'Ambulatorio'}</dd>

@@ -147,10 +147,11 @@ for (const width of [1440, 768, 390]) test(`colonne leggibili a ${width} e Diari
         const diary = (await page.locator('#diario').boundingBox())!;
         expect(problemBox.x + problemBox.width).toBeLessThanOrEqual(diary.x);
         expect(diary.width).toBeGreaterThan(380);
-    } else if (width >= 700) {
-        expect(problemBox.y).toBeCloseTo(therapyBox.y, 0);
-        expect(problemBox.x + problemBox.width).toBeLessThanOrEqual(therapyBox.x);
-    } else expect(problemBox.y + problemBox.height).toBeLessThanOrEqual(therapyBox.y);
+    } else {
+        expect(therapyBox.y + therapyBox.height).toBeLessThanOrEqual(problemBox.y);
+        expect(therapyBox.x).toBeCloseTo(problemBox.x, 0);
+        expect(therapyBox.width).toBeCloseTo(problemBox.width, 0);
+    }
 });
 
 async function capture(page: Page, suffix: string) {

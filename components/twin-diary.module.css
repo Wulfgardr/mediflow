@@ -47,3 +47,18 @@
 /* Le voci eliminate sono una consultazione di controllo, non un'azione principale. */
 .quietAction:global(.mf-button-text) { color: var(--lume-ink-muted); font: var(--type-meta); }
 .quietAction:global(.mf-button-text):hover { color: var(--lume-ink); }
+.readingDiary { padding-bottom: 0; }
+.readingDiary > .entry { padding-block: 12px; }
+.readingDiary > .entry:first-child { padding-top: 2px; }
+.readingDiary > .entry:last-child { border-bottom: 0; padding-bottom: 0; }
+.readingDiary .patientEntry { grid-template-columns: 48px minmax(0, 1fr); gap: 14px; }
+.readingDiary .patientEntry .header { margin-bottom: 4px; }
+.readingDiary .patientEntry .header > div:last-child:empty { display: none; }
+.readingDiary .entryTitle { margin-bottom: 2px; }
+.readingDiary .registration { margin-top: 6px; }
+.readingText :global(.prose) { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+.readingAuthor { font-weight: 600; }
+.fullDiaryLink { display: inline-flex; align-items: center; min-height: 28px; color: var(--lume-accent); font: var(--type-body); white-space: nowrap; }
+.fullDiaryLink:hover { text-decoration: underline; }
+@media (pointer: coarse) { .fullDiaryLink { min-height: 44px; } }
+.readingDiary .margin { flex-direction: column; align-content: flex-start; justify-content: flex-start; gap: 2px; }

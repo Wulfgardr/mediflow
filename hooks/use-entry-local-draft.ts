@@ -1,18 +1,24 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { db } from '@/lib/db';
+import { clinicalRichTextToPlainText } from '@/lib/clinical-rich-text';
+import { useLiveQuery } from '@/lib/live-query';
 import { useSecurity } from '@/components/security-provider';
 import { clientArchiveGeneration } from '@/lib/security/client-auth-api';
 import { createEntryLocalDraft, entryDraftStorageKey, entryDraftToPersist, type EntryLocalDraft } from '@/lib/entry-local-draft';
 
 const draftChanged = 'mediflow:entry-draft-changed';
 
-export function hasEntryDraft(user: string, patient: string) {
+function storedEntryDraft(user: string, patient: string) {
     try {
-        return window.localStorage.getItem(entryDraftStorageKey({ archive: clientArchiveGeneration(), user, patient })) !== null;
+        return window.localStorage.getItem(entryDraftStorageKey({ archive: clientArchiveGeneration(), user, patient }));
     } catch {
-        return false;
+        return null;
     }
+}
+
+export function hasEntryDraft(user: string, patient: string) {
+    return storedEntryDraft(user, patient) !== null;
 }
 
 function subscribeToDrafts(notify: () => void) {
@@ -30,6 +36,27 @@ export function useEntryDraftMarker(patient: string) {
     const { user } = useSecurity();
     const read = useCallback(() => Boolean(user && hasEntryDraft(user.id, patient)), [user, patient]);
     return useSyncExternalStore(subscribeToDrafts, read, absent);
+}
+
+const absentText = () => null;
+const words = new Intl.Segmenter('it', { granularity: 'word' });
+
+export function useEntryDraftWords(patient: string) {
+    const user = useSecurity().user?.id;
+    const read = useCallback(() => user ? storedEntryDraft(user, patient) : null, [user, patient]);
+    const ciphertext = useSyncExternalStore(subscribeToDrafts, read, absentText);
+    const result = useLiveQuery(async () => {
+        if (!user || !ciphertext) return null;
+        const scope = { archive: clientArchiveGeneration(), user, patient };
+        const owner = createEntryLocalDraft(scope, window.localStorage, db, navigator.locks);
+        const draft = await owner.read();
+        if (!draft || read() !== ciphertext) return null;
+        const text = clinicalRichTextToPlainText(draft.content) || draft.dictatedDraft;
+        let count = 0;
+        for (const word of words.segment(text)) if (word.isWordLike) count++;
+        return { ciphertext, user, patient, count };
+    }, [ciphertext, user, patient, read], null, []);
+    return result && result.ciphertext === ciphertext && result.patient === patient && result.user === user ? result.count : null;
 }
 
 export function useEntryLocalDraft(patient: string, value: EntryLocalDraft, restore: (value: EntryLocalDraft) => void) {
