@@ -10,7 +10,7 @@ import { openVersionedSqliteDatabase } from './sqlite-schema-open';
 function fixture() {
     const root = mkdtempSync(join(tmpdir(), 'mediflow-cassette-migration-')), file = join(root, 'medical.db');
     const database = new Database(file); initializeSqliteSchema(database);
-    database.exec('DROP TABLE agent_unlock_grants; DROP TABLE agent_registrations; DROP TABLE IF EXISTS agent_cassettes; PRAGMA user_version=14');
+    database.exec('DROP TABLE entry_revisions; DROP TABLE agent_unlock_grants; DROP TABLE agent_registrations; DROP TABLE IF EXISTS agent_cassettes; PRAGMA user_version=14');
     database.prepare("INSERT INTO users(id,username,password_hash,encrypted_master_key,salt) VALUES ('synthetic-cassette-migration','synthetic-cassette-migration','synthetic-hash','synthetic-wrap','synthetic-salt')").run();
     const before = database.prepare('SELECT * FROM users').all(); database.close();
     return { root, file, before, cleanup: () => rmSync(root, { recursive: true, force: true }) };
