@@ -3,8 +3,6 @@ import { anyDocDesktopRendererTrace } from './scripts/anydoc-desktop-renderer-tr
 
 /* @Codex */
 const distDir = process.env.MEDIFLOW_NEXT_DIST_DIR || '.next';
-const windowsDocumentSandboxTrace = process.platform === 'win32'
-  ? ['./scripts/document-windows-sandbox/launcher-x64.exe'] : [];
 
 /* WUL-343. La UI decifra PHI nel browser, quindi gli header valgono come
    riduzione di superficie, non come formalita'.
@@ -133,7 +131,6 @@ const nextConfig: NextConfig = {
       "./.nvmrc",
       "./scripts/document-child-launcher.mjs",
       "./scripts/document-windows-sandbox.mjs",
-      ...windowsDocumentSandboxTrace,
       "./scripts/document-child-network-guard.mjs",
       "./scripts/anydoc-local-extraction-worker.mjs",
       "./scripts/anydoc-pdf-page-worker.mjs",
@@ -156,6 +153,7 @@ const nextConfig: NextConfig = {
       "./node_modules/@napi-rs/canvas/**/*",
       "./node_modules/@napi-rs/canvas-darwin-arm64/**/*",
       ...anyDocDesktopRendererTrace(process.platform, process.arch), // @Codex: explicit target binding closure
+      ...(process.platform === "win32" ? ["./scripts/document-windows-sandbox/launcher-x64.exe"] : []),
     ],
   },
   /* @Codex */
