@@ -80,7 +80,9 @@ fn resolve<'a>(controls: &'a [Control], target: &Value) -> Result<&'a Control, S
         if let Some(label) = target["label"].as_str() {
             return control.name == label;
         }
-        target["role"] == control.role && target["name"] == control.name
+        target["role"] == control.role
+            && target["name"] == control.name
+            && target["id"].as_str().is_none_or(|id| control.id == id)
     });
     let found = matches.next().ok_or("Controllo assente.")?;
     if matches.next().is_some() {
@@ -148,7 +150,7 @@ fn drive(
     let target = &action["target"];
     if op == "discover" && target.is_null() {
         return Ok(json!({ "tree": available.iter().map(|control|
-            json!({"role": control.role, "name": control.name, "focused": focused(control, view, cx)})
+            json!({"role": control.role, "name": control.name, "id": control.id, "focused": focused(control, view, cx)})
         ).collect::<Vec<_>>() }));
     }
     if op == "press" && target.is_null() {
