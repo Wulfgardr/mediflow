@@ -4,9 +4,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { bootstrapUnlockedSession, openPatientSection } from './utils';
 import { secureLaunch } from './fixtures/secure-browser';
+import { currentPreset } from './fixtures/territorial-preset';
 
-const primaryHrefs = ['#quadro', '#terapie', '#parametri', '#documenti'];
-const secondaryHrefs = ['#attenzione', '#identita', '#clinica', '#amministrazione', '#prestazioni', '#protesica', '#scale', '#siss', '#timeline', '#diario', '#follow-up'];
+const wideHrefs = ['#quadro', '#diario', '#terapie', '#documenti', '#parametri', '#follow-up'];
+const compactHrefs = ['#quadro', '#terapie', '#parametri', '#documenti'];
+const compactMenuHrefs = ['#attenzione', '#identita', '#clinica', '#amministrazione', '#prestazioni', '#protesica', '#scale', '#siss', '#timeline', '#diario', '#follow-up'];
 const navigation = (page: Page) => page.getByRole('navigation', { name: 'Sezioni della vista', exact: true });
 
 async function seed(page: Page, count: number) {
@@ -69,11 +71,20 @@ test('Azioni restituisce il fuoco dopo Report PDF e lo cede ai dialoghi', async 
     await expect(archive).toBeHidden();
 });
 
-for (const count of [0, 1, 12]) test(`segmenti stabili con ${count} record sintetici e quindici destinazioni`, async ({ page }) => {
+for (const [width, count] of [[1320, 0], [1320, 12], [390, 1], [1001, 1], [1000, 0]]) test(`destinazioni del profilo accessibili a ${width}px con ${count} record sintetici`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 880 });
+    const wide = width >= 1001;
     await seed(page, count);
     const nav = navigation(page);
-    await expect(nav.locator(':scope > a')).toHaveText(count ? ['Riepilogo', `Terapie${count}`, `Parametri${count}`, `Documenti${count}`] : ['Riepilogo', 'Terapie', 'Parametri', 'Documenti']);
-    expect(await nav.locator(':scope > a').evaluateAll(links => links.map(link => link.getAttribute('href')))).toEqual(primaryHrefs);
+    const primaryHrefs = wide ? wideHrefs : compactHrefs;
+    const lombardy = await currentPreset(page) === 'core+it+lom';
+    const secondaryHrefs = compactMenuHrefs.filter(href => !primaryHrefs.includes(href) && (href !== '#siss' || lombardy));
+    const suffix = count ? String(count) : '';
+    const primary = nav.getByRole('link');
+    await expect(primary).toHaveText(wide
+        ? ['Riepilogo', 'Diario', `Terapie${suffix}`, `Documenti${suffix}`, `Parametri${suffix}`, 'Controlli']
+        : ['Riepilogo', `Terapie${suffix}`, `Parametri${suffix}`, `Documenti${suffix}`]);
+    expect(await primary.evaluateAll(links => links.map(link => link.getAttribute('href')))).toEqual(primaryHrefs);
     const trigger = nav.getByRole('button', { name: 'Altro', exact: true });
     await trigger.click();
     const menu = page.getByRole('menu', { name: 'Altre sezioni della cartella' });
@@ -86,11 +97,12 @@ for (const count of [0, 1, 12]) test(`segmenti stabili con ${count} record sinte
         await expect(trigger).toHaveAttribute('aria-current', 'location');
         await trigger.click();
         await expect(menu.locator(`a[href="${href}"]`)).toHaveAttribute('aria-current', 'location');
+        await expect(nav.locator('[aria-current="location"]:visible')).toHaveCount(1);
         await page.keyboard.press('Escape');
         await expect(trigger).toBeFocused();
     }
     for (const href of primaryHrefs) {
-        await nav.locator(`:scope > a[href="${href}"]`).click();
+        await primary.and(nav.locator(`a[href="${href}"]`)).click();
         await expect(nav.locator(`a[href="${href}"]`)).toHaveAttribute('aria-current', 'location');
         await expect(page.locator(href)).toBeVisible();
         await expect(trigger).not.toHaveAttribute('aria-current', 'location');

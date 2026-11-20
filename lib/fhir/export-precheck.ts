@@ -4,18 +4,8 @@ import { fhirDiagnosisSystem } from './clinical-adapter';
 import type { FhirBundleInput } from './types';
 import { FhirScaleScoreError, FhirScaleTitleError, validateFhirScaleEntry } from './scale-validation';
 
-export class FhirExportPrecheckError extends Error {
-    readonly severity = 'error';
-    readonly category = 'scale';
-
-    constructor(
-        public readonly code: 'INVALID_SCALE_SCORE' | 'INVALID_SCALE_TITLE',
-        public readonly recordId: string,
-    ) {
-        super(code);
-        this.name = 'FhirExportPrecheckError';
-    }
-}
+import { FhirExportPrecheckError } from './export-precheck-error';
+export { FhirExportPrecheckError } from './export-precheck-error';
 
 /* Local legacy-input check; DTO v2 canonical warning IDs remain a separate slice. */
 export type FhirDiagnosisCodingWarning = Readonly<{

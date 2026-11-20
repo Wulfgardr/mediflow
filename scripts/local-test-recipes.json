@@ -655,7 +655,7 @@
       "files": [
         "scripts/generate-fhir-golden-worker.ts"
       ],
-      "prerequisites": "Assertive synthetic FHIR golden generator; rewrites fixtures and verifies round trips. Not excluded as a non-test."
+      "prerequisites": "Synthetic Web FHIR reference generator with round-trip checks. Writes to tmp-fhir-web-reference."
     },
     {
       "id": "scripts/mediflow-headless-supervisor-standalone-smoke.mjs",

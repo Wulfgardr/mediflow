@@ -383,7 +383,7 @@ function rustTokens(source) {
 
 function gpuiTitleCallerInventory(sources) {
   const errors = [], inventory = [];
-  const ordinary = new Set(['Prose', 'Brand', 'Body', 'Strong', 'Meta', 'Code']);
+  const ordinary = new Set(['Prose', 'Brand', 'Body', 'Strong', 'Meta', 'Code', 'RecordRow']);
   for (const [file, source] of sources) {
     const { tokens: t, pairs } = rustTokens(source), v = i => t[i]?.value;
     const rendering = /^(?:shell(?:\/|\.rs)|components\.rs|demo_app\.rs|title\.rs)$/u.test(file) || file.startsWith('shell/') || t.some(token => ['TitleText', 'title_element'].includes(token.value)) || t.some((token, i) => token.value === 'title' && v(i - 1) === '::' && v(i - 2) === 'crate');
@@ -403,7 +403,7 @@ function gpuiTitleCallerInventory(sources) {
         const arg = t.slice(comma + 1, end);
         const roles = arg.filter((token, j) => token.value === 'TextRole' && arg[j + 1]?.value === '::').map(token => arg[arg.indexOf(token) + 2]?.value);
         const expression = arg.map(token => token.value).join(' ').replace(/ ,$/u, '');
-        const direct = '(?:crate :: theme :: )?TextRole :: (?:Prose|Brand|Body|Strong|Meta|Code)';
+        const direct = `(?:crate :: theme :: )?TextRole :: (?:${[...ordinary].join('|')})`;
         const recognized = new RegExp(String.raw`^(?:${direct}|if (?:[A-Za-z_][A-Za-z_0-9]* \. )?[A-Za-z_][A-Za-z_0-9]* \{ ${direct} \} else \{ ${direct} \})$`, 'u').test(expression);
         if (!recognized || !roles.length || roles.some(role => !ordinary.has(role)) || arg.some(token => token.value === 'TypeRole' || token.value === 'TitleRole')) errors.push(`${file}: unrecognized or protected type_role`);
       }

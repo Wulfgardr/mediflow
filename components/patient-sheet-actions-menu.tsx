@@ -20,7 +20,7 @@ type PatientSheetActionsMenuProps = {
 export function PatientSheetActionsMenu({ editHref, canShareFhirFile, onExportFhir, onShareFhir,
     onReportPdf, leadingActions = [], triggerRef: suppliedRef, onOpen }: PatientSheetActionsMenuProps) {
     return <PatientSheetMenu label="Azioni scheda" triggerRef={suppliedRef} onOpen={onOpen}
-        trigger={props => <Button {...props} variant="secondary"><MoreHorizontal size={16} aria-hidden="true" />Azioni</Button>}>
+        trigger={props => <Button {...props} variant="secondary" aria-label="Azioni" title="Azioni della scheda"><MoreHorizontal size={16} aria-hidden="true" /></Button>}>
         {leadingActions.map(action => <button key={action.label} type="button" role="menuitem" tabIndex={-1}
                 className="mf-popover-row" onClick={action.onSelect}>{action.label}</button>)}
         <Link href={editHref} role="menuitem" tabIndex={-1} className="mf-popover-row">Modifica</Link>
