@@ -37,6 +37,10 @@ export const CL_SCENARIOS: Readonly<Record<string, readonly string[]>> = Object.
 });
 
 export const CL_MIN_SAMPLES = 30;
+export const BUDGET_MARGIN = 1.2;
+
+/** Il contratto chiede le prove C-7 in entrambi gli host desktop (0.9.1, «Righe che restano intere»). */
+export const C7_HOSTS = Object.freeze(['claude_desktop', 'codex_desktop']);
 
 const SURFACE_OBLIGATIONS: Readonly<Record<string, readonly string[]>> = Object.freeze({
     'G-5': Object.freeze(['proposalShown', 'sourcesShown', 'consent', 'revokeObserved']),
@@ -106,8 +110,12 @@ function clMet(functionId: string, f: Json): string[] {
         if (!(Number.isInteger(group.n) && group.n >= CL_MIN_SAMPLES)) reasons.push(`${scenario}/${mode}_incomplete`);
         if (group.errors !== 0) reasons.push(`${scenario}/${mode}_errors`);
         if (group.timeouts !== 0) reasons.push(`${scenario}/${mode}_timeouts`);
+        if (!(typeof group.p95Ms === 'number' && Number.isFinite(group.p95Ms) && group.p95Ms > 0)) reasons.push(`${scenario}/${mode}_latency_unmeasured`);
     }
-    if (!Number.isInteger(f?.cl?.functionBudget?.latencyMs)) reasons.push('function_budget_absent');
+    const p95 = (CL_SCENARIOS[functionId] ?? []).flatMap(scenario => groups.filter(g => g.scenario === scenario)).map(g => g.p95Ms);
+    const latency = f?.cl?.functionBudget?.latencyMs;
+    if (!Number.isInteger(latency)) reasons.push('function_budget_absent');
+    else if (!p95.length || p95.some(v => !(typeof v === 'number' && v > 0)) || latency !== Math.ceil(Math.max(...p95) * BUDGET_MARGIN)) reasons.push('function_budget_not_derived_from_measurements');
     const verification: Json[] = Array.isArray(f?.cl?.verification) ? f.cl.verification : [];
     if (!verification.length) reasons.push('verification_absent');
     if (verification.some(v => v.available !== true || v.withinLatencyBudget !== true || v.withinRssBudget !== true)) reasons.push('verification_outside_budget');
@@ -117,9 +125,10 @@ function clMet(functionId: string, f: Json): string[] {
 function memoryMet(f: Json): string[] {
     const reasons: string[] = [];
     const memory = f?.memory ?? {};
-    if (!Number.isInteger(f?.cl?.functionBudget?.rssBytes)) reasons.push('rss_budget_absent');
+    const rssBudget = f?.cl?.functionBudget?.rssBytes;
+    if (!(Number.isInteger(rssBudget) && rssBudget > 0)) reasons.push('rss_budget_absent');
     if (memory.rss?.source !== 'process_tree_rss') reasons.push('rss_source_unidentified');
-    if (!Number.isInteger(memory.modelAllocation?.peakBytes) || memory.modelAllocation?.source !== 'ollama_api_ps_size_vram') reasons.push('model_allocation_not_recorded');
+    if (!(Number.isInteger(memory.modelAllocation?.peakBytes) && memory.modelAllocation.peakBytes > 0) || memory.modelAllocation?.source !== 'ollama_api_ps_size_vram') reasons.push('model_allocation_not_recorded');
     if (memory.systemGpu !== undefined && memory.systemGpu !== null && memory.systemGpu.attribution !== 'system_wide') reasons.push('system_gpu_misattributed');
     if (memory.summed !== false) reasons.push('memory_sources_summed');
     return reasons;
@@ -155,6 +164,17 @@ function evaluate(criterion: string, register: Json, cell: Json, receipts: Json[
     const found = candidates(criterion, cell, receipts);
     if (!found.length) return { status: 'not_executed', reasons: ['no_receipt'], receipt: null };
     const reasons = new Set<string>();
+    if (criterion === 'C-7') {
+        const passing = new Map<string, string>();
+        for (const { receipt, f } of found) {
+            const failures = [...eligibility(register, cell, receipt), ...surfaceMet(criterion, receipt, f)];
+            if (!C7_HOSTS.includes(receipt.host?.client)) failures.push('host_not_required');
+            if (failures.length) for (const reason of failures) reasons.add(reason);
+            else if (!passing.has(receipt.host.client)) passing.set(receipt.host.client, receipt.ref);
+        }
+        for (const host of C7_HOSTS) if (!passing.has(host)) reasons.add(`host_missing:${host}`);
+        return passing.size === C7_HOSTS.length ? { status: 'met', reasons: [], receipt: [...passing.values()].join(',') } : { status: 'not_met', reasons: [...reasons].sort(), receipt: null };
+    }
     for (const { receipt, f } of found) {
         const failures = [
             ...eligibility(register, cell, receipt),
