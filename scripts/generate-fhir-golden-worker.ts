@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
@@ -7,9 +7,9 @@ import { buildFhirBundleFromRecords } from '../lib/fhir/bundle-mapper';
 import type { FhirBundleInput } from '../lib/fhir/types';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const contractsDir = join(here, '..', 'native', 'contracts');
-const inputPath = join(contractsDir, 'fhir-golden-input.v1.json');
-const bundlePath = join(contractsDir, 'fhir-golden-bundle.v1.json');
+const outputDir = join(here, '..', 'tmp-fhir-web-reference');
+const inputPath = join(outputDir, 'input.json');
+const bundlePath = join(outputDir, 'bundle.json');
 
 const input: FhirBundleInput = {
     generatedAt: '2026-07-08T09:00:00.000Z',
@@ -141,6 +141,7 @@ assert.deepEqual(
 assert.equal(scaleObservation?.valueInteger, 6, 'FHIR golden self-check must include scale Observation score');
 assert.equal(scaleObservation?.code?.text, 'ADL (Indice di Katz)', 'FHIR golden self-check must include scale Observation title');
 
+mkdirSync(outputDir, { recursive: true });
 writeFileSync(inputPath, inputJson);
 writeFileSync(bundlePath, bundleJson);
 

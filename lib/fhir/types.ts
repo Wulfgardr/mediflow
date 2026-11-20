@@ -4,7 +4,7 @@ export interface FhirDiagnosisInput {
     code: string;
     description: string;
     system: string;
-    date: Date | string;
+    date?: Date | string | null;
 }
 
 export interface FhirPatientInput {
@@ -33,7 +33,7 @@ export interface FhirClinicalEntryInput {
     content: string;
     deletedAt?: Date | string | null;
     metadata?: Record<string, unknown>;
-    setting?: 'home' | 'hospital' | 'ambulatory';
+    setting?: 'home' | 'hospital' | 'ambulatory' | null;
 }
 
 export interface FhirTherapyInput {

@@ -17,11 +17,12 @@ test('corpus serializes the real Web mapper and retains current branch behavior'
       assert.equal(artifact.producer, 'web');
     }
     const bundle = (id: string) => artifacts.find(item => item.id === id)!.bundle;
-    assert.equal(bundle('scale-zero').entry[2].resource.valueInteger, 0);
-    assert.equal(bundle('scale-integer').entry[2].resource.valueInteger, 6);
-    assert.equal(bundle('scale-numeric').entry[2].resource.valueInteger, 3);
+    assert.equal(bundle('scale-zero').entry[1].resource.valueInteger, 0);
+    assert.equal(bundle('scale-integer').entry[1].resource.valueInteger, 6);
+    assert.equal(bundle('scale-numeric').entry[1].resource.valueInteger, 3);
     assert.equal(artifacts.some(item => ['scale-fraction', 'scale-empty', 'scale-invalid', 'scale-nonfinite'].includes(item.id)), false);
-    assert.equal(bundle('encounters').entry.length, 4);
+    assert.deepEqual(bundle('encounters').entry.slice(1).map(({ resource }: { resource: { class: { code: string } } }) => resource.class.code),
+      ['HH', 'AMB', 'VR']);
     assert.equal(bundle('diagnosis-unknown').entry[1].resource.code.coding, undefined);
     assert.equal(bundle('therapy-suspended').entry[1].resource.status, 'on-hold');
     assert.equal(bundle('observation-text').entry[1].resource.valueString, 'Synthetic text');

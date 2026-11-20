@@ -4,11 +4,19 @@ import * as z from 'zod';
 import { patientAllergiesSchema } from './patient-allergies';
 import { isWhoCanonicalMmsUri } from './reference-data/icd11-who-local-contract';
 
+import { parseClinicalDate } from './clinical-date';
+
 export const diagnosisSchema = z.object({
     code: z.string().min(1, "Codice richiesto"),
     description: z.string().min(1, "Descrizione richiesta"),
     system: z.enum(['ICD-9', 'ICD-10', 'ICD-11']),
-    date: z.string().or(z.date()).transform(d => new Date(d)),
+    date: z.union([z.string(), z.date()]).nullish().transform((value, context) => {
+        if (value == null || value === '') return null;
+        const date = parseClinicalDate(value);
+        if (date) return date;
+        context.addIssue({ code: 'custom', message: 'Data non valida.' });
+        return z.NEVER;
+    }),
     /* preserve the selected WHO identity inside the existing encrypted JSON field. */
     canonicalUri: z.string().refine(isWhoCanonicalMmsUri, 'URI WHO non valido').optional(),
     reference: z.custom<WhoReference>(value => parseWhoReference(value) !== null, 'Riferimento WHO non valido').optional(),
