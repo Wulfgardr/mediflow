@@ -5,12 +5,22 @@ Questo file raccoglie le modifiche principali di MediFlow.
 Il formato segue [Keep a Changelog](https://keepachangelog.com/en/1.0.0/);
 le versioni seguono [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Non ancora rilasciato]
+## [0.9.1]
 
-Cambiamenti già su `main`, che usciranno con la prossima versione.
-Le prove e i limiti dei singoli candidati sono nella
-[matrice di parità](./docs/parity-matrix.md); non si trasferiscono alla
-versione pubblicata né attestano tutte le interazioni sulle piattaforme.
+Il [contratto della 0.9.1](./docs/releases/0.9.1-contract.md) descrive le
+funzioni distribuite e i sistemi su cui vengono provate. La [pagina delle
+release](https://github.com/Wulfgardr/mediflow/releases) raccoglie i pacchetti pubblicati.
+
+### Aggiornamento dalla 0.9.0
+
+- Prima dell’aggiornamento, salva un backup completo cifrato e conserva il
+  kit e la chiave di recupero. Al primo avvio l’archivio passa dallo schema 3 al
+  17. MediFlow conserva una copia dell’archivio di partenza.
+- Per tornare alla 0.9.0, conserva a parte l’archivio aggiornato e riapri
+  la copia iniziale oppure ripristina il backup completo cifrato creato con
+  la 0.9.0 prima dell’aggiornamento. La 0.9.0 rifiuta in anteprima un backup
+  portabile `.mediflow` esportato dalla 0.9.1.
+  Per rileggere le voci scritte dopo l’aggiornamento, usa la 0.9.1.
 
 ### Avvio
 
@@ -34,6 +44,10 @@ versione pubblicata né attestano tutte le interazioni sulle piattaforme.
 
 ### Accesso per agenti
 
+- Con il consenso del medico, la chat esterna riceve il profilo
+  pseudonimizzato nei limiti del mandato. Le note, le trascrizioni e i PDF forniti dall’agente
+  attendono il medico in **In arrivo**. Il medico esamina i contenuti prima
+  che entrino nella cartella. [Profilo](https://github.com/Wulfgardr/mediflow/pull/1055) · [Revisione](https://github.com/Wulfgardr/mediflow/pull/1056)
 - Mini offre l'anteprima del cambio di stato di un controllo tramite lo
   stesso servizio di MCP. La conferma resta nel Web e l'agente non acquisisce
   permessi di scrittura
@@ -47,6 +61,13 @@ versione pubblicata né attestano tutte le interazioni sulle piattaforme.
 
 ### Profilo paziente
 
+- Nel Quadro una diagnosi o una sintesi di documento senza data resta
+  esclusa dai cambiamenti recenti. Per le diagnosi, l’export FHIR riporta la data di
+  registrazione e omette esordio e stato clinico. Una data di registrazione
+  mancante o invalida ferma l’export. [Date cliniche e FHIR](https://github.com/Wulfgardr/mediflow/pull/1062)
+- Sul Web la cancellazione di una prescrizione di prestazioni si ferma
+  se nel frattempo una voce è cambiata. I risultati già collegati restano
+  in cartella e l’audit registra ogni collegamento rimosso. [Prescrizioni e risultati](https://github.com/Wulfgardr/mediflow/pull/1063)
 - Gli ingressi Web, API locale e client abbinati usano un comando interno
   normalizzato e un dispatch unico verso il writer Node esistente. Una stessa
   esecuzione riusa il proprio esito senza ripetere gli effetti; richieste HTTP
@@ -81,11 +102,15 @@ versione pubblicata né attestano tutte le interazioni sulle piattaforme.
   ([#549](https://github.com/Wulfgardr/mediflow/pull/549)).
 - L'accesso ChatGPT riconosce il piano `prolite` e aggiorna i vincoli del
   sistema Mac dopo la verifica prevista. Accesso e catalogo hanno prove
-  reali; la generazione nelle quattro funzioni resta da verificare
+  reali. Il contratto comprende Quadro paziente, Smart Import e Sintesi
+  documentale sul canale ChatGPT
   ([#540](https://github.com/Wulfgardr/mediflow/pull/540),
   [esiti e limiti](./docs/known-limitations.md#chatgpt-e-plugin-stato-delle-prove)).
 
 ### Client Apple
+
+Le modifiche qui elencate riguardano il sorgente dei client Swift e la
+compatibilità con le app esistenti. Il pacchetto nativo per Mac della 0.9.1 è il client GPUI.
 
 - Accesso con passphrase v3 nei client abbinati, con derivazione locale e
   verifica della generazione dell'archivio. Il preflight corrente ammette
@@ -123,11 +148,13 @@ versione pubblicata né attestano tutte le interazioni sulle piattaforme.
 
 ### Interfaccia
 
-- Tipografia uniforme: Newsreader per titoli e nomi dei pazienti, carattere di
-  sistema su quattro dimensioni per gli altri testi e monospaziato per i
-  codici. Pulsanti alti 40 px con il mouse e 44 px sui dispositivi touch;
-  azioni senza cornice nel diario e nella scheda
-  ([#530](https://github.com/Wulfgardr/mediflow/pull/530)).
+- Nella scheda Web e Mac, **Stabile**, **Cambiato** e **Contesto** raccolgono
+  i problemi e le terapie, le variazioni dall’ultima visita e i dati da
+  consultare. Ogni zona ha un fondo opaco. A larghezza ridotta, Cambiato
+  viene per primo. Una bozza si riapre con **Torna alla bozza**. [Scheda Web e Mac](https://github.com/Wulfgardr/mediflow/pull/1059)
+- Da **Tutto il diario** il medico può rettificare una voce e rileggerne le
+  versioni precedenti nello **Storico delle rettifiche**. Il backup comprende
+  lo storico cifrato. [Rettifiche del diario](https://github.com/Wulfgardr/mediflow/pull/1064)
 - Azioni e colonne di Pazienti e Repertori si adattano allo spazio; i comandi
   mobile sono nel menu Altro. La revisione del ragionamento terapeutico usa
   la composizione Punto d'inchiostro su Web e Mac, con fonti leggibili e
