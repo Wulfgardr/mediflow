@@ -1,3 +1,4 @@
+import { PatientEntryRevisions } from './patient-entry-revisions';
 import { format } from 'date-fns';
 import { presentTinettiResult, scaleHistoryNotice } from '@/lib/scale-history';
 
@@ -151,6 +152,15 @@ export function TimelineEntryCard({
     const tinetti = entry.type === 'scale' ? presentTinettiResult(entry.metadata, entry.title) : null;
     const scaleNotice = entry.type === 'scale' && !tinetti ? scaleHistoryNotice(entry.metadata, entry.title) : null;
 
+    const prose = <>
+        {diaryPresentation && entry.title && !(reading && entry.title.trim().toLocaleLowerCase('it-IT') === typeLabel.toLocaleLowerCase('it-IT')) ? <h4 className={twin.entryTitle}><PrivacyBlur>{entry.title}</PrivacyBlur></h4> : null}
+        <div className={reading ? twin.readingText : undefined} style={{ color: presentation.draft ? 'var(--lume-ink-muted)' : 'var(--lume-ink)' }}>
+            <PrivacyBlur>
+                <ClinicalRichTextContent content={entry.content} className="prose prose-sm max-w-none prose-p:leading-relaxed dark:prose-invert" />
+            </PrivacyBlur>
+        </div>
+    </>;
+
     return (
         <article
             className={`group relative pl-8 outline-none ${proposal ? twin.entry : ''} ${diaryPresentation ? twin.patientEntry : ''} ${isDeleted ? 'opacity-60 grayscale' : ''}`}
@@ -268,14 +278,8 @@ export function TimelineEntryCard({
                         {tinetti.version && !entry.content.includes(tinetti.version) && <p>{tinetti.version}</p>}
                         <PrivacyBlur><ClinicalRichTextContent content={entry.content} /></PrivacyBlur>
                     </Disclosure>
-                </> : <>
-                    {diaryPresentation && entry.title && !(reading && entry.title.trim().toLocaleLowerCase('it-IT') === typeLabel.toLocaleLowerCase('it-IT')) ? <h4 className={twin.entryTitle}><PrivacyBlur>{entry.title}</PrivacyBlur></h4> : null}
-                    <div className={reading ? twin.readingText : undefined} style={{ color: presentation.draft ? 'var(--lume-ink-muted)' : 'var(--lume-ink)' }}>
-                        <PrivacyBlur>
-                            <ClinicalRichTextContent content={entry.content} className="prose prose-sm max-w-none prose-p:leading-relaxed dark:prose-invert" />
-                        </PrivacyBlur>
-                    </div>
-                </>}
+                </> : patientDiary && !reading && !isDeleted && entry.type !== 'scale'
+                    ? <PatientEntryRevisions key={entry.id} entry={entry}>{prose}</PatientEntryRevisions> : prose}
 
                 {diaryPresentation ? <div className={twin.registration}>
                     {stateKnown ? <InkState state={presentation.draft ? 'fresh' : 'dry'}>{presentation.stateLabel === 'Registrata' ? patientDiaryRegistration(reading && sameCivilDay(entry.createdAt, entry.date) ? { recordedBy: entry.recordedBy } : entry) : `${presentation.stateLabel}${presentation.author ? ` da ${presentation.author}` : ''}`}</InkState> : <span>{presentation.stateLabel}{presentation.author ? ` · Autore: ${presentation.author}` : ''}</span>}

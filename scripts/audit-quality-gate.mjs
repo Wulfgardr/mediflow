@@ -1313,12 +1313,20 @@ function validateRequiredClinicalRowAudit({ spec, routeSource, coreSource, bridg
     const txName = callback.parameters[0].name.text;
     const auditCalls = bindingCalls(owner, core.checker, writer.symbol);
     const audit = auditCalls.length === 1 ? auditCalls[0] : null;
-    const auditStatement = audit?.parent;
+    const capturedDiaryAudit = resource === 'entry' && spec.operation === 'update';
+    const auditStatement = audit && directStatement(callback, audit);
     const statements = [...callback.body.statements];
     const auditIndex = statements.indexOf(auditStatement);
+    const auditIdentity = capturedDiaryAudit && auditStatement && ts.isVariableStatement(auditStatement)
+        && auditStatement.declarationList.flags === ts.NodeFlags.Const
+        && auditStatement.declarationList.declarations.length === 1
+        ? auditStatement.declarationList.declarations[0] : null;
+    const directAudit = capturedDiaryAudit
+        ? auditIdentity && ts.isIdentifier(auditIdentity.name) && auditIdentity.initializer === audit
+        : auditStatement && ts.isExpressionStatement(auditStatement) && isReachableStandaloneCall(audit, callback);
     if (!audit || audit.arguments.length !== 2 || !ts.isIdentifier(unwrap(audit.arguments[0]))
         || unwrap(audit.arguments[0]).text !== txName || auditIndex < 2
-        || !ts.isExpressionStatement(auditStatement) || !isReachableStandaloneCall(audit, callback)) {
+        || !directAudit || !isReachableCall(audit, callback)) {
         problems.push('exactly one direct required clinical-row audit must execute on the same transaction');
         return problems;
     }
@@ -1363,7 +1371,7 @@ function validateRequiredClinicalRowAudit({ spec, routeSource, coreSource, bridg
     const input = audit.arguments[1] && unwrap(audit.arguments[1]);
     const props = input && ts.isObjectLiteralExpression(input)
         ? exactPropertyAssignments(input, ['eventType', 'outcome', 'archiveGeneration', 'actorType', 'actorRef',
-            'subjectType', 'subjectRef', 'sourceSurface', 'requestId', ...(input.properties.some(property => property.name?.text === 'agentProvenance') ? ['agentProvenance'] : []), 'redactedMetadata']) : null;
+            'subjectType', 'subjectRef', 'sourceSurface', 'requestId', ...(capturedDiaryAudit ? ['occurredAt'] : []), ...(input.properties.some(property => property.name?.text === 'agentProvenance') ? ['agentProvenance'] : []), 'redactedMetadata']) : null;
     const literal = (name, value) => {
         const node = props?.get(name)?.initializer;
         return node && ts.isStringLiteral(node) && node.text === value;
@@ -1379,7 +1387,14 @@ function validateRequiredClinicalRowAudit({ spec, routeSource, coreSource, bridg
         || compact(props.get('subjectRef')?.initializer) !== `${name}.${resource === 'entry' && spec.operation === 'create' ? 'id' : `${resource}Id`}`) {
         problems.push('clinical-row audit event and subject must describe the applied resource mutation');
     }
-    if (auditIndex !== statements.length - 2 || !ts.isReturnStatement(statements[auditIndex + 1])) {
+    if (capturedDiaryAudit) {
+        const revision = statements[auditIndex + 1];
+        const expected = `retainEntryRevision(${txName},${name},existing,${auditIdentity.name.text},${compact(props?.get('occurredAt')?.initializer)},previous);`;
+        if (compact(revision) !== expected || !props?.get('occurredAt')
+            || auditIndex !== statements.length - 3 || !ts.isReturnStatement(statements[auditIndex + 2])) {
+            problems.push('diary success must follow the audit-linked revision write on the same transaction');
+        }
+    } else if (auditIndex !== statements.length - 2 || !ts.isReturnStatement(statements[auditIndex + 1])) {
         problems.push('clinical-row success must return immediately after the required audit');
     }
     return problems;

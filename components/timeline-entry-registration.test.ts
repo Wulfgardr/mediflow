@@ -15,6 +15,7 @@ function render(recordedBy?: string | null, extra: Record<string, unknown> = {})
             type: 'visit', title: 'Controllo sintetico', content: 'Testo clinico sintetico',
             date: new Date('2020-01-01T08:00:00Z'), createdAt, recordedBy, ...extra } },
         imports: {
+            './patient-entry-revisions': { PatientEntryRevisions: ({ children }: { children: unknown }) => children },
             'date-fns': { format }, 'date-fns/locale': { it }, '@/lib/scale-history': scaleHistory,
             '@/lib/db': {}, '@/components/ui/button': { Button: (props: Record<string, unknown>) => element('button', props) },
             '@/components/patient-sheet-menu': {}, '@/components/ui/lume-filo': {},

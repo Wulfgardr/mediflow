@@ -1178,6 +1178,225 @@ fn capture_record_d_on_the_synthetic_bench() {
     .unwrap();
 }
 
+#[gpui::test]
+fn live_diary_revisions_select_long_previous_text_at_narrow_width(cx: &mut gpui::TestAppContext) {
+    let Ok(path) = std::env::var("MEDIFLOW_DIARY_HISTORY_BENCH") else {
+        return;
+    };
+    let pairing: Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let session = login(&pairing);
+    let scope = session
+        .list_ambulatories()
+        .unwrap()
+        .into_iter()
+        .find(|row| row.is_default)
+        .unwrap()
+        .id;
+    let patient = pairing["patient"].as_str().unwrap();
+    session.select_profile_patient(&scope, patient).unwrap();
+    let original = "Inizio nota sintetica. ".to_owned()
+        + &"Testo di prova per la rilettura. ".repeat(120)
+        + "Fine prima versione.";
+    let draft = |content: &str| EntryDraft {
+        entry_type: "note".into(),
+        title: "Nota sintetica con rettifiche".into(),
+        date: chrono::Utc::now().to_rfc3339(),
+        setting: None,
+        content: content.into(),
+    };
+    let id = match pairing["legacyEntryId"].as_str() {
+        Some(id) => id.to_owned(),
+        None => {
+            session
+                .create_entry(&scope, patient, &draft(&original))
+                .unwrap()
+                .id
+        }
+    };
+    let second = "Seconda versione sintetica.";
+    let third = "Terza versione sintetica.";
+    let first = session.read_entry(&scope, patient, &id).unwrap();
+    assert_eq!(first.version, 1);
+    assert_eq!(first.content, original);
+    if pairing["legacyEntryId"].is_string() {
+        assert_eq!(first.recorded_by, None);
+    }
+
+    let (view, cx) = cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+    cx.simulate_resize(gpui::size(px(760.), px(610.)));
+    view.update(cx, |app, cx| {
+        app.session = Some(session.clone());
+        app.scope = Some(scope.clone());
+        app.area = Area::Patients;
+        app.select_patient(patient, true, cx);
+        app.section_selected(PatientSection::Diary, cx);
+    });
+    let current_session = |cx: &mut gpui::VisualTestContext| {
+        view.read_with(cx, |app, _| {
+            app.session.clone().expect("active profile session")
+        })
+    };
+    let wait_for = |cx: &mut gpui::VisualTestContext, selector: &'static str| {
+        for _ in 0..120 {
+            notes_recovery_tests::draw(cx);
+            if let Some(bounds) = cx.debug_bounds(selector) {
+                return bounds;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        panic!("control {selector} was not rendered");
+    };
+    let click = |cx: &mut gpui::VisualTestContext, selector| {
+        for _ in 0..80 {
+            let bounds = wait_for(cx, selector);
+            let viewport = cx
+                .debug_bounds("threshold-full-plane")
+                .or_else(|| cx.debug_bounds("threshold-scroll"))
+                .unwrap();
+            let in_view = |area: gpui::Bounds<gpui::Pixels>| {
+                area.contains(&bounds.center())
+                    && bounds.top() >= area.top()
+                    && bounds.bottom() <= area.bottom() + px(1.)
+            };
+            if in_view(viewport) || cx.debug_bounds("threshold-bar").is_some_and(in_view) {
+                cx.simulate_click(bounds.center(), gpui::Modifiers::default());
+                notes_recovery_tests::draw(cx);
+                return;
+            }
+            let delta = f32::from(viewport.center().y - bounds.center().y).clamp(-180., 180.);
+            cx.simulate_event(gpui::ScrollWheelEvent {
+                position: viewport.center(),
+                delta: gpui::ScrollDelta::Pixels(gpui::point(px(0.), px(delta))),
+                ..Default::default()
+            });
+        }
+        panic!(
+            "control {selector} was not reachable: {:?} in {:?}",
+            cx.debug_bounds(selector),
+            cx.debug_bounds("threshold-scroll"),
+        );
+    };
+    let edit: &'static str =
+        Box::leak(format!("clinical-workspace-edit-entry-{id}").into_boxed_str());
+    let toggle = Box::leak(format!("clinical-workspace-entry-history-{id}").into_boxed_str());
+    let wait_for_form = |cx: &mut gpui::VisualTestContext| {
+        for _ in 0..120 {
+            notes_recovery_tests::draw(cx);
+            if view.read_with(cx, |app, _| {
+                app.form
+                    .as_ref()
+                    .is_some_and(|form| form.kind == FormKind::Entry)
+            }) {
+                return;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        let message = view.read_with(cx, |app, _| app.message.clone());
+        panic!("the diary edit must open its existing form: {message:?}");
+    };
+    let set_text = |cx: &mut gpui::VisualTestContext, text: &'static str| {
+        click(cx, edit);
+        wait_for_form(cx);
+        view.update(cx, |app, cx| {
+            app.form
+                .as_mut()
+                .unwrap()
+                .fields
+                .iter()
+                .find(|field| field.label == "Contenuto della voce")
+                .unwrap()
+                .editor
+                .update(cx, |input, cx| input.set_content(text, cx));
+        });
+    };
+
+    set_text(cx, "Testo sintetico annullato.");
+    click(cx, "clinical-workspace-review-save");
+    click(cx, "threshold-back");
+    let before = current_session(cx)
+        .read_entry_revisions(&scope, patient, &id, 1, 0)
+        .unwrap();
+    assert!(before.revisions.is_empty());
+
+    for (index, text) in [second, third].into_iter().enumerate() {
+        view.update(cx, |app, cx| {
+            app.form
+                .as_mut()
+                .unwrap()
+                .fields
+                .iter()
+                .find(|field| field.label == "Contenuto della voce")
+                .unwrap()
+                .editor
+                .update(cx, |input, cx| input.set_content(text, cx));
+        });
+        click(cx, "clinical-workspace-review-save");
+        click(cx, "clinical-workspace-confirm-save");
+        for _ in 0..120 {
+            notes_recovery_tests::draw(cx);
+            if view.read_with(cx, |app, _| app.form.is_none()) {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        assert_eq!(
+            current_session(cx)
+                .read_entry(&scope, patient, &id)
+                .unwrap()
+                .version,
+            index as u64 + 2
+        );
+        if index == 0 {
+            click(cx, edit);
+            wait_for_form(cx);
+        }
+    }
+    let session = current_session(cx);
+    let retry = session.update_entry(&scope, patient, &id, first.version, &draft(second));
+    assert_eq!(retry, Err(RuntimeError::ReadRequired));
+    let current = session.read_entry(&scope, patient, &id).unwrap();
+    assert_eq!(current.content, third);
+    let history = session
+        .read_entry_revisions(&scope, patient, &id, current.version, 0)
+        .unwrap();
+    assert_eq!(
+        history
+            .revisions
+            .iter()
+            .map(|row| row.content.as_deref().unwrap())
+            .collect::<Vec<_>>(),
+        [original.as_str(), second]
+    );
+    assert_eq!(
+        history.revisions[0].title.as_deref(),
+        Some("Nota sintetica con rettifiche")
+    );
+    assert!(
+        history
+            .revisions
+            .iter()
+            .all(|row| row.correction.corrected_by.is_some())
+    );
+    assert!(history.available_since.is_some());
+    click(cx, toggle);
+    for version in 1..=3 {
+        let control = Box::leak(format!("clinical-diary-version-{id}-{version}").into_boxed_str());
+        click(cx, control);
+        let text = wait_for(cx, "clinical-diary-history-text");
+        assert!(
+            text.right() <= px(760.) && text.left() >= px(0.),
+            "{text:?}"
+        );
+        if version == 1 {
+            assert!(
+                text.size.height > px(100.),
+                "long content lays out across lines: {text:?}"
+            );
+        }
+    }
+    view.update(cx, |app, cx| app.disconnect(cx));
+}
+
 mod concept {
     use super::super::*;
     use super::context;

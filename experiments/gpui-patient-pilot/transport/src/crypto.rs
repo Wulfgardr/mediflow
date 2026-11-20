@@ -227,6 +227,125 @@ fn seal_with_iv<T: serde::Serialize + ?Sized>(
     ))
 }
 
+fn diary_revision_aad(
+    patient: &str,
+    entry: &str,
+    version: u64,
+    field: Option<&str>,
+) -> Result<Vec<u8>> {
+    let context = match field {
+        Some(field) => serde_json::json!([
+            "mediflow.diary.revision.data.v1",
+            patient,
+            entry,
+            version,
+            field
+        ]),
+        None => serde_json::json!(["mediflow.diary.revision.key.v1", patient, entry, version]),
+    };
+    serde_json::to_vec(&context).map_err(|_| RuntimeError::Crypto)
+}
+
+pub(crate) fn prepare_legacy_diary_revision(
+    master: &MasterKey,
+    patient: &str,
+    entry: &str,
+    version: u64,
+) -> Result<Value> {
+    let mut key = Zeroizing::new([0u8; 32]);
+    let mut iv = [0u8; 12];
+    getrandom::fill(key.as_mut()).map_err(|_| RuntimeError::Crypto)?;
+    getrandom::fill(&mut iv).map_err(|_| RuntimeError::Crypto)?;
+    let aad = diary_revision_aad(patient, entry, version, None)?;
+    let cipher = Aes256Gcm::new_from_slice(master.as_ref()).map_err(|_| RuntimeError::Crypto)?;
+    let wrapped = cipher
+        .encrypt(
+            Nonce::from_slice(&iv),
+            Payload {
+                msg: key.as_ref(),
+                aad: &aad,
+            },
+        )
+        .map_err(|_| RuntimeError::Crypto)?;
+    let reopened = Zeroizing::new(
+        cipher
+            .decrypt(
+                Nonce::from_slice(&iv),
+                Payload {
+                    msg: &wrapped,
+                    aad: &aad,
+                },
+            )
+            .map_err(|_| RuntimeError::Crypto)?,
+    );
+    if reopened.as_slice() != key.as_ref() {
+        return Err(RuntimeError::Crypto);
+    }
+    Ok(serde_json::json!({
+        "patientId": patient, "entryId": entry, "version": version,
+        "key": BASE64.encode(key.as_ref()), "wrapIv": BASE64.encode(iv), "wrappedKey": BASE64.encode(wrapped),
+    }))
+}
+
+pub(crate) const LEGACY_DIARY_PREFIX: &str = "ENCD1:";
+
+pub(crate) fn open_legacy_diary_revision(
+    value: &str,
+    master: &MasterKey,
+    patient: &str,
+    entry: &str,
+    version: u64,
+    field: &str,
+) -> Result<String> {
+    let mut segments = value
+        .strip_prefix(LEGACY_DIARY_PREFIX)
+        .ok_or(RuntimeError::Crypto)?
+        .split(':');
+    let mut next = || {
+        BASE64
+            .decode(segments.next().ok_or(RuntimeError::Crypto)?)
+            .map_err(|_| RuntimeError::Crypto)
+    };
+    let wrap_iv = next()?;
+    let wrapped = next()?;
+    let iv = next()?;
+    let data = next()?;
+    if segments.next().is_some()
+        || wrap_iv.len() != 12
+        || wrapped.len() != 48
+        || iv.len() != 12
+        || data.len() < 16
+    {
+        return Err(RuntimeError::Crypto);
+    }
+    let wrap_aad = diary_revision_aad(patient, entry, version, None)?;
+    let data_aad = diary_revision_aad(patient, entry, version, Some(field))?;
+    let master_cipher =
+        Aes256Gcm::new_from_slice(master.as_ref()).map_err(|_| RuntimeError::Crypto)?;
+    let key = Zeroizing::new(
+        master_cipher
+            .decrypt(
+                Nonce::from_slice(&wrap_iv),
+                Payload {
+                    msg: &wrapped,
+                    aad: &wrap_aad,
+                },
+            )
+            .map_err(|_| RuntimeError::Crypto)?,
+    );
+    let cipher = Aes256Gcm::new_from_slice(&key).map_err(|_| RuntimeError::Crypto)?;
+    let plaintext = cipher
+        .decrypt(
+            Nonce::from_slice(&iv),
+            Payload {
+                msg: &data,
+                aad: &data_aad,
+            },
+        )
+        .map_err(|_| RuntimeError::Crypto)?;
+    String::from_utf8(plaintext).map_err(|_| RuntimeError::Crypto)
+}
+
 pub(crate) fn open(value: &str, master: &MasterKey) -> Result<Value> {
     if value.len() > 24 * 1024 * 1024 {
         return Err(RuntimeError::TooLarge);

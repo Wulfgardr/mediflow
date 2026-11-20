@@ -30,6 +30,7 @@ const BACKUP_TABLES = {
   documentDiagnosisProposals: 'document_diagnosis_proposals',
   drugs: 'drugs',
   entries: 'entries',
+  entryRevisions: 'entry_revisions',
   exemptions: 'exemptions',
   exemptionImportReceipts: 'exemption_import_receipts',
   prostheticsCatalogEntries: 'prosthetics_catalog_entries',
@@ -344,6 +345,7 @@ function buildDataset(db, backupCollections) {
     const schemaVersion = db.pragma('user_version', { simple: true });
     if (!hasTable(db, 'therapy_status_commands') && (!Number.isSafeInteger(schemaVersion) || schemaVersion < 0 || schemaVersion > 4)) throw new Error('Therapy command ledger unavailable');
     if (!hasTable(db, 'ambulatory_destructive_commands') && (!Number.isSafeInteger(schemaVersion) || schemaVersion < 0 || schemaVersion > 5)) throw new Error('Ambulatory command ledger unavailable');
+    if (!hasTable(db, 'entry_revisions') && (!Number.isSafeInteger(schemaVersion) || schemaVersion < 0 || schemaVersion > 16)) throw new Error('Entry revision history unavailable');
     const dataset = Object.fromEntries(
       backupCollections.filter(collection => collection !== 'auditEvents' || hasTable(db, 'audit_events')).map((collection) => [
         collection,
@@ -370,6 +372,8 @@ function buildDataset(db, backupCollections) {
     dataset.attachments = filterRowsByReference(dataset.attachments, 'patientId', patientIds);
     dataset.documentDiagnosisProposals = filterRowsByReference(dataset.documentDiagnosisProposals, 'patientId', patientIds);
     dataset.entries = filterRowsByReference(dataset.entries, 'patientId', patientIds);
+    const entryIds = new Set(dataset.entries.map(row => row.id));
+    dataset.entryRevisions = filterRowsByReference(dataset.entryRevisions, 'entryId', entryIds);
     dataset.observations = filterRowsByReference(dataset.observations, 'patientId', patientIds);
     dataset.checkups = filterRowsByReference(dataset.checkups, 'patientId', patientIds);
     dataset.therapies = filterRowsByReference(dataset.therapies, 'patientId', patientIds);
