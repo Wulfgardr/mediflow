@@ -603,7 +603,7 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
             showToast('Esportazione FHIR completata.', 'success');
         } catch (error) {
             if (error instanceof FhirExportPrecheckError) {
-                const entry = await db.entries.get(error.recordId);
+                const entry = error.category === 'scale' ? await db.entries.get(error.recordId) : undefined;
                 showToast(buildFhirExportBlockingToast(error, entry?.patientId === id ? entry : undefined));
                 return;
             }
@@ -627,7 +627,7 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
             });
         } catch (error) {
             if (error instanceof FhirExportPrecheckError) {
-                const entry = await db.entries.get(error.recordId);
+                const entry = error.category === 'scale' ? await db.entries.get(error.recordId) : undefined;
                 showToast(buildFhirExportBlockingToast(error, entry?.patientId === id ? entry : undefined));
                 return;
             }

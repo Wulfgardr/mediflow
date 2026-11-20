@@ -38,7 +38,8 @@ export function buildFhirBundleFromRecords(input: FhirBundleInput): Bundle {
     input.entries.forEach(entry => {
         if (entry.deletedAt) return;
 
-        append(toFhirEncounter(entry, patientReference));
+        const encounter = toFhirEncounter(entry, patientReference);
+        if (encounter) append(encounter);
 
         const observation = toFhirObservation(entry, patientReference);
         if (observation) {

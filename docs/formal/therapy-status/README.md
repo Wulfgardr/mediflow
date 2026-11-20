@@ -10,6 +10,22 @@ sono una prova TLA né un'estensione implicita degli invarianti legacy sottostan
 
 Il recovery cifrato supporta lo schema corrente 16 e i predecessori canonici 3, 4, 5, 6, 9, 10, 11, 12, 13, 14 e 15; le prove di compatibilità sono esterne a TLC, che non copre schema, migrazione, cifratura o ricevute. Restano aperte la verifica verticale Rust-host e quella della GUI.
 
+## WUL-909. Validità dell’intervallo terapeutico
+
+La scrittura verifica le date effettive dopo il controllo di versione e il
+calcolo del nuovo stato, nella stessa transazione IMMEDIATE. Un intervallo
+incoerente introdotto da una modifica viene rifiutato prima di aggiornare
+la riga o scrivere l’audit. I comandi di stato trattano il rifiuto come un
+diniego, senza ricevuta. Le modifiche che preservano le date consentono di
+rileggere e gestire anche le righe storiche con un periodo incoerente.
+
+Il diff in `lib/db.ts` riguarda i tipi di lettura di diagnosi e sintesi
+documentali. Il modello TLC legacy astrae le date cliniche. Il nuovo esito
+del writer rientra nel diniego prima del commit già previsto dal modello.
+I casi su SQLite in `therapy-required-audit.test.ts` e
+`therapy-status-command.test.ts` coprono gli effetti persistenti del nuovo
+controllo.
+
 ## Raccordo del 18 novembre 2026: riga della tabella Terapie
 
 La tabella mostra indicazione, diagnosi collegata, periodo e codici nella
