@@ -7,12 +7,15 @@
 {"op":"expect","target":{"role":"tab","name":"Documenti"},"state":"selected"}
 {"op":"expect","target":{"role":"heading","name":"Documenti"},"state":"visible"}
 {"op":"discover"}
+{"op":"scroll","target":{"role":"region","name":"Contenuto della scheda"},"deltaY":240}
+{"op":"discover"}
 {"op":"click","target":{"role":"button","name":"Sintesi e fonte"}}
 {"op":"expect","target":{"role":"button","name":"Chiudi sintesi e fonte"},"state":"expanded"}
 {"op":"click","target":{"role":"button","name":"Chiudi sintesi e fonte"}}
 {"op":"click","target":{"role":"button","name":"Originale"}}
 {"op":"expect","target":{"role":"button","name":"Chiudi originale"},"state":"expanded"}
 {"op":"click","target":{"role":"button","name":"Chiudi originale"}}
+{"op":"scroll","target":{"role":"region","name":"Contenuto della scheda"},"deltaY":-2500}
 {"op":"press","target":{"role":"tab","name":"Riepilogo"},"key":"Enter"}
 {"op":"expect","target":{"role":"tab","name":"Riepilogo"},"state":"selected"}
 {"op":"click","target":{"role":"button","name":"Nuova voce"}}
