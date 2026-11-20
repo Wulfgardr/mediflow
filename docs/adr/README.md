@@ -14,6 +14,7 @@ verifica dello stato successivo.
 
 ## Decisioni richiamate
 
+- L'[ADR 0196](0196-document-child-platform-boundary.md) propone il confine documentale di Web e Headless. Il 19 novembre 2026 Leonardo ha approvato l’isolamento di rete imposto dal sistema come requisito di consegna su Windows 11 ARM. L’ADR registra le prove su macOS ARM64, Omarchy ARM e Windows 11 ARM. La ricetta resta proposta durante l’integrazione.
 - L'[ADR 0195](0195-materiale-dell-agente-dopo-il-gesto-del-medico.md), accettato il 19/11/2026, fa entrare in cartella nota, trascrizione, PDF e proposte depositati da un client agente solo dopo il gesto del medico, sul Web o nella conferma nativa che li mostra per intero.
 - L'[ADR 0194](0194-profilo-pseudonimizzato-per-la-chat-esterna.md), accettato il 19/11/2026, fa uscire verso la chat MCP il profilo del paziente con segnaposto al posto dell'identità, sostituiti nel proprietario Web prima dell'IPC. Mini e le corsie HTTP restano con i dati veri.
 - L'[ADR 0193](0193-egress-clinico-controllato-dal-server.md), accettato il 19/11/2026, fa rifiutare dal server le operazioni cliniche dei mandati cloud senza egress dichiarato e toglie dall'applicazione automatica le cassette già depositate così.

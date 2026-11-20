@@ -200,6 +200,30 @@ const STANDARD_FONT_FILES = new Set([
     'LiberationSans-Bold.ttf', 'LiberationSans-BoldItalic.ttf', 'LiberationSans-Italic.ttf', 'LiberationSans-Regular.ttf',
 ]);
 
+const WORKER_ROOT = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
+
+function physicalRendererFile(packageName, ...segments) {
+    const windows = process.platform === 'win32';
+    const packageRoot = windows ? path.join(WORKER_ROOT, 'node_modules', packageName)
+        : path.dirname(require.resolve(`${packageName}/package.json`));
+    const file = path.join(packageRoot, ...segments);
+    if (windows) {
+        const staged = path.relative(WORKER_ROOT, file);
+        if (!staged.startsWith(`node_modules${path.sep}`)) throw new EngineUnavailable();
+        let directory = WORKER_ROOT;
+        for (const part of path.dirname(staged).split(path.sep)) {
+            directory = path.join(directory, part);
+            if (!lstatSync(directory).isDirectory()) throw new EngineUnavailable();
+        }
+    } else {
+        const relative = path.relative(realpathSync.native(WORKER_ROOT), realpathSync.native(file));
+        if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) throw new EngineUnavailable();
+    }
+    const stat = lstatSync(file);
+    if (!stat.isFile()) throw new EngineUnavailable();
+    return { file, size: stat.size };
+}
+
 /* Non-embedded standard fonts (Helvetica, Times, Courier...) are drawn only from
    the pinned pdfjs-dist package assets; document-supplied URLs are ignored. Without
    them PDF.js silently skips the glyphs and OCR never sees overlay text. */
@@ -208,69 +232,64 @@ class PackageStandardFontDataFactory {
 
     async fetch({ filename }) {
         if (typeof filename !== 'string' || !STANDARD_FONT_FILES.has(filename)) throw new EngineUnavailable();
-        const root = realpathSync(fileURLToPath(new URL('..', import.meta.url)));
-        const file = path.join(path.dirname(require.resolve('pdfjs-dist/package.json')), 'standard_fonts', filename);
-        const relative = path.relative(root, realpathSync(file));
-        const stat = lstatSync(file);
-        if (!stat.isFile() || stat.size < 1 || stat.size > STANDARD_FONT_MAX_BYTES
-            || relative.startsWith('..') || path.isAbsolute(relative)) throw new EngineUnavailable();
+        const { file, size } = physicalRendererFile('pdfjs-dist', 'standard_fonts', filename);
+        if (size < 1 || size > STANDARD_FONT_MAX_BYTES) throw new EngineUnavailable();
         return new Uint8Array(readFileSync(file));
     }
 }
 
 async function loadRenderer() {
-    if (process.versions.node.split('.')[0] !== '24') throw new EngineUnavailable();
-    const profiles = JSON.parse(readFileSync(new URL('./anydoc-pdf-renderer-profiles.json', import.meta.url), 'utf8'));
-    const profile = profiles.find((entry) => entry.platform === process.platform && entry.arch === process.arch);
-    const glibc = process.platform === 'linux' ? String(process.report.getReport().header.glibcVersionRuntime).split('.').map(Number) : [];
-    if (!profile || (profile.libc === 'glibc' && !(glibc[0] > 2 || (glibc[0] === 2 && glibc[1] >= 18))))
-        throw new EngineUnavailable();
-    let installedPdfJs;
-    let installedCanvas;
-    let installedProfile;
+    let stage = 'profile';
     try {
-        installedPdfJs = require('pdfjs-dist/package.json').version;
-        installedCanvas = require('@napi-rs/canvas/package.json').version;
-        installedProfile = require(`${profile.package}/package.json`).version;
-        // @Codex: macOS packaging relocates and signs canvas; preserve its existing version gate.
+        if (process.versions.node.split('.')[0] !== '24') throw new EngineUnavailable();
+        const profiles = JSON.parse(readFileSync(new URL('./anydoc-pdf-renderer-profiles.json', import.meta.url), 'utf8'));
+        const profile = profiles.find((entry) => entry.platform === process.platform && entry.arch === process.arch);
+        const glibc = process.platform === 'linux' ? String(process.report.getReport().header.glibcVersionRuntime).split('.').map(Number) : [];
+        if (!profile || (profile.libc === 'glibc' && !(glibc[0] > 2 || (glibc[0] === 2 && glibc[1] >= 18))))
+            throw new EngineUnavailable();
+
+        stage = 'package_versions';
+        if (require('pdfjs-dist/package.json').version !== PDFJS_VERSION
+            || require('@napi-rs/canvas/package.json').version !== CANVAS_VERSION
+            || require(`${profile.package}/package.json`).version !== CANVAS_VERSION) throw new EngineUnavailable();
         if (process.platform !== 'darwin') {
-            const binaryPath = require.resolve(`${profile.package}/${profile.binary}`);
-            const root = realpathSync(fileURLToPath(new URL('..', import.meta.url)));
-            const relative = path.relative(root, realpathSync(binaryPath));
-            if (!lstatSync(binaryPath).isFile() || relative.startsWith('..') || path.isAbsolute(relative)) throw new EngineUnavailable();
-            const binary = readFileSync(binaryPath);
-            if (binary.byteLength !== profile.binaryByteLength
-                || createHash('sha256').update(binary).digest('hex') !== profile.binarySha256) throw new EngineUnavailable();
-            // Windows Skia text initializes Unicode from its package-local ICU sidecar.
-            // Verify it before either renderer import can enter native initialization.
+            stage = 'binary_path';
+            const binary = physicalRendererFile(profile.package, profile.binary);
+            stage = 'binary_identity';
+            const binaryBytes = readFileSync(binary.file);
+            if (binaryBytes.byteLength !== profile.binaryByteLength
+                || createHash('sha256').update(binaryBytes).digest('hex') !== profile.binarySha256) throw new EngineUnavailable();
             if (process.platform === 'win32') {
+                stage = 'icu_path';
                 const asset = profile.icuData;
                 if (asset?.file !== 'icudtl.dat') throw new EngineUnavailable();
-                const assetPath = path.join(path.dirname(binaryPath), asset.file);
-                const assetStat = lstatSync(assetPath);
-                if (!assetStat.isFile() || assetStat.isSymbolicLink() || assetStat.size !== asset.byteLength
-                    || realpathSync(assetPath) !== assetPath) throw new EngineUnavailable();
-                const bytes = readFileSync(assetPath);
+                const icu = physicalRendererFile(profile.package, asset.file);
+                if (icu.size !== asset.byteLength) throw new EngineUnavailable();
+                stage = 'icu_identity';
+                const bytes = readFileSync(icu.file);
                 if (bytes.byteLength !== asset.byteLength
                     || createHash('sha256').update(bytes).digest('hex') !== asset.sha256) throw new EngineUnavailable();
+                process.env.NAPI_RS_NATIVE_LIBRARY_PATH = binary.file;
             }
         }
-    } catch { throw new EngineUnavailable(); }
-    if (installedPdfJs !== PDFJS_VERSION || installedCanvas !== CANVAS_VERSION
-        || installedProfile !== CANVAS_VERSION) throw new EngineUnavailable();
-    process.env.DISABLE_SYSTEM_FONTS_LOAD = '1';
-    try {
-        const [pdfjs, canvas] = await Promise.all([
-            import('pdfjs-dist/legacy/build/pdf.mjs'),
-            import('@napi-rs/canvas'),
-        ]);
+        process.env.DISABLE_SYSTEM_FONTS_LOAD = '1';
+        stage = 'canvas_import';
+        const canvas = await import('@napi-rs/canvas');
+        stage = 'pdfjs_import';
+        const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+        stage = 'renderer_api';
         if (pdfjs.version !== PDFJS_VERSION || typeof pdfjs.getDocument !== 'function'
             || !Number.isInteger(pdfjs.OPS?.showText)
             || typeof canvas.createCanvas !== 'function') throw new EngineUnavailable();
-        return { getDocument: pdfjs.getDocument, showText: pdfjs.OPS?.showText, createCanvas: canvas.createCanvas };
+        return { getDocument: pdfjs.getDocument, showText: pdfjs.OPS.showText, createCanvas: canvas.createCanvas };
     } catch (error) {
-        if (error instanceof EngineUnavailable) throw error;
-        throw new EngineUnavailable();
+        if (process.argv[2] === '--smoke-renderer-init') {
+            const failures = [error, ...(Array.isArray(error?.cause) ? error.cause : [error?.cause])];
+            const code = ['ERR_DLOPEN_FAILED', 'ERR_ACCESS_DENIED', 'EACCES', 'EPERM', 'ENOENT', 'MODULE_NOT_FOUND', 'ERR_MODULE_NOT_FOUND']
+                .find((value) => failures.some((failure) => failure?.code === value)) ?? 'unavailable';
+            writeSync(2, `renderer-init:${stage}:${code}\n`);
+        }
+        throw error;
     }
 }
 
@@ -434,13 +453,13 @@ async function recognizeTesseract(frame) {
     if (offset !== frame.body.byteLength) return { failure: 'invalid_request' };
     let core, model, createCore;
     try {
-        const root = realpathSync(fileURLToPath(new URL('..', import.meta.url)));
+        const root = realpathSync.native(fileURLToPath(new URL('..', import.meta.url)));
         const manifest = JSON.parse(readFileSync(new URL('./anydoc-tesseract-artifacts.json', import.meta.url), 'utf8'));
         const directory = path.join(root, manifest.directory);
         const artifacts = new Map();
         for (const artifact of manifest.files) {
             const file = path.join(directory, artifact.name);
-            const relative = path.relative(root, realpathSync(file));
+            const relative = path.relative(root, realpathSync.native(file));
             if (!lstatSync(file).isFile() || relative.startsWith('..') || path.isAbsolute(relative)) throw new EngineUnavailable();
             const bytes = readFileSync(file);
             if (bytes.byteLength !== artifact.byteLength
@@ -506,7 +525,7 @@ if (selfTest === '--self-test=sync-hang') {
         if (error?.code === 'MEDIFLOW_NETWORK_DISABLED') denials += 1;
     }
     emitFailure(denials === 3 ? 'invalid_request' : 'render_failed');
-} else if (selfTest !== undefined) {
+} else if (selfTest !== undefined && selfTest !== '--smoke-renderer-init') {
     emitFailure('invalid_request');
 } else {
     try {

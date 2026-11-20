@@ -283,14 +283,34 @@ pacchetti. Il launcher `uvx` predefinito forza la modalità offline: se la cache
 necessaria manca, interrompe l’operazione invece di cercare un’alternativa.
 Avere il runner non dimostra quindi che ATHENA sia pronta in ogni ambiente.
 
-AnyDoc è il primo passaggio automatico locale degli allegati e lavora in un
-processo figlio con limiti di esecuzione e senza rete. Per i PDF supportati,
-vengono classificate e materializzate soltanto le pagine `needsOcr`, poi
-renderizzate e trattate da Apple Vision in locale, con rete negata. Il risultato
-viene ricomposto conservando ordine, provenienza e hash e pubblicato soltanto
-se la sorgente è ancora corrente. In presenza di errori, formati ambigui,
-documenti cifrati o motore indisponibile, il percorso si arresta senza aggirare
-i controlli.
+### Processi documentali
+
+AnyDoc elabora gli allegati in un processo figlio con limiti di esecuzione.
+I worker di estrazione e PDF bloccano le API JavaScript di rete. Il modello
+dei permessi Node limita le operazioni Node, mentre i renderer e i parser
+nativi operano fuori da quei controlli JavaScript.
+
+Nel runtime Web condiviso con Headless, la protezione di rete del figlio
+dipende dal profilo.
+
+| Profilo | Controlli di sistema del launcher documentale |
+| --- | --- |
+| macOS Apple Silicon | `sandbox-exec` applica la policy Seatbelt che nega `network*`, scritture su file e fork ai worker AnyDoc/PDF. Il launcher non ripiega su Node diretto. Il processo Apple Vision ha una policy Seatbelt separata che nega `network*`. |
+| Omarchy ARM | `prlimit` impone il limite dati. `unshare` avvia il figlio in un namespace di rete distinto, senza interfacce e rotte IP del guest. Il kernel deve consentire la creazione di namespace all'utente ordinario. Se l'avvio fallisce, l'elaborazione resta indisponibile. |
+| Windows 11 ARM, Node x64 emulato | Il launcher Win32 richiede un AppContainer senza capacità di rete e verifica il token prima di avviare Node x64. Il figlio riceve soltanto le pipe standard e una copia temporanea degli asset documentali. Se il confinamento è indisponibile, l’elaborazione si arresta. |
+
+Il namespace Linux riguarda la rete IP e i socket Unix astratti. I socket
+Unix nel filesystem restano soggetti ai permessi del processo. Sulle altre
+architetture Linux il launcher impone il limite dati tramite `prlimit`.
+
+Per i PDF supportati, il passaggio OCR riguarda soltanto le pagine `needsOcr`.
+Il riconoscimento locale usa Apple Vision sul Mac e Tesseract WASM su Linux
+e Windows, quando sono disponibili gli artefatti previsti. Il risultato
+conserva ordine, provenienza e hash ed è pubblicato soltanto se la sorgente
+è ancora corrente. Errori, formati ambigui, documenti cifrati e motori
+indisponibili fermano il percorso. La qualifica GPUI riguarda il client
+installato sul Mac fissato dal contratto. Queste policy appartengono ai
+worker del runtime Web. Vedi [ADR 0196](docs/adr/0196-document-child-platform-boundary.md).
 
 DeepSeek-OCR 2/CUDA, benchmark di qualifica e readiness universale hanno stato
 `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`. Le route OCR legacy, dopo

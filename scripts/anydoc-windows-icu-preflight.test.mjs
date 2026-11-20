@@ -34,7 +34,26 @@ for(const scenario of ['valid','missing','same-size-corrupt','truncated','symlin
    for(const [name,version] of [['pdfjs-dist','4.10.38'],['@napi-rs/canvas','0.1.100']]){const directory=path.join(root,'node_modules',name);fs.mkdirSync(directory,{recursive:true});fs.writeFileSync(path.join(directory,'package.json'),JSON.stringify({name,version}));}
    fs.writeFileSync(path.join(scripts,'anydoc-pdf-renderer-profiles.json'),JSON.stringify([profile]));
    const worker=path.join(scripts,'anydoc-pdf-page-worker.mjs');fs.copyFileSync(new URL('./anydoc-pdf-page-worker.mjs',import.meta.url),worker);
-   const hook=path.join(scripts,'test-native-entry.mjs');fs.writeFileSync(hook,"import {registerHooks} from 'node:module';import {writeSync} from 'node:fs';Object.defineProperty(process,'platform',{value:'win32'});Object.defineProperty(process,'arch',{value:'x64'});registerHooks({resolve(specifier,context,next){if(specifier==='@napi-rs/canvas'||specifier==='pdfjs-dist/legacy/build/pdf.mjs'){writeSync(2,'NATIVE_ENTRY_ATTEMPTED\\n');throw Error('TEST_NATIVE_IMPORT_FORBIDDEN');}return next(specifier,context);}});");
+   const hook = path.join(scripts, 'test-native-entry.mjs');
+   fs.writeFileSync(hook, String.raw`
+import { registerHooks } from 'node:module';
+import { realpathSync, writeSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+
+Object.defineProperty(process, 'platform', { value: 'win32' });
+Object.defineProperty(process, 'arch', { value: 'x64' });
+realpathSync.native = () => { throw Object.assign(new Error('TEST_REALPATH_UNAVAILABLE'), { code: 'EPERM' }); };
+const expectedBinary = fileURLToPath(new URL('../node_modules/@napi-rs/canvas-win32-x64-msvc/skia.win32-x64-msvc.node', import.meta.url));
+registerHooks({
+  resolve(specifier, context, next) {
+    if (specifier !== '@napi-rs/canvas' && specifier !== 'pdfjs-dist/legacy/build/pdf.mjs') return next(specifier, context);
+    if (process.env.NAPI_RS_NATIVE_LIBRARY_PATH !== path.normalize(expectedBinary)) throw Error('TEST_UNVERIFIED_BINARY_SELECTION');
+    writeSync(2, 'NATIVE_ENTRY_ATTEMPTED\n');
+    throw Error('TEST_NATIVE_IMPORT_FORBIDDEN');
+  },
+});
+`);
    const body=Buffer.from('Synthetic page input for pre-import guard only.'),header=Buffer.from(JSON.stringify({schemaVersion:schema,operation:'render',pages:[{page:1,byteLength:body.length}],bodyByteLength:body.length})),prefix=Buffer.alloc(4);prefix.writeUInt32BE(header.length);
    const result=spawnSync(process.execPath,['--max-old-space-size=256','--permission','--disable-warning=SecurityWarning','--allow-fs-read='+root,'--allow-addons','--import',hook,worker],{cwd:scripts,env:{NODE_ENV:'production',NAPI_RS_ENFORCE_VERSION_CHECK:'1'},input:Buffer.concat([prefix,header,body]),timeout:30000,maxBuffer:4194304,encoding:'buffer',windowsHide:true});
    assert.equal(result.error,undefined);assert.equal(result.signal,null);assert.equal(result.status,0,result.stderr.toString());assert.ok(result.stdout.length>=5);

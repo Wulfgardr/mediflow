@@ -12,7 +12,7 @@ import { localImportClosure } from './fixtures/local-import-closure.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const SCHEMA = 'mediflow.anydoc_pdf_child_protocol.v1';
-const WORKER_HASH = '5facb4803373cd1a15c7548813f9a3662107dd0efd5e9cf3739643921e49cedc';
+const WORKER_HASH = '76c33a3e4c68e6db85fd2dab2d189a7fdb8f4d0e4cf91a40468900ed8038bf09';
 const SENTINEL = 'SYNTHETIC_PRIVATE_FIELD_NOT_FOR_DIAGNOSTICS';
 // Match the production runner's explicit test-data rule before invoking any child.
 if (!process.env.MEDIFLOW_DATA_DIR?.trim()) {
@@ -56,6 +56,17 @@ for (const reason of [
     assert.equal(info.exitCode, 0);
   });
 }
+
+test('render initialization exposes only an enumerated phase and error code', () => {
+  const stderr = Buffer.from('renderer-init:canvas_import:ERR_DLOPEN_FAILED\n');
+  const failure = completed(frame(workerError('engine_unavailable')), { stderr });
+  assert.deepEqual(diagnostic(failure, 'render', 'transport').rendererInit,
+    { stage: 'canvas_import', code: 'ERR_DLOPEN_FAILED' });
+  assert.equal(diagnostic(failure, 'materialize', 'transport').rendererInit, undefined);
+  for (const unexpected of [`renderer-init:canvas_import:${SENTINEL}\n`, stderr + SENTINEL]) {
+    assert.equal(diagnostic({ ...failure, stderr: Buffer.from(unexpected) }, 'render', 'transport').rendererInit, undefined);
+  }
+});
 
 test('bounded framing observations distinguish short, incomplete and noncanonical envelopes', () => {
   const longPrefix = Buffer.alloc(4); longPrefix.writeUInt32BE(65_537);
@@ -169,6 +180,7 @@ test('real checker still exits 1 on an intentionally incomplete physical package
   for (const file of localImportClosure(root, [
     'scripts/check-standalone-runtime-bundle.mjs', 'scripts/anydoc-pdf-page-worker.mjs',
     'scripts/anydoc-pdf-renderer-profiles.json', 'scripts/anydoc-tesseract-artifacts.json',
+    'scripts/document-windows-sandbox/launcher-x64.exe',
   ])) {
     fs.mkdirSync(path.dirname(path.join(directory, file)), { recursive: true });
     fs.copyFileSync(path.join(root, file), path.join(directory, file));
