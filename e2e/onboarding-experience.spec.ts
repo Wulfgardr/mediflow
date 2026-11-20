@@ -102,7 +102,7 @@ async function unlockPassphrase(page: Page, passphrase = PASSPHRASE) {
     await expect(lock.or(page.getByTestId('work-profile-onboarding')).or(page.getByTestId('settings-access-section')).first()).toBeVisible();
     if (!await lock.isVisible()) return;
     const field = page.getByLabel('Passphrase', { exact: true });
-    await renewAccessIfNeeded(page, field);
+    if (!await field.isEnabled()) await renewAccessIfNeeded(page, field);
     if (!await lock.isVisible()) return;
     await expect(field).toBeEnabled(); await field.fill(passphrase);
     await page.getByRole('button', { name: 'Sblocca', exact: true }).click();
@@ -193,9 +193,18 @@ async function setup(page: Page, info?: TestInfo) {
     expect(JSON.parse(setupBodies[0])).toMatchObject({ password: PIN, encryptedMasterKey: expect.stringMatching(/^v3:/u) });
     for (const secret of [PASSPHRASE, key]) expect(setupBodies[0]).not.toContain(secret);
     await expect(page.getByLabel('Passphrase', { exact: true })).toBeEnabled();
-    await expect(page.getByRole('button', { name: 'Rinnova accesso', exact: true })).toHaveCount(0);
     await expect(page.getByText(/Una sessione è già attiva|Passphrase aggiornata/u)).toHaveCount(0);
-    await unlockPassphrase(page);
+    const tabAccessRequests: string[] = [];
+    const observeTabAccess = (request: { url(): string }) => {
+        if (new URL(request.url()).pathname === '/api/auth/tab-access') tabAccessRequests.push(request.url());
+    };
+    page.on('request', observeTabAccess);
+    try {
+        await unlockPassphrase(page);
+        expect(tabAccessRequests).toEqual([]);
+    } finally {
+        page.off('request', observeTabAccess);
+    }
     const panel = page.getByTestId('work-profile-onboarding');
     await expect(panel).toBeVisible();
     await expect(panel).toHaveAttribute('aria-busy', 'false');

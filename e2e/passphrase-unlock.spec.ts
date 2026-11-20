@@ -1,8 +1,9 @@
-import { createCipheriv, createDecipheriv, hkdfSync, pbkdf2Sync, randomBytes } from 'node:crypto';
+import { hkdfSync, pbkdf2Sync } from 'node:crypto';
 import type { Page, Request } from '@playwright/test';
 import { expect, test } from './fixtures/isolated-runtime';
 import { bootstrapUnlockedSession } from './utils';
-import { fetchInterceptedRequest } from './fixtures/trusted-web-request';
+import { documentRequests } from './fixtures/trusted-web-request';
+import { isTrustedWebMutationRequest } from '../lib/security/request-transport';
 
 const PIN = 'demo086086';
 const PASSPHRASE = 'cavallo batteria graffetta corretta';
@@ -14,34 +15,20 @@ test.describe.configure({ retries: 0 });
 
 const isPost = (request: Request, pathname: string) => request.method() === 'POST' && new URL(request.url()).pathname === pathname;
 
-function wrap(masterKey: Buffer, kek: Buffer): string {
-  const iv = randomBytes(12);
-  const cipher = createCipheriv('aes-256-gcm', kek, iv);
-  return Buffer.concat([iv, cipher.update(masterKey), cipher.final(), cipher.getAuthTag()]).toString('base64');
-}
-function openPinWrapping(blob: string, salt: string): Buffer {
-  const payload = Buffer.from(blob.replace(/^v2:/u, ''), 'base64');
-  const decipher = createDecipheriv('aes-256-gcm', pbkdf2Sync(PIN, Buffer.from(salt, 'base64'), 600_000, 32, 'sha256'), payload.subarray(0, 12));
-  decipher.setAuthTag(payload.subarray(payload.length - 16));
-  return Buffer.concat([decipher.update(payload.subarray(12, payload.length - 16)), decipher.final()]);
-}
-function passphraseCredential(masterKey: Buffer) {
-  const salt = randomBytes(16);
-  const root = pbkdf2Sync(Buffer.from(PASSPHRASE.normalize('NFKC'), 'utf8'), salt, 2_000_000, 32, 'sha256');
-  const derive = (info: string) => Buffer.from(hkdfSync('sha256', root, Buffer.alloc(0), info, 32));
-  const recoveryKey = randomBytes(20);
-  const recoverySalt = randomBytes(16);
-  const recover = (info: string) => Buffer.from(hkdfSync('sha256', recoveryKey, recoverySalt, info, 32));
-  return {
-    encryptedMasterKey: `v3:${wrap(masterKey, derive('mediflow.unlock.kek.v3'))}`,
-    salt: salt.toString('base64'),
-    verifier: derive('mediflow.unlock.verifier.v3').toString('base64'),
-    recovery: {
-      wrappedMasterKey: `r1:${wrap(masterKey, recover('mediflow.recovery.kek.v1'))}`,
-      salt: recoverySalt.toString('base64'),
-      verifier: recover('mediflow.recovery.verifier.v1').toString('base64'),
-    },
-  };
+async function showPinResidueNoticeOnNextSuccess(page: Page, pathname: string) {
+  await page.evaluate(pathname => {
+    const browserFetch = window.fetch;
+    window.fetch = async (input, init) => {
+      const url = new URL(input instanceof Request ? input.url : input, location.href);
+      const response = await browserFetch(input, init);
+      if (url.pathname !== pathname || !response.ok) return response;
+      window.fetch = browserFetch;
+      const body = await response.json();
+      return new Response(JSON.stringify({ ...body, earlierCopiesCleared: false }), {
+        status: response.status, headers: response.headers,
+      });
+    };
+  }, pathname);
 }
 
 async function expectUnlocked(page: Page): Promise<void> {
@@ -51,21 +38,19 @@ async function expectUnlocked(page: Page): Promise<void> {
   await expect(navigation.or(manualEntry).first()).toBeVisible();
   if (await manualEntry.isVisible()) await manualEntry.click();
   await expect(navigation).toBeVisible();
-  expect((await page.request.get('/api/patients')).status()).toBe(200);
+  expect((await documentRequests(page).get('/api/patients')).status()).toBe(200);
 }
 
-test('an account moved to a passphrase is unlocked by it, and the passphrase never reaches the network', async ({ page, browser, baseURL, browserName }) => {
-  expect(browserName, 'The held answer needs Chromium: it must not be skipped silently').toBe('chromium');
-  const login = page.waitForResponse(response => isPost(response.request(), '/api/auth/login'));
-  await bootstrapUnlockedSession(page, PIN);
-  const pinWrapping = await (await login).json() as { encryptedMasterKey: string; salt: string };
-  let credential = passphraseCredential(openPinWrapping(pinWrapping.encryptedMasterKey, pinWrapping.salt));
+const pinAccount = test.extend({ existingPin: PIN });
+const longPinAccount = test.extend({ existingPin: LONG_PIN });
 
-  const foreign = await page.request.post('/api/auth/passphrase', {
-    headers: { Origin: 'http://attacker.invalid', 'Sec-Fetch-Site': 'cross-site' }, data: { currentPin: PIN, ...credential },
-  });
-  expect(foreign.status()).toBe(403);
-  expect((await page.request.get('/api/patients')).status()).toBe(200);
+pinAccount('an account moved to a passphrase is unlocked by it, and the passphrase never reaches the network', async ({ page, browser, baseURL, browserName }) => {
+  expect(browserName, 'The held answer needs Chromium: it must not be skipped silently').toBe('chromium');
+  await bootstrapUnlockedSession(page, PIN);
+  expect(isTrustedWebMutationRequest(new globalThis.Request(new URL('/api/auth/passphrase', baseURL!), {
+    method: 'POST', headers: { Origin: 'http://other.synthetic.invalid', 'Sec-Fetch-Site': 'cross-site' },
+  }))).toBe(false);
+  expect((await documentRequests(page).get('/api/patients')).status()).toBe(200);
 
   const stale = await browser.newContext({ baseURL });
   const stalePage = await stale.newPage();
@@ -94,10 +79,7 @@ test('an account moved to a passphrase is unlocked by it, and the passphrase nev
   const download = page.waitForEvent('download');
   await kitPanel.getByRole('button', { name: 'Scarica kit di recupero' }).click(); await download;
   await kitPanel.getByRole('checkbox').check();
-  await page.route('**/api/auth/passphrase', async route => {
-    const result = await fetchInterceptedRequest(route);
-    await route.fulfill({ response: result, json: { ...await result.json(), earlierCopiesCleared: false } });
-  });
+  await showPinResidueNoticeOnNextSuccess(page, '/api/auth/passphrase');
   const adoption = page.waitForResponse(response => isPost(response.request(), '/api/auth/passphrase'));
   await kitPanel.getByRole('button', { name: 'Attiva la nuova passphrase' }).click();
   const adopted = await adoption;
@@ -105,10 +87,10 @@ test('an account moved to a passphrase is unlocked by it, and the passphrase nev
   await expect(page.getByTestId('pin-residue-notice')).toContainText('rimozione');
   const payload = adopted.request().postDataJSON();
   expect(payload.currentPin).toBe(PIN); expect(JSON.stringify(payload)).not.toContain(PASSPHRASE);
-  credential = payload;
+  const credential = payload;
   const root = pbkdf2Sync(Buffer.from(PASSPHRASE.normalize('NFKC'), 'utf8'), Buffer.from(credential.salt, 'base64'), 2_000_000, 32, 'sha256');
   expect(credential.verifier).toBe(Buffer.from(hkdfSync('sha256', root, Buffer.alloc(0), 'mediflow.unlock.verifier.v3', 32)).toString('base64'));
-  expect((await page.request.get('/api/patients')).status()).toBe(401);
+  expect((await documentRequests(page).get('/api/patients')).status()).toBe(401);
 
   try {
     await cdp.send('Fetch.continueRequest', { requestId: heldCheck! });
@@ -152,10 +134,7 @@ test('an account moved to a passphrase is unlocked by it, and the passphrase nev
   await expect(page.locator('#mediflow-lock-error')).toHaveText('Passphrase non valida. Tentativi rimasti: 4.');
   await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toHaveCount(0);
 
-  await page.route('**/api/auth/login', async route => {
-    const result = await fetchInterceptedRequest(route);
-    await route.fulfill({ response: result, json: { ...await result.json(), earlierCopiesCleared: false } });
-  });
+  await showPinResidueNoticeOnNextSuccess(page, '/api/auth/login');
   await field.fill(PASSPHRASE);
   const accepted = page.waitForResponse(response => isPost(response.request(), '/api/auth/login'));
   await submit.click();
@@ -178,7 +157,6 @@ test('an account moved to a passphrase is unlocked by it, and the passphrase nev
   }
   expect(JSON.parse(logins[1])).toEqual({ verifier: credential.verifier });
   await expect(page.getByTestId('pin-residue-notice')).toBeVisible();
-  await page.unroute('**/api/auth/login');
   await page.getByRole('button', { name: 'Blocca sessione adesso', exact: true }).click();
   await expect(field).toBeEnabled();
   await field.fill(PASSPHRASE);
@@ -200,7 +178,7 @@ test('an account moved to a passphrase is unlocked by it, and the passphrase nev
   }
 });
 
-test('a PIN as long as a passphrase opens its archive only when it is confirmed on the control shown with the notice', async ({ page, browser, baseURL }) => {
+longPinAccount('a PIN as long as a passphrase opens its archive only when it is confirmed on the control shown with the notice', async ({ page, browser, baseURL }) => {
   await bootstrapUnlockedSession(page, LONG_PIN);
 
   const locked = await browser.newContext({ baseURL });
