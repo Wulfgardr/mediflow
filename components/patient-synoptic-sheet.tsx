@@ -61,9 +61,10 @@ function Section<T>({ name, read, count, empty, children, icon: Icon, action, sh
     </section>;
 }
 
-function DateCell({ date }: { date?: Date }) {
-    if (!date || !Number.isFinite(new Date(date).getTime())) return null;
-    return <time dateTime={new Date(date).toISOString()}>{new Date(date).toLocaleDateString('it-IT')}</time>;
+function DateCell({ date, prefix = '', missing = null }: { date?: Date | null; prefix?: string; missing?: string | null }) {
+    const value = date ? new Date(date) : null;
+    if (!value || !Number.isFinite(value.getTime())) return missing;
+    return <time dateTime={value.toISOString()}>{prefix}{value.toLocaleDateString('it-IT')}</time>;
 }
 
 const rangeArrow = { alto: '↑', basso: '↓' } as const;
@@ -75,11 +76,11 @@ export function PatientSynopticSheet({ clinicalSupport, notesContent, problems, 
     const stable = <>
         <Section name="Problemi" id="riepilogo-problemi" icon={overview ? Heart : undefined} action={overview && !composer ? <a href="#clinica" className={reading.islandAction}>Clinica</a> : undefined} read={problems} count={formatCountLabel(problems.data?.length ?? 0, 'problema', 'problemi')} empty="Nessun problema registrato.">
             <table role="table" className={`${register.table} ${reading.problems}`} aria-label="Problemi">
-                <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Descrizione</th><th role="columnheader" scope="col">Codice</th><th role="columnheader" scope="col" className={secondary}>Da quando</th></tr></thead>
+                <thead role="rowgroup"><tr role="row"><th role="columnheader" scope="col">Descrizione</th><th role="columnheader" scope="col">Codice</th><th role="columnheader" scope="col" className={secondary}>Registrata il</th></tr></thead>
                 <tbody role="rowgroup">{problems.data?.map((problem, index) => <tr role="row" key={`${problem.system}-${problem.code}-${index}`}>
-                    <td role="cell"><PrivacyBlur>{problem.description}</PrivacyBlur>{overview && problem.date ? <small>Registrata il <DateCell date={problem.date} /></small> : null}</td>
+                    <td role="cell"><PrivacyBlur>{problem.description}</PrivacyBlur>{overview ? <small><DateCell date={problem.date} prefix="Registrata il " missing="Data sconosciuta" /></small> : null}</td>
                     <td role="cell" className={`lume-code ${reading.codeColumn}`}>{problem.code}</td>
-                    <td role="cell" className={secondary}><DateCell date={problem.date} /></td>
+                    <td role="cell" className={secondary}><DateCell date={problem.date} missing="Data sconosciuta" /></td>
                 </tr>)}</tbody>
             </table>
         </Section>

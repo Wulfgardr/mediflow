@@ -1,7 +1,7 @@
 import { expect as baseExpect, test, type Page, type Locator } from '@playwright/test';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { bootstrapUnlockedSession, openPatientSection } from './utils';
+import { bootstrapUnlockedSession, openPatientSection, unlockIfNeeded } from './utils';
 import { installGestureMeter, type GestureReading } from './fixtures/gesture-meter';
 import { assertGestureRatchet, measuredRevision, type GestureCounts } from './fixtures/gesture-ratchet';
 
@@ -12,6 +12,18 @@ type Mode = 'puntatore' | 'tastiera';
 type Measurement = GestureCounts & { id: string; modo: Mode; rispostaPeggioreMs: number; percorso: string[]; eventi: GestureReading['events'] };
 type Baseline = { measurements: Measurement[] };
 const baselinePath = path.resolve(__dirname, '../docs/design/misura-base/conti.json');
+
+async function openStartingDocument(page: Page, destination: string) {
+  await page.goto(destination);
+  const locked = page.getByRole('heading', { name: 'Sblocca MediFlow', exact: true });
+  const workspace = page.getByRole('navigation', { name: 'Navigazione principale', exact: true });
+  await expect(locked.or(workspace).first()).toBeVisible();
+  if (await locked.isVisible()) {
+    await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
+    test.info().annotations.push({ type: 'accesso', description: 'Accesso rinnovato per il documento di partenza.' });
+  }
+  await expect(workspace).toBeVisible();
+}
 
 async function reach(page: Page, locator: Locator) {
   await expect(locator).toBeVisible();
@@ -63,9 +75,12 @@ async function createFromEmptySearch(page: Page, lastName: string, mode: Mode) {
 
 async function readCreatedPatient(page: Page, url: string, lastName: string) {
   const patientId = new URL(url).pathname.split('/')[2];
-  const persisted = await page.request.get(`/api/patients/${patientId}`);
-  expect(persisted.status()).toBe(200);
-  expect(await persisted.json()).toMatchObject({ id: patientId, firstName: 'Caso', lastName, identifierType: 'none',
+  const persisted = await page.evaluate(async id => {
+    const response = await fetch(`/api/patients/${encodeURIComponent(id)}`);
+    return { status: response.status, patient: await response.json() };
+  }, patientId);
+  expect(persisted.status).toBe(200);
+  expect(persisted.patient).toMatchObject({ id: patientId, firstName: 'Caso', lastName, identifierType: 'none',
     taxCode: '', birthDatePrecision: 'estimated', birthYear: 1994, birthDate: null });
 }
 
@@ -135,7 +150,7 @@ test('sei compiti Web: conti di base su archivio sintetico', async ({ page }, in
   try {
     for (const mode of ['puntatore', 'tastiera'] as const) {
       let createdUrl = '';
-      await page.goto(`/?area=incarico&paziente=${patients[1]}`);
+      await openStartingDocument(page, `/?area=incarico&paziente=${patients[1]}`);
       const search = page.getByRole('searchbox', { name: 'Cerca nella lista pazienti', exact: true });
       await expect(search).toBeVisible();
       await measure('1', mode, ['Elenco pazienti', mode === 'puntatore' ? 'Clic ricerca' : '/ apre ricerca', `Scrivi ${name} (due omonimi)`, 'Seleziona il nato nel 1972', 'Apri scheda'], async () => {
@@ -153,13 +168,13 @@ test('sei compiti Web: conti di base su archivio sintetico', async ({ page }, in
         await expect(page).toHaveURL(url => url.pathname === patientUrl);
         await expect(page.getByRole('heading', { level: 1 })).toContainText(name);
       });
-      await page.goto('/?area=incarico');
+      await openStartingDocument(page, '/?area=incarico');
       await search.fill(`Nuovo${mode === 'puntatore' ? 'P' : 'T'}${suffix}`); // starting boundary: an already unsuccessful search
       await expect(page.getByRole('status').filter({ hasText: 'Nessun risultato' })).toBeVisible();
       await measure('2', mode, ['Ricerca senza esito', 'Nuova scheda', 'Nome Caso', 'Cognome Nuovo + suffisso sintetico', 'Identificativo: Nessun identificativo per ora (Tab, n)', 'Conosco solo l’anno: 1994', 'Crea scheda', 'Rilettura scheda'], async () => {
         createdUrl = await createFromEmptySearch(page, `Nuovo${mode === 'puntatore' ? 'P' : 'T'}${suffix}`, mode);
       });
-      await page.goto(patientUrl);
+      await openStartingDocument(page, patientUrl);
       await measure('3', mode, ['Scheda aperta', 'Nuova voce', 'Resoconto: Visita sintetica. Pressione 135/80 mmHg.', 'Rivedi', 'Conferma e registra', 'Esito e rilettura'], async () => {
         const writesBeforeReview = writes.length;
         await activate(page, page.getByRole('link', { name: 'Nuova voce', exact: true }), mode);
@@ -175,7 +190,7 @@ test('sei compiti Web: conti di base su archivio sintetico', async ({ page }, in
         await expect(receipt).toContainText('Registrata alle');
         await expect(receipt).toContainText('Visita sintetica. Pressione 135/80 mmHg.');
       });
-      await page.goto(patientUrl);
+      await openStartingDocument(page, patientUrl);
       await measure('4b', mode, ['Scheda aperta', 'Terapie', 'Nuova terapia', 'Farmaco sintetico dal catalogo, dose 20 mg', 'Posologia: 1 compressa la sera', 'Salva terapia', 'Rilettura terapia'], async () => {
         await activate(page, page.getByRole('navigation', { name: 'Sezioni della vista', exact: true }).getByRole('link', { name: /Terapie/ }), mode);
         await activate(page, page.getByRole('button', { name: 'Nuova terapia', exact: true }), mode);
@@ -195,7 +210,7 @@ test('sei compiti Web: conti di base su archivio sintetico', async ({ page }, in
         await expect(page.getByRole('button', { name: 'Salva terapia', exact: true })).toHaveCount(0);
         await expect(page.getByRole('row').filter({ hasText: 'MISURASTATINA' }).filter({ hasText: '1 compressa la sera' })).toHaveCount(mode === 'puntatore' ? 1 : 2);
       });
-      await page.goto(patientUrl);
+      await openStartingDocument(page, patientUrl);
       await measure('4a-alternativa', mode, ['Scheda aperta', 'Terapie', 'Modifica una terapia attiva', 'Aggiorna terapia senza cambiare i valori', 'Rilettura terapia (non è una conferma di revisione)'], async () => {
         await activate(page, page.getByRole('navigation', { name: 'Sezioni della vista', exact: true }).getByRole('link', { name: /Terapie/ }), mode);
         const row = page.getByRole('row').filter({ hasText: 'MISURASTATINA' }).first();
@@ -207,7 +222,7 @@ test('sei compiti Web: conti di base su archivio sintetico', async ({ page }, in
         await expect(page.getByRole('button', { name: 'Aggiorna terapia', exact: true })).toHaveCount(0);
         await expect(row).toContainText('1 compressa la sera');
       });
-      await page.goto(patientUrl);
+      await openStartingDocument(page, patientUrl);
       await measure('5-alternativa', mode, ['Scheda già scelta (nessuna coda documenti in arrivo)', 'Documenti, eventualmente sotto Altro', 'Carica documenti', 'Selezione TXT sintetico nel selettore nativo: non misurata', 'Allegato salvato e riletto nella scheda'], async () => {
         const nav = page.getByRole('navigation', { name: 'Sezioni della vista', exact: true });
         const documents = nav.getByRole('link', { name: /Documenti/ });
@@ -221,7 +236,7 @@ test('sei compiti Web: conti di base su archivio sintetico', async ({ page }, in
         await expect(page.getByRole('status').filter({ hasText: '1 allegato salvato' })).toBeVisible();
         await expect(area.getByRole('heading', { name: `documento-sintetico-${mode}.txt`, exact: true })).toBeVisible();
       });
-      await page.reload();
+      await openStartingDocument(page, page.url());
       const sections = page.getByRole('navigation', { name: 'Sezioni della vista', exact: true });
       await sections.getByRole('link', { name: /Documenti/ }).click();
       await expect(page.getByRole('heading', { name: `documento-sintetico-${mode}.txt`, exact: true })).toBeVisible();
@@ -229,7 +244,7 @@ test('sei compiti Web: conti di base su archivio sintetico', async ({ page }, in
       await expect(page.getByRole('row').filter({ hasText: 'MISURASTATINA 20 mg' }).filter({ hasText: '1 compressa la sera' })).toHaveCount(mode === 'puntatore' ? 1 : 2);
       await openPatientSection(page, 'diario');
       await expect(page.getByText('Visita sintetica. Pressione 135/80 mmHg.', { exact: false }).first()).toBeVisible();
-      await page.goto(createdUrl);
+      await openStartingDocument(page, createdUrl);
       await expect(page.getByRole('heading', { level: 1 })).toContainText(`Nuovo${mode === 'puntatore' ? 'P' : 'T'}${suffix}`);
       await readCreatedPatient(page, createdUrl, `Nuovo${mode === 'puntatore' ? 'P' : 'T'}${suffix}`);
     }
@@ -262,14 +277,14 @@ test('Nuova scheda da ricerca vuota mantiene il focus sulle nuove navigazioni e 
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   for (let attempt = 0; attempt < 2; attempt++) {
     const lastName = `Rilettura${crypto.randomUUID().slice(0, 8)}`;
-    await page.goto('/?area=incarico');
+    await openStartingDocument(page, '/?area=incarico');
     const search = page.getByRole('searchbox', { name: 'Cerca nella lista pazienti' });
     await search.fill(lastName);
     await expect(page.getByRole('status').filter({ hasText: 'Nessun risultato' })).toBeVisible();
     const createdUrl = await createFromEmptySearch(page, lastName, 'tastiera');
     await readCreatedPatient(page, createdUrl, lastName);
     const patientId = new URL(createdUrl).pathname.split('/')[2];
-    await page.goto(`/?area=incarico&paziente=${patientId}`);
+    await openStartingDocument(page, `/?area=incarico&paziente=${patientId}`);
     await search.fill(lastName);
     await expect(page.getByRole('option').filter({ hasText: lastName })).toHaveAttribute('aria-selected', 'true');
     await page.keyboard.press('Tab');

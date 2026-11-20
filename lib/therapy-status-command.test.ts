@@ -146,3 +146,12 @@ test('a completed therapy cannot be suspended by command: denied without receipt
     assert.deepEqual(counts(command), before);
     assert.equal(counts(command).receipt, undefined);
 });
+
+test('completing before the recorded start is denied without mutation, audit or receipt', () => {
+    const command = fixture();
+    const future = Math.floor(Date.now() / 1000) + 86_400;
+    sql.prepare('UPDATE therapies SET start_date = ? WHERE id = ?').run(future, command.therapyId);
+    const before = counts(command);
+    assert.throws(() => executeTherapyStatusCommand(session, { ...command, target: 'completed' }), /denied/);
+    assert.deepEqual(counts(command), before);
+});

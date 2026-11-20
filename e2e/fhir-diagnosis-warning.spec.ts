@@ -1,6 +1,9 @@
+import Database from 'better-sqlite3';
+import { readFile } from 'node:fs/promises';
+import { isAbsolute, join } from 'node:path';
 import { scopedNotesOpenInput, syntheticScopedNotesView } from './fixtures/scoped-profile-notes-query';
 import { expect, test, type Page } from '@playwright/test';
-import { bootstrapUnlockedSession } from './utils';
+import { bootstrapUnlockedSession, openPatientSection } from './utils';
 
 test.describe.configure({ retries: 0 });
 test.beforeEach(async ({ baseURL }) => {
@@ -127,7 +130,9 @@ function assertPayload(payload: string) {
     coding: [{ system: 'http://hl7.org/fhir/sid/icd-10', code: DIAGNOSES[2].code, display: DIAGNOSES[2].description }],
   });
   for (const condition of conditions) {
-    expect(condition.onsetDateTime).toBe(DATE);
+    expect(condition.recordedDate).toBe(DATE);
+    expect(condition).not.toHaveProperty('onsetDateTime');
+    expect(condition).not.toHaveProperty('clinicalStatus');
     expect(condition.subject.reference).toBe(bundle.entry[0].fullUrl);
   }
   expect(conditions[0].id).toBe('synthetic-unknown');
@@ -179,3 +184,84 @@ for (const entry of ['edit-download', 'modules-download', 'modules-share'] as co
     await expect(page.getByText(/Errore durante (l'esportazione|la condivisione)/)).toHaveCount(0);
   });
 }
+
+test('the module downloads recorded diagnoses and supported encounters from the synthetic archive', async ({ page, baseURL }, info) => {
+  test.setTimeout(150_000);
+  const directory = process.env.MEDIFLOW_DATA_DIR;
+  const url = new URL(baseURL!);
+  if (!directory || !isAbsolute(directory) || url.hostname !== '127.0.0.1' || !url.port || url.port === '3000') {
+    throw new Error('Owned synthetic archive and dedicated loopback port required');
+  }
+
+  const patientId = '10000000-0000-4000-8000-000000000909';
+  await page.route('**/api/ai/**', route => route.abort());
+  await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+  const sql = new Database(join(directory, 'medical.db'), { fileMustExist: true });
+  const diagnosis = DIAGNOSES[2];
+  const seconds = Date.parse(DATE) / 1000;
+  try {
+    sql.transaction(() => {
+      sql.prepare('INSERT INTO patients (id, first_name, last_name, tax_code, diagnoses, ambulatory_id) SELECT ?, ?, ?, ?, ?, id FROM ambulatories WHERE is_default = 1')
+        .run(patientId, 'Archivio', 'Sintetico', 'SYNTHETIC0000909', JSON.stringify([diagnosis]));
+      sql.prepare('INSERT INTO patients_to_ambulatories (patient_id, ambulatory_id) SELECT ?, id FROM ambulatories WHERE is_default = 1').run(patientId);
+      const entry = sql.prepare('INSERT INTO entries (id, patient_id, type, date, content, setting) VALUES (?, ?, ?, ?, ?, ?)');
+      for (const [type, setting] of [['phone', null], ['remote', 'home'], ['hospitalization', 'hospital'], ['visit', 'ambulatory'], ['note', null]]) {
+        entry.run(`synthetic-fhir-${type}`, patientId, type, seconds, 'Sintetico', setting);
+      }
+    })();
+
+    const openExport = async () => {
+      await page.getByRole('button', { name: 'Azioni', exact: true }).click();
+      await page.getByRole('menuitem', { name: 'Esporta FHIR', exact: true }).click();
+      await page.getByRole('button', { name: 'Scarica FHIR JSON', exact: true }).click();
+    };
+    expect(sql.prepare('SELECT id FROM patients WHERE id = ? AND deleted_at IS NULL').get(patientId)).toEqual({ id: patientId });
+    const profile = await page.request.get(`/api/patients/${patientId}`);
+    expect(profile.status(), await profile.text()).toBe(200);
+    await page.goto(`/patients/${patientId}/modules`);
+    await expect(page.getByRole('heading', { name: 'Sintetico Archivio', exact: true, level: 1 })).toBeVisible({ timeout: 60_000 });
+    const download = page.waitForEvent('download');
+    await openExport();
+    const received = await download;
+    const file = info.outputPath(received.suggestedFilename());
+    await received.saveAs(file);
+    const resources = JSON.parse(await readFile(file, 'utf8')).entry.map((entry: { resource: unknown }) => entry.resource);
+    const condition = resources.find((resource: { resourceType: string }) => resource.resourceType === 'Condition');
+    expect(condition.recordedDate).toBe(DATE);
+    expect(condition).not.toHaveProperty('onsetDateTime');
+    expect(condition).not.toHaveProperty('clinicalStatus');
+    const encounters = resources.filter((resource: { resourceType: string }) => resource.resourceType === 'Encounter');
+    expect(Object.fromEntries(encounters.map((resource: { id: string; class: { code: string } }) => [resource.id, resource.class.code]))).toEqual({
+      'synthetic-fhir-phone': 'VR', 'synthetic-fhir-remote': 'VR',
+      'synthetic-fhir-hospitalization': 'IMP', 'synthetic-fhir-visit': 'AMB',
+    });
+    expect(encounters.map((resource: { period: unknown }) => resource.period)).toEqual(
+      Array.from({ length: 4 }, () => ({ start: DATE })),
+    );
+
+    const archivedSummaries = [
+      { id: 'old-undated', fileName: 'Sintesi senza data.pdf', summary: 'Sintesi sintetica senza data' },
+      { id: 'old-dated', fileName: 'Sintesi con data.pdf', summary: 'Sintesi sintetica con data', date: '2026-07-21' },
+    ];
+    sql.prepare('UPDATE patients SET diagnoses = ?, document_insights = ? WHERE id = ?')
+      .run(JSON.stringify([{ ...diagnosis, date: undefined }]), JSON.stringify(archivedSummaries), patientId);
+    await page.reload();
+    await expect(page.getByRole('row').filter({ hasText: diagnosis.description })).toContainText('Data sconosciuta');
+    await openPatientSection(page, 'timeline');
+    const timeline = page.getByRole('feed', { name: 'Timeline clinica del paziente' });
+    await expect(timeline.getByText('Sintesi con data.pdf')).toBeVisible();
+    await expect(timeline.getByText('Sintesi senza data.pdf')).toHaveCount(0);
+    let unexpectedDownload = false;
+    page.once('download', () => { unexpectedDownload = true; });
+    await openExport();
+    await expect(page.getByText('Una diagnosi è priva di una data di registrazione valida.')).toBeVisible();
+    expect(unexpectedDownload).toBe(false);
+  } finally {
+    sql.transaction(() => {
+      sql.prepare('DELETE FROM entries WHERE patient_id = ?').run(patientId);
+      sql.prepare('DELETE FROM patients_to_ambulatories WHERE patient_id = ?').run(patientId);
+      sql.prepare('DELETE FROM patients WHERE id = ?').run(patientId);
+    })();
+    sql.close();
+  }
+});
