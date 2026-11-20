@@ -59,19 +59,14 @@ function own(value: unknown, key: string): unknown {
     return descriptor && ObjectHasOwn(descriptor, 'value') ? descriptor.value : undefined;
 }
 
-/**
- * Controlli locali sulla risposta gia' letta, prima della validazione autorevole del lease (che
- * resta invariata e non si ritenta). Un riassunto non in italiano e' una risposta non valida; una
- * citazione che non si ritrova nella sua fonte, neppure ignorando la forma degli spazi, e' una
- * citazione non letterale. In entrambi i casi la richiesta puo' partire una seconda volta.
- */
-function localCheck(envelope: object, sources: readonly string[] | null): 'invalid' | 'unfaithful' | null {
+function localCheck(envelope: object, sources: readonly string[] | null): 'invalid' | 'unfaithful' | 'citation_count' | null {
     try {
         const snapshot = resolveDocumentSynthesisProviderEnvelope(envelope);
         const summary = own(own(snapshot, 'output'), 'summary');
         if (typeof summary === 'string' && !documentSynthesisSummaryLanguage(summary).acceptable) return 'invalid';
         const citations = own(snapshot, 'citations');
-        if (!sources || !ArrayIsArray(citations) || citations.length !== sources.length) return null;
+        if (!sources || !ArrayIsArray(citations)) return null;
+        if (citations.length !== sources.length) return 'citation_count';
         for (let index = 0; index < sources.length; index += 1) {
             const quote = own(citations[index], 'quote');
             if (typeof quote === 'string' && own(citations[index], 'label') === `S${index + 1}` && !locateDocumentSynthesisQuote(quote, sources[index]!)) return 'unfaithful';
@@ -80,14 +75,6 @@ function localCheck(envelope: object, sources: readonly string[] | null): 'inval
     } catch { return null; }
 }
 
-/**
- * Resolves one B2ab handoff and invokes its fixed local binding; returns no provider output.
- * Come il Quadro paziente (#891): se l'involucro della risposta non si legge, la risposta e'
- * tagliata dal tetto di token, il riassunto non e' in italiano o una citazione non e' letterale,
- * la stessa richiesta parte una seconda volta, mai di piu'. La
- * validazione delle fonti chiude il lease e non si ritenta. `stillCurrent` (consenso e
- * attualita' letti dal chiamante) e l'annullamento si rileggono prima del secondo tentativo.
- */
 export async function prepareDocumentSynthesisFabricExecution(handoff: unknown, stillCurrent?: unknown): Promise<DocumentSynthesisFabricExecutionPrepareResult> {
     if (!opaque(handoff)) return denied('input_invalid');
     const retained = ReflectApply(WeakMapGet, handoffs, [handoff]) as Entry | undefined;
@@ -99,11 +86,12 @@ export async function prepareDocumentSynthesisFabricExecution(handoff: unknown, 
     const current = typeof stillCurrent === 'function' && !IsProxy(stillCurrent) ? stillCurrent as () => unknown : null;
     const failure: { code: DenialCode } = { code: 'provider_unavailable' };
     const sources = readDocumentSynthesisPromptSources(input.prompt);
+    let prompt = input.prompt;
     // L'ammissione accetta solo una ricevuta `local_process`: il luogo e' sempre il modello locale.
     const outcome = await runLocalGenerationAttempts<object, DenialCode>({
         venue: 'local_process',
         attempt: async () => {
-            const settled = await invoke(entry, admission.resolution, input.prompt);
+            const settled = await invoke(entry, admission.resolution, prompt);
             if (entry.timer !== null) { ClearTimeout(entry.timer); entry.timer = null; } entry.settle = null;
             if (entry.state !== 'running') { failure.code = 'canceled'; return ObjectFreeze({ status: 'provider_failed' as const }); }
             if (settled.kind === 'timeout') { failure.code = 'provider_timeout'; return ObjectFreeze({ status: 'provider_failed' as const }); }
@@ -112,6 +100,13 @@ export async function prepareDocumentSynthesisFabricExecution(handoff: unknown, 
             const parsed = parseDocumentSynthesisProviderEnvelope(responseContent(settled.value));
             if (parsed.status !== 'available') return ObjectFreeze({ status: 'rejected' as const, reason: 'invalid' as const });
             const rejected = localCheck(parsed.token, sources);
+            if (rejected === 'citation_count') {
+                prompt = `${input.prompt}\nCorrection: match SOURCE_COUNT exactly. Return one citation per source label in source order, using a single continuous clinical passage for each quote.`;
+                return ObjectFreeze({ status: 'rejected' as const, reason: 'invalid' as const });
+            }
+            if (rejected === 'unfaithful') {
+                prompt = `${input.prompt}\nCorrection: copy a continuous clinical passage that occurs exactly once in its labelled source. If it repeats, copy the nearest literal context with it or select a different unique supporting passage. Do not invent text or cite a heading alone.`;
+            }
             return rejected ? ObjectFreeze({ status: 'rejected' as const, reason: rejected }) : ObjectFreeze({ status: 'accepted' as const, value: parsed.token });
         },
         between: async () => {
