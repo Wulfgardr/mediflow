@@ -11,7 +11,7 @@ import { evidenceHash, redactionIdentityDigest } from '../ai-redaction-evidence'
 import { REDACTION_RUNTIME_ADAPTER, REDACTION_RUNTIME_FILES, REDACTION_RUNTIME_MODEL, REDACTION_RUNTIME_PACKAGES,
     REDACTION_RUNTIME_REVISION, REDACTION_RUNTIME_SCHEMA, REDACTION_WORKER_SHA256 } from '../redaction-runtime-identity';
 import type { NeuralRedactionSpan } from '../gliner-redaction-runner';
-import type { ClinicalProfile as Card } from './clinical-profile';
+import { CLINICAL_PROFILE_VERSION, clinicalSchema, clinicalSelectionSchema, type ClinicalProfile as Card } from './clinical-profile';
 
 const identity = Object.freeze({ schema: REDACTION_RUNTIME_SCHEMA, adapter: REDACTION_RUNTIME_ADAPTER, model: REDACTION_RUNTIME_MODEL,
     revision: REDACTION_RUNTIME_REVISION, workerSha256: REDACTION_WORKER_SHA256, pythonSha256: 'a'.repeat(64),
@@ -96,6 +96,65 @@ function broker(config = installation()): Broker {
 const fixtureKnown = { names: corpus.flatMap(entry => entry.gold.entities.filter(e => e.type !== 'date').map(e => e.text)), birthDates: corpus.flatMap(entry => entry.gold.entities.filter(e => e.type === 'date').map(e => e.text)) };
 const selectionA = 'a'.repeat(64), selectionB = 'b'.repeat(64);
 const all = { diagnoses: ['diabete mellito tipo 2'], noteExcerpts: ['HbA1c 7,2. Pressione 130/80 mmHg. Peso 72 kg. Metformina 500 mg due volte al giorno.'] };
+
+const SUPPLEMENTARY = '🟦';
+
+for (const section of ['diagnoses', 'noteExcerpts'] as const) {
+    test(`clinical v1 ${section}: selected rows count UTF-16 units`, () => {
+        for (const input of ['a'.repeat(2048), SUPPLEMENTARY.repeat(1024)]) {
+            const selection = { diagnoses: [], noteExcerpts: [], [section]: [input] };
+            assert.equal(input.length, 2048);
+            assert.deepEqual(clinicalSelectionSchema.parse(selection), selection);
+            assert.equal(clinicalSelectionSchema.safeParse({ ...selection, [section]: [input + 'a'] }).success, false);
+        }
+    });
+    test(`clinical v1 ${section}: rendered rows count UTF-16 units`, () => {
+        for (const text of ['a'.repeat(4096), SUPPLEMENTARY.repeat(2048)]) {
+            const row = { text, sourceRef: 'src_' + 'a'.repeat(32) };
+            const profile = { profile: CLINICAL_PROFILE_VERSION, version: 1, pseudonym: 'card_' + 'b'.repeat(32),
+                diagnoses: [], noteExcerpts: [], [section]: [row] };
+            assert.equal(text.length, 4096);
+            assert.deepEqual(clinicalSchema.parse(profile), profile);
+            assert.equal(clinicalSchema.safeParse({ ...profile, [section]: [{ ...row, text: text + 'a' }] }).success, false);
+        }
+    });
+}
+
+test('clinical v1 selection sums UTF-16 units across diagnoses and excerpts', () => {
+    const text = SUPPLEMENTARY.repeat(1000);
+    const selection = { diagnoses: [text], noteExcerpts: [text, text] };
+    assert.deepEqual(clinicalSelectionSchema.parse(selection), selection);
+    assert.equal(clinicalSelectionSchema.safeParse({ ...selection, noteExcerpts: [text, text + 'a'] }).success, false);
+});
+
+test('clinical owner keeps a row at the UTF-16 limit intact and denies one extra unit before review', async () => {
+    const { createNativeClinicalOwner } = await import('../../scripts/chat-card-clinical-owner.mjs');
+    const knownIdentifiers = { names: [], birthDates: [] };
+    const prefix = 'Quadro stabile.';
+    const text = prefix + ' '.repeat(2046 - prefix.length) + SUPPLEMENTARY;
+    assert.equal(text.length, 2048);
+    assert.equal(Array.from(text + '.').length, 2048);
+    for (const row of [text, text + '.']) {
+        const owner = createNativeClinicalOwner(installation());
+        const consume = { command: 'consume', patient: selectionA };
+        try {
+            const prepare = { command: 'prepare', knownIdentifiers, patient: selectionA,
+                selection: { diagnoses: [], noteExcerpts: [row] } };
+            if (row === text) {
+                const review = await owner.command(prepare);
+                assert.ok('payload' in review && review.payload);
+                const profile: Card = JSON.parse(review.payload);
+                assert.equal(profile.noteExcerpts[0]?.text, text);
+                assert.equal(review.payloadSha256, evidenceHash(review.payload));
+                assert.deepEqual(await owner.command(consume), { payload: review.payload });
+            } else {
+                await assert.rejects(owner.command(prepare), denied);
+            }
+            await assert.rejects(owner.command(consume), denied);
+        } finally { await owner.close(); }
+    }
+});
+
 async function ready(b = broker(), patient = 'basic', selection = all) {
     await b.owner.selectPatient(patient);
     const token = await b.owner.prepare(selection, fixtureKnown), review = b.owner.review(token);

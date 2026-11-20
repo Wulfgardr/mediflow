@@ -1,8 +1,8 @@
 import { syntheticLoopbackRequest } from './security/loopback-ingress-test-fixture';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
-import { createRequire } from 'node:module';
+import crypto, { randomBytes } from 'node:crypto';
+import { createRequire, syncBuiltinESMExports } from 'node:module';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -30,6 +30,7 @@ const { acquirePatientProfileQueryHostPort, headlessProfileRelease } = load('./s
 const { createPatientProfileQueryWebDispatcher } = load('./security/patient-profile-query-web-dispatcher.ts') as typeof import('./security/patient-profile-query-web-dispatcher');
 const { createPatientProfileQuerySupervisorPortV1 } = load('./security/patient-profile-query-supervisor-port.ts') as typeof import('./security/patient-profile-query-supervisor-port');
 const { createProfilePseudonymizer } = load('./patient-profile-pseudonymization.ts') as typeof import('./patient-profile-pseudonymization');
+const { PLACEHOLDER_PATTERN } = load('./ai-redaction-session.ts') as typeof import('./ai-redaction-session');
 
 const patientA = 'pseudonym-synthetic-a', patientB = 'pseudonym-synthetic-b';
 const SENTINEL = Object.freeze({
@@ -157,6 +158,52 @@ test('M1: the MCP stdio transport serves both projections without any identity v
     assert.equal(mcp.stderr(), '');
 });
 
+function residualText(released: string): string {
+    const nonces = new Set([...released.matchAll(PLACEHOLDER_PATTERN)].map(match => match[4]));
+    assert.ok(nonces.size <= 1, `placeholders of different sessions in one release: ${[...nonces].join(', ')}`);
+    return released.replace(PLACEHOLDER_PATTERN, '\u0000');
+}
+const leakedPieces = (released: string, pieces: readonly string[]) => { const residual = residualText(released); return pieces.filter(piece => residual.includes(piece)); };
+
+function withSessionSeed<T>(seed: Buffer, run: () => T): T {
+    const original = crypto.randomBytes;
+    let pending = true;
+    crypto.randomBytes = ((size: number, ...rest: []) => {
+        if (pending && size === seed.length) { pending = false; return Buffer.from(seed); }
+        return original(size, ...rest);
+    }) as typeof crypto.randomBytes;
+    syncBuiltinESMExports();
+    try { return run(); } finally { crypto.randomBytes = original; syncBuiltinESMExports(); }
+}
+
+test('M1 oracle: identity pieces count only outside complete placeholders of the release session', () => {
+    const token = (role: string, nonce: string) => `[[MF_${role}_${nonce}]]`;
+    assert.deepEqual(leakedPieces(`{"notes":"pz ${token('TEL2', '6sr555d2')} fine"}`, ['555']), []);
+    assert.deepEqual(leakedPieces(`{"notes":"pz 555 ${token('TEL2', '6sr555d2')} fine"}`, ['555']), ['555']);
+    assert.deepEqual(leakedPieces(`{"notes":"pz [[MF_TEL2_6sr555d2 fine"}`, ['555']), ['555']);
+    assert.deepEqual(leakedPieces(`{"notes":"pz [[MF_TEL2_6sr555d9]] fine"}`, ['555']), ['555']);
+    assert.deepEqual(leakedPieces(`{"notes":"55${token('TEL1', 'abcdefgh')}5"}`, ['555']), []);
+    assert.throws(() => leakedPieces(`${token('TEL1', '6sr555d2')} ${token('TEL2', 'abc555de')}`, ['555']), /different sessions/u);
+});
+
+test('M1 oracle: the Web Core failure of #1074 was a session nonce containing 555, and the dictated number never left as text', () => {
+    const seed = Buffer.alloc(16);
+    seed.writeUInt32BE(4163, 12);
+    const source = { firstName: 'Ada', lastName: 'Sintetica', taxCode: 'SNTDAA48C42F205X', birthDate: '1948-03-02T00:00:00.000Z',
+        address: 'Via Sintetica 12, Milano', phone: '02 1234 5678', caregiver: 'Carlo Bianchi', diagnoses: null, exemptions: null,
+        notes: `${'pz stabile '.repeat(1_200).slice(0, 11_001)} figlio 347 555 0199 fine nota.`, isAdi: null, isArchived: null,
+        statusReason: null, archiveReason: null, archiveNote: null } as ProfileFields;
+    const released = withSessionSeed(seed, () => {
+        const pseudonymizer = createProfilePseudonymizer();
+        try { return JSON.stringify(pseudonymizer.project(source, 'profile')); } finally { pseudonymizer.close(); }
+    });
+    const nonces = [...released.matchAll(PLACEHOLDER_PATTERN)].map(match => match[4]);
+    assert.deepEqual([...new Set(nonces)], ['6sr555d2']);
+    assert.ok(released.includes('555'));
+    assert.ok([...released.matchAll(PLACEHOLDER_PATTERN)].some(match => match[1] === 'TEL' && match[2] === '2'));
+    assert.deepEqual(leakedPieces(released, ['347', '555', '0199']), []);
+});
+
 test('M1: a free text longer than one preparation releases no identity piece wherever the cut falls', () => {
     const source = { firstName: 'Ada', lastName: 'Sintetica', taxCode: 'SNTDAA48C42F205X', birthDate: '1948-03-02T00:00:00.000Z',
         address: 'Via Sintetica 12, Milano', phone: '02 1234 5678', caregiver: 'Carlo Bianchi', diagnoses: null, exemptions: null,
@@ -178,7 +225,7 @@ test('M1: a free text longer than one preparation releases no identity piece whe
                 const pseudonymizer = createProfilePseudonymizer();
                 try {
                     const released = JSON.stringify(pseudonymizer.project({ ...source, notes }, projection));
-                    const leaked = pieces.filter(piece => released.includes(piece));
+                    const leaked = leakedPieces(released, pieces);
                     if (leaked.length) leaks.push(`${projection} ${position} ${leaked.join('+')} of «${value}»`);
                 } finally { pseudonymizer.close(); }
             }
