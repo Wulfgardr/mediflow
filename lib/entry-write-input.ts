@@ -66,6 +66,7 @@ export function prepareEntryCreate(body: Record<string, unknown>, surface: Entry
 export function prepareEntryUpdate(body: Record<string, unknown>, surface: EntrySurface, isDelete = false) {
     const fields = isDelete ? DELETE_FIELDS : new Set(UPDATE_FIELDS);
     if (!isDelete && surface !== 'network') fields.add('updatedAt');
+    if (!isDelete && surface !== 'v1') fields.add('legacyRevisionProtection');
     if (!allowed(body, fields)) return invalid();
     const expectedVersion = entryExpectedVersion(body.version);
     if (expectedVersion === null) return invalid('Version is required');

@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { archiveGenerationForSession } from '@/lib/security/archive-session-generation';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
@@ -49,7 +50,7 @@ export async function POST(request: Request) {
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('Change PIN error:', error);
+        logServerError('Change PIN error', error);
         return failureResponse(500, 'PIN_CHANGE_FAILED', 'Errore durante il cambio PIN.');
     }
 }

@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { NextResponse } from 'next/server';
 /* @Codex */
 import { getNetworkCapabilities } from '@/lib/network-home-base-server';
@@ -15,7 +16,7 @@ export async function GET(request: Request) {
         const capabilities = await getNetworkCapabilities();
         return NextResponse.json(projectNetworkCapabilitiesForDiscoveryAuth(capabilities, auth.context));
     } catch (error) {
-        console.error('API GET /api/v1/network/capabilities error:', error);
+        logServerError('API GET /api/v1/network/capabilities error', error);
         return NextResponse.json({ error: 'Failed to load network capabilities' }, { status: 500 });
     }
 }

@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { readPrescriptionJsonObject } from '@/lib/prescription-json-body';
@@ -18,7 +19,7 @@ export async function GET(request: Request) {
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('API GET /prosthetic-prescriptions error:', error);
+        logServerError('API GET /prosthetic-prescriptions error', error);
         return NextResponse.json({ error: 'Failed to fetch prosthetic prescriptions' }, { status: 500 });
     }
 }
@@ -38,7 +39,7 @@ export async function POST(request: Request) {
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('API POST /prosthetic-prescriptions error:', error);
+        logServerError('API POST /prosthetic-prescriptions error', error);
         return NextResponse.json({ error: 'Failed to create prosthetic prescription' }, { status: 500 });
     }
 }

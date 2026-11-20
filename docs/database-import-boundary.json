@@ -19,6 +19,7 @@
     ]
   },
   "classifications": {
+    "local-diary-revisions": "ADR0183: read-only diary history through the existing SQLite authority. Generation, patient, note and paired scope share one read transaction.",
     "legacy-node-http": "Existing Web/local/paired HTTP adapters importing the current Node SQL authority; not migrated by WUL-576.",
     "legacy-node-service": "Existing Node services/owners with direct authority or handle dependencies; see authority-census and mutation CSV for ownership and guarantees.",
     "sqlite-infrastructure": "Existing schema/open/repair/maintenance primitives. Not an alternative clinical writer or permission to run maintenance.",
@@ -1005,6 +1006,17 @@
       ],
       "count": 1,
       "classification": "legacy-node-service"
+    },
+    {
+      "file": "lib/entry-revision-read.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "local-diary-revisions"
     },
     {
       "file": "lib/entry-write-operation.ts",

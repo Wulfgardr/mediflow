@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { NextResponse } from 'next/server';
 /* @Codex */
 import { getNetworkNodeSummary } from '@/lib/network-home-base-server';
@@ -13,7 +14,7 @@ export async function GET(request: Request) {
         const summary = await getNetworkNodeSummary();
         return NextResponse.json(summary);
     } catch (error) {
-        console.error('API GET /api/v1/network/node error:', error);
+        logServerError('API GET /api/v1/network/node error', error);
         return NextResponse.json({ error: 'Failed to load network node summary' }, { status: 500 });
     }
 }

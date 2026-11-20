@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { NextResponse } from 'next/server';
 import {
     getFseValidatePatientId,
@@ -25,7 +26,7 @@ export async function GET(request: Request) {
         );
         return NextResponse.json(result.value, { status: result.status });
     } catch (error) {
-        console.error('API GET /api/v1/network/fse/validate-patient error:', error);
+        logServerError('API GET /api/v1/network/fse/validate-patient error', error);
         return NextResponse.json({ error: 'Failed to validate patient export' }, { status: 500 });
     }
 }

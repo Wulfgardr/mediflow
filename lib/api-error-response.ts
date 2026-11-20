@@ -1,19 +1,4 @@
-/* WUL-347. Forma d'errore condivisa fra le route legacy e la v1.
-
-   Il problema che risolve non e' l'estetica del contratto: alcune route
-   rimandavano al client il `message` grezzo dell'eccezione, che su questo
-   prodotto puo' contenere percorsi del filesystem, dettagli SQLite e internals
-   di PM2. La UI decifra PHI, quindi ogni dettaglio interno che esce e' superficie
-   in piu' per chi sta gia' guardando.
-
-   La regola e' asimmetrica ed e' il punto di questo modulo: il dettaglio va
-   **loggato** sul server e **non** restituito. Cio' che torna al client e' un
-   messaggio stabile piu' un codice su cui si puo' fare match.
-
-   Non usare questi helper per i messaggi di dominio destinati all'operatore
-   (per esempio il rifiuto di un import AIFA malformato): quelli sono contenuto,
-   non fuga. Per loro esiste apiFailure(), che pretende un codice esplicito. */
-
+import { logServerError } from './server-error-log';
 import { NextResponse } from 'next/server';
 import { ArchiveReplacedError } from './archive-generation';
 
@@ -36,8 +21,6 @@ type CampiExtra = Record<string, unknown>;
 
 const GENERIC_INTERNAL_MESSAGE = 'Errore interno del server.';
 
-/* Errore inatteso: il dettaglio resta nei log del server. `scope` serve a
-   ritrovarlo, ed e' l'unica cosa che il chiamante deve ricordarsi di passare. */
 export function apiInternalError(
     scope: string,
     error: unknown,
@@ -45,7 +28,7 @@ export function apiInternalError(
 ): NextResponse {
     const replacement = archiveReplacementResponse(error);
     if (replacement) return replacement;
-    console.error(`[MediFlow] ${scope}:`, error);
+    logServerError(scope, error);
     const body: ApiErrorBody & CampiExtra = {
         ...(options.extra ?? {}),
         error: options.message ?? GENERIC_INTERNAL_MESSAGE,

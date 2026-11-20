@@ -45,13 +45,13 @@ export async function POST(request: Request) {
                     isDefault: true,
                     createdAt: new Date(),
                 }).run();
-                console.log("Default ambulatory created:", defaultAmbulatoryId);
+                console.log("Default ambulatory created.");
             } else {
                 console.log("Ambulatories exist.");
             }
 
             if (orphanedPatients.length > 0) {
-                console.log(`Migrating ${orphanedPatients.length} orphaned patients to ${defaultAmbulatoryId}...`);
+                console.log("Migrating orphaned patients to the default ambulatory.");
                 tx.update(patients)
                     .set({ ambulatoryId: defaultAmbulatoryId })
                     .where(isNull(patients.ambulatoryId))

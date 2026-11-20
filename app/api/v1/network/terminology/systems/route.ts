@@ -1,4 +1,5 @@
 /* @Codex */
+import { logServerError } from '@/lib/server-error-log';
 import { NextResponse } from 'next/server';
 /* @Codex */
 import {
@@ -17,7 +18,7 @@ export async function GET(request: Request) {
         const result = await listTerminologyCatalogSystems();
         return NextResponse.json(result.body, { status: result.status ?? 200 });
     } catch (error) {
-        console.error('API GET /api/v1/network/terminology/systems error:', error);
+        logServerError('API GET /api/v1/network/terminology/systems error', error);
         return NextResponse.json({ error: 'Failed to load terminology systems' }, { status: 500 });
     }
 }

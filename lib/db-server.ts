@@ -1,3 +1,4 @@
+import { logServerError } from './server-error-log';
 import {
     checkHasCanonicalPhysicianReviewAttestationSchema,
     checkHasCanonicalHeadlessCheckupActiveRoleAttestationSchema,
@@ -67,7 +68,7 @@ export function openDbServer(): Database.Database {
                 fs.renameSync(bootStagingPath, dbPath);
                 console.log(`[MediFlow] Copied legacy DB to ${dbPath}`);
             } catch (error) {
-                console.error('[MediFlow] Failed to copy legacy DB:', error);
+                logServerError('[MediFlow] Failed to copy legacy DB:', error);
                 fs.rmSync(bootStagingPath, { force: true });
                 throw error;
             }
@@ -95,7 +96,7 @@ export function openDbServer(): Database.Database {
         // A journal that cannot be read stays for inspection and never blocks the archive.
         if (!isNextProductionBuild) {
             try { reconcileAccountResets(sqlite); }
-            catch (error) { console.error('[MediFlow] Account reset journal not reconciled:', (error as Error).message); }
+            catch (error) { logServerError('Account reset journal: reconciliation', error); }
         }
         initialSqlite = sqlite;
         openState = 'opened';

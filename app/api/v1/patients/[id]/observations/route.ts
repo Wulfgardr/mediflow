@@ -1,3 +1,4 @@
+import { logServerError } from '@/lib/server-error-log';
 import { rejectUnsealedV1Write } from '@/lib/api/v1/sealed-write';
 import { archiveReplacementResponse } from '@/lib/api-error-response';
 import { NextResponse } from 'next/server';
@@ -74,7 +75,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('API GET /api/v1/patients/[id]/observations error:', error);
+        logServerError('API GET /api/v1/patients/[id]/observations error', error);
         return NextResponse.json({ error: 'Failed to fetch observations' }, { status: 500 });
     }
 }
@@ -106,7 +107,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     } catch (error) {
         const replacement = archiveReplacementResponse(error);
         if (replacement) return replacement;
-        console.error('API POST /api/v1/patients/[id]/observations error:', error);
+        logServerError('API POST /api/v1/patients/[id]/observations error', error);
         return NextResponse.json({ error: 'Failed to create observation' }, { status: 500 });
     }
 }

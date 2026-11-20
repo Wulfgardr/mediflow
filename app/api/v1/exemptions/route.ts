@@ -1,4 +1,5 @@
 // Codex: created 2026-02-06
+import { logServerError } from '@/lib/server-error-log';
 import { NextResponse } from 'next/server';
 import { dbServer } from '@/lib/db-server';
 import { exemptions } from '@/lib/schema';
@@ -60,7 +61,7 @@ export async function GET(request: Request) {
         const result = await readExemptionCatalog(searchParams);
         return NextResponse.json(result.body, { status: result.status ?? 200 });
     } catch (error) {
-        console.error('API GET /api/v1/exemptions error:', error);
+        logServerError('API GET /api/v1/exemptions error', error);
         return NextResponse.json({ error: 'Failed to fetch exemptions' }, { status: 500 });
     }
 }
@@ -106,7 +107,7 @@ export async function POST(request: Request) {
 
         return NextResponse.json({ success: true, count: items.length });
     } catch (error) {
-        console.error('API POST /api/v1/exemptions error:', error);
+        logServerError('API POST /api/v1/exemptions error', error);
         return NextResponse.json({ error: 'Failed to import exemptions' }, { status: 500 });
     }
 }
@@ -119,7 +120,7 @@ export async function DELETE(request: Request) {
         await dbServer.delete(exemptions);
         return NextResponse.json({ success: true });
     } catch (error) {
-        console.error('API DELETE /api/v1/exemptions error:', error);
+        logServerError('API DELETE /api/v1/exemptions error', error);
         return NextResponse.json({ error: 'Failed to clear exemptions' }, { status: 500 });
     }
 }
