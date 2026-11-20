@@ -1,3 +1,5 @@
+import { compareClinicalDatesDesc, parseClinicalDate } from '../../clinical-date';
+import { parsePatientDatedRecords } from '../../patient-structured-fields';
 import { clinicalRichTextToPlainText } from '../../clinical-rich-text';
 import type { ClinicalEntry, Diagnosis, DocumentInsight, Patient, Therapy } from '../../db';
 import { normalizeClinicalText } from './clinical-text-normalization';
@@ -156,34 +158,12 @@ export function buildPatientSmartImportTherapyCandidateHints(
     return hints;
 }
 
-function parseDocumentInsights(raw: Patient['documentInsights']): DocumentInsight[] {
-    if (!raw) return [];
-    if (Array.isArray(raw)) return raw;
-    if (typeof raw !== 'string') return [];
-    try {
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed as DocumentInsight[] : [];
-    } catch {
-        return [];
-    }
-}
-
 export function parsePatientSmartImportDiagnoses(raw: Patient['diagnoses']): Diagnosis[] {
-    if (!raw) return [];
-    if (Array.isArray(raw)) return raw;
-    if (typeof raw !== 'string') return [];
-    try {
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed as Diagnosis[] : [];
-    } catch {
-        return [];
-    }
+    return parsePatientDatedRecords<Diagnosis>(raw);
 }
 
 function normalizeDate(value: unknown): string | undefined {
-    if (!value) return undefined;
-    const date = new Date(value as string | number | Date);
-    return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+    return parseClinicalDate(value)?.toISOString();
 }
 
 export function buildPatientSmartImportSourceRecords(
@@ -224,8 +204,8 @@ export function buildPatientSmartImportSourceRecords(
 
     const insightFileNames = new Set<string>();
     dedupeDocumentInsightsForContext(
-        [...parseDocumentInsights(patient.documentInsights)]
-            .sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime()),
+        parsePatientDatedRecords<DocumentInsight>(patient.documentInsights)
+            .sort((left, right) => compareClinicalDatesDesc(left.date, right.date)),
     ).insights.slice(0, 4).forEach((insight) => {
         const fileName = typeof insight.fileName === 'string' ? insight.fileName.trim() : '';
         if (fileName) insightFileNames.add(fileName.toLowerCase());

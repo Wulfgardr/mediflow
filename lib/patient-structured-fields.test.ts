@@ -24,7 +24,7 @@ test('parsePatientDatedRecords revives dates from strings and arrays', () => {
     assert.ok(fromString[0].date instanceof Date);
     assert.equal(fromString[0].date.toISOString(), '2025-03-10T00:00:00.000Z');
     assert.equal(fromArray[0].fileName, 'referto.pdf');
-    assert.equal(fromArray[0].date.toISOString(), '2025-03-11T00:00:00.000Z');
+    assert.equal(fromArray[0].date?.toISOString(), '2025-03-11T00:00:00.000Z');
 });
 
 test('parsePatientDatedRecords returns an empty array for malformed JSON strings', () => {
@@ -51,4 +51,15 @@ test('revivePatientStructuredFields only mutates parsable patient fields', () =>
     assert.ok(Array.isArray(documentInsights));
     assert.ok(documentInsights?.[0].date instanceof Date);
     assert.equal(revived.untouched, 'value');
+});
+
+test('legacy records preserve an unknown date and reject impossible calendar days', () => {
+    const archive = '[{"id":"unknown"},{"id":"impossible","date":"2025-02-29T12:00:00Z"},{"id":"known","date":"2024-02-29"}]';
+    for (let read = 0; read < 2; read++) {
+        assert.deepEqual(parsePatientDatedRecords<{ id: string }>(archive), [
+            { id: 'unknown', date: null },
+            { id: 'impossible', date: null },
+            { id: 'known', date: new Date('2024-02-29') },
+        ]);
+    }
 });

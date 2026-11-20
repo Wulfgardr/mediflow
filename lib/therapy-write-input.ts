@@ -1,5 +1,6 @@
 /* therapy-specific object, own-key and date boundary; shared clinical normalizers are unchanged. */
 import { v4 as uuidv4 } from 'uuid';
+import { parseClinicalDate } from './clinical-date';
 import { readBoundedJsonBody } from './bounded-request-body';
 
 export type TherapySurface = 'web' | 'v1' | 'network';
@@ -34,8 +35,7 @@ export async function readTherapyJsonObject(request: Request, surface: TherapySu
 function dateValue(value: unknown, nullable = false): boolean {
     if (nullable && (value === null || value === '')) return true;
     if (typeof value !== 'string' && (typeof value !== 'number' || !Number.isFinite(value))) return false;
-    if (typeof value === 'string' && !value.trim()) return false;
-    return Number.isFinite(new Date(value).getTime());
+    return parseClinicalDate(value) !== null;
 }
 
 function allowedFields(surface: TherapySurface, operation: TherapyMutation): Set<string> {

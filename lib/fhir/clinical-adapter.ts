@@ -1,4 +1,6 @@
 import { Condition, Encounter, MedicationStatement, Observation } from 'fhir/r4';
+import { parseClinicalDate } from '../clinical-date';
+import { FhirExportPrecheckError } from './export-precheck-error';
 import { toFhirDerivedId, toFhirId } from './id';
 import { validateFhirScaleEntry } from './scale-validation';
 export { FhirScaleScoreError, FhirScaleTitleError } from './scale-validation';
@@ -19,22 +21,21 @@ export function toFhirCondition(
     patientReference: string,
     orderedPosition: number,
 ): Condition {
-    const diagnosisDate = new Date(diagnosis.date).toISOString();
+    const recordedDate = parseClinicalDate(diagnosis.date)?.toISOString();
+    const id = diagnosis.id
+        ? toFhirId(diagnosis.id, 'condition')
+        : toFhirDerivedId('condition', [
+            diagnosis.system.trim(),
+            diagnosis.code.trim(),
+            recordedDate ?? '',
+            diagnosis.description.trim(),
+        ], orderedPosition);
+    if (!recordedDate) throw new FhirExportPrecheckError('INVALID_DATE', id, 'diagnosis');
     const system = fhirDiagnosisSystem(diagnosis.system);
     return {
         resourceType: "Condition",
-        id: diagnosis.id
-            ? toFhirId(diagnosis.id, 'condition')
-            : toFhirDerivedId('condition', [
-                diagnosis.system.trim(),
-                diagnosis.code.trim(),
-                diagnosisDate,
-                diagnosis.description.trim(),
-            ], orderedPosition),
+        id,
         subject: { reference: patientReference },
-        clinicalStatus: {
-            coding: [{ system: "http://terminology.hl7.org/CodeSystem/condition-clinical", code: "active" }]
-        },
         code: {
             ...(system ? { coding: [{
                 system,
@@ -43,30 +44,40 @@ export function toFhirCondition(
             }] } : {}),
             text: diagnosis.description
         },
-        onsetDateTime: diagnosisDate
+        recordedDate,
     };
 }
 
-export function toFhirEncounter(entry: FhirClinicalEntryInput, patientReference: string): Encounter {
+function encounterClass(entry: FhirClinicalEntryInput): string | undefined {
+    switch (entry.type) {
+        case 'phone':
+        case 'remote':
+            return 'VR';
+        case 'hospitalization':
+            return entry.setting === 'hospital' ? 'IMP' : undefined;
+        case 'visit':
+        case 'exam':
+        case 'access':
+            if (entry.setting === 'home') return 'HH';
+            if (entry.setting === 'ambulatory') return 'AMB';
+            return undefined;
+    }
+}
+
+export function toFhirEncounter(entry: FhirClinicalEntryInput, patientReference: string): Encounter | null {
+    if (entry.type === 'note' || entry.type === 'scale') return null;
+    const code = encounterClass(entry);
+    if (!code) throw new FhirExportPrecheckError('INVALID_ENCOUNTER_PAIR', entry.id, 'entry');
+    const start = parseClinicalDate(entry.date)?.toISOString();
+    if (!start) throw new FhirExportPrecheckError('INVALID_DATE', entry.id, 'entry');
     return {
         resourceType: "Encounter",
         id: toFhirId(entry.id, 'encounter'),
         status: "finished",
-        class: {
-            system: "http://terminology.hl7.org/CodeSystem/v3-ActCode",
-            code: entry.setting === 'home' ? "HH" : "AMB",
-            display: entry.setting === 'home' ? "home health" : "ambulatory"
-        },
+        class: { system: "http://terminology.hl7.org/CodeSystem/v3-ActCode", code },
         subject: { reference: patientReference },
-        period: {
-            start: new Date(entry.date).toISOString(),
-            end: new Date(entry.date).toISOString()
-        },
-        type: [
-            {
-                text: entry.type // 'visit', 'remote', etc.
-            }
-        ]
+        period: { start },
+        type: [{ text: entry.type }],
     };
 }
 
@@ -90,6 +101,11 @@ export function toFhirObservation(entry: FhirClinicalEntryInput, patientReferenc
 }
 
 export function toFhirMedicationStatement(therapy: FhirTherapyInput, patientReference: string): MedicationStatement {
+    const start = parseClinicalDate(therapy.startDate);
+    const end = parseClinicalDate(therapy.endDate);
+    if (!start || (therapy.endDate != null && !end) || (end && end < start)) {
+        throw new FhirExportPrecheckError('INVALID_DATE', therapy.id, 'therapy');
+    }
     return {
         resourceType: "MedicationStatement",
         id: toFhirId(therapy.id, 'medication-statement'),
@@ -99,8 +115,8 @@ export function toFhirMedicationStatement(therapy: FhirTherapyInput, patientRefe
         },
         subject: { reference: patientReference },
         effectivePeriod: {
-            start: new Date(therapy.startDate).toISOString(),
-            end: therapy.endDate ? new Date(therapy.endDate).toISOString() : undefined
+            start: start.toISOString(),
+            end: end?.toISOString()
         },
         dosage: [{
             text: therapy.dosage

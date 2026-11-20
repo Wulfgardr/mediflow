@@ -83,11 +83,11 @@ async function openSyntheticQuadro(page: Page, quadroCase: QuadroCase): Promise<
   return { quadro, patient };
 }
 
-async function resolveColor(page: Page, variable: string): Promise<string> {
-  return page.evaluate((name) => {
+async function resolveColor(scope: Locator, variable: string): Promise<string> {
+  return scope.evaluate((element, name) => {
     const probe = document.createElement('span');
     probe.style.color = `var(${name})`;
-    document.body.appendChild(probe);
+    element.appendChild(probe);
     const color = getComputedStyle(probe).color;
     probe.remove();
     return color;
@@ -102,22 +102,27 @@ async function assertQuadroContract(page: Page, quadro: Locator, patient: LivePa
     .filter({ has: page.getByRole('cell', { name: 'Ramipril sintetico', exact: true }) });
   await expect(activeTherapy.getByRole('cell', { name: '5 mg · 1-0-0', exact: true })).toBeVisible();
   await expect(quadro.locator('table [aria-pressed]')).toHaveCount(0);
-  const elevations = await quadro.evaluate((element) => [element, ...element.querySelectorAll('*')]
+  const shadows = await quadro.evaluate((element) => [element, ...element.querySelectorAll('*')]
     .filter(node => (node as HTMLElement).offsetParent !== null && getComputedStyle(node).boxShadow !== 'none')
-    .map(node => node.tagName));
-  expect(elevations).toEqual([]);
+    .map(node => ({ tray: node.getAttribute('data-record-tray'), shadow: getComputedStyle(node).boxShadow })));
+  for (const { tray, shadow } of shadows) {
+    expect(tray).toMatch(/^(stabile|cambiato|contesto)$/);
+    expect(shadow.match(/\binset\b/g)).toHaveLength(3);
+  }
+  if (page.viewportSize()!.width >= 1280) expect(shadows).toHaveLength(3);
+  if (page.viewportSize()!.width <= 390) expect(shadows).toHaveLength(0);
   await expect(page.getByTestId('lume-scheda-surface')).toHaveCSS('box-shadow', 'none');
 
   const measure = quadro.getByRole('region', { name: 'Parametri recenti', exact: true });
   const value = measure.getByRole('cell', { name: /160 mmHg/ });
   await expect(value).toContainText('160 mmHg');
-  await expect(value).toHaveCSS('color', await resolveColor(page, '--lume-signal-critical'));
+  await expect(value).toHaveCSS('color', await resolveColor(quadro, '--lume-signal-critical'));
   await expect(value).toHaveCSS('font-variant-numeric', 'tabular-nums');
   await expect(value).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   await expect(value).toHaveCSS('border-left-width', '0px');
   await expect(value).toHaveCSS('border-radius', '0px');
   await expect(quadro.getByRole('table', { name: 'Terapie attive', exact: true }).getByText('Ramipril sintetico', { exact: true }))
-    .toHaveCSS('color', await resolveColor(page, '--lume-ink'));
+    .toHaveCSS('color', await resolveColor(quadro, '--lume-ink'));
 
   const hierarchy = await measure.evaluate(element => {
     const heading = element.querySelector('th')!;
@@ -142,7 +147,7 @@ async function assertQuadroContract(page: Page, quadro: Locator, patient: LivePa
   const primary = page.getByTestId('lume-scheda-header').getByRole('link', { name: 'Nuova voce', exact: true });
   await expect(primary).toHaveCount(1);
   await expect(primary).toHaveAttribute('href', `/patients/${patient.id}/modules?voce=nuova`);
-  await expect(primary).toHaveCSS('background-color', await resolveColor(page, '--lume-ink-fresh'));
+  await expect(primary).toHaveCSS('background-color', await resolveColor(primary, '--lume-accent'));
   await assertNotClippedInViewport(primary, 'azione primaria quadro');
   await assertKeyboardFocusProgresses(page, primary, 'azione primaria quadro');
   for (const link of await quadro.getByRole('link').all()) await assertNotClippedInViewport(link, await link.innerText());
@@ -150,11 +155,13 @@ async function assertQuadroContract(page: Page, quadro: Locator, patient: LivePa
 
 async function assertReflowStack(quadro: Locator): Promise<void> {
   const regions = [
-    quadro.getByRole('region', { name: 'Problemi', exact: true }),
     quadro.getByRole('region', { name: 'Terapie attive', exact: true }),
+    quadro.getByRole('region', { name: 'Problemi', exact: true }),
     quadro.locator('#diario'),
     quadro.getByRole('region', { name: 'Parametri recenti', exact: true }),
   ];
+  const changed = (await quadro.getByRole('heading', { name: 'Cambiato dall’ultima visita', exact: true }).boundingBox())!;
+  expect((await regions[0].boundingBox())!.y).toBeGreaterThan(changed.y + changed.height);
   let previous: { x: number; y: number; height: number } | undefined;
   for (const region of regions) {
     await expect(region).toBeVisible();

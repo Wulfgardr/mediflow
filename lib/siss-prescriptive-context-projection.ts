@@ -7,6 +7,7 @@
  */
 
 import type { Diagnosis, ServicePrescription, Therapy } from '@/lib/db';
+import { compareClinicalDatesDesc } from './clinical-date';
 import { parsePatientDatedRecords } from '@/lib/patient-structured-fields';
 
 /* Stesso limite di lib/ai-context.ts MAX_DIAGNOSES: le diagnosi principali
@@ -75,11 +76,11 @@ export function selectRecentServicePrescriptions(
 export function selectPrincipalDiagnoses(
     diagnoses: unknown,
     options: { max?: number } = {},
-): Array<Diagnosis & { date: Date }> {
+): Diagnosis[] {
     const max = options.max ?? MAX_PRINCIPAL_DIAGNOSES;
 
     return parsePatientDatedRecords<Diagnosis>(diagnoses)
-        .sort((left, right) => toTime(right.date) - toTime(left.date))
+        .sort((left, right) => compareClinicalDatesDesc(left.date, right.date))
         .slice(0, Math.max(0, max));
 }
 

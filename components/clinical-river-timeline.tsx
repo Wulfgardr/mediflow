@@ -1,5 +1,6 @@
 'use client';
 
+import { parseClinicalDate } from '@/lib/clinical-date';
 import { compactClinicalRichText } from '@/lib/clinical-rich-text';
 import type { Checkup, ClinicalEntry, DocumentInsight } from '@/lib/db';
 import { patientDiarySource } from '@/lib/patient-diary-metadata';
@@ -76,13 +77,19 @@ function buildRiverItems(
         kind: 'checkup' as const,
     }));
 
-    const documentItems = documentInsights.slice(0, DOCUMENT_LIMIT).map((insight) => ({
-        id: `document-${insight.id}`,
-        title: insight.fileName,
-        summary: insight.summary,
-        date: new Date(insight.date),
-        kind: 'document' as const,
-    }));
+    const documentItems = documentInsights
+        .flatMap((insight) => {
+            const date = parseClinicalDate(insight.date);
+            return date ? [{
+                id: `document-${insight.id}`,
+                title: insight.fileName,
+                summary: insight.summary,
+                date,
+                kind: 'document' as const,
+            }] : [];
+        })
+        .sort((left, right) => right.date.getTime() - left.date.getTime())
+        .slice(0, DOCUMENT_LIMIT);
 
     return [...entryItems, ...checkupItems, ...documentItems]
         .sort((left, right) => right.date.getTime() - left.date.getTime())

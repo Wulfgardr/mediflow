@@ -4,7 +4,7 @@
 .sheet th { height: 36px; }
 .sheet td { height: 40px; }
 .sheet .value { text-align: right; font-variant-numeric: tabular-nums; }
-.problems th:first-child { width: 5.5rem; }
+.problems th:nth-child(2) { width: 5.5rem; }
 .problems th:nth-child(3) { width: 6.5rem; }
 .therapies th:first-child { width: 46%; }
 .therapies th:nth-child(3) { width: 5.5rem; }
@@ -20,28 +20,176 @@
 @media (pointer: coarse) { .sheet td { height: 44px; } }
 
 
-.sheet[data-overview] { container-type: normal; gap: 20px; align-items: start; }
-.stable, .middle, .side, .context, .contextRows, .activity { display: grid; gap: 14px; min-width: 0; align-content: start; }
-.stable > section, .contextRows > section { min-width: 0; }
-.stable > section, .stable .notes {
-    padding: 0 12px 6px;
-    background: var(--lume-surface-field);
-    border-radius: var(--lume-radius-control);
+.sheet[data-overview] {
+    container: record-sheet / inline-size;
+    --record-island-radius: 14px;
+    --record-tray-inset: 10px;
+    --record-gap: 12px;
+    --record-proposal-ink: color-mix(in oklab, var(--lume-record-proposal-rule) 72%, var(--lume-ink));
 }
-.sheet[data-overview] :global(.lume-section-heading) { column-gap: 6px; flex-wrap: wrap; }
-.sheet[data-overview] :global(.lume-section-heading > span) { font: var(--type-meta); }
-.sheet[data-overview] :is(.stable, .contextRows) :is(th, td):is(.secondaryColumn) { display: none; }
-.sheet[data-overview] .stable :is(th, td) { height: auto; }
-.sheet[data-overview] .stable td { padding-block: 5px; }
-.sheet[data-overview] .problems th:first-child { width: 3.5rem; }
-.sheet[data-overview] .therapies th:first-child { width: 54%; }
-.sheet[data-overview] .therapies td { vertical-align: top; overflow-wrap: anywhere; }
+.overview { display: grid; align-items: start; gap: var(--record-gap); min-width: 0; min-inline-size: 0; }
+.stable, .middle, .side, .context, .contextRows, .activity {
+    display: grid;
+    gap: 12px;
+    min-width: 0;
+    align-content: start;
+}
+:global(:root) .overview .zoneTitle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    padding: 2px 4px;
+    color: var(--lume-ink);
+    font: var(--type-record-zone);
+    letter-spacing: -0.015em;
+    scroll-margin-block-start: 20px;
+}
+.overview .middle > .zoneTitle:has(+ .activity .comparison)::after {
+    content: '';
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--lume-accent);
+}
+.visuallyHidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+.overviewIndex {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 3px;
+}
+.overviewIndex a {
+    display: inline-flex;
+    align-items: center;
+    padding-inline: 12px;
+    min-height: 36px;
+    border: 1px solid var(--lume-rule-strong);
+    border-radius: 999px;
+    color: var(--lume-ink);
+    font: var(--type-body);
+    white-space: nowrap;
+}
+.overviewIndex a:hover, .islandAction:hover { text-decoration: underline; }
+.overview :is(.stable > section, .notes, .contextRows > section, .activity > section, .noComparison, .support),
+:global([data-folder-section='quadro']) .overview .middle > :global(#diario) {
+    min-width: 0;
+    padding: 14px 16px;
+    border: 1px solid var(--lume-record-island-rule);
+    border-radius: var(--record-island-radius);
+    background: var(--lume-record-compact-island);
+    scroll-margin-block-start: 20px;
+}
+.overview .activity > .comparison { background: var(--lume-record-change); border-color: var(--lume-record-change-rule); }
+.overview .support:has([data-has-proposals='true']) {
+    border-style: dashed;
+    border-color: var(--lume-record-proposal-rule);
+    background: transparent;
+}
+.overview .islandHeader { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-bottom: 6px; }
+.islandHeader > h2 { flex: 1 1 auto; justify-content: start; }
+.comparison .islandHeader > h2 { flex: 0 1 auto; }
+.islandIcon, .proposalIcon {
+    display: inline-grid;
+    width: 28px;
+    height: 28px;
+    place-items: center;
+    border: 1px solid var(--lume-record-island-rule);
+    border-radius: 8px;
+    background: var(--lume-record-island);
+    flex: none;
+    color: var(--lume-ink-muted);
+}
+.proposalIcon {
+    border-color: transparent;
+    background: color-mix(in oklab, var(--lume-record-proposal-rule) 14%, transparent);
+    color: var(--record-proposal-ink);
+}
+.visitDate { color: var(--lume-ink-muted); font: var(--type-meta); white-space: nowrap; }
+.islandAction { display: inline-flex; align-items: center; min-height: 28px; margin-inline-start: auto; color: var(--lume-accent); font: var(--type-body); }
+:global(:root) .overview :is(.islandHeader > h2, .support h2, .activity > section > h2, .contextRows > section > h2) {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    color: var(--lume-ink);
+    font: var(--type-record-island);
+    overflow-wrap: anywhere;
+}
+.overview :global(.lume-section-heading > span) { margin-inline-start: 6px; color: var(--lume-ink-muted); font: var(--type-meta); }
+.overview .secondaryColumn { display: none; }
+.overview :is(.problems, .therapies, .measures, .checkups) thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+}
+.overview :is(.problems, .therapies, .measures, .checkups) :is(th, td) { height: auto; border: 0; }
+.overview .checkups td { padding: 7px 0; }
+.overview .problems td:first-child, .overview .therapies td:first-child, .overview .measures td:first-child { font: var(--type-record-row); color: var(--lume-ink); }
+.overview table td:not(:global(.lume-code)) { overflow-wrap: anywhere; }
+.overview table small { margin-top: 1px; color: var(--lume-ink-muted); font: var(--type-meta); }
+.overview .problems td.codeColumn { grid-column: 2; grid-row: 1; color: var(--lume-ink-muted); font: var(--type-meta); text-align: right; letter-spacing: .02em; }
+.overview :is(.problems, .therapies, .measures), .overview :is(.problems, .therapies, .measures) tbody { display: block; }
+.overview :is(.problems, .therapies, .measures) tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 10px;
+    padding-block: 7px;
+}
+.overview :is(.problems, .therapies, .measures) td { padding: 0; }
+.overview .problems td:first-child { grid-column: 1; grid-row: 1; }
+.overview .therapies td:nth-child(1), .overview .therapies td:nth-child(2) { grid-column: 1; }
+.overview .therapies td:nth-child(2) { color: var(--lume-ink); font: var(--type-body); }
+.overview .therapies td:first-child small { display: inline; margin-inline-start: 8px; letter-spacing: .02em; }
+.rowStatus { grid-column: 2; grid-row: 1 / span 2; align-self: start; }
+.overview .measures td:nth-child(1) { grid-column: 1; grid-row: 1; }
+.overview .measures td:nth-child(3) { grid-column: 1; grid-row: 2; color: var(--lume-ink-muted); font: var(--type-meta); }
+.overview .measures tr { grid-template-columns: minmax(0, 1fr) auto auto; }
+.overview .measures td:nth-child(2) { grid-column: 3; grid-row: 1 / span 2; align-self: start; font: var(--type-record-row); font-variant-numeric: tabular-nums; }
+.overview .measures td.trendCell { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+.overview .measures tr[data-trend] td:nth-child(2) small {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+.trend { display: block; stroke: var(--lume-ink-muted); }
+.trend[data-critical='true'] { stroke: var(--lume-signal-critical); }
+.overview .measures td:nth-child(2) small { font-weight: 400; }
+.rangeArrow { margin-inline-end: 4px; }
+.drugStrength { color: var(--lume-ink-muted); font-weight: 400; }
+.overview .checkups td:last-child { width: 6.5rem; color: var(--lume-ink-muted); font: var(--type-meta); text-align: right; }
+.overview .notes p { font: var(--type-body); }
+.overview table :global(.lume-code) { font: var(--type-meta); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 2px; }
+.chipChange, .chipCritical, .chipNeutral, .chipNeutralStatic {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    padding: 1px 8px;
+    border-radius: 8px;
+    font: var(--type-section);
+    white-space: nowrap;
+}
+.chipChange { background: var(--lume-record-warning-fill); color: var(--lume-signal-warning); }
+.chipCritical { background: var(--lume-record-critical-fill); color: var(--lume-signal-critical); }
+.chipNeutral, .chipNeutralStatic { background: var(--lume-record-island); color: var(--lume-ink); }
+.chipNeutral:hover { text-decoration: underline; }
 .diaryTools { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
 .diaryTools button { padding: 3px 0; text-align: start; font: var(--type-meta); color: var(--lume-accent); font-weight: 600; }
 .diaryTools button:hover { text-decoration: underline; }
-@media (pointer: coarse) { .changeItems .changeDetails summary, .diaryTools button { min-height: 44px; } }
-.sheet[data-overview] .measures th:first-child { width: 36%; }
-.sheet[data-overview] .measures th:nth-child(2) { width: 29%; }
+@media (pointer: coarse) { .changeItems .changeDetails summary, .diaryTools button, .moreFacts > button, .sameDay .sourceLink { min-height: 44px; } }
 .support > :global([data-testid='patient-proposals-summary']) { flex-wrap: wrap; gap: 6px; }
 .comparison, .noComparison {
     border: 1px solid var(--lume-rule-strong);
@@ -52,103 +200,181 @@
 .comparison > h2 { margin: 0; font: var(--type-section-heading); }
 .noComparison { background: transparent; color: var(--lume-ink-muted); }
 .changeList, .sourceList { margin: 0; padding: 0; list-style: none; }
-.changeList > li { min-width: 0; overflow-wrap: anywhere; border-bottom: 1px solid var(--lume-rule); }
-.changeDay { padding-top: 6px; display: block; color: var(--lume-ink-muted); font: var(--type-section); }
-.changeDetails { color: var(--lume-ink-muted); font: var(--type-meta); }
+.changeList > li { min-width: 0; overflow-wrap: anywhere; }
+.changeDay { display: block; padding-top: 6px; color: var(--lume-ink-muted); font: var(--type-section); }
+.changeDetails { color: var(--lume-ink-muted); font: var(--type-body); }
 .changeDetails summary {
     display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: 6px 10px;
+    align-items: center;
+    gap: 6px 8px;
     cursor: pointer;
-    padding-block: 6px;
+    padding-block: 4px;
+    list-style: none;
 }
-.changeDetails summary > span { display: inline-flex; gap: 5px; align-items: center; }
-.changeDetails summary svg { flex: none; }
-.changeDetails[open] summary svg { transform: rotate(180deg); }
-.changeDetails summary > strong { color: var(--lume-ink); }
-.changeDetails[open] p { margin-block: 5px; }
-.changeDateGroup { padding-bottom: 4px; }
-.changeGroup { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 10px; }
-.groupLabel, .changeGroup > .outOfRange { flex: 0 0 7.5rem; font: var(--type-meta); font-weight: 600; }
+.changeDetails summary::-webkit-details-marker { display: none; }
+.changeName { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 0 6px; min-width: 0; flex: 1 1 auto; }
+.changeName > strong { color: var(--lume-ink); font: var(--type-record-row); }
+.changeName > span { color: var(--lume-ink-muted); }
+.changeDetails summary > :is(.chipChange, .chipCritical) { flex: none; }
+.changeDetails summary svg { flex: none; color: var(--lume-ink-muted); transform: rotate(-90deg); }
+.changeDetails[open] summary svg { transform: none; }
+.changeFacts {
+    display: grid;
+    gap: 4px;
+    margin: 2px 0 8px;
+    padding: 10px 12px;
+    border: 1px solid var(--lume-record-change-rule);
+    border-radius: 10px;
+    background: var(--lume-record-island);
+}
+.fact { display: grid; grid-template-columns: 5.75rem minmax(0, 1fr); gap: 8px; }
+.fact dt { color: var(--lume-ink-muted); font: var(--type-meta); line-height: 1.6; }
+.fact dd { margin: 0; color: var(--lume-ink); font: var(--type-body); }
+.sourceLink { display: block; padding: 0; color: var(--lume-accent); font: var(--type-body); text-align: start; overflow-wrap: anywhere; }
+.sourceLink:hover { text-decoration: underline; }
+.sameDay { display: flex; flex-wrap: wrap; gap: 2px 12px; }
+.sameDay .sourceLink { display: inline; }
+.untilToday::before { content: ' → ' / ''; }
+.moreFacts { grid-column: 1 / -1; }
+.moreFacts > button { padding: 0; color: var(--lume-accent); font: var(--type-meta); }
+.moreFacts > button:hover { text-decoration: underline; }
+.moreFacts dl:not([hidden]) { display: grid; gap: 4px; margin: 4px 0 0; }
+.changeDateGroup { padding-bottom: 2px; }
+.changeGroup { display: flex; align-items: flex-start; gap: 0 8px; }
+.changeGroup > :is(.chipChange, .chipCritical, .chipNeutralStatic) { flex: none; margin-top: 6px; }
 .changeItems {
-    flex: 1 1 11rem;
+    flex: 1 1 auto;
     min-width: 0;
     margin: 0;
     padding: 0;
     list-style: none;
     display: flex;
     flex-wrap: wrap;
-    gap: 0 10px;
+    gap: 0 12px;
 }
 .changeItems > li { min-width: 0; max-width: 100%; }
-.changeItems > li:has(details[open]) { flex: 1 1 100%; }
-.changeItems .changeDetails summary { gap: 3px 5px; justify-content: flex-start; padding-block: 2px; }
-.changeItems .changeDetails[open] { padding-bottom: 5px; }
-.changeItems .changeDetails summary > span { flex: none; }
+.changeGroup:not([data-grouped]) .changeItems > li, .changeItems > li:has(details[open]) { flex: 1 1 100%; }
+.changeItems .changeDetails[open] { padding-bottom: 2px; }
+.changeGroup[data-grouped] .changeDetails summary { padding-block: 2px; }
+.changeGroup[data-grouped] .changeName > strong { font: var(--type-strong); }
+.changeGroup[data-grouped] > :is(.chipChange, .chipCritical, .chipNeutralStatic) { margin-top: 2px; }
 .changeItems a, .changeItems button { overflow-wrap: anywhere; }
-.activityLink { display: inline-block; padding-block: 5px; color: var(--lume-accent); font: var(--type-meta); font-weight: 600; }
-.activityLink:hover { text-decoration: underline; }
 .outOfRange { color: var(--lume-signal-critical); }
-.activityToggle { display: flex; align-items: center; gap: 8px; padding-block: 6px; }
+.activityToggle { display: flex; align-items: center; gap: 8px; padding-top: 8px; color: var(--lume-ink-muted); font: var(--type-meta); }
 .readState { margin-block: 6px; color: var(--lume-ink-muted); font: var(--type-meta); }
+.recentTherapies .changeDetails summary { padding-block: 4px; }
 .sourcePane { min-width: 0; overflow-wrap: anywhere; }
 .sourceButton { display: flex; gap: 8px; align-items: center; text-align: start; width: 100%; min-height: 40px; padding: 4px 2px; border-bottom: 1px solid var(--lume-rule); overflow-wrap: anywhere; }
 .sourceButton svg { flex: none; }
 .sourceButton:hover { color: var(--lume-accent); }
-.fullDiary { display: none; }
-:global([data-folder-section='quadro']) .middle :global(#diario > [data-section-header] > h3) { flex-basis: auto; }
-@media (min-width: 1000px) {
+.proposalSummary.proposalSummary { display: grid; justify-content: stretch; gap: 10px; padding: 0; border: 0; }
+.proposalSummary .islandHeader { margin-bottom: 0; }
+.proposalLabel {
+    justify-self: start;
+    margin: 0;
+    padding: 1px 8px;
+    border: 1px dashed var(--lume-record-proposal-rule);
+    border-radius: 8px;
+    color: var(--record-proposal-ink);
+    font: var(--type-section);
+}
+.proposalText { margin: 0; color: var(--lume-ink); font: var(--type-record-text); }
+.proposalGaps h3 { margin: 0 0 2px; color: var(--lume-ink-muted); font: var(--type-section); }
+.proposalGaps ul { display: grid; gap: 2px; margin: 0; padding-inline-start: 16px; color: var(--lume-ink); font: var(--type-body); }
+.proposalList { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.proposalList li { display: grid; grid-template-columns: 14px minmax(0, 1fr); gap: 10px; color: var(--lume-ink); font: var(--type-record-text); }
+.proposalList li::before {
+    content: '';
+    width: 12px;
+    height: 12px;
+    margin-top: 5px;
+    border: 1.5px dashed var(--lume-record-proposal-rule);
+    border-radius: 50%;
+}
+.proposalSources { display: flex; flex-wrap: wrap; gap: 6px; }
+.proposalSources a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    padding: 1px 8px;
+    border: 1px solid var(--lume-record-proposal-rule);
+    border-radius: 8px;
+    color: var(--record-proposal-ink);
+    font: var(--type-section);
+}
+.proposalSources a:hover { text-decoration: underline; }
+.proposalReceipt { margin: 0; color: var(--lume-ink-muted); font: var(--type-meta); }
+:global([data-folder-section='quadro']) .overview .middle :global(#diario > [data-section-header] > h3) { flex-basis: auto; }
+:global([data-folder-section='quadro']) .overview .middle :global(#diario > [data-section-header] > h3 span:first-child) { font: var(--type-record-island); }
+.overview .middle :global(#diario [role='feed']) { min-width: 0; }
+:global([data-folder-section='quadro']) .sheet:not([data-writing]) .middle > :global(#diario > div[id]) { padding: 4px 0 0; }
+:global([data-folder-section='quadro']) .sheet:not([data-writing]) .middle > :global(#diario > [data-section-header]) { align-items: center; gap: 8px 12px; margin: 0; padding: 0; border: 0; }
+:global([data-folder-section='quadro']) .overview .middle :global(#diario [role='feed'] .prose) { font: var(--type-record-text); }
+.overview .support > :global([data-testid='patient-proposals-summary']) { padding: 0; border: 0; }
+.contextRows:has([data-source-open='true']) { display: contents; }
+.contextRows > [data-source-open='true'] { order: -1; }
+
+@container record-sheet (width >= 44rem) {
+    :global([data-folder-section='quadro']) .overview { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
+    .overviewIndex { display: none; }
+    :global(:root) .overview .zoneTitle { padding: 6px 6px 0; }
+    .overview :is(.stable, .middle, .context) {
+        gap: var(--record-tray-inset);
+        padding: var(--record-tray-inset);
+        border-radius: calc(var(--record-island-radius) + var(--record-tray-inset));
+        background: var(--lume-record-tray);
+        box-shadow: inset 0 0 0 1px var(--lume-record-tray-rule),
+            inset 0 1px 0 var(--lume-record-tray-light),
+            inset 0 -12px 18px -18px var(--lume-record-tray-shadow);
+    }
+    .overview :is(.stable > section, .notes, .contextRows > section, .activity > section, .noComparison, .support),
+    :global([data-folder-section='quadro']) .overview .middle > :global(#diario) { background: var(--lume-record-island); }
+    .overview .activity > .comparison { background: var(--lume-record-change); }
+    .overview .support:has([data-has-proposals='true']) { background: transparent; }
+    .overview .context > .contextRows, .overview .middle > .activity { gap: var(--record-tray-inset); }
+    :global([data-folder-section='quadro']) :is(.overview > .middle, .overview > .side) {
+        max-height: max(320px, calc(100dvh - 212px));
+        overflow-y: auto;
+        scrollbar-width: thin;
+    }
     .diaryTools[data-reading='true'] {
         position: sticky;
         top: 0;
         z-index: 2;
-        background: var(--lume-surface-focal);
-    }
-    :global([data-folder-section='quadro']) .sheet[data-overview] { grid-template-columns: minmax(0, 1fr) minmax(270px, 340px); }
-    .side .context { display: contents; }
-    .composer { order: -1; }
-    :global([data-folder-section='quadro']) .sheet[data-overview] > :is(.middle,.side) {
-        max-height: max(320px, calc(100dvh - 242px));
-        overflow-y: auto;
-        scrollbar-width: thin;
-        padding: 2px 4px 6px;
-        scroll-padding: 6px;
+        padding-inline: 6px;
+        background: var(--lume-record-tray);
+        border-radius: 8px;
     }
 }
-@media (min-width: 1280px) {
-    :global([data-folder-section='quadro']) .sheet[data-overview] {
-        grid-template-columns: minmax(185px, 270px) minmax(0, 1fr) minmax(280px, 340px);
+@container record-sheet (width >= 62rem) {
+    :global([data-folder-section='quadro']) .sheet:not([data-writing]) .overview {
+        grid-template-columns: minmax(0, 1.04fr) minmax(0, 1.2fr) minmax(0, 1fr);
     }
-    :global([data-folder-section='quadro']) .sheet[data-overview] > .side { display: contents; }
-    .middle { grid-column: 2; grid-row: 1; }
-    .stable { grid-column: 1; grid-row: 1; }
-    .side .context { display: grid; grid-column: 3; grid-row: 1; }
-    :global([data-folder-section='quadro']) .sheet[data-overview] .side > :is(.stable,.context) {
-        max-height: max(320px, calc(100dvh - 242px));
+    :global([data-folder-section='quadro']) .sheet:not([data-writing]) .side { display: contents; }
+    :global([data-folder-section='quadro']) .sheet:not([data-writing]) .middle { grid-column: 2; grid-row: 1; }
+    :global([data-folder-section='quadro']) .sheet:not([data-writing]) .stable { grid-column: 1; grid-row: 1; }
+    :global([data-folder-section='quadro']) .sheet:not([data-writing]) .context { grid-column: 3; grid-row: 1; }
+    :global([data-folder-section='quadro']) .sheet:not([data-writing]) :is(.middle, .side > .stable, .side > .context) {
+        max-height: max(320px, calc(100dvh - 212px));
         overflow-y: auto;
         scrollbar-width: thin;
-        padding: 2px 4px 6px;
-        scroll-padding: 6px;
     }
 }
-@media (max-width: 999px) {
-    :global([data-folder-section='quadro']) .sheet[data-overview] :is(.middle,.side,.context) { display: contents; }
-    .support { order: -5; }
+@container record-sheet (width < 44rem) {
+    :global([data-folder-section='quadro']) .overview :is(.middle, .side, .context) { display: contents; }
+    .overviewIndex { order: -5; }
     .composer { order: -4; }
-    .activity { order: -3; }
-    .stable { order: -2; }
-    .contextRows { order: 2; }
-    :global([data-folder-section='quadro']) .sheet:not([data-full-diary]) .middle :global(#diario:not(:target) [role='feed'] > article:nth-of-type(n + 6)) { display: none; }
-    :global([data-folder-section='quadro']) .fullDiary { display: inline-flex; justify-self: start; order: 1; }
+    .contextRows > [data-source-open='true'] { order: -3; }
+    .middle > .zoneTitle, .activity { order: -2; }
+    .stable { order: -1; }
+    .stable > section:has(.therapies) { order: -1; }
+    .stable > .zoneTitle { order: -2; }
+    .context > .zoneTitle, .support, .contextRows { order: 2; }
+    .sheet[data-full-diary] .diaryTools { order: -1; }
 }
-@media (min-width: 700px) and (max-width: 999px) {
-    .stable { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .stable .notes { grid-column: 1 / -1; }
-}
-
-.contextRows:has([data-source-open='true']) { display: contents; }
-.contextRows > [data-source-open='true'] { order: -1; }
 @media (max-width: 999px) {
-    .contextRows > [data-source-open='true'] { order: -4; }
+    :global([data-folder-section='quadro']) .sheet:not([data-full-diary]) .middle :global(#diario:not(:target) [role='feed'] > article:nth-of-type(n + 6)) { display: none; }
+}
+@media (pointer: coarse) {
+    .overviewIndex a, .islandAction { min-height: 44px; align-content: center; }
 }

@@ -78,6 +78,14 @@
   --type-body: 400 0.875rem/1.5 var(--lume-font-sans);
   --type-strong: 600 0.875rem/1.5 var(--lume-font-sans);
   --type-threshold: 600 0.9375rem/1.5 var(--lume-font-sans);
+  --type-record-person: 600 1.75rem/2rem var(--lume-font-sans);
+  --type-record-zone: 600 1.25rem/1.5rem var(--lume-font-sans);
+  --type-record-island: 600 1.0625rem/1.375rem var(--lume-font-sans);
+  --type-record-data: 400 0.8125rem/1.125rem var(--lume-font-sans);
+  --type-record-label: 600 0.75rem/1rem var(--lume-font-sans);
+  --type-record-meta: 400 0.75rem/1rem var(--lume-font-sans);
+  --type-record-text: 400 0.9375rem/1.375rem var(--lume-font-sans);
+  --type-record-row: 600 0.9375rem/1.375rem var(--lume-font-sans);
   --type-meta: 400 0.8125rem/1.5 var(--lume-font-sans);
   --type-section-heading: 600 0.9375rem/1.5 var(--lume-font-sans);
   --type-section: 600 0.75rem/1.5 var(--lume-font-sans);
@@ -1913,3 +1921,8 @@ html:root[data-lume] .mf-button-destructive:disabled {
    keyboard focus elsewhere keeps the visible outline. */
 h1[tabindex='-1']:focus:not(:focus-visible),
 h1[tabindex='-1']:focus { outline: none; }
+
+.mf-draft-return { position: fixed; left: max(14px, calc(100vw - 100% + 14px)); bottom: 18px; z-index: 6; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px dashed var(--lume-ink-muted); border-radius: 999px; background: var(--lume-surface-focal); color: var(--lume-ink); font: var(--type-body); }
+.mf-draft-return #bozza-parole { display: none; }
+@media (min-width: 1001px) { .mf-draft-return #bozza-parole { display: inline; } [data-patient-record='true'] .mf-draft-return { left: calc(var(--twin-rail) + 26px); } }
+@media (max-width: 700px) { .mf-draft-return { bottom: calc(72px + env(safe-area-inset-bottom)); } }
