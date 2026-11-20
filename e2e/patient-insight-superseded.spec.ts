@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 import type { FunctionModelPreferences } from '../lib/function-models/browser';
 import { parsePatientInsightPreviewRequest, type PatientInsightPreviewRequest } from '../lib/ai-providers/fabric/patient-insight-preview-contract';
-import { bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch } from './utils';
+import { bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch, openUnlockedDocument } from './utils';
 
 const MODEL = 'synthetic-patient-insight:latest';
 const MODEL_OPTION_ID = `model_option_${'a'.repeat(32)}`;
@@ -59,7 +59,7 @@ async function generatedProposal(page: Page) {
     requests.push(request);
     await route.fulfill({ status: 200, json: availablePreview(request) });
   });
-  await page.goto(`/patients/${patientId}/modules`);
+  await openUnlockedDocument(page, `/patients/${patientId}/modules`);
   await openPatientSection(page, 'attenzione');
   const panel = page.locator('#patient-insight');
   await panel.locator(':scope > div > [data-disclosure-control]').click();
