@@ -2,15 +2,22 @@ import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { bancoPaths, readBancoReference } from './banco-paths.mjs';
 import { openPatientSection, unlockIfNeeded, isVisible } from '../../e2e/utils';
-const output = process.env.MF_BANCO_CAPTURES || process.env.MF_BANCO_CAPTURE_DIR || join(homedir(), 'Antigravity', 'mf-ui-identita-20261107', 'web');
-const data = process.env.MEDIFLOW_DATA_DIR || '/Volumes/Vision/mf-ui-identita-20261107-scratch/apfs/banco';
-test('sequenza canonica 01-07', async ({ page }, info) => {
-  if (!data.startsWith('/Volumes/Vision/mf-ui-identita-20261107-scratch/') || !fs.existsSync(`${data}/SYNTHETIC_ONLY`)) throw new Error('Solo banco sintetico');
-  const { referenceId, emptyId } = JSON.parse(fs.readFileSync(`${data}/reference.json`, 'utf8'));
-  fs.mkdirSync(output, { recursive: true });
+const paths = bancoPaths();
+const output = process.env.MF_BANCO_CAPTURES || process.env.MF_BANCO_CAPTURE_DIR || (paths.needsContainer
+  ? join(homedir(), 'Antigravity', 'mf-ui-identita-20261107', 'web')
+  : join(paths.scratch, 'web'));
+
+test.beforeEach(async ({ page }, info) => {
   const theme = info.project.name.startsWith('giorno') ? 'light' : 'dark';
   await page.addInitScript(t => localStorage.setItem('mediflow-theme', t), theme);
+});
+
+test('sequenza canonica 01-07', async ({ page }, info) => {
+  const { referenceId, emptyId } = readBancoReference(paths);
+  fs.mkdirSync(output, { recursive: true });
+  const theme = info.project.name.startsWith('giorno') ? 'light' : 'dark';
   const capture = async (name: string) => {
     await expect(page.locator('html')).toHaveClass(new RegExp(theme));
     await page.evaluate(() => document.fonts.ready);
@@ -50,12 +57,14 @@ test('sequenza canonica 01-07', async ({ page }, info) => {
 });
 
 
-test('allergie: pillola dal campo strutturato e modifica della scheda', async ({ page }) => {
-  const { referenceId, emptyId } = JSON.parse(fs.readFileSync(`${data}/reference.json`, 'utf8'));
+test('allergie: pillola dal campo strutturato e modifica della scheda', async ({ page }, info) => {
+  const { referenceId, emptyId } = readBancoReference(paths);
   await page.goto(`/patients/${referenceId}/modules`);
   if (await isVisible(page.getByLabel('PIN operatore').first(), 2500)) await unlockIfNeeded(page, '314159');
   await expect(page.getByRole('list', { name: 'Allergie', exact: true })).toContainText('Amoxicillina');
   await expect(page.getByRole('list', { name: 'Allergie', exact: true })).toContainText('▲');
+  fs.mkdirSync(output, { recursive: true });
+  await page.screenshot({ path: join(output, `08-allergia-strutturata-${info.project.name}.png`), animations: 'disabled' });
   await page.goto(`/patients/${emptyId}/modules`);
   await expect(page.getByText('Allergie: nessuna registrata', { exact: true })).toBeVisible();
   await expect(page.getByRole('list', { name: 'Allergie', exact: true })).toHaveCount(0);
@@ -70,7 +79,10 @@ test('allergie: pillola dal campo strutturato e modifica della scheda', async ({
   await page.goto(`/patients/${emptyId}/edit`);
   await expect(page.getByLabel('Sostanza *', { exact: true })).toHaveValue('Lattice sintetico');
   await expect(page.getByLabel('Reazione', { exact: true })).toHaveValue('Orticaria sintetica');
-  await expect(page.getByLabel('Gravità della reazione', { exact: true })).toHaveValue('moderate');
+  const severity = page.getByLabel('Gravità della reazione', { exact: true });
+  await expect(severity).toHaveValue('moderate');
+  await severity.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: join(output, `09-allergia-persistita-${info.project.name}.png`), animations: 'disabled' });
   await page.getByLabel('Sostanza *', { exact: true }).fill('Nichel sintetico');
   await page.getByRole('button', { name: 'Aggiorna scheda', exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/patients/${emptyId}/modules`));

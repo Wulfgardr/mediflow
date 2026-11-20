@@ -212,7 +212,9 @@
 .embedded { container-type: inline-size; }
 .embedded .form { padding: 14px; }
 .embedded .editor { border-color: var(--lume-ink-muted); }
-.embedded .editor [data-lume-editor-surface="field"] { min-height: 120px; }
+@media (width > 680px) {
+    .embedded .editor [data-lume-editor-surface="field"] { min-height: 120px; }
+}
 .embedded .actions { position: static; margin: 14px 0 18px; padding: 10px 0; border-radius: 0; }
 .review { margin-block: 12px; overflow-wrap: anywhere; }
 .review h2 { font: var(--type-strong); }
