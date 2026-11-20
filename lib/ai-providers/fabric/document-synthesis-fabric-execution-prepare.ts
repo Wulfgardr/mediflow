@@ -37,11 +37,11 @@ function abort(entry: Entry): void { if (entry.state === 'aborted') return; entr
 function responseContent(value: unknown): object | null {
     try { if (!value || typeof value !== 'object' || IsProxy(value) || ObjectGetPrototypeOf(value) !== OBJECT || ReflectOwnKeys(value).length !== 2) return null; const content = ObjectGetOwnPropertyDescriptor(value, 'content'); const stats = ObjectGetOwnPropertyDescriptor(value, 'stats'); if (!content || !stats || !content.enumerable || !stats.enumerable || !ObjectHasOwn(content, 'value') || !ObjectHasOwn(stats, 'value') || typeof content.value !== 'string') return null; return ObjectFreeze({ content: content.value }); } catch { return null; }
 }
-function invoke(entry: Entry, resolution: LocalProviderResolution, prompt: string): Promise<Outcome> {
+function invoke(entry: Entry, resolution: LocalProviderResolution, prompt: string, maxTokens: number): Promise<Outcome> {
     let resolveOutcome!: (value: Outcome) => void;
     const outcome = new PromiseConstructor<Outcome>((resolve) => { resolveOutcome = resolve; }); entry.settle = resolveOutcome;
     entry.timer = SetTimeout(() => { if (entry.state === 'running') { try { entry.controller.abort(); } catch { /* Internal timeout only. */ } resolveOutcome(frozen({ kind: 'timeout' as const })); } }, timeoutMs);
-    let returned: unknown; try { returned = resolution.adapter.chat([{ role: 'user', content: prompt }], entry.controller.signal, documentSynthesisResponseTokenLimit(prompt), ObjectFreeze({ responseFormat: 'document_synthesis_v2' })); } catch { resolveOutcome(frozen({ kind: 'failure' as const })); return outcome; }
+    let returned: unknown; try { returned = resolution.adapter.chat([{ role: 'user', content: prompt }], entry.controller.signal, maxTokens, ObjectFreeze({ responseFormat: 'document_synthesis_v2' })); } catch { resolveOutcome(frozen({ kind: 'failure' as const })); return outcome; }
     try {
         if (opaque(returned) && ObjectGetPrototypeOf(returned) === PromiseConstructor.prototype) { const observed = ReflectApply(PromiseThen, returned, [(value: unknown) => resolveOutcome(frozen({ kind: 'response' as const, value })), () => resolveOutcome(frozen({ kind: 'failure' as const }))]); ReflectApply(PromiseThen, observed, [() => undefined, () => undefined]); }
         else { const then = opaque(returned) ? ObjectGetOwnPropertyDescriptor(returned, 'then') : null; if (then && ObjectHasOwn(then, 'value') && typeof then.value === 'function') { const tail = ReflectApply(then.value, returned, [(value: unknown) => resolveOutcome(frozen({ kind: 'response' as const, value })), () => resolveOutcome(frozen({ kind: 'failure' as const }))]); if (opaque(tail) && ObjectGetPrototypeOf(tail) === PromiseConstructor.prototype) ReflectApply(PromiseThen, tail, [() => undefined, () => undefined]); } else resolveOutcome(frozen({ kind: 'response' as const, value: returned })); }
@@ -86,12 +86,14 @@ export async function prepareDocumentSynthesisFabricExecution(handoff: unknown, 
     const current = typeof stillCurrent === 'function' && !IsProxy(stillCurrent) ? stillCurrent as () => unknown : null;
     const failure: { code: DenialCode } = { code: 'provider_unavailable' };
     const sources = readDocumentSynthesisPromptSources(input.prompt);
-    let prompt = input.prompt;
+    const maxTokens = documentSynthesisResponseTokenLimit(input.prompt);
+    const initialPrompt = `${input.prompt}\nQuote one continuous passage with clinical information that supports the summary. Do not cite a heading alone. If the clinical text repeats, extend the passage with just enough adjacent literal context (such as a page heading) to make it unique. If that still fails, choose another supporting passage that occurs once.`;
+    let prompt = initialPrompt;
     // L'ammissione accetta solo una ricevuta `local_process`: il luogo e' sempre il modello locale.
     const outcome = await runLocalGenerationAttempts<object, DenialCode>({
         venue: 'local_process',
         attempt: async () => {
-            const settled = await invoke(entry, admission.resolution, prompt);
+            const settled = await invoke(entry, admission.resolution, prompt, maxTokens);
             if (entry.timer !== null) { ClearTimeout(entry.timer); entry.timer = null; } entry.settle = null;
             if (entry.state !== 'running') { failure.code = 'canceled'; return ObjectFreeze({ status: 'provider_failed' as const }); }
             if (settled.kind === 'timeout') { failure.code = 'provider_timeout'; return ObjectFreeze({ status: 'provider_failed' as const }); }
@@ -101,11 +103,11 @@ export async function prepareDocumentSynthesisFabricExecution(handoff: unknown, 
             if (parsed.status !== 'available') return ObjectFreeze({ status: 'rejected' as const, reason: 'invalid' as const });
             const rejected = localCheck(parsed.token, sources);
             if (rejected === 'citation_count') {
-                prompt = `${input.prompt}\nCorrection: match SOURCE_COUNT exactly. Return one citation per source label in source order, using a single continuous clinical passage for each quote.`;
+                prompt = `${initialPrompt}\nCorrection: match SOURCE_COUNT exactly. Return one citation per source label in source order, using a single continuous clinical passage for each quote.`;
                 return ObjectFreeze({ status: 'rejected' as const, reason: 'invalid' as const });
             }
             if (rejected === 'unfaithful') {
-                prompt = `${input.prompt}\nCorrection: copy a continuous clinical passage that occurs exactly once in its labelled source. If it repeats, copy the nearest literal context with it or select a different unique supporting passage. Do not invent text or cite a heading alone.`;
+                prompt = `${initialPrompt}\nCorrection: copy a continuous clinical passage that occurs exactly once in its labelled source. If it repeats, copy the nearest literal context with it or select a different unique supporting passage. Do not invent text or cite a heading alone.`;
             }
             return rejected ? ObjectFreeze({ status: 'rejected' as const, reason: rejected }) : ObjectFreeze({ status: 'accepted' as const, value: parsed.token });
         },
