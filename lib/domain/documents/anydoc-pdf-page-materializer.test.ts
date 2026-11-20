@@ -11,8 +11,9 @@ import {
     materializeAnyDocPdfPages,
 } from './anydoc-pdf-page-materializer';
 import { ANYDOC_LOCAL_EXTRACTION_MAX_SOURCE_BYTES } from './anydoc-local-extraction-contract';
+import { ANYDOC_PDF_CHILD_WORKER_SHA256 } from './anydoc-pdf-child-process-owner';
 
-const ENGINE_SHA256 = 'ea12718f14e91e9189709f4d959cb9a6710c3abe25fd875c606c61f653e52466';
+const ENGINE_SHA256 = '0dcc41546a6717986c8946023bac2e85ab8dc3f2c794e3fb0164223dd2ea3514';
 const sha256 = (bytes: Uint8Array | string) => createHash('sha256').update(bytes).digest('hex');
 const routing = (pageCount: number, pages: readonly number[] = [1]) => ({
     schemaVersion: 'mediflow.anydoc_page_routing.v1' as const, pages, pageCount,
@@ -59,10 +60,12 @@ test('materializes every source page once, in order, with deterministic digest-b
         const pdf = await PDFDocument.load(pdfBytes); return [pdf.getPageCount(), pdf.getPage(0).getWidth()];
     })), [[1, 611], [1, 622], [1, 633]]);
     assert.deepEqual(first.pages.map((page) => Buffer.compare(page.pdfBytes, second.pages[page.page - 1]!.pdfBytes)), [0, 0, 0]);
+    const descriptorSha256 = sha256(ANYDOC_PDF_PAGE_MATERIALIZER_DESCRIPTOR);
+    assert.equal(descriptorSha256, ENGINE_SHA256);
     for (const page of first.pages) assert.deepEqual(page.receipt, {
         sourceSha256, sourceByteLength: source.byteLength, page: page.page,
         pageSha256: sha256(page.pdfBytes), pageByteLength: page.pdfBytes.byteLength,
-        materializerSha256: ENGINE_SHA256,
+        materializerSha256: descriptorSha256,
     });
     assert.equal(ANYDOC_PDF_PAGE_MATERIALIZER_SHA256, ENGINE_SHA256);
     assert.equal('text' in first, false); assert.equal('routing' in first, false);
@@ -128,7 +131,9 @@ test('enforces source, page-count and cumulative output byte limits without part
 test('pins the reviewed child engine graph and excludes parser, renderer and PDF engines from the parent', () => {
     const root = new URL('../../../', import.meta.url); const pkg = JSON.parse(readFileSync(new URL('package.json', root), 'utf8'));
     const lock = JSON.parse(readFileSync(new URL('package-lock.json', root), 'utf8')); const source = readFileSync(new URL('./anydoc-pdf-page-materializer.ts', import.meta.url), 'utf8');
-    const worker = readFileSync(new URL('../../../scripts/anydoc-pdf-page-worker.mjs', import.meta.url), 'utf8');
+    const workerBytes = readFileSync(new URL('../../../scripts/anydoc-pdf-page-worker.mjs', import.meta.url));
+    assert.equal(sha256(workerBytes), ANYDOC_PDF_CHILD_WORKER_SHA256);
+    const worker = workerBytes.toString('utf8');
     assert.equal(pkg.dependencies['pdf-lib'], '1.17.1');
     const expected = [
         ['node_modules/pdf-lib', '1.17.1', 'sha512-V/mpyJAoTsN4cnP31vc0wfNA1+p20evqqnap0KLoRUN0Yk/p3wN52DOEsL4oBFcLdb76hlpKPtzJIgo67j/XLw==', 'MIT'],

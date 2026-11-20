@@ -10,6 +10,8 @@ import { assertNodeRuntime, readNodeContract, standaloneDirectory } from './node
 import { assertScheduledBackupRuntime } from './scheduled-backup-runtime-contract.mjs';
 import { assertStandaloneRuntimeChunks } from './standalone-runtime-chunks.mjs';
 import { formatPdfSmokeFailure } from './anydoc-pdf-smoke-diagnostics.mjs';
+import { countWindowsIcuPngInk } from './anydoc-windows-icu-png-oracle.mjs';
+import { documentChildLaunch } from './document-child-launcher.mjs';
 
 import http from 'node:http';
 import https from 'node:https';
@@ -80,14 +82,13 @@ class PdfPageWorkerSmokeError extends Error {}
 const ANYDOC_WORKER_FILE = 'anydoc-local-extraction-worker.mjs';
 const ANYDOC_WORKER_SHA256 = '5d6e2e60f1d71f3fd45065961258a7debe8a96e017abdcee92823986c8f08c67';
 const ANYDOC_PDF_PAGE_WORKER_FILE = 'anydoc-pdf-page-worker.mjs';
-const ANYDOC_PDF_PAGE_WORKER_SHA256 = '5facb4803373cd1a15c7548813f9a3662107dd0efd5e9cf3739643921e49cedc';
+const ANYDOC_PDF_PAGE_WORKER_SHA256 = '76c33a3e4c68e6db85fd2dab2d189a7fdb8f4d0e4cf91a40468900ed8038bf09';
 const PDFJS_STANDARD_FONT_FILES = Object.freeze([
   'FoxitDingbats.pfb', 'FoxitFixed.pfb', 'FoxitFixedBold.pfb', 'FoxitFixedBoldItalic.pfb', 'FoxitFixedItalic.pfb',
   'FoxitSerif.pfb', 'FoxitSerifBold.pfb', 'FoxitSerifBoldItalic.pfb', 'FoxitSerifItalic.pfb', 'FoxitSymbol.pfb',
   'LiberationSans-Bold.ttf', 'LiberationSans-BoldItalic.ttf', 'LiberationSans-Italic.ttf', 'LiberationSans-Regular.ttf',
 ]);
 const ANYDOC_PDF_CHILD_SCHEMA_VERSION = 'mediflow.anydoc_pdf_child_protocol.v1';
-const ANYDOC_PDF_CHILD_MAX_OLD_SPACE_MB = 256;
 const ANYDOC_LOCAL_EXTRACTION_ROUTE_DIRECTORY = path.join(
   'server', 'app', 'api', 'attachments', '[id]', 'local-extraction',
 );
@@ -340,11 +341,13 @@ function decodePdfChildFrame(output) {
 }
 
 function syntheticPdfPage() {
+  const stream = 'BT /F1 14 Tf 8 10 Td (MediFlow 012345) Tj ET';
   const objects = [
     '<< /Type /Catalog /Pages 2 0 R >>',
     '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 72 36] /Resources << >> /Contents 4 0 R >>',
-    '<< /Length 3 >>\nstream\nq Q\nendstream',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 128 32] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
+    `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>',
   ];
   const parts = [Buffer.from('%PDF-1.4\n')];
   const offsets = [];
@@ -354,37 +357,37 @@ function syntheticPdfPage() {
   }
   const xrefOffset = parts.reduce((total, part) => total + part.byteLength, 0);
   const xref = offsets.map((offset) => `${String(offset).padStart(10, '0')} 00000 n \n`).join('');
-  parts.push(Buffer.from(`xref\n0 5\n0000000000 65535 f \n${xref}trailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`));
+  parts.push(Buffer.from(`xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${xref}trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`));
   return Buffer.concat(parts);
 }
 
 function runPdfChild(workerPath, input, { allowAddons = false, args = [] } = {}) {
   const packageRoot = path.dirname(path.dirname(workerPath));
-  const runtimeArguments = [
-    `--max-old-space-size=${ANYDOC_PDF_CHILD_MAX_OLD_SPACE_MB}`,
-    '--permission',
-    '--disable-warning=SecurityWarning',
-    `--allow-fs-read=${packageRoot}`,
-    ...(allowAddons ? ['--allow-addons'] : []),
-    workerPath,
-    ...args,
-  ];
   const started = performance.now();
-  const result = spawnSync(process.execPath, runtimeArguments, {
-    cwd: path.dirname(workerPath),
-    env: { NODE_ENV: 'production', NAPI_RS_ENFORCE_VERSION_CHECK: '1' },
-    input,
-    encoding: 'buffer',
-    timeout: 30_000,
-    maxBuffer: 4 * 1024 * 1024,
-    windowsHide: true,
-  });
+  const result = runDocumentSmoke(packageRoot, workerPath, input, {
+    allowAddons, args, networkGuard: false,
+  }, 30_000);
   if (process.env.MEDIFLOW_PDF_SMOKE_TIMINGS === '1') {
     console.log(JSON.stringify({ type: 'pdf-smoke-timing', stage: allowAddons ? 'render' : 'materialize',
       elapsedMs: Math.round(performance.now() - started), status: result.status,
       signal: result.signal, error: result.error?.code ?? null }));
   }
   return result;
+}
+
+function runDocumentSmoke(root, worker, input, options, timeout) {
+  const launch = documentChildLaunch(root, worker, options);
+  try { return spawnSync(launch.command, launch.args, {
+    cwd: path.dirname(worker),
+    env: launch.env,
+    input,
+    encoding: 'buffer',
+    timeout,
+    maxBuffer: 4 * 1024 * 1024,
+    windowsHide: true,
+  }); } finally {
+    if (launch.cleanup?.() === false) throw new Error('Windows document sandbox cleanup failed.');
+  }
 }
 
 /* follow the pinned worker's desktop profiles and minimum glibc version.
@@ -398,7 +401,7 @@ function supportsPdfRendering(profiles, platform, arch, glibcVersion) {
   return major > 2 || (major === 2 && minor >= 18);
 }
 
-function framedPdfPageWorkerSmokeFailure(workerPath) {
+function framedPdfPageWorkerSmokeFailure(workerPath, observePng) {
   const source = syntheticPdfPage();
   const materialize = runPdfChild(workerPath, encodePdfChildFrame({
     schemaVersion: ANYDOC_PDF_CHILD_SCHEMA_VERSION,
@@ -421,20 +424,21 @@ function framedPdfPageWorkerSmokeFailure(workerPath) {
     return formatPdfSmokeFailure('materialize', 'response', materialize);
   }
 
+  const profiles = JSON.parse(fs.readFileSync(path.join(path.dirname(workerPath), 'anydoc-pdf-renderer-profiles.json'), 'utf8'));
+  const glibcVersion = process.platform === 'linux' ? process.report.getReport().header.glibcVersionRuntime : undefined;
+  const supported = supportsPdfRendering(profiles, process.platform, process.arch, glibcVersion);
   const render = runPdfChild(workerPath, encodePdfChildFrame({
     schemaVersion: ANYDOC_PDF_CHILD_SCHEMA_VERSION,
     operation: 'render',
     pages: [{ page: 1, byteLength: materialized.body.byteLength }],
     bodyByteLength: materialized.body.byteLength,
-  }, [materialized.body]), { allowAddons: true });
+  }, [materialized.body]), { allowAddons: true, args: supported ? ['--smoke-renderer-init'] : [] });
   if (render.error || render.status !== 0 || render.signal !== null
       || !Buffer.isBuffer(render.stderr) || render.stderr.byteLength !== 0) {
     return formatPdfSmokeFailure('render', 'transport', render);
   }
   const rendered = decodePdfChildFrame(render.stdout);
-  const profiles = JSON.parse(fs.readFileSync(path.join(path.dirname(workerPath), 'anydoc-pdf-renderer-profiles.json'), 'utf8'));
-  const glibcVersion = process.platform === 'linux' ? process.report.getReport().header.glibcVersionRuntime : undefined;
-  if (!supportsPdfRendering(profiles, process.platform, process.arch, glibcVersion)) {
+  if (!supported) {
     return rendered?.header?.schemaVersion === ANYDOC_PDF_CHILD_SCHEMA_VERSION
       && rendered.header.status === 'error' && rendered.header.reason === 'engine_unavailable'
       && rendered.header.bodyByteLength === 0 && rendered.body.byteLength === 0
@@ -448,11 +452,21 @@ function framedPdfPageWorkerSmokeFailure(workerPath) {
       || rendered.header.bodyByteLength !== rendered.body.byteLength
       || !Array.isArray(rendered.header.pages) || rendered.header.pages.length !== 1
       || raster?.page !== 1 || raster?.byteLength !== rendered.body.byteLength
-      || raster?.width !== 144 || raster?.height !== 72
+      || raster?.width !== 256 || raster?.height !== 64
       || !Number.isSafeInteger(raster?.durationMs) || raster.durationMs < 0
       || !rendered.body.subarray(0, pngSignature.byteLength).equals(pngSignature)) {
     return formatPdfSmokeFailure('render', 'response', render);
   }
+  try {
+    const inkPixels = countWindowsIcuPngInk(rendered.body);
+    if (process.env.MEDIFLOW_PDF_SMOKE_TIMINGS === '1') {
+      console.log(JSON.stringify({ type: 'pdf-smoke-rendered-text', width: raster.width, height: raster.height, inkPixels,
+        pngSha256: createHash('sha256').update(rendered.body).digest('hex') }));
+    }
+  } catch {
+    return formatPdfSmokeFailure('render', 'text_pixels', render);
+  }
+  observePng?.(rendered.body);
   return null;
 }
 
@@ -1208,8 +1222,10 @@ const pdfPageWorkerFailure = bundledPdfPageWorkerFailure(standaloneDir);
 if (pdfPageWorkerFailure) fail(pdfPageWorkerFailure);
 const pdfPageWorkerTraceFailure = bundledPdfPageWorkerTraceFailure(standaloneDir);
 if (pdfPageWorkerTraceFailure) fail(pdfPageWorkerTraceFailure);
+let syntheticPdfPng;
 const pdfPageWorkerSmokeFailure = framedPdfPageWorkerSmokeFailure(
   path.join(standaloneDir, 'scripts', ANYDOC_PDF_PAGE_WORKER_FILE),
+  png => { syntheticPdfPng = png; },
 );
 if (pdfPageWorkerSmokeFailure) fail(pdfPageWorkerSmokeFailure);
 const windowsBootstrapFailure = await windowsBootstrapBundleFailure(standaloneDir);
@@ -1305,17 +1321,29 @@ if (!anyDocNativePackage) fail('AnyDoc does not declare a native package for the
 const anyDocNativeManifest = requireFromStandalone.resolve(`${anyDocNativePackage}/package`);
 const anyDocNativeDir = path.dirname(assertRealpathInsideStandalone(anyDocNativeManifest, `${anyDocNativePackage} package`));
 nativeArtifacts(anyDocNativeDir, `${anyDocNativePackage} native binding`, (name) => name.endsWith('.node'));
-const anyDocRun = spawnSync(process.execPath, [anyDocWorkerPath], {
-  cwd: path.dirname(anyDocWorkerPath),
-  env: { NODE_ENV: 'production', NAPI_RS_ENFORCE_VERSION_CHECK: '1' },
-  input: SYNTHETIC_RTF,
-  encoding: 'buffer',
-  timeout: 15_000,
-  windowsHide: true,
-});
+const anyDocRun = runDocumentSmoke(standaloneDir, anyDocWorkerPath, SYNTHETIC_RTF, { allowAddons: true }, 15_000);
 if (anyDocRun.error || anyDocRun.status !== 0 || !Buffer.isBuffer(anyDocRun.stdout)
     || anyDocRun.stdout.toString('utf8') !== 'Synthetic standalone note.\n') {
-  fail('Standalone runtime AnyDoc worker did not extract the synthetic RTF with its allowlisted environment.');
+  fail('Standalone runtime AnyDoc worker did not extract the synthetic RTF through the production launcher.');
+}
+
+const anyDocPdfRun = runDocumentSmoke(standaloneDir, anyDocWorkerPath, syntheticPdfPage(), { allowAddons: true }, 15_000);
+if (anyDocPdfRun.error || anyDocPdfRun.status !== 0 || anyDocPdfRun.signal !== null
+    || !Buffer.isBuffer(anyDocPdfRun.stdout) || anyDocPdfRun.stdout.toString('utf8') !== '## MediFlow 012345\n') {
+  fail('Standalone runtime AnyDoc worker did not extract the synthetic PDF text through the production launcher.');
+}
+
+if (process.env.MEDIFLOW_PDF_SMOKE_TIMINGS === '1') {
+  console.log(JSON.stringify({ type: 'pdf-smoke-extracted-text', text: 'MediFlow 012345' }));
+}
+const documentSmokeOutput = process.env.MEDIFLOW_PDF_SMOKE_OUTPUT_DIR;
+if (documentSmokeOutput) {
+  if (!path.isAbsolute(documentSmokeOutput) || !syntheticPdfPng) {
+    fail('Standalone PDF smoke output needs an absolute directory and a rendered synthetic PNG.');
+  }
+  fs.mkdirSync(documentSmokeOutput, { recursive: true });
+  fs.writeFileSync(path.join(documentSmokeOutput, 'synthetic-text.md'), anyDocPdfRun.stdout);
+  fs.writeFileSync(path.join(documentSmokeOutput, 'synthetic-page.png'), syntheticPdfPng);
 }
 
 let databaseEntry;

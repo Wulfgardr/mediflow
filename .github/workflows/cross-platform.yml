@@ -146,6 +146,9 @@ jobs:
         run: node scripts/prepare-windows-launcher-bootstrap.mjs verify
       - name: Install (npm ci)
         run: npm ci && npm run prepare:dependencies
+      - name: Verify Windows document AppContainer profile lifecycle
+        if: runner.os == 'Windows'
+        run: node --test scripts/document-windows-sandbox.test.mjs
       - name: Verify better-sqlite3 native binding loads
         run: node -e "const db=require('better-sqlite3')(':memory:'); console.log('better-sqlite3 query result:', db.prepare('select 1 as x').get().x);"
       - name: Flag better-sqlite3 source compile (non-fatal visibility)
@@ -174,7 +177,14 @@ jobs:
       - name: Unified launcher smoke (first build and verified boot)
         env:
           MEDIFLOW_PDF_SMOKE_TIMINGS: '1'
+          MEDIFLOW_PDF_SMOKE_OUTPUT_DIR: ${{ runner.os == 'Windows' && format('{0}/mediflow-document-smoke', runner.temp) || '' }}
         run: node scripts/ci-start-smoke.mjs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: runner.os == 'Windows'
+        with:
+          name: windows-x64-standalone-document-smoke
+          path: ${{ runner.temp }}/mediflow-document-smoke/
+          if-no-files-found: error
 
   static-checks:
     if: github.event_name != 'workflow_dispatch' || !inputs.regenerate_bootstrap
