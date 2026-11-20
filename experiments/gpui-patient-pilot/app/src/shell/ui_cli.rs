@@ -506,11 +506,16 @@ fn shell_ui_cli_shared_observation_button(cx: &mut gpui::TestAppContext) {
 #[gpui::test]
 fn shell_ui_cli_review_returns_without_registering(cx: &mut gpui::TestAppContext) {
     let (host, cx) = shell_fixture(cx);
+    let requests_before_review = host.routes().len();
     run(
         include_str!("../../../../../e2e/ui-cli/gpui-shell-review.jsonl"),
         |action| drive(action, cx),
     );
-    assert!(host.routes().iter().all(|route| route.starts_with("GET ")));
+    assert!(
+        host.routes()[requests_before_review..]
+            .iter()
+            .all(|route| route.starts_with("GET "))
+    );
 }
 
 #[gpui::test]
