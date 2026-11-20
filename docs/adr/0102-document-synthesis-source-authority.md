@@ -613,10 +613,12 @@ scartate per una citazione non letterale, mostrata col messaggio generico.
 
 ### Guida per le citazioni ripetute
 
-Il prompt chiede un passaggio clinico continuo che sostenga il riassunto. Se il
-testo si ripete, chiede di includere il contesto letterale adiacente sufficiente
-a rendere unico il brano, oppure di scegliere un altro passaggio clinico
-univoco. Una sola intestazione è insufficiente come evidenza.
+L'adapter locale riceve la richiesta di scegliere un passaggio clinico continuo
+che sostenga il riassunto. Se il testo si ripete, la richiesta indica di
+includere il contesto letterale adiacente sufficiente a rendere unico il brano,
+oppure di scegliere un altro passaggio clinico univoco. Una sola intestazione
+è insufficiente come evidenza. Il prompt ordinario condiviso resta la base
+per il calcolo del budget di risposta di entrambi i tentativi locali.
 
 Nel percorso locale anche un numero errato di citazioni consuma il primo
 tentativo e consente una sola correzione, dopo la verifica di attualità e

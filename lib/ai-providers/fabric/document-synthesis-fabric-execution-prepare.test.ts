@@ -178,7 +178,12 @@ for (const [name, firstQuotes, correction] of [
     test(`local scanned PDF: ${name} can be corrected once using the same source`, async () => {
         assert.equal(createHash('sha256').update(SCAN_SOURCE).digest('hex'), '03bd00a527cf4300d8df17357efc75188877406cb82d7bce0b51139767b3e04f');
         const prompts: string[] = [];
-        const fixture = await handoff(scriptedChat([pdfBody(firstQuotes), pdfBody([SCAN_QUOTE])], prompts), undefined, SCAN_SOURCE);
+        const budgets: unknown[] = [];
+        const chat = scriptedChat([pdfBody(firstQuotes), pdfBody([SCAN_QUOTE])], prompts);
+        const fixture = await handoff(async (...args) => {
+            budgets.push(args[2]);
+            return chat(...args);
+        }, undefined, SCAN_SOURCE);
         try {
             const result = await prepareDocumentSynthesisFabricExecution(fixture.value);
             assert.equal(prompts.length, 2);
@@ -190,11 +195,15 @@ for (const [name, firstQuotes, correction] of [
             assert.equal(citation.quote, SCAN_QUOTE);
             assert.equal(Buffer.from(SCAN_SOURCE).subarray(citation.startByte, citation.endByte).toString(), SCAN_QUOTE);
             assert.equal(publication.provenance.fabricProvenance.receipt.egressProfile.egress, 'none');
+            assert.match(prompts[0]!, /\nEND_SOURCE_SET\nQuote one continuous passage/u);
             assert.match(prompts[0]!, /Do not cite a heading alone/u);
             assert.match(prompts[0]!, /choose another supporting passage/u);
             assert.ok(prompts[1]!.startsWith(prompts[0]!));
             assert.match(prompts[1]!.slice(prompts[0]!.length), correction);
             assert.deepEqual(prompts.map(readDocumentSynthesisPromptSources), [[SCAN_SOURCE], [SCAN_SOURCE]]);
+            assert.equal(budgets[0], budgets[1]);
+            assert.equal(finalizeDocumentSynthesisFabricPreparedExecution(result.preparedToken), null);
+            exact(await prepareDocumentSynthesisFabricExecution(fixture.value), 'handoff_unavailable');
         } finally { fixture.restore(); }
     });
 }
