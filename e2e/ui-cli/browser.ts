@@ -38,11 +38,12 @@ export async function openBrowser(origin: string): Promise<{ browser: Browser; p
 async function control(page: Page, target: Target, allowAbsent: boolean): Promise<Locator> {
   let within: Page | Locator = page;
   for (const part of Array.isArray(target) ? target : [target]) {
-    const match: Locator = 'role' in part
+    const byName: Locator = 'role' in part
       ? within.getByRole(part.role as Parameters<Page['getByRole']>[0], { name: part.name, exact: true })
       : 'label' in part
         ? within.getByLabel(part.label, { exact: true })
         : within.getByText(part.text, { exact: true });
+    const match = 'id' in part && part.id ? byName.and(page.locator(`[id="${part.id}"]`)) : byName;
     if (!allowAbsent) await until(async () => await match.count() > 0,
       () => `Controllo assente: ${JSON.stringify(part)}`);
     const count = await match.count();
