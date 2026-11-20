@@ -4,6 +4,8 @@ import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 import { openUnlockedDocument, unlockIfNeeded, bootstrapUnlockedSession, assertNoHorizontalOverflow } from './utils';
 import { documentRequests, fetchInterceptedRequest } from './fixtures/trusted-web-request';
 
+const networkOverviewReadback = '/api/system/network-overview?readback=1';
+
 function requireSynthetic(baseURL?: string) {
     if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL || new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).port === '3000') throw new Error('Runtime e archivio sintetici isolati richiesti');
 }
@@ -55,7 +57,7 @@ test('Indice Impostazioni: gerarchia, stati e risposta persa dopo PUT reale', as
         await expect(action).toBeDisabled(); await expect(value).toContainText('Lettura');
         await capture('lettura'); hold = false; gate.release();
         await expect(action).toBeEnabled();
-        const original = await documentRequests(page).get('/api/system/network-overview'); expect(original.ok()).toBe(true);
+        const original = await documentRequests(page).get(networkOverviewReadback); expect(original.ok()).toBe(true);
         const from = (await original.json()).session.operatingMode as string;
         expect(from).toBe('local-only');
         await expect(value).toContainText('Locale');
@@ -83,7 +85,7 @@ test('Indice Impostazioni: gerarchia, stati e risposta persa dopo PUT reale', as
             await expect(page.getByText('Esito del cambio non verificato. Rileggo la modalità corrente.', { exact: true })).toBeVisible();
             await expect(value).toContainText('Non verificata'); await expect(value).not.toContainText('Locale'); await expect(action).toBeDisabled();
         }
-        const readback = await documentRequests(page).get('/api/system/network-overview'); expect(readback.ok()).toBe(true);
+        const readback = await documentRequests(page).get(networkOverviewReadback); expect(readback.ok()).toBe(true);
         const actualMode = (await readback.json()).session.operatingMode;
         expect(actualMode).toBe('network-home-base'); expect(writes).toHaveLength(1);
         if (directory) await writeFile(`${directory}/lost-response-receipt.json`, JSON.stringify({ from, actualMode, committed, writes, observedValue: await value.innerText() }, null, 2));
@@ -143,7 +145,7 @@ test('Indice Impostazioni: diniego reale, ricevuta positiva e riconciliazione no
         await action.click();
         await expect(page.getByText('La richiesta è stata rifiutata. La modalità non è cambiata.', { exact: true })).toBeVisible();
         await expect(value).toContainText('Locale'); await expect(action).toBeEnabled();
-        expect((await (await documentRequests(page).get('/api/system/network-overview')).json()).session.operatingMode).toBe('local-only');
+        expect((await (await documentRequests(page).get(networkOverviewReadback)).json()).session.operatingMode).toBe('local-only');
         expect(writes).toHaveLength(1); await capture('diniego');
         scenario = 'confirmed'; writes.length = 0;
         await page.route('**/api/system/network-overview', route => { overviewReads++; return route.fulfill({ status: 503, json: { error: 'Dettagli sintetici indisponibili' } }); });
@@ -160,7 +162,7 @@ test('Indice Impostazioni: diniego reale, ricevuta positiva e riconciliazione no
         await expect(page.getByText('Esito del cambio non verificato. La modalità corrente non è disponibile. Verificala dalla diagnostica.', { exact: true })).toBeVisible();
         await expect(value).not.toContainText('Home-base'); await expect(value).not.toContainText('Locale'); await expect(action).toBeDisabled();
         expect(writes).toHaveLength(1); expect(overviewReads).toBe(1);
-        const readback = await documentRequests(page).get('/api/system/network-overview'); expect(readback.ok()).toBe(true);
+        const readback = await documentRequests(page).get(networkOverviewReadback); expect(readback.ok()).toBe(true);
         expect((await readback.json()).session.operatingMode).toBe('local-only');
         await capture('riconciliazione-indisponibile');
         if (directory) await writeFile(`${directory}/update-states-receipt.json`, JSON.stringify({ denials, writes, overviewReads, errors, actualMode: 'local-only' }, null, 2));

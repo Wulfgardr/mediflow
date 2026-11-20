@@ -173,6 +173,7 @@ test('Diario paziente distingue metadata object/JSON, assenti, illeggibili e sta
     }
     metadata = { ...fixture.metadata, workflowStatus: 'future-unrecognized-state' }; await read(); await expect(row).toContainText('Stato non riconosciuto'); await expect(row).toContainText('Ada Sintetica'); await expect(row.locator('[data-ink]')).toHaveCount(0);
     metadata = null; await read(); await expect(row).toContainText('Registrata'); await expect(row).not.toContainText('Metadati della voce non leggibili.'); await expect(row).not.toContainText('Autore:');
+    await page.unroute('**/api/entries?*');
     const response = await documentRequests(page).get(`/api/entries?patientId=${fixture.patientId}`); const stored = await response.json();
     expect(stored[0]).toMatchObject({ id: fixture.entryId, version: 1 }); expect(stored[0].metadata).toMatch(/^ENC:/u);
 });

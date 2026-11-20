@@ -86,7 +86,7 @@ test('a lost save response preserves draft and requires reread without a second 
     expect(puts).toBe(2);
 });
 
-test('same-account login in another tab preserves draft and requires an explicit profile read', async ({ page, context }) => {
+test('shared lock hides the profile draft until explicit renewal and a fresh profile read', async ({ page, context }) => {
     await bootstrapUnlockedSession(page, '1234');
     await openUnlockedDocument(page, '/settings/profilo');
     const save = page.getByRole('button', { name: 'Salva profilo', exact: true });
@@ -103,15 +103,14 @@ test('same-account login in another tab preserves draft and requires an explicit
     try {
         await other.goto('/');
         await lockAllTabsAndSignIn(other, '1234');
-        const checked = page.waitForResponse(response => response.url().endsWith('/api/auth/check') && response.request().method() === 'GET');
-        await page.evaluate(() => window.dispatchEvent(new Event('focus')));
-        expect((await checked).status()).toBe(200);
-        await expect(page.getByRole('status').filter({ hasText: 'La sessione è cambiata' })).toBeVisible();
-        await expect(save).toBeDisabled();
-        await expect(page.getByLabel('Nome medico', { exact: true })).toHaveValue('Bozza prima del cambio sessione');
+        await expect(page.getByRole('heading', { name: 'Sblocca MediFlow', exact: true })).toBeVisible();
+        await expect(save).toHaveCount(0);
         expect(reads).toBe(0);
         expect(writes).toBe(0);
-        await page.getByRole('button', { name: 'Rileggi profilo mantenendo la bozza' }).click();
+        const readback = page.waitForResponse(response => new URL(response.url()).pathname === '/api/auth/profile'
+            && response.request().method() === 'GET');
+        await unlockIfNeeded(page, '1234');
+        expect((await readback).status()).toBe(200);
         await expect(save).toBeEnabled();
         await expect(page.getByLabel('Nome medico', { exact: true })).toHaveValue('Bozza prima del cambio sessione');
         expect(reads).toBe(1);

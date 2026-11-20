@@ -1,5 +1,5 @@
 import { expect, test, type Route } from '@playwright/test';
-import { openUnlockedDocument, bootstrapUnlockedSession } from './utils';
+import { bootstrapUnlockedSession } from './utils';
 import { readFunctionModelPreferences } from '../lib/ai-providers/fabric/function-model-preferences';
 
 const forbiddenRuntimePath = (path: string) => /^\/api\/(?:ai|icd|who|ollama|mlx|providers?)(?:\/|$)/iu.test(path)
@@ -72,7 +72,8 @@ for (const view of ['funzioni', 'modelli']) test(`AI settings ${view}: one faile
         if (forbiddenRuntimePath(path) || /(?:ai|ollama|mlx|model|provider|download)/iu.test(path)) { blocked.push(path); return route.abort(); }
         return route.continue();
     });
-    await openUnlockedDocument(page, `/settings/ai/${view}`);
+    await page.getByRole('link', { name: 'Impostazioni', exact: true }).click();
+    await page.locator(`a[href="/settings/ai/${view}"]:visible`).first().click();
     const controls = page.getByTestId('ai-settings-controls');
     const error = page.getByText('Impossibile leggere le impostazioni.', { exact: false });
     const save = controls.getByRole('button', { name: view === 'funzioni' ? 'Salva parametri avanzati' : 'Salva configurazione', exact: true });
