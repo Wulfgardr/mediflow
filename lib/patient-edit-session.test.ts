@@ -362,7 +362,7 @@ for (const [field, value] of Object.entries({ code: 'TEST-B', description: 'Chan
         const draft = session.getDefaultValues();
         draft.diagnoses[0] = { ...draft.diagnoses[0], [field]: value };
         assert.deepEqual(await session.submit(draft, memory.port, newId), { status: 'complete', confirmed: 1, total: 1 });
-        assert.deepEqual(memory.calls[0].changes, { version: 3, diagnoses: draft.diagnoses.map(row => ({ ...row, date: new Date(row.date) })) });
+        assert.deepEqual(memory.calls[0].changes, { version: 3, diagnoses: draft.diagnoses.map(row => ({ ...row, date: row.date ? new Date(row.date) : null })) });
         assert.equal(memory.calls.length, 1);
     });
 }
@@ -377,7 +377,7 @@ for (const action of ['reorder', 'add duplicate', 'remove'] as const) {
         else if (action === 'add duplicate') draft.diagnoses.push({ ...draft.diagnoses[0] });
         else draft.diagnoses.splice(0, 1);
         assert.equal((await session.submit(draft, memory.port, newId)).confirmed, 1);
-        assert.deepEqual(memory.calls[0].changes, { version: 3, diagnoses: draft.diagnoses.map(row => ({ ...row, date: new Date(row.date) })) });
+        assert.deepEqual(memory.calls[0].changes, { version: 3, diagnoses: draft.diagnoses.map(row => ({ ...row, date: row.date ? new Date(row.date) : null })) });
         assert.equal(memory.calls.length, 1);
     });
 }
@@ -406,7 +406,7 @@ test('retained opaque metadata comes from the snapshot, not a draft or the row i
     const draft = { ...values, diagnoses: [edited, untrusted] };
     await session.submit(draft, memory.port, newId);
     assert.deepEqual(memory.calls[0].changes, { version: 3, diagnoses: [
-        { ...edited, date: new Date(edited.date) }, record.diagnoses[0],
+        { ...edited, date: edited.date ? new Date(edited.date) : null }, record.diagnoses[0],
     ] });
     assert.equal(memory.calls.length, 1);
     assert.deepEqual(session.getDefaultValues(), values);
@@ -429,7 +429,7 @@ for (const action of ['edit', 'remove', 'duplicate'] as const) {
 test('schema-shaped reordered diagnosis keys do not prepend a patient write to a checkup conflict', async () => {
     const memory = store(); const session = new PatientEditSession(fixture());
     const values = session.getDefaultValues(); const row = values.diagnoses[0];
-    const draft = { ...values, diagnoses: [{ code: row.code, description: row.description, system: row.system, date: new Date(row.date) }] };
+    const draft = { ...values, diagnoses: [{ code: row.code, description: row.description, system: row.system, date: row.date ? new Date(row.date) : null }] };
     draft.checkups[0].title = 'Reviewed'; memory.rows.get('synthetic-checkup-a')!.version = 6;
     const result = await session.submit(draft, memory.port, newId);
     assert.equal(result.status, 'interrupted'); assert.equal(result.confirmed, 0); assert.equal(result.total, 1);

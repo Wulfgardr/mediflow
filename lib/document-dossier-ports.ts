@@ -7,7 +7,8 @@
  * nuova autorità.
  */
 
-import { ApiConflictError, captureAttachmentWritePrecondition, db, type Attachment } from './db';
+import { ApiConflictError, captureAttachmentWritePrecondition, db, type Attachment, type Patient } from './db';
+import { parseClinicalDate } from './clinical-date';
 import { AttachmentCollectionChangedError, AttachmentCollectionView } from './attachment-collection-client';
 import { decodeBase64, encodeBase64 } from './security/attachment-file-envelope';
 import { isLockedDataPlaceholder } from './locked-field-guard';
@@ -36,13 +37,12 @@ function tableFor(name: DossierRecordTable) {
     }
 }
 
-function patientView(patient: { id: string; firstName: string; lastName: string; taxCode: string; birthDate?: Date; version?: number;
-    diagnoses?: Array<{ code: string; description: string; system: string; date: Date }>; exemptions?: string[] }): DossierPatient {
+function patientView(patient: Patient): DossierPatient {
     return {
         id: patient.id, firstName: patient.firstName, lastName: patient.lastName, taxCode: patient.taxCode ?? '',
         ...(patient.birthDate ? { birthDate: day(patient.birthDate) } : {}), ...(typeof patient.version === 'number' ? { version: patient.version } : {}),
         diagnoses: Array.isArray(patient.diagnoses) ? patient.diagnoses.map((item) => ({ code: item.code ?? '', description: item.description ?? '',
-            system: item.system ?? '', date: item.date instanceof Date ? item.date.toISOString() : String(item.date ?? '') })) : [],
+            system: item.system ?? '', date: parseClinicalDate(item.date)?.toISOString() ?? '' })) : [],
         exemptions: Array.isArray(patient.exemptions) ? patient.exemptions.filter((code): code is string => typeof code === 'string') : [],
     };
 }
@@ -95,7 +95,7 @@ export function createDossierPorts(): DossierPorts {
             try {
                 await db.patients.update(id, {
                     version: change.version,
-                    ...(change.diagnoses ? { diagnoses: change.diagnoses.map((item) => ({ ...item, date: new Date(item.date) })) } : {}),
+                    ...(change.diagnoses ? { diagnoses: change.diagnoses.map((item) => ({ ...item, date: parseClinicalDate(item.date) })) } : {}),
                     ...(change.exemptions ? { exemptions: change.exemptions } : {}),
                 });
             } catch (error) {
