@@ -173,8 +173,10 @@ dataset pubblico e la sua rappresentazione; non può attestare i log privati.
 
 Dal 28 settembre lo snapshot viene esteso dai record locali con
 `npm run collect:development-usage`, poi si rigenerano tabelle e SVG con
-`npm run build:usage-dashboard`. La base pubblicata del 27 settembre resta
-conservata separatamente. La copertura successiva dipende dai log disponibili.
+`npm run build:usage-dashboard`. All’ultimo dataset si aggiungono i giorni
+successivi fino alla mezzanotte più recente, nel fuso di Roma. Così i
+conteggi già pubblicati restano leggibili anche quando i log locali non sono più
+disponibili. La copertura dei nuovi giorni dipende dai log presenti.
 La [procedura di release](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/docs/releases/development-usage.md) descrive fonti,
 esclusioni, controlli ed ordine dei commit prima del tag. La raccolta include
 le sessioni T3 Code registrate dai rispettivi harness con cwd attribuibile.
@@ -183,19 +185,19 @@ le sessioni T3 Code registrate dai rispettivi harness con cwd attribuibile.
 
 <!-- usage-dashboard:start -->
 
-Snapshot: **2026-11-06**. Token registrati nelle checkout verificate di **MediFlow: 39.835.292.569**. Altri progetti e attribuzioni incerte esclusi.
+Snapshot: **2026-11-19**. Token registrati nelle checkout verificate di **MediFlow: 46.715.871.657**. Altri progetti e attribuzioni incerte esclusi.
 
 | Ambiente che registra | Fonte | Periodo disponibile | Token | Cache letta (inclusa) | Copertura |
 | :-- | :-- | :-- | --: | --: | :-- |
-| Codex | Codex local token records + historical CodexBar 0.60.3 | 2026-02-02 → 2026-11-06 | 34.535.287.187 | 33.279.168.239 | Parziale |
-| Claude Code | Claude Code local response records | 2026-07-02 → 2026-11-06 | 5.300.005.382 | 5.193.631.015 | Parziale |
+| Codex | Codex local token records + historical CodexBar 0.60.3 | 2026-02-02 → 2026-11-19 | 38.152.552.958 | 36.840.518.127 | Parziale |
+| Claude Code | Claude Code local response records | 2026-07-02 → 2026-11-19 | 8.563.318.699 | 8.402.974.913 | Parziale |
 
 ### Storico mensile per provider
 
 | Provider dedotto | 2026-02 | 2026-03 | 2026-04 | 2026-05 | 2026-06 | 2026-07 | 2026-08 | 2026-09 | 2026-10 | 2026-11 | Totale |
 | :-- | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: |
-| OpenAI | 392.724.553 | 1.143.437.723 | 1.300.702.147 | 1.650.113.993 | 327.263.594 | 4.848.219.908 | 10.701.770.867 | 8.317.602.702 | 4.706.851.250 | 1.208.873.422 | 34.597.560.159 |
-| Anthropic | 0 | 0 | 0 | 0 | 0 | 713.927.967 | 15.445.581 | 0 | 2.435.537.918 | 2.072.820.944 | 5.237.732.410 |
+| OpenAI | 392.724.553 | 1.143.437.723 | 1.300.702.147 | 1.650.113.993 | 327.263.594 | 4.848.219.908 | 10.701.770.867 | 8.317.602.702 | 4.706.851.250 | 4.826.139.193 | 38.214.825.930 |
+| Anthropic | 0 | 0 | 0 | 0 | 0 | 713.927.967 | 15.445.581 | 0 | 2.435.537.918 | 5.336.134.261 | 8.501.045.727 |
 
 ### Storico mensile completo per modello
 
@@ -204,59 +206,72 @@ Valori zero indicano assenza di token registrati, non prova di mancato utilizzo.
 | Identificatore modello | 2026-02 | 2026-03 | 2026-04 | 2026-05 | 2026-06 | 2026-07 | 2026-08 | 2026-09 | 2026-10 | 2026-11 | Totale |
 | :-- | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: | --: |
 | gpt-5.6-sol | 0 | 0 | 0 | 0 | 0 | 3.643.888.650 | 4.535.268.418 | 4.032.171.592 | 0 | 0 | 12.211.328.660 |
-| gpt-6.1-sol | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3.776.228.101 | 1.079.519.521 | 4.855.747.622 |
+| gpt-6.1-sol | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3.776.228.101 | 2.953.476.869 | 6.729.704.970 |
+| claude-opus-5-5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2.413.246.014 | 4.171.382.346 | 6.584.628.360 |
 | gpt-5.6-luna | 0 | 0 | 0 | 0 | 0 | 36.160.075 | 4.360.662.683 | 222.688.256 | 0 | 0 | 4.619.511.014 |
-| claude-opus-5-5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2.413.246.014 | 2.072.800.979 | 4.486.046.993 |
-| gpt-6-astra | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2.933.011.101 | 695.517.009 | 89.087.292 | 3.717.615.402 |
+| gpt-6-astra | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2.933.011.101 | 695.517.009 | 177.975.172 | 3.806.503.282 |
 | gpt-5.6-terra | 0 | 0 | 0 | 0 | 0 | 678.987.477 | 1.689.514.162 | 426.875.063 | 0 | 0 | 2.795.376.702 |
 | gpt-5.5 | 0 | 0 | 166.706.103 | 1.649.938.188 | 327.263.594 | 489.183.706 | 0 | 0 | 0 | 0 | 2.633.091.591 |
 | gpt-5.4 | 0 | 1.091.585.133 | 1.124.469.068 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2.216.054.201 |
+| claude-fable-5-2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1.082.612.207 | 1.082.612.207 |
+| gpt-6.2-sol | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 926.749.924 | 926.749.924 |
+| gpt-6.1-terra | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 186.496.501 | 556.759.464 | 743.255.965 |
 | claude-fable-5 | 0 | 0 | 0 | 0 | 0 | 682.998.672 | 0 | 0 | 0 | 0 | 682.998.672 |
 | gpt-6-sol | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 537.845.199 | 0 | 0 | 537.845.199 |
 | gpt-5.3-codex | 303.266.404 | 51.642.499 | 9.526.976 | 175.805 | 0 | 0 | 0 | 0 | 0 | 0 | 364.611.684 |
-| gpt-daybreak-blue-latest | 0 | 0 | 0 | 0 | 0 | 0 | 116.325.604 | 38.563.477 | 48.609.639 | 14.715.173 | 218.213.893 |
-| gpt-6.1-terra | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 186.496.501 | 25.551.436 | 212.047.937 |
+| gpt-daybreak-blue-latest | 0 | 0 | 0 | 0 | 0 | 0 | 116.325.604 | 38.563.477 | 48.609.639 | 41.730.133 | 245.228.853 |
+| gpt-6.2-astra | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 169.447.631 | 169.447.631 |
 | gpt-6-luna | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 126.448.014 | 0 | 0 | 126.448.014 |
 | gpt-5.2-codex | 78.566.024 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 78.566.024 |
+| claude-mythos-5-2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 75.692.310 | 75.692.310 |
 | claude-sonnet-5-5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 21.384.143 | 0 | 21.384.143 |
 | claude-opus-4-8 | 0 | 0 | 0 | 0 | 0 | 21.305.602 | 0 | 0 | 0 | 0 | 21.305.602 |
 | claude-sonnet-5 | 0 | 0 | 0 | 0 | 0 | 9.623.693 | 8.861.454 | 0 | 0 | 0 | 18.485.147 |
 | gpt-5.2 | 10.892.125 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 10.892.125 |
+| claude-haiku-5-5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 907.761 | 6.447.398 | 7.355.159 |
 | claude-opus-5 | 0 | 0 | 0 | 0 | 0 | 0 | 6.584.127 | 0 | 0 | 0 | 6.584.127 |
-| claude-haiku-5-5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 907.761 | 19.965 | 927.726 |
 | gpt-5.3-codex-spark | 0 | 210.091 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 210.091 |
 
 ### Provider, modello ed effort registrato
 
-Serie separata: **2026-09-03 → 2026-11-06**, **9.822.318.975 token** in **67.091 risposte**. 130 file indicizzati non erano disponibili: la copertura non è completa.
+Serie separata: **2026-09-03 → 2026-11-19**, **13.167.298.205 token** in **83.403 risposte**. 130 file indicizzati non erano disponibili: la copertura non è completa.
 
 | Provider dedotto | Identificatore modello | Effort registrato | Token |
 | :-- | :-- | :-- | --: |
+| OpenAI | gpt-6.1-sol | xhigh | 2.743.426.269 |
 | OpenAI | gpt-6-astra | ultra | 2.191.566.524 |
-| OpenAI | gpt-6.1-sol | high | 1.301.952.626 |
-| OpenAI | gpt-6.1-sol | xhigh | 1.129.553.499 |
+| OpenAI | gpt-6.1-sol | high | 1.358.309.863 |
 | OpenAI | gpt-5.6-sol | ultra | 982.521.161 |
+| OpenAI | gpt-6.2-sol | xhigh | 829.818.509 |
 | OpenAI | gpt-6-astra | medium | 771.521.299 |
 | OpenAI | gpt-5.6-sol | medium | 611.967.864 |
 | OpenAI | gpt-6-sol | medium | 558.849.533 |
 | OpenAI | gpt-6-astra | max | 484.405.483 |
 | OpenAI | gpt-5.6-terra | medium | 436.645.403 |
+| OpenAI | gpt-6.1-terra | max | 430.302.963 |
+| OpenAI | gpt-6-astra | xhigh | 179.589.720 |
 | OpenAI | gpt-5.6-luna | max | 175.251.858 |
 | OpenAI | gpt-6-astra | low | 175.076.068 |
+| OpenAI | gpt-6.2-astra | xhigh | 169.298.793 |
 | OpenAI | gpt-5.6-sol | xhigh | 162.693.375 |
-| OpenAI | gpt-6-astra | xhigh | 143.338.807 |
 | OpenAI | gpt-6-luna | medium | 136.135.783 |
 | OpenAI | gpt-6.1-sol | max | 124.015.193 |
 | Non determinato | chatgpt-web/pro | ultra | 106.373.221 |
+| OpenAI | gpt-6.1-terra | xhigh | 97.856.545 |
 | OpenAI | gpt-daybreak-blue-latest | xhigh | 90.476.076 |
-| OpenAI | gpt-6.1-terra | xhigh | 79.001.283 |
-| OpenAI | gpt-daybreak-blue-latest | high | 48.609.639 |
+| OpenAI | gpt-6.2-sol | high | 80.292.254 |
+| OpenAI | gpt-daybreak-blue-latest | high | 75.624.599 |
+| OpenAI | gpt-6.1-terra | high | 71.793.938 |
 | OpenAI | gpt-5.6-luna | medium | 38.184.213 |
-| OpenAI | gpt-6.1-sol | medium | 23.980.438 |
-| OpenAI | gpt-6.1-terra | high | 18.897.014 |
+| OpenAI | gpt-6.1-sol | medium | 36.081.164 |
 | OpenAI | gpt-6-astra | high | 15.802.168 |
+| OpenAI | gpt-6.2-sol | max | 12.711.610 |
 | OpenAI | codex-auto-review | low | 12.512.044 |
+| OpenAI | gpt-6.2-sol | medium | 3.927.551 |
 | Non determinato | unknown | Non registrato | 1.647.964 |
 | OpenAI | gpt-5.6-sol | low | 1.340.439 |
+| OpenAI | gpt-6.1-terra | medium | 1.021.610 |
+| OpenAI | gpt-6.2-astra | medium | 148.838 |
+| OpenAI | gpt-6.1-terra | low | 108.310 |
 
 <!-- usage-dashboard:end -->
