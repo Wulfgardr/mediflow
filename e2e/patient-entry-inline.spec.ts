@@ -17,7 +17,7 @@ for (const width of [1440, 390]) test(`le allergie strutturate restano nella tes
   await expect(page).toHaveURL(new RegExp(`/patients/${patient.id}/modules$`));
   const header = page.getByTestId('lume-scheda-header');
   const allergies = header.getByRole('list', { name: 'Allergie', exact: true });
-  await expect(allergies).toContainText('▲ Amoxicillina sintetica');
+  await expect(allergies.getByRole('listitem')).toHaveText('▲ Allergia: Amoxicillina sintetica');
   await openUnlockedDocument(page, `/patients/${patient.id}/entries/new`);
   await expect(page.getByTestId('progressive-entry-composer').getByRole('list', { name: 'Allergie', exact: true })).toContainText('Amoxicillina sintetica');
   await openUnlockedDocument(page, `/patients/${patient.id}/modules`);
@@ -32,7 +32,7 @@ for (const width of [1440, 390]) test(`le allergie strutturate restano nella tes
     }, theme);
     await editor.scrollIntoViewIfNeeded();
     await expect(allergies).toHaveCount(1);
-    await expect(allergies).toContainText('▲ Amoxicillina sintetica');
+    await expect(allergies.getByRole('listitem')).toHaveText('▲ Allergia: Amoxicillina sintetica');
     await expect.poll(() => allergies.evaluate(element => {
       const box = element.getBoundingClientRect();
       return box.top >= 0 && box.bottom <= innerHeight && box.left >= 0 && box.right <= innerWidth;
