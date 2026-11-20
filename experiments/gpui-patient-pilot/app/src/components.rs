@@ -149,18 +149,33 @@ pub fn button(
     primary: bool,
     enabled: bool,
 ) -> Stateful<Div> {
-    let id = id.into();
     let label = label.into();
+    action_button(id, label.clone(), label, theme, primary, enabled)
+}
+
+fn action_button(
+    id: impl Into<SharedString>,
+    accessible_name: SharedString,
+    label: SharedString,
+    theme: Theme,
+    primary: bool,
+    enabled: bool,
+) -> Stateful<Div> {
+    let id = id.into();
     #[cfg(test)]
     crate::shell::rendered_command::record_button_id(&id);
     let control = div();
     #[cfg(test)]
     let control = {
         let id = id.clone();
-        let label = label.clone();
+        let accessible_name = accessible_name.clone();
         control.on_children_prepainted(move |bounds, window, _| {
             crate::shell::rendered_command::record_shared_button(
-                &id, &label, enabled, &bounds, window,
+                &id,
+                &accessible_name,
+                enabled,
+                &bounds,
+                window,
             )
         })
     };
@@ -168,7 +183,7 @@ pub fn button(
         .id(id.clone())
         .accessibility_id(id)
         .role(Role::Button)
-        .aria_label(label.clone())
+        .aria_label(accessible_name)
         .focusable()
         .tab_stop(enabled)
         .a11y_synthetic_children(move |builder| {
@@ -243,16 +258,14 @@ pub fn title_button_with_role(
     } else {
         title
     };
-    button(id, "", theme, primary, enabled)
-        .aria_label(accessible)
-        .child(
-            div()
-                .flex_auto()
-                .min_w_0()
-                .max_w_full()
-                .text_center()
-                .child(title),
-        )
+    action_button(id, accessible.into(), "".into(), theme, primary, enabled).child(
+        div()
+            .flex_auto()
+            .min_w_0()
+            .max_w_full()
+            .text_center()
+            .child(title),
+    )
 }
 
 pub fn tab(id: &'static str, label: &'static str, selected: bool, theme: Theme) -> Stateful<Div> {

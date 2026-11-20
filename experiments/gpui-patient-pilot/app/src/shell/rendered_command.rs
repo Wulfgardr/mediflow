@@ -75,6 +75,7 @@ pub(super) struct SharedButton {
     pub id: String,
     pub label: String,
     pub enabled: bool,
+    pub bounds: gpui::Bounds<gpui::Pixels>,
 }
 
 pub(crate) fn record_shared_button(
@@ -93,14 +94,16 @@ pub(crate) fn record_shared_button(
             .content_mask()
             .bounds
             .intersect(&window.visual_viewport_bounds());
-        if bounds
+        if let Some(bounds) = bounds
             .iter()
-            .any(|bounds| !bounds.intersect(&mask).is_empty())
+            .map(|bounds| bounds.intersect(&mask))
+            .find(|bounds| !bounds.is_empty())
         {
             frame.shared_buttons.push(SharedButton {
                 id: id.to_owned(),
                 label: label.to_owned(),
                 enabled,
+                bounds,
             });
         }
     });
