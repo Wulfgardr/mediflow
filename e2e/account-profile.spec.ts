@@ -111,9 +111,13 @@ test('shared lock hides the profile draft until explicit renewal and a fresh pro
             && response.request().method() === 'GET');
         await unlockIfNeeded(page, '1234');
         expect((await readback).status()).toBe(200);
-        await expect(save).toBeEnabled();
         await expect(page.getByLabel('Nome medico', { exact: true })).toHaveValue('Bozza prima del cambio sessione');
+        await expect(save).toBeDisabled();
         expect(reads).toBe(1);
+        expect(writes).toBe(0);
+        await page.getByRole('button', { name: 'Rileggi profilo mantenendo la bozza' }).click();
+        await expect(save).toBeEnabled();
+        expect(reads).toBe(2);
         expect(writes).toBe(0);
         await save.click();
         await expect(page.getByRole('status').filter({ hasText: 'Profilo aggiornato.' })).toBeVisible();
