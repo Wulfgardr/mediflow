@@ -122,7 +122,8 @@ fn frame(cx: &mut VisualTestContext) -> (Vec<Control>, Vec<Value>, Vec<Value>) {
                 input,
                 shared_name: true,
             }
-        });
+        })
+        .collect::<Vec<_>>();
     let mut controls = vec![];
     let mut excluded = vec![];
     for RenderedControl {
