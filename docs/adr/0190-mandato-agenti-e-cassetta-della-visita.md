@@ -31,7 +31,10 @@ mandato per il deposito. Revoca e blocco manuale revocano il mandato.
 Scadenza e revoca negano ogni nuovo deposito, anche con un token già emesso.
 
 Ogni agente chiede un abbinamento con codice di otto caratteri. Solo il
-medico, confrontando il codice nella UI fidata, approva l'abbinamento. Il
+medico, confrontando il codice nella UI fidata, approva l'abbinamento. Per il
+kit locale sullo stesso Mac dello stesso utente macOS, l'[ADR 0196](0196-collegamento-agente-locale-senza-codice.md)
+ammette il collegamento diretto dalla UI fidata sbloccata senza codice, con
+scrittura atomica delle credenziali nella cartella configurata del kit. Il
 token opaco identifica agente, mandato, perimetro e scadenza, mai successiva
 a quella del mandato. Il token locale preesistente non accede al canale
 agenti. Il token agente non legge dati clinici decifrati, non conferma
