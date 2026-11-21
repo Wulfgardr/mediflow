@@ -137,3 +137,16 @@ test('rejects synced user folders such as Documents and Desktop', () => {
     const blocked = path.join(os.homedir(), 'Documents', 'synthetic-kit-never-allowed');
     assert.throws(() => validateLocalKitDirectory(blocked), LocalKitPathError);
 });
+
+test('credenziali written through a symlinked parent of the kit resolve inside the physical kit directory', () => {
+    const realRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-kit-real-'));
+    const kit = path.join(realRoot, 'mf-ambulatorio-kit');
+    fs.mkdirSync(kit, { mode: 0o700 });
+    const alias = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-kit-alias-')), 'alias');
+    fs.symlinkSync(realRoot, alias);
+    const credsThroughAlias = path.join(alias, 'mf-ambulatorio-kit', '.agente');
+    const physicalKit = fs.realpathSync(kit);
+    const credentials = resolveKitCredentialsDirectory(physicalKit, { credenziali: credsThroughAlias });
+    assert.equal(credentials, path.join(physicalKit, '.agente'));
+    assert.throws(() => resolveKitCredentialsDirectory(physicalKit, { credenziali: path.join(alias, 'altrove') }));
+});

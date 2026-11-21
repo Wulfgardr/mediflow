@@ -97,6 +97,18 @@ export function readDepositoJson(kitPath: string): Record<string, unknown> {
     }
 }
 
+function physicalPathOf(target: string): string {
+    const rest: string[] = [];
+    let current = target;
+    while (!fs.existsSync(current)) {
+        const parent = path.dirname(current);
+        if (parent === current) return target;
+        rest.unshift(path.basename(current));
+        current = parent;
+    }
+    return path.join(fs.realpathSync(current), ...rest);
+}
+
 export function resolveKitCredentialsDirectory(kitPath: string, deposito: Record<string, unknown>): string {
     const rawResolvedKit = path.resolve(kitPath);
     const physicalKitDir = validateLocalKitDirectory(kitPath);
@@ -106,7 +118,7 @@ export function resolveKitCredentialsDirectory(kitPath: string, deposito: Record
         if (/[\x00-\x1f\x7f]/u.test(candidate) || !path.isAbsolute(candidate)) {
             throw new LocalKitPathError('LOCAL_KIT_PATH_INVALID');
         }
-        const resolvedCandidate = path.resolve(candidate);
+        const resolvedCandidate = physicalPathOf(path.resolve(candidate));
         if (isInside(physicalKitDir, resolvedCandidate)) {
             relative = path.relative(physicalKitDir, resolvedCandidate);
         } else if (isInside(rawResolvedKit, resolvedCandidate)) {
