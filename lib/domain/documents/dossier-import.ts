@@ -298,10 +298,7 @@ export function evaluateDossierGroupIdentity(
     }
     const holders = (code: string) => patients.filter((patient) => normalizedCode(patient.taxCode) === code).map((patient) => patient.id);
     if (patientCodes.length > 1) {
-        const sameDocumentTwoCodes = comparable.some((document) => new Set(document.taxCodes
-            .filter((code) => code.checksumValid && !excludedProfessionalCode(code))
-            .map((code) => normalizedCode(code.value))).size === 2);
-        if (!physicianCode && patientCodes.length === 2 && (unattributed || sameDocumentTwoCodes)) {
+        if (!physicianCode && patientCodes.length === 2 && unattributed) {
             return {
                 status: 'mixed', blocking: true, confirmationRequired: true, missingPhysicianTaxCode: true,
                 documentPatientCodes: patientCodes, candidatePatientIds: [],

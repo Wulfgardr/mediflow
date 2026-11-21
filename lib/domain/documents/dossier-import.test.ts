@@ -524,4 +524,10 @@ test('WUL-924: promemoria con CF paziente e prescrittore senza CF medico spiega 
     assert.equal(mixedPatients.blocking, true);
     assert.equal(mixedPatients.missingPhysicianTaxCode, undefined);
     assert.doesNotMatch(mixedPatients.message, /Manca il tuo codice fiscale nel Profilo/u);
+    const onePdfTwoPatients = { taxCodes: collectDossierTaxCodes(`Paziente: Mario Rossi\nCodice fiscale paziente: ${CF_A}\nPaziente: Luca Bianchi\nCodice fiscale paziente: ${CF_B}`) };
+    assert.ok(onePdfTwoPatients.taxCodes.every((code) => code.role === 'patient_cf'));
+    const mixedInOnePdf = evaluateDossierGroupIdentity([onePdfTwoPatients], patients, 'pa', null);
+    assert.equal(mixedInOnePdf.blocking, true);
+    assert.equal(mixedInOnePdf.missingPhysicianTaxCode, undefined);
+    assert.doesNotMatch(mixedInOnePdf.message, /Manca il tuo codice fiscale nel Profilo/u);
 });
