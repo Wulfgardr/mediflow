@@ -114,6 +114,43 @@ test('without confirmation nothing is created: cancel retires, wrong PIN retires
     await call({ operation: 'preview', commandId: wrong.view.commandId, viewId: wrong.view.viewId, review: review() });
     assert.equal((await call({ operation: 'execute', commandId: wrong.view.commandId, pin: wrongPin })).status, 403);
     assert.deepEqual((await call({ operation: 'receipt', commandId: wrong.view.commandId })).body, { outcome: 'retired' });
+    assert.deepEqual(effects(), before);
+});
+
+test('a passphrase or non-digit PIN is rejected at the route boundary with 400 before execute or lockout counting', async () => {
+    const active = operator('route-non-digit-pin');
+    state.session = active;
+    const attempts = () => (dbServer.$client.prepare('SELECT failed_login_attempts n FROM users WHERE id = ?').get(active.userId) as { n: number }).n;
+    const commandId = randomUUID();
+    assert.equal(attempts(), 0);
+    for (const candidate of ['cavallo batteria graffetta corretta', 'cavallo ', 'segreto', '1234a']) {
+        assert.equal((await call({ operation: 'execute', commandId, pin: candidate })).status, 400, candidate);
+        assert.equal(attempts(), 0, candidate);
+    }
+});
+
+test('a passphrase or non-digit PIN is rejected before verification and does not consume a lockout attempt', async () => {
+    const active = operator('non-digit-pin');
+    state.session = active;
+    const before = effects();
+    const { view } = await staged();
+    assert.equal((await call({ operation: 'preview', commandId: view.commandId, viewId: view.viewId, review: review() })).status, 200);
+    const attempts = () => (dbServer.$client.prepare('SELECT failed_login_attempts n FROM users WHERE id = ?').get(active.userId) as { n: number }).n;
+    assert.equal(attempts(), 0);
+    for (const candidate of ['cavallo batteria graffetta corretta', 'cavallo ', 'segreto']) {
+        assert.equal((await call({ operation: 'execute', commandId: view.commandId, pin: candidate })).status, 400, candidate);
+        assert.equal(attempts(), 0, candidate);
+    }
+    const applied = await call({ operation: 'execute', commandId: view.commandId, pin });
+    assert.equal(applied.status, 200);
+    assert.equal(applied.body.outcome, 'applied');
+    assert.equal(attempts(), 0);
+    assert.deepEqual(effects(), before.map(n => n + 1));
+});
+
+test('moved ambulatory and lock void staged work without creating patients', async () => {
+    state.session = operator('negative-scope');
+    const before = effects();
 
     const moved = await staged(), other = randomUUID();
     dbServer.insert(ambulatories).values({ id: other, name: 'Altro ambulatorio inventato' }).run();

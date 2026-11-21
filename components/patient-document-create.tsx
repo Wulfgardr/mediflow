@@ -22,6 +22,7 @@ import { birthError, identifierError, IDENTIFIER_LABELS, IDENTIFIER_TYPES, PATIE
 import type { DossierIdentityProposal } from '@/lib/domain/documents/dossier-sections';
 import type { PatientDocumentCreateReview } from '@/lib/patient-document-create-command';
 import { focusPatientCreationTarget } from '@/lib/patient-creation-focus';
+import { acceptNumericPinChange, isValidNumericPin, validateNumericPinSubmission } from '@/lib/security/pin-input';
 
 /** Dossier (ADR 0175): documento già scelto nel lotto e proposte d'identità con evidenza. */
 export type PatientDocumentDossierSource = Readonly<{
@@ -85,6 +86,7 @@ export default function PatientDocumentCreate({ onActiveChange, dossier }: { onA
     const [separate, setSeparate] = useState(false);
     const [pin, setPin] = useState('');
     const [dragging, setDragging] = useState(false);
+    const [pinError, setPinError] = useState<string | null>(null);
     // The ambulatory scope of the local reference, resolved like the server does (selected, else default).
     const scope = useRef('predefinito-non-letto');
     const resolveScope = useCallback(async () => {
@@ -101,7 +103,7 @@ export default function PatientDocumentCreate({ onActiveChange, dossier }: { onA
         work.current.controller.abort();
         work.current.original?.fill(0);
         work.current = { epoch: work.current.epoch + 1, controller: new AbortController(), original: null };
-        setFields(EMPTY); setSeparate(false); setPin('');
+        setFields(EMPTY); setSeparate(false); setPin(''); setPinError(null);
         return work.current;
     }, []);
     const current = (token: { epoch: number }) => work.current.epoch === token.epoch && !work.current.controller.signal.aborted;
@@ -223,6 +225,9 @@ export default function PatientDocumentCreate({ onActiveChange, dossier }: { onA
     }
 
     async function submit(back: Extract<Phase, { kind: 'confirm' }>) {
+        const pinProblem = validateNumericPinSubmission(pin);
+        if (pinProblem) { setPinError(pinProblem); return; }
+        setPinError(null);
         const token = work.current, { commandId, viewId } = back.view;
         const entered = (value: string) => ({ action: 'correct' as const, value: value.trim() });
         const common = { firstName: entered(fields.firstName), lastName: entered(fields.lastName), duplicate: separate ? 'create-separate' as const : 'none' as const };
@@ -426,14 +431,19 @@ export default function PatientDocumentCreate({ onActiveChange, dossier }: { onA
                             </p>
                             <label htmlFor="patient-document-pin" className="mf-field-label">PIN di conferma</label>
                             <input id="patient-document-pin" className="mf-input max-w-48" type="password" inputMode="numeric" autoComplete="off"
-                                value={pin} onChange={(event) => setPin(event.target.value)} minLength={4} maxLength={8} required />
+                                aria-invalid={Boolean(pinError)} aria-describedby={pinError ? 'patient-document-pin-error' : undefined}
+                                value={pin} onChange={(event) => {
+                                    const next = acceptNumericPinChange(event.target.value, pin);
+                                    setPin(next.value); setPinError(next.error);
+                                }} required />
+                            {pinError && <p id="patient-document-pin-error" role="alert" className="text-sm text-[color:var(--lume-signal-critical)]">{pinError}</p>}
                         </div>
                     )}
 
                     <div className="flex flex-wrap gap-3">
                         {phase.kind === 'review' && <button type="submit" className="mf-button-primary" disabled={!canConfirm}>Prosegui alla conferma</button>}
-                        {phase.kind === 'confirm' && <button type="submit" className="mf-button-primary" disabled={pin.length < 4}>Conferma creazione con PIN</button>}
-                        {phase.kind === 'confirm' && <button type="button" className="mf-button-secondary" onClick={() => { setPin(''); setPhase({ ...phase, kind: 'review' }); }}>Torna alla revisione</button>}
+                        {phase.kind === 'confirm' && <button type="submit" className="mf-button-primary" disabled={!isValidNumericPin(pin)}>Conferma creazione con PIN</button>}
+                        {phase.kind === 'confirm' && <button type="button" className="mf-button-secondary" onClick={() => { setPin(''); setPinError(null); setPhase({ ...phase, kind: 'review' }); }}>Torna alla revisione</button>}
                         <button type="button" className="mf-button-text" onClick={() => void withdraw(phase.view.commandId, fields !== EMPTY)}>Annulla e ritira</button>
                     </div>
                 </form>

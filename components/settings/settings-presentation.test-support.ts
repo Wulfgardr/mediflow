@@ -63,6 +63,7 @@ export function mountContract(file: string, name: string, options: {
         },
         useEffect(callback: () => unknown) { effects.push(callback); },
         useId() { return `synthetic-id-${idCursor++}`; },
+        useCallback<T>(callback: T) { return callback; },
         useMemo(callback: () => unknown) { return callback(); },
         useRef(initial: unknown) { const index = refCursor++; if (!refs.has(index)) refs.set(index, { current: initial }); return refs.get(index); },
     };
