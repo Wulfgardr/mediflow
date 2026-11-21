@@ -8,7 +8,6 @@ import { PatientDocumentDuplicateReviewRequired, type PatientDocumentCreateRevie
 import { PATIENT_IDENTIFIER_DUPLICATE, PatientIdentifierConflictError } from '@/lib/patient-identity';
 import { NativePatientDocumentExtractionFailed, PatientDocumentIntakeBusy } from '@/lib/native-patient-document';
 import { COMMAND_UUID } from '@/lib/therapy-status-command-contract';
-import { isValidNumericPin } from '@/lib/security/pin-input';
 
 export const runtime = 'nodejs';
 /** A 10 MiB PDF sealed as ENC2 plus its base64 original stays below 28 MB of JSON. */
@@ -44,7 +43,7 @@ export async function POST(request: Request): Promise<Response> {
             return reply(await webPatientDocumentService.preview(context, input.commandId, input.viewId, input.review as PatientDocumentCreateReview));
         }
         if (input.operation === 'execute' && keys === 'commandId,operation,pin'
-            && typeof input.pin === 'string' && isValidNumericPin(input.pin)) {
+            && typeof input.pin === 'string' && /^[^\u0000-\u001f\u007f]{4,8}$/u.test(input.pin)) {
             return reply(await webPatientDocumentService.execute(context, input.commandId, input.pin));
         }
         if (input.operation === 'receipt' && keys === 'commandId,operation') return reply(await webPatientDocumentService.receipt(context, input.commandId));

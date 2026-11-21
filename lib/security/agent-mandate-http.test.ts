@@ -107,7 +107,7 @@ test('a passphrase or non-digit PIN fails before verification without consuming 
     const beforeCalls = pinCalls;
     const attempts = () => (database.prepare('SELECT failed_login_attempts n FROM users WHERE id = ?').get(actor) as { n: number }).n;
     const beforeAttempts = attempts();
-    for (const candidatePin of ['cavallo batteria graffetta corretta', 'segreto', '1234a']) {
+    for (const candidatePin of ['cavallo batteria graffetta corretta', 'AbC!09', '123456789', 'segreto', '1234a']) {
         const response = await post(input, { pin: candidatePin });
         assert.equal(response.status, 400, candidatePin);
     }
