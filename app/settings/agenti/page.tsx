@@ -4,7 +4,8 @@ import { useState } from 'react';
 import Link from 'next/link';
 import type { AgentRegistration } from '@/lib/agent-registration-store';
 import type { AgentPairingRequest } from '@/lib/agent-pairing-store';
-import { AGENT_OPERATIONS, type AgentMandate, type AgentMandateInput } from '@/lib/agent-mandate-contract';
+import type { AgentLocalKitStatus } from '@/lib/agent-local-kit-store';
+import { AGENT_OPERATIONS, MANDATE_MAX_DURATION_MS, type AgentMandate, type AgentMandateInput } from '@/lib/agent-mandate-contract';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { generateMandateKeys } from '@/lib/agent-mandate-client';
 import { isValidNumericPin, numericPinError, validateNumericPinSubmission } from '@/lib/security/pin-input';
@@ -12,6 +13,11 @@ import { SETTINGS_INPUT_CLASS, SETTINGS_PRIMARY_BUTTON_CLASS, SETTINGS_SECONDARY
 
 export default function AgentSettingsPage() {
     const confirm = useConfirm();
+    const [localKit, setLocalKit] = useState<AgentLocalKitStatus | null>(null);
+    const [kitPathDraft, setKitPathDraft] = useState('');
+    const [localKitConfirming, setLocalKitConfirming] = useState(false);
+    const [localKitPin, setLocalKitPin] = useState('');
+    const [localKitPinSubmitError, setLocalKitPinSubmitError] = useState<string | null>(null);
     const [mandates, setMandates] = useState<AgentMandate[]>([]);
     const [pairings, setPairings] = useState<AgentPairingRequest[]>([]);
     const [selectedMandates, setSelectedMandates] = useState<Record<string, string>>({});
@@ -31,20 +37,34 @@ export default function AgentSettingsPage() {
     const [approvalPinSubmitError, setApprovalPinSubmitError] = useState<string | null>(null);
     const pinError = numericPinError(pin) ?? pinSubmitError;
     const approvalPinError = numericPinError(approvalPin) ?? approvalPinSubmitError;
+    const localKitPinError = numericPinError(localKitPin) ?? localKitPinSubmitError;
     async function run(action: () => Promise<void>) {
-        setBusy(true); setError(null); setPinSubmitError(null); setApprovalPinSubmitError(null);
+        setBusy(true); setError(null); setPinSubmitError(null); setApprovalPinSubmitError(null); setLocalKitPinSubmitError(null);
         try { await action(); } catch { setError('Operazione non riuscita. Riprova.'); }
-        finally { setBusy(false); setPin(''); setApprovalPin(''); }
+        finally { setBusy(false); setPin(''); setApprovalPin(''); setLocalKitPin(''); }
     }
     async function refresh() {
-        const [response, requests, clients] = await Promise.all(['/api/agent-mandates', '/api/agent-mandates/pairings',
-            '/api/agent-mandates/registrations'].map(url => fetch(url, { cache: 'no-store' })));
-        if (!response.ok || !requests.ok || !clients.ok) throw new Error('denied');
+        const [response, requests, clients, kitResponse] = await Promise.all([
+            '/api/agent-mandates',
+            '/api/agent-mandates/pairings',
+            '/api/agent-mandates/registrations',
+            '/api/agent-mandates/local-kit',
+        ].map(url => fetch(url, { cache: 'no-store' })));
+        if (!response.ok || !requests.ok || !clients.ok || !kitResponse.ok) throw new Error('denied');
         setMandates(await response.json());
         setPairings(await requests.json());
         setRegistrations(await clients.json());
+        const nextKit = await kitResponse.json() as AgentLocalKitStatus;
+        setLocalKit(nextKit);
+        setKitPathDraft(nextKit.kitPath);
         setReadAt(Date.now());
     }
+    const localKitConnected = Boolean(localKit?.connected);
+    const localKitStatusText = !localKitConnected
+        ? 'Non collegato'
+        : localKit?.expiresAt && localKit.expiresAt > readAt
+            ? `Collegato · fino alle ${new Date(localKit.expiresAt).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`
+            : 'Collegato · rinnovo allo sblocco';
     return <section aria-labelledby="agenti-title" className="mx-auto max-w-3xl space-y-6">
         <header className="space-y-3">
             <h2 id="agenti-title" className="[font:var(--type-section-heading)]">Agenti</h2>
@@ -55,11 +75,140 @@ export default function AgentSettingsPage() {
         </header>
         <nav aria-label="In questa pagina" className="flex flex-wrap gap-x-4 gap-y-2">
             <span>In questa pagina</span>
+            <a href="#codex-ambulatorio" className="font-semibold">Codex · Ambulatorio</a>
             <a href="#mandato-nuovo" className="font-semibold">Nuovo mandato</a>
             <a href="#abbinamenti" className="font-semibold">Richieste di abbinamento</a>
             {registrations.length > 0 ? <a href="#client" className="font-semibold">Client registrati</a> : null}
             <a href="#mandati" className="font-semibold">Mandati</a>
         </nav>
+        <section id="codex-ambulatorio" aria-labelledby="codex-ambulatorio-title" className="space-y-4 border-b pb-6">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                    <h3 id="codex-ambulatorio-title" className="[font:var(--type-section-heading)]">Codex · Ambulatorio</h3>
+                    <p>{localKitStatusText}</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                    {localKitConnected ? (
+                        <button
+                            type="button"
+                            className={SETTINGS_SECONDARY_BUTTON_CLASS}
+                            disabled={busy}
+                            onClick={async () => {
+                                const answer = await confirm({
+                                    title: 'Scollegare Codex · Ambulatorio?',
+                                    message: 'Revoca mandato e credenziali del kit.',
+                                    confirmLabel: 'Scollega',
+                                    tone: 'danger',
+                                });
+                                if (!answer.confirmed) return;
+                                await run(async () => {
+                                    const response = await fetch('/api/agent-mandates/local-kit', { method: 'DELETE' });
+                                    if (!response.ok) throw new Error('denied');
+                                    setLocalKitConfirming(false);
+                                    await refresh();
+                                });
+                            }}
+                        >
+                            Scollega
+                        </button>
+                    ) : (
+                        <button
+                            type="button"
+                            className={SETTINGS_PRIMARY_BUTTON_CLASS}
+                            disabled={busy}
+                            onClick={() => {
+                                setLocalKitConfirming(current => !current);
+                                setLocalKitPin('');
+                                setLocalKitPinSubmitError(null);
+                            }}
+                        >
+                            Collega
+                        </button>
+                    )}
+                </div>
+            </div>
+            {localKitConfirming && !localKitConnected && (
+                <form className="space-y-4 border p-4" onSubmit={event => {
+                    event.preventDefault();
+                    const problem = validateNumericPinSubmission(localKitPin);
+                    if (problem) { setLocalKitPinSubmitError(problem); return; }
+                    void run(async () => {
+                        const keys = await generateMandateKeys();
+                        const payload: Record<string, unknown> = {
+                            pin: localKitPin,
+                            mandate: {
+                                id: crypto.randomUUID(),
+                                durationMs: MANDATE_MAX_DURATION_MS,
+                                operations: [...AGENT_OPERATIONS],
+                                provider: 'openai',
+                                allowsClinicalEgress: true,
+                                ...keys,
+                            },
+                        };
+                        if (kitPathDraft.trim()) payload.kitPath = kitPathDraft.trim();
+                        const response = await fetch('/api/agent-mandates/local-kit', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload),
+                        });
+                        if (!response.ok) throw new Error('denied');
+                        setLocalKitConfirming(false);
+                        await refresh();
+                    });
+                }}>
+                    <p>OpenAI (Codex) con passaggio di documenti e trascrizioni. Si rinnova a ogni sblocco.</p>
+                    <ul className="list-disc pl-5 text-sm">
+                        {operationLabels.map(label => <li key={label}>{label}</li>)}
+                    </ul>
+                    <label className="block">
+                        PIN per collegare Codex
+                        <input
+                            className={SETTINGS_INPUT_CLASS}
+                            type="password"
+                            inputMode="numeric"
+                            autoComplete="off"
+                            required
+                            aria-invalid={Boolean(localKitPinError)}
+                            aria-describedby={localKitPinError ? 'local-kit-pin-error' : undefined}
+                            value={localKitPin}
+                            onChange={event => { setLocalKitPin(event.target.value); setLocalKitPinSubmitError(null); }}
+                        />
+                    </label>
+                    {localKitPinError && <p id="local-kit-pin-error" role="alert">{localKitPinError}</p>}
+                    <div className="flex flex-wrap gap-2">
+                        <button type="submit" className={SETTINGS_PRIMARY_BUTTON_CLASS} disabled={busy || !isValidNumericPin(localKitPin)}>Consenti</button>
+                        <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy} onClick={() => setLocalKitConfirming(false)}>Annulla</button>
+                    </div>
+                </form>
+            )}
+            <details className="space-y-3">
+                <summary className="cursor-pointer font-semibold">Cartella del kit</summary>
+                <form className="mt-3 space-y-3" onSubmit={event => {
+                    event.preventDefault();
+                    void run(async () => {
+                        const response = await fetch('/api/agent-mandates/local-kit', {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ kitPath: kitPathDraft.trim() }),
+                        });
+                        if (!response.ok) throw new Error('denied');
+                        await refresh();
+                    });
+                }}>
+                    <label className="block">
+                        Percorso cartella del kit
+                        <input
+                            className={SETTINGS_INPUT_CLASS}
+                            type="text"
+                            value={kitPathDraft}
+                            placeholder={localKit?.kitPath ?? '/Users/<utente>/Antigravity/mf-ambulatorio-kit'}
+                            onChange={event => setKitPathDraft(event.target.value)}
+                        />
+                    </label>
+                    <button type="submit" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy || !kitPathDraft.trim()}>Salva percorso</button>
+                </form>
+            </details>
+        </section>
         <form id="mandato-nuovo" aria-labelledby="mandato-nuovo-title" className="space-y-4" onSubmit={event => {
             event.preventDefault();
             const pinProblem = validateNumericPinSubmission(pin);
