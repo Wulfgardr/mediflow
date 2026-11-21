@@ -503,3 +503,31 @@ test('a patient label inside a prescriber section stops professional attribution
         assert.equal(evaluateDossierGroupIdentity([{ taxCodes }], patients, 'pa').status, 'mixed');
     }
 });
+
+test('WUL-924: promemoria con CF paziente e prescrittore senza CF medico spiega il blocco e si sblocca dopo il Profilo', () => {
+    const patients = [{ id: 'pa', taxCode: CF_A }, { id: 'pb', taxCode: CF_B }];
+    const promemoria = { taxCodes: collectDossierTaxCodes(`Promemoria ricetta\nPaziente: Mario Rossi CF ${CF_A}\nTimbro: Dott. Sintetico ${CF_B}`) };
+    const blocked = evaluateDossierGroupIdentity([promemoria], patients, 'pa', null);
+    assert.equal(blocked.status, 'mixed');
+    assert.equal(blocked.blocking, true);
+    assert.equal(blocked.missingPhysicianTaxCode, true);
+    assert.match(blocked.message, /Manca il tuo codice fiscale nel Profilo/u);
+    const resolved = evaluateDossierGroupIdentity([promemoria], patients, 'pa', CF_B);
+    assert.equal(resolved.status, 'matched');
+    assert.equal(resolved.blocking, false);
+    assert.equal(resolved.missingPhysicianTaxCode, undefined);
+    const twoPatients = [
+        { taxCodes: collectDossierTaxCodes(`Paziente: Mario Rossi\nCodice fiscale paziente: ${CF_A}`) },
+        { taxCodes: collectDossierTaxCodes(`Paziente: Luca Bianchi\nCodice fiscale paziente: ${CF_B}`) },
+    ];
+    const mixedPatients = evaluateDossierGroupIdentity(twoPatients, patients, 'pa', null);
+    assert.equal(mixedPatients.blocking, true);
+    assert.equal(mixedPatients.missingPhysicianTaxCode, undefined);
+    assert.doesNotMatch(mixedPatients.message, /Manca il tuo codice fiscale nel Profilo/u);
+    const onePdfTwoPatients = { taxCodes: collectDossierTaxCodes(`Paziente: Mario Rossi\nCodice fiscale paziente: ${CF_A}\nPaziente: Luca Bianchi\nCodice fiscale paziente: ${CF_B}`) };
+    assert.ok(onePdfTwoPatients.taxCodes.every((code) => code.role === 'patient_cf'));
+    const mixedInOnePdf = evaluateDossierGroupIdentity([onePdfTwoPatients], patients, 'pa', null);
+    assert.equal(mixedInOnePdf.blocking, true);
+    assert.equal(mixedInOnePdf.missingPhysicianTaxCode, undefined);
+    assert.doesNotMatch(mixedInOnePdf.message, /Manca il tuo codice fiscale nel Profilo/u);
+});

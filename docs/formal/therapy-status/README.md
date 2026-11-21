@@ -322,6 +322,17 @@ scritture cliniche. Il confronto non estende TLC a lease o bozze.
 Dopo questo riesame sono aggiornati il digest del solo tipo modificato e
 `syncCommit`; modello, invarianti, limiti, mutanti e testimoni restano invariati.
 
+## Raccordo WUL-924: codice fiscale del medico al primo avvio
+
+Riesaminato `0d587ad7a` rispetto a `fd9eff8e3`. Fra i file coperti cambia solo
+`lib/security/client-auth-api.ts`: il tipo `SetupRequestPayload` aggiunge il
+campo opzionale `doctorTaxCode`. Il codice eseguibile del modulo resta
+identico: nessuna modifica a richieste HTTP, fence, segnali, recupero,
+transizioni, guardie o posizione degli await. Il valore viaggia nel corpo
+della richiesta di setup e non tocca terapie, writer, CAS, ledger o audit.
+Sono aggiornati il digest del solo tipo modificato e `syncCommit`; modello,
+invarianti, limiti, mutanti e testimoni restano invariati.
+
 ## Raccordo HC-A2 del 29 ottobre 2026: esiti delle scale
 
 Riesaminato il diff rispetto a `d7e5e0f4228d5a4e112c5b526f5e212e106c122d`,

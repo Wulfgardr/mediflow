@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import { identifierError } from '@/lib/patient-identity';
 import { checkPassphrase } from '@/lib/security/unlock-credential';
 import styles from './onboarding-experience.module.css';
 
-export type SecuritySetup = { displayName: string; ambulatoryName: string; pin: string; passphrase: string };
+export type SecuritySetup = { displayName: string; ambulatoryName: string; doctorTaxCode?: string; pin: string; passphrase: string };
 interface OnboardingWizardProps {
     onComplete: (data: SecuritySetup) => Promise<void>;
 }
@@ -22,14 +23,16 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     const [formData, setFormData] = useState({
         displayName: '',
         ambulatoryName: '',
+        doctorTaxCode: '',
         pin: '',
         confirmPin: '',
         passphrase: '',
         confirmPassphrase: ''
     });
 
-    // Step 1: Profile
-    const canAdvanceProfile = formData.displayName.length > 2 && formData.ambulatoryName.length > 2;
+    const normalizedDoctorTaxCode = formData.doctorTaxCode.trim().toUpperCase();
+    const doctorTaxCodeError = normalizedDoctorTaxCode ? identifierError('cf', normalizedDoctorTaxCode) : null;
+    const canAdvanceProfile = formData.displayName.length > 2 && formData.ambulatoryName.length > 2 && doctorTaxCodeError === null;
 
     const canSubmit = checkPassphrase(formData.passphrase).ok
         && formData.passphrase.normalize('NFKC') === formData.confirmPassphrase.normalize('NFKC')
@@ -43,6 +46,7 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
             await onComplete({
                 displayName: formData.displayName,
                 ambulatoryName: formData.ambulatoryName,
+                ...(normalizedDoctorTaxCode ? { doctorTaxCode: normalizedDoctorTaxCode } : {}),
                 pin: formData.pin,
                 passphrase: formData.passphrase
             });
@@ -90,6 +94,23 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                                 placeholder="es. Studio Medico Centrale"
                                 className={styles.input}
                             />
+                        </div>
+                        <div className={styles.field}>
+                            <label htmlFor="setup-doctor-tax-code">Codice fiscale</label>
+                            <input
+                                type="text"
+                                id="setup-doctor-tax-code"
+                                value={formData.doctorTaxCode}
+                                onChange={(e) => setFormData({ ...formData, doctorTaxCode: e.target.value.toUpperCase() })}
+                                maxLength={16}
+                                autoComplete="off"
+                                className={styles.input}
+                                aria-invalid={doctorTaxCodeError !== null}
+                                aria-describedby={doctorTaxCodeError !== null ? 'setup-doctor-tax-code-error' : undefined}
+                            />
+                            {doctorTaxCodeError !== null && (
+                                <p id="setup-doctor-tax-code-error" className={styles.errorText}>Codice fiscale non valido.</p>
+                            )}
                         </div>
                     </div>
                     <div className={styles.actions}>

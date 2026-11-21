@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
+import Link from 'next/link';
 
 import { DossierEvidenceText, splitDossierPassage } from '@/components/dossier-evidence';
 import { Kree8WorkspaceShell } from '@/components/kree8/kree8-workspace-shell';
@@ -351,7 +352,10 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
                                             </tr>;
                                         })}</tbody>
                                     </table>
-                                    <p className={identity.blocking ? styles.notice : undefined} data-testid="dossier-identity" role={identity.blocking ? 'alert' : undefined}>{identity.message}</p>
+                                    <p className={identity.blocking ? styles.notice : undefined} data-testid="dossier-identity" role={identity.blocking ? 'alert' : undefined}>
+                                        {identity.message}
+                                        {identity.missingPhysicianTaxCode ? <> <Link href="/settings/profilo" data-testid="dossier-profile-link">Apri Profilo</Link></> : null}
+                                    </p>
                                     <div className={styles.fileLabel}>
                                         <label htmlFor={`${ids}-${group.key}-patient`}>Scheda di destinazione</label>
                                         <select id={`${ids}-${group.key}-patient`} value={linked} disabled={Boolean(busy)}
