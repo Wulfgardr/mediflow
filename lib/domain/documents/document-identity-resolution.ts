@@ -26,7 +26,11 @@ const ITALIAN_TAX_CODE_REGEX = /\b(?:(?:STP|ENI)\d{13}|[A-Z]{6}[0-9LMNPQRSTUV]{2
 
 export const isValidItalianTaxCodeChecksum = isValidItalianTaxCode;
 
-// Specific prescriber/operator labels must be evaluated before generic physician or patient prose.
+const CF_LABEL_SOURCE = String.raw`(?:codice\s+fiscale\b|c\.?\s*f\.?(?![a-z0-9]))`;
+const PREP_SOURCE = String.raw`(?:dell['’]\s*|del(?:la|lo)?\s+)?`;
+const PHYSICIAN_ROLE_SOURCE = String.raw`(?:medico\s+refertante|dirigente\s+medico|medico\s+specialista|specialista|il\s+medico|medico|dott(?:\.ssa|\.|ore|oressa)?|dr(?:\.ssa|\.)?)`;
+const SIGNATURE_ROLE_SOURCE = String.raw`(?:(?:documento\s+)?(?:firmato|sottoscritto)(?:\s+digitalmente)?(?:\s+ai\s+sensi\s+[^:\n]{1,40})?\s+da|refertato\s+da|validato\s+da|firma\s+(?:digitale|del(?:lo)?\s+(?:medico|specialista|dirigente\s+medico)))`;
+
 const ROLE_PATTERNS: Array<{
     role: DocumentDecisionIdentityRole;
     high: RegExp;
@@ -34,27 +38,42 @@ const ROLE_PATTERNS: Array<{
 }> = [
     {
         role: 'patient_cf',
-        high: /\b(?:codice\s+fiscale|cf)\s+(?:assistit[oa]|paziente|cittadin[oa]|intestatari[oa])\b|\b(?:assistit[oa]|paziente|cittadin[oa]|intestatari[oa])\s+(?:codice\s+fiscale|cf)\b/i,
+        high: new RegExp(
+            String.raw`(?:\b${CF_LABEL_SOURCE}\s+${PREP_SOURCE}(?:assistit[oa]|paziente|cittadin[oa]|intestatari[oa])\b|\b(?:assistit[oa]|paziente|cittadin[oa]|intestatari[oa])\s*[:,-]?\s*${CF_LABEL_SOURCE})`,
+            'i',
+        ),
         medium: /\b(?:assistit[oa]|paziente|cittadin[oa]|intestatari[oa]|utente)\b/i,
     },
     {
         role: 'prescriber_cf',
-        high: /\b(?:codice\s+fiscale|cf)\s+(?:medico\s+prescrittore|prescrittore|richiedente)\b|\b(?:medico\s+prescrittore|prescrittore|richiedente)\s+(?:codice\s+fiscale|cf)\b/i,
+        high: new RegExp(
+            String.raw`(?:\b${CF_LABEL_SOURCE}\s+${PREP_SOURCE}(?:medico\s+prescrittore|prescrittore|richiedente)\b|\b(?:medico\s+prescrittore|prescrittore|richiedente)\s*[:,-]?\s*${CF_LABEL_SOURCE})`,
+            'i',
+        ),
         medium: /\b(?:medico\s+prescrittore|prescrittore|richiedente)\b/i,
     },
     {
         role: 'physician_cf',
-        high: /\b(?:codice\s+fiscale|cf)\s+(?:medico|dott(?:\.|ore|oressa)?)\b|\b(?:medico|dott(?:\.|ore|oressa)?)\s+(?:codice\s+fiscale|cf)\b/i,
-        medium: /\b(?:medico|dott(?:\.|ore|oressa)?)\b/i,
+        high: new RegExp(
+            String.raw`(?:\b${CF_LABEL_SOURCE}\s+${PREP_SOURCE}${PHYSICIAN_ROLE_SOURCE}\b|\b${PHYSICIAN_ROLE_SOURCE}\s*[:,-]?\s*${CF_LABEL_SOURCE}|\b${SIGNATURE_ROLE_SOURCE}\b)`,
+            'i',
+        ),
+        medium: new RegExp(String.raw`\b(?:${PHYSICIAN_ROLE_SOURCE}|${SIGNATURE_ROLE_SOURCE})\b`, 'i'),
     },
     {
         role: 'operator_cf',
-        high: /\b(?:codice\s+fiscale|cf)\s+(?:operatore|operatrice|compilatore|compilatrice)\b|\b(?:operatore|operatrice|compilatore|compilatrice)\s+(?:codice\s+fiscale|cf)\b/i,
+        high: new RegExp(
+            String.raw`(?:\b${CF_LABEL_SOURCE}\s+${PREP_SOURCE}(?:operatore|operatrice|compilatore|compilatrice)\b|\b(?:operatore|operatrice|compilatore|compilatrice)\s*[:,-]?\s*${CF_LABEL_SOURCE})`,
+            'i',
+        ),
         medium: /\b(?:operatore|operatrice|compilatore|compilatrice)\b/i,
     },
     {
         role: 'facility_tax_code',
-        high: /\b(?:codice\s+fiscale|cf|partita\s+iva|p\.?\s*iva)\s+(?:struttura|azienda|ente|erogatore|ambulatorio)\b|\b(?:struttura|azienda|ente|erogatore|ambulatorio)\s+(?:codice\s+fiscale|cf|partita\s+iva|p\.?\s*iva)\b/i,
+        high: new RegExp(
+            String.raw`(?:\b(?:${CF_LABEL_SOURCE}|partita\s+iva\b|p\.?\s*iva\b)\s+${PREP_SOURCE}(?:struttura|azienda|ente|erogatore|ambulatorio)\b|\b(?:struttura|azienda|ente|erogatore|ambulatorio)\s*[:,-]?\s*(?:${CF_LABEL_SOURCE}|partita\s+iva\b|p\.?\s*iva\b))`,
+            'i',
+        ),
         medium: /\b(?:struttura|azienda|ente|erogatore|ambulatorio|asl|ats|asst)\b/i,
     },
 ];
@@ -63,71 +82,115 @@ function normalizeText(text: string): string {
     return text.replace(/\s+/g, ' ').trim();
 }
 
-function contextAround(text: string, start: number, end: number, contextWindow: number): { snippet: string; taxCodeIndex: number } {
-    const left = Math.max(0, start - contextWindow);
-    const right = Math.min(text.length, end + contextWindow);
+function contextAround(
+    text: string,
+    start: number,
+    end: number,
+    contextWindow: number,
+    minLeft: number,
+    maxRight: number,
+): { snippet: string; taxCodeStart: number; taxCodeEnd: number } {
+    const left = Math.max(minLeft, start - contextWindow);
+    const right = Math.min(maxRight, end + contextWindow);
     const rawSnippet = text.slice(left, right);
-    // The snippet is whitespace-collapsed, so the tax-code index must be computed on the
-    // same normalized representation or irregular OCR spacing skews the label distances.
     const normalizedPrefix = text.slice(left, start).replace(/\s+/g, ' ').trimStart();
+    const taxCodeStart = normalizedPrefix.length;
     return {
         snippet: normalizeText(rawSnippet),
-        taxCodeIndex: normalizedPrefix.length,
+        taxCodeStart,
+        taxCodeEnd: taxCodeStart + (end - start),
     };
 }
 
-function regexDistanceFromTaxCode(pattern: RegExp, context: string, taxCodeIndex: number): number | undefined {
-    const matches = Array.from(context.matchAll(new RegExp(pattern.source, `${pattern.flags}g`)));
-    if (matches.length === 0) return undefined;
-
-    return matches.reduce<number | undefined>((closest, match) => {
-        if (match.index === undefined) return closest;
-        const matchStart = match.index;
-        const matchEnd = matchStart + match[0].length;
-        const distance = taxCodeIndex >= matchStart && taxCodeIndex <= matchEnd
-            ? 0
-            : Math.min(Math.abs(taxCodeIndex - matchStart), Math.abs(taxCodeIndex - matchEnd));
-        return closest === undefined || distance < closest ? distance : closest;
-    }, undefined);
+function roleFamily(role: DocumentDecisionIdentityRole): 'patient' | 'physician' | 'operator' | 'facility' | 'unknown' {
+    if (role === 'patient_cf') return 'patient';
+    if (role === 'prescriber_cf' || role === 'physician_cf') return 'physician';
+    if (role === 'operator_cf') return 'operator';
+    if (role === 'facility_tax_code') return 'facility';
+    return 'unknown';
 }
 
-function inferRole(context: string, taxCodeIndex: number): Pick<DocumentDecisionTaxCodeRole, 'role' | 'confidence'> {
-    const candidates: Array<{
-        role: DocumentDecisionIdentityRole;
-        confidence: DocumentDecisionTaxCodeRole['confidence'];
-        priority: number;
-        distance: number;
-    }> = [];
+interface RoleCandidate {
+    role: DocumentDecisionIdentityRole;
+    confidence: DocumentDecisionTaxCodeRole['confidence'];
+    priority: number;
+    direction: 0 | 1;
+    distance: number;
+    start: number;
+    end: number;
+}
+
+function patternCandidates(
+    pattern: RegExp,
+    role: DocumentDecisionIdentityRole,
+    confidence: DocumentDecisionTaxCodeRole['confidence'],
+    priority: number,
+    context: string,
+    taxCodeStart: number,
+    taxCodeEnd: number,
+): RoleCandidate[] {
+    const candidates: RoleCandidate[] = [];
+    for (const match of context.matchAll(new RegExp(pattern.source, `${pattern.flags}g`))) {
+        if (match.index === undefined) continue;
+        const start = match.index;
+        const end = start + match[0].length;
+        const isAfter = start >= taxCodeEnd;
+        const direction: 0 | 1 = isAfter ? 1 : 0;
+        const distance = end <= taxCodeStart
+            ? taxCodeStart - end
+            : isAfter
+                ? start - taxCodeEnd
+                : 0;
+        candidates.push({ role, confidence, priority, direction, distance, start, end });
+    }
+    return candidates;
+}
+
+function inferRole(context: string, taxCodeStart: number, taxCodeEnd: number): Pick<DocumentDecisionTaxCodeRole, 'role' | 'confidence'> {
+    const candidates: RoleCandidate[] = [];
 
     for (const pattern of ROLE_PATTERNS) {
-        const highDistance = regexDistanceFromTaxCode(pattern.high, context, taxCodeIndex);
-        if (highDistance !== undefined) {
-            candidates.push({
-                role: pattern.role,
-                confidence: 'high',
-                priority: 0,
-                distance: highDistance,
-            });
-        }
-        const mediumDistance = regexDistanceFromTaxCode(pattern.medium, context, taxCodeIndex);
-        if (mediumDistance !== undefined) {
-            candidates.push({
-                role: pattern.role,
-                confidence: 'medium',
-                priority: 1,
-                distance: mediumDistance,
-            });
-        }
+        candidates.push(...patternCandidates(pattern.high, pattern.role, 'high', 0, context, taxCodeStart, taxCodeEnd));
+        candidates.push(...patternCandidates(pattern.medium, pattern.role, 'medium', 1, context, taxCodeStart, taxCodeEnd));
     }
 
-    candidates.sort((left, right) => left.priority - right.priority || left.distance - right.distance);
-    if (candidates[0]) {
+    const active = candidates.filter((candidate) => !candidates.some((other) => (
+        other.direction === candidate.direction
+        && roleFamily(other.role) !== roleFamily(candidate.role)
+        && (candidate.direction === 0 ? other.start >= candidate.end : other.end <= candidate.start)
+    )));
+
+    active.sort((left, right) => left.direction - right.direction || left.priority - right.priority || left.distance - right.distance);
+    if (active[0]) {
         return {
-            role: candidates[0].role,
-            confidence: candidates[0].confidence,
+            role: active[0].role,
+            confidence: active[0].confidence,
         };
     }
     return { role: 'unknown_cf', confidence: 'low' };
+}
+
+const GENERIC_TAX_CODE_LINE = /^(?:codice[ \t\u00a0]+fiscale|c\.?[ \t\u00a0]*f\.?)[ \t\u00a0]*[:=]?[ \t\u00a0]*$/iu;
+const PATIENT_SECTION_HEADER = /^(?:dati(?:\s+(?:anagrafici|personali))?\s+(?:dell['’]\s*|del(?:la)?\s+)?(?:assistit[oa]|paziente|cittadin[oa])|(?:assistit[oa]|paziente|cittadin[oa])\s*:)/iu;
+const NON_PATIENT_BLOCK_CUE = /\b(?:medico|prescrittore|refertante|specialista|dirigente|operatore|operatrice|compilatore|compilatrice|firmato|sottoscritto|firma|struttura|azienda|asl|ats|asst)\b/iu;
+
+function inferPatientSectionFallback(
+    text: string,
+    start: number,
+    minLeft: number,
+): Pick<DocumentDecisionTaxCodeRole, 'role' | 'confidence'> | null {
+    const windowStart = Math.max(minLeft, start - 280);
+    const prefix = text.slice(windowStart, start);
+    const lines = prefix.split(/[\r\n\v\f\u0085\u2028\u2029]/u);
+    const current = (lines.pop() ?? '').trim();
+    if (!GENERIC_TAX_CODE_LINE.test(current)) return null;
+    for (let index = lines.length - 1; index >= 0; index -= 1) {
+        const line = lines[index].trim();
+        if (!line) break;
+        if (NON_PATIENT_BLOCK_CUE.test(line)) return null;
+        if (PATIENT_SECTION_HEADER.test(line)) return { role: 'patient_cf', confidence: 'medium' };
+    }
+    return null;
 }
 
 export function resolveDocumentTaxCodeRoles(
@@ -140,14 +203,22 @@ export function resolveDocumentTaxCodeRoles(
     const taxCodes: DocumentDecisionTaxCodeRole[] = [];
     const seen = new Set<string>();
 
-    for (const match of matches) {
+    for (let index = 0; index < matches.length; index += 1) {
+        const match = matches[index];
         if (match.index === undefined) continue;
         const value = match[0].toUpperCase();
         const start = match.index;
         const end = start + match[0].length;
-        const context = contextAround(input.text, start, end, contextWindow);
+        const previous = index > 0 ? matches[index - 1] : undefined;
+        const next = index + 1 < matches.length ? matches[index + 1] : undefined;
+        const minLeft = previous?.index !== undefined ? previous.index + previous[0].length : 0;
+        const maxRight = next?.index !== undefined ? next.index : input.text.length;
+        const context = contextAround(input.text, start, end, contextWindow, minLeft, maxRight);
         const evidenceId = `tax-code:${taxCodes.length + 1}`;
-        const role = inferRole(context.snippet, context.taxCodeIndex);
+        const inferred = inferRole(context.snippet, context.taxCodeStart, context.taxCodeEnd);
+        const role = inferred.role === 'unknown_cf'
+            ? (inferPatientSectionFallback(input.text, start, minLeft) ?? inferred)
+            : inferred;
 
         // Un CF con checksum non valido (tipico dei falsi positivi OCR O/0, I/1)
         // non puo mai essere high confidence: viene declassato a medium, cosi
