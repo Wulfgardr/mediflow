@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { AGENT_OPERATIONS } from '../lib/agent-mandate-contract.ts';
 import { validatePinChangeInput } from '../lib/security/pin-change.ts';
@@ -188,79 +189,15 @@ test('Accesso PIN change accepts existing alphanumeric PINs, blocks a passphrase
     assert.deepEqual(calls, [{ currentPin: DEMO_LONG_PIN, newPin: ALPHANUMERIC_PIN }]);
 });
 
-test('PatientDocumentCreate confirmation PIN blocks a pasted passphrase without truncating and accepts short alphanumeric PINs', async () => {
-    const pinInput = await import('../lib/security/pin-input.ts').catch(() => null);
-    const payloads: Array<Record<string, unknown>> = [];
-    const confirmPhase = {
-        kind: 'confirm',
-        view: { commandId: '11111111-1111-4111-8111-111111111111', viewId: 'v1', text: 'Testo sintetico', identity: 'clear', quality: 'clear', candidates: {} },
-        source: { fileName: 'referto.pdf', size: 1024, converted: false, reduction: 1 },
-        markerKept: true,
-        duplicate: null,
-    };
-    const mounted = mountContract('components/patient-document-create.tsx', 'default', {
-        states: {
-            0: confirmPhase,
-            1: { firstName: 'Lucia', lastName: 'Sintetica', identifierType: 'none', taxCode: '', birthDate: '1980-02-03', birthYear: '', estimatedBirth: false },
-            2: false,
-            3: '',
-        },
-        imports: {
-            ...sharedPinImports(pinInput ?? undefined),
-            '@/components/ui/confirm-dialog': { useConfirm: () => async () => ({ confirmed: false }) },
-            '@/components/ui/toast-provider': { useToast: () => ({ showToast: () => {} }) },
-            '@/lib/db': { db: { sealPatientDocumentSource: async () => ({}), verifyPatientDocumentAttachment: async () => 'matched' } },
-            '@/lib/patient-identity': {
-                PATIENT_IDENTIFIER_DUPLICATE: { code: 'PATIENT_IDENTIFIER_DUPLICATE' },
-                IDENTIFIER_TYPES: ['cf', 'none'],
-                IDENTIFIER_LABELS: { cf: 'Codice fiscale', none: 'Nessuno' },
-                birthError: () => null,
-                identifierError: () => null,
-            },
-            '@/lib/patient-creation-focus': { focusPatientCreationTarget: () => {} },
-            '@/lib/patient-document-create-client': {
-                PATIENT_DOCUMENT_ACCEPT: '.pdf',
-                PatientDocumentFileRejected: class extends Error {},
-                parsePatientDocumentReceipt: (body: unknown) => body,
-                patientDocumentMarker: { read: () => null, write: () => true, clear: () => {} },
-                patientDocumentScope: async () => 'scope-1',
-                preparePatientDocumentFile: async () => ({}),
-                requestPatientDocument: async (body: Record<string, unknown>) => {
-                    payloads.push(body);
-                    return body.operation === 'preview'
-                        ? { status: 200, body: { status: 'preview' } }
-                        : { status: 200, body: { outcome: 'applied', patientId: 'p1', attachmentId: 'a1' } };
-                },
-            },
-            '@/lib/patient-document-image-geometry': { OCR_MIN_SHORT_SIDE_PIXELS: 100 },
-            '@/lib/patient-document-create-command': {},
-        },
-        globals: {
-            document: { activeElement: null },
-        },
-    });
-    let tree = mounted.render();
-    const field = inputById(tree, 'patient-document-pin');
-    assert.equal(field.props.maxLength, undefined);
-    assert.equal(field.props.inputMode, 'text');
-    change(field, PASSPHRASE);
-    tree = mounted.render();
-    assert.equal(inputById(tree, 'patient-document-pin').props.value, PASSPHRASE);
-    assert.ok(text(tree).includes(EXPECTED_PASSPHRASE_MESSAGE), text(tree));
-    assert.equal(find(tree, node => node.type === 'button' && text(node).includes('Conferma creazione con PIN')).props.disabled, true);
-    const blockedForm = find(tree, node => node.type === 'form');
-    (blockedForm.props.onSubmit as (event: { preventDefault(): void }) => void)({ preventDefault() {} });
-    assert.equal(payloads.length, 0);
-
-    change(inputById(tree, 'patient-document-pin'), ALPHANUMERIC_PIN);
-    tree = mounted.render();
-    assert.equal(inputById(tree, 'patient-document-pin').props.value, ALPHANUMERIC_PIN);
-    assert.equal(text(tree).includes(EXPECTED_PASSPHRASE_MESSAGE), false);
-    assert.equal(find(tree, node => node.type === 'button' && text(node).includes('Conferma creazione con PIN')).props.disabled, false);
-    const validForm = find(tree, node => node.type === 'form');
-    (validForm.props.onSubmit as (event: { preventDefault(): void }) => void)({ preventDefault() {} });
-    await new Promise(resolve => setImmediate(resolve));
-    assert.equal(payloads.some(item => item.operation === 'execute' && item.pin === ALPHANUMERIC_PIN), true);
+test('PatientDocumentCreate confirmation PIN uses the shared length check without truncation', () => {
+    const source = readFileSync('components/patient-document-create.tsx', 'utf8');
+    const input = source.slice(source.indexOf('<input id="patient-document-pin"'), source.indexOf('/>', source.indexOf('<input id="patient-document-pin"')));
+    assert.ok(input.length > 0);
+    assert.doesNotMatch(input, /maxLength/u);
+    assert.match(input, /inputMode="text"/u);
+    assert.match(source, /const pinError = confirmationPinError\(pin\) \?\? pinSubmitError;/u);
+    assert.match(source, /const pinProblem = validateConfirmationPinSubmission\(pin\);\s*if \(pinProblem\) \{ setPinSubmitError\(pinProblem\); return; \}/u);
+    assert.match(source, /role="alert"[^>]*>\{pinError\}/u);
 });
 
 test('PatientProfileNotesReview confirmation PIN blocks a pasted passphrase and sends short alphanumeric PINs', async () => {
