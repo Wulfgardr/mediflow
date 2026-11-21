@@ -9,6 +9,7 @@ import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css
 import { notifyDbChange } from '@/lib/live-query';
 import { IntelligentHostCheckupBrowserAdapterError,
   createIntelligentHostCheckupBrowserAdapter } from '@/lib/security/intelligent-host-checkup-browser-adapter';
+import { confirmationPinError, isValidConfirmationPin } from '@/lib/security/pin-input';
 
 import popoverStyles from './intelligent-host-checkup-action.module.css';
 
@@ -91,8 +92,10 @@ export function IntelligentHostCheckupAction({ patientId, ambulatoryId, checkups
       window.removeEventListener('scroll', updatePopoverPosition, true);
     };
   }, [open]);
+  const pinError = confirmationPinError(pin);
+  const pinValid = isValidConfirmationPin(pin);
   const run = async (operation: (candidatePin: string) => Promise<void>, needsPin = false) => {
-    if (busy || (needsPin && pin.length < 4)) return;
+    if (busy || (needsPin && !pinValid)) return;
     const candidatePin = pin; if (needsPin) setPin(''); setBusy(true);
     try { await operation(candidatePin); } catch (error) { if (mounted.current) setMessage(status(error)); }
     finally { if (mounted.current) setBusy(false); }
@@ -164,13 +167,13 @@ export function IntelligentHostCheckupAction({ patientId, ambulatoryId, checkups
           </ol>
           <p>Rivedi la proposta dell’assistente prima di confermare: la conferma con il PIN modifica lo stato del checkup. Non è un controllo del computer.</p>
           <p role="status" aria-live="polite" aria-atomic="true">{message}</p>
-          <p id={`${pinId}-reason`}>{busy ? 'Operazione in corso: attendi prima di un nuovo comando.' : pin.length < 4 ? 'Abilitazione e revoca richiedono il PIN di almeno 4 caratteri.' : 'PIN inserito: puoi abilitare o revocare la gestione.'}</p>
+          <p id={`${pinId}-reason`} role={pinError ? 'alert' : undefined}>{busy ? 'Operazione in corso: attendi prima di un nuovo comando.' : pinError ? pinError : !pinValid ? 'Abilitazione e revoca richiedono il PIN di almeno 4 caratteri.' : 'PIN inserito: puoi abilitare o revocare la gestione.'}</p>
           <label htmlFor={pinId} className="mf-field-label">Reinserisci il PIN per autorizzare</label>
           <input id={pinId} className="mf-input mf-input-sm w-full" type="password" inputMode="text"
-            autoComplete="current-password" value={pin} onChange={(event) => setPin(event.target.value)} />
+            autoComplete="current-password" aria-invalid={Boolean(pinError)} aria-describedby={`${pinId}-reason`} value={pin} onChange={(event) => setPin(event.target.value)} />
           <div className="flex flex-wrap gap-2">
-            <button type="button" className={actionClass} aria-describedby={`${pinId}-reason`} disabled={busy || pin.length < 4} onClick={enroll}>Abilita gestione checkup</button>
-            <button type="button" className="mf-button-destructive" aria-describedby={`${pinId}-reason`} disabled={busy || pin.length < 4} onClick={revokeRole}>Revoca definitivamente la gestione</button>
+            <button type="button" className={actionClass} aria-describedby={`${pinId}-reason`} disabled={busy || !pinValid} onClick={enroll}>Abilita gestione checkup</button>
+            <button type="button" className="mf-button-destructive" aria-describedby={`${pinId}-reason`} disabled={busy || !pinValid} onClick={revokeRole}>Revoca definitivamente la gestione</button>
           </div>
           <label className="mf-field-label" htmlFor={`${statusId}-checkup`}>Checkup da completare</label>
           <select id={`${statusId}-checkup`} className="mf-input mf-input-sm w-full" value={selectedId}
@@ -203,7 +206,7 @@ export function IntelligentHostCheckupAction({ patientId, ambulatoryId, checkups
             <p>{proposal.resourceTitle}</p>
             <p>Stato atteso: da completare · versione {proposal.resourceRevision}</p>
             <p>Scadenza: {new Date(proposal.expiresAt).toLocaleTimeString('it-IT')}</p>
-            <button type="button" className={actionClass} disabled={busy || pin.length < 4} onClick={confirm}>
+            <button type="button" className={actionClass} disabled={busy || !pinValid} onClick={confirm}>
               {committed ? 'Rileggi conferma con PIN' : 'Conferma modifica con PIN'}
             </button>
           </div> : null}

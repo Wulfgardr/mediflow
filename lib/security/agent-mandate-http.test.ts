@@ -102,6 +102,20 @@ test('12h1min and invalid curve point fail without a mandate', async () => {
     assert.equal(createAgentMandateStore(database).read(input.id), null);
 });
 
+test('a passphrase or non-digit PIN fails before verification without consuming a lockout attempt', async () => {
+    const input = await candidate();
+    const beforeCalls = pinCalls;
+    const attempts = () => (database.prepare('SELECT failed_login_attempts n FROM users WHERE id = ?').get(actor) as { n: number }).n;
+    const beforeAttempts = attempts();
+    for (const candidatePin of ['cavallo batteria graffetta corretta', 'AbC!09', '123456789', 'segreto', '1234a']) {
+        const response = await post(input, { pin: candidatePin });
+        assert.equal(response.status, 400, candidatePin);
+    }
+    assert.equal(pinCalls, beforeCalls);
+    assert.equal(attempts(), beforeAttempts);
+    assert.equal(createAgentMandateStore(database).read(input.id), null);
+});
+
 test('session retirement during PIN verification cannot publish a new mandate', async () => {
     const input = await candidate(); revokeDuringPin = true;
     try { assert.equal((await post(input)).status, 403); assert.equal(createAgentMandateStore(database).read(input.id), null); }

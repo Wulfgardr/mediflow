@@ -7,6 +7,7 @@ import type { AgentPairingRequest } from '@/lib/agent-pairing-store';
 import { AGENT_OPERATIONS, type AgentMandate, type AgentMandateInput } from '@/lib/agent-mandate-contract';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { generateMandateKeys } from '@/lib/agent-mandate-client';
+import { isValidNumericPin, numericPinError, validateNumericPinSubmission } from '@/lib/security/pin-input';
 import { SETTINGS_INPUT_CLASS, SETTINGS_PRIMARY_BUTTON_CLASS, SETTINGS_SECONDARY_BUTTON_CLASS } from '@/components/settings/settings-ui';
 
 export default function AgentSettingsPage() {
@@ -26,8 +27,12 @@ export default function AgentSettingsPage() {
     const [error, setError] = useState<string | null>(null);
     const operationLabels = ['Aprire una visita', 'Allegare PDF', 'Depositare trascrizioni', 'Depositare note', 'Proporre terapie', 'Proporre prestazioni', 'Proporre diagnosi', 'Proporre esenzioni', 'Proporre osservazioni', 'Chiudere una visita'];
     const [operations, setOperations] = useState([...AGENT_OPERATIONS]);
+    const [pinSubmitError, setPinSubmitError] = useState<string | null>(null);
+    const [approvalPinSubmitError, setApprovalPinSubmitError] = useState<string | null>(null);
+    const pinError = numericPinError(pin) ?? pinSubmitError;
+    const approvalPinError = numericPinError(approvalPin) ?? approvalPinSubmitError;
     async function run(action: () => Promise<void>) {
-        setBusy(true); setError(null);
+        setBusy(true); setError(null); setPinSubmitError(null); setApprovalPinSubmitError(null);
         try { await action(); } catch { setError('Operazione non riuscita. Riprova.'); }
         finally { setBusy(false); setPin(''); setApprovalPin(''); }
     }
@@ -55,14 +60,19 @@ export default function AgentSettingsPage() {
             {registrations.length > 0 ? <a href="#client" className="font-semibold">Client registrati</a> : null}
             <a href="#mandati" className="font-semibold">Mandati</a>
         </nav>
-        <form id="mandato-nuovo" aria-labelledby="mandato-nuovo-title" className="space-y-4" onSubmit={event => { event.preventDefault(); void run(async () => {
-            const keys = await generateMandateKeys();
-            const response = await fetch('/api/agent-mandates', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ pin, mandate: { id: crypto.randomUUID(), durationMs: Number(hours) * 3600000,
-                    operations, provider, allowsClinicalEgress: provider !== 'local' && egress, ...keys } }) });
-            if (!response.ok) throw new Error('denied');
-            await refresh();
-        }); }}>
+        <form id="mandato-nuovo" aria-labelledby="mandato-nuovo-title" className="space-y-4" onSubmit={event => {
+            event.preventDefault();
+            const pinProblem = validateNumericPinSubmission(pin);
+            if (pinProblem) { setPinSubmitError(pinProblem); return; }
+            void run(async () => {
+                const keys = await generateMandateKeys();
+                const response = await fetch('/api/agent-mandates', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pin, mandate: { id: crypto.randomUUID(), durationMs: Number(hours) * 3600000,
+                        operations, provider, allowsClinicalEgress: provider !== 'local' && egress, ...keys } }) });
+                if (!response.ok) throw new Error('denied');
+                await refresh();
+            });
+        }}>
             <h3 id="mandato-nuovo-title" className="[font:var(--type-section-heading)]">Nuovo mandato</h3>
             <label className="block">Durata in ore<input className={SETTINGS_INPUT_CLASS} type="number" min="1" max="12" required value={hours} onChange={event => setHours(event.target.value)} /></label>
             <label className="block">Fornitore<select className={SETTINGS_INPUT_CLASS} value={provider} onChange={event => { setProvider(event.target.value as typeof provider); setEgress(false); }}>
@@ -73,8 +83,11 @@ export default function AgentSettingsPage() {
                 <input type="checkbox" checked={operations.includes(operation)} onChange={event => setOperations(current => event.target.checked ? [...current, operation] : current.filter(value => value !== operation))} />{operationLabels[index]}
             </label>)}</fieldset>
             <p>Nota, trascrizione e PDF verificati entrano nella scheda allo sblocco. Le proposte cliniche attendono la tua conferma.</p>
-            <label className="block">PIN di conferma<input className={SETTINGS_INPUT_CLASS} type="password" inputMode="numeric" autoComplete="off" required pattern="[0-9]{4,8}" value={pin} onChange={event => setPin(event.target.value)} /></label>
-            <button className={SETTINGS_PRIMARY_BUTTON_CLASS} disabled={busy || !operations.length}>Crea mandato</button>
+            <label className="block">PIN di conferma<input className={SETTINGS_INPUT_CLASS} type="password" inputMode="numeric" autoComplete="off" required aria-invalid={Boolean(pinError)} aria-describedby={pinError ? 'agent-mandate-pin-error' : undefined} value={pin} onChange={event => {
+                setPin(event.target.value); setPinSubmitError(null);
+            }} /></label>
+            {pinError && <p id="agent-mandate-pin-error" role="alert">{pinError}</p>}
+            <button className={SETTINGS_PRIMARY_BUTTON_CLASS} disabled={busy || !operations.length || !isValidNumericPin(pin)}>Crea mandato</button>
         </form>
         {error && <p role="alert">{error}</p>}
         <section id="abbinamenti" className="space-y-3"><h3 className="[font:var(--type-section-heading)]">Richieste di abbinamento</h3>
@@ -94,19 +107,28 @@ export default function AgentSettingsPage() {
                     </select></label>
                     <label className="flex gap-2">
                         <input type="checkbox" checked={renewOnUnlock} onChange={event => {
-                            setRenewing(event.target.checked ? pairing.id : null); setApprovalPin('');
+                            setRenewing(event.target.checked ? pairing.id : null); setApprovalPin(''); setApprovalPinSubmitError(null);
                         }} />Rinnova allo sblocco
                     </label>
                     {renewOnUnlock && <>
                         <p>Dal prossimo sblocco il client riceve un mandato di 12 ore con queste operazioni, finché l’accesso resta attivo.</p>
                         <label className="block">PIN per {pairing.name}<input className={SETTINGS_INPUT_CLASS} type="password"
-                            inputMode="numeric" autoComplete="off" value={approvalPin} onChange={event => setApprovalPin(event.target.value)} /></label>
+                            inputMode="numeric" autoComplete="off" aria-invalid={Boolean(approvalPinError)} value={approvalPin} onChange={event => {
+                                setApprovalPin(event.target.value); setApprovalPinSubmitError(null);
+                            }} /></label>
+                        {approvalPinError && <p role="alert">{approvalPinError}</p>}
                     </>}
-                    <button className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy || !selected || (renewOnUnlock && !/^[0-9]{4,8}$/u.test(approvalPin))} onClick={() => { void run(async () => {
-                        const response = await fetch('/api/agent-mandates/pairings', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ requestId: pairing.id, code: pairing.code, mandateRef: selected, ...(renewOnUnlock ? { renewOnUnlock, pin: approvalPin } : {}) }) });
-                        if (!response.ok) throw new Error('denied'); await refresh();
-                    }); }}>Approva {pairing.code}</button>
+                    <button className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy || !selected || (renewOnUnlock && !isValidNumericPin(approvalPin))} onClick={() => {
+                        if (renewOnUnlock) {
+                            const approvalProblem = validateNumericPinSubmission(approvalPin);
+                            if (approvalProblem) { setApprovalPinSubmitError(approvalProblem); return; }
+                        }
+                        void run(async () => {
+                            const response = await fetch('/api/agent-mandates/pairings', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ requestId: pairing.id, code: pairing.code, mandateRef: selected, ...(renewOnUnlock ? { renewOnUnlock, pin: approvalPin } : {}) }) });
+                            if (!response.ok) throw new Error('denied'); await refresh();
+                        });
+                    }}>Approva {pairing.code}</button>
                 </li>;
             })}</ul>
         </section>

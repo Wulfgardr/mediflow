@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { setImmediate as nextTurn } from 'node:timers/promises';
 import { mountContract, find, flatten, text, type TestNode } from './settings/settings-presentation.test-support.ts';
+import * as pinInput from '../lib/security/pin-input.ts';
 
 const componentUrl = new URL('./intelligent-host-checkup-action.tsx', import.meta.url);
 const adapterUrl = new URL('../lib/security/intelligent-host-checkup-browser-adapter.ts', import.meta.url);
@@ -58,6 +59,7 @@ function fixture(states: Record<number, unknown> = {}, props: Record<string, unk
         ], ...props },
         imports: {
             '@/lib/security/intelligent-host-checkup-browser-adapter': { createIntelligentHostCheckupBrowserAdapter: () => client, IntelligentHostCheckupBrowserAdapterError: AdapterError },
+            '@/lib/security/pin-input': pinInput,
             '@/lib/live-query': { notifyDbChange: (table: string) => calls.push({ method: 'notifyDbChange', args: [table] }) },
         },
         globals: { navigator: { clipboard: { writeText: record('copy', undefined) } } },

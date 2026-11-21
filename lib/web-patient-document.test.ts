@@ -49,9 +49,9 @@ async function documentSource(text = 'Nome: Lucia\nCognome: Inventata\nDocumento
     return { bytes, source: { name: seal('referto-inventato.pdf'), path: seal('referto-inventato.pdf'),
         original: bytes.toString('base64'), ...await sealPatientDocumentFile(new Uint8Array(bytes), await masterKey()) } };
 }
-function operator(suffix: string) {
+function operator(suffix: string, operatorPin = pin) {
     const id = `synthetic-web-document-${suffix}-${randomUUID()}`;
-    dbServer.insert(users).values({ id, username: id, role: 'admin', passwordHash: bcrypt.hashSync(pin, 4),
+    dbServer.insert(users).values({ id, username: id, role: 'admin', passwordHash: bcrypt.hashSync(operatorPin, 4),
         salt: 'synthetic', encryptedMasterKey: 'synthetic' }).run();
     return issueSyntheticWebSession({ id, username: id, role: 'admin' }, suffix + randomUUID());
 }
@@ -114,6 +114,66 @@ test('without confirmation nothing is created: cancel retires, wrong PIN retires
     await call({ operation: 'preview', commandId: wrong.view.commandId, viewId: wrong.view.viewId, review: review() });
     assert.equal((await call({ operation: 'execute', commandId: wrong.view.commandId, pin: wrongPin })).status, 403);
     assert.deepEqual((await call({ operation: 'receipt', commandId: wrong.view.commandId })).body, { outcome: 'retired' });
+    assert.deepEqual(effects(), before);
+});
+
+test('route boundary rejects over-long passphrases with 400 without counting attempts and accepts short alphanumeric PINs', async () => {
+    const active = operator('route-pin-boundary');
+    state.session = active;
+    const attempts = () => (dbServer.$client.prepare('SELECT failed_login_attempts n FROM users WHERE id = ?').get(active.userId) as { n: number }).n;
+    const commandId = randomUUID();
+    const alphanumericPin = ['AbC', '!09'].join('');
+    assert.equal(attempts(), 0);
+    for (const candidate of ['cavallo batteria graffetta corretta', 'demo086086', '123456789']) {
+        assert.equal((await call({ operation: 'execute', commandId, pin: candidate })).status, 400, candidate);
+        assert.equal(attempts(), 0, candidate);
+    }
+    const alphanumeric = await call({ operation: 'execute', commandId, pin: alphanumericPin });
+    assert.notEqual(alphanumeric.status, 400);
+    assert.equal(alphanumeric.status, 403);
+    assert.equal(attempts(), 0);
+});
+
+test('a passphrase or over-long PIN is rejected at the route boundary with 400 before verification and does not consume a lockout attempt', async () => {
+    const active = operator('overlong-pin');
+    state.session = active;
+    const before = effects();
+    const { view } = await staged();
+    assert.equal((await call({ operation: 'preview', commandId: view.commandId, viewId: view.viewId, review: review() })).status, 200);
+    const attempts = () => (dbServer.$client.prepare('SELECT failed_login_attempts n FROM users WHERE id = ?').get(active.userId) as { n: number }).n;
+    assert.equal(attempts(), 0);
+    for (const candidate of ['cavallo batteria graffetta corretta', 'demo086086', '123456789']) {
+        assert.equal((await call({ operation: 'execute', commandId: view.commandId, pin: candidate })).status, 400, candidate);
+        assert.equal(attempts(), 0, candidate);
+    }
+    const applied = await call({ operation: 'execute', commandId: view.commandId, pin });
+    assert.equal(applied.status, 200);
+    assert.equal(applied.body.outcome, 'applied');
+    assert.equal(attempts(), 0);
+    assert.deepEqual(effects(), before.map(n => n + 1));
+});
+
+test('a short alphanumeric PIN is accepted by document-create and does not fail with 400', async () => {
+    const alphanumericPin = ['AbC', '!09'].join('');
+    state.session = operator('alphanumeric-pin', alphanumericPin);
+    const before = effects();
+    const { view } = await staged();
+    assert.equal((await call({ operation: 'preview', commandId: view.commandId, viewId: view.viewId, review: review() })).status, 200);
+    const applied = await call({ operation: 'execute', commandId: view.commandId, pin: alphanumericPin });
+    assert.equal(applied.status, 200);
+    assert.equal(applied.body.outcome, 'applied');
+    assert.deepEqual(effects(), before.map(n => n + 1));
+
+    state.session = operator('alphanumeric-mismatch');
+    const other = await staged();
+    assert.equal((await call({ operation: 'preview', commandId: other.view.commandId, viewId: other.view.viewId, review: review() })).status, 200);
+    const mismatch = await call({ operation: 'execute', commandId: other.view.commandId, pin: alphanumericPin });
+    assert.equal(mismatch.status, 403);
+});
+
+test('moved ambulatory and lock void staged work without creating patients', async () => {
+    state.session = operator('negative-scope');
+    const before = effects();
 
     const moved = await staged(), other = randomUUID();
     dbServer.insert(ambulatories).values({ id: other, name: 'Altro ambulatorio inventato' }).run();
