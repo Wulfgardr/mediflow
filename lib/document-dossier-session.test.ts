@@ -863,3 +863,87 @@ test('l’applicazione conserva la sospensione dichiarata e ferma una riattivazi
     const therapies = [...records].filter(([key]) => key.startsWith('therapies:')).map(([, value]) => [value.drugName, value.status]);
     assert.deepEqual(therapies, [['Ramipril', 'suspended'], ['Atenololo', 'completed']]);
 });
+
+test('WUL-925: three RefertoCittadino PDFs with specialist CF in header, footer, and signature acquire cleanly on the patient', async () => {
+    const CF_SPEC = 'MEDPRS00A01A000W';
+    const headerPdf = `%PDF-1.4 sintetico\nASST Sintetica - U.O. Cardiologia - Medico refertante: Dott. Luca Bianchi - C.F.: ${CF_SPEC}\nAssistito: Mario Rossi\nCodice fiscale assistito: ${CF_A}\nData referto: 10/11/2026\nVisita cardiologica nei limiti.`;
+    const footerPdf = `%PDF-1.4 sintetico\nRefertoCittadino\nAssistito: Mario Rossi\nC.F. assistito: ${CF_A}\nData referto: 12/11/2026\nEsame obiettivo regolare.\nIl medico\nDott. Luca Bianchi\nC.F.: ${CF_SPEC}`;
+    const signaturePdf = `%PDF-1.4 sintetico\nRefertoCittadino\nPaziente: Mario Rossi\nCodice fiscale paziente: ${CF_A}\nData referto: 14/11/2026\nReferto regolare.\nFirmato digitalmente da: BIANCHI LUCA (CF: ${CF_SPEC})`;
+    const { files, ports, attachments } = setup([
+        ['Dossier/Rossi/referto-intestazione.pdf', headerPdf],
+        ['Dossier/Rossi/referto-calce.pdf', footerPdf],
+        ['Dossier/Rossi/referto-firma.pdf', signaturePdf],
+    ]);
+    const [group] = await buildDossierInventory(ports, files, live);
+    const patients = await ports.listPatients(live.signal);
+    const suggested = evaluateDraftGroupIdentity(group, patients, null);
+    assert.equal(suggested.status, 'suggested');
+    assert.deepEqual(suggested.candidatePatientIds, ['pa']);
+    assert.equal(suggested.uncertainDocuments, undefined);
+    const outcomes = await acquireDossierGroup(ports, { group, patientId: 'pa', confirmed: true, ...live });
+    assert.deepEqual(outcomes.map((item) => item.status), ['stored', 'stored', 'stored']);
+    assert.equal(attachments.size, 3);
+});
+
+test('WUL-925: one uncertain document does not block coherent ones and is never written without per-document confirmation', async () => {
+    const CF_SPEC = 'MEDPRS00A01A000W';
+    const CF_UNCERTAIN = 'OPRTST00A01A000K';
+    const coherentPdf = `%PDF-1.4 sintetico\nRefertoCittadino\nAssistito: Mario Rossi\nCodice fiscale assistito: ${CF_A}\nData referto: 10/11/2026\nEsenzione 031\nFirmato digitalmente da: BIANCHI LUCA (CF: ${CF_SPEC})`;
+    const uncertainPdf = `%PDF-1.4 sintetico\nRefertoCittadino\nAssistito: Mario Rossi\nCodice fiscale assistito: ${CF_A}\nData referto: 11/11/2026\nEsenzione 048\n${CF_UNCERTAIN}`;
+    const otherUnlabeledPdf = `%PDF-1.4 sintetico\nLettera senza intestazione\n${CF_B}\nData referto: 12/11/2026`;
+    const { files, ports, attachments } = setup([
+        ['Dossier/Rossi/coerente.pdf', coherentPdf],
+        ['Dossier/Rossi/incerto.pdf', uncertainPdf],
+        ['Dossier/Rossi/estraneo.pdf', otherUnlabeledPdf],
+    ]);
+    const [group] = await buildDossierInventory(ports, files, live);
+    const patients = await ports.listPatients(live.signal);
+
+    const identity = evaluateDraftGroupIdentity(group, patients, 'pa');
+    assert.equal(identity.status, 'matched');
+    assert.equal(identity.blocking, false);
+    assert.deepEqual(
+        identity.uncertainDocuments?.map((doc) => [doc.fileName, doc.codes]),
+        [['incerto.pdf', [CF_UNCERTAIN]], ['estraneo.pdf', [CF_B]]],
+    );
+
+    const firstPass = await acquireDossierGroup(ports, { group, patientId: 'pa', confirmed: true, ...live });
+    assert.deepEqual(
+        firstPass.map((item) => [item.status, 'reason' in item ? item.reason : undefined]),
+        [['stored', undefined], ['skipped', 'identity_unconfirmed'], ['skipped', 'identity_unconfirmed']],
+    );
+    assert.equal(attachments.size, 1);
+
+    const confirmedGroup = {
+        ...group,
+        sources: group.sources.map((source) => source.fileName === 'incerto.pdf'
+            ? { ...source, confirmedUncertainCodes: [CF_UNCERTAIN] }
+            : source),
+    };
+    const secondPass = await acquireDossierGroup(ports, { group: confirmedGroup, patientId: 'pa', confirmed: true, ...live });
+    assert.deepEqual(
+        secondPass.map((item) => [item.status, 'reason' in item ? item.reason : undefined]),
+        [['reused', undefined], ['stored', undefined], ['skipped', 'identity_unconfirmed']],
+    );
+    assert.equal(attachments.size, 2);
+
+    const confirmedAttachmentId = (secondPass[1] as { attachmentId: string }).attachmentId;
+    const loaded = (await loadPatientDossier(ports, 'pa', live.signal))!;
+    const confirmedDoc = loaded.documents.find((doc) => doc.attachment.id === confirmedAttachmentId)!;
+    assert.equal(confirmedDoc.coverage.gaps.includes('identity_conflict'), false);
+    const reviewed = await acceptAll(ports, 'pa', confirmedAttachmentId, (record) => ({
+        ...record,
+        facts: record.facts.filter((fact) => fact.kind === 'exemption'),
+    }));
+    const applied = await applyDossierDocument(ports, { patientId: 'pa', attachmentId: confirmedAttachmentId, expected: reviewed.attachment.currentness!, ...live });
+    assert.equal(applied.stopped, null);
+    assert.deepEqual((await ports.getPatient('pa', live.signal))!.exemptions, ['048']);
+
+    const meta = attachments.get(confirmedAttachmentId)!.meta;
+    const tampered = JSON.parse(meta.parseEvidenceArtifactSnapshot!);
+    tampered.dossier.identity.taxCodes.push({ value: CF_B, role: 'unknown_cf', checksumValid: true });
+    meta.parseEvidenceArtifactSnapshot = JSON.stringify(tampered);
+    const reloaded = (await loadPatientDossier(ports, 'pa', live.signal))!;
+    const tamperedDoc = reloaded.documents.find((doc) => doc.attachment.id === confirmedAttachmentId)!;
+    assert.equal(tamperedDoc.coverage.gaps.includes('identity_conflict'), true);
+});

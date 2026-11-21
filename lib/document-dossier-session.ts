@@ -106,6 +106,7 @@ export interface DossierDraftSource {
     text: string | null;
     taxCodes: DossierTaxCodeEvidence[];
     patientNames: string[][];
+    confirmedUncertainCodes?: string[];
     documentDate: DossierRecord['documentDate'];
     facts: DossierFact[];
     classificationResult: DossierRecord['classification'];
@@ -227,7 +228,20 @@ export async function buildDossierInventory(
 }
 
 export function evaluateDraftGroupIdentity(group: DossierDraftGroup, patients: readonly DossierPatient[], linkedPatientId: string | null): DossierIdentityEvaluation {
-    return evaluateDossierGroupIdentity(group.sources.filter((source) => source.status === 'ready'), patients, linkedPatientId, group.physicianTaxCode);
+    return evaluateDossierGroupIdentity(
+        group.sources
+            .filter((source) => source.status === 'ready')
+            .map((source) => ({
+                key: source.key,
+                fileName: source.fileName,
+                taxCodes: source.taxCodes,
+                patientNames: source.patientNames,
+                ...(source.confirmedUncertainCodes?.length ? { confirmedUncertainCodes: source.confirmedUncertainCodes } : {}),
+            })),
+        patients,
+        linkedPatientId,
+        group.physicianTaxCode,
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -257,7 +271,7 @@ async function boundary<T>(guard: Guard, operation: () => Promise<T>): Promise<T
 
 export type DossierAcquireOutcome =
     | { key: string; status: 'stored' | 'reused'; attachmentId: string; verified: boolean; measured?: { original: number; artifact: number } }
-    | { key: string; status: 'skipped'; reason: 'duplicate_in_selection' | 'excluded' | 'unreadable' | 'unsupported_format' }
+    | { key: string; status: 'skipped'; reason: 'duplicate_in_selection' | 'excluded' | 'unreadable' | 'unsupported_format' | 'identity_unconfirmed' }
     | { key: string; status: 'failed'; reason: 'source_changed' | 'too_large' | 'readback_mismatch' | 'write_failed' | 'artifact_conflict'; attachmentId?: string };
 
 function dataEqual(left: Uint8Array, right: Uint8Array): boolean {
@@ -291,13 +305,16 @@ export async function acquireDossierGroup(
     guard();
     const identity = evaluateDraftGroupIdentity({ ...group, physicianTaxCode }, patients, patientId);
     if (identity.blocking || !patients.some((patient) => patient.id === patientId)) throw new DossierIdentityBlocked(identity);
+    const uncertainKeys = new Set((identity.uncertainDocuments ?? []).map((doc) => doc.key).filter((key): key is string => Boolean(key)));
     const confirmedAt = ports.now().toISOString();
     const outcomes: DossierAcquireOutcome[] = [];
     for (const source of group.sources) {
         guard();
         const outcome: DossierAcquireOutcome = source.status !== 'ready'
             ? { key: source.key, status: 'skipped', reason: source.status === 'duplicate_in_selection' ? 'duplicate_in_selection' : source.status }
-            : await acquireOne(ports, source, patientId, identity, confirmedAt, signal, guard);
+            : uncertainKeys.has(source.key)
+                ? { key: source.key, status: 'skipped', reason: 'identity_unconfirmed' }
+                : await acquireOne(ports, source, patientId, identity, confirmedAt, signal, guard);
         outcomes.push(outcome);
         input.onProgress?.(outcome);
     }
@@ -319,7 +336,13 @@ function initialRecord(source: DossierDraftSource, ports: DossierPorts, identity
         extractionAttempts: source.classification.extractable
             ? [{ at: confirmedAt, outcome: source.extraction.state === 'extracted' ? 'extracted' : 'failed',
                 ...(source.extraction.state === 'failed' ? { detail: source.extraction.detail } : {}) }] : [],
-        identity: { taxCodes: source.taxCodes, patientNames: source.patientNames, status: identity.status, confirmedAt },
+        identity: {
+            taxCodes: source.taxCodes,
+            patientNames: source.patientNames,
+            ...(source.confirmedUncertainCodes?.length ? { confirmedUncertainCodes: [...source.confirmedUncertainCodes] } : {}),
+            status: identity.status,
+            confirmedAt,
+        },
         documentDate: source.documentDate,
         classification: source.classificationResult,
         facts: source.facts,
@@ -630,7 +653,7 @@ export async function retryDossierExtraction(
         const identity = evaluateDossierGroupIdentity([{ taxCodes, patientNames }], [patient], input.patientId, physicianTaxCode);
         const known = new Set(record.facts.map((fact) => fact.factId));
         next = { ...record, updatedAt: at, extraction, documentDate: date,
-            identity: { ...record.identity, taxCodes, patientNames, status: identity.status },
+            identity: { ...record.identity, taxCodes, patientNames, confirmedUncertainCodes: undefined, status: identity.status },
             classification: proposed.classification,
             facts: [...record.facts, ...proposed.facts.filter((fact) => !known.has(fact.factId))],
             residualReview: { state: 'pending' },

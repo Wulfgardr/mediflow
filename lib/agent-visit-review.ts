@@ -5,7 +5,7 @@ import { cassetteItems } from './agent-cassette-contract';
 import { agentBytes } from './agent-cassette-crypto';
 import { openAgentVisit, type OpenedAgentVisit } from './agent-cassette-client';
 import { agentApplicationSchema, agentStructuredKind, type AgentApplicationInput, type AgentCassetteIndexEntry, type IncomingAgentCassette } from './agent-visit-application-contract';
-import { collectDossierTaxCodes, evaluateDossierGroupIdentity, dossierFactBlockers } from './domain/documents/dossier-import';
+import { collectDossierTaxCodes, evaluateDossierGroupIdentity, excludedProfessionalCode, dossierFactBlockers } from './domain/documents/dossier-import';
 import { verifyPreparedFields, preparedTokens } from './domain/documents/dossier-prepared';
 import { clinicalFactContext, contextReview, isHistoricalTherapy } from './domain/documents/clinical-context-lexicon';
 import { servicePrescriptionCreateSchema } from './api-schemas/prescriptions';
@@ -59,7 +59,7 @@ export async function inspectAgentVisit(row: IncomingAgentCassette, patients: Pa
             documents.set(hash, { ...read, id: item.id, name: text(item.value.name), hash });
             const identity = evaluateDossierGroupIdentity([{ taxCodes: codes }], patient ? [patient] : [], patient?.id, physicianTaxCode);
             const foreign = codes.filter(code => code.checksumValid && code.value !== physicianTaxCode
-                && !(code.role === 'professional_cf' && code.explicitProfessional));
+                && !excludedProfessionalCode(code));
             if (identity.status !== 'matched' || identity.blocking || foreign.length === 0
                 || foreign.some(code => code.value !== cf || code.role !== 'patient_cf')) {
                 blockers.push(identity.missingPhysicianTaxCode ? identity.message + ' PDF: ' + text(item.value.name) : 'Identità da verificare nel PDF ' + text(item.value.name) + ': ' + identity.documentPatientCodes.join(', '));

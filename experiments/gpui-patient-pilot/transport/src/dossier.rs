@@ -788,8 +788,23 @@ pub fn patient_names(text: &str) -> Value {
 fn professional(code: &Value) -> bool {
     code["role"] == "professional_cf"
         && code["explicitProfessional"] == true
-        && (code["professionalLabelScope"] == "same_line"
-            || code["professionalLabelScope"] == "prescriber_block")
+        && matches!(
+            code["professionalLabelScope"].as_str(),
+            Some(
+                "same_line"
+                    | "prescriber_block"
+                    | "specialist_block"
+                    | "signature_block"
+                    | "header_block"
+            )
+        )
+}
+struct AnalyzedIdentityDoc<'a> {
+    index: usize,
+    doc: &'a Value,
+    patient_codes: Vec<String>,
+    uncertain_codes: Vec<String>,
+    has_unattributed: bool,
 }
 pub fn identity(
     documents: &[Value],
@@ -798,28 +813,265 @@ pub fn identity(
     physician: Option<&str>,
 ) -> Value {
     let physician = physician.unwrap_or("").trim().to_uppercase();
-    let codes: BTreeSet<_> = documents
+    let analyzed: Vec<AnalyzedIdentityDoc<'_>> = documents
         .iter()
-        .flat_map(|d| array(&d["taxCodes"]))
-        .filter(|c| {
-            c["checksumValid"] == true
-                && !professional(c)
-                && string(&c["value"]).trim().to_uppercase() != physician
+        .enumerate()
+        .map(|(index, doc)| {
+            let confirmed: BTreeSet<String> = array(&doc["confirmedUncertainCodes"])
+                .iter()
+                .map(|c| string(c).trim().to_uppercase())
+                .collect();
+            let active: Vec<&Value> = array(&doc["taxCodes"])
+                .iter()
+                .filter(|c| {
+                    c["checksumValid"] == true
+                        && !professional(c)
+                        && string(&c["value"]).trim().to_uppercase() != physician
+                })
+                .collect();
+            let patient_set: BTreeSet<String> = active
+                .iter()
+                .filter(|c| c["role"] == "patient_cf")
+                .map(|c| string(&c["value"]).trim().to_uppercase())
+                .collect();
+            let uncertain_set: BTreeSet<String> = active
+                .iter()
+                .filter(|c| {
+                    let value = string(&c["value"]).trim().to_uppercase();
+                    c["role"] != "patient_cf"
+                        && !confirmed.contains(&value)
+                        && !patient_set.contains(&value)
+                })
+                .map(|c| string(&c["value"]).trim().to_uppercase())
+                .collect();
+            let has_unattributed = active.iter().any(|c| {
+                let value = string(&c["value"]).trim().to_uppercase();
+                c["role"] != "patient_cf" && !confirmed.contains(&value)
+            });
+            AnalyzedIdentityDoc {
+                index,
+                doc,
+                patient_codes: patient_set.into_iter().collect(),
+                uncertain_codes: uncertain_set.into_iter().collect(),
+                has_unattributed,
+            }
         })
-        .map(|c| string(&c["value"]).trim().to_uppercase())
         .collect();
-    let codes: Vec<_> = codes.into_iter().collect();
-    let unattributed = documents
+    let explicit_patient_codes: Vec<String> = analyzed
         .iter()
-        .flat_map(|d| array(&d["taxCodes"]))
-        .any(|c| {
-            c["checksumValid"] == true
-                && c["role"] != "patient_cf"
-                && !professional(c)
-                && string(&c["value"]).trim().to_uppercase() != physician
+        .flat_map(|entry| entry.patient_codes.iter().cloned())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    let codes: Vec<String> = analyzed
+        .iter()
+        .flat_map(|entry| {
+            entry
+                .patient_codes
+                .iter()
+                .chain(entry.uncertain_codes.iter())
+                .cloned()
+        })
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    let unattributed = analyzed.iter().any(|entry| entry.has_unattributed);
+    let build_result = |status: &str,
+                        blocking: bool,
+                        doc_codes: &[String],
+                        ids: Vec<Value>,
+                        message: &str,
+                        missing_physician: bool,
+                        uncertain: &[Value]| {
+        let mut obj = json!({
+            "status": status,
+            "blocking": blocking,
+            "confirmationRequired": true,
+            "documentPatientCodes": doc_codes,
+            "candidatePatientIds": ids,
+            "message": message
         });
-    let result = |status: &str, blocking: bool, ids: Vec<Value>, message: &str| json!({"status":status,"blocking":blocking,"confirmationRequired":true,"documentPatientCodes":codes,"candidatePatientIds":ids,"message":message});
+        if missing_physician {
+            obj["missingPhysicianTaxCode"] = json!(true);
+        }
+        if !uncertain.is_empty() {
+            obj["uncertainDocuments"] = json!(uncertain);
+        }
+        obj
+    };
+    let linked_patient = linked.and_then(|id| patients.iter().find(|p| p["id"] == id));
+    if !physician.is_empty()
+        && linked_patient.is_some_and(|p| string(&p["taxCode"]).trim().to_uppercase() == physician)
+    {
+        return build_result(
+            "discordant",
+            true,
+            &codes,
+            vec![],
+            "La scheda scelta ha il codice fiscale del medico. Scegli la scheda del paziente.",
+            false,
+            &[],
+        );
+    }
+    let holders_for = |target: &str| {
+        patients
+            .iter()
+            .filter(|p| string(&p["taxCode"]).trim().to_uppercase() == target)
+            .map(|p| p["id"].clone())
+            .collect::<Vec<_>>()
+    };
+    if explicit_patient_codes.len() > 1 {
+        return build_result(
+            "mixed",
+            true,
+            &codes,
+            vec![],
+            "I documenti contengono più codici fiscali distinti, inclusi quelli di attribuzione incerta. Controlla a chi si riferiscono ed escludi le fonti discordanti prima di procedere.",
+            false,
+            &[],
+        );
+    }
+    if explicit_patient_codes.len() == 1 {
+        let group_code = &explicit_patient_codes[0];
+        let mut uncertain_docs = vec![];
+        let mut coherent_count = 0usize;
+        for entry in &analyzed {
+            let foreign: Vec<String> = entry
+                .uncertain_codes
+                .iter()
+                .filter(|c| *c != group_code)
+                .cloned()
+                .collect();
+            if !foreign.is_empty() {
+                let mut item = json!({
+                    "index": entry.index,
+                    "codes": foreign,
+                    "message": format!("Codice fiscale di ruolo incerto ({}): conferma che appartiene a questa scheda o escludi il documento.", foreign.join(", "))
+                });
+                if let Some(key) = entry.doc["key"].as_str().filter(|v| !v.is_empty()) {
+                    item["key"] = json!(key);
+                }
+                if let Some(file_name) = entry.doc["fileName"].as_str().filter(|v| !v.is_empty()) {
+                    item["fileName"] = json!(file_name);
+                }
+                uncertain_docs.push(item);
+            } else if entry.patient_codes.contains(group_code) {
+                coherent_count += 1;
+            }
+        }
+        let group_codes = vec![group_code.clone()];
+        if let Some(patient) = linked_patient
+            && string(&patient["taxCode"]).trim().to_uppercase() != *group_code
+        {
+            return build_result(
+                "discordant",
+                true,
+                &group_codes,
+                holders_for(group_code),
+                "Il codice fiscale nei documenti non corrisponde alla scheda scelta. Nessuna fonte verrà salvata su questa scheda.",
+                false,
+                &[],
+            );
+        }
+        if !uncertain_docs.is_empty() && coherent_count == 0 {
+            if physician.is_empty() && codes.len() == 2 && unattributed {
+                return build_result(
+                    "mixed",
+                    true,
+                    &codes,
+                    vec![],
+                    "Manca il tuo codice fiscale nel Profilo: inseriscilo per escludere il prescrittore e ripeti la lettura.",
+                    true,
+                    &uncertain_docs,
+                );
+            }
+            return build_result(
+                "mixed",
+                true,
+                &codes,
+                vec![],
+                "I documenti contengono più codici fiscali distinti, inclusi quelli di attribuzione incerta. Controlla a chi si riferiscono ed escludi le fonti discordanti prima di procedere.",
+                false,
+                &uncertain_docs,
+            );
+        }
+        let uncertain_note = match uncertain_docs.len() {
+            0 => String::new(),
+            1 => " 1 documento ha un codice fiscale di ruolo incerto: confermalo o escludilo prima di salvarlo.".to_owned(),
+            n => format!(" {n} documenti hanno codici fiscali di ruolo incerto: confermali o escludili prima di salvarli."),
+        };
+        if let Some(patient) = linked_patient {
+            let msg = if !uncertain_docs.is_empty() {
+                format!(
+                    "Il codice fiscale nei documenti coerenti coincide con la scheda scelta.{uncertain_note}"
+                )
+            } else if unattributed {
+                "Il codice fiscale letto coincide con la scheda scelta, ma la sua attribuzione nel documento è incerta. Verifica a chi si riferisce prima di confermare.".to_owned()
+            } else {
+                "Il codice fiscale nei documenti coincide con la scheda scelta. Conferma comunque il collegamento.".to_owned()
+            };
+            return build_result(
+                "matched",
+                false,
+                &group_codes,
+                vec![patient["id"].clone()],
+                &msg,
+                false,
+                &uncertain_docs,
+            );
+        }
+        let owners = holders_for(group_code);
+        return match owners.len() {
+            0 => build_result(
+                "unmatched_cf",
+                false,
+                &group_codes,
+                owners,
+                &format!(
+                    "Nessuna scheda con questo codice fiscale: crea una nuova scheda o scegline una esistente.{uncertain_note}"
+                ),
+                false,
+                &uncertain_docs,
+            ),
+            1 => build_result(
+                "suggested",
+                false,
+                &group_codes,
+                owners,
+                &format!(
+                    "Una scheda ha lo stesso codice fiscale. Il codice non prova l’identità: conferma il collegamento.{uncertain_note}"
+                ),
+                false,
+                &uncertain_docs,
+            ),
+            _ => build_result(
+                "ambiguous_cf",
+                false,
+                &group_codes,
+                owners,
+                &format!(
+                    "Più schede hanno lo stesso codice fiscale: scegli quella corretta.{uncertain_note}"
+                ),
+                false,
+                &uncertain_docs,
+            ),
+        };
+    }
+    let result = |status: &str, blocking: bool, ids: Vec<Value>, message: &str| {
+        build_result(status, blocking, &codes, ids, message, false, &[])
+    };
     if codes.len() > 1 {
+        if physician.is_empty() && codes.len() == 2 && unattributed {
+            return build_result(
+                "mixed",
+                true,
+                &codes,
+                vec![],
+                "Manca il tuo codice fiscale nel Profilo: inseriscilo per escludere il prescrittore e ripeti la lettura.",
+                true,
+                &[],
+            );
+        }
         return result(
             "mixed",
             true,
@@ -827,30 +1079,8 @@ pub fn identity(
             "I documenti contengono più codici fiscali distinti, inclusi quelli di attribuzione incerta. Controlla a chi si riferiscono ed escludi le fonti discordanti prima di procedere.",
         );
     }
-    if !physician.is_empty()
-        && linked
-            .and_then(|id| patients.iter().find(|p| p["id"] == id))
-            .is_some_and(|p| string(&p["taxCode"]).trim().to_uppercase() == physician)
-    {
-        return result(
-            "discordant",
-            true,
-            vec![],
-            "La scheda scelta ha il codice fiscale del medico. Scegli la scheda del paziente.",
-        );
-    }
-    let holders = || {
-        patients
-            .iter()
-            .filter(|p| {
-                codes
-                    .first()
-                    .is_some_and(|c| string(&p["taxCode"]).trim().to_uppercase() == *c)
-            })
-            .map(|p| p["id"].clone())
-            .collect::<Vec<_>>()
-    };
-    if let Some(patient) = linked.and_then(|id| patients.iter().find(|p| p["id"] == id)) {
+    let holders = || codes.first().map(|c| holders_for(c)).unwrap_or_default();
+    if let Some(patient) = linked_patient {
         if let Some(code) = codes.first() {
             if string(&patient["taxCode"]).trim().to_uppercase() != *code {
                 return result(
@@ -1463,6 +1693,59 @@ mod tests {
             identity(&documents, &patients, None, None)["status"],
             "mixed"
         );
+    }
+
+    #[test]
+    fn specialist_scopes_and_single_document_uncertainty_match_web_rules() {
+        let patients = vec![
+            json!({"id":"pa","taxCode":"RSSMRA80A01F205X"}),
+            json!({"id":"pb","taxCode":"RSSMRA85T10A562S"}),
+        ];
+        for scope in ["specialist_block", "signature_block", "header_block"] {
+            let docs = vec![json!({
+                "taxCodes": [
+                    {"value":"RSSMRA80A01F205X","checksumValid":true,"role":"patient_cf"},
+                    {"value":"MEDPRS00A01A000W","checksumValid":true,"role":"professional_cf","explicitProfessional":true,"professionalLabelScope":scope}
+                ]
+            })];
+            let eval = identity(&docs, &patients, Some("pa"), None);
+            assert_eq!(eval["status"], "matched");
+            assert_eq!(eval["blocking"], false);
+        }
+        let coherent = json!({
+            "key": "s1",
+            "fileName": "coerente.pdf",
+            "taxCodes": [{"value":"RSSMRA80A01F205X","checksumValid":true,"role":"patient_cf"}]
+        });
+        let uncertain = json!({
+            "key": "s2",
+            "fileName": "incerto.pdf",
+            "taxCodes": [
+                {"value":"RSSMRA80A01F205X","checksumValid":true,"role":"patient_cf"},
+                {"value":"OPRTST00A01A000K","checksumValid":true,"role":"unknown_cf"}
+            ]
+        });
+        let eval = identity(&[coherent.clone(), uncertain], &patients, Some("pa"), None);
+        assert_eq!(eval["status"], "matched");
+        assert_eq!(eval["blocking"], false);
+        assert_eq!(eval["uncertainDocuments"][0]["key"], "s2");
+        assert_eq!(
+            eval["uncertainDocuments"][0]["codes"],
+            json!(["OPRTST00A01A000K"])
+        );
+
+        let confirmed = json!({
+            "key": "s2",
+            "fileName": "incerto.pdf",
+            "confirmedUncertainCodes": ["OPRTST00A01A000K"],
+            "taxCodes": [
+                {"value":"RSSMRA80A01F205X","checksumValid":true,"role":"patient_cf"},
+                {"value":"OPRTST00A01A000K","checksumValid":true,"role":"unknown_cf"}
+            ]
+        });
+        let resolved = identity(&[coherent, confirmed], &patients, Some("pa"), None);
+        assert_eq!(resolved["status"], "matched");
+        assert!(resolved.get("uncertainDocuments").is_none());
     }
     fn canonical(value: &Value) -> String {
         match value {

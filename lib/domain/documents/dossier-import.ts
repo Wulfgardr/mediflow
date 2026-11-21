@@ -162,38 +162,155 @@ export function unitText(text: string, unit: DossierUnit): string { return text.
 // Identità: un codice fiscale valido non prova l'identità
 // ---------------------------------------------------------------------------
 
+export type DossierProfessionalLabelScope =
+    | 'same_line'
+    | 'prescriber_block'
+    | 'specialist_block'
+    | 'signature_block'
+    | 'header_block';
+
 export interface DossierTaxCodeEvidence {
     value: string; role: 'patient_cf' | 'professional_cf' | 'unknown_cf'; checksumValid: boolean;
     explicitProfessional?: boolean;
-    professionalLabelScope?: 'same_line' | 'prescriber_block';
+    professionalLabelScope?: DossierProfessionalLabelScope;
 }
+
+const EXCLUDED_PROFESSIONAL_SCOPES = new Set<DossierProfessionalLabelScope>([
+    'same_line',
+    'prescriber_block',
+    'specialist_block',
+    'signature_block',
+    'header_block',
+]);
 
 const CF_LABEL = String.raw`(?:codice[ \t\u00a0]+fiscale|c\.?[ \t\u00a0]*f\.?)`;
-const PROFESSIONAL_LABEL = String.raw`(?:medico(?:[ \t\u00a0]+prescrittore)?|prescrittore|operatore|operatrice|compilatore|compilatrice)`;
-const EXPLICIT_PROFESSIONAL_CF = new RegExp(String.raw`^[ \t\u00a0]*(?:${CF_LABEL}[ \t\u00a0]+(?:del(?:la)?[ \t\u00a0]+)?${PROFESSIONAL_LABEL}|${PROFESSIONAL_LABEL}[ \t\u00a0]+${CF_LABEL})[ \t\u00a0]*[:=]?[ \t\u00a0]*$`, 'iu');
+const PROFESSIONAL_TITLE = String.raw`(?:dott(?:\.ssa|\.|ore|oressa)?|dr(?:\.ssa|\.)?|prof(?:\.ssa|\.)?)`;
+const PERSON_NAME_TOKENS = String.raw`[\p{L}’'-]+(?:,?[ \t\u00a0]+[\p{L}’'-]+){1,3}`;
+const PROFESSIONAL_LABEL = String.raw`(?:medico(?:[ \t\u00a0]+(?:prescrittore|refertante|specialista|firmatario|firmataria|esecutore|responsabile))?|dirigente[ \t\u00a0]+medico|specialista|il[ \t\u00a0]+medico(?:[ \t\u00a0]+(?:refertante|specialista|prescrittore))?|prescrittore|refertante|operatore|operatrice|compilatore|compilatrice)`;
+const SPECIALIST_ROLE_PREFIX = String.raw`(?:(?:il[ \t\u00a0]+)?medico[ \t\u00a0]+(?:refertante|prescrittore|specialista|firmatario|firmataria|esecutore|responsabile)|(?:il[ \t\u00a0]+)?dirigente[ \t\u00a0]+medico|(?:lo[ \t\u00a0]+)?specialista(?:[ \t\u00a0]+in[ \t\u00a0]+[\p{L}’'-]+(?:[ \t\u00a0]+[\p{L}’'-]+)?)?|il[ \t\u00a0]+medico)`;
+const SIGNATURE_LABEL = String.raw`(?:(?:documento[ \t\u00a0]+)?(?:firmato|sottoscritto)(?:[ \t\u00a0]+digitalmente)?(?:[ \t\u00a0]+ai[ \t\u00a0]+sensi[ \t\u00a0]+[^:\r\n]{1,40})?[ \t\u00a0]+da|refertato[ \t\u00a0]+da|validato[ \t\u00a0]+da|firma[ \t\u00a0]+(?:digitale|del(?:lo)?[ \t\u00a0]+(?:medico|specialista|dirigente[ \t\u00a0]+medico)))`;
+const EXPLICIT_PROFESSIONAL_CF = new RegExp(
+    String.raw`^[ \t\u00a0]*(?:${CF_LABEL}[ \t\u00a0]+(?:dell['’][ \t\u00a0]*|del(?:la|lo)?[ \t\u00a0]+)?${PROFESSIONAL_LABEL}|${PROFESSIONAL_LABEL}[ \t\u00a0]+${CF_LABEL})[ \t\u00a0]*[:=]?[ \t\u00a0]*$`,
+    'iu',
+);
+const SPECIALIST_SAME_LINE = new RegExp(
+    String.raw`^(?:${SPECIALIST_ROLE_PREFIX}[ \t\u00a0]*(?:[:\-–,][ \t\u00a0]*|[ \t\u00a0]+)(?:${PROFESSIONAL_TITLE}[ \t\u00a0]+)?${PERSON_NAME_TOKENS}[ \t\u00a0]*(?:[-–,/|(\[]+[ \t\u00a0]*)?(?:${CF_LABEL}[ \t\u00a0]*[:=]?[ \t\u00a0]*)?|medico[ \t\u00a0]*:[ \t\u00a0]*${PROFESSIONAL_TITLE}[ \t\u00a0]+${PERSON_NAME_TOKENS}[ \t\u00a0]*(?:[-–,/|(\[]+[ \t\u00a0]*)?${CF_LABEL}[ \t\u00a0]*[:=]?[ \t\u00a0]*)$`,
+    'iu',
+);
+const SIGNATURE_SAME_LINE = new RegExp(
+    String.raw`^(?:[\p{L}'’ .-]{2,30},[ \t\u00a0]*\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}[ \t\u00a0]*[-–·|]?[ \t\u00a0]*)?${SIGNATURE_LABEL}[ \t\u00a0]*:?[ \t\u00a0]+(?:${PROFESSIONAL_TITLE}[ \t\u00a0]+)?${PERSON_NAME_TOKENS}[ \t\u00a0]*(?:[-–,/|(\[]+[ \t\u00a0]*)?(?:${CF_LABEL}[ \t\u00a0]*[:=]?[ \t\u00a0]*)?(?:serialnumber[ \t\u00a0]*=[ \t\u00a0]*)?(?:tinit-)?$`,
+    'iu',
+);
+const SIGNATURE_TINIT_LINE = new RegExp(
+    String.raw`^(?:[\p{L}'’ .-]{2,30},[ \t\u00a0]*\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}[ \t\u00a0]*[-–·|]?[ \t\u00a0]*)?${SIGNATURE_LABEL}[ \t\u00a0]*:?[ \t\u00a0]*(?:(?:${CF_LABEL}[ \t\u00a0]*[:=]?[ \t\u00a0]*)(?:(?:serialnumber[ \t\u00a0]*=[ \t\u00a0]*)?tinit-)?|(?:serialnumber[ \t\u00a0]*=[ \t\u00a0]*)?tinit-)$`,
+    'iu',
+);
+const DOCTOR_NAME_LINE = new RegExp(String.raw`^${PROFESSIONAL_TITLE}[ \t\u00a0]+${PERSON_NAME_TOKENS}$`, 'iu');
+const DOCTOR_NAME_BEFORE_CF = new RegExp(
+    String.raw`^${PROFESSIONAL_TITLE}[ \t\u00a0]+${PERSON_NAME_TOKENS}[ \t\u00a0]*(?:[-–,/|(\[]+[ \t\u00a0]*)?(?:${CF_LABEL}[ \t\u00a0]*[:=]?[ \t\u00a0]*)?$`,
+    'iu',
+);
+const SAME_LINE_ROLE_SUFFIX = new RegExp(
+    String.raw`^[)\]]*[ \t\u00a0]*[-–,/|(\[]*[ \t\u00a0]*${SPECIALIST_ROLE_PREFIX}[)\]]*[ \t\u00a0]*$`,
+    'iu',
+);
+const FOOTER_ROLE_ONLY_LINE = new RegExp(String.raw`^${SPECIALIST_ROLE_PREFIX}$`, 'iu');
+const FACILITY_HEADER_PREFIX = /^(?:regione[ \t\u00a0]+[\p{L}'’-]+|sistema[ \t\u00a0]+socio[ \t\u00a0]*sanitario|asst|ats|asl|irccs|azienda[ \t\u00a0]+(?:socio[ \t\u00a0]*sanitaria|ospedaliera|sanitaria)|ospedale|presidio(?:[ \t\u00a0]+ospedaliero)?|policlinico|fondazione|ambulatorio|u\.?[ \t\u00a0]*o\.?(?:c|s|sd)?\.?|reparto|servizio[ \t\u00a0]+di|struttura)\b/iu;
+const FACILITY_SUBLINE = /^(?:u\.?[ \t\u00a0]*o\.?(?:c|s|sd)?\.?|presidio|dipartimento|ambulatorio|reparto|servizio|sede|via\b|viale\b|piazza\b|corso\b|tel\.?\b)/iu;
+const PATIENT_GUARD_WORDS = /\b(?:paziente|assistit[oa]|cittadin[oa]|intestatari[oa]|dichiarante|interessat[oa]|delegante|genitore|tutore|nat[oa][ \t\u00a0]+(?:il|a))\b/iu;
+const STOP_BLOCK_WORDS = /\b(?:paziente|assistit[oa]|cittadin[oa]|intestatari[oa]|referto|clinico|clinica|diagnosi|terapia|anamnesi|esame|visita|scheda|documento|lettera|richiesta|ricetta|promemoria|prescrizione|nat[oa])\b/iu;
+const GENERIC_CODE_LABEL = /^(?:(?:codice[ \t\u00a0]+fiscale|c\.?[ \t\u00a0]*f\.?)[ \t\u00a0]*[:=]?(?:[ \t\u00a0]*tinit-)?|serialnumber[ \t\u00a0]*=[ \t\u00a0]*tinit-|tinit-)$/iu;
+const PRESCRIBER_HEADING = /^(?:medico\s+prescrittore|cognome\s+e\s+nome\s+del\s+medico)(?:\s*:\s*[\p{L} .’'-]+)?\s*:?$/iu;
+const SPECIALIST_HEADING = new RegExp(String.raw`^${SPECIALIST_ROLE_PREFIX}(?:\s*:\s*[\p{L} ,.’'-]+)?\s*:?$`, 'iu');
+const SIGNATURE_HEADING = new RegExp(String.raw`^${SIGNATURE_LABEL}(?:\s*:\s*[\p{L} ,.’'-]+)?\s*:?$`, 'iu');
+const SIGNATURE_META_LINE = /^(?:data(?:\s+firma)?|emesso\s+da|ente\s+certificatore|certificato|qualifica|ruolo|ordine\s+dei\s+medici|n\.?\s*iscrizione)\s*[:.]?\s*.+$/iu;
+const PLAIN_NAME_LINE = /^\p{Lu}[\p{L}’'-]+(?:\s+\p{Lu}[\p{L}’'-]+){1,3}$/u;
+const LINE_TAX_CODE = /\b(?:(?:STP|ENI)\d{13}|[A-Z]{6}[0-9LMNPQRSTUV]{2}[A-Z][0-9LMNPQRSTUV]{2}[A-Z][0-9LMNPQRSTUV]{3}[A-Z])\b/giu;
 
-function excludedProfessionalCode(code: DossierTaxCodeEvidence): boolean {
-    return code.role === 'professional_cf' && code.explicitProfessional === true && (code.professionalLabelScope === 'same_line' || code.professionalLabelScope === 'prescriber_block');
+export function excludedProfessionalCode(code: DossierTaxCodeEvidence): boolean {
+    return code.role === 'professional_cf'
+        && code.explicitProfessional === true
+        && code.professionalLabelScope !== undefined
+        && EXCLUDED_PROFESSIONAL_SCOPES.has(code.professionalLabelScope);
 }
 
-function professionalOccurrenceScope(prefix: string): 'same_line' | 'prescriber_block' | null {
+function cleanScopeLine(value: string): string {
+    return value.replace(/^[\s>*#|_-]+/u, '').replace(/[*_]+/gu, '').trim();
+}
+
+function afterPreviousTaxCode(line: string): string {
+    const previous = [...line.matchAll(LINE_TAX_CODE)];
+    if (!previous.length) return line;
+    const last = previous[previous.length - 1];
+    return line.slice(last.index! + last[0].length).replace(/^[\s|;,.:)\]-–]+/u, '');
+}
+
+function headerLineProfessionalScope(cleanCurrent: string): 'header_block' | null {
+    if (!FACILITY_HEADER_PREFIX.test(cleanCurrent) || /\bsig(?:\.ra|\.)\b/iu.test(cleanCurrent)) return null;
+    const segments = cleanCurrent.split(/[ \t\u00a0]*(?:[-–·|]|,(?=[ \t\u00a0]*(?:medico|dirigente|specialista|dott|dr|prof)))[ \t\u00a0]*/iu);
+    for (let index = 1; index < segments.length; index += 1) {
+        const tail = segments.slice(index).join(' - ').trim();
+        if (EXPLICIT_PROFESSIONAL_CF.test(tail) || SPECIALIST_SAME_LINE.test(tail) || DOCTOR_NAME_BEFORE_CF.test(tail)) {
+            return 'header_block';
+        }
+    }
+    return null;
+}
+
+function professionalOccurrenceScope(prefix: string, suffix = ''): DossierProfessionalLabelScope | null {
     const lines = prefix.split(/[\r\n\v\f\u0085\u2028\u2029]/u);
-    const current = lines.pop()!;
-    if (EXPLICIT_PROFESSIONAL_CF.test(current)) return 'same_line';
-    const genericCodeLabel = /^(?:codice\s+fiscale|c\.?\s*f\.?)\s*:?$/iu;
-    const heading = /^(?:medico\s+prescrittore|cognome\s+e\s+nome\s+del\s+medico)(?:\s*:\s*[\p{L} .’'-]+)?\s*:?$/iu;
-    if (current.trim() && !genericCodeLabel.test(current.trim())) return null;
-    const previous = lines.pop()?.trim() ?? '';
-    if (!current.trim() && EXPLICIT_PROFESSIONAL_CF.test(previous)) return 'prescriber_block';
-    if (heading.test(previous)) return 'prescriber_block';
-    if (!current.trim() && !genericCodeLabel.test(previous)) return null;
-    const block = current.trim() ? [...lines, previous] : lines;
+    const current = afterPreviousTaxCode(lines.pop()!);
+    if (PATIENT_GUARD_WORDS.test(current)) return null;
+    const cleanCurrent = cleanScopeLine(current);
+    const nextLines = suffix.split(/[\r\n\v\f\u0085\u2028\u2029]/u);
+    const restOfLine = nextLines.shift() ?? '';
+
+    if (EXPLICIT_PROFESSIONAL_CF.test(current) || EXPLICIT_PROFESSIONAL_CF.test(cleanCurrent)) return 'same_line';
+    if (SIGNATURE_SAME_LINE.test(cleanCurrent) || SIGNATURE_TINIT_LINE.test(cleanCurrent)) return 'signature_block';
+    if (SPECIALIST_SAME_LINE.test(cleanCurrent)) return 'same_line';
+    if (headerLineProfessionalScope(cleanCurrent)) return 'header_block';
+    if (DOCTOR_NAME_BEFORE_CF.test(cleanCurrent) && SAME_LINE_ROLE_SUFFIX.test(restOfLine)) return 'same_line';
+
+    const currentHasDoctorName = DOCTOR_NAME_BEFORE_CF.test(cleanCurrent);
+    if (cleanCurrent && !GENERIC_CODE_LABEL.test(cleanCurrent) && !currentHasDoctorName) return null;
+
+    const nextClean = cleanScopeLine(nextLines[0] ?? '');
+    const previousRaw = lines[lines.length - 1] ?? '';
+    const previousClean = cleanScopeLine(previousRaw);
+
+    if (currentHasDoctorName && FOOTER_ROLE_ONLY_LINE.test(nextClean)) return 'signature_block';
+    if (!currentHasDoctorName && previousClean && !PATIENT_GUARD_WORDS.test(previousRaw) && DOCTOR_NAME_LINE.test(previousClean) && FOOTER_ROLE_ONLY_LINE.test(nextClean)) {
+        return 'signature_block';
+    }
+
+    if (!cleanCurrent && (EXPLICIT_PROFESSIONAL_CF.test(previousRaw) || EXPLICIT_PROFESSIONAL_CF.test(previousClean))) {
+        return 'prescriber_block';
+    }
+
+    let hasDoctorName = currentHasDoctorName;
     let unlabelledName = false;
-    for (const line of block.slice(-3).reverse()) {
-        const value = line.trim();
-        if (heading.test(value)) return !unlabelledName || /^cognome/iu.test(value) ? 'prescriber_block' : null;
-        if (!/^(?:(?:Dott|Dott\.ssa|Dr)\.?\s+)?\p{Lu}[\p{L}’'-]+(?:\s+\p{Lu}[\p{L}’'-]+){1,3}$/u.test(value)) return null;
-        if (!/^(?:Dott|Dr)\b/u.test(value)) unlabelledName = true;
+    let sawMeta = false;
+    const blockStart = !cleanCurrent && GENERIC_CODE_LABEL.test(previousClean) ? lines.length - 2 : lines.length - 1;
+    const scanFrom = Math.max(0, blockStart - 3);
+    for (let index = blockStart; index >= scanFrom; index -= 1) {
+        const raw = lines[index];
+        const value = cleanScopeLine(raw);
+        if (!value || PATIENT_GUARD_WORDS.test(raw)) return null;
+        if (PRESCRIBER_HEADING.test(value)) {
+            if (sawMeta) return null;
+            return !unlabelledName || /^cognome/iu.test(value) ? 'prescriber_block' : null;
+        }
+        if (SPECIALIST_HEADING.test(value)) {
+            if (sawMeta) return null;
+            return !unlabelledName ? 'specialist_block' : null;
+        }
+        if (SIGNATURE_HEADING.test(value)) return 'signature_block';
+        if (FACILITY_HEADER_PREFIX.test(value)) return hasDoctorName && !unlabelledName ? 'header_block' : null;
+        if (DOCTOR_NAME_LINE.test(value)) { hasDoctorName = true; continue; }
+        if (SIGNATURE_META_LINE.test(value)) { sawMeta = true; continue; }
+        if (hasDoctorName && FACILITY_SUBLINE.test(value)) continue;
+        if (PLAIN_NAME_LINE.test(value) && !STOP_BLOCK_WORDS.test(value)) { unlabelledName = true; continue; }
+        return null;
     }
     return null;
 }
@@ -204,20 +321,39 @@ export function collectDossierTaxCodes(text: string): DossierTaxCodeEvidence[] {
     const result: DossierTaxCodeEvidence[] = [];
     for (const code of resolved.taxCodes) {
         const occurrences = [...text.matchAll(new RegExp(`\\b${code.value}\\b`, 'giu'))];
-        const scopes = occurrences.map(match => professionalOccurrenceScope(text.slice(0, match.index!)));
+        const scopes = occurrences.map(match => professionalOccurrenceScope(text.slice(0, match.index!), text.slice(match.index! + match[0].length)));
         const explicitProfessional = scopes.length > 0 && scopes.every(Boolean);
         const role = explicitProfessional ? 'professional_cf' : code.role === 'patient_cf' ? 'patient_cf' : 'unknown_cf';
         const key = `${code.value}:${role}`;
         if (seen.has(key)) continue;
         seen.add(key);
+        const scope: DossierProfessionalLabelScope = scopes.every(item => item === 'same_line')
+            ? 'same_line'
+            : (scopes.find((item): item is DossierProfessionalLabelScope => item !== null && item !== 'same_line') ?? 'prescriber_block');
         result.push({ value: code.value, role, checksumValid: isValidItalianTaxCodeChecksum(code.value),
-            ...(explicitProfessional ? { explicitProfessional: true, professionalLabelScope: scopes.every(scope => scope === 'same_line') ? 'same_line' as const : 'prescriber_block' as const } : {}) });
+            ...(explicitProfessional ? { explicitProfessional: true, professionalLabelScope: scope } : {}) });
     }
     return result;
 }
 
 export type DossierIdentityStatus =
     | 'mixed' | 'discordant' | 'discordant_name' | 'matched' | 'no_document_cf' | 'unmatched_cf' | 'ambiguous_cf' | 'suggested';
+
+export interface DossierDocumentIdentityInput {
+    taxCodes: readonly DossierTaxCodeEvidence[];
+    patientNames?: ReadonlyArray<readonly string[]>;
+    confirmedUncertainCodes?: readonly string[];
+    key?: string;
+    fileName?: string;
+}
+
+export interface DossierUncertainDocument {
+    index: number;
+    key?: string;
+    fileName?: string;
+    codes: string[];
+    message: string;
+}
 
 export interface DossierIdentityEvaluation {
     status: DossierIdentityStatus;
@@ -228,6 +364,7 @@ export interface DossierIdentityEvaluation {
     missingPhysicianTaxCode?: boolean;
     documentPatientCodes: string[];
     candidatePatientIds: string[];
+    uncertainDocuments?: DossierUncertainDocument[];
     message: string;
 }
 
@@ -279,24 +416,107 @@ function nameMatches(written: readonly string[], patient: DossierPatientIdentity
 function normalizedCode(value: string): string { return value.trim().toUpperCase(); }
 
 export function evaluateDossierGroupIdentity(
-    documents: ReadonlyArray<{ taxCodes: readonly DossierTaxCodeEvidence[]; patientNames?: ReadonlyArray<readonly string[]> }>,
+    documents: readonly DossierDocumentIdentityInput[],
     patients: readonly DossierPatientIdentity[],
     linkedPatientId?: string | null,
     physicianTaxCode?: string | null,
 ): DossierIdentityEvaluation {
     const physicianCode = normalizedCode(physicianTaxCode ?? '');
-    const comparable = documents.map(document => ({ ...document, taxCodes: document.taxCodes.filter(code => normalizedCode(code.value) !== physicianCode) }));
-    const patientCodes = [...new Set(comparable.flatMap((document) => document.taxCodes
-        .filter((code) => code.checksumValid && !excludedProfessionalCode(code))
-        .map((code) => normalizedCode(code.value))))].sort();
-    const unattributed = comparable.some((document) => document.taxCodes.some((code) => code.checksumValid
-        && code.role !== 'patient_cf' && !excludedProfessionalCode(code)));
+    const analyzed = documents.map((document, index) => {
+        const confirmed = new Set((document.confirmedUncertainCodes ?? []).map(normalizedCode));
+        const active = document.taxCodes.filter((code) => (
+            code.checksumValid
+            && !excludedProfessionalCode(code)
+            && normalizedCode(code.value) !== physicianCode
+        ));
+        const patientCodes = [...new Set(active
+            .filter((code) => code.role === 'patient_cf')
+            .map((code) => normalizedCode(code.value)))].sort();
+        const patientSet = new Set(patientCodes);
+        const uncertainCodes = [...new Set(active
+            .filter((code) => code.role !== 'patient_cf' && !confirmed.has(normalizedCode(code.value)) && !patientSet.has(normalizedCode(code.value)))
+            .map((code) => normalizedCode(code.value)))].sort();
+        const hasUnattributed = active.some((code) => code.role !== 'patient_cf' && !confirmed.has(normalizedCode(code.value)));
+        return { document, index, patientCodes, uncertainCodes, hasUnattributed };
+    });
+    const explicitPatientCodes = [...new Set(analyzed.flatMap((entry) => entry.patientCodes))].sort();
+    const patientCodes = [...new Set(analyzed.flatMap((entry) => [...entry.patientCodes, ...entry.uncertainCodes]))].sort();
+    const unattributed = analyzed.some((entry) => entry.hasUnattributed);
     const linked = linkedPatientId ? patients.find((patient) => patient.id === linkedPatientId) : undefined;
     if (physicianCode && linked && normalizedCode(linked.taxCode) === physicianCode) {
         return { status: 'discordant', blocking: true, confirmationRequired: true, documentPatientCodes: patientCodes, candidatePatientIds: [],
             message: 'La scheda scelta ha il codice fiscale del medico. Scegli la scheda del paziente.' };
     }
     const holders = (code: string) => patients.filter((patient) => normalizedCode(patient.taxCode) === code).map((patient) => patient.id);
+
+    if (explicitPatientCodes.length > 1) {
+        return { status: 'mixed', blocking: true, confirmationRequired: true, documentPatientCodes: patientCodes, candidatePatientIds: [],
+            message: 'I documenti contengono più codici fiscali distinti, inclusi quelli di attribuzione incerta. Controlla a chi si riferiscono ed escludi le fonti discordanti prima di procedere.' };
+    }
+
+    if (explicitPatientCodes.length === 1) {
+        const [groupCode] = explicitPatientCodes;
+        const uncertainDocuments: DossierUncertainDocument[] = [];
+        let coherentCount = 0;
+        for (const entry of analyzed) {
+            const foreignUncertain = entry.uncertainCodes.filter((code) => code !== groupCode);
+            if (foreignUncertain.length > 0) {
+                uncertainDocuments.push({
+                    index: entry.index,
+                    ...(entry.document.key ? { key: entry.document.key } : {}),
+                    ...(entry.document.fileName ? { fileName: entry.document.fileName } : {}),
+                    codes: foreignUncertain,
+                    message: `Codice fiscale di ruolo incerto (${foreignUncertain.join(', ')}): conferma che appartiene a questa scheda o escludi il documento.`,
+                });
+            } else if (entry.patientCodes.includes(groupCode)) {
+                coherentCount += 1;
+            }
+        }
+        if (linked && normalizedCode(linked.taxCode) !== groupCode) {
+            return { status: 'discordant', blocking: true, confirmationRequired: true, documentPatientCodes: [groupCode], candidatePatientIds: holders(groupCode),
+                message: 'Il codice fiscale nei documenti non corrisponde alla scheda scelta. Nessuna fonte verrà salvata su questa scheda.' };
+        }
+        if (uncertainDocuments.length > 0 && coherentCount === 0) {
+            if (!physicianCode && patientCodes.length === 2 && unattributed) {
+                return {
+                    status: 'mixed', blocking: true, confirmationRequired: true, missingPhysicianTaxCode: true,
+                    documentPatientCodes: patientCodes, candidatePatientIds: [], uncertainDocuments,
+                    message: 'Manca il tuo codice fiscale nel Profilo: inseriscilo per escludere il prescrittore e ripeti la lettura.',
+                };
+            }
+            return { status: 'mixed', blocking: true, confirmationRequired: true, documentPatientCodes: patientCodes, candidatePatientIds: [], uncertainDocuments,
+                message: 'I documenti contengono più codici fiscali distinti, inclusi quelli di attribuzione incerta. Controlla a chi si riferiscono ed escludi le fonti discordanti prima di procedere.' };
+        }
+        const uncertainField = uncertainDocuments.length > 0 ? { uncertainDocuments } : {};
+        const uncertainNote = uncertainDocuments.length === 1
+            ? ' 1 documento ha un codice fiscale di ruolo incerto: confermalo o escludilo prima di salvarlo.'
+            : uncertainDocuments.length > 1
+                ? ` ${uncertainDocuments.length} documenti hanno codici fiscali di ruolo incerto: confermali o escludili prima di salvarli.`
+                : '';
+        if (linked) {
+            return {
+                status: 'matched', blocking: false, confirmationRequired: true, documentPatientCodes: [groupCode], candidatePatientIds: [linked.id],
+                ...uncertainField,
+                message: uncertainDocuments.length > 0
+                    ? `Il codice fiscale nei documenti coerenti coincide con la scheda scelta.${uncertainNote}`
+                    : unattributed
+                        ? 'Il codice fiscale letto coincide con la scheda scelta, ma la sua attribuzione nel documento è incerta. Verifica a chi si riferisce prima di confermare.'
+                        : 'Il codice fiscale nei documenti coincide con la scheda scelta. Conferma comunque il collegamento.',
+            };
+        }
+        const owners = holders(groupCode);
+        if (owners.length === 0) {
+            return { status: 'unmatched_cf', blocking: false, confirmationRequired: true, documentPatientCodes: [groupCode], candidatePatientIds: [], ...uncertainField,
+                message: `Nessuna scheda con questo codice fiscale: crea una nuova scheda o scegline una esistente.${uncertainNote}` };
+        }
+        if (owners.length > 1) {
+            return { status: 'ambiguous_cf', blocking: false, confirmationRequired: true, documentPatientCodes: [groupCode], candidatePatientIds: owners, ...uncertainField,
+                message: `Più schede hanno lo stesso codice fiscale: scegli quella corretta.${uncertainNote}` };
+        }
+        return { status: 'suggested', blocking: false, confirmationRequired: true, documentPatientCodes: [groupCode], candidatePatientIds: owners, ...uncertainField,
+            message: `Una scheda ha lo stesso codice fiscale. Il codice non prova l’identità: conferma il collegamento.${uncertainNote}` };
+    }
+
     if (patientCodes.length > 1) {
         if (!physicianCode && patientCodes.length === 2 && unattributed) {
             return {
@@ -319,8 +539,6 @@ export function evaluateDossierGroupIdentity(
                 message: unattributed ? 'Il codice fiscale letto coincide con la scheda scelta, ma la sua attribuzione nel documento è incerta. Verifica a chi si riferisce prima di confermare.'
                     : 'Il codice fiscale nei documenti coincide con la scheda scelta. Conferma comunque il collegamento.' };
         }
-        // Senza CF il nome scritto con etichetta è l'unica identità letta. Un documento può nominare anche il
-        // prescrittore («Cognome e nome» in due riquadri): blocca solo se nessun nome scritto è quello della scheda.
         const foreign = documents.some((document) => (document.patientNames?.length ?? 0) > 0
             && !document.patientNames!.some((name) => nameMatches(name, linked)));
         if (linked.lastName && linked.firstName && foreign) {
@@ -1005,7 +1223,7 @@ export interface DossierRecord {
     extractionAttempts?: DossierExtractionAttempt[];
     pendingWrites?: DossierWriteClaim[];
     extraction: DossierExtraction;
-    identity: { taxCodes: DossierTaxCodeEvidence[]; patientNames?: string[][]; status: DossierIdentityStatus; confirmedAt: string };
+    identity: { taxCodes: DossierTaxCodeEvidence[]; patientNames?: string[][]; confirmedUncertainCodes?: string[]; status: DossierIdentityStatus; confirmedAt: string };
     documentDate: { value: string; source: 'text' | 'file_name' | 'physician' } | null;
     classification: DocumentDecisionClassification;
     facts: DossierFact[];

@@ -27,7 +27,7 @@ import {
 } from '@/lib/document-dossier-session';
 import {
     DOSSIER_FACT_KIND_LABELS, DOSSIER_GAP_LABELS, buildDossierReceipt, createManualDossierFact, dossierFactBlockers, dossierFactRef,
-    extractDossierCandidates, latestAppliedOutcome, unitText,
+    excludedProfessionalCode, extractDossierCandidates, latestAppliedOutcome, unitText,
     type DossierFact, type DossierFactKind, type DossierRecord,
 } from '@/lib/domain/documents/dossier-import';
 import {
@@ -94,7 +94,7 @@ const EXTRACTION_LABEL: Record<string, string> = {
 const ACQUIRE_LABEL: Record<string, string> = {
     stored: 'Originale salvato e riletto identico', reused: 'Già in MediFlow: riusato, non duplicato',
     duplicate_in_selection: 'Copia identica di un altro file selezionato', excluded: 'Escluso da te', unreadable: 'Non leggibile dal browser',
-    unsupported_format: 'Formato non ammesso',
+    unsupported_format: 'Formato non ammesso', identity_unconfirmed: 'Non salvato: ruolo del codice fiscale da confermare',
     source_changed: 'Il file è cambiato dopo la lettura: rileggi la cartella', too_large: 'Oltre il limite di dimensione dell’archivio',
     readback_mismatch: 'Rilettura diversa dall’originale', write_failed: 'Salvataggio non confermato', artifact_conflict: 'Artefatto esistente non compatibile o non leggibile',
 };
@@ -159,6 +159,7 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
     const [groups, setGroups] = useState<DossierDraftGroup[]>([]);
     const [links, setLinks] = useState<Record<string, string>>({});
     const [confirmations, setConfirmations] = useState<Record<string, boolean>>({});
+    const [confirmedUncertain, setConfirmedUncertain] = useState<Record<string, Record<string, string[]>>>({});
     const [outcomes, setOutcomes] = useState<Record<string, DossierAcquireOutcome>>({});
     const [measured, setMeasured] = useState<Record<string, { original: number; artifact: number }>>({});
     // Creazione di una scheda da un documento del gruppo: una sola alla volta, nessun dato nell'URL o nello storage.
@@ -225,7 +226,7 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
     const readFiles = async (files: DossierInputFile[], extraction: PreparedExtraction | null) => {
         lastSelection.current = files;
         const op = operation();
-        setGroups([]); setOutcomes({}); setMeasured({}); setNotice(null); setConfirmations({});
+        setGroups([]); setOutcomes({}); setMeasured({}); setNotice(null); setConfirmations({}); setConfirmedUncertain({});
         setBusy(`Lettura locale di ${formatCountLabel(files.length, 'file', 'file')}…`);
         try {
             const next = await buildDossierInventory(ports, files, { ...op, prepared: extraction, onProgress: (done, total) => {
@@ -248,7 +249,34 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
         setGroups((current) => current.map((group) => group.key !== groupKey ? group : { ...group, sources: group.sources.map((source) =>
             source.key !== sourceKey || source.status === 'duplicate_in_selection' || source.status === 'unreadable' || source.status === 'unsupported_format' ? source
                 : { ...source, status: excluded ? 'excluded' : 'ready' }) }));
+        setConfirmedUncertain((current) => {
+            if (!current[groupKey]?.[sourceKey]) return current;
+            const nextGroup = { ...current[groupKey] };
+            delete nextGroup[sourceKey];
+            return { ...current, [groupKey]: nextGroup };
+        });
         setConfirmations((current) => ({ ...current, [groupKey]: false }));
+    };
+
+    const setSourceUncertainConfirmed = (groupKey: string, sourceKey: string, codes: readonly string[], checked: boolean) => {
+        setConfirmedUncertain((current) => {
+            const nextGroup = { ...(current[groupKey] ?? {}) };
+            if (checked) nextGroup[sourceKey] = [...codes];
+            else delete nextGroup[sourceKey];
+            return { ...current, [groupKey]: nextGroup };
+        });
+        setConfirmations((current) => ({ ...current, [groupKey]: false }));
+    };
+
+    const withSourceConfirmations = (group: DossierDraftGroup): DossierDraftGroup => {
+        const confirmed = confirmedUncertain[group.key];
+        if (!confirmed || !Object.keys(confirmed).length) return group;
+        return {
+            ...group,
+            sources: group.sources.map((source) => confirmed[source.key]?.length
+                ? { ...source, confirmedUncertainCodes: confirmed[source.key] }
+                : source),
+        };
     };
 
     const acquire = async (group: DossierDraftGroup) => {
@@ -316,8 +344,20 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
                         </div>
                         {groups.map((group) => {
                             const linked = links[group.key] ?? '';
-                            const identity = evaluateDraftGroupIdentity(group, patients, linked || null);
-                            const ready = group.sources.filter((source) => source.status === 'ready').length;
+                            const baseIdentity = evaluateDraftGroupIdentity(group, patients, linked || null);
+                            const effectiveGroup = withSourceConfirmations(group);
+                            const identity = evaluateDraftGroupIdentity(effectiveGroup, patients, linked || null);
+                            const baseUncertainByKey = new Map(
+                                (baseIdentity.uncertainDocuments ?? [])
+                                    .filter((doc): doc is typeof doc & { key: string } => Boolean(doc.key))
+                                    .map((doc) => [doc.key, doc]),
+                            );
+                            const activeUncertainKeys = new Set(
+                                (identity.uncertainDocuments ?? [])
+                                    .map((doc) => doc.key)
+                                    .filter((key): key is string => Boolean(key)),
+                            );
+                            const acquirable = effectiveGroup.sources.filter((source) => source.status === 'ready' && !activeUncertainKeys.has(source.key)).length;
                             return (
                                 <article key={group.key} className={styles.section} data-testid="dossier-group" data-group={group.key} data-identity={identity.status}>
                                     <h3><PrivacyBlur>{groupTitle(group.key, group.sources)}</PrivacyBlur> · {formatCountLabel(group.sources.length, 'fonte', 'fonti')}</h3>
@@ -326,10 +366,13 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
                                         <thead><tr><th scope="col">N.</th><th scope="col">File</th><th scope="col">Lettura</th><th scope="col">Esito</th></tr></thead>
                                         <tbody>{group.sources.map((source, index) => {
                                             const outcome = outcomes[source.key];
+                                            const uncertainDoc = source.status === 'ready' ? baseUncertainByKey.get(source.key) : undefined;
+                                            const isUncertain = Boolean(uncertainDoc && activeUncertainKeys.has(source.key));
                                             const taxCodes = source.taxCodes.map((code) => `${code.value} (${!code.checksumValid ? 'controllo formale non valido'
-                                                : code.role === 'professional_cf' && code.explicitProfessional && code.professionalLabelScope === 'same_line' ? 'professionista esplicito'
+                                                : excludedProfessionalCode(code) ? 'professionista esplicito'
                                                     : code.role === 'patient_cf' ? 'paziente' : 'attribuzione da verificare'})`);
-                                            return <tr key={source.key} role="row" data-testid="dossier-source" data-source-status={source.status}>
+                                            return <tr key={source.key} role="row" data-testid="dossier-source" data-source-status={source.status}
+                                                data-identity-uncertain={uncertainDoc ? (isUncertain ? 'true' : 'confirmed') : undefined}>
                                                 <td role="cell" data-label="N.">{index + 1}</td>
                                                 <td role="cell" data-label="File"><PrivacyBlur>{source.relativePath}</PrivacyBlur>
                                                     <small className={styles.muted}>{source.classification.reason}</small></td>
@@ -344,6 +387,12 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
                                                         : source.status === 'duplicate_in_selection' ? ACQUIRE_LABEL.duplicate_in_selection
                                                         : source.status === 'unreadable' || source.status === 'unsupported_format' ? ACQUIRE_LABEL[source.status] : null}
                                                     {measured[source.key] ? <small>Spazio misurato: originale {measured[source.key].original} byte cifrati, testo e artefatto {measured[source.key].artifact} byte cifrati</small> : null}
+                                                    {isUncertain && uncertainDoc ? <small className={styles.notice} data-testid="dossier-source-uncertain">Codice fiscale incerto (<PrivacyBlur>{uncertainDoc.codes.join(', ')}</PrivacyBlur>): conferma questo documento o escludilo.</small> : null}
+                                                    {uncertainDoc ? <label className={styles.consent}>
+                                                        <input type="checkbox" checked={!isUncertain} disabled={!linked || Boolean(busy)}
+                                                            data-testid="dossier-source-confirm-uncertain"
+                                                            onChange={(event) => setSourceUncertainConfirmed(group.key, source.key, uncertainDoc.codes, event.currentTarget.checked)} />
+                                                        <span>Conferma questo documento</span></label> : null}
                                                     {source.status === 'ready' || source.status === 'excluded' ? <label className={styles.consent}>
                                                         <input type="checkbox" checked={source.status === 'excluded'} disabled={Boolean(busy)}
                                                             onChange={(event) => setExcluded(group.key, source.key, event.currentTarget.checked)} />
@@ -359,7 +408,12 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
                                     <div className={styles.fileLabel}>
                                         <label htmlFor={`${ids}-${group.key}-patient`}>Scheda di destinazione</label>
                                         <select id={`${ids}-${group.key}-patient`} value={linked} disabled={Boolean(busy)}
-                                            onChange={(event) => { const value = event.currentTarget.value; setLinks((current) => ({ ...current, [group.key]: value })); setConfirmations((current) => ({ ...current, [group.key]: false })); }}>
+                                            onChange={(event) => {
+                                                const value = event.currentTarget.value;
+                                                setLinks((current) => ({ ...current, [group.key]: value }));
+                                                setConfirmations((current) => ({ ...current, [group.key]: false }));
+                                                setConfirmedUncertain((current) => ({ ...current, [group.key]: {} }));
+                                            }}>
                                             <option value="">Scegli una scheda</option>
                                             {patients.map((patient) => <option key={patient.id} value={patient.id}>{patientLabel(patient)}</option>)}
                                         </select>
@@ -370,8 +424,8 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
                                         <span>Ho controllato le fonti e confermo che appartengono alla scheda scelta.</span>
                                     </label>
                                     <div className={styles.actions}>
-                                        <button type="button" className={styles.primary} disabled={!linked || identity.blocking || !confirmations[group.key] || !ready || Boolean(busy)}
-                                            onClick={() => { void acquire(group); }}>Salva {formatCountLabel(ready, 'originale', 'originali')} nella scheda</button>
+                                        <button type="button" className={styles.primary} disabled={!linked || identity.blocking || !confirmations[group.key] || !acquirable || Boolean(busy)}
+                                            onClick={() => { void acquire(effectiveGroup); }}>Salva {formatCountLabel(acquirable, 'originale', 'originali')} nella scheda</button>
                                     </div>
                                     <NewPatientFromDocument group={group} identityBlocking={identity.blocking} busy={Boolean(busy)}
                                         creating={creating?.groupKey === group.key ? creating.sourceKey : null}
@@ -381,6 +435,7 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
                                             await refreshPatients();
                                             setLinks((current) => ({ ...current, [group.key]: patientId }));
                                             setConfirmations((current) => ({ ...current, [group.key]: false }));
+                                            setConfirmedUncertain((current) => ({ ...current, [group.key]: {} }));
                                             setNotice('Scheda creata dal documento. Conferma il collegamento e salva gli originali: il documento già allegato viene riusato, non duplicato.');
                                         }} />
                                 </article>
