@@ -531,3 +531,209 @@ test('WUL-924: promemoria con CF paziente e prescrittore senza CF medico spiega 
     assert.equal(mixedInOnePdf.missingPhysicianTaxCode, undefined);
     assert.doesNotMatch(mixedInOnePdf.message, /Manca il tuo codice fiscale nel Profilo/u);
 });
+
+test('WUL-925: three synthetic RefertoCittadino reports with specialist CF in header, footer, and signature match the patient', async () => {
+    const { isValidItalianTaxCodeChecksum } = await import('./document-identity-resolution');
+    const CF_SPEC = 'MEDPRS00A01A000W';
+    const CF_SPEC_2 = 'OPRTST00A01A000K';
+    assert.equal(isValidItalianTaxCodeChecksum(CF_SPEC), true);
+    assert.equal(isValidItalianTaxCodeChecksum(CF_SPEC_2), true);
+
+    const patients = [{ id: 'pa', taxCode: CF_A }, { id: 'pb', taxCode: CF_B }];
+    const headerReferto = [
+        'Regione Lombardia - Sistema Socio Sanitario',
+        'ASST Sintetica Nord - Presidio Ospedaliero',
+        'U.O. Cardiologia',
+        `Medico refertante: Dott. Luca Bianchi - C.F.: ${CF_SPEC}`,
+        '',
+        'Dati assistito',
+        'Cognome e nome: ROSSI MARIO',
+        'Data di nascita: 01/01/1980',
+        'Luogo di nascita: MILANO (MI)',
+        'Residenza: VIA SINTETICA 10, 20100 MILANO',
+        `Codice fiscale: ${CF_A}`,
+        'Data referto: 12/11/2026',
+        'Referto: visita cardiologica nei limiti di norma.',
+    ].join('\n');
+    const footerReferto = [
+        'Regione Lombardia - Fascicolo Sanitario',
+        'RefertoCittadino',
+        'Assistito: Mario Rossi',
+        `C.F. assistito: ${CF_A}`,
+        'Data referto: 14/11/2026',
+        'Referto: ecocolordoppler cardiaco nella norma.',
+        '',
+        'Il medico',
+        'Dott.ssa Elena Verdi',
+        `C.F.: ${CF_SPEC_2}`,
+    ].join('\n');
+    const signatureReferto = [
+        'RefertoCittadino - Fascicolo Sanitario Lombardia',
+        'ASST Sintetica Sud - Ambulatorio Pneumologia',
+        `Paziente: Mario Rossi - Codice fiscale paziente: ${CF_A}`,
+        'Data referto: 18/11/2026',
+        'Spirometria globale nella norma.',
+        '',
+        `Documento firmato digitalmente ai sensi del D.Lgs. 82/2005 da: BIANCHI LUCA (CF: ${CF_SPEC})`,
+    ].join('\n');
+
+    const docs = [headerReferto, footerReferto, signatureReferto].map((text) => ({ taxCodes: collectDossierTaxCodes(text) }));
+    for (const [index, doc] of docs.entries()) {
+        assert.equal(evaluateDossierGroupIdentity([doc], patients, 'pa', null).status, 'matched', `referto ${index + 1}`);
+        assert.equal(evaluateDossierGroupIdentity([doc], patients, 'pa', null).blocking, false, `referto ${index + 1}`);
+        assert.deepEqual(evaluateDossierGroupIdentity([doc], patients, null, null).candidatePatientIds, ['pa'], `referto ${index + 1}`);
+    }
+    const groupEval = evaluateDossierGroupIdentity(docs, patients, 'pa', null);
+    assert.equal(groupEval.status, 'matched');
+    assert.equal(groupEval.blocking, false);
+    assert.deepEqual(groupEval.documentPatientCodes, [CF_A]);
+    assert.equal(groupEval.uncertainDocuments, undefined);
+});
+
+test('WUL-925: all specialist labels and layouts exclude only explicit professional occurrences', () => {
+    const CF_SPEC = 'MEDPRS00A01A000W';
+    const patients = [{ id: 'pa', taxCode: CF_A }, { id: 'pb', taxCode: CF_B }];
+    const positiveFragments = [
+        `Firmato da: Dott. Luca Bianchi - CF: ${CF_SPEC}`,
+        `Firmato da: BIANCHI LUCA (${CF_SPEC})`,
+        `Firmato da:\nDott. Luca Bianchi\nC.F.: ${CF_SPEC}`,
+        `Firmato digitalmente da: BIANCHI LUCA (CF: ${CF_SPEC})`,
+        `Firmato digitalmente da: BIANCHI, LUCA (CF: ${CF_SPEC})`,
+        `Firmato digitalmente da: CF ${CF_SPEC}`,
+        `Firmato digitalmente da: BIANCHI LUCA serialNumber=TINIT-${CF_SPEC}`,
+        `Firmato digitalmente da:\nBIANCHI LUCA\nCodice fiscale: ${CF_SPEC}`,
+        `Firmato digitalmente da: BIANCHI LUCA\nData firma: 15/11/2026\nCF: ${CF_SPEC}`,
+        `Firma digitale: Dott. Luca Bianchi - C.F. ${CF_SPEC}`,
+        `Firma del medico: Dott. Luca Bianchi (${CF_SPEC})`,
+        `Medico refertante: Dott. Luca Bianchi - C.F.: ${CF_SPEC}`,
+        `Medico refertante\nDott. Luca Bianchi\nCodice fiscale: ${CF_SPEC}`,
+        `Specialista: Dott.ssa Elena Verdi (CF: ${CF_SPEC})`,
+        `Specialista in Cardiologia\nDott.ssa Elena Verdi\nCF: ${CF_SPEC}`,
+        `Dirigente medico: Dr. Luca Bianchi - C.F. ${CF_SPEC}`,
+        `Dirigente medico\nDott. Luca Bianchi\nC.F.: ${CF_SPEC}`,
+        `Il medico: Dott. Luca Bianchi - Codice fiscale: ${CF_SPEC}`,
+        `Il medico\nDott. Luca Bianchi\n${CF_SPEC}`,
+        `ASST Sintetica - U.O. Cardiologia - Medico refertante: Dott. Luca Bianchi - CF ${CF_SPEC}`,
+        `ASST Sintetica - U.O. Cardiologia - Dott. Luca Bianchi (C.F. ${CF_SPEC})`,
+        `ASST Sintetica - Presidio Nord\nU.O. Cardiologia\nDott. Luca Bianchi\nC.F.: ${CF_SPEC}`,
+        `Dott. Luca Bianchi - C.F. ${CF_SPEC} - Medico refertante`,
+        `Dott. Luca Bianchi\nC.F.: ${CF_SPEC}\nDirigente medico`,
+    ];
+
+    for (const fragment of positiveFragments) {
+        const codes = collectDossierTaxCodes(`Assistito: Mario Rossi\nCodice fiscale assistito: ${CF_A}\n\n${fragment}`);
+        const evaluation = evaluateDossierGroupIdentity([{ taxCodes: codes }], patients, 'pa', null);
+        assert.equal(evaluation.status, 'matched', fragment);
+        assert.equal(evaluation.blocking, false, fragment);
+        assert.deepEqual(evaluation.documentPatientCodes, [CF_A], fragment);
+    }
+
+    const negativeFragments = [
+        `${CF_B}`,
+        `C.F.: ${CF_B}`,
+        `Dott. Luca Bianchi\nC.F.: ${CF_B}`,
+        `Firma: Luca Bianchi (${CF_B})`,
+        `Firmato da: Assistito Luca Bianchi (${CF_B})`,
+        `Firmato dal paziente Luca Bianchi (CF: ${CF_B})`,
+        `Firma del paziente: Luca Bianchi (${CF_B})`,
+        `Firmato digitalmente da:\nPaziente Persona Sintetica\nCF: ${CF_B}`,
+        `Firmato digitalmente da:\nReferto clinico\nCF: ${CF_B}`,
+        `ASST Sintetica - U.O. Cardiologia\nC.F.: ${CF_B}`,
+        `ASST Sintetica - U.O. Cardiologia\nBianchi Luca\nC.F.: ${CF_B}`,
+        `ASST Sintetica - U.O. Cardiologia\nDott. Luca Bianchi nato il 10/12/1985\nC.F.: ${CF_B}`,
+        `ASST Sintetica - U.O. Cardiologia - Sig. Luca Bianchi nato il 10/12/1985 C.F. ${CF_B}`,
+        `Firmato digitalmente da: BIANCHI LUCA (CF: ${CF_B})\nC.F.: ${CF_B}`,
+        `Assistito: Luca Bianchi (medico curante Dott. Verdi) - CF assistito: ${CF_B}`,
+    ];
+
+    for (const fragment of negativeFragments) {
+        const codes = collectDossierTaxCodes(`Assistito: Mario Rossi\nCodice fiscale assistito: ${CF_A}\n\n${fragment}`);
+        const evaluation = evaluateDossierGroupIdentity([{ taxCodes: codes }], patients, 'pa', null);
+        assert.equal(evaluation.blocking, true, fragment);
+        assert.equal(codes.some((code) => code.value === CF_B && code.explicitProfessional), false, fragment);
+    }
+});
+
+test('WUL-925: explicit patient CF stays patient even next to physician words and blocks wrong patient', () => {
+    const patients = [{ id: 'pa', taxCode: CF_A }, { id: 'pb', taxCode: CF_B }];
+    const texts = [
+        `Medico refertante: Dott. Verdi\nAssistito: Luca Bianchi\nCodice fiscale assistito: ${CF_B}`,
+        `Assistito: Luca Bianchi (medico curante Dott. Verdi)\nCodice fiscale assistito: ${CF_B}`,
+        `Assistito: Luca Bianchi\nC.F.: ${CF_B}\nMedico refertante: Dott. Verdi`,
+        `Firmato da: Dott. Verdi\nPaziente: Luca Bianchi\nCodice fiscale paziente: ${CF_B}`,
+    ];
+    for (const text of texts) {
+        const codes = collectDossierTaxCodes(text);
+        assert.equal(codes.length, 1, text);
+        assert.equal(codes[0].role, 'patient_cf', text);
+        assert.equal(codes[0].explicitProfessional, undefined, text);
+        assert.equal(evaluateDossierGroupIdentity([{ taxCodes: codes }], patients, 'pa').status, 'discordant', text);
+        assert.equal(evaluateDossierGroupIdentity([{ taxCodes: codes }], patients, 'pb').status, 'matched', text);
+    }
+});
+
+test('WUL-925: uncertain CF role isolates the single document instead of marking the coherent group mixed', () => {
+    const CF_SPEC = 'MEDPRS00A01A000W';
+    const CF_UNCERTAIN = 'OPRTST00A01A000K';
+    const patients = [{ id: 'pa', taxCode: CF_A }, { id: 'pb', taxCode: CF_B }];
+    const coherentA = {
+        key: 's1',
+        fileName: 'referto-cardio.pdf',
+        taxCodes: collectDossierTaxCodes(`Assistito codice fiscale ${CF_A}\nFirmato digitalmente da: BIANCHI LUCA (CF: ${CF_SPEC})`),
+    };
+    const coherentB = {
+        key: 's2',
+        fileName: 'esami.pdf',
+        taxCodes: collectDossierTaxCodes(`Paziente: Mario Rossi\nCodice fiscale paziente: ${CF_A}`),
+    };
+    const uncertainDoc = {
+        key: 's3',
+        fileName: 'referto-dubbio.pdf',
+        taxCodes: collectDossierTaxCodes(`Assistito codice fiscale ${CF_A}\nCodice sconosciuto ${CF_UNCERTAIN}`),
+    };
+
+    const suggested = evaluateDossierGroupIdentity([coherentA, coherentB, uncertainDoc], patients, null, null);
+    assert.equal(suggested.status, 'suggested');
+    assert.equal(suggested.blocking, false);
+    assert.deepEqual(suggested.candidatePatientIds, ['pa']);
+    assert.deepEqual(suggested.documentPatientCodes, [CF_A]);
+    assert.equal(suggested.uncertainDocuments?.length, 1);
+    assert.equal(suggested.uncertainDocuments?.[0].key, 's3');
+    assert.equal(suggested.uncertainDocuments?.[0].fileName, 'referto-dubbio.pdf');
+    assert.deepEqual(suggested.uncertainDocuments?.[0].codes, [CF_UNCERTAIN]);
+
+    const matched = evaluateDossierGroupIdentity([coherentA, coherentB, uncertainDoc], patients, 'pa', null);
+    assert.equal(matched.status, 'matched');
+    assert.equal(matched.blocking, false);
+    assert.equal(matched.uncertainDocuments?.length, 1);
+    assert.equal(matched.uncertainDocuments?.[0].index, 2);
+
+    const wrongPatient = evaluateDossierGroupIdentity([coherentA, coherentB, uncertainDoc], patients, 'pb', null);
+    assert.equal(wrongPatient.status, 'discordant');
+    assert.equal(wrongPatient.blocking, true);
+
+    const confirmed = evaluateDossierGroupIdentity(
+        [coherentA, coherentB, { ...uncertainDoc, confirmedUncertainCodes: [CF_UNCERTAIN] }],
+        patients,
+        'pa',
+        null,
+    );
+    assert.equal(confirmed.status, 'matched');
+    assert.equal(confirmed.blocking, false);
+    assert.equal(confirmed.uncertainDocuments, undefined);
+
+    const twoPatientsDoc = {
+        key: 's4',
+        fileName: 'altro-paziente.pdf',
+        taxCodes: collectDossierTaxCodes(`Assistito codice fiscale ${CF_B}`),
+    };
+    const stillMixed = evaluateDossierGroupIdentity(
+        [coherentA, { ...twoPatientsDoc, confirmedUncertainCodes: [CF_B] }],
+        patients,
+        'pa',
+        null,
+    );
+    assert.equal(stillMixed.status, 'mixed');
+    assert.equal(stillMixed.blocking, true);
+    assert.equal(stillMixed.uncertainDocuments, undefined);
+});

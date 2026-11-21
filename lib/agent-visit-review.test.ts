@@ -238,3 +238,25 @@ test('an observation code absent from its cited source remains a proposal with a
         assert.match(review.proposalBlockers.join(' '), /Codice dell’osservazione/);
     } finally { query.mock.restore(); f.close(); }
 });
+
+test('WUL-925: RefertoCittadino with specialist CF in header, footer, or signature passes without profile physician CF, while unlabeled CF blocks', async () => {
+    const specialistCf = 'MEDPRS00A01A000W';
+    const reports = [
+        `ASST Sintetica - U.O. Cardiologia - Medico refertante: Dott. Luca Bianchi - C.F.: ${specialistCf}\nAssistito: Mario Rossi\nCodice fiscale assistito: ${cfA}`,
+        `RefertoCittadino\nAssistito codice fiscale ${cfA}\nIl medico\nDott. Luca Bianchi\nC.F.: ${specialistCf}`,
+        `RefertoCittadino\nPaziente codice fiscale ${cfA}\nFirmato digitalmente da: BIANCHI LUCA (CF: ${specialistCf})`,
+    ];
+    for (const text of reports) {
+        const f = await fixture(cfA);
+        try {
+            const review = await inspectAgentVisit(f.row, [patient(cfA), patient(cfB)], null, new AbortController().signal, pdfText(text));
+            assert.deepEqual(review.blockers, [], text);
+            assert.equal(review.patient?.taxCode, cfA);
+        } finally { f.close(); }
+    }
+    const f = await fixture(cfA);
+    try {
+        const blocked = await inspectAgentVisit(f.row, [patient(cfA), patient(cfB)], null, new AbortController().signal, pdfText(`Assistito codice fiscale ${cfA}\n${specialistCf}`));
+        assert.ok(blocked.blockers.length > 0);
+    } finally { f.close(); }
+});

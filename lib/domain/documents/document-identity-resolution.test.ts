@@ -322,3 +322,67 @@ test('guardrails coerce link_existing_patient identity without patientId into re
     assert.ok(guarded.negativeAssertions.includes('ambiguous_identity'));
     assert.equal(guarded.writePlan.forbiddenActions[0].blockedReason, 'ambiguous_identity');
 });
+
+test('WUL-925: RefertoCittadino distinguishes patient CF from specialist CF in header, footer, and digital signature', () => {
+    const headerReport = [
+        'Regione Lombardia - Sistema Socio Sanitario',
+        `ASST Sintetica - U.O. Cardiologia - Medico refertante: Dott. Luca Bianchi - C.F.: ${SYNTHETIC_PRESCRIBER_CF}`,
+        `Assistito: Mario Rossi - Codice fiscale assistito: ${SYNTHETIC_PATIENT_CF}`,
+        'Esito visita cardiologica nella norma.',
+    ].join('\n');
+    const footerReport = [
+        'Referto specialistico',
+        `Codice fiscale dell'assistito: ${SYNTHETIC_PATIENT_CF}`,
+        'Esito nella norma.',
+        `Dirigente medico: Dott.ssa Elena Verdi - Codice fiscale: ${SYNTHETIC_PRESCRIBER_CF}`,
+    ].join('\n');
+    const signatureReport = [
+        'RefertoCittadino',
+        `Paziente: Mario Rossi - C.F. paziente: ${SYNTHETIC_PATIENT_CF}`,
+        'Esito nella norma.',
+        `Firmato digitalmente da: BIANCHI LUCA (CF: ${SYNTHETIC_PRESCRIBER_CF})`,
+    ].join('\n');
+
+    for (const text of [headerReport, footerReport, signatureReport]) {
+        const resolved = resolveDocumentTaxCodeRoles({ text });
+        const byValue = new Map(resolved.taxCodes.map((entry) => [entry.value, entry]));
+        assert.equal(byValue.get(SYNTHETIC_PATIENT_CF)?.role, 'patient_cf', text);
+        assert.equal(byValue.get(SYNTHETIC_PATIENT_CF)?.confidence, 'high', text);
+        assert.equal(byValue.get(SYNTHETIC_PRESCRIBER_CF)?.role, 'physician_cf', text);
+        assert.equal(resolved.humanRequired, false, text);
+    }
+});
+
+test('WUL-925: explicit patient CF stays patient_cf even near physician or signature labels', () => {
+    const cases = [
+        `Medico refertante: Dott. Luca Bianchi\nAssistito: Mario Rossi\nCodice fiscale assistito: ${SYNTHETIC_PATIENT_CF}`,
+        `Assistito: Mario Rossi (medico curante Dott. Verdi)\nCodice fiscale assistito: ${SYNTHETIC_PATIENT_CF}`,
+        `Assistito: Mario Rossi\nC.F.: ${SYNTHETIC_PATIENT_CF}\nMedico refertante: Dott. Luca Bianchi`,
+        `Firmato da: Dott. Luca Bianchi\nAssistito: Mario Rossi\nC.F.: ${SYNTHETIC_PATIENT_CF}`,
+        `Firmato da: Assistito Mario Rossi (CF: ${SYNTHETIC_PATIENT_CF})`,
+        `Firma del paziente: Mario Rossi C.F.: ${SYNTHETIC_PATIENT_CF}`,
+    ];
+    for (const text of cases) {
+        const resolved = resolveDocumentTaxCodeRoles({ text });
+        assert.equal(resolved.taxCodes.length, 1, text);
+        assert.equal(resolved.taxCodes[0].role, 'patient_cf', text);
+    }
+});
+
+test('WUL-925: two explicit patient CFs stay in review and unlabeled CF stays unknown_cf', () => {
+    const twoPatients = resolveDocumentTaxCodeRoles({
+        text: `Assistito codice fiscale ${SYNTHETIC_PATIENT_CF}\nPaziente codice fiscale ${SYNTHETIC_PRESCRIBER_CF}`,
+    });
+    assert.deepEqual(twoPatients.taxCodes.map((entry) => entry.role), ['patient_cf', 'patient_cf']);
+    assert.equal(twoPatients.humanRequired, true);
+    assert.equal(buildDocumentDecisionIdentityFromTaxCodes(twoPatients, 'link_existing_patient', 'p1').action, 'review_identity');
+
+    const unlabeled = resolveDocumentTaxCodeRoles({
+        text: `RefertoCittadino\nAssistito codice fiscale ${SYNTHETIC_PATIENT_CF}\n${SYNTHETIC_OPERATOR_CF}`,
+    });
+    assert.deepEqual(
+        unlabeled.taxCodes.map((entry) => [entry.value, entry.role]),
+        [[SYNTHETIC_PATIENT_CF, 'patient_cf'], [SYNTHETIC_OPERATOR_CF, 'unknown_cf']],
+    );
+    assert.equal(unlabeled.humanRequired, true);
+});
