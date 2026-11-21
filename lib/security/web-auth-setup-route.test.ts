@@ -21,7 +21,7 @@ const { POST: setup } = await import('../../app/api/auth/setup/route.ts');
 const { POST: login } = await import('../../app/api/auth/login/route.ts');
 const { GET: check } = await import('../../app/api/auth/check/route.ts');
 const { dbServer } = await import('../db-server.ts');
-const { users, ambulatories } = await import('../schema.ts');
+const { users, ambulatories, settings } = await import('../schema.ts');
 const { retire } = await import('./web-auth-lifecycle-owner-adapter.ts');
 const { completeExactWebP3Logout } = await import('./web-auth-logout-server.ts');
 
@@ -108,6 +108,7 @@ test('keeps the committed setup recoverable through ordinary login when final P3
             username: USERNAME, password: PIN,
             encryptedMasterKey: 'synthetic-wrapped-key', salt: 'synthetic-salt',
             displayName: 'Synthetic Recovery Operator', ambulatoryName: 'Synthetic Recovery Ambulatory',
+            doctorTaxCode: 'rssmra80a01f205x',
         }, setupControl));
     } finally { dbServer.transaction = transaction; }
 
@@ -118,6 +119,8 @@ test('keeps the committed setup recoverable through ordinary login when final P3
     assert.equal(setupResponse.headers.get('set-cookie'), null);
     const persisted = await dbServer.select({ id: users.id }).from(users).limit(1);
     assert.match(persisted[0]?.id ?? '', /^[0-9a-f-]{36}$/u);
+    const savedSettings = await dbServer.select().from(settings);
+    assert.equal(savedSettings.find((row) => row.key === `accountProfile.doctorTaxCode:${persisted[0]?.id}`)?.value, 'RSSMRA80A01F205X');
     const initialAmbulatories = await dbServer.select().from(ambulatories);
     assert.equal(initialAmbulatories.length, 1);
     assert.equal(initialAmbulatories[0]?.name, 'Synthetic Recovery Ambulatory');
