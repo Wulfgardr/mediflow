@@ -67,3 +67,10 @@ test('numeric PIN enforces 4-8 digits and shows the passphrase message for long 
         assert.equal(validateNumericPinSubmission(tooLong), PIN_PASSPHRASE_MESSAGE, tooLong);
     }
 });
+
+test('la lunghezza del PIN di conferma si conta come nella creazione delle credenziali', () => {
+    assert.equal('\u{1F600}\u{1F600}'.length, 4);
+    assert.equal(isValidConfirmationPin('\u{1F600}\u{1F600}'), true);
+    assert.equal(validateConfirmationPinSubmission('\u{1F600}\u{1F600}'), null);
+    assert.equal(isValidConfirmationPin('\u{1F600}\u{1F600}\u{1F600}\u{1F600}\u{1F600}'), false);
+});
