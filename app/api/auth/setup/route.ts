@@ -60,7 +60,7 @@ export async function POST(request: Request) {
             setWebAuthControlEtag(parsedBody.response, mutation.ifMatch);
             return parsedBody.response;
         }
-        const { username, password, encryptedMasterKey, salt, displayName, ambulatoryName, verifier, recovery } = parsedBody.data;
+        const { username, password, encryptedMasterKey, salt, displayName, ambulatoryName, doctorTaxCode, verifier, recovery } = parsedBody.data;
 
         const hashedPassword = await bcrypt.hash(password, 10);
         const unlockVerifierHash = verifier ? await hashAccessVerifier(verifier) : null;
@@ -92,6 +92,9 @@ export async function POST(request: Request) {
             // Initialize Settings
             if (displayName) {
                 tx.insert(settings).values({ key: 'doctorName', value: displayName }).onConflictDoUpdate({ target: settings.key, set: { value: displayName } }).run();
+            }
+            if (doctorTaxCode) {
+                tx.insert(settings).values({ key: `accountProfile.doctorTaxCode:${userId}`, value: doctorTaxCode }).onConflictDoUpdate({ target: settings.key, set: { value: doctorTaxCode } }).run();
             }
             if (ambulatoryName) {
                 tx.insert(settings).values({ key: 'clinicName', value: ambulatoryName }).onConflictDoUpdate({ target: settings.key, set: { value: ambulatoryName } }).run();

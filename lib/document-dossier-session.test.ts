@@ -802,7 +802,16 @@ test('WUL-878 profile physician code is excluded without labels and cannot recei
     const text = `%PDF-1.4 sintetico\nRicetta\nPaziente CF ${CF_A}\n${CF_B}`;
     const { ports, files } = setup([['ricetta.pdf', text]]);
     const [withoutProfile] = await buildDossierInventory(ports, files, live);
-    assert.equal(evaluateDraftGroupIdentity(withoutProfile, patientsFixture(), 'pa').status, 'mixed');
+    const blocked = evaluateDraftGroupIdentity(withoutProfile, patientsFixture(), 'pa');
+    assert.equal(blocked.status, 'mixed');
+    assert.equal(blocked.missingPhysicianTaxCode, true);
+    assert.match(blocked.message, /Manca il tuo codice fiscale nel Profilo/u);
+    await assert.rejects(
+        acquireDossierGroup(ports, { group: withoutProfile, patientId: 'pa', confirmed: true, ...live }),
+        (error: unknown) => error instanceof DossierIdentityBlocked
+            && error.identity.missingPhysicianTaxCode === true
+            && /Manca il tuo codice fiscale nel Profilo/u.test(error.message),
+    );
     Object.assign(ports, { physicianTaxCode: async () => CF_B });
     const [group] = await buildDossierInventory(ports, files, live);
     assert.equal(evaluateDraftGroupIdentity(group, patientsFixture(), 'pa').status, 'matched');

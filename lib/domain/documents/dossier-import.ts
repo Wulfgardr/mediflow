@@ -225,6 +225,7 @@ export interface DossierIdentityEvaluation {
     blocking: boolean;
     /** Serve una conferma esplicita del medico prima dell'acquisizione. */
     confirmationRequired: boolean;
+    missingPhysicianTaxCode?: boolean;
     documentPatientCodes: string[];
     candidatePatientIds: string[];
     message: string;
@@ -297,6 +298,16 @@ export function evaluateDossierGroupIdentity(
     }
     const holders = (code: string) => patients.filter((patient) => normalizedCode(patient.taxCode) === code).map((patient) => patient.id);
     if (patientCodes.length > 1) {
+        const sameDocumentTwoCodes = comparable.some((document) => new Set(document.taxCodes
+            .filter((code) => code.checksumValid && !excludedProfessionalCode(code))
+            .map((code) => normalizedCode(code.value))).size === 2);
+        if (!physicianCode && patientCodes.length === 2 && (unattributed || sameDocumentTwoCodes)) {
+            return {
+                status: 'mixed', blocking: true, confirmationRequired: true, missingPhysicianTaxCode: true,
+                documentPatientCodes: patientCodes, candidatePatientIds: [],
+                message: 'Manca il tuo codice fiscale nel Profilo: inseriscilo per escludere il prescrittore e ripeti la lettura.',
+            };
+        }
         return { status: 'mixed', blocking: true, confirmationRequired: true, documentPatientCodes: patientCodes, candidatePatientIds: [],
             message: 'I documenti contengono più codici fiscali distinti, inclusi quelli di attribuzione incerta. Controlla a chi si riferiscono ed escludi le fonti discordanti prima di procedere.' };
     }
