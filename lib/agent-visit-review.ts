@@ -62,7 +62,7 @@ export async function inspectAgentVisit(row: IncomingAgentCassette, patients: Pa
                 && !(code.role === 'professional_cf' && code.explicitProfessional));
             if (identity.status !== 'matched' || identity.blocking || foreign.length === 0
                 || foreign.some(code => code.value !== cf || code.role !== 'patient_cf')) {
-                blockers.push(identity.missingPhysicianTaxCode ? identity.message : 'Identità da verificare nel PDF ' + text(item.value.name) + ': ' + identity.documentPatientCodes.join(', '));
+                blockers.push(identity.missingPhysicianTaxCode ? identity.message + ' PDF: ' + text(item.value.name) : 'Identità da verificare nel PDF ' + text(item.value.name) + ': ' + identity.documentPatientCodes.join(', '));
             }
         } catch (error) {
             if (signal.aborted) throw error;
