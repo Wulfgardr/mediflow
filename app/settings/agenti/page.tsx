@@ -13,11 +13,6 @@ import { SETTINGS_INPUT_CLASS, SETTINGS_PRIMARY_BUTTON_CLASS, SETTINGS_SECONDARY
 
 export default function AgentSettingsPage() {
     const confirm = useConfirm();
-    const [localKit, setLocalKit] = useState<AgentLocalKitStatus | null>(null);
-    const [kitPathDraft, setKitPathDraft] = useState('');
-    const [localKitConfirming, setLocalKitConfirming] = useState(false);
-    const [localKitPin, setLocalKitPin] = useState('');
-    const [localKitPinSubmitError, setLocalKitPinSubmitError] = useState<string | null>(null);
     const [mandates, setMandates] = useState<AgentMandate[]>([]);
     const [pairings, setPairings] = useState<AgentPairingRequest[]>([]);
     const [selectedMandates, setSelectedMandates] = useState<Record<string, string>>({});
@@ -35,6 +30,11 @@ export default function AgentSettingsPage() {
     const [operations, setOperations] = useState([...AGENT_OPERATIONS]);
     const [pinSubmitError, setPinSubmitError] = useState<string | null>(null);
     const [approvalPinSubmitError, setApprovalPinSubmitError] = useState<string | null>(null);
+    const [localKit, setLocalKit] = useState<AgentLocalKitStatus | null>(null);
+    const [kitPathDraft, setKitPathDraft] = useState('');
+    const [localKitConfirming, setLocalKitConfirming] = useState(false);
+    const [localKitPin, setLocalKitPin] = useState('');
+    const [localKitPinSubmitError, setLocalKitPinSubmitError] = useState<string | null>(null);
     const pinError = numericPinError(pin) ?? pinSubmitError;
     const approvalPinError = numericPinError(approvalPin) ?? approvalPinSubmitError;
     const localKitPinError = numericPinError(localKitPin) ?? localKitPinSubmitError;
