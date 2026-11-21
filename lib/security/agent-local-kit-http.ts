@@ -65,6 +65,8 @@ export function createAgentLocalKitHttp(sources: Sources) {
                 if (!body || Object.keys(body).join(',') !== 'kitPath' || typeof body.kitPath !== 'string') return denied(400, 'INVALID_INPUT');
                 const validated = validateLocalKitDirectory(body.kitPath);
                 readDepositoJson(validated);
+                const current = sources.store().status(access.session.userId);
+                if (current.connected && current.kitPath !== validated) return denied(409, 'LOCAL_KIT_CONNECTED');
                 return reply(sources.store().saveKitPath(validated, access.session.userId, access.generation));
             } catch (error) {
                 if (error instanceof LocalKitPathError) return denied(400, error.code);
@@ -108,6 +110,8 @@ export function createAgentLocalKitHttp(sources: Sources) {
                 }
 
                 if (typeof body.kitPath === 'string') {
+                    const current = store.status(access.session.userId);
+                    if (current.connected && current.kitPath !== physicalKitDir) return denied(409, 'LOCAL_KIT_CONNECTED');
                     store.saveKitPath(physicalKitDir, access.session.userId, access.generation);
                 }
                 const connection = store.connect(body.mandate, access.session.userId, access.generation);

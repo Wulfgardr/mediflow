@@ -170,6 +170,13 @@ test('connects Codex in one click, writes kit files without leaking tokens, supp
     assert.equal(receiptText.includes('mfr_'), false);
     const receipt = JSON.parse(receiptText);
     assert.equal(receipt.status, 'connected');
+    const otherKit = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-other-kit-'));
+    fs.chmodSync(otherKit, 0o700);
+    fs.writeFileSync(path.join(otherKit, 'deposito.json'), JSON.stringify({ credenziali: path.join(otherKit, '.agente'), agente: null }), { mode: 0o600 });
+    const moveRes = await fetch(origin, { method: 'PUT', headers: mutationHeaders(), body: JSON.stringify({ kitPath: otherKit }) });
+    assert.equal(moveRes.status, 409);
+    assert.equal((await moveRes.json()).code, 'LOCAL_KIT_CONNECTED');
+    assert.equal(fs.existsSync(path.join(otherKit, '.agente')), false);
     assert.equal(typeof receipt.agentRef, 'string');
     assert.equal(receipt.mandateRef, mandateInput.id);
 

@@ -60,7 +60,9 @@ export default function AgentSettingsPage() {
         setReadAt(Date.now());
     }
     const localKitConnected = Boolean(localKit?.connected);
-    const localKitStatusText = !localKitConnected
+    const localKitStatusText = localKit === null
+        ? 'Stato da leggere'
+        : !localKitConnected
         ? 'Non collegato'
         : localKit?.expiresAt && localKit.expiresAt > readAt
             ? `Collegato · fino alle ${new Date(localKit.expiresAt).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`
@@ -88,7 +90,11 @@ export default function AgentSettingsPage() {
                     <p>{localKitStatusText}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                    {localKitConnected ? (
+                    {localKit === null ? (
+                        <button type="button" className={SETTINGS_PRIMARY_BUTTON_CLASS} disabled={busy} onClick={() => { void run(refresh); }}>
+                            Leggi lo stato
+                        </button>
+                    ) : localKitConnected ? (
                         <button
                             type="button"
                             className={SETTINGS_SECONDARY_BUTTON_CLASS}
@@ -127,7 +133,7 @@ export default function AgentSettingsPage() {
                     )}
                 </div>
             </div>
-            {localKitConfirming && !localKitConnected && (
+            {localKitConfirming && localKit !== null && !localKitConnected && (
                 <form className="space-y-4 border p-4" onSubmit={event => {
                     event.preventDefault();
                     const problem = validateNumericPinSubmission(localKitPin);
@@ -205,7 +211,8 @@ export default function AgentSettingsPage() {
                             onChange={event => setKitPathDraft(event.target.value)}
                         />
                     </label>
-                    <button type="submit" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy || !kitPathDraft.trim()}>Salva percorso</button>
+                    {localKitConnected ? <p>Scollega Codex per cambiare cartella.</p> : null}
+                    <button type="submit" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy || !kitPathDraft.trim() || localKitConnected}>Salva percorso</button>
                 </form>
             </details>
         </section>
