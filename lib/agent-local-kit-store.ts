@@ -13,6 +13,7 @@ export const LOCAL_KIT_AGENT_NAME = 'Codex · Ambulatorio';
 export type AgentLocalKitStatus = {
     kitPath: string;
     connected: boolean;
+    active: boolean;
     agentRef: string | null;
     expiresAt: number | null;
     lastRenewalAt: number | null;
@@ -88,37 +89,67 @@ export function createAgentLocalKitStore(database: Database.Database, now = Date
             }).immediate();
             return this.status(actorRef);
         },
-        status(actorRef: string): AgentLocalKitStatus {
+        status(actorRef: string, isUnlockActive?: (ref: string, actorRef: string) => boolean): AgentLocalKitStatus {
             const kitPath = this.readKitPath();
             const agentRef = readSetting(database, LOCAL_KIT_AGENT_SETTING_KEY);
             if (!agentRef) {
-                return { kitPath, connected: false, agentRef: null, expiresAt: null, lastRenewalAt: null };
+                return { kitPath, connected: false, active: false, agentRef: null, expiresAt: null, lastRenewalAt: null };
             }
             const generation = readSqliteArchiveGeneration(database);
             const row = database.prepare(`SELECT registration.id,
                 registration.revoked_at AS revokedAt,
+                registration.current_mandate_ref AS currentMandateRef,
                 current.created_at AS lastRenewalAt,
-                COALESCE(current.expires_at, template.expires_at) AS expiresAt,
-                COALESCE(current.revoked_at, template.revoked_at) AS mandateRevokedAt
+                current.expires_at AS currentExpiresAt,
+                current.revoked_at AS currentRevokedAt,
+                template.expires_at AS templateExpiresAt,
+                template.revoked_at AS templateRevokedAt,
+                grant.unlock_ref AS unlockRef,
+                client.revoked_at AS clientRevokedAt,
+                client.expires_at AS clientExpiresAt
                 FROM agent_registrations AS registration
                 JOIN agent_mandates AS template ON template.id=registration.template_ref
                 LEFT JOIN agent_mandates AS current ON current.id=registration.current_mandate_ref
+                LEFT JOIN agent_unlock_grants AS grant ON grant.mandate_ref=registration.current_mandate_ref AND grant.agent_ref=registration.id
+                LEFT JOIN agent_clients AS client ON client.id=registration.id AND client.mandate_ref=registration.template_ref
                 WHERE registration.id=? AND template.actor_ref=? AND template.archive_generation=?`)
                 .get(agentRef, actorRef, generation) as {
                     id: string;
                     revokedAt: number | null;
+                    currentMandateRef: string | null;
                     lastRenewalAt: number | null;
-                    expiresAt: number;
-                    mandateRevokedAt: number | null;
+                    currentExpiresAt: number | null;
+                    currentRevokedAt: number | null;
+                    templateExpiresAt: number;
+                    templateRevokedAt: number | null;
+                    unlockRef: string | null;
+                    clientRevokedAt: number | null;
+                    clientExpiresAt: number | null;
                 } | undefined;
             if (!row || row.revokedAt !== null) {
-                return { kitPath, connected: false, agentRef: null, expiresAt: null, lastRenewalAt: null };
+                return { kitPath, connected: false, active: false, agentRef: null, expiresAt: null, lastRenewalAt: null };
             }
+            const currentTime = now();
+            if (row.currentMandateRef !== null) {
+                const unlockValid = row.unlockRef !== null && (!isUnlockActive || isUnlockActive(row.unlockRef, actorRef));
+                const active = row.currentRevokedAt === null && row.currentExpiresAt !== null && row.currentExpiresAt > currentTime && unlockValid;
+                return {
+                    kitPath,
+                    connected: true,
+                    active,
+                    agentRef: row.id,
+                    expiresAt: active ? row.currentExpiresAt : null,
+                    lastRenewalAt: row.lastRenewalAt,
+                };
+            }
+            const initialActive = row.templateRevokedAt === null && row.clientRevokedAt === null
+                && row.templateExpiresAt > currentTime && (row.clientExpiresAt ?? 0) > currentTime;
             return {
                 kitPath,
                 connected: true,
+                active: initialActive,
                 agentRef: row.id,
-                expiresAt: row.mandateRevokedAt === null ? row.expiresAt : null,
+                expiresAt: initialActive ? Math.min(row.templateExpiresAt, row.clientExpiresAt ?? row.templateExpiresAt) : null,
                 lastRenewalAt: row.lastRenewalAt,
             };
         },

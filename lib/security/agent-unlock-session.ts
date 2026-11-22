@@ -1,5 +1,5 @@
 import 'server-only';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { mintResourcePort, registerPrivateResource, releaseResourcePort, resolve } from './web-auth-lifecycle-owner-adapter';
 
 type Unlock = { sessionId: string; controlId: string; confirmed: boolean; sharedGestures: Set<string> };
@@ -55,6 +55,10 @@ export function confirmSharedAgentUnlock(gesture: string, sessionId: string, con
         unlock.confirmed = true;
     }
     return true;
+}
+
+export function confirmDirectAgentRenewal(sessionId: string, controlId: string, actorRef: string, issue: (unlockRef: string) => void): boolean {
+    return confirmSharedAgentUnlock(randomUUID(), sessionId, controlId, actorRef, issue);
 }
 
 export function isAgentUnlockActive(ref: string, actorRef: string): boolean {

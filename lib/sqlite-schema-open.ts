@@ -8,6 +8,7 @@ import { schemaSnapshot, schemaDifferences } from './sqlite-schema-shape';
 import { createVerifiedSqliteSnapshotSync } from './sqlite-repair';
 import { initSqlitePragmas } from './sqlite-pragmas';
 import { upgradeObservationTimestampDefault } from './sqlite-observation-schema-upgrade';
+import { hasLegacyAgentMandateDurationSchema, upgradeAgentMandateDurationConstraint } from './sqlite-agent-mandate-duration-upgrade';
 import { readSqliteArchiveGeneration } from './archive-generation';
 import { initializeTerritorialPacks } from './territorial-pack-store';
 
@@ -16,7 +17,7 @@ import { initializeTerritorialPacks } from './territorial-pack-store';
 // 11: drop of the durable review and headless SOAP tables, never written by the product.
 // A version is validated without DDL at every start: any change to the canonical
 // schema needs a new number, or the archives already stamped are refused.
-export const CURRENT_SQLITE_SCHEMA_VERSION = 17;
+export const CURRENT_SQLITE_SCHEMA_VERSION = 18;
 // Same values as scripts/native-first-install-contract.json, which the native
 // helper writes; sqlite-schema-open.test.ts reserves with the JSON and opens here.
 const reservation = { applicationId: 1296451154, userVersion: 0 };
@@ -117,50 +118,55 @@ export function openVersionedSqliteDatabase(databasePath: string, openConnection
         // Connection-only settings precede admission. WAL changes the database
         // header and therefore follows the verified original and schema commit.
         connection.pragma('busy_timeout = 5000');
-        connection.pragma('foreign_keys = ON');
+        const needsMandateDurationRebuild = Number(connection.pragma('user_version', { simple: true })) < CURRENT_SQLITE_SCHEMA_VERSION
+            && hasLegacyAgentMandateDurationSchema(connection);
+        connection.pragma(`foreign_keys = ${needsMandateDurationRebuild ? 'OFF' : 'ON'}`);
         connection.pragma('synchronous = FULL');
-        connection.transaction(() => {
-            const current = fs.lstatSync(databasePath);
-            if (current.dev !== before.dev || current.ino !== before.ino || !current.isFile()) deny('database identity changed');
-            const version = Number(connection.pragma('user_version', { simple: true }));
-            if (!Number.isSafeInteger(version) || version < 0 || version > CURRENT_SQLITE_SCHEMA_VERSION) deny('newer or unsupported schema version');
-            const applicationId = Number(connection.pragma('application_id', { simple: true }));
-            const objects = connection.prepare("SELECT type, name FROM sqlite_schema WHERE name NOT GLOB 'sqlite_*'").all();
-            const reserved = version === reservation.userVersion && applicationId === reservation.applicationId && objects.length === 0;
-            const fresh = (created && version === 0 && applicationId === 0 && objects.length === 0) || reserved;
-            if (!fresh && applicationId !== 0) deny('unsupported database application identity');
-            if (!fresh && objects.length === 0) deny('empty database has no first-install reservation');
-            assertIntegrity(connection);
-
-            const canonical = new Database(':memory:');
-            try {
-                canonical.pragma('foreign_keys = ON');
-                initializeSqliteSchema(canonical);
-                if (version === CURRENT_SQLITE_SCHEMA_VERSION) {
-                    // Repeated starts validate without DDL, backfill or another snapshot.
-                    assertCanonical(connection, canonical);
-                    if (!options.prepareReplacement) initializeTerritorialPacks(connection, 'existing');
-                    return;
-                }
-                if (!fresh) {
-                    snapshot = `${databasePath}.schema-original-v${version}-${randomUUID()}.db`;
-                    createVerifiedSqliteSnapshotSync(databasePath, snapshot);
-                    const afterCopy = fs.lstatSync(databasePath);
-                    if (afterCopy.dev !== before.dev || afterCopy.ino !== before.ino) deny('database identity changed during snapshot');
-                }
-                const violationsBefore = foreignKeyViolations(connection);
-                initializeSqliteSchema(connection);
-                if (!fresh) freezeUnattestedBackupHistory(connection);
-                upgradeObservationTimestampDefault(connection, canonical);
-                assertCanonical(connection, canonical);
+        try {
+            connection.transaction(() => {
+                const current = fs.lstatSync(databasePath);
+                if (current.dev !== before.dev || current.ino !== before.ino || !current.isFile()) deny('database identity changed');
+                const version = Number(connection.pragma('user_version', { simple: true }));
+                if (!Number.isSafeInteger(version) || version < 0 || version > CURRENT_SQLITE_SCHEMA_VERSION) deny('newer or unsupported schema version');
+                const applicationId = Number(connection.pragma('application_id', { simple: true }));
+                const objects = connection.prepare("SELECT type, name FROM sqlite_schema WHERE name NOT GLOB 'sqlite_*'").all();
+                const reserved = version === reservation.userVersion && applicationId === reservation.applicationId && objects.length === 0;
+                const fresh = (created && version === 0 && applicationId === 0 && objects.length === 0) || reserved;
+                if (!fresh && applicationId !== 0) deny('unsupported database application identity');
+                if (!fresh && objects.length === 0) deny('empty database has no first-install reservation');
                 assertIntegrity(connection);
-                if (foreignKeyViolations(connection) !== violationsBefore) deny('migration changed foreign key violations');
-                if (!options.prepareReplacement) initializeTerritorialPacks(connection, fresh ? 'new' : 'existing');
-                // The native reservation is consumed atomically with the schema.
-                connection.pragma('application_id = 0');
-                connection.pragma(`user_version = ${CURRENT_SQLITE_SCHEMA_VERSION}`);
-            } finally { canonical.close(); }
-        }).immediate();
+
+                const canonical = new Database(':memory:');
+                try {
+                    canonical.pragma('foreign_keys = ON');
+                    initializeSqliteSchema(canonical);
+                    if (version === CURRENT_SQLITE_SCHEMA_VERSION) {
+                        assertCanonical(connection, canonical);
+                        if (!options.prepareReplacement) initializeTerritorialPacks(connection, 'existing');
+                        return;
+                    }
+                    if (!fresh) {
+                        snapshot = `${databasePath}.schema-original-v${version}-${randomUUID()}.db`;
+                        createVerifiedSqliteSnapshotSync(databasePath, snapshot);
+                        const afterCopy = fs.lstatSync(databasePath);
+                        if (afterCopy.dev !== before.dev || afterCopy.ino !== before.ino) deny('database identity changed during snapshot');
+                    }
+                    const violationsBefore = foreignKeyViolations(connection);
+                    initializeSqliteSchema(connection);
+                    if (!fresh) freezeUnattestedBackupHistory(connection);
+                    upgradeObservationTimestampDefault(connection, canonical);
+                    upgradeAgentMandateDurationConstraint(connection, canonical);
+                    assertCanonical(connection, canonical);
+                    assertIntegrity(connection);
+                    if (foreignKeyViolations(connection) !== violationsBefore) deny('migration changed foreign key violations');
+                    if (!options.prepareReplacement) initializeTerritorialPacks(connection, fresh ? 'new' : 'existing');
+                    connection.pragma('application_id = 0');
+                    connection.pragma(`user_version = ${CURRENT_SQLITE_SCHEMA_VERSION}`);
+                } finally { canonical.close(); }
+            }).immediate();
+        } finally {
+            connection.pragma('foreign_keys = ON');
+        }
         readSqliteArchiveGeneration(connection);
         initSqlitePragmas(connection);
         ensurePrivateArchiveFiles(databasePath);

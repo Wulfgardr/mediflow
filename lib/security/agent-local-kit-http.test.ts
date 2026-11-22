@@ -48,6 +48,7 @@ const context = issueSyntheticWebSessionContext({ id: actor, username, role: 'ad
 let current = context.session as typeof context.session | null;
 let pinCalls = 0;
 
+let activeUnlockRef: string | null = null;
 const handlers = createAgentLocalKitHttp({
     session: async () => current,
     async verifyPin(candidateUser, candidatePin) {
@@ -56,6 +57,12 @@ const handlers = createAgentLocalKitHttp({
         return result.kind === 'verified' ? result.account.id : null;
     },
     store: () => createAgentLocalKitStore(database),
+    isUnlockActive: (ref, actorRef) => actorRef === actor && activeUnlockRef === ref,
+    renew(_request, session, generation) {
+        activeUnlockRef = `synthetic-direct-renewal-${randomUUID()}`;
+        createAgentRegistrationStore(database).renew(session.userId, generation, activeUnlockRef);
+        return true;
+    },
 });
 
 installLoopbackIngress();
@@ -159,6 +166,7 @@ test('connects Codex in one click, writes kit files without leaking tokens, supp
     assert.equal(savedState.connected, false);
 
     const mandateInput = await candidateMandate();
+    mandateInput.durationMs = 86400000;
     const connectRes = await fetch(origin, {
         method: 'POST',
         headers: mutationHeaders(),
@@ -200,10 +208,32 @@ test('connects Codex in one click, writes kit files without leaking tokens, supp
 
     const registrationStore = createAgentRegistrationStore(database);
     const generation = readSqliteArchiveGeneration(database);
+    activeUnlockRef = 'synthetic-unlock-ref';
     registrationStore.renew(actor, generation, 'synthetic-unlock-ref');
     const renewed = registrationStore.retrieve(registration.token, ref => ref === 'synthetic-unlock-ref');
     assert.equal(renewed.agentRef, receipt.agentRef);
+    assert.equal(renewed.expiresAt - renewed.issuedAt, 86400000);
     assert.match(renewed.token, /^mfa_[A-Za-z0-9_-]{43}$/u);
+
+    const statusActive = await (await fetch(origin)).json();
+    assert.equal(statusActive.connected, true);
+    assert.equal(statusActive.active, true);
+
+    activeUnlockRef = null;
+    const statusStale = await (await fetch(origin)).json();
+    assert.equal(statusStale.connected, true);
+    assert.equal(statusStale.active, false);
+    assert.equal(statusStale.expiresAt, null);
+
+    const directRenewRes = await fetch(origin, { method: 'PATCH', headers: mutationHeaders() });
+    assert.equal(directRenewRes.status, 200);
+    const directRenewText = await directRenewRes.text();
+    assert.equal(directRenewText.includes('mfa_'), false);
+    assert.equal(directRenewText.includes('mfr_'), false);
+    const directRenewBody = JSON.parse(directRenewText);
+    assert.equal(directRenewBody.connected, true);
+    assert.equal(directRenewBody.active, true);
+    assert.ok(typeof directRenewBody.expiresAt === 'number' && directRenewBody.expiresAt > Date.now());
 
     const creationAudits = database.prepare("SELECT event_type FROM audit_events WHERE actor_ref=? ORDER BY rowid").all(actor) as { event_type: string }[];
     assert.ok(creationAudits.some(row => row.event_type === 'agent.mandate.created'));
@@ -230,5 +260,9 @@ test('connects Codex in one click, writes kit files without leaking tokens, supp
 
     const statusAfter = await (await fetch(origin)).json();
     assert.equal(statusAfter.connected, false);
+    assert.equal(statusAfter.active, false);
     assert.equal(statusAfter.agentRef, null);
+    const renewDisconnected = await fetch(origin, { method: 'PATCH', headers: mutationHeaders() });
+    assert.equal(renewDisconnected.status, 409);
+    assert.equal((await renewDisconnected.json()).code, 'LOCAL_KIT_NOT_CONNECTED');
 });

@@ -1724,6 +1724,17 @@
       "classification": "sqlite-infrastructure"
     },
     {
+      "file": "lib/sqlite-agent-mandate-duration-upgrade.ts",
+      "target": "better-sqlite3",
+      "capability": "driver:better-sqlite3",
+      "form": "import",
+      "symbols": [
+        "default"
+      ],
+      "count": 1,
+      "classification": "sqlite-infrastructure"
+    },
+    {
       "file": "lib/sqlite-observation-schema-upgrade.ts",
       "target": "better-sqlite3",
       "capability": "driver:better-sqlite3",

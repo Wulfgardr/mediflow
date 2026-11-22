@@ -6,7 +6,7 @@ export const AGENT_OPERATIONS = [
 export type AgentOperation = typeof AGENT_OPERATIONS[number];
 export const clinicalContentAllowed = (provider: AgentMandateInput['provider'], allowsClinicalEgress: boolean | number) =>
     provider === 'local' || allowsClinicalEgress === true || allowsClinicalEgress === 1;
-export const MANDATE_MAX_DURATION_MS = 12 * 60 * 60 * 1000;
+export const MANDATE_MAX_DURATION_MS = 24 * 60 * 60 * 1000;
 export type AgentMandateInput = {
     id: string;
     durationMs: number;
