@@ -10,7 +10,7 @@ import { Activity, BookOpen, CalendarDays, CircleDashed, ChevronDown, CircleHelp
 import { db } from '@/lib/db';
 import { currentWorkspaceDestination } from '@/lib/workspace-destination';
 import { useLiveQuery } from '@/lib/live-query';
-import { agentIncomingServerSnapshot, agentIncomingSnapshot, subscribeAgentIncoming } from '@/lib/agent-incoming';
+import { agentIncomingCountServerSnapshot, agentIncomingCountSnapshot, subscribeAgentIncomingCount } from '@/lib/agent-incoming-count';
 import { useSecurity } from '@/components/security-provider';
 import { useTheme } from '@/components/theme-provider';
 import PrivacyBlur from '@/components/privacy-blur';
@@ -71,8 +71,7 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
   const { lock, user } = useSecurity();
   const { setTheme } = useTheme();
   const desktop = useSyncExternalStore(watchRecordWidth, desktopRecord, serverRecordWidth);
-  const incomingVisits = useSyncExternalStore(subscribeAgentIncoming, agentIncomingSnapshot, agentIncomingServerSnapshot).visits;
-  const incomingCount = incomingVisits.length;
+  const incomingCount = useSyncExternalStore(subscribeAgentIncomingCount, agentIncomingCountSnapshot, agentIncomingCountServerSnapshot);
   const pathname = usePathname();
   const patientId = pathname.match(/^\/patients\/([^/]+)\//)?.[1] ?? null;
   const wideRecord = !!patientId && proposal && desktop;
