@@ -95,6 +95,8 @@ export const AUDIT_EVENT_TYPES = [
     'agent.client.approved',
     'agent.mandate.created',
     'agent.mandate.revoked',
+    'agent.context.exported',
+    'agent.context.cleared',
     'agent.semantic_query.executed',
     /* non-terminal PHI-safe attempt emitted by generic AIP ports. */
     'agent.operation.attempted',
