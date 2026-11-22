@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createServer } from 'node:http';
+import { Readable } from 'node:stream';
 import os from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -52,12 +53,18 @@ function wrappedStore() {
     const base = createAgentLocalKitStore(database);
     return {
         ...base,
-        recordContextAudit(eventType: 'agent.context.exported' | 'agent.context.cleared', actorRef: string, subjectRef: string, generation: string) {
+        recordContextAudit(
+            eventType: 'agent.context.exported' | 'agent.context.cleared',
+            actorRef: string,
+            subjectRef: string,
+            generation: string,
+            isUnlockActive?: (ref: string, actorRef: string) => boolean,
+        ) {
             if (failAuditOnce) {
                 failAuditOnce = false;
                 throw new Error('synthetic audit failure');
             }
-            return base.recordContextAudit(eventType, actorRef, subjectRef, generation);
+            return base.recordContextAudit(eventType, actorRef, subjectRef, generation, isUnlockActive);
         },
     };
 }
@@ -79,14 +86,13 @@ const contextHandlers = createAgentLocalKitContextHttp({
 installLoopbackIngress();
 const server = createServer(async (incoming, outgoing) => {
     try {
-        const chunks: Buffer[] = [];
-        for await (const chunk of incoming) chunks.push(Buffer.from(chunk));
         const url = new URL(incoming.url ?? '/', 'http://127.0.0.1');
+        const hasBody = incoming.method !== 'GET' && incoming.method !== 'HEAD';
         const request = new Request(url, {
             method: incoming.method,
             headers: incoming.headers as Record<string, string>,
-            ...(chunks.length ? { body: Buffer.concat(chunks) } : {}),
-        });
+            ...(hasBody ? { body: Readable.toWeb(incoming), duplex: 'half' } : {}),
+        } as RequestInit);
         const table = url.pathname.startsWith('/context') ? contextHandlers : kitHandlers;
         const handler = table[incoming.method as keyof typeof table];
         const response = handler ? await handler(request) : new Response(null, { status: 405 });
@@ -232,7 +238,14 @@ test('exports audited patient context when kit is active, rolls back file on aud
     assert.equal(listed.count, 1);
     assert.equal(listed.items[0].taxCodeLast4, '501U');
 
-    const deleteRes = await fetch(`${origin}/context`, { method: 'DELETE', headers: mutationHeaders() });
+    const deleteRes = await fetch(`${origin}/context`, {
+        method: 'DELETE',
+        headers: {
+            Origin: origin,
+            'Sec-Fetch-Site': 'same-origin',
+            'x-mediflow-archive-generation': readSqliteArchiveGeneration(database),
+        },
+    });
     assert.equal(deleteRes.status, 200);
     assert.equal((await deleteRes.json()).removed, 1);
     assert.equal(fs.existsSync(contextFile), false);
@@ -240,4 +253,40 @@ test('exports audited patient context when kit is active, rolls back file on aud
     const audits = database.prepare('SELECT event_type, subject_ref FROM audit_events WHERE actor_ref=? ORDER BY rowid').all(actor) as Array<{ event_type: string; subject_ref: string }>;
     assert.ok(audits.some(row => row.event_type === 'agent.context.exported' && row.subject_ref === payload.patient.cfHash));
     assert.ok(audits.some(row => row.event_type === 'agent.context.cleared' && row.subject_ref === 'all'));
+});
+
+test('revalidates kit authorization after awaiting POST body if disconnected mid-flight', async () => {
+    const payload = await sampleContextPayload('VRDLGI75B12F205X');
+    const encoded = new TextEncoder().encode(JSON.stringify(payload));
+    const mid = Math.floor(encoded.length / 2);
+    let releaseSecondHalf!: () => void;
+    const secondHalfReady = new Promise<void>(resolve => { releaseSecondHalf = resolve; });
+    let firstChunkSent!: () => void;
+    const firstChunkObserved = new Promise<void>(resolve => { firstChunkSent = resolve; });
+
+    const body = new ReadableStream<Uint8Array>({
+        async start(controller) {
+            controller.enqueue(encoded.subarray(0, mid));
+            firstChunkSent();
+            await secondHalfReady;
+            controller.enqueue(encoded.subarray(mid));
+            controller.close();
+        },
+    });
+
+    const responsePromise = fetch(`${origin}/context`, {
+        method: 'POST',
+        headers: mutationHeaders(),
+        body,
+        duplex: 'half',
+    } as RequestInit);
+    await firstChunkObserved;
+    await new Promise(resolve => setTimeout(resolve, 20));
+    createAgentLocalKitStore(database).disconnect(actor, readSqliteArchiveGeneration(database));
+    releaseSecondHalf();
+
+    const response = await responsePromise;
+    assert.equal(response.status, 403);
+    assert.equal((await response.json()).code, 'LOCAL_KIT_INACTIVE');
+    assert.equal(fs.existsSync(path.join(kitDir, LOCAL_KIT_CONTEXT_DIR_NAME, `${payload.patient.cfHash}.json`)), false);
 });

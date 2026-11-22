@@ -284,7 +284,10 @@ export default function AgentSettingsPage() {
                             void run(async () => {
                                 const response = await fetch('/api/agent-mandates/local-kit/context', {
                                     method: 'DELETE',
-                                    headers: { 'x-mediflow-archive-generation': clientArchiveGeneration() },
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'x-mediflow-archive-generation': clientArchiveGeneration(),
+                                    },
                                 });
                                 if (!response.ok) throw new Error(await readFailureMessage(response));
                                 await refresh();
