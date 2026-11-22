@@ -94,9 +94,9 @@ test('automation PIN outside trusted browser transport, local token and forged l
     assert.equal(createAgentMandateStore(database).read(input.id), null);
 });
 
-test('12h1min and invalid curve point fail without a mandate', async () => {
+test('24h1min and invalid curve point fail without a mandate', async () => {
     const input = await candidate();
-    assert.equal((await post({ ...input, durationMs: 43260000 })).status, 400);
+    assert.equal((await post({ ...input, durationMs: 86460000 })).status, 400);
     const response = await post({ ...input, publicKey: 'B' + '/'.repeat(86) + '=' });
     assert.notEqual(response.status, 201);
     assert.equal(createAgentMandateStore(database).read(input.id), null);

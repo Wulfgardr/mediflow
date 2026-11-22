@@ -49,6 +49,7 @@ test('Agenti mandate PIN blocks a pasted passphrase with the passphrase message,
             '@/lib/agent-mandate-contract': { AGENT_OPERATIONS },
             '@/components/ui/confirm-dialog': { useConfirm: () => async () => ({ confirmed: false }) },
             '@/lib/agent-mandate-client': { generateMandateKeys: async () => ({ publicKey: 'k', wrappedPrivateKey: 'w' }) },
+            '@/lib/hooks/effects/use-agent-settings-load': { useAgentSettingsLoad: () => {} },
         },
         globals: {
             fetch: async (url: string, init?: { body?: string }) => {
@@ -104,6 +105,7 @@ test('Agenti renewal approval PIN blocks a pasted passphrase with the passphrase
             '@/lib/agent-mandate-contract': { AGENT_OPERATIONS },
             '@/components/ui/confirm-dialog': { useConfirm: () => async () => ({ confirmed: false }) },
             '@/lib/agent-mandate-client': { generateMandateKeys: async () => ({ publicKey: 'k', wrappedPrivateKey: 'w' }) },
+            '@/lib/hooks/effects/use-agent-settings-load': { useAgentSettingsLoad: () => {} },
         },
         globals: {
             fetch: async (url: string, init?: { body?: string }) => {
