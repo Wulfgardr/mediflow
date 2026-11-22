@@ -4,7 +4,6 @@ import nextTs from "eslint-config-next/typescript";
 import reactHooks from "eslint-plugin-react-hooks";
 import { EFFECT_EXEMPT_PATTERNS, EFFECT_RESTRICTIONS } from "./scripts/use-effect-ratchet.mjs";
 
-// @Codex: apply the existing Next lint contract to the package CommonJS sources.
 const packageCommonJsConfig = {
   ...nextVitals[0],
   name: "mediflow/web-auth-lifecycle-owner-commonjs",
@@ -19,7 +18,6 @@ const packageCommonJsConfig = {
   },
   rules: {
     ...nextVitals[0].rules,
-    // @Codex: CommonJS is the package contract, so require() is intentional here.
     "@typescript-eslint/no-require-imports": "off",
   },
 };
@@ -29,15 +27,10 @@ const eslintConfig = defineConfig([
   ...nextTs,
   packageCommonJsConfig,
   {
-    // @Codex: flat-config rules must declare their plugin in the same config object.
     plugins: { "react-hooks": reactHooks },
     rules: {
-      // @Codex: temporary downgrade to unblock delivery while typed refactors are phased in.
       "@typescript-eslint/no-explicit-any": "warn",
       "react-hooks/set-state-in-effect": "warn",
-      // Regole arrivate con eslint-plugin-react-hooks 7.1: segnalano dieci punti già presenti
-      // (ref letti o scritti durante il render, Date.now() nel render, funzioni usate prima
-      // della dichiarazione). Restano visibili come avvisi finché quei punti non sono corretti.
       "react-hooks/refs": "warn",
       "react-hooks/immutability": "warn",
       "react-hooks/purity": "warn",
@@ -52,14 +45,11 @@ const eslintConfig = defineConfig([
     files: EFFECT_EXEMPT_PATTERNS,
     rules: { "no-restricted-syntax": "off" },
   },
-  // Override default ignores of eslint-config-next.
   globalIgnores([
-    // Default ignores of eslint-config-next:
     ".next/**",
     "out/**",
     "build/**",
     "next-env.d.ts",
-    // @Codex: generated local test artifacts and local sandboxes
     "tmp/**",
     "tmp-*/**",
     "playwright-report/**",
@@ -76,11 +66,8 @@ const eslintConfig = defineConfig([
     "scripts/__pycache__/**",
     "native/MediFlowMac/.build/**",
     "native/MediFlowMac/Build/**",
-    // Cargo owns these generated dependency/build trees, which can change
-    // while the JavaScript source lint is running.
     "experiments/gpui-patient-pilot/target/**",
     "experiments/rust-boundary/target/**",
-    // Output minificato di scripts/build-dossier-worker.mjs: si corregge la sorgente, non il bundle.
     "experiments/gpui-patient-pilot/worker/dossier.bundle.mjs",
   ]),
 ]);
