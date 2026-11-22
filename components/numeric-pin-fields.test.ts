@@ -91,6 +91,39 @@ test('Agenti mandate PIN blocks a pasted passphrase with the passphrase message,
     assert.equal(sent[0].body.pin, '2468');
 });
 
+test('Agenti initial settings load does not clear a PIN entered before the refresh resolves', async () => {
+    const pinInput = await import('../lib/security/pin-input.ts').catch(() => null);
+    let initialLoad: (() => Promise<void>) | null = null;
+    const mounted = mountContract('app/settings/agenti/page.tsx', 'default', {
+        imports: {
+            ...sharedPinImports(pinInput ?? undefined),
+            '@/lib/agent-mandate-contract': { AGENT_OPERATIONS },
+            '@/components/ui/confirm-dialog': { useConfirm: () => async () => ({ confirmed: false }) },
+            '@/lib/agent-mandate-client': { generateMandateKeys: async () => ({ publicKey: 'k', wrappedPrivateKey: 'w' }) },
+            '@/lib/hooks/effects/use-agent-settings-load': {
+                useAgentSettingsLoad: (load: () => Promise<void>) => { initialLoad = load; },
+            },
+        },
+        globals: {
+            fetch: async (url: string) => {
+                if (url.endsWith('/local-kit')) {
+                    return new Response(JSON.stringify({ connected: false, active: false, kitPath: '/tmp/kit', agentRef: null, expiresAt: null, lastRenewalAt: null }), { status: 200 });
+                }
+                return new Response('[]', { status: 200 });
+            },
+            crypto: globalThis.crypto,
+        },
+    });
+    let tree = mounted.render();
+    assert.ok(initialLoad);
+    const pendingLoad = (initialLoad as () => Promise<void>)();
+    change(inputInsideLabel(tree, 'PIN di conferma'), '2468');
+    await pendingLoad;
+    tree = mounted.render();
+    assert.equal(inputInsideLabel(tree, 'PIN di conferma').props.value, '2468');
+    assert.equal(find(tree, node => node.type === 'button' && text(node).includes('Crea mandato')).props.disabled, false);
+});
+
 test('Agenti renewal approval PIN blocks a pasted passphrase with the passphrase message and accepts valid digits', async () => {
     const pinInput = await import('../lib/security/pin-input.ts').catch(() => null);
     const sent: Array<{ url: string; body: Record<string, unknown> }> = [];

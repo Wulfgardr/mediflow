@@ -74,12 +74,15 @@ export default function AgentSettingsPage() {
     const pinError = numericPinError(pin) ?? pinSubmitError;
     const approvalPinError = numericPinError(approvalPin) ?? approvalPinSubmitError;
     const localKitPinError = numericPinError(localKitPin) ?? localKitPinSubmitError;
-    async function run(action: () => Promise<void>) {
+    async function run(action: () => Promise<void>, clearPins = true) {
         setBusy(true); setError(null); setPinSubmitError(null); setApprovalPinSubmitError(null); setLocalKitPinSubmitError(null);
         try { await action(); } catch (failure) {
             setError(failure instanceof Error && failure.message && failure.message !== 'denied' ? failure.message : 'Operazione non riuscita. Riprova.');
         }
-        finally { setBusy(false); setPin(''); setApprovalPin(''); setLocalKitPin(''); }
+        finally {
+            setBusy(false);
+            if (clearPins) { setPin(''); setApprovalPin(''); setLocalKitPin(''); }
+        }
     }
     async function refresh() {
         const [response, requests, clients, kitResponse] = await Promise.all([
@@ -97,7 +100,7 @@ export default function AgentSettingsPage() {
         setKitPathDraft(nextKit.kitPath);
         setReadAt(Date.now());
     }
-    useAgentSettingsLoad(() => run(refresh));
+    useAgentSettingsLoad(() => refresh().catch(() => { setError('Operazione non riuscita. Riprova.'); }));
     const localKitConnected = Boolean(localKit?.connected);
     const localKitActive = Boolean(localKit?.connected && localKit.active && localKit.expiresAt && localKit.expiresAt > readAt);
     const localKitStatusText = localKit === null
@@ -112,7 +115,7 @@ export default function AgentSettingsPage() {
             <h2 id="agenti-title" className="[font:var(--type-section-heading)]">Agenti</h2>
             <div className="flex flex-wrap gap-2">
                 <Link href="/in-arrivo" className={SETTINGS_SECONDARY_BUTTON_CLASS}>In arrivo</Link>
-                <button className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy} onClick={() => { void run(refresh); }}>Aggiorna</button>
+                <button className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy} onClick={() => { void run(refresh, false); }}>Aggiorna</button>
             </div>
         </header>
         <nav aria-label="In questa pagina" className="flex flex-wrap gap-x-4 gap-y-2">
@@ -144,7 +147,7 @@ export default function AgentSettingsPage() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                     {localKit === null ? (
-                        <button type="button" className={SETTINGS_PRIMARY_BUTTON_CLASS} disabled={busy} onClick={() => { void run(refresh); }}>
+                        <button type="button" className={SETTINGS_PRIMARY_BUTTON_CLASS} disabled={busy} onClick={() => { void run(refresh, false); }}>
                             Leggi lo stato
                         </button>
                     ) : localKitConnected ? (
