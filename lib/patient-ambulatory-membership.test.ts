@@ -6,7 +6,8 @@ import path from 'node:path';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
-import { patients, patientsToAmbulatories } from './schema';
+import { ambulatories, patients, patientsToAmbulatories } from './schema';
+import { initializeSqliteSchema } from './sqlite-schema';
 import {
     normalizePrimaryAmbulatoryIdInput,
     resolvePrimaryAmbulatoryId,
@@ -18,53 +19,14 @@ const PATIENT_ID = 'pat-1';
 
 function createDb() {
     const sqlite = new Database(':memory:');
-    sqlite.exec(`
-        CREATE TABLE patients (
-            id TEXT PRIMARY KEY NOT NULL,
-            first_name TEXT NOT NULL,
-            last_name TEXT NOT NULL,
-            tax_code TEXT NOT NULL,
-            identifier_type TEXT NOT NULL DEFAULT 'cf',
-            birth_date_precision TEXT NOT NULL DEFAULT 'unknown',
-            birth_year INTEGER,
-            identifier_history TEXT NOT NULL DEFAULT '[]',
-            birth_date INTEGER,
-            address TEXT,
-            phone TEXT,
-            caregiver TEXT,
-            exemptions TEXT,
-            diagnoses TEXT,
-            allergies TEXT,
-            monitoring_profile TEXT,
-            status_reason TEXT,
-            notes TEXT,
-            ai_summary TEXT,
-            -- @Codex: keep the focused fixture aligned with every patients column Drizzle inserts.
-            ai_summary_generated_at INTEGER,
-            ai_summary_context_hash TEXT,
-            document_insights TEXT,
-            is_adi INTEGER DEFAULT 0,
-            is_archived INTEGER DEFAULT 0,
-            archive_reason TEXT,
-            archive_note TEXT,
-            version INTEGER NOT NULL DEFAULT 1,
-            deleted_at INTEGER,
-            deletion_reason TEXT,
-            ambulatory_id TEXT,
-            created_at INTEGER DEFAULT (unixepoch()),
-            updated_at INTEGER DEFAULT (unixepoch())
-        );
-        CREATE TABLE patients_to_ambulatories (
-            patient_id TEXT NOT NULL,
-            ambulatory_id TEXT NOT NULL,
-            assigned_at INTEGER,
-            PRIMARY KEY (patient_id, ambulatory_id)
-        );
-    `);
+    initializeSqliteSchema(sqlite);
     return drizzle(sqlite);
 }
 
 function seedPatient(db: ReturnType<typeof createDb>, ambulatoryIds: string[]) {
+    for (const id of new Set([...ambulatoryIds, 'amb-1', 'amb-2', 'amb-3'])) {
+        db.insert(ambulatories).values({ id, name: `Ambulatorio ${id}` }).onConflictDoNothing().run();
+    }
     db.insert(patients).values({
         id: PATIENT_ID,
         firstName: 'Mario',
