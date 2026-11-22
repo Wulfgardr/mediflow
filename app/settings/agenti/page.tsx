@@ -8,8 +8,44 @@ import type { AgentLocalKitStatus } from '@/lib/agent-local-kit-store';
 import { AGENT_OPERATIONS, MANDATE_MAX_DURATION_MS, type AgentMandate, type AgentMandateInput } from '@/lib/agent-mandate-contract';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { generateMandateKeys } from '@/lib/agent-mandate-client';
+import { useAgentSettingsLoad } from '@/lib/hooks/effects/use-agent-settings-load';
 import { isValidNumericPin, numericPinError, validateNumericPinSubmission } from '@/lib/security/pin-input';
 import { SETTINGS_INPUT_CLASS, SETTINGS_PRIMARY_BUTTON_CLASS, SETTINGS_SECONDARY_BUTTON_CLASS } from '@/components/settings/settings-ui';
+
+const LOCAL_KIT_ERROR_MESSAGES: Record<string, string> = {
+    LOCAL_KIT_PATH_INVALID: 'Cartella del kit non valida, inesistente o sincronizzata.',
+    LOCAL_KIT_CONNECTED: 'Scollega Codex prima di cambiare la cartella del kit.',
+    LOCAL_KIT_WRITE_FAILED: 'Impossibile scrivere le credenziali nella cartella del kit.',
+    LOCAL_KIT_NOT_CONNECTED: 'Collega prima Codex · Ambulatorio.',
+};
+
+function formatMandateExpiry(expiresAt: number, now: number): string {
+    const target = new Date(expiresAt);
+    const reference = new Date(now || Date.now());
+    const time = target.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+    const sameDay = target.getFullYear() === reference.getFullYear()
+        && target.getMonth() === reference.getMonth()
+        && target.getDate() === reference.getDate();
+    if (sameDay) return `fino alle ${time}`;
+    const tomorrow = new Date(reference.getFullYear(), reference.getMonth(), reference.getDate() + 1);
+    const isTomorrow = target.getFullYear() === tomorrow.getFullYear()
+        && target.getMonth() === tomorrow.getMonth()
+        && target.getDate() === tomorrow.getDate();
+    if (isTomorrow) return `fino a domani alle ${time}`;
+    const day = target.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' });
+    return `fino al ${day} alle ${time}`;
+}
+
+async function readFailureMessage(response: Response): Promise<string> {
+    try {
+        const body = await response.json() as { code?: unknown };
+        if (typeof body?.code === 'string' && body.code in LOCAL_KIT_ERROR_MESSAGES) {
+            return LOCAL_KIT_ERROR_MESSAGES[body.code];
+        }
+    } catch {
+    }
+    return 'Operazione non riuscita. Riprova.';
+}
 
 export default function AgentSettingsPage() {
     const confirm = useConfirm();
@@ -21,7 +57,7 @@ export default function AgentSettingsPage() {
     const [approvalPin, setApprovalPin] = useState('');
     const [readAt, setReadAt] = useState(0);
     const [pin, setPin] = useState('');
-    const [hours, setHours] = useState('12');
+    const [hours, setHours] = useState('24');
     const [provider, setProvider] = useState<AgentMandateInput['provider']>('openai');
     const [egress, setEgress] = useState(false);
     const [busy, setBusy] = useState(false);
@@ -40,7 +76,9 @@ export default function AgentSettingsPage() {
     const localKitPinError = numericPinError(localKitPin) ?? localKitPinSubmitError;
     async function run(action: () => Promise<void>) {
         setBusy(true); setError(null); setPinSubmitError(null); setApprovalPinSubmitError(null); setLocalKitPinSubmitError(null);
-        try { await action(); } catch { setError('Operazione non riuscita. Riprova.'); }
+        try { await action(); } catch (failure) {
+            setError(failure instanceof Error && failure.message && failure.message !== 'denied' ? failure.message : 'Operazione non riuscita. Riprova.');
+        }
         finally { setBusy(false); setPin(''); setApprovalPin(''); setLocalKitPin(''); }
     }
     async function refresh() {
@@ -59,14 +97,16 @@ export default function AgentSettingsPage() {
         setKitPathDraft(nextKit.kitPath);
         setReadAt(Date.now());
     }
+    useAgentSettingsLoad(() => run(refresh));
     const localKitConnected = Boolean(localKit?.connected);
+    const localKitActive = Boolean(localKit?.connected && localKit.active && localKit.expiresAt && localKit.expiresAt > readAt);
     const localKitStatusText = localKit === null
-        ? 'Stato da leggere'
+        ? 'Lettura stato in corso'
         : !localKitConnected
         ? 'Non collegato'
-        : localKit?.expiresAt && localKit.expiresAt > readAt
-            ? `Collegato · fino alle ${new Date(localKit.expiresAt).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`
-            : 'Collegato · rinnovo allo sblocco';
+        : localKitActive && localKit.expiresAt
+            ? `Collegato · attivo ${formatMandateExpiry(localKit.expiresAt, readAt)}`
+            : 'Collegato · mandato da rinnovare';
     return <section aria-labelledby="agenti-title" className="mx-auto max-w-3xl space-y-6">
         <header className="space-y-3">
             <h2 id="agenti-title" className="[font:var(--type-section-heading)]">Agenti</h2>
@@ -83,11 +123,24 @@ export default function AgentSettingsPage() {
             {registrations.length > 0 ? <a href="#client" className="font-semibold">Client registrati</a> : null}
             <a href="#mandati" className="font-semibold">Mandati</a>
         </nav>
-        <section id="codex-ambulatorio" aria-labelledby="codex-ambulatorio-title" className="space-y-4 border-b pb-6">
+        <section id="codex-ambulatorio" aria-labelledby="codex-ambulatorio-title" className="space-y-4 border-b border-[var(--lume-rule)] pb-6">
             <div className="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                    <h3 id="codex-ambulatorio-title" className="[font:var(--type-section-heading)]">Codex · Ambulatorio</h3>
+                <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <h3 id="codex-ambulatorio-title" className="[font:var(--type-section-heading)]">Codex · Ambulatorio</h3>
+                        {localKit !== null ? (
+                            <span className="rounded-full border border-[var(--lume-rule)] px-2 py-0.5 [font:var(--type-record-meta)]" style={{ color: localKitActive ? 'var(--lume-signal-success)' : localKitConnected ? 'var(--lume-signal-warning)' : 'var(--lume-ink-muted)' }}>
+                                {localKitActive ? 'Attivo' : localKitConnected ? 'Da rinnovare' : 'Non collegato'}
+                            </span>
+                        ) : null}
+                    </div>
                     <p>{localKitStatusText}</p>
+                    {localKitConnected ? (
+                        <p className="[font:var(--type-meta)] text-[var(--lume-ink-muted)]">
+                            Registrazione permanente · mandato di 24 ore con rinnovo automatico allo sblocco
+                            {localKit?.lastRenewalAt ? ` · ultimo rinnovo ${new Date(localKit.lastRenewalAt).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' })}` : ''}
+                        </p>
+                    ) : null}
                 </div>
                 <div className="flex flex-wrap gap-2">
                     {localKit === null ? (
@@ -95,28 +148,46 @@ export default function AgentSettingsPage() {
                             Leggi lo stato
                         </button>
                     ) : localKitConnected ? (
-                        <button
-                            type="button"
-                            className={SETTINGS_SECONDARY_BUTTON_CLASS}
-                            disabled={busy}
-                            onClick={async () => {
-                                const answer = await confirm({
-                                    title: 'Scollegare Codex · Ambulatorio?',
-                                    message: 'Revoca mandato e credenziali del kit.',
-                                    confirmLabel: 'Scollega',
-                                    tone: 'danger',
-                                });
-                                if (!answer.confirmed) return;
-                                await run(async () => {
-                                    const response = await fetch('/api/agent-mandates/local-kit', { method: 'DELETE' });
-                                    if (!response.ok) throw new Error('denied');
-                                    setLocalKitConfirming(false);
-                                    await refresh();
-                                });
-                            }}
-                        >
-                            Scollega
-                        </button>
+                        <>
+                            {!localKitActive ? (
+                                <button
+                                    type="button"
+                                    className={SETTINGS_PRIMARY_BUTTON_CLASS}
+                                    disabled={busy}
+                                    onClick={() => {
+                                        void run(async () => {
+                                            const response = await fetch('/api/agent-mandates/local-kit', { method: 'PATCH' });
+                                            if (!response.ok) throw new Error(await readFailureMessage(response));
+                                            await refresh();
+                                        });
+                                    }}
+                                >
+                                    Rinnova ora
+                                </button>
+                            ) : null}
+                            <button
+                                type="button"
+                                className={SETTINGS_SECONDARY_BUTTON_CLASS}
+                                disabled={busy}
+                                onClick={async () => {
+                                    const answer = await confirm({
+                                        title: 'Scollegare Codex · Ambulatorio?',
+                                        message: 'Revoca mandato e credenziali del kit.',
+                                        confirmLabel: 'Scollega',
+                                        tone: 'danger',
+                                    });
+                                    if (!answer.confirmed) return;
+                                    await run(async () => {
+                                        const response = await fetch('/api/agent-mandates/local-kit', { method: 'DELETE' });
+                                        if (!response.ok) throw new Error(await readFailureMessage(response));
+                                        setLocalKitConfirming(false);
+                                        await refresh();
+                                    });
+                                }}
+                            >
+                                Scollega
+                            </button>
+                        </>
                     ) : (
                         <button
                             type="button"
@@ -134,7 +205,7 @@ export default function AgentSettingsPage() {
                 </div>
             </div>
             {localKitConfirming && localKit !== null && !localKitConnected && (
-                <form className="space-y-4 border p-4" onSubmit={event => {
+                <form className="space-y-4 rounded-lg border border-[var(--lume-rule)] p-4" onSubmit={event => {
                     event.preventDefault();
                     const problem = validateNumericPinSubmission(localKitPin);
                     if (problem) { setLocalKitPinSubmitError(problem); return; }
@@ -157,12 +228,12 @@ export default function AgentSettingsPage() {
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(payload),
                         });
-                        if (!response.ok) throw new Error('denied');
+                        if (!response.ok) throw new Error(await readFailureMessage(response));
                         setLocalKitConfirming(false);
                         await refresh();
                     });
                 }}>
-                    <p>OpenAI (Codex) con passaggio di documenti e trascrizioni. Si rinnova a ogni sblocco.</p>
+                    <p>OpenAI (Codex) con passaggio di documenti e trascrizioni. Registrazione permanente con mandato di 24 ore rinnovato a ogni sblocco.</p>
                     <ul className="list-disc pl-5 text-sm">
                         {operationLabels.map(label => <li key={label}>{label}</li>)}
                     </ul>
@@ -197,7 +268,7 @@ export default function AgentSettingsPage() {
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ kitPath: kitPathDraft.trim() }),
                         });
-                        if (!response.ok) throw new Error('denied');
+                        if (!response.ok) throw new Error(await readFailureMessage(response));
                         await refresh();
                     });
                 }}>
@@ -230,7 +301,7 @@ export default function AgentSettingsPage() {
             });
         }}>
             <h3 id="mandato-nuovo-title" className="[font:var(--type-section-heading)]">Nuovo mandato</h3>
-            <label className="block">Durata in ore<input className={SETTINGS_INPUT_CLASS} type="number" min="1" max="12" required value={hours} onChange={event => setHours(event.target.value)} /></label>
+            <label className="block">Durata in ore<input className={SETTINGS_INPUT_CLASS} type="number" min="1" max="24" required value={hours} onChange={event => setHours(event.target.value)} /></label>
             <label className="block">Fornitore<select className={SETTINGS_INPUT_CLASS} value={provider} onChange={event => { setProvider(event.target.value as typeof provider); setEgress(false); }}>
                 <option value="openai">OpenAI (Codex)</option><option value="anthropic">Anthropic</option><option value="local">Locale</option>
             </select></label>
@@ -238,7 +309,7 @@ export default function AgentSettingsPage() {
             <fieldset><legend>Operazioni consentite</legend>{AGENT_OPERATIONS.map((operation, index) => <label className="flex gap-2" key={operation}>
                 <input type="checkbox" checked={operations.includes(operation)} onChange={event => setOperations(current => event.target.checked ? [...current, operation] : current.filter(value => value !== operation))} />{operationLabels[index]}
             </label>)}</fieldset>
-            <p>Nota, trascrizione e PDF verificati entrano nella scheda allo sblocco. Le proposte cliniche attendono la tua conferma.</p>
+            <p>Nota, trascrizione, PDF e proposte attendono la tua conferma in «In arrivo».</p>
             <label className="block">PIN di conferma<input className={SETTINGS_INPUT_CLASS} type="password" inputMode="numeric" autoComplete="off" required aria-invalid={Boolean(pinError)} aria-describedby={pinError ? 'agent-mandate-pin-error' : undefined} value={pin} onChange={event => {
                 setPin(event.target.value); setPinSubmitError(null);
             }} /></label>
@@ -253,13 +324,13 @@ export default function AgentSettingsPage() {
                     && pairing.operations.every(operation => mandate.operations.includes(operation)));
                 const selected = compatible.find(mandate => mandate.id === selectedMandates[pairing.id])?.id ?? compatible[0]?.id ?? '';
                 const renewOnUnlock = renewing === pairing.id;
-                return <li className="space-y-3 border-b py-4" key={pairing.id}>
+                return <li className="space-y-3 border-b border-[var(--lume-rule)] py-4" key={pairing.id}>
                     <h3>{pairing.name} <strong>{pairing.code}</strong></h3>
                     <p>{pairing.operations.map(operation => operationLabels[AGENT_OPERATIONS.indexOf(operation)]).join(', ')}</p>
                     <label className="block">Mandato per {pairing.name}<select className={SETTINGS_INPUT_CLASS} value={selected}
                         onChange={event => setSelectedMandates(current => ({ ...current, [pairing.id]: event.target.value }))}>
                         {!compatible.length && <option value="">Crea un mandato con queste operazioni</option>}
-                        {compatible.map(mandate => <option key={mandate.id} value={mandate.id}>{mandate.provider} · {new Date(mandate.expiresAt).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</option>)}
+                        {compatible.map(mandate => <option key={mandate.id} value={mandate.id}>{mandate.provider} · {formatMandateExpiry(mandate.expiresAt, readAt)}</option>)}
                     </select></label>
                     <label className="flex gap-2">
                         <input type="checkbox" checked={renewOnUnlock} onChange={event => {
@@ -267,7 +338,7 @@ export default function AgentSettingsPage() {
                         }} />Rinnova allo sblocco
                     </label>
                     {renewOnUnlock && <>
-                        <p>Dal prossimo sblocco il client riceve un mandato di 12 ore con queste operazioni, finché l’accesso resta attivo.</p>
+                        <p>Dal prossimo sblocco il client riceve un mandato di 24 ore con queste operazioni, finché l’accesso resta attivo.</p>
                         <label className="block">PIN per {pairing.name}<input className={SETTINGS_INPUT_CLASS} type="password"
                             inputMode="numeric" autoComplete="off" aria-invalid={Boolean(approvalPinError)} value={approvalPin} onChange={event => {
                                 setApprovalPin(event.target.value); setApprovalPinSubmitError(null);
@@ -308,7 +379,7 @@ export default function AgentSettingsPage() {
         </section>}
         <section id="mandati" className="space-y-3"><h3 className="[font:var(--type-section-heading)]">Mandati</h3>
             <ul>{mandates.map(mandate => <li key={mandate.id} className="flex items-center justify-between gap-4 py-2">
-                <span>{mandate.provider} · {mandate.revokedAt !== null ? 'Revocato' : mandate.expiresAt <= readAt ? 'Scaduto' : `Fino alle ${new Date(mandate.expiresAt).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`}</span>
+                <span>{mandate.provider} · {mandate.revokedAt !== null ? 'Revocato' : mandate.expiresAt <= readAt ? 'Scaduto' : formatMandateExpiry(mandate.expiresAt, readAt)}</span>
                 {mandate.revokedAt === null && <button className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy} onClick={async () => {
                     const answer = await confirm({ title: 'Revocare il mandato?', message: mandate.provider, confirmLabel: 'Conferma revoca', tone: 'danger' });
                     if (!answer.confirmed) return;

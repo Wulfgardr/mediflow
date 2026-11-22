@@ -18,7 +18,7 @@ visita confermata. L'orario non identifica il paziente.
 
 Il medico crea un mandato nella UI fidata dopo lo sblocco con la credenziale
 dell’account e la conferma con PIN. Sceglie durata, operazioni consentite e fornitore del
-modello. La durata massima è 12 ore. Il fornitore attuale è OpenAI tramite
+modello. La durata massima è 24 ore. Il fornitore attuale è OpenAI tramite
 Codex. Il mandato deve dichiarare l'eventuale passaggio di trascrizione e
 documenti a quel fornitore e le ricevute devono registrarlo. Un abbonamento
 all'host non costituisce una credenziale API del provider.
@@ -55,7 +55,7 @@ un client, confermando col PIN il perimetro, il fornitore e l’eventuale
 passaggio di documenti e trascrizioni già scelti. Ogni sblocco riuscito
 con PIN o passphrase e ogni «Rinnova accesso» che ottiene la chiave da
 un’altra scheda confermano il gesto nella sessione Web corrente. Il server
-emette un mandato di 12 ore per ciascun client registrato, con il perimetro
+emette un mandato di 24 ore per ciascun client registrato, con il perimetro
 approvato. Riusa la chiave pubblica e l’involucro registrati. La conferma
 trasporta solo il ticket di login o l’identificativo del gesto, legato
 alla stessa sessione e alla stessa generazione di archivio.

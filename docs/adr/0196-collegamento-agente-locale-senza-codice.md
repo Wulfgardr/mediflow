@@ -58,7 +58,7 @@ che il medico compie gia dentro MediFlow sbloccato.
      aggiornando soltanto il campo `agente` (`agentRef` al collegamento, `null`
      allo scollegamento) e preservando invariati tutti gli altri campi.
 4. **Mandato, rinnovo e assenza di segreti nei log.** In una sola transazione
-   SQLite `IMMEDIATE` il server crea il mandato iniziale di 12 ore, la
+   SQLite `IMMEDIATE` il server crea il mandato iniziale di 24 ore, la
    registrazione rinnovabile allo sblocco e il client attivo per l'uso immediato.
    I token `mfa_...` e `mfr_...` non compaiono mai nelle risposte HTTP, nei log
    o nell'audit. Se la scrittura dei file nella cartella del kit fallisce, il
