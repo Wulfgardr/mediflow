@@ -6,10 +6,31 @@ import { spawnSync } from 'node:child_process';
 import assert from 'node:assert/strict';
 
 const root = path.resolve(import.meta.dirname, '..');
-const jar = process.env.TLA_JAR || path.join(os.homedir(), '.codex/tools/tlaplus/1.7.4/tla2tools.jar');
 const expectedJar = '936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88';
+const tlaReleaseUrl = 'https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar';
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
-assert.equal(hash(fs.readFileSync(jar)), expectedJar, 'TLC artifact differs from pinned v1.7.4 / TLC 2.19');
+async function resolveTlaJar() {
+    for (const candidate of [
+        process.env.TLA_JAR,
+        path.join(os.homedir(), '.codex/tools/tlaplus/1.7.4/tla2tools.jar'),
+        path.join(process.env.MEDIFLOW_TLA_CACHE || path.join(os.homedir(), '.cache/mediflow-formal/tla/v1.7.4'), 'tla2tools.jar'),
+    ]) {
+        if (candidate && fs.existsSync(candidate)) {
+            assert.equal(hash(fs.readFileSync(candidate)), expectedJar, 'TLC artifact differs from pinned v1.7.4 / TLC 2.19');
+            return candidate;
+        }
+    }
+    const cacheDir = process.env.MEDIFLOW_TLA_CACHE || path.join(os.homedir(), '.cache/mediflow-formal/tla/v1.7.4');
+    fs.mkdirSync(cacheDir, { recursive: true });
+    const cachedJar = path.join(cacheDir, 'tla2tools.jar');
+    const response = await fetch(tlaReleaseUrl, { signal: AbortSignal.timeout(30_000) });
+    if (!response.ok) throw new Error(`Official TLC download failed: ${response.status}`);
+    const bytes = Buffer.from(await response.arrayBuffer());
+    assert.equal(hash(bytes), expectedJar, 'Downloaded TLC artifact differs from pinned v1.7.4 / TLC 2.19');
+    fs.writeFileSync(cachedJar, bytes, { flag: 'wx' });
+    return cachedJar;
+}
+const jar = await resolveTlaJar();
 const owned = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-cu1a-verification-'));
 const evidence = [];
 const outputDirectory = process.env.MEDIFLOW_FORMAL_OUTPUT;
