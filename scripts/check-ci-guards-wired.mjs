@@ -11,7 +11,6 @@ export const EXEMPT_CI_GUARDS = Object.freeze({
     'check:standalone-runtime-bundle': 'Runs via package.json postbuild during npm run build in web-core.yml and e2e.yml.',
     'check:terminology-parity': 'Split across three CI phases: web-core.yml (test:unit), e2e.yml (test:network:home-base-catalog-read), and apple-native.yml (assert-apple-terminology-tests.sh).',
     'check:web-auth-lifecycle-owner-boundary': 'All four boundary test files run unconditionally in npm run test:unit (web-core.yml).',
-    'verify:local-operation': 'Local TLA+/TLC formal verifier pending shared TLC setup in web-core.yml.',
     'verify:specialist-operation': 'Local specialist vertical verifier requiring TLC and browser runtime.',
 });
 
