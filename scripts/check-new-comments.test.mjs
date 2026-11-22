@@ -199,3 +199,22 @@ test('ignora testo JSX, espressioni regolari e template che contengono marcatori
 
     assert.deepEqual(flagged(), []);
 });
+
+test('blocca i marcatori @Codex anche nei doc comment, nei triple-slash e nelle righe con link', (t) => {
+    const { write, flagged } = fixtureRepo(t);
+    write('marker.ts', [
+        '/** @Codex nota di agente */',
+        'export function a() { return 1; }',
+        '/// @Codex doc comment',
+        'export const b = 2;',
+        '// @Codex https://example.org/spec',
+        'export const c = 3;',
+        '',
+    ].join('\n'));
+    write('marker.rs', '/// @Codex marcatore Rust\npub fn f() {}\n');
+    const got = flagged();
+    assert.ok(got.includes('/** @Codex nota di agente */'));
+    assert.ok(got.includes('/// @Codex doc comment'));
+    assert.ok(got.includes('// @Codex https://example.org/spec'));
+    assert.ok(got.includes('/// @Codex marcatore Rust'));
+});

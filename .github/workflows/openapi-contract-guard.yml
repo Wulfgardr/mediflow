@@ -88,6 +88,21 @@ jobs:
         run: |
           npm run test:test-fake-schema-ratchet
           npm run check:test-fake-schema-ratchet
+      - name: Attachment currentness writer guard and tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          npm run test:attachment-currentness-writers
+          npm run check:attachment-currentness-writers
+      - name: AnyDoc local-only guard and tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          npm run test:anydoc-local-only
+          npm run check:anydoc-local-only
+      - name: CI guard wiring check and tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          npm run test:ci-guards-wired
+          npm run check:ci-guards-wired
 
       - name: Fabric generative runtime crosswalk
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
