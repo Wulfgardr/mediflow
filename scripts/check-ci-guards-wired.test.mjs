@@ -54,6 +54,7 @@ test('ignores commented-out, disabled, and continue-on-error workflow steps', (t
             'check:commented': 'node a.mjs',
             'check:disabled': 'node b.mjs',
             'check:soft-fail': 'node c.mjs',
+            'check:soft-fail-expr': 'node c2.mjs',
             'verify:formal-model': 'node d.mjs',
         },
         [
@@ -66,17 +67,20 @@ test('ignores commented-out, disabled, and continue-on-error workflow steps', (t
             '      - run: |',
             '          # npm run check:commented',
             '          echo ok',
-            '      - if: false',
+            '      - if: FALSE',
             '        run: npm run check:disabled',
             '      - continue-on-error: true',
             '        run: npm run check:soft-fail',
+            '      - continue-on-error: ${{ true }}',
+            '        run: npm run check:soft-fail-expr',
         ].join('\n'),
     );
     const result = checkCiGuardsWired(root, {});
-    assert.equal(result.errors.length, 4);
+    assert.equal(result.errors.length, 5);
     assert.match(result.errors.join('\n'), /UNWIRED_GUARD: check:commented/);
     assert.match(result.errors.join('\n'), /UNWIRED_GUARD: check:disabled/);
-    assert.match(result.errors.join('\n'), /UNWIRED_GUARD: check:soft-fail/);
+    assert.match(result.errors.join('\n'), /UNWIRED_GUARD: check:soft-fail\b/);
+    assert.match(result.errors.join('\n'), /UNWIRED_GUARD: check:soft-fail-expr/);
     assert.match(result.errors.join('\n'), /UNWIRED_GUARD: verify:formal-model[\s\S]*web-core\.yml/);
 });
 
