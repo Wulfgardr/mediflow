@@ -83,6 +83,11 @@ jobs:
         run: |
           npm run test:pairing-state-writers
           npm run check:pairing-state-writers
+      - name: Test fake-schema ratchet and tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          npm run test:test-fake-schema-ratchet
+          npm run check:test-fake-schema-ratchet
 
       - name: Fabric generative runtime crosswalk
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
