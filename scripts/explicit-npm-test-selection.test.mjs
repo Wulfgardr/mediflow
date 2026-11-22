@@ -248,6 +248,7 @@ test('ten required npm script bodies and CI bindings select the actual independe
     'npm:test:lume-tokens': ['scripts/check-lume-tokens.test.mjs'],
     'npm:test:new-comments': ['scripts/check-new-comments.test.mjs'],
     'npm:test:use-effect-ratchet': ['scripts/use-effect-ratchet.test.mjs'],
+    'npm:test:pairing-state-writers': ['scripts/check-pairing-state-writers.test.mjs'],
   });
   for (const suite of Object.values(actual)) assert.deepEqual(suite.errors, []);
   assert.equal(actual['npm:test:native-launcher'].binding.stepIf, "runner.os == 'macOS'");
@@ -256,6 +257,7 @@ test('ten required npm script bodies and CI bindings select the actual independe
   assert.deepEqual(actual['npm:test:usage-dashboard'].binding.commands, ['test:usage-dashboard', 'check:usage-dashboard']);
   assert.deepEqual(actual['npm:test:new-comments'].binding.commands, ['test:new-comments', 'check:new-comments']);
   assert.deepEqual(actual['npm:test:use-effect-ratchet'].binding.commands, ['test:use-effect-ratchet', 'check:use-effect-ratchet']);
+  assert.deepEqual(actual['npm:test:pairing-state-writers'].binding.commands, ['test:pairing-state-writers', 'check:pairing-state-writers']);
   assert.equal(collectUnitTestFiles(sourceRoot).filter(file => file === 'scripts/explicit-npm-test-selection.test.mjs').length, 1);
 });
 
