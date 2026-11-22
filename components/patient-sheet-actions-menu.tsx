@@ -12,13 +12,14 @@ type PatientSheetActionsMenuProps = {
     onExportFhir: () => void;
     onShareFhir: () => void;
     onReportPdf: () => void;
+    onSendToCodex?: () => void;
     leadingActions?: readonly { label: string; onSelect: () => void }[];
     triggerRef?: RefObject<HTMLButtonElement | null>;
     onOpen?: () => void;
 };
 
 export function PatientSheetActionsMenu({ editHref, canShareFhirFile, onExportFhir, onShareFhir,
-    onReportPdf, leadingActions = [], triggerRef: suppliedRef, onOpen }: PatientSheetActionsMenuProps) {
+    onReportPdf, onSendToCodex, leadingActions = [], triggerRef: suppliedRef, onOpen }: PatientSheetActionsMenuProps) {
     return <PatientSheetMenu label="Azioni scheda" triggerRef={suppliedRef} onOpen={onOpen}
         trigger={props => <Button {...props} variant="secondary" aria-label="Azioni" title="Azioni della scheda"><MoreHorizontal size={16} aria-hidden="true" /></Button>}>
         {leadingActions.map(action => <button key={action.label} type="button" role="menuitem" tabIndex={-1}
@@ -27,6 +28,7 @@ export function PatientSheetActionsMenu({ editHref, canShareFhirFile, onExportFh
         <button type="button" role="menuitem" tabIndex={-1} className="mf-popover-row" onClick={onExportFhir}>Esporta FHIR</button>
         {canShareFhirFile ? <button type="button" role="menuitem" tabIndex={-1} className="mf-popover-row" onClick={onShareFhir}>Condividi FHIR</button> : null}
         <button type="button" role="menuitem" tabIndex={-1} className="mf-popover-row" onClick={onReportPdf}>Report PDF</button>
+        {onSendToCodex ? <button type="button" role="menuitem" tabIndex={-1} className="mf-popover-row" onClick={onSendToCodex}>Invia a Codex</button> : null}
         <Link href={editHref} role="menuitem" tabIndex={-1} className="mf-popover-row">Archivia</Link>
     </PatientSheetMenu>;
 }

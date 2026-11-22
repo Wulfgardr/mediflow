@@ -1956,6 +1956,17 @@
       "classification": "agent-registration-host"
     },
     {
+      "file": "app/api/agent-mandates/local-kit/context/route.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "openDbServer"
+      ],
+      "count": 1,
+      "classification": "agent-registration-host"
+    },
+    {
       "file": "app/api/agent-mandates/unlock/route.ts",
       "target": "lib/db-server.ts",
       "capability": "server:lib/db-server.ts",

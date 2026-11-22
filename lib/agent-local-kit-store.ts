@@ -213,5 +213,15 @@ export function createAgentLocalKitStore(database: Database.Database, now = Date
                 return { agentRef };
             }).immediate();
         },
+        recordContextAudit(eventType: 'agent.context.exported' | 'agent.context.cleared', actorRef: string, subjectRef: string, generation: string): void {
+            database.transaction(() => {
+                if (readSqliteArchiveGeneration(database) !== generation) throw new ArchiveReplacedError();
+                const time = now();
+                database.prepare(`INSERT INTO audit_events(event_id,schema_version,event_type,occurred_at,outcome,actor_type,actor_ref,
+                    subject_type,subject_ref,source_surface,created_at)
+                    VALUES (?,1,?,?,'success','user',?,'agent_operation',?,'web',?)`)
+                    .run(randomUUID(), eventType, time, actorRef, subjectRef, Math.floor(time / 1000));
+            }).immediate();
+        },
     };
 }
