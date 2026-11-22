@@ -2,9 +2,9 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-OUT_DIR="$ROOT_DIR/tmp-patient-ambulatory-membership-test"
+DATA_DIR="$(mktemp -d "${TMPDIR:-/tmp}/mediflow-patient-ambulatory-membership.XXXXXX")"
+trap 'rm -rf -- "$DATA_DIR"' EXIT
 
-trap 'node -e "require('\''fs'\'').rmSync(process.argv[1], { recursive: true, force: true })" "$OUT_DIR"' EXIT
-node -e "require('fs').rmSync(process.argv[1], { recursive: true, force: true })" "$OUT_DIR"
-npx tsc -p "$ROOT_DIR/tsconfig.patient-ambulatory-membership-test.json"
-node --test "$OUT_DIR/lib/patient-ambulatory-membership.test.js"
+MEDIFLOW_DATA_DIR="${MEDIFLOW_DATA_DIR:-$DATA_DIR}" \
+MEDIFLOW_E2E_DISABLE_LEGACY_COPY=1 \
+  node "$ROOT_DIR/scripts/run-strip-types.mjs" --test "$ROOT_DIR/lib/patient-ambulatory-membership.test.ts"
