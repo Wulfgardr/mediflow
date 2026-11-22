@@ -12,10 +12,10 @@ import { agentReviewFieldLabels as fieldLabels, agentReviewFieldValues as fieldV
 type VisitItem = AgentVisitReview['visit']['items'][number];
 
 const SOAP_LABELS: Record<string, string> = {
-    S: 'S · Soggettivo',
-    O: 'O · Obiettivo',
-    A: 'A · Valutazione',
-    P: 'P · Piano',
+    S: 'Soggettivo',
+    O: 'Obiettivo',
+    A: 'Valutazione',
+    P: 'Piano',
 };
 
 function parseSoapSections(text: string): Array<{ key: string; label: string; body: string }> | null {
@@ -25,7 +25,7 @@ function parseSoapSections(text: string): Array<{ key: string; label: string; bo
         const match = /^\s*([SOAP])\s*:\s*(.*)$/u.exec(rawLine);
         if (match) {
             const key = match[1]!;
-            sections.push({ key, label: SOAP_LABELS[key] ?? key, body: match[2] ? [match[2]] : [] });
+            sections.push({ key, label: SOAP_LABELS[key] ?? key, body: [rawLine.trim()] });
         } else if (sections.length > 0) {
             sections[sections.length - 1]!.body.push(rawLine);
         } else if (rawLine.trim()) {
@@ -165,7 +165,7 @@ function UnlockedIncoming() {
 
                 {pdfItems.length > 0 && (
                     <div className="space-y-2">
-                        <h3 className="[font:var(--type-record-label)] text-[var(--lume-ink-muted)]">Documenti PDF</h3>
+                        <h3 className="[font:var(--type-record-label)] text-[var(--lume-ink-muted)]">PDF</h3>
                         <div className="flex flex-wrap gap-2">
                             {pdfItems.map(item => typeof item.value.name === 'string' && (
                                 <button key={item.id} type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={openingPdf}
@@ -210,12 +210,12 @@ function UnlockedIncoming() {
                                 return <article key={item.id} className="min-w-0 space-y-3 rounded-lg border border-[var(--lume-rule)] p-4">
                                     <div className="flex flex-wrap items-baseline justify-between gap-2">
                                         <div className="space-y-0.5">
-                                            <p className="[font:var(--type-record-label)] text-[var(--lume-ink-muted)]">{agentReviewItemLabels[item.kind]}</p>
-                                            <h4 className="[font:var(--type-strong)]">{proposalHeadline(item)}</h4>
+                                            <h3 className="[font:var(--type-record-label)] text-[var(--lume-ink-muted)]">{agentReviewItemLabels[item.kind]}</h3>
+                                            <p className="[font:var(--type-strong)]">{proposalHeadline(item)}</p>
                                         </div>
                                         {sourceFileName ? (
                                             sourcePdfId ? (
-                                                <button type="button" className="underline [font:var(--type-meta)] text-[var(--lume-ink-muted)]" disabled={openingPdf}
+                                                <button type="button" aria-label={`Apri ${sourceFileName}`} className="underline [font:var(--type-meta)] text-[var(--lume-ink-muted)]" disabled={openingPdf}
                                                     onClick={() => { void showPdf(visit.cassette.id, visit.cassette.revision, sourcePdfId); }}>
                                                     {sourceFileName}
                                                 </button>
