@@ -17,7 +17,12 @@ export const EXEMPT_CI_GUARDS = Object.freeze({
 
 function isDisabled(condition) {
     if (condition === false) return true;
-    return typeof condition === 'string' && /^(?:false|\$\{\{\s*false\s*\}\})$/u.test(condition.trim());
+    return typeof condition === 'string' && /^(?:false|\$\{\{\s*false\s*\}\})$/iu.test(condition.trim());
+}
+
+function isContinueOnError(value) {
+    if (value === true) return true;
+    return typeof value === 'string' && /^(?:true|\$\{\{\s*true\s*\}\})$/iu.test(value.trim());
 }
 
 function extractNpmRuns(runScript) {
@@ -43,10 +48,10 @@ export function collectWiredCiScripts(root) {
         const parsed = load(fs.readFileSync(path.join(workflowsDir, entry.name), 'utf8'), { schema: JSON_SCHEMA });
         if (!parsed || typeof parsed !== 'object' || !parsed.jobs || typeof parsed.jobs !== 'object') continue;
         for (const job of Object.values(parsed.jobs)) {
-            if (!job || typeof job !== 'object' || isDisabled(job.if) || job['continue-on-error'] === true) continue;
+            if (!job || typeof job !== 'object' || isDisabled(job.if) || isContinueOnError(job['continue-on-error'])) continue;
             if (!Array.isArray(job.steps)) continue;
             for (const step of job.steps) {
-                if (!step || typeof step !== 'object' || isDisabled(step.if) || step['continue-on-error'] === true) continue;
+                if (!step || typeof step !== 'object' || isDisabled(step.if) || isContinueOnError(step['continue-on-error'])) continue;
                 for (const name of extractNpmRuns(step.run)) wired.add(name);
             }
         }
