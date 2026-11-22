@@ -235,7 +235,7 @@ console.log(JSON.stringify(result.files));`;
   assert.deepEqual(JSON.parse(result.stdout), [claimsFile]);
 });
 
-test('ten required npm script bodies and CI bindings select the actual independent expected paths', () => {
+test('required npm script bodies and CI bindings select the actual independent expected paths', () => {
   const actual = collectExplicitNpmSelections(sourceRoot);
   assert.deepEqual(Object.fromEntries(Object.entries(actual).map(([id, value]) => [id, value.files])), {
     'npm:test:launcher-helpers': ['scripts/launcher-helpers.test.mjs', 'scripts/windows-system-command.test.mjs'],
@@ -250,6 +250,9 @@ test('ten required npm script bodies and CI bindings select the actual independe
     'npm:test:use-effect-ratchet': ['scripts/use-effect-ratchet.test.mjs'],
     'npm:test:pairing-state-writers': ['scripts/check-pairing-state-writers.test.mjs'],
     'npm:test:test-fake-schema-ratchet': ['scripts/check-test-fake-schema-ratchet.test.mjs'],
+    'npm:test:attachment-currentness-writers': ['scripts/check-attachment-currentness-writers.test.mjs'],
+    'npm:test:anydoc-local-only': ['scripts/check-anydoc-local-only.test.mjs'],
+    'npm:test:ci-guards-wired': ['scripts/check-ci-guards-wired.test.mjs'],
   });
   for (const suite of Object.values(actual)) assert.deepEqual(suite.errors, []);
   assert.equal(actual['npm:test:native-launcher'].binding.stepIf, "runner.os == 'macOS'");
@@ -260,6 +263,9 @@ test('ten required npm script bodies and CI bindings select the actual independe
   assert.deepEqual(actual['npm:test:use-effect-ratchet'].binding.commands, ['test:use-effect-ratchet', 'check:use-effect-ratchet']);
   assert.deepEqual(actual['npm:test:pairing-state-writers'].binding.commands, ['test:pairing-state-writers', 'check:pairing-state-writers']);
   assert.deepEqual(actual['npm:test:test-fake-schema-ratchet'].binding.commands, ['test:test-fake-schema-ratchet', 'check:test-fake-schema-ratchet']);
+  assert.deepEqual(actual['npm:test:attachment-currentness-writers'].binding.commands, ['test:attachment-currentness-writers', 'check:attachment-currentness-writers']);
+  assert.deepEqual(actual['npm:test:anydoc-local-only'].binding.commands, ['test:anydoc-local-only', 'check:anydoc-local-only']);
+  assert.deepEqual(actual['npm:test:ci-guards-wired'].binding.commands, ['test:ci-guards-wired', 'check:ci-guards-wired']);
   assert.equal(collectUnitTestFiles(sourceRoot).filter(file => file === 'scripts/explicit-npm-test-selection.test.mjs').length, 1);
 });
 
