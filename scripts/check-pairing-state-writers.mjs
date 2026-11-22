@@ -9,10 +9,35 @@ const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const PRODUCTION_ROOTS = ['app', 'components', 'lib', 'packages'];
 const EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.mjs', '.cjs']);
 const SOLE_WRITER_FILE = 'lib/network-home-base-server.ts';
+const PAIRING_MODEL_FILE = 'lib/network-pairing-model.ts';
 const PAIRING_KEY_IDENT = 'NETWORK_PAIRING_STATE_KEY';
-const PAIRING_KEY_LITERAL = 'network_pairing_state';
+const DEFAULT_PAIRING_KEY_LITERAL = 'network.pairing.state';
 const WRITE_METHODS = new Set(['insert', 'update', 'delete']);
 const SKIP_DIRS = new Set(['node_modules', '.next', 'dist', 'artifacts', 'target']);
+
+export function resolvePairingKeyLiteral(root = ROOT_DIR) {
+    const modelPath = path.join(root, PAIRING_MODEL_FILE);
+    if (!fs.existsSync(modelPath)) return DEFAULT_PAIRING_KEY_LITERAL;
+    const ast = parseFile(PAIRING_MODEL_FILE, fs.readFileSync(modelPath, 'utf8'));
+    let literal = null;
+    function visit(node) {
+        if (
+            ts.isVariableDeclaration(node)
+            && ts.isIdentifier(node.name)
+            && node.name.text === PAIRING_KEY_IDENT
+            && node.initializer
+            && ts.isStringLiteralLike(node.initializer)
+        ) {
+            literal = node.initializer.text;
+        }
+        ts.forEachChild(node, visit);
+    }
+    visit(ast);
+    if (!literal) {
+        throw new Error(`Could not resolve string literal ${PAIRING_KEY_IDENT} in ${PAIRING_MODEL_FILE}.`);
+    }
+    return literal;
+}
 
 export const FIX_GUIDANCE =
     `Route all ${PAIRING_KEY_IDENT} writes through mutateNetworkPairingState() in ${SOLE_WRITER_FILE} `
@@ -55,7 +80,7 @@ function referencesSettingsTable(node) {
     return false;
 }
 
-export function inspectPairingStateSource(file, source) {
+export function inspectPairingStateSource(file, source, pairingKeyLiteral = DEFAULT_PAIRING_KEY_LITERAL) {
     const ast = parseFile(file, source);
     let mentionsPairingKey = false;
     let writesSettingsTable = false;
@@ -66,7 +91,7 @@ export function inspectPairingStateSource(file, source) {
 
     function visit(node) {
         if (ts.isIdentifier(node) && node.text === PAIRING_KEY_IDENT) mentionsPairingKey = true;
-        if (ts.isStringLiteralLike(node) && node.text.includes(PAIRING_KEY_LITERAL)) mentionsPairingKey = true;
+        if (ts.isStringLiteralLike(node) && node.text.includes(pairingKeyLiteral)) mentionsPairingKey = true;
 
         if (ts.isFunctionDeclaration(node) && node.name?.text === 'mutateNetworkPairingState') {
             hasMutateFn = true;
@@ -109,13 +134,14 @@ export function inspectPairingStateSource(file, source) {
 }
 
 export function checkPairingStateWriters(root) {
+    const pairingKeyLiteral = resolvePairingKeyLiteral(root);
     const files = collectProductionFiles(root);
     const findings = [];
     let checkedSoleWriter = false;
     for (const file of files) {
         const source = fs.readFileSync(path.join(root, file), 'utf8');
         if (file === SOLE_WRITER_FILE) checkedSoleWriter = true;
-        findings.push(...inspectPairingStateSource(file, source));
+        findings.push(...inspectPairingStateSource(file, source, pairingKeyLiteral));
     }
     if (!checkedSoleWriter) {
         findings.push(`Missing canonical pairing-state writer module: ${SOLE_WRITER_FILE}.`);

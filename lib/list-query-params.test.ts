@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import encryptedFields from './backup-encrypted-fields.json';
 import { ENCRYPTED_COLUMNS_BY_TABLE } from './encrypted-columns';
+import { observations, patients, therapies } from './schema';
 import { definePlaintextSortColumns, parseCappedLimit, parseDateParam, parseListParams } from './list-query-params';
 
 function sp(query: string): URLSearchParams {
@@ -152,5 +153,26 @@ test('encrypted columns are rejected at compile time and at runtime by definePla
             defaultOrderBy: 'date',
         }),
         /Encrypted column "content" on table "entries"/,
+    );
+    assert.throws(
+        () => definePlaintextSortColumns('observations', {
+            // @ts-expect-error -- encrypted Drizzle column aliased under a plaintext sort key must be rejected
+            createdAt: observations.notes,
+        }),
+        /maps to encrypted column "notes" on table "observations"/,
+    );
+    assert.throws(
+        () => definePlaintextSortColumns('patients', {
+            // @ts-expect-error -- snake_case encrypted Drizzle column aliased under a plaintext sort key must be rejected
+            updatedAt: patients.deletionReason,
+        }),
+        /maps to encrypted column "deletion_reason" on table "patients"/,
+    );
+    assert.throws(
+        () => definePlaintextSortColumns('observations', {
+            // @ts-expect-error -- column belonging to another table must be rejected
+            createdAt: therapies.createdAt,
+        }),
+        /maps to column "therapies\.created_at", expected table "observations"/,
     );
 });

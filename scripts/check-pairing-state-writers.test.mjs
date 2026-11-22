@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { checkPairingStateWriters, FIX_GUIDANCE, inspectPairingStateSource } from './check-pairing-state-writers.mjs';
+import { checkPairingStateWriters, FIX_GUIDANCE, inspectPairingStateSource, resolvePairingKeyLiteral } from './check-pairing-state-writers.mjs';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -32,10 +32,12 @@ test('rejects a second production writer updating NETWORK_PAIRING_STATE_KEY via 
         'app/api/v1/network/rogue/route.ts',
         `
         export function writeUnsafe(sqlite: { prepare(sql: string): { run(...args: unknown[]): void } }) {
-            sqlite.prepare("UPDATE settings SET value = ? WHERE key = 'network_pairing_state'").run('{}');
+            sqlite.prepare("UPDATE settings SET value = ? WHERE key = 'network.pairing.state'").run('{}');
         }
         `,
+        resolvePairingKeyLiteral(REPO_ROOT),
     );
+    assert.equal(resolvePairingKeyLiteral(REPO_ROOT), 'network.pairing.state');
     assert.equal(rawSqlBypass.length, 1);
     assert.ok(rawSqlBypass[0].includes('mutateNetworkPairingState()'));
 });
