@@ -213,9 +213,19 @@ export function createAgentLocalKitStore(database: Database.Database, now = Date
                 return { agentRef };
             }).immediate();
         },
-        recordContextAudit(eventType: 'agent.context.exported' | 'agent.context.cleared', actorRef: string, subjectRef: string, generation: string): void {
+        recordContextAudit(
+            eventType: 'agent.context.exported' | 'agent.context.cleared',
+            actorRef: string,
+            subjectRef: string,
+            generation: string,
+            isUnlockActive?: (ref: string, actorRef: string) => boolean,
+        ): void {
             database.transaction(() => {
                 if (readSqliteArchiveGeneration(database) !== generation) throw new ArchiveReplacedError();
+                if (eventType === 'agent.context.exported') {
+                    const current = this.status(actorRef, isUnlockActive);
+                    if (!current.connected || !current.active) throw new AgentMandateDenied();
+                }
                 const time = now();
                 database.prepare(`INSERT INTO audit_events(event_id,schema_version,event_type,occurred_at,outcome,actor_type,actor_ref,
                     subject_type,subject_ref,source_surface,created_at)

@@ -29,8 +29,8 @@ const reply = (value: unknown, status = 200) => Response.json(value, { status, h
 const denied = (status = 403, code = 'AGENT_LOCAL_KIT_DENIED') => reply({ code, error: 'Contesto agente non disponibile.' }, status);
 
 export function createAgentLocalKitContextHttp(sources: Sources) {
-    async function admitted(request: Request, mutation: boolean): Promise<{ session: ServerSession; generation: string } | null> {
-        if (!hasAttestedLoopbackIngress(request) || (mutation && !isTrustedWebMutationRequest(request))
+    async function admitted(request: Request, mutation: boolean, requireJsonBody = true): Promise<{ session: ServerSession; generation: string } | null> {
+        if (!hasAttestedLoopbackIngress(request) || (mutation && !isTrustedWebMutationRequest(request, requireJsonBody))
             || request.headers.has('authorization')) return null;
         const session = await sources.session();
         if (!session || session.authChannel !== 'web' || session.role !== 'admin') return null;
@@ -68,7 +68,7 @@ export function createAgentLocalKitContextHttp(sources: Sources) {
         },
         POST: async (request: Request): Promise<Response> => {
             try {
-                const access = await admitted(request, true);
+                const access = await admitted(request, true, true);
                 if (!access) return denied(403);
                 const store = sources.store();
                 const status = store.status(access.session.userId, sources.isUnlockActive);
@@ -79,13 +79,29 @@ export function createAgentLocalKitContextHttp(sources: Sources) {
                 });
                 const parsed = parseAgentPatientContextInput(body);
                 if (!parsed) return denied(400, 'INVALID_INPUT');
+                const fresh = await admitted(request, true, true);
+                if (!fresh || fresh.session.id !== access.session.id
+                    || fresh.session.userId !== access.session.userId
+                    || fresh.generation !== access.generation) {
+                    return denied(403);
+                }
+                const freshStatus = store.status(access.session.userId, sources.isUnlockActive);
+                if (!freshStatus.connected || !freshStatus.active || freshStatus.kitPath !== status.kitPath) {
+                    return denied(403, 'LOCAL_KIT_INACTIVE');
+                }
                 const envelope = sealAgentPatientContextEnvelope(parsed);
-                writeLocalKitPatientContext(status.kitPath, envelope);
+                writeLocalKitPatientContext(freshStatus.kitPath, envelope);
                 try {
-                    store.recordContextAudit('agent.context.exported', access.session.userId, envelope.patient.cfHash, access.generation);
+                    store.recordContextAudit(
+                        'agent.context.exported',
+                        access.session.userId,
+                        envelope.patient.cfHash,
+                        access.generation,
+                        sources.isUnlockActive,
+                    );
                 } catch (auditError) {
                     try {
-                        removeLocalKitPatientContext(status.kitPath, envelope.patient.cfHash);
+                        removeLocalKitPatientContext(freshStatus.kitPath, envelope.patient.cfHash);
                     } catch {
                     }
                     throw auditError;
@@ -103,7 +119,7 @@ export function createAgentLocalKitContextHttp(sources: Sources) {
         },
         DELETE: async (request: Request): Promise<Response> => {
             try {
-                const access = await admitted(request, true);
+                const access = await admitted(request, true, false);
                 if (!access) return denied(403);
                 const store = sources.store();
                 const kitPath = store.readKitPath();
