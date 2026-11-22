@@ -88,3 +88,18 @@ export const ENCRYPTED_COLUMNS_BY_TABLE = {
 
 export type EncryptedFieldsTable = keyof typeof ENCRYPTED_COLUMNS_BY_TABLE;
 export type EncryptedColumnName<T extends EncryptedFieldsTable> = (typeof ENCRYPTED_COLUMNS_BY_TABLE)[T][number];
+
+type CamelToSnake<S extends string> =
+    S extends `${infer Head}${infer Tail}`
+        ? Tail extends Uncapitalize<Tail>
+            ? `${Lowercase<Head>}${CamelToSnake<Tail>}`
+            : `${Lowercase<Head>}_${CamelToSnake<Tail>}`
+        : S;
+
+export type EncryptedSqlColumnName<T extends EncryptedFieldsTable> =
+    | EncryptedColumnName<T>
+    | CamelToSnake<EncryptedColumnName<T>>;
+
+export function toSqlColumnName(name: string): string {
+    return name.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
+}

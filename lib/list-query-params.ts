@@ -1,11 +1,26 @@
+import { getTableName, type Table } from 'drizzle-orm';
 import encryptedFields from './backup-encrypted-fields.json';
-import type { EncryptedColumnName, EncryptedFieldsTable } from './encrypted-columns';
+import {
+    toSqlColumnName,
+    type EncryptedColumnName,
+    type EncryptedFieldsTable,
+    type EncryptedSqlColumnName,
+} from './encrypted-columns';
 
-export type { EncryptedColumnName, EncryptedFieldsTable };
+export type { EncryptedColumnName, EncryptedFieldsTable, EncryptedSqlColumnName };
 export type ListSortDir = 'asc' | 'desc';
 
+type PlaintextSortValue<T extends EncryptedFieldsTable, V> =
+    V extends { readonly _: { readonly name: infer ColName extends string; readonly tableName: infer TableName extends string } }
+        ? TableName extends T
+            ? ColName extends EncryptedSqlColumnName<T>
+                ? never
+                : V
+            : never
+        : V;
+
 export type PlaintextSortMap<T extends EncryptedFieldsTable, TColumns extends Record<string, unknown>> = {
-    readonly [K in keyof TColumns]: K extends EncryptedColumnName<T> ? never : TColumns[K];
+    readonly [K in keyof TColumns]: K extends EncryptedColumnName<T> ? never : PlaintextSortValue<T, TColumns[K]>;
 };
 
 export interface ParsedListParams {
@@ -31,8 +46,17 @@ export interface ListParamsSpec<T extends EncryptedFieldsTable = EncryptedFields
 
 const DEFAULT_MAX_LIMIT = 500;
 
+function forbiddenColumnNames(table: EncryptedFieldsTable): Set<string> {
+    const forbidden = new Set<string>();
+    for (const column of encryptedFields[table]) {
+        forbidden.add(column);
+        forbidden.add(toSqlColumnName(column));
+    }
+    return forbidden;
+}
+
 function assertPlaintextColumns(table: EncryptedFieldsTable, columns: readonly string[]): void {
-    const forbidden = new Set<string>(encryptedFields[table]);
+    const forbidden = forbiddenColumnNames(table);
     for (const column of columns) {
         if (forbidden.has(column)) {
             throw new Error(
@@ -42,11 +66,33 @@ function assertPlaintextColumns(table: EncryptedFieldsTable, columns: readonly s
     }
 }
 
+function assertMappedPlaintextColumn(table: EncryptedFieldsTable, key: string, value: unknown): void {
+    if (!value || typeof value !== 'object') return;
+    const candidate = value as { name?: unknown; table?: unknown };
+    if (typeof candidate.name !== 'string') return;
+    if (candidate.table && typeof candidate.table === 'object') {
+        const mappedTable = getTableName(candidate.table as Table);
+        if (mappedTable !== table) {
+            throw new Error(
+                `Sort key "${key}" maps to column "${mappedTable}.${candidate.name}", expected table "${table}".`,
+            );
+        }
+    }
+    if (forbiddenColumnNames(table).has(candidate.name)) {
+        throw new Error(
+            `Sort key "${key}" maps to encrypted column "${candidate.name}" on table "${table}" (see lib/backup-encrypted-fields.json).`,
+        );
+    }
+}
+
 export function definePlaintextSortColumns<
     T extends EncryptedFieldsTable,
     TColumns extends Record<string, unknown>,
 >(table: T, columns: TColumns & PlaintextSortMap<T, TColumns>): Readonly<TColumns> {
     assertPlaintextColumns(table, Object.keys(columns));
+    for (const [key, value] of Object.entries(columns)) {
+        assertMappedPlaintextColumn(table, key, value);
+    }
     return Object.freeze({ ...columns });
 }
 
