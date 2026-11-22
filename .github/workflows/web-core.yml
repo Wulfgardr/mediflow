@@ -53,6 +53,11 @@ jobs:
         env:
           MEDIFLOW_FORMAL_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: npm run verify:therapy-status
+      - name: Formal models for ambulatory pruning, agent unlock, visit confirmation, and local operation
+        timeout-minutes: 10
+        run: |
+          npm run verify:formal-models
+          npm run verify:local-operation
       - run: npm run lint
       - run: npm run typecheck
       # La prova di installabilità sul Mac compila con webpack; il launcher ordinario con Turbopack.
