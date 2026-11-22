@@ -8,7 +8,11 @@ Il test di composizione controlla il consumer reale e impedisce di ripristinare
 implicitamente una PUT dal nuovo controller. Le proprietà del nuovo ledger non
 sono una prova TLA né un'estensione implicita degli invarianti legacy sottostanti.
 
-Il recovery cifrato supporta lo schema corrente 16 e i predecessori canonici 3, 4, 5, 6, 9, 10, 11, 12, 13, 14 e 15; le prove di compatibilità sono esterne a TLC, che non copre schema, migrazione, cifratura o ricevute. Restano aperte la verifica verticale Rust-host e quella della GUI.
+Il recovery cifrato supporta lo schema corrente 18 e i predecessori canonici 3, 4, 5, 6, 9, 10, 11, 12, 13, 14, 15, 16 e 17; le prove di compatibilità sono esterne a TLC, che non copre schema, migrazione, cifratura o ricevute. Restano aperte la verifica verticale Rust-host e quella della GUI.
+
+## Raccordo schema 18 del 22 novembre 2026
+
+Lo schema SQLite corrente passa da 17 a 18 in `lib/sqlite-schema-open.ts` per estendere da 12 a 24 ore il tetto del vincolo `CHECK` di `agent_mandates` (`lib/sqlite-agent-mandate-duration-upgrade.ts`, ADR 0190 e ADR 0196). La ricostruzione dei predecessori v13..v17 ripristina il vincolo storico a 12 ore e conserva invariate tutte le impronte precedenti; la versione 17 entra fra i predecessori canonici di `lib/recovery-backup-server.ts`. Transizioni, CAS, audit e ricevute del comando di stato terapia non cambiano.
 
 ## WUL-909. Validità dell’intervallo terapeutico
 
