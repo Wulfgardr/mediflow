@@ -527,7 +527,7 @@ test(`encrypted 0.9.0 predecessor (schema 3) ${alteration}: the published releas
     } finally { f.cleanup(); }
 });
 
-for (const version of [11, 12, 13, 14, 15, 16]) test(`encrypted v${version} predecessor restores historical audit into current schema without fabricating agent provenance`, async () => {
+for (const version of [11, 12, 13, 14, 15, 16, 17]) test(`encrypted v${version} predecessor restores historical audit into current schema without fabricating agent provenance`, async () => {
     const f = await fixture();
     try {
         const file = path.join(f.root, `canonical${version}.db`);
@@ -536,11 +536,18 @@ for (const version of [11, 12, 13, 14, 15, 16]) test(`encrypted v${version} pred
         if (version === 16) old.prepare(
             "INSERT INTO entries (id,patient_id,type,date,title,content) VALUES ('synthetic-v16-diary','synthetic-patient','note',1783000000,?,?)",
         ).run('Titolo legacy sintetico', 'Testo legacy sintetico ancora leggibile.');
-        old.exec('DROP TABLE entry_revisions');
+        if (version < 17) old.exec('DROP TABLE entry_revisions');
         if (version < 16) old.exec('DROP TABLE agent_unlock_grants; DROP TABLE agent_registrations');
         if (version < 15) old.exec('DROP TABLE agent_cassettes');
         if (version < 14) old.exec('DROP TABLE agent_clients; DROP TABLE agent_pairing_requests');
         if (version < 13) old.exec('DROP TABLE agent_mandates');
+        else {
+            const mandateDdl = (old.prepare("SELECT sql FROM sqlite_schema WHERE type='table' AND name='agent_mandates'").get() as { sql: string }).sql;
+            old.pragma('foreign_keys = OFF');
+            old.exec('DROP TABLE agent_mandates');
+            old.exec(mandateDdl.replace('created_at + 86400000', 'created_at + 43200000'));
+            old.pragma('foreign_keys = ON');
+        }
         old.exec(`DROP TABLE synthetic_extension; PRAGMA user_version=${version};`);
         if (version < 12) for (const column of ['proposer_ref', 'mandate_ref', 'model_provider']) old.exec(`ALTER TABLE audit_events DROP COLUMN ${column}`);
         old.pragma('wal_checkpoint(TRUNCATE)'); old.pragma('journal_mode=DELETE');

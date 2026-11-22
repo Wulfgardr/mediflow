@@ -15,6 +15,11 @@ test('v15 admission preserves its original and migrates to the current version w
         const predecessor = new Database(file);
         initializeSqliteSchema(predecessor);
         predecessor.exec('DROP TABLE entry_revisions; DROP TABLE agent_unlock_grants; DROP TABLE agent_registrations');
+        const mandateDdl = (predecessor.prepare("SELECT sql FROM sqlite_schema WHERE type='table' AND name='agent_mandates'").get() as { sql: string }).sql;
+        predecessor.pragma('foreign_keys = OFF');
+        predecessor.exec('DROP TABLE agent_mandates');
+        predecessor.exec(mandateDdl.replace('created_at + 86400000', 'created_at + 43200000'));
+        predecessor.pragma('foreign_keys = ON');
         predecessor.pragma('user_version=15');
         assertAmbulatoryCommandPredecessorRecoverySchema(predecessor);
         predecessor.close();
