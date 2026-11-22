@@ -1,23 +1,18 @@
-// Server-side list query parameter parsing + whitelisting.
-//
-// STREAM B (kill full-table fetch+decrypt): the list GET handlers used to fetch
-// entire tables and let the client filter/sort/limit in memory after decrypting
-// every row. This module gives each handler a small, table-scoped validator so it
-// can filter and sort server-side on PLAINTEXT columns only.
-//
-// SECURITY: we only ever sort/filter on plaintext columns (patient_id, ids,
-// timestamps). Encrypted (ENC:) columns are opaque server-side and must never be
-// used as an orderBy/filter target: sorting ciphertext is meaningless and could
-// leak ordering. Every sortable column here is whitelisted per table.
+import encryptedFields from './backup-encrypted-fields.json';
+import type { EncryptedColumnName, EncryptedFieldsTable } from './encrypted-columns';
 
+export type { EncryptedColumnName, EncryptedFieldsTable };
 export type ListSortDir = 'asc' | 'desc';
+
+export type PlaintextSortMap<T extends EncryptedFieldsTable, TColumns extends Record<string, unknown>> = {
+    readonly [K in keyof TColumns]: K extends EncryptedColumnName<T> ? never : TColumns[K];
+};
 
 export interface ParsedListParams {
     limit?: number;
     offset?: number;
     orderBy?: string;
     orderDir: ListSortDir;
-    /* attachments-only: when true the list omits the heavy base64 `data` blob. */
     metadataOnly: boolean;
 }
 
@@ -25,39 +20,51 @@ export type ParseListParamsResult =
     | { ok: true; params: ParsedListParams }
     | { ok: false; error: string };
 
-export interface ListParamsSpec {
-    // Whitelist of plaintext columns that may be used as orderBy targets.
-    // MUST NOT include any ENC:-encrypted column.
+export interface ListParamsSpec<T extends EncryptedFieldsTable = EncryptedFieldsTable> {
+    table?: T;
     sortableColumns: readonly string[];
-    // Default column to order by when none is requested (must be in sortableColumns).
     defaultOrderBy?: string;
     defaultOrderDir?: ListSortDir;
-    // Upper bound on limit to keep responses bounded.
     maxLimit?: number;
-    // When true, the `metadata` param is recognised (attachments list mode).
     allowMetadataOnly?: boolean;
 }
 
 const DEFAULT_MAX_LIMIT = 500;
 
+function assertPlaintextColumns(table: EncryptedFieldsTable, columns: readonly string[]): void {
+    const forbidden = new Set<string>(encryptedFields[table]);
+    for (const column of columns) {
+        if (forbidden.has(column)) {
+            throw new Error(
+                `Encrypted column "${column}" on table "${table}" cannot be used for server-side sorting (see lib/backup-encrypted-fields.json).`,
+            );
+        }
+    }
+}
+
+export function definePlaintextSortColumns<
+    T extends EncryptedFieldsTable,
+    TColumns extends Record<string, unknown>,
+>(table: T, columns: TColumns & PlaintextSortMap<T, TColumns>): Readonly<TColumns> {
+    assertPlaintextColumns(table, Object.keys(columns));
+    return Object.freeze({ ...columns });
+}
+
 function parseNonNegativeInt(raw: string | null): number | null | 'invalid' {
     if (raw === null) return null;
     const trimmed = raw.trim();
     if (trimmed.length === 0) return 'invalid';
-    // Reject anything that is not a plain base-10 non-negative integer.
     if (!/^\d+$/.test(trimmed)) return 'invalid';
     const value = Number.parseInt(trimmed, 10);
     if (!Number.isSafeInteger(value)) return 'invalid';
     return value;
 }
 
-// Parse and whitelist the generic list params (limit/offset/orderBy/orderDir and
-// the attachments metadata flag). patientId/conversationId are handled directly by
-// the route because they map to a required equality filter, not a shape option.
-export function parseListParams(
+export function parseListParams<T extends EncryptedFieldsTable = EncryptedFieldsTable>(
     searchParams: URLSearchParams,
-    spec: ListParamsSpec,
+    spec: ListParamsSpec<T>,
 ): ParseListParamsResult {
+    if (spec.table) assertPlaintextColumns(spec.table, spec.sortableColumns);
     const maxLimit = spec.maxLimit ?? DEFAULT_MAX_LIMIT;
 
     const limitRaw = parseNonNegativeInt(searchParams.get('limit'));
@@ -68,8 +75,6 @@ export function parseListParams(
 
     const offsetRaw = parseNonNegativeInt(searchParams.get('offset'));
     if (offsetRaw === 'invalid') return { ok: false, error: 'Invalid offset' };
-    // SQLite rejects OFFSET without an accompanying LIMIT, so an offset alone
-    // would 500 at query time. Require a limit whenever offset is supplied.
     if (offsetRaw !== null && limitRaw === null) {
         return { ok: false, error: 'offset richiede limit' };
     }
@@ -118,16 +123,16 @@ export function parseListParams(
     };
 }
 
-// Lenient filters of the /api/v1 patient lists: a missing or unreadable value means "no filter".
-export function parseCappedLimit(value: string | null, max: number): number | null {
-    if (!value) return null;
-    const parsed = Number.parseInt(value, 10);
-    if (Number.isNaN(parsed) || parsed <= 0) return null;
+export function parseCappedLimit(raw: string | null, max: number): number | null {
+    const parsed = parseNonNegativeInt(raw);
+    if (parsed === null || parsed === 'invalid' || parsed < 1) return null;
     return Math.min(parsed, max);
 }
 
-export function parseDateParam(value: string | null): Date | null {
-    if (!value) return null;
-    const parsed = new Date(value);
+export function parseDateParam(raw: string | null): Date | null {
+    if (raw === null) return null;
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+    const parsed = new Date(trimmed);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
 }

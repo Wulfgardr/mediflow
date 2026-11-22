@@ -78,6 +78,11 @@ jobs:
         run: |
           npm run test:use-effect-ratchet
           npm run check:use-effect-ratchet
+      - name: Pairing state single-writer guard and tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          npm run test:pairing-state-writers
+          npm run check:pairing-state-writers
 
       - name: Fabric generative runtime crosswalk
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
