@@ -87,6 +87,19 @@ function createState(directory: string, kind: 'pairing' | 'visit', id: string, v
     } catch { throw new AgentClientError('AGENT_STATE_INVALID'); }
     finally { if (owned) fs.unlinkSync(temporary); }
 }
+function replaceState(directory: string, kind: 'pairing' | 'visit', id: string, value: unknown): void {
+    const file = statePath(directory, kind, id), temporary = file + '.' + randomUUID() + '.tmp';
+    let owned = false;
+    try {
+        const existing = fs.lstatSync(file);
+        if (existing.isSymbolicLink() || !existing.isFile() || existing.nlink !== 1
+            || (process.platform !== 'win32' && (existing.uid !== process.getuid?.() || (existing.mode & 0o7777) !== 0o600))) throw invalid();
+        const fd = fs.openSync(temporary, fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | fs.constants.O_NOFOLLOW, 0o600); owned = true;
+        try { fs.writeFileSync(fd, JSON.stringify(value)); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+        fs.renameSync(temporary, file); owned = false;
+    } catch { throw new AgentClientError('AGENT_STATE_INVALID'); }
+    finally { if (owned) fs.unlinkSync(temporary); }
+}
 export async function requestAgentPairing(directory: string, origin: string, name: string, operations: AgentOperation[] = [...AGENT_OPERATIONS], signal?: AbortSignal) {
     agentPrivateDirectory(directory); agentOrigin(origin);
     if (!name.trim() || name.length > 80 || !operations.length || new Set(operations).size !== operations.length || !operations.every(value => AGENT_OPERATIONS.includes(value))) throw invalid();
@@ -136,7 +149,7 @@ export async function retrieveAgentMandate(directory: string, agentRef: string, 
     return (await retrieveMandate(directory, agentRef, signal, origin)).receipt;
 }
 
-export type AgentVisitPlan = { version: 1; inputFingerprint: string; agentRef: string; mandateRef: string; visitId: string; anchor: AgentEnvelope; items: AgentCassetteItem[] };
+export type AgentVisitPlan = { version: 1; inputFingerprint: string; contentFingerprint?: string; agentRef: string; mandateRef: string; visitId: string; anchor: AgentEnvelope; items: AgentCassetteItem[] };
 function readSource(file: string, max: number): Buffer {
     let fd: number | undefined;
     try {
@@ -156,6 +169,7 @@ export function prepareAgentVisit(publicKey: string, agentRef: string, mandateRe
     if (!isAgentId(visitId) || !isAgentId(agentRef) || !isAgentId(mandateRef) || !isValidItalianTaxCode(fiscalCode) || fiscalCode !== fiscalCode.toUpperCase()) throw invalid();
     const extractionBytes = readSource(extractionFile, DOSSIER_PREPARED_MAX_BYTES);
     const fingerprint = createHash('sha256').update(JSON.stringify([agentRef, mandateRef, fiscalCode])).update(extractionBytes);
+    const content = createHash('sha256').update(JSON.stringify([agentRef, fiscalCode])).update(extractionBytes);
     const parsed = parsePreparedExtraction(new TextDecoder('utf-8', { fatal: true }).decode(extractionBytes));
     if (!parsed.ok || parsed.warnings.length || !parsed.value.sources.length) throw invalid();
     const items: AgentCassetteItem[] = [];
@@ -170,6 +184,7 @@ export function prepareAgentVisit(publicKey: string, agentRef: string, mandateRe
         const bytes = readSource(path.join(path.dirname(extractionFile), source.fileName), AGENT_MAX_ITEM_BYTES);
         if (sha(bytes) !== source.sha256 || bytes.subarray(0, 5).toString() !== '%PDF-') throw new AgentClientError('AGENT_FILE_INVALID');
         fingerprint.update(source.sha256);
+        content.update(source.sha256);
         const provenance = { sha256: source.sha256, fileName: source.fileName, documentDate: source.documentDate };
         seal('pdf', { name: source.fileName, base64: bytes.toString('base64') }, source.sha256);
         for (const fact of source.facts) {
@@ -181,12 +196,12 @@ export function prepareAgentVisit(publicKey: string, agentRef: string, mandateRe
         }
     }
     if (transcriptionFile) {
-        const bytes = readSource(transcriptionFile, AGENT_MAX_ITEM_BYTES); fingerprint.update(bytes);
+        const bytes = readSource(transcriptionFile, AGENT_MAX_ITEM_BYTES); fingerprint.update(bytes); content.update(bytes);
         seal('transcription', { text: new TextDecoder('utf-8', { fatal: true }).decode(bytes) });
     }
     cassetteItems({ itemsCiphertext: JSON.stringify(items) });
     const anchor = sealAgentItemNode(publicKey, { mandateRef, visitId, itemId: visitId, kind: 'anchor' }, new TextEncoder().encode(JSON.stringify({ fiscalCode })));
-    return { version: 1, inputFingerprint: fingerprint.digest('hex'), agentRef, mandateRef, visitId, anchor, items };
+    return { version: 1, inputFingerprint: fingerprint.digest('hex'), contentFingerprint: content.digest('hex'), agentRef, mandateRef, visitId, anchor, items };
 }
 function credential(directory: string, agentRef: string): AgentCredential {
     const value = readAgentCredential(directory, agentRef);
@@ -194,8 +209,13 @@ function credential(directory: string, agentRef: string): AgentCredential {
     return value;
 }
 function visitPlan(value: unknown): value is AgentVisitPlan {
-    if (!record(value) || Object.keys(value).sort().join(',') !== 'agentRef,anchor,inputFingerprint,items,mandateRef,version,visitId' || value.version !== 1
+    if (!record(value)) return false;
+    const keys = Object.keys(value).sort().join(',');
+    if (keys !== 'agentRef,anchor,inputFingerprint,items,mandateRef,version,visitId'
+        && keys !== 'agentRef,anchor,contentFingerprint,inputFingerprint,items,mandateRef,version,visitId') return false;
+    if (value.version !== 1
         || typeof value.inputFingerprint !== 'string' || !/^[a-f0-9]{64}$/u.test(value.inputFingerprint)
+        || (value.contentFingerprint !== undefined && (typeof value.contentFingerprint !== 'string' || !/^[a-f0-9]{64}$/u.test(value.contentFingerprint)))
         || ![value.agentRef, value.mandateRef, value.visitId].every(isAgentId) || !validAgentEnvelope(value.anchor) || !Array.isArray(value.items)) return false;
     try { cassetteItems({ itemsCiphertext: JSON.stringify(value.items) }); return true; } catch { return false; }
 }
@@ -242,8 +262,15 @@ export async function prepareAndDepositAgentVisit(directory: string, agentRef: s
     try { createState(directory, 'visit', plan.visitId, plan); }
     catch (error) {
         const existing = readState(directory, 'visit', plan.visitId);
-        if (!visitPlan(existing) || existing.inputFingerprint !== plan.inputFingerprint) throw error;
-        plan = existing;
+        if (!visitPlan(existing)) throw error;
+        if (existing.mandateRef === plan.mandateRef && existing.inputFingerprint === plan.inputFingerprint) {
+            plan = existing;
+        } else if (existing.agentRef === plan.agentRef && existing.mandateRef !== plan.mandateRef
+            && existing.contentFingerprint !== undefined && existing.contentFingerprint === plan.contentFingerprint) {
+            replaceState(directory, 'visit', plan.visitId, plan);
+        } else {
+            throw error;
+        }
     }
     return depositAgentVisit(access, plan, signal).catch(error => {
         throw new AgentClientError(error instanceof AgentClientError ? error.code : 'AGENT_HTTP_UNAVAILABLE', error instanceof AgentClientError ? error.status : undefined, plan.visitId);

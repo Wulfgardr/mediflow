@@ -14,7 +14,8 @@ import { agentRequest, prepareAgentVisit, prepareAndDepositAgentVisit, resumeAge
 import { parseAgentCommand, agentCommandFailure } from './commands';
 import { agentBytes, openAgentItem } from '../../../lib/agent-cassette-crypto';
 import { decryptData } from '../../../lib/security/security';
-import { MANDATE_MAX_DURATION_MS } from '../../../lib/agent-mandate-contract';
+import { AGENT_OPERATIONS, MANDATE_MAX_DURATION_MS } from '../../../lib/agent-mandate-contract';
+import { createAgentMandateStore } from '../../../lib/agent-mandate-store';
 
 const cf = 'RSSMRA80A01H501U', sentinel = 'SYNTHETIC_CLI_VISIT_ONLY_6742';
 async function fixture(model: 'local' | 'openai' = 'local') {
@@ -95,7 +96,7 @@ async function fixture(model: 'local' | 'openai' = 'local') {
     saveAgentCredential(credentials, { agentRef: f.principal.agentRef, mandateRef: f.mandate.id, token: f.token, expiresAt: f.mandate.expiresAt, origin });
     return { ...f, longToken, pulls: () => pulls,
         installRegistration: () => saveAgentRegistration(credentials, { agentRef: f.principal.agentRef, origin, token: longToken }),
-        root, files, credentials, file, transcription, extraction, bodies, events, origin, afterNote: (action: () => void) => { afterNote = action; }, drop: () => { drop = true; }, deny: () => { denied = true; }, scope: () => { operations = ['visita.apri', 'visita.nota', 'visita.chiudi']; },
+        root, files, credentials, file, transcription, extraction, bodies, events, origin, afterNote: (action: () => void) => { afterNote = action; }, drop: () => { drop = true; }, deny: () => { denied = true; }, allow: () => { denied = false; }, scope: () => { operations = ['visita.apri', 'visita.nota', 'visita.chiudi']; },
         async cleanup() { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); f.database.close(); fs.rmSync(root, { recursive: true, force: true }); } };
 }
 async function cli(args: string[], data: string, environment: Partial<NodeJS.ProcessEnv> = {}, input?: string) {
@@ -196,6 +197,36 @@ test('repeating the same explicit visit command reuses the original envelopes an
         f.extraction.preparedAt = '2026-11-17T09:00:00Z'; fs.writeFileSync(f.file, JSON.stringify(f.extraction));
         await assert.rejects(prepareAndDepositAgentVisit(f.credentials, f.principal.agentRef, f.file, cf, undefined, visitId), /AGENT_STATE_INVALID/);
         assert.deepEqual(fs.readFileSync(path.join(f.credentials, 'visit-' + visitId + '.json')), bytes);
+    } finally { await f.cleanup(); }
+});
+
+test('retrying the same visit after mandate renewal re-seals identical inputs for the new mandate while still rejecting changed inputs', async () => {
+    const f = await fixture(), visitId = randomUUID();
+    try {
+        f.deny();
+        await assert.rejects(prepareAndDepositAgentVisit(f.credentials, f.principal.agentRef, f.file, cf, undefined, visitId), error => {
+            return error instanceof AgentClientError && error.code === 'AGENT_ACCESS_DENIED';
+        });
+        assert.ok(fs.existsSync(path.join(f.credentials, 'visit-' + visitId + '.json')));
+        const nextMandate = createAgentMandateStore(f.database, () => f.mandate.createdAt).create({
+            id: randomUUID(),
+            durationMs: MANDATE_MAX_DURATION_MS,
+            operations: [...AGENT_OPERATIONS],
+            provider: 'local',
+            allowsClinicalEgress: false,
+            publicKey: f.mandate.publicKey,
+            wrappedPrivateKey: f.mandate.wrappedPrivateKey,
+        }, f.mandate.actorRef, f.mandate.archiveGeneration);
+        f.principal.mandateRef = nextMandate.id;
+        f.mandate.id = nextMandate.id;
+        saveAgentCredential(f.credentials, { agentRef: f.principal.agentRef, mandateRef: nextMandate.id, token: f.token, expiresAt: nextMandate.expiresAt, origin: f.origin });
+        f.allow();
+        const deposited = await prepareAndDepositAgentVisit(f.credentials, f.principal.agentRef, f.file, cf, undefined, visitId);
+        assert.equal(deposited.status, 'closed');
+        assert.equal(deposited.mandateRef, nextMandate.id);
+        f.extraction.preparedAt = '2026-11-18T10:00:00Z';
+        fs.writeFileSync(f.file, JSON.stringify(f.extraction));
+        await assert.rejects(prepareAndDepositAgentVisit(f.credentials, f.principal.agentRef, f.file, cf, undefined, visitId), /AGENT_STATE_INVALID/);
     } finally { await f.cleanup(); }
 });
 
