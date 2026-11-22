@@ -37,7 +37,7 @@
     "lib/security/client-auth-api.ts": "9ac40b69b8c073644198e86d532591464f2c28a44fda1926fa9f082a93e25274",
     "lib/therapy-write-operation.ts": "8fa4abf13ad501bdb1d199b2abeaee5e18331f84e6dcdb19caa0b040b5c63345",
     "app/api/therapies/[id]/route.ts": "ecc8f661c1f2521e567a6666c4c9da89097ef8da2874281285066b266f6fdcc1",
-    "app/api/therapies/route.ts": "e13c48abb76cb0461eb1a9c1f23cf8724ec9cf34d32a7bd54909e58d4e251dac",
+    "app/api/therapies/route.ts": "cfb3c6a5bced36c77a73a9b9573324f803a9abcabf7c97e34e523f21d4fe185d",
     "lib/locked-field-guard.ts": "a4b64b4db1968423169937a2b491add2d2a19b6fba2489b1515e37b358a55d3a",
     "lib/therapy-status-command-service.ts": "2e27218f4d0f6f4efbf9466ed783e43852254217a0623186ade3252438c09dd3",
     "lib/therapy-status-command-confirmation.ts": "86682b47ca7eeadaa91065511e44c72951414e5bfe7a5d7b2001224bb424db1e",
@@ -155,5 +155,5 @@
     }
   },
   "legacyModelSyncCommit": "64e190438da8287928f0903b9b719c18b329a7ec",
-  "filesSha256": "61c42a62e9edfd675c147fccdcc2e11763ab8d31ec1941c3e7f4105216e6c774"
+  "filesSha256": "8f9e0578bec4b13b87b3d5f93177be8593129ea6f3ab337c8aa599a1fcea0299"
 }

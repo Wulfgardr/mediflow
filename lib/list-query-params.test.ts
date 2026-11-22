@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseCappedLimit, parseDateParam, parseListParams } from './list-query-params';
+import encryptedFields from './backup-encrypted-fields.json';
+import { ENCRYPTED_COLUMNS_BY_TABLE } from './encrypted-columns';
+import { definePlaintextSortColumns, parseCappedLimit, parseDateParam, parseListParams } from './list-query-params';
 
 function sp(query: string): URLSearchParams {
     return new URLSearchParams(query);
@@ -115,4 +117,40 @@ test('parseCappedLimit and parseDateParam treat unreadable values as no filter',
     assert.equal(parseDateParam(null), null);
     assert.equal(parseDateParam('non una data'), null);
     assert.equal(parseDateParam('2026-05-02')?.toISOString(), '2026-05-02T00:00:00.000Z');
+});
+
+test('encrypted columns are rejected at compile time and at runtime by definePlaintextSortColumns and parseListParams', () => {
+    assert.deepEqual(ENCRYPTED_COLUMNS_BY_TABLE, encryptedFields);
+    const allowed = definePlaintextSortColumns('observations', { observedAt: 'observed_at', createdAt: 'created_at' });
+    assert.deepEqual(Object.keys(allowed), ['observedAt', 'createdAt']);
+
+    assert.throws(
+        () => definePlaintextSortColumns('observations', {
+            // @ts-expect-error -- encrypted column must be rejected by the type system
+            notes: 'notes',
+        }),
+        /Encrypted column "notes" on table "observations"/,
+    );
+    assert.throws(
+        () => definePlaintextSortColumns('therapies', {
+            // @ts-expect-error -- encrypted column must be rejected by the type system
+            motivation: 'motivation',
+        }),
+        /Encrypted column "motivation" on table "therapies"/,
+    );
+    assert.throws(
+        () => definePlaintextSortColumns('patients', {
+            // @ts-expect-error -- encrypted column must be rejected by the type system
+            address: 'address',
+        }),
+        /Encrypted column "address" on table "patients"/,
+    );
+    assert.throws(
+        () => parseListParams(sp('orderBy=content'), {
+            table: 'entries',
+            sortableColumns: ['date', 'content'],
+            defaultOrderBy: 'date',
+        }),
+        /Encrypted column "content" on table "entries"/,
+    );
 });
