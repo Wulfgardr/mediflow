@@ -46,3 +46,14 @@ test('allows synthetic non-production helper tables and enforces ratchet shrink 
     assert.equal(shrinkProblems.length, 1);
     assert.match(shrinkProblems[0], /ratchet only shrinks/);
 });
+
+test('detects schema-qualified and bracket/quote-delimited SQLite CREATE TABLE forms', () => {
+    const tables = new Set(['patients', 'entries']);
+    const sql = [
+        'CREATE TABLE main.patients (id TEXT);',
+        'CREATE TABLE IF NOT EXISTS [patients] (id TEXT);',
+        'CREATE TABLE "main"."entries" (id TEXT);',
+        'CREATE TEMP TABLE `entries` (id TEXT);',
+    ].join('\n');
+    assert.equal(countProductionCreateTables(sql, tables), 4);
+});

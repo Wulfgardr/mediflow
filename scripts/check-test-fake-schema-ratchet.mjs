@@ -38,10 +38,16 @@ export function extractProductionTables(root) {
 }
 
 export function countProductionCreateTables(source, productionTables) {
-    const regex = /\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?["'`]?([A-Za-z_][A-Za-z0-9_]*)["'`]?/giu;
+    const ident = '(?:["\'`\\[](?:[A-Za-z_][A-Za-z0-9_]*)["\'`\\]]|([A-Za-z_][A-Za-z0-9_]*))';
+    const target = '(?:["\'`\\[](?<quoted>[A-Za-z_][A-Za-z0-9_]*)["\'`\\]]|(?<bare>[A-Za-z_][A-Za-z0-9_]*))';
+    const regex = new RegExp(
+        `\\bCREATE\\s+(?:TEMP(?:ORARY)?\\s+)?TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?(?:${ident}\\s*\\.\\s*)?${target}`,
+        'giu',
+    );
     let count = 0;
     for (const match of source.matchAll(regex)) {
-        if (productionTables.has(match[1].toLowerCase())) count += 1;
+        const tableName = (match.groups?.quoted || match.groups?.bare || '').toLowerCase();
+        if (productionTables.has(tableName)) count += 1;
     }
     return count;
 }
