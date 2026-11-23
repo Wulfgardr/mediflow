@@ -43,6 +43,7 @@ function runDrill(workDir: string, reportPath: string, options: { keep?: boolean
     assert.deepEqual(report.realRestore.differences, []);
     assert.ok(report.realRestore.recordsCompared >= 5, 'the seeded synthetic records take part in the comparison');
     assert.equal(report.realRestore.sealedValuesReadable, 8);
+    assert.equal(report.realRestore.excludedRetiredPatients, 0);
     assert.equal(report.preflight.ok, true);
     assert.deepEqual(report.failures, []);
     assert.deepEqual(report.retention, {
