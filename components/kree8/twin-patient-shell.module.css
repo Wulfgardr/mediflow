@@ -104,7 +104,7 @@
  .patientBody[data-folder-section='quadro'] { padding-block-start: 18px; }
 }
 
-.patientCanvas[data-folder-section='quadro'] .patientHeader h1 { font: var(--type-record-person); }
+.patientCanvas .patientHeader h1 { font: var(--type-record-person); }
 
 @media (min-width: 1001px) {
   .patientCanvas .patientHeader, :global(html[data-twin-composition='stream']) .patientCanvas .patientHeader {

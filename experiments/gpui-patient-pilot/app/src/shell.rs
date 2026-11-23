@@ -41,6 +41,7 @@ mod scales;
 mod service_matching;
 mod settings;
 mod smart_import;
+mod surface;
 mod therapy_picker;
 mod threshold_actions;
 #[cfg(test)]
