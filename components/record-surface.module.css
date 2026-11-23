@@ -91,7 +91,7 @@
     inset 0 -12px 18px -18px var(--lume-record-tray-shadow);
 }
 
-.zoneTitle {
+:global(:root) .tray > .zoneTitle, .zoneTitle {
   display: flex;
   align-items: center;
   gap: 8px;

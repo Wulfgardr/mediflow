@@ -271,6 +271,10 @@
 .notesReview h2 { font: var(--type-record-island); }
 
 @media (max-width: 699px) {
-    .entryRoute .writingColumn { padding: 8px; border-radius: 16px; }
-    .entryRoute .writingColumn .sheet, .notesReview > section { padding: 12px 14px; }
+    .entryRoute .page { padding-top: 10px; }
+    .entryRoute .header { margin-bottom: 10px; }
+    .entryRoute .writingColumn { padding: 6px; border-radius: 16px; }
+    .entryRoute .writingColumn .columnHeading { margin: 2px 6px 6px; }
+    .entryRoute .writingColumn .sheet, .notesReview > section { padding: 10px 14px; }
+    .entryRoute .metadata { gap: 8px 12px; padding-bottom: 12px; }
 }
