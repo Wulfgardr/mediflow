@@ -131,9 +131,18 @@ function minimizedAudit(reader: RestoreReader, incoming: BackupRecord): boolean 
     } catch { return false; }
 }
 
-function assertNoUnattributedMaterial(db: Database.Database, reader: RestoreReader, payload: BackupDataset, retired: ReadonlySet<unknown>): void {
-    if (payload.agentCassettes?.some(row => !cassetteAttributedHere(db, reader, row, retired))
-        || payload.auditEvents?.some(row => !minimizedAudit(reader, row))) block('retired_patient_material');
+function cassetteHeldHere(db: Database.Database, cassette: BackupRecord): boolean {
+    const { id, actorRef } = cassette;
+    return typeof id === 'string' && typeof actorRef === 'string' && isDeepStrictEqual(readAgentCassette(db, id, actorRef), cassette);
+}
+
+function assertNoRetiredPatientMaterial(
+    db: Database.Database, reader: RestoreReader, payload: BackupDataset, retired: ReadonlySet<unknown>, excludesPatients: boolean,
+): void {
+    const cassetteAdmitted = (row: BackupRecord) => excludesPatients ? cassetteAttributedHere(db, reader, row, retired) : cassetteHeldHere(db, row);
+    const auditInScope = (row: BackupRecord) => excludesPatients || retired.has(row.subjectRef);
+    if (payload.agentCassettes?.some(row => !cassetteAdmitted(row))
+        || payload.auditEvents?.some(row => auditInScope(row) && !minimizedAudit(reader, row))) block('retired_patient_material');
 
     for (const row of payload.therapyStatusCommands ?? []) {
         if (!retired.has(row.patientId) || (row.target === null && row.resultEndDate === null)) continue;
@@ -148,6 +157,6 @@ export function planBackupRestore(db: Database.Database, source: BackupDataset, 
     const payload = excluded.size > 0 ? retainPatientGraph(source, retired) : source;
     const plan = { payload, memberships: derivePatientAmbulatoryLinks(payload.patients), excludedRetiredPatients: excluded.size };
     assertRestorePreservesHolds(db, reader, plan);
-    if (excluded.size > 0) assertNoUnattributedMaterial(db, reader, source, retired);
+    if (retired.size > 0) assertNoRetiredPatientMaterial(db, reader, source, retired, excluded.size > 0);
     return plan;
 }

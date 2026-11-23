@@ -146,6 +146,10 @@ produce scaduti.
   depositi o storico clinico che possono riguardare un fascicolo escluso,
   il ripristino si ferma. Si può scegliere una copia successiva alla
   cancellazione o usare il backup completo cifrato su una nuova destinazione.
+- Lo stesso controllo vale quando la destinazione ha fascicoli ritirati e la
+  copia non ne contiene la scheda: un comando terapia o un evento di audit
+  con valori clinici per un fascicolo ritirato, oppure una cassetta che
+  l’archivio non possiede già identica, fermano il ripristino.
 - WAL, pagine libere, snapshot del sistema e copie di riparazione possono
   conservare valori precedenti (matrice dei dati a riposo). Lo scarto non è
   una bonifica del supporto.
