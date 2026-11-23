@@ -67,8 +67,13 @@ fn prose_renderer_limits_display_lines_without_rewriting_source() {
 
 #[test]
 fn access_threshold_uses_system_role() {
-    let s = source("shell.rs");
-    assert!(s.contains("heading_with_role(\"clinical-workspace-connect-heading\",ifpaired{\"Accedialtuoarchivio\"}else{\"Collegaquestodispositivo\"},theme,crate::theme::TitleRole::Threshold)"));
+    let shell = source("shell.rs");
+    assert!(shell.contains("surface::page_header(\"clinical-workspace-connect-heading\",ifpaired{\"Accedialtuoarchivio\"}else{\"Collegaquestodispositivo\""));
+    let surface = source("shell/surface.rs");
+    let page_header = &surface[surface.find("fnpage_header(").unwrap()..surface.find("fnheader_row(").unwrap()];
+    assert!(page_header.contains("crate::theme::TitleRole::RecordPerson"));
+    let theme = source("theme.rs");
+    assert!(theme.contains("TypeRole::RecordPerson=>(SYSTEM,"));
 }
 
 #[test]
