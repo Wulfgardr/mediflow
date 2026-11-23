@@ -2000,7 +2000,8 @@ mod concept {
             "birthDate": "1947-06-12",
             "taxCode": "SNTBNC47H52Z000K",
             "isAdi": true,
-            "version": 3
+            "version": 3,
+            "updatedAt": "2026-11-23T10:00:00Z"
         });
         let summary_b = json!({
             "id": "patient-b",
@@ -2009,7 +2010,8 @@ mod concept {
             "birthDate": "1953-04-19",
             "taxCode": "VRDMRC53D19Z000K",
             "isAdi": false,
-            "version": 1
+            "version": 1,
+            "updatedAt": "2026-11-21T16:15:00Z"
         });
         let summary_c = json!({
             "id": "patient-c",
@@ -2018,7 +2020,8 @@ mod concept {
             "birthDate": "1960-11-02",
             "taxCode": "BNCLNE60S42Z000W",
             "isAdi": true,
-            "version": 2
+            "version": 2,
+            "updatedAt": "2026-11-18T11:20:00Z"
         });
         let document = json!({
             "id": "doc-sintetico",
@@ -2081,6 +2084,9 @@ mod concept {
                     summary_c.clone(),
                 ]));
                 app.selected_id = Some("patient-a".into());
+                apply(app, &fixture);
+                app.patient.attachments = ReadLoad::Ready(rows!([document.clone()]));
+                app.patient.checkups = ReadLoad::Ready(rows!([checkup.clone()]));
                 cx.notify();
             });
             run.shot(&format!("{theme}-01-pazienti"));
