@@ -10,7 +10,6 @@ import { useConfirm } from '@/components/ui/confirm-dialog';
 import { generateMandateKeys } from '@/lib/agent-mandate-client';
 import { useAgentSettingsLoad } from '@/lib/hooks/effects/use-agent-settings-load';
 import { isValidNumericPin, numericPinError, validateNumericPinSubmission } from '@/lib/security/pin-input';
-import { clientArchiveGeneration } from '@/lib/security/client-auth-api';
 import { SETTINGS_INPUT_CLASS, SETTINGS_PRIMARY_BUTTON_CLASS, SETTINGS_SECONDARY_BUTTON_CLASS } from '@/components/settings/settings-ui';
 
 const LOCAL_KIT_ERROR_MESSAGES: Record<string, string> = {
@@ -284,10 +283,7 @@ export default function AgentSettingsPage() {
                             void run(async () => {
                                 const response = await fetch('/api/agent-mandates/local-kit/context', {
                                     method: 'DELETE',
-                                    headers: {
-                                        'Content-Type': 'application/json',
-                                        'x-mediflow-archive-generation': clientArchiveGeneration(),
-                                    },
+                                    headers: { 'Content-Type': 'application/json' },
                                 });
                                 if (!response.ok) throw new Error(await readFailureMessage(response));
                                 await refresh();
