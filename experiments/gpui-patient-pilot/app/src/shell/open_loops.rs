@@ -190,29 +190,20 @@ impl ClinicalApp {
     }
     pub(super) fn open_loops_view(&self, cx: &Context<Self>) -> Div {
         let theme = self.theme;
-        let mut pane = div()
-            .min_w_0()
-            .flex()
-            .flex_col()
-            .gap(px(16.))
-            .child(heading(
-                "clinical-open-loops-heading",
-                "Follow-up aperti",
+        let actions = div().child(
+            button(
+                "clinical-open-loops-close",
+                "Chiudi follow-up",
                 theme,
-            ))
-            .child(
-                button(
-                    "clinical-open-loops-close",
-                    "Chiudi follow-up",
-                    theme,
-                    false,
-                    true,
-                )
-                .on_click(cx.listener(|this, _, _, cx| {
-                    this.open_loops.reset();
-                    cx.notify();
-                })),
-            );
+                false,
+                true,
+            )
+            .on_click(cx.listener(|this, _, _, cx| {
+                this.open_loops.reset();
+                cx.notify();
+            })),
+        );
+        let mut pane = surface::island(theme, false);
         pane = match &self.open_loops.rows {
             Load::Idle => pane,
             Load::Loading => pane.child(notice(
@@ -277,7 +268,7 @@ impl ClinicalApp {
                 pane.children(read.standalone_loops.iter().map(|row| loop_row(row, theme)))
             }
         };
-        pane
+        surface::section_tray("clinical-open-loops-heading", "Follow-up aperti", actions, pane, theme)
     }
 }
 fn loop_text(

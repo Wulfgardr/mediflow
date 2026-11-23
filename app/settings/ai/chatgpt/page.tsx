@@ -14,7 +14,7 @@ export default function ChatGptProductPage() {
                 <div>
                     <SettingsSectionIntro
                         title="OpenAI · ChatGPT"
-                        description="Account collegato non significa modello pronto. La prova richiede un accesso dedicato e una scelta manuale; non usa i modelli locali."
+                        description="La prova usa dati dimostrativi e richiede un accesso dedicato e la scelta del modello OpenAI."
                     />
                     <p className="type-meta">Servizio esterno · abbonamento personale ChatGPT.</p>
                 </div>
@@ -22,10 +22,10 @@ export default function ChatGptProductPage() {
             <Link href="/settings/ai/fabric" prefetch={false} className={`${SETTINGS_SECONDARY_BUTTON_CLASS} ${styles.returnLink}`}>Torna a Intelligence Fabric</Link>
         </header>
         <ChatGptSynthesisPanel />
-        <Disclosure title="Controllo account ChatGPT · separato dalla prova">
+        <Disclosure title="Controllo account ChatGPT · separato dalla prova" headingLevel={3} className={styles.account}>
             <div className={styles.accountBody}>
-                <p>Qui controlli collegamento, modelli e utilizzo dell’account. Questo accesso non abilita la prova né le funzioni cliniche.</p>
-                <ChatGptAccountPanel />
+                <p>Per la prova serve l’accesso dedicato. Da qui puoi controllare collegamento, modelli e utilizzo dell’account.</p>
+                <ChatGptAccountPanel primary={false} />
             </div>
         </Disclosure>
     </div>;

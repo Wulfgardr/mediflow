@@ -203,29 +203,30 @@ impl ClinicalApp {
     }
     pub(super) fn evidence_queue_view(&self, cx: &Context<Self>) -> Div {
         let theme = self.theme;
-        let mut pane = div()
-            .min_w_0()
-            .flex()
-            .flex_col()
-            .gap(px(16.))
-            .child(
-                heading("evidence-queue-heading", "Evidenze dai documenti", theme)
-                    .debug_selector(|| "evidence-queue-heading".into()),
+        let actions = div().child(
+            button(
+                "evidence-queue-close",
+                "Chiudi evidenze",
+                theme,
+                false,
+                true,
             )
-            .child(
-                button(
-                    "evidence-queue-close",
-                    "Chiudi evidenze",
-                    theme,
-                    false,
-                    true,
-                )
-                .on_click(cx.listener(|this, _, _, cx| {
-                    this.evidence_queue.reset();
-                    cx.notify();
-                })),
-            );
-        match &self.evidence_queue.rows {
+            .on_click(cx.listener(|this, _, _, cx| {
+                this.evidence_queue.reset();
+                cx.notify();
+            })),
+        );
+        let mut pane = surface::island(theme, false);
+        let panel = |content| {
+            surface::section_tray(
+                "evidence-queue-heading",
+                "Evidenze dai documenti",
+                actions,
+                content,
+                theme,
+            )
+        };
+        let content = match &self.evidence_queue.rows {
             Load::Idle => pane,
             Load::Loading => pane.child(notice(
                 "evidence-queue-loading",
@@ -245,7 +246,7 @@ impl ClinicalApp {
                         session.evidence_queue_sources_are_current(read, sources)
                     })
                 }) {
-                    return pane
+                    return panel(pane
                         .child(notice(
                             "evidence-queue-stale",
                             "Documenti cambiati.",
@@ -263,7 +264,7 @@ impl ClinicalApp {
                             .on_click(
                                 cx.listener(|this, _, _, cx| this.request_evidence_queue(cx)),
                             ),
-                        );
+                        ));
                 }
                 pane = pane.child(queue_text(
                     "evidence-queue-receipt",
@@ -347,7 +348,8 @@ impl ClinicalApp {
                 }
                 pane
             }
-        }
+        };
+        panel(content)
     }
 }
 fn queue_text(id: &'static str, value: impl Into<SharedString>, theme: Theme) -> Stateful<Div> {

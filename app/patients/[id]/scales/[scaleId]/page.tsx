@@ -14,6 +14,7 @@ import { SCALES } from '@/lib/scale-definitions';
 import { scaleDisplayTitle } from '@/lib/scale-history';
 import { submitScale } from '@/lib/scale-submission';
 import { v4 as uuidv4 } from 'uuid';
+import surface from '@/components/record-surface.module.css';
 import styles from '@/components/scales/scale-workspace.module.css';
 import { Kree8WorkspaceShell } from '@/components/kree8/kree8-workspace-shell';
 import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css';
@@ -160,14 +161,14 @@ function ScaleRunner({ patientId, scaleId }: { patientId: string; scaleId: strin
             navItems={[]}
         >
             {/* WUL-678: context stays selectable without secondary panels. */}
-            <section id="scala" className={styles.workspace}>
-                {message && <div><p role={readFailed ? 'alert' : 'status'}>{message}</p>
+            <section id="scala" className={`${styles.workspace} ${surface.tray}`} data-record-tray="scala">
+                {message && <div className={surface.island}><p role={readFailed ? 'alert' : 'status'}>{message}</p>
                     {readFailed && !contextRetired && !draft?.suspended && <button type="button" className={styles.control} onClick={refresh}>Riprova</button>}
                 </div>}
-                <fieldset disabled={!enabled} inert={!enabled} className={localStyles.form}>
+                <fieldset disabled={!enabled} inert={!enabled} className={`${surface.island} ${localStyles.form}`}>
                 <label className={styles.context}>
                     Contesto
-                    <select disabled={answersLocked} value={setting} onChange={event => setSetting(event.target.value as 'ambulatory' | 'home')}>
+                    <select className={surface.field} disabled={answersLocked} value={setting} onChange={event => setSetting(event.target.value as 'ambulatory' | 'home')}>
                         <option value="ambulatory">Ambulatorio</option>
                         <option value="home">Domicilio</option>
                     </select>

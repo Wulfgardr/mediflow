@@ -8,10 +8,11 @@ import { Button } from '@/components/ui/button';
 import { ChoiceField } from '@/components/choice-field';
 import { ViewState } from '@/components/ui/view-state';
 import { PatientSheetMenu } from '@/components/patient-sheet-menu';
+import surface from '@/components/record-surface.module.css';
 import { CollapsibleSection } from '@/components/kree8/collapsible-section';
 import { formatCountLabel } from '@/lib/format-count';
 import { v4 as uuidv4 } from 'uuid';
-import { Minus, MoreHorizontal, Plus, TrendingDown, TrendingUp } from 'lucide-react';
+import { Activity, Minus, MoreHorizontal, Plus, TrendingDown, TrendingUp } from 'lucide-react';
 import { ApiConflictError, db } from '@/lib/db';
 import { notifyDbChange } from '@/lib/live-query';
 import { formatMeasureValue, formatUnitForDisplay, searchStaticTerminology } from '@/lib/terminology';
@@ -370,7 +371,10 @@ export default function ObservationManager({
     const count = readable ? formatCountLabel(observations.length, 'misura', 'misure') : undefined;
     const content = (
         <div className={styles.register} data-clinical-register="observations">
-            {!embedded && <header className={styles.therapyHeading}><h2>Parametri <span>{count}</span></h2>{newButton}</header>}
+            {!embedded && <header className={`${styles.therapyHeading} ${surface.islandHeader}`}>
+                <span className={surface.islandIcon} aria-hidden="true"><Activity size={16} /></span>
+                <h2>Parametri <span>{count}</span></h2>{newButton}
+            </header>}
             <div id={formId} hidden={!formOpen}>
             <form ref={formRef} onSubmit={saveObservation} className={styles.form + " grid grid-cols-1 gap-3 md:grid-cols-2"}>
                 {servicePrescriptionItemId && servicePrescriptionItem ? (
@@ -511,7 +515,7 @@ export default function ObservationManager({
                     {day.items.map(item => { const flag = classifyObservationRange(item.value, item.refLow, item.refHigh); return <tr key={item.id}>
                         <td>{italianLoincLabel(item.code, item.display)}</td>
                         <td className={`${styles.value} ${flag ? styles.critical : ''}`}>{formatMeasureValue(item.value, item.unitCode)}{flag && <small>{flag === 'alto' ? '▲ Alto' : '▼ Basso'}</small>}</td>
-                        <td className={styles.muted}>{formatReferenceRange(item.refLow, item.refHigh, item.refText) || '—'}</td>
+                        <td className={styles.muted}>{formatReferenceRange(item.refLow, item.refHigh, item.refText) || '–'}</td>
                     </tr>; })}
                 </tbody></table>
             </section>) : <div className={styles.split}>
@@ -528,7 +532,7 @@ export default function ObservationManager({
                             </DisclosureControl></td>
                             <td className={`${styles.value} ${flag ? styles.critical : ''}`}>{latest.value} <span className={styles.muted}>{formatUnitForDisplay(group.unitCode)}</span>{flag && <small>{flag === 'alto' ? '▲ Alto' : '▼ Basso'}</small>}</td>
                             <td className={styles.muted}><time>{new Date(latest.observedAt).toLocaleDateString('it-IT')}</time></td>
-                            <td className={styles.secondaryColumn}>{delta === null ? '—' : <span className="inline-flex items-center gap-1">{delta > 0 ? <TrendingUp size={14} aria-label="in aumento" /> : delta < 0 ? <TrendingDown size={14} aria-label="in calo" /> : <Minus size={14} aria-label="stabile" />}{delta > 0 ? '+' : ''}{delta.toLocaleString('it-IT')}</span>}</td>
+                            <td className={styles.secondaryColumn}>{delta === null ? '–' : <span className="inline-flex items-center gap-1">{delta > 0 ? <TrendingUp size={14} aria-label="in aumento" /> : delta < 0 ? <TrendingDown size={14} aria-label="in calo" /> : <Minus size={14} aria-label="stabile" />}{delta > 0 ? '+' : ''}{delta.toLocaleString('it-IT')}</span>}</td>
                         </tr>;
                     })}
                 </tbody></table></div>
@@ -562,7 +566,7 @@ export default function ObservationManager({
             </div>}
         </div>
     );
-    return embedded ? <CollapsibleSection id="parametri" title="Parametri" count={count} defaultOpen={formOpen}
+    return embedded ? <CollapsibleSection id="parametri" title="Parametri" icon={Activity} count={count} defaultOpen={formOpen}
         headerAction={newButton} surfaceClassName={surfaceClassName} keepMounted>
         {content}
     </CollapsibleSection> : content;

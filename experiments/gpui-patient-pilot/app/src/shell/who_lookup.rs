@@ -350,7 +350,7 @@ impl ClinicalApp {
             query: self.who.query.clone(),
         };
         let mut pane = div().min_w_0().max_w_full().flex().flex_col().gap(px(16.))
-            .child(heading("clinical-workspace-who-heading", crate::title::TitleText::code("ICD-11 WHO"), theme))
+            .child(surface::island_title("clinical-workspace-who-heading", crate::title::TitleText::code("ICD-11 WHO"), None, theme))
             .when(self.who.patient.is_some(), |el| el.child(
                 button("clinical-workspace-who-close", "Chiudi ricerca ICD", theme, false, true)
                     .on_click(cx.listener(|this, _, _, cx| { this.who.reset(); cx.notify(); }))))

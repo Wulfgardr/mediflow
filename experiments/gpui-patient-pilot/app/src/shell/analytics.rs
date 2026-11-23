@@ -234,17 +234,12 @@ impl ClinicalApp {
 
     pub(super) fn analytics_view(&self, cx: &Context<Self>) -> Div {
         let theme = self.theme;
-        let mut pane = div().reading_surface(theme)
-            .min_w_0()
-            .max_w_full()
+        let header = surface::page(theme)
             .max_w(px(760.))
-            .flex()
-            .flex_col()
-            .gap(px(24.))
-            .child(heading("clinical-analytics-heading", "Analisi", theme))
-            .child(div().text_color(theme.secondary).child(text!(
-                "L’archivio calcola i conteggi della popolazione attiva per la fascia scelta. Questa finestra non calcola età, fasce o indicatori clinici: mostra i valori restituiti dall’archivio, con barre proporzionali e gli stessi conteggi in testo."
-            )));
+            .child(surface::page_header(
+                "clinical-analytics-heading", "Analisi", None, div(), theme,
+            ));
+        let mut pane = surface::island(theme, false);
         if let Some(session) = &self.session
             && !session.can_write(POPULATION_DEMOGRAPHICS_CAPABILITY)
         {
@@ -256,7 +251,7 @@ impl ClinicalApp {
             ));
         }
         pane = pane
-            .child(section("clinical-analytics-range", "FASCIA DI ETÀ", theme))
+            .child(surface::island_title("clinical-analytics-range", "FASCIA DI ETÀ", None, theme))
             .child(
                 div()
                     .flex()
@@ -319,12 +314,12 @@ impl ClinicalApp {
             pane = pane.child(notice("clinical-analytics-state", message, theme, error));
         }
         let Some(demographics) = self.analytics.state.ready() else {
-            return pane;
+            return header.child(surface::tray(theme).child(pane));
         };
         let stats = &demographics.stats;
         let [min_age, max_age] = demographics.age_range;
-        pane = pane
-            .child(section("clinical-analytics-population", "POPOLAZIONE", theme))
+        let mut population = surface::island(theme, false)
+            .child(surface::island_title("clinical-analytics-population", "POPOLAZIONE", None, theme))
             .child(crate::components::number_line(
                 "clinical-analytics-population-summary", "", stats.total_in_range.to_string(),
                 &format!(" schede attive tra {min_age} e {max_age} anni"), theme,
@@ -339,7 +334,7 @@ impl ClinicalApp {
                 schede(stats.adi_count)
             ))));
         if stats.total_in_range == 0 {
-            pane = pane.child(notice(
+            population = population.child(notice(
                 "clinical-analytics-empty",
                 "Nessuna scheda attiva con età nota rientra nella fascia scelta.",
                 theme,
@@ -348,10 +343,11 @@ impl ClinicalApp {
         } else {
             let rows = stats.age_dist.rows();
             let total = stats.total_in_range;
-            pane = pane
-                .child(section(
+            population = population
+                .child(surface::island_title(
                     "clinical-analytics-distribution",
                     "DISTRIBUZIONE PER ETÀ",
+                    None,
                     theme,
                 ))
                 .children(
@@ -364,14 +360,15 @@ impl ClinicalApp {
                         .child(text!(format!("Distribuzione: {}.", rows_text(rows)))),
                 );
         }
-        pane.child(
+        let population = population.child(
             div()
                 .text_color(theme.secondary)
                 .child(text!(format!(
                     "Dati osservati dall’archivio il {}. La lettura non include diagnosi né conteggi diagnostici.",
                     observed_label(&demographics.observed_at)
                 ))),
-        )
+        );
+        header.child(surface::tray(theme).child(pane).child(population))
     }
 }
 

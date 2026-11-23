@@ -7,12 +7,12 @@ import sectionRecipe from '@/components/ink-section.module.css';
    /mockups/kree8 as a review alias. WUL-273 starts the real-data migration for
    live patients/checkups after PIN unlock; the review alias remains synthetic. */
 
-import { type FocusEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type FocusEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import { useRuntimeWorkspaceArea, useRuntimeWorkspaceCommand } from '@/components/runtime-twin-workspace';
-import { X } from 'lucide-react';
+import { CircleHelp, X } from 'lucide-react';
 
 import { db } from '@/lib/db';
 /* WUL-UIUX Fase 7: pipeline dati del Quadro condivisa con la Scheda. */
@@ -121,6 +121,7 @@ function AreaContent({
   onRetryDiary,
   onRetryTodos,
   territorialHandoff,
+  commandTrigger,
 }: {
   area: AreaId;
   filter: StatusFilter;
@@ -144,6 +145,7 @@ function AreaContent({
   onRetryTodos: () => void;
   /** Pacchetto Lombardia attivo (o superficie di review): abilita SISS e portali. */
   territorialHandoff: boolean;
+  commandTrigger?: ReactNode;
 }) {
   switch (area) {
     case 'turno':
@@ -158,6 +160,7 @@ function AreaContent({
           onSelectPatient={onSelectPatient}
           onOpenArea={onOpenArea}
           onRetry={onRetryAgenda}
+          commandTrigger={commandTrigger}
         />
       );
     case 'incarico':
@@ -175,6 +178,7 @@ function AreaContent({
           territorialHandoff={territorialHandoff}
           onRetryPatients={onRetryPatients}
           isReview={isReview}
+          commandTrigger={commandTrigger}
         />
       );
     case 'scheda':
@@ -192,6 +196,7 @@ function AreaContent({
           onOpenArea={onOpenArea}
           onSelectPatient={onSelectPatient}
           onRetry={isReview ? undefined : onRetryDiary}
+          commandTrigger={commandTrigger}
         />
       );
     case 'revisione':
@@ -205,7 +210,7 @@ function AreaContent({
           />
         );
     case 'repertori':
-      return <RepertoriArea isReview={isReview} />;
+      return <RepertoriArea isReview={isReview} commandTrigger={commandTrigger} />;
     case 'handoff':
       if (isReview) return <HandoffArea />;
       return territorialHandoff
@@ -217,6 +222,8 @@ function AreaContent({
         : <LiveGovernanceArea patientCount={patientState.patients.length} />;
   }
 }
+
+const RECORD_PAGE_AREAS: ReadonlySet<AreaId> = new Set<AreaId>(['turno', 'incarico', 'diario', 'repertori']);
 
 type Kree8ClinicalCockpitProps = {
   surface?: 'live' | 'review';
@@ -575,6 +582,20 @@ export function Kree8ClinicalCockpit({
         ? String(diaryState.activeCount)
         : '…';
 
+  const recordPage = proposal && RECORD_PAGE_AREAS.has(area);
+  const commandTrigger = recordPage ? (
+    <button
+      type="button"
+      className={styles.commandTrigger}
+      onClick={openCommandCenter}
+      aria-label="Apri comandi e aiuto tastiera"
+      title="Comandi e aiuto (⌘/Ctrl + K)"
+      data-mobile-commands={commandsInWorkspace ? 'workspace' : undefined}
+    >
+      <CircleHelp size={16} aria-hidden="true" />
+    </button>
+  ) : undefined;
+
   return (
     <div
       className={`${styles.shell} ${sectionRecipe.sections}`}
@@ -644,7 +665,7 @@ export function Kree8ClinicalCockpit({
         data-testid="lume-frame-canvas"
         data-lume-frame-element="canvas"
       >
-        <Toolbar
+        {recordPage ? null : <Toolbar
           activeArea={area}
           filter={filter}
           setFilter={setFilter}
@@ -657,7 +678,7 @@ export function Kree8ClinicalCockpit({
           commandsInWorkspace={commandsInWorkspace}
           searchAcrossAreas={isReview}
           operatorName={operatorName}
-        />
+        />}
         <div
           className={styles.framePanel}
           data-testid="lume-frame-panel"
@@ -719,6 +740,7 @@ export function Kree8ClinicalCockpit({
                 onRetryPatients={refreshPatients}
                 onRetryAgenda={() => { refreshPatients(); refreshCheckups(); }}
                 onRetryDiary={() => { refreshPatients(); refreshDiary(); }}
+                commandTrigger={commandTrigger}
               />
             </div>
           </main>

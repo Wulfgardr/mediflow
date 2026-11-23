@@ -356,17 +356,30 @@ impl ClinicalApp {
 
     pub(super) fn smart_import_view(&self, cx: &Context<Self>) -> Div {
         let theme = self.theme;
-        let mut pane = div()
-            .min_w_0()
-            .max_w_full()
-            .flex()
-            .flex_col()
-            .gap(px(12.))
-            .child(section(
-                "smart-import-heading",
-                "IMPORT ASSISTITO · PROPOSTA",
-                theme,
-            ))
+        let proposal = matches!(self.patient.smart_import.phase, ImportPhase::Proposal { .. });
+        let mut pane = if proposal {
+            surface::island_proposal(theme)
+        } else {
+            surface::island(theme, false)
+        }
+        .child(
+            div()
+                .min_w_0()
+                .flex()
+                .items_center()
+                .gap(px(10.))
+                .child(surface::glyph(
+                    Icon::Proposal,
+                    proposal.then_some(theme.record.proposal_rule),
+                    theme,
+                ))
+                .child(surface::island_title(
+                    "smart-import-heading",
+                    "IMPORT ASSISTITO · PROPOSTA",
+                    None,
+                    theme,
+                )),
+        )
             .when_some(self.import_chat_notice(), |el, message| {
                 el.child(notice("smart-import-chat-step", message, theme, false))
             });

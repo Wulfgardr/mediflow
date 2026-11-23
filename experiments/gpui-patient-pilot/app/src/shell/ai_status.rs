@@ -43,19 +43,9 @@ impl ClinicalApp {
         let enabled = self.session.is_some()
             && !self.local_work_pending()
             && !matches!(self.ai_status, Load::Loading);
-        let pane = div()
-            .min_w_0()
-            .max_w_full()
-            .border_t_1()
-            .border_color(theme.rule)
-            .pt(px(24.))
-            .flex()
-            .flex_col()
-            .gap(px(12.))
-            .child(section(
-                "clinical-workspace-ai-status-heading",
-                "STATO FUNZIONI IA",
-                theme,
+        let pane = div().min_w_0().flex().flex_col().gap(px(10.))
+            .child(surface::island_title(
+                "clinical-workspace-ai-status-heading", "STATO FUNZIONI IA", None, theme,
             ))
             .child(notice(
                 "clinical-workspace-ai-status-boundary",

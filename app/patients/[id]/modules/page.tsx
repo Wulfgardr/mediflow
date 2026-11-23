@@ -8,11 +8,11 @@ import { formatCountLabel } from '@/lib/format-count';
 import { projectFollowupReadState } from '@/lib/followup-read-state';
 import { ViewState } from '@/components/ui/view-state';
 import Link from 'next/link';
-import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
+import { useRuntimeTwinDesign, useRuntimeTwinFolder } from '@/components/runtime-twin-design';
 import { useEntryDraftOnOpen } from '@/lib/hooks/effects/use-entry-draft-on-open';
 import { useParams, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, ArrowLeft, ChevronRight, ClipboardPenLine, FileText as DraftIcon, Plus } from 'lucide-react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Activity, ArrowLeft, ChevronRight, ClipboardPenLine, Clock3, FileText as DraftIcon, FolderOpen, HeartPulse, History, Plus, Sparkles, UserRound } from 'lucide-react';
 
 import { PluginLocalUiNavigation, PluginPrescribingGuide } from '@/components/plugin-local-ui-navigation';
 import { PatientClinicalSupport, PatientProposalsSummary } from '@/components/patient-clinical-support';
@@ -28,6 +28,7 @@ import { PatientSheetActivity, therapyChangesSinceVisit } from '@/components/pat
 import { CollapsibleSection } from '@/components/kree8/collapsible-section';
 import DocumentInsightsPanel from '@/components/document-insights-panel';
 import DocumentUpload from '@/components/document-upload';
+import surface from '@/components/record-surface.module.css';
 import disclosure from '@/components/patient-disclosure.module.css';
 import ObservationManager from '@/components/observation-manager';
 import type { ObservationPrefill } from '@/lib/observation-prefill';
@@ -95,6 +96,15 @@ function DraftReturn({ patientId }: { patientId: string }) {
         <DraftIcon size={15} aria-hidden /> Torna alla bozza
         {count ? <span id="bozza-parole"><span aria-hidden>· </span>{count} {count === 1 ? 'parola' : 'parole'}</span> : null}
     </Link>;
+}
+
+function FolderTray({ children, kind }: { children: ReactNode; kind: 'diario' | 'attenzione' | 'modules' }) {
+    const folder = useRuntimeTwinFolder();
+    const active = kind === 'modules'
+        ? folder !== null && !['quadro', 'diario', 'attenzione'].includes(folder)
+        : folder === kind;
+    return <div className={active ? `${surface.tray} ${disclosure.folderTray}` : disclosure.passthrough}
+        data-record-tray={active ? folder : undefined}>{children}</div>;
 }
 
 export default function PatientDetailPage() {
@@ -731,11 +741,16 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
         >
             {proposal && savedDraft && !writing ? <DraftReturn patientId={id} /> : null}
             <div className={workspaceStyles.clinicalStack}>
+                <FolderTray kind="attenzione">
                 <section id="attenzione" className={workspaceStyles.attentionBand} data-has-attention={reviewQueueSummary.attentionCount + openLoopCount > 0 || hasInsightProposal} aria-labelledby="attention-title" data-testid="lume-scheda-attention">
                     <div className={workspaceStyles.attentionHead}>
-                        <div>
+                        <div className={disclosure.attentionHeading}>
                             {!proposal ? <p className={workspaceStyles.sectionLabel}>Attenzione</p> : null}
+                            <span className={`${surface.islandIcon} ${disclosure.folderOnly}`} aria-hidden="true"><Activity size={16} /></span>
                             <h2 id="attention-title" className={workspaceStyles.sectionTitle}>{proposal ? 'Da rivedere' : 'Cosa fare adesso'}</h2>
+                            <span className={disclosure.folderOnly}>
+                                {formatCountLabel(reviewQueueSummary.attentionCount + openLoopCount + Number(hasInsightProposal), 'elemento', 'elementi')}
+                            </span>
                         </div>
                     </div>
                     <div className={workspaceStyles.attentionContent}>
@@ -790,7 +805,10 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
                     <PatientClinicalSupport patient={patient} stale={insightStale} onProposalChange={onInsightProposalChange} />
                 </section>
 
+                </FolderTray>
+
                 <PluginLocalUiNavigation key={id} patientId={id} patientVersion={patient.version} patientLabel={`${patient.firstName} ${patient.lastName}`} />
+                <FolderTray kind="diario">
                 <PatientSynopticSheet
                     clinicalSupport={<PatientProposalsSummary hasInsightProposal={hasInsightProposal} patientId={patient.id} preview={currentInsightPreview}
                             hasSmartImportProposal={smartImportProposalCapture !== null && smartImportProposalCapture === smartImportFabricCaptureInput} />}
@@ -823,10 +841,13 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
                     checkups={{ data: checkups, loading: checkupsLoading, error: checkupsError }}
                 />
 
-                {/* WUL-678: three actual folder destinations; #identita remains an identity-only alias. */}
+                </FolderTray>
+
+                <FolderTray kind="modules">
                 {(['anagrafica', 'clinica', 'amministrazione'] as const).map((domain) => (
                     <CollapsibleSection key={domain} id={domain === 'anagrafica' ? 'identita' : domain}
                         title={domain === 'anagrafica' ? 'Anagrafica' : domain === 'clinica' ? 'Clinica' : 'Amministrazione'}
+                        icon={domain === 'anagrafica' ? UserRound : domain === 'clinica' ? HeartPulse : FolderOpen}
                         surfaceClassName={`${workspaceStyles.clinicalSection} ${disclosure.domainSection}`} defaultOpen={domain === 'anagrafica'}>
                         <PatientIdentityLens variant="reader" domain={domain} patient={patient}
                             ageLabel={ageLabel} birthDateLabel={birthDateLabel} diagnoses={diagnosisItems}
@@ -837,6 +858,7 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
                 <CollapsibleSection
                     id="timeline"
                     title="Timeline clinica"
+                    icon={History}
                     count={entries !== undefined && checkups !== undefined ? formatCountLabel(nonScaleEntries.length + checkups.length + documentInsights.length, 'evento', 'eventi') : undefined}
                     summary="Diario, controlli e referti in ordine cronologico."
                     surfaceClassName={workspaceStyles.clinicalSection}
@@ -862,6 +884,7 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
                     {territorialPacks.lombardy && <CollapsibleSection
                         id="siss"
                         title="SISS e FSE"
+                        icon={ClipboardPenLine}
                         count={sissHandoffCount !== undefined && sissHandoffCount > 0 ? formatCountLabel(sissHandoffCount, 'passaggio registrato', 'passaggi registrati') : undefined}
                         summary="Apertura assistita dei portali regionali e diario dei passaggi."
                         surfaceClassName={`${workspaceStyles.clinicalSection} ${sissStyles.section}`}
@@ -880,6 +903,7 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
                     id="documenti"
                     keepMounted
                     title="Archivio documenti ed evidenze"
+                    icon={FolderOpen}
                     count={attachmentsError || attachments === undefined ? undefined : `${attachments.length} file`}
                     summary={attachmentsError ? 'Conteggio non disponibile.'
                         : attachments === undefined ? 'Caricamento documenti…'
@@ -901,7 +925,10 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
                         ) : null}
                     </DocumentUpload>
                     {smartImportSourceCount > 0 && smartImportFabricCaptureInput ? <section className={disclosure.clinicalSupport} aria-label="Smart Import">
-                        <h3 className="type-section">Smart Import</h3>
+                        <div className={surface.islandHeader}>
+                            <span className={surface.islandIcon} aria-hidden="true"><Sparkles size={16} /></span>
+                            <h3>Smart Import</h3>
+                        </div>
                         <Disclosure id="smart-import" className={disclosure.disclosure} title="Proposte">
                             <PatientSmartImportFabricPreviewCard patientId={patient.id}
                                 captureInput={smartImportFabricCaptureInput}
@@ -956,10 +983,11 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
                     id="follow-up"
                     kicker="Pianificazione"
                     title="Follow-up"
+                    icon={Clock3}
                     count={followupRead.count}
                     summary={followupRead.summary}
                     surfaceClassName={workspaceStyles.clinicalSection}
-                    headerAction={<Link href={`/patients/${id}/edit#pianificazione`} className="mf-button-text">
+                    headerAction={<Link href={`/patients/${id}/edit#pianificazione`} className={surface.islandAction}>
                         Aggiungi follow-up
                     </Link>}
                 >
@@ -989,6 +1017,7 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
                             existingTitles={(checkups ?? []).map((checkup) => checkup.title)}
                         />
                 </CollapsibleSection>
+                </FolderTray>
             </div>
 
             <PatientActionModal

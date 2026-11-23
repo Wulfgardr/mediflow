@@ -346,16 +346,18 @@ impl ClinicalApp {
         let theme = self.theme;
         let state = &self.ai_preferences;
         let idle = state.working.is_none();
-        let mut view = div().w_full().min_w_0().max_w(px(760.)).flex().flex_col().gap(px(20.))
-            .child(heading("clinical-workspace-ai-preferences-heading", "Preferenze funzioni IA", theme))
-            .child(div().type_role(theme, crate::theme::TextRole::Strong)
-                .child(text!("Le preferenze valgono per tutti gli operatori dell’home-base.")))
-            .child(notice("clinical-workspace-ai-preferences-scope", "Scegli i modelli per le funzioni disponibili. La disponibilità indicata nel catalogo non verifica che il modello possa eseguire un’analisi.", theme, false))
-            .child(div().flex().flex_wrap().gap(px(8.))
+        let actions = div().flex().flex_wrap().gap(px(8.))
                 .child(state.targets[0].attach_enabled(button("clinical-workspace-ai-preferences-back", "Torna alle impostazioni", theme, false, idle), idle)
                     .on_click(cx.listener(|this, _, window, cx| this.close_ai_preferences(window, cx))))
                 .child(state.targets[1].attach_enabled(button("clinical-workspace-ai-preferences-reload", "Rileggi preferenze dall’home-base", theme, false, idle), idle)
-                    .on_click(cx.listener(|this, _, _, cx| this.load_ai_preferences(cx)))))
+                    .on_click(cx.listener(|this, _, _, cx| this.load_ai_preferences(cx))));
+        let header = surface::page(theme)
+            .max_w(px(760.))
+            .child(surface::page_header("clinical-workspace-ai-preferences-heading", "Preferenze funzioni IA", None, actions, theme));
+        let mut view = surface::island(theme, false)
+            .child(div().type_role(theme, crate::theme::TextRole::Strong)
+                .child(text!("Le preferenze valgono per tutti gli operatori dell’home-base.")))
+            .child(notice("clinical-workspace-ai-preferences-scope", "Scegli i modelli per le funzioni disponibili. La disponibilità indicata nel catalogo non verifica che il modello possa eseguire un’analisi.", theme, false))
             .child(notice("clinical-workspace-ai-preferences-message", state.message.clone(), theme, state.failed));
         if let Some(received) = state.received_at {
             view = view.child(div().text_color(theme.secondary).child(text!(format!(
@@ -487,7 +489,7 @@ impl ClinicalApp {
                 );
             view = view.child(proposed);
         }
-        view
+        header.child(surface::tray(theme).child(view))
     }
 
     fn ai_draft_view(&self, draft: &AiPreferenceChange, cx: &Context<Self>) -> Div {

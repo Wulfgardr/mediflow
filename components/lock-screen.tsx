@@ -6,6 +6,7 @@ import { PassphraseAccessForm } from './recovery-kit';
 import { AlertCircle, Loader2, Unlock } from 'lucide-react';
 import { checkPassphrase } from '@/lib/security/unlock-credential';
 import { LONG_PIN_CONFIRM_LABEL, LONG_PIN_NOTICE } from '@/lib/security/unlock-plan';
+import access from '@/components/auth-health-screen.module.css';
 import styles from './kree8/kree8-lock-screen.module.css';
 
 export function LockScreen() {
@@ -95,21 +96,19 @@ export function LockScreen() {
 
     return (
         // WUL-55 F2d-A: lock chrome uses the landed Lume identity without changing auth semantics.
-        <div className={styles.lockShell} aria-label="MediFlow lock screen">
-            <section className={styles.lockCard} aria-labelledby="mediflow-lock-title">
+        <div className={styles.lockShell} data-record-page aria-label="MediFlow lock screen">
+            <section className={styles.lockCard} data-record-island aria-labelledby="mediflow-lock-title">
                 <div className={styles.brandRow}>
-                    <span className={`${styles.brandWord} type-brand`}>
-                        MediFlow<span className={styles.brandDot} aria-hidden="true" />
-                    </span>
+                    <span className={access.brand} data-record-brand><span className={access.brandGlyph} data-brand-glyph aria-hidden="true"><i /><i /><i /></span>MediFlow</span>
                 </div>
 
                 <div className={styles.headerBlock}>
-                    <h1 id="mediflow-lock-title" className={`${styles.title} type-page-title`}>
-                        Sblocca MediFlow<span aria-hidden="true">.</span>
+                    <h1 id="mediflow-lock-title" className={styles.title}>
+                        Sblocca MediFlow
                     </h1>
                 </div>
 
-                <form onSubmit={handleLogin} className={styles.form}
+                <form onSubmit={handleLogin} className={styles.form} hidden={recovering}
                     // A key held down is one gesture: its repetitions activate nothing, on any control of the form.
                     onKeyDown={(e) => { if (e.key === 'Enter' && e.repeat) e.preventDefault(); }}
                     aria-busy={loading || recoveryPending}>
@@ -152,7 +151,7 @@ export function LockScreen() {
                             </div>
                             <div className="text-center text-sm">
                                 <button type="button" id="mediflow-lock-confirm-pin" disabled={credentialsDisabled}
-                                    className="min-h-11 px-4 py-2 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2"
+                                    className="mf-button-text min-h-11"
                                     onClick={confirmHeldText}>
                                     {LONG_PIN_CONFIRM_LABEL}
                                 </button>
@@ -184,7 +183,7 @@ export function LockScreen() {
                         {loading || recoveryPending ? (
                             <>
                                 <Loader2 className={styles.spinner} size={16} />
-                                {recoveryPending ? 'Attendi la conferma…' : 'Sto sbloccando...'}
+                                {recoveryPending ? 'Attendi la conferma…' : 'Sblocco in corso…'}
                             </>
                         ) : (
                             <>
@@ -195,7 +194,7 @@ export function LockScreen() {
                     {!requiresSetup && (visibleError || authRecoveryState !== 'ready') && (
                         <div className="text-center text-sm">
                             <button type="button" disabled={loading || recoveryPending}
-                                className="min-h-11 px-4 py-2 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2"
+                                className="mf-button-text min-h-11"
                                 onClick={() => {
                                     setHeldText(null);
                                     setPin('');
@@ -210,10 +209,11 @@ export function LockScreen() {
                     )}
                 </form>
                 {passphrase && <div className="mt-4 space-y-4">
-                    <button type="button" disabled={credentialsDisabled} className="min-h-11 underline" onClick={() => setRecovering(!recovering)}>Recupera con kit e chiave</button>
+                    <button type="button" disabled={credentialsDisabled} aria-expanded={recovering} className="mf-button-text min-h-11"
+                        onClick={() => setRecovering(!recovering)}>{recovering ? 'Torna allo sblocco' : 'Recupera con kit e chiave'}</button>
                     {recovering && <PassphraseAccessForm mode="recover" onPrepare={preparePassphraseRecovery} />}
                 </div>}
-                {!passphrase && <p className="mt-4 text-sm">Accesso PIN transitorio. Dopo lo sblocco, adotta una passphrase in Impostazioni → Accesso. Il PIN resterà separato per le conferme.</p>}
+                {!passphrase && <p className="mt-4 text-sm">Per passare dal PIN alla passphrase, apri Impostazioni → Accesso dopo lo sblocco.</p>}
 
             </section>
         </div>

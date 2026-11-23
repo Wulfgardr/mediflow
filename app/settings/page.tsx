@@ -1,13 +1,14 @@
 'use client';
 
-import { ArrowUpRight } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, BrainCircuit, Database, LifeBuoy, Monitor, Palette } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 
 import { Disclosure } from '@/components/disclosure';
 import { ViewState } from '@/components/ui/view-state';
-import { ThemeToggle } from '@/components/theme-toggle';
+import { SettingsThemeControl } from '@/components/settings/settings-theme-control';
+import surface from '@/components/record-surface.module.css';
 import {
     deriveNetworkOperatingModeViewModel,
     type NetworkOverviewPayload,
@@ -16,6 +17,13 @@ import { SETTINGS_NAV_GROUPS } from '@/lib/settings-navigation';
 
 import styles from '@/components/settings/settings-lume.module.css';
 import overviewStyles from './overview.module.css';
+
+const GROUP_ICONS = new Map([
+    ['generale', Monitor],
+    ['sicurezza-dati', Database],
+    ['ai', BrainCircuit],
+    ['avanzate', LifeBuoy],
+]);
 
 const LEGACY_ANCHOR_REDIRECTS: Record<string, string> = {
     '#account': '/settings/profilo',
@@ -140,66 +148,74 @@ export default function SettingsPage() {
 
     return (
         <div className={overviewStyles.overview} data-testid="settings-overview-section">
-            <p className={overviewStyles.introduction}>Apri una sezione per configurare la postazione. Le impostazioni restano separate dal lavoro clinico.</p>
-            <section className={overviewStyles.section} aria-labelledby="settings-workstation-title"
-                data-testid="settings-focus-section" data-settings-section="system-status">
-                <div>
-                    <h2 id="settings-workstation-title" className={overviewStyles.sectionTitle}>Postazione</h2>
-                    <div className={overviewStyles.status} data-testid="settings-network-mode-value" aria-live="polite">
-                        {currentNetworkMode ? <p>Stato <strong>{isHomeBase ? 'Home-base' : 'Locale'}</strong></p>
-                            : <ViewState state={isNetworkUnverified || networkError ? 'unavailable' : 'loading'}
-                                title={isNetworkUnverified ? 'Non verificata' : networkError ? 'Non disponibile' : 'Lettura della modalità operativa…'}
-                                detail={networkError ?? undefined} />}
+            <div className={surface.tray} data-record-tray="settings-workstation">
+                <section className={surface.island} aria-labelledby="settings-workstation-title"
+                    data-testid="settings-focus-section" data-settings-section="system-status">
+                    <div className={surface.islandHeader}>
+                        <span className={surface.islandIcon}><Monitor size={16} aria-hidden="true" /></span>
+                        <h2 id="settings-workstation-title">Postazione</h2>
                     </div>
-                    {currentNetworkMode ? <p className={overviewStyles.supportingCopy}>{isHomeBase ? 'Home-base attivo.' : 'Home-base disattivato.'}</p> : null}
-                    <Disclosure title="Dettagli della connessione" className={overviewStyles.details}>
-                        <p>{connectionDetail}</p>
-                        {networkViewModel ? <p>{networkViewModel.currentState.label}. {networkViewModel.currentState.description}</p> : null}
-                        <p>Esportazione e backup restano percorsi separati ed espliciti.</p>
-                    </Disclosure>
-                    {currentNetworkMode && networkError ? <p className={overviewStyles.notice} role="status">{networkError}</p> : null}
-                </div>
-                <div className={overviewStyles.actions}>
-                    <button type="button" className={styles.primaryAction} data-settings-primary="true"
-                        data-testid="settings-network-mode-action" disabled={isNetworkLoading || isNetworkSaving || !currentNetworkMode}
-                        onClick={() => void updateNetworkMode()}>
-                        {isNetworkSaving ? 'Aggiornamento' : !currentNetworkMode
-                            ? isNetworkLoading ? 'Lettura stato' : 'Stato non disponibile'
-                            : isHomeBase ? 'Disattiva home-base' : 'Abilita home-base'}
-                    </button>
-                    <Link href="/settings/diagnostica" className={styles.secondaryAction}>
-                        Apri diagnostica<ArrowUpRight aria-hidden="true" />
-                    </Link>
-                </div>
-            </section>
-            <section className={overviewStyles.section} aria-labelledby="settings-appearance-title"
-                data-testid="settings-preview-section" data-settings-section="appearance-preview">
-                <div>
-                    <h2 id="settings-appearance-title" className={overviewStyles.sectionTitle}>Aspetto</h2>
-                    <p className={overviewStyles.supportingCopy}>Scegli il tema chiaro, scuro o di sistema.</p>
-                </div>
-                <div className={overviewStyles.actions}>
-                    <ThemeToggle />
-                </div>
-            </section>
-            <nav className={overviewStyles.index} aria-labelledby="settings-index-title">
-                <h2 id="settings-index-title" className={overviewStyles.sectionTitle}>Sezioni</h2>
-                {SETTINGS_NAV_GROUPS.map(group => (
-                    <div className={overviewStyles.group} key={group.id}>
-                        <h3 className={overviewStyles.groupTitle}>{group.label}</h3>
-                        <ul className={overviewStyles.list}>
-                            {group.items.filter(item => item.href !== "/settings").map(item => (
-                                <li key={item.id}>
-                                    <Link href={item.href} className={overviewStyles.indexLink}
-                                        data-testid={`settings-overview-link-${item.id}`} data-tone={item.tone ?? 'default'}>
-                                        <span><strong>{item.label}</strong><small>{item.description}</small></span>
-                                        <ArrowUpRight aria-hidden="true" />
-                                    </Link>
-                                </li>
-                            ))}
-                        </ul>
+                    <div className={overviewStyles.row}>
+                        <div>
+                            <div data-testid="settings-network-mode-value" aria-live="polite">
+                                {currentNetworkMode ? <p className={overviewStyles.status}>Modalità operativa <strong>{isHomeBase ? 'Home-base' : 'Locale'}</strong></p>
+                                    : <ViewState state={isNetworkUnverified || networkError ? 'unavailable' : 'loading'}
+                                        title={isNetworkUnverified ? 'Non verificata' : networkError ? 'Non disponibile' : 'Lettura della modalità operativa…'}
+                                        detail={networkError ?? undefined} />}
+                            </div>
+                            <Disclosure title="Dettagli della connessione">
+                                <p>{connectionDetail}</p>
+                                {networkViewModel ? <p>{networkViewModel.currentState.label}. {networkViewModel.currentState.description}</p> : null}
+                                <p>Esportazione e backup restano percorsi separati ed espliciti.</p>
+                            </Disclosure>
+                            {currentNetworkMode && networkError ? <p className={overviewStyles.notice} role="status">{networkError}</p> : null}
+                        </div>
+                        <div className={overviewStyles.actions}>
+                            <button type="button" className={styles.primaryAction} data-settings-primary="true"
+                                data-testid="settings-network-mode-action" disabled={isNetworkLoading || isNetworkSaving || !currentNetworkMode}
+                                onClick={() => void updateNetworkMode()}>
+                                {isNetworkSaving ? 'Aggiornamento' : !currentNetworkMode
+                                    ? isNetworkLoading ? 'Lettura stato' : 'Stato non disponibile'
+                                    : isHomeBase ? 'Disattiva home-base' : 'Abilita home-base'}
+                            </button>
+                            <Link href="/settings/diagnostica" className={styles.secondaryAction}>
+                                Apri diagnostica<ArrowUpRight size={16} aria-hidden="true" />
+                            </Link>
+                        </div>
                     </div>
-                ))}
+                </section>
+                <section className={`${surface.island} ${overviewStyles.appearance}`} aria-labelledby="settings-appearance-title"
+                    data-testid="settings-preview-section" data-settings-section="appearance-preview">
+                    <div className={surface.islandHeader}>
+                        <span className={surface.islandIcon}><Palette size={16} aria-hidden="true" /></span>
+                        <h2 id="settings-appearance-title">Aspetto</h2>
+                    </div>
+                    <SettingsThemeControl />
+                </section>
+            </div>
+            <nav className={`${surface.tray} ${overviewStyles.index}`} data-record-tray="settings-sections" aria-label="Sezioni">
+                {SETTINGS_NAV_GROUPS.map(group => {
+                    const Icon = GROUP_ICONS.get(group.id);
+                    return (
+                        <section className={surface.island} key={group.id} aria-labelledby={`settings-group-${group.id}`}>
+                            <div className={surface.islandHeader}>
+                                {Icon && <span className={surface.islandIcon}><Icon size={16} aria-hidden="true" /></span>}
+                                <h2 id={`settings-group-${group.id}`}>{group.label}</h2>
+                            </div>
+                            <ul className={overviewStyles.list}>
+                                {group.items.filter(item => item.href !== '/settings').map(item => (
+                                    <li key={item.id}>
+                                        <Link href={item.href} className={overviewStyles.indexLink}
+                                            data-testid={`settings-overview-link-${item.id}`} data-tone={item.tone ?? 'default'}>
+                                            <span><strong>{item.label}</strong><small>{item.description}</small></span>
+                                            <ArrowRight size={16} aria-hidden="true" />
+                                        </Link>
+                                    </li>
+                                ))}
+                            </ul>
+                        </section>
+                    );
+                })}
             </nav>
         </div>
     );
