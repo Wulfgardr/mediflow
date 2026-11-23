@@ -268,17 +268,10 @@ impl ClinicalApp {
     }
 
     pub(super) fn document_original_view(&self, cx: &Context<Self>) -> Div {
-        let view = div()
-            .min_w_0()
-            .max_w_full()
-            .flex()
-            .flex_col()
-            .gap(px(12.))
-            .child(section(
-                "document-original-heading",
-                "Originale",
-                self.theme,
-            ));
+        let theme = self.theme;
+        let view = surface::island(theme, true).child(surface::island_title(
+            "document-original-heading", "ORIGINALE", None, theme,
+        ));
         match &self.patient.document_original {
             Some(original) => {
                 view.child(self.document_original_content(original, OriginalPlace::Documents, cx))
@@ -762,13 +755,7 @@ impl ClinicalApp {
 
     pub(super) fn document_details_view(&self, attachment: &Attachment, cx: &Context<Self>) -> Div {
         let id = format!("clinical-workspace-document-source-{}", attachment.id);
-        div()
-            .min_w_0()
-            .max_w_full()
-            .flex()
-            .flex_col()
-            .gap(px(16.))
-            .py(px(12.))
+        surface::island(self.theme, true)
             .children(
                 presentation(attachment)
                     .into_iter()

@@ -10,7 +10,8 @@ import { useConfirm } from '@/components/ui/confirm-dialog';
 import { generateMandateKeys } from '@/lib/agent-mandate-client';
 import { useAgentSettingsLoad } from '@/lib/hooks/effects/use-agent-settings-load';
 import { isValidNumericPin, numericPinError, validateNumericPinSubmission } from '@/lib/security/pin-input';
-import { SETTINGS_INPUT_CLASS, SETTINGS_PRIMARY_BUTTON_CLASS, SETTINGS_SECONDARY_BUTTON_CLASS } from '@/components/settings/settings-ui';
+import surface from '@/components/record-surface.module.css';
+import { SETTINGS_CARD_CLASS, SETTINGS_INPUT_CLASS, SETTINGS_PRIMARY_BUTTON_CLASS, SETTINGS_SECONDARY_BUTTON_CLASS } from '@/components/settings/settings-ui';
 
 const LOCAL_KIT_ERROR_MESSAGES: Record<string, string> = {
     LOCAL_KIT_PATH_INVALID: 'Cartella del kit non valida, inesistente o sincronizzata.',
@@ -112,6 +113,7 @@ export default function AgentSettingsPage() {
     useAgentSettingsLoad(() => refresh().catch(() => { setError('Operazione non riuscita. Riprova.'); }));
     const localKitConnected = Boolean(localKit?.connected);
     const localKitActive = Boolean(localKit?.connected && localKit.active && localKit.expiresAt && localKit.expiresAt > readAt);
+    const showLocalKitConfirmation = localKitConfirming && localKit !== null && !localKitConnected;
     const localKitStatusText = localKit === null
         ? 'Lettura stato in corso'
         : !localKitConnected
@@ -119,15 +121,15 @@ export default function AgentSettingsPage() {
         : localKitActive && localKit.expiresAt
             ? `Collegato · attivo ${formatMandateExpiry(localKit.expiresAt, readAt)}`
             : 'Collegato · mandato da rinnovare';
-    return <section aria-labelledby="agenti-title" className="mx-auto max-w-3xl space-y-6">
-        <header className="space-y-3">
-            <h2 id="agenti-title" className="[font:var(--type-section-heading)]">Agenti</h2>
+    return <section aria-labelledby="agenti-title" className="grid min-w-0 gap-[10px]">
+        <header className="flex flex-wrap items-center justify-between gap-2 px-1.5">
+            <h2 id="agenti-title" className="[font:var(--type-record-island)]">Agenti</h2>
             <div className="flex flex-wrap gap-2">
                 <Link href="/in-arrivo" className={SETTINGS_SECONDARY_BUTTON_CLASS}>In arrivo</Link>
                 <button className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy} onClick={() => { void run(refresh, false); }}>Aggiorna</button>
             </div>
         </header>
-        <nav aria-label="In questa pagina" className="flex flex-wrap gap-x-4 gap-y-2">
+        <nav aria-label="In questa pagina" className="flex flex-wrap gap-x-4 gap-y-2 px-1.5">
             <span>In questa pagina</span>
             <a href="#codex-ambulatorio" className="font-semibold">Codex · Ambulatorio</a>
             <a href="#mandato-nuovo" className="font-semibold">Nuovo mandato</a>
@@ -135,13 +137,13 @@ export default function AgentSettingsPage() {
             {registrations.length > 0 ? <a href="#client" className="font-semibold">Client registrati</a> : null}
             <a href="#mandati" className="font-semibold">Mandati</a>
         </nav>
-        <section id="codex-ambulatorio" aria-labelledby="codex-ambulatorio-title" className="space-y-4 border-b border-[var(--lume-rule)] pb-6">
+        <section id="codex-ambulatorio" aria-labelledby="codex-ambulatorio-title" className={`${SETTINGS_CARD_CLASS} space-y-4`}>
             <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
-                        <h3 id="codex-ambulatorio-title" className="[font:var(--type-section-heading)]">Codex · Ambulatorio</h3>
+                        <h3 id="codex-ambulatorio-title" className="[font:var(--type-record-island)]">Codex · Ambulatorio</h3>
                         {localKit !== null ? (
-                            <span className="rounded-full border border-[var(--lume-rule)] px-2 py-0.5 [font:var(--type-record-meta)]" style={{ color: localKitActive ? 'var(--lume-signal-success)' : localKitConnected ? 'var(--lume-signal-warning)' : 'var(--lume-ink-muted)' }}>
+                            <span className={localKitActive ? surface.pillSuccess : localKitConnected ? surface.pillWarning : surface.pillNeutral}>
                                 {localKitActive ? 'Attivo' : localKitConnected ? 'Da rinnovare' : 'Non collegato'}
                             </span>
                         ) : null}
@@ -156,7 +158,7 @@ export default function AgentSettingsPage() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                     {localKit === null ? (
-                        <button type="button" className={SETTINGS_PRIMARY_BUTTON_CLASS} disabled={busy} onClick={() => { void run(refresh, false); }}>
+                        <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy} onClick={() => { void run(refresh, false); }}>
                             Leggi lo stato
                         </button>
                     ) : localKitConnected ? (
@@ -164,7 +166,7 @@ export default function AgentSettingsPage() {
                             {!localKitActive ? (
                                 <button
                                     type="button"
-                                    className={SETTINGS_PRIMARY_BUTTON_CLASS}
+                                    className={SETTINGS_SECONDARY_BUTTON_CLASS}
                                     disabled={busy}
                                     onClick={() => {
                                         void run(async () => {
@@ -203,7 +205,7 @@ export default function AgentSettingsPage() {
                     ) : (
                         <button
                             type="button"
-                            className={SETTINGS_PRIMARY_BUTTON_CLASS}
+                            className={SETTINGS_SECONDARY_BUTTON_CLASS}
                             disabled={busy}
                             onClick={() => {
                                 setLocalKitConfirming(current => !current);
@@ -216,8 +218,8 @@ export default function AgentSettingsPage() {
                     )}
                 </div>
             </div>
-            {localKitConfirming && localKit !== null && !localKitConnected && (
-                <form className="space-y-4 rounded-lg border border-[var(--lume-rule)] p-4" onSubmit={event => {
+            {showLocalKitConfirmation && (
+                <form className="space-y-4 border-t border-[var(--lume-record-island-rule)] pt-4" onSubmit={event => {
                     event.preventDefault();
                     const problem = validateNumericPinSubmission(localKitPin);
                     if (problem) { setLocalKitPinSubmitError(problem); return; }
@@ -271,7 +273,7 @@ export default function AgentSettingsPage() {
                 </form>
             )}
             {localKitContextCount > 0 ? (
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--lume-rule)] px-3 py-2">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--lume-record-island-rule)] py-2">
                     <p className="[font:var(--type-meta)]">
                         Contesti paziente pronti per Codex: {localKitContextCount}
                     </p>
@@ -294,7 +296,7 @@ export default function AgentSettingsPage() {
                     </button>
                 </div>
             ) : null}
-            <details className="space-y-3">
+            <details className="space-y-3 border-t border-[var(--lume-record-island-rule)] pt-3">
                 <summary className="cursor-pointer font-semibold">Cartella del kit</summary>
                 <form className="mt-3 space-y-3" onSubmit={event => {
                     event.preventDefault();
@@ -323,7 +325,7 @@ export default function AgentSettingsPage() {
                 </form>
             </details>
         </section>
-        <form id="mandato-nuovo" aria-labelledby="mandato-nuovo-title" className="space-y-4" onSubmit={event => {
+        <form id="mandato-nuovo" aria-labelledby="mandato-nuovo-title" className={`${SETTINGS_CARD_CLASS} space-y-4`} onSubmit={event => {
             event.preventDefault();
             const pinProblem = validateNumericPinSubmission(pin);
             if (pinProblem) { setPinSubmitError(pinProblem); return; }
@@ -336,7 +338,7 @@ export default function AgentSettingsPage() {
                 await refresh();
             });
         }}>
-            <h3 id="mandato-nuovo-title" className="[font:var(--type-section-heading)]">Nuovo mandato</h3>
+            <h3 id="mandato-nuovo-title" className="[font:var(--type-record-island)]">Nuovo mandato</h3>
             <label className="block">Durata in ore<input className={SETTINGS_INPUT_CLASS} type="number" min="1" max="24" required value={hours} onChange={event => setHours(event.target.value)} /></label>
             <label className="block">Fornitore<select className={SETTINGS_INPUT_CLASS} value={provider} onChange={event => { setProvider(event.target.value as typeof provider); setEgress(false); }}>
                 <option value="openai">OpenAI (Codex)</option><option value="anthropic">Anthropic</option><option value="local">Locale</option>
@@ -350,18 +352,22 @@ export default function AgentSettingsPage() {
                 setPin(event.target.value); setPinSubmitError(null);
             }} /></label>
             {pinError && <p id="agent-mandate-pin-error" role="alert">{pinError}</p>}
-            <button className={SETTINGS_PRIMARY_BUTTON_CLASS} disabled={busy || !operations.length || !isValidNumericPin(pin)}>Crea mandato</button>
+            <div className="flex justify-end">
+                <button className={showLocalKitConfirmation ? SETTINGS_SECONDARY_BUTTON_CLASS : SETTINGS_PRIMARY_BUTTON_CLASS}
+                    disabled={busy || !operations.length || !isValidNumericPin(pin)}>Crea mandato</button>
+            </div>
         </form>
         {error && <p role="alert">{error}</p>}
-        <section id="abbinamenti" className="space-y-3"><h3 className="[font:var(--type-section-heading)]">Richieste di abbinamento</h3>
-            <p>Confronta il codice con quello mostrato dall’agente prima di approvare.</p>
+        <section id="abbinamenti" className={`${SETTINGS_CARD_CLASS} space-y-3`}><h3 className="[font:var(--type-record-island)]">Richieste di abbinamento</h3>
+            {pairings.length > 0 ? <p>Confronta il codice con quello mostrato dall’agente prima di approvare.</p>
+                : readAt > 0 && <p className="type-meta">Nessuna richiesta di abbinamento.</p>}
             <ul>{pairings.map(pairing => {
                 const compatible = mandates.filter(mandate => mandate.revokedAt === null && mandate.expiresAt > readAt
                     && pairing.operations.every(operation => mandate.operations.includes(operation)));
                 const selected = compatible.find(mandate => mandate.id === selectedMandates[pairing.id])?.id ?? compatible[0]?.id ?? '';
                 const renewOnUnlock = renewing === pairing.id;
-                return <li className="space-y-3 border-b border-[var(--lume-rule)] py-4" key={pairing.id}>
-                    <h3>{pairing.name} <strong>{pairing.code}</strong></h3>
+                return <li className="space-y-3 border-t border-[var(--lume-record-island-rule)] py-4" key={pairing.id}>
+                    <h3 className="type-section-heading">{pairing.name} <strong>{pairing.code}</strong></h3>
                     <p>{pairing.operations.map(operation => operationLabels[AGENT_OPERATIONS.indexOf(operation)]).join(', ')}</p>
                     <label className="block">Mandato per {pairing.name}<select className={SETTINGS_INPUT_CLASS} value={selected}
                         onChange={event => setSelectedMandates(current => ({ ...current, [pairing.id]: event.target.value }))}>
@@ -395,8 +401,8 @@ export default function AgentSettingsPage() {
                 </li>;
             })}</ul>
         </section>
-        {registrations.length > 0 && <section id="client" className="space-y-3"><h3 className="[font:var(--type-section-heading)]">Client registrati</h3>
-            <ul>{registrations.map(registration => <li key={registration.id} className="flex items-center justify-between gap-4 py-2">
+        {registrations.length > 0 && <section id="client" className={`${SETTINGS_CARD_CLASS} space-y-3`}><h3 className="[font:var(--type-record-island)]">Client registrati</h3>
+            <ul>{registrations.map(registration => <li key={registration.id} className="flex flex-wrap items-center justify-between gap-4 border-t border-[var(--lume-record-island-rule)] py-2">
                 <div>
                     <p>{registration.name}</p>
                     <p>{registration.revokedAt !== null ? 'Revocato' : registration.lastRenewalAt === null ? 'In attesa del primo sblocco'
@@ -413,8 +419,9 @@ export default function AgentSettingsPage() {
                     }); }}>Revoca</button>}
             </li>)}</ul>
         </section>}
-        <section id="mandati" className="space-y-3"><h3 className="[font:var(--type-section-heading)]">Mandati</h3>
-            <ul>{mandates.map(mandate => <li key={mandate.id} className="flex items-center justify-between gap-4 py-2">
+        <section id="mandati" className={`${SETTINGS_CARD_CLASS} space-y-3`}><h3 className="[font:var(--type-record-island)]">Mandati</h3>
+            {readAt > 0 && mandates.length === 0 && <p className="type-meta">Nessun mandato registrato.</p>}
+            <ul>{mandates.map(mandate => <li key={mandate.id} className="flex flex-wrap items-center justify-between gap-4 border-t border-[var(--lume-record-island-rule)] py-2">
                 <span>{mandate.provider} · {mandate.revokedAt !== null ? 'Revocato' : mandate.expiresAt <= readAt ? 'Scaduto' : formatMandateExpiry(mandate.expiresAt, readAt)}</span>
                 {mandate.revokedAt === null && <button className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy} onClick={async () => {
                     const answer = await confirm({ title: 'Revocare il mandato?', message: mandate.provider, confirmLabel: 'Conferma revoca', tone: 'danger' });

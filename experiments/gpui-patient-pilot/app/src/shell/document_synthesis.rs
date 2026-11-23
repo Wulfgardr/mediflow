@@ -347,17 +347,12 @@ impl ClinicalApp {
     pub(super) fn document_synthesis_view(&self, row: &Attachment, cx: &Context<Self>) -> Div {
         let theme = self.theme;
         let id = row.id.clone();
-        let mut pane = div()
-            .min_w_0()
-            .max_w_full()
-            .flex()
-            .flex_col()
-            .gap(px(12.))
-            .child(section(
-                SharedString::from(format!("document-synthesis-heading-{id}")),
-                "NUOVA SINTESI · PROPOSTA",
-                theme,
-            ));
+        let mut pane = surface::island(theme, true).child(surface::island_title(
+            format!("document-synthesis-heading-{id}"),
+            "NUOVA SINTESI · PROPOSTA",
+            None,
+            theme,
+        ));
         let line = |text: String| div().min_w_0().child(text!(text));
         let muted = |text: String| {
             div()

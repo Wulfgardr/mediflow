@@ -256,11 +256,7 @@ impl ClinicalApp {
             .flex()
             .flex_col()
             .gap(px(16.))
-            .child(heading(
-                "clinical-workspace-settings-heading",
-                "Voce locale",
-                theme,
-            ));
+            ;
         let Some(catalog) = &area.catalog else {
             return pane.child(notice(
                 "voice-model-status",

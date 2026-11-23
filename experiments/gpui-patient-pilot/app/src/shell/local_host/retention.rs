@@ -455,11 +455,6 @@ impl ClinicalApp {
             .flex()
             .flex_col()
             .gap(px(16.))
-            .child(heading(
-                "retention-heading",
-                "Conservazione dei dati",
-                theme,
-            ))
             .child(self.local_host_panel(cx));
         if self.local_host.access().is_none() {
             return pane;

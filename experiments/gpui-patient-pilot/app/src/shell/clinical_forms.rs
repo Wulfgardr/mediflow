@@ -14,7 +14,7 @@ impl ClinicalApp {
     }
 
     pub(super) fn form_view(&self, cx: &Context<Self>) -> Div {
-        self.form_body(true, cx)
+        surface::island(self.theme, false).child(self.form_body(true, cx))
     }
 
     pub(super) fn form_body(&self, preamble: bool, cx: &Context<Self>) -> Div {

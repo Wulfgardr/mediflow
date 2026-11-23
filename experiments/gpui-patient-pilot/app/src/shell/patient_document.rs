@@ -647,8 +647,7 @@ impl ClinicalApp {
         let pin = self.patient_document.pin.editor.read(cx).value();
         let ready_to_confirm =
             (4..=8).contains(&pin.len()) && pin.bytes().all(|b| b.is_ascii_digit());
-        let content=div().id("document-create-content").max_w(px(820.)).w_full().flex_shrink_0().flex().flex_col().gap(px(16.))
-            .child(heading("document-create-title","Nuova scheda da PDF",theme))
+        let content = surface::island(theme, false).id("document-create-content")
             .child(notice("document-create-identity","Identità ambigua e dati incerti. Inserisci e verifica personalmente ogni campo. Il testo del PDF è una fonte da controllare.",theme,true))
             .when(phase==Phase::Selecting,|el|el.child(div().id("document-create-drop").debug_selector(|| "document-create-drop-target".into()).border_1().border_color(theme.strong_rule).p(px(24.)).child(text!("Trascina qui un solo PDF, fino a 10 MiB."))
                 .on_drop(cx.listener(|this,paths:&gpui::ExternalPaths,_,cx|this.stage_patient_document(paths.paths().to_vec(),cx))))
@@ -701,7 +700,11 @@ impl ClinicalApp {
                 .flex()
                 .flex_col()
                 .items_center()
-                .child(content),
+                .child(surface::page(theme).max_w(px(820.)).flex_shrink_0()
+                    .child(surface::page_header(
+                        "document-create-title", "Nuova scheda da PDF", None, div(), theme,
+                    ))
+                    .child(surface::tray(theme).child(content))),
         )
     }
 }

@@ -202,9 +202,12 @@ fn catalog_copy(prosthetics: bool) -> (&'static str, &'static str) {
 impl ClinicalApp {
     pub(super) fn chat_function_view(&self, cx: &Context<Self>) -> Option<Div> {
         match self.patient.chat_function? {
-            Function::Insight => Some(self.patient_insight_view(cx)),
+            Function::Insight => Some(
+                surface::tray(self.theme)
+                    .child(surface::island(self.theme, false).child(self.patient_insight_view(cx))),
+            ),
             Function::Synthesis => Some(self.documents_view(cx)),
-            Function::Import => Some(self.smart_import_view(cx)),
+            Function::Import => Some(surface::tray(self.theme).child(self.smart_import_view(cx))),
             Function::OpenLoops
                 if self
                     .selected_id
@@ -229,7 +232,7 @@ impl ClinicalApp {
                     .as_deref()
                     .is_some_and(|id| self.service_matching.patient_is(id)) =>
             {
-                Some(self.service_matching_view(cx))
+                Some(surface::tray(self.theme).child(self.service_matching_view(cx)))
             }
             Function::ServiceMatching => None,
             Function::Icd
@@ -238,7 +241,8 @@ impl ClinicalApp {
                     .as_deref()
                     .is_some_and(|id| self.who.patient_is(id)) =>
             {
-                Some(self.who_view(cx))
+                Some(surface::tray(self.theme)
+                    .child(surface::island(self.theme, false).child(self.who_view(cx))))
             }
             Function::Icd => None,
         }
@@ -862,11 +866,10 @@ impl ClinicalApp {
             catalog_copy(pending.lock().is_ok_and(|p| p.is_prosthetics_catalog()))
         };
         let theme = self.theme;
-        Some(div().id("native-chat-access-confirmation").role(Role::Group)
+        Some(surface::island(theme, false)
+            .id("native-chat-access-confirmation").role(Role::Group)
             .aria_label("Conferma accesso della chat").flex_1().min_h_0().overflow_y_scroll()
-            .p(px(20.)).border_1().border_color(theme.rule)
-            .flex().flex_col().gap(px(12.))
-            .child(heading("native-chat-access-title", if booking_mode { "Conferma la prenotazione del controllo" } else if therapy_mode { "Conferma il cambio di stato della terapia" } else if catalog_mode { catalog_title } else if clinical_mode { "Scegli diagnosi e passi delle note" } else { "Condividi la scheda di prova nella chat?" }, theme))
+            .child(surface::page_header("native-chat-access-title", if booking_mode { "Conferma la prenotazione del controllo" } else if therapy_mode { "Conferma il cambio di stato della terapia" } else if catalog_mode { catalog_title } else if clinical_mode { "Scegli diagnosi e passi delle note" } else { "Condividi la scheda di prova nella chat?" }, None, div(), theme))
             .child(text!(format!("App richiedente: {app}")).with_id("native-chat-access-app"))
             .child(text!(opener).with_id("native-chat-access-opener"))
             .child(text!(format!("Archivio: {}", self.chat_access.archive)).with_id("native-chat-access-archive"))

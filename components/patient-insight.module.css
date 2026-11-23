@@ -5,3 +5,12 @@
 .proposal { border-inline-start: 1px dashed var(--lume-ink-pencil); padding-inline-start: 16px; overflow-wrap: anywhere; }
 .links { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 :global(html:root[data-lume]) .links :global(.mf-button-text) { padding-inline: 8px; }
+
+:global([data-record-tray='attenzione']) .section { border-color: var(--lume-record-island-rule); }
+:global([data-record-tray='attenzione']) .section > h3 { font: var(--type-record-island); }
+:global([data-record-tray='attenzione']) .proposal {
+    padding: 14px 16px;
+    border: 1px dashed var(--lume-record-proposal-rule);
+    border-radius: 14px;
+    background: transparent;
+}

@@ -1,5 +1,5 @@
 .page { min-width: 0; color: var(--lume-ink); font: var(--type-body); }
-.intro { margin-bottom: 28px; }
-.page.page .intro h2 { margin: 0 0 8px; font: var(--type-section-heading); }
+.intro { margin: 6px 6px 10px; }
+.page.page .intro h2 { margin: 0 0 8px; font: var(--type-record-island); }
 .intro p { max-width: 64ch; color: var(--lume-ink-muted); }
-.rows { min-width: 0; display: grid; }
+.rows { min-width: 0; display: grid; gap: 10px; }

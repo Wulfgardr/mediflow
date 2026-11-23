@@ -329,14 +329,11 @@ impl ClinicalApp {
     pub(super) fn service_matching_view(&self, cx: &Context<Self>) -> Div {
         let theme = self.theme;
         let saving = self.service_matching.saving;
-        let mut pane = div()
-            .min_w_0()
-            .flex()
-            .flex_col()
-            .gap(px(16.))
-            .child(heading(
+        let mut pane = surface::island(theme, false)
+            .child(surface::island_title(
                 "service-matching-heading",
                 "Abbinamento prestazioni",
+                None,
                 theme,
             ))
             .child(

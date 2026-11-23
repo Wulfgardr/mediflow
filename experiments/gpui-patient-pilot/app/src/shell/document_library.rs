@@ -118,16 +118,21 @@ impl ClinicalApp {
         let show_import = true;
         let writable =
             self.document_import_available() && self.patient.attachments.ready().is_some();
-        div().min_w_0().max_w_full().flex().flex_col().gap(px(16.))
-            .child(div().flex().flex_wrap().items_center().justify_between().gap(px(12.))
-                .child(observe_control(heading("clinical-workspace-documents-heading", "Documenti", theme)))
-                .child(observe_control(button("clinical-workspace-new-document", "Aggiungi documenti…", theme, true, writable && !self.document_imports.pending())
-                    .when(writable, |el| el.on_click(cx.listener(|this, _, _, cx| this.pick_document(cx)))))))
-            .when_some(self.synthesis_chat_notice(), |el, message| el.child(notice("document-synthesis-chat-selection", message, theme, false)))
+        let actions = div().child(observe_control(button(
+            "clinical-workspace-new-document",
+            "Aggiungi documenti…",
+            theme,
+            true,
+            writable && !self.document_imports.pending(),
+        )
+        .when(writable, |el| el.on_click(cx.listener(|this, _, _, cx| this.pick_document(cx))))));
+        let content = div().min_w_0().flex().flex_col().gap(px(10.))
             .child(self.dossier_import_view(cx))
             .when(show_import, |el| el.child(self.smart_import_view(cx)))
             .child(self.document_imports_view(cx))
-            .child(self.document_curation_view(cx))
+            .child(self.document_curation_view(cx));
+        let library = surface::island(theme, false)
+            .when_some(self.synthesis_chat_notice(), |el, message| el.child(notice("document-synthesis-chat-selection", message, theme, false)))
             .child(div().text_color(theme.secondary).child(text!("Prima del salvataggio puoi annullare la copia cambiando scheda o bloccando la sessione. Una copia già avviata può completarsi anche dopo il blocco.")))
             .when(self.document_operation != DocumentOperation::Idle, |el| el.child(notice("clinical-workspace-document-operation", self.document_operation.message(), theme, false)))
             .when_some(self.patient.attachments.state(ReadObject::Documenti), |el, state| el.child(self.render_read_state("clinical-workspace-attachments-state", state, cx)))
@@ -164,7 +169,14 @@ impl ClinicalApp {
                     .when(details_open, |el| el.child(self.document_details_view(row, cx)).child(self.document_synthesis_view(row, cx)))
             }))
             .child(div().text_color(theme.secondary).child(text!("Ogni caricamento richiede revisione e conferma. Il limite per file è 10 MiB. Le copie vengono salvate soltanto nella destinazione che scegli.")))
-            .child(notice("clinical-workspace-documents-native-limits", "Anteprima delle immagini diverse da PNG e JPEG, nuova estrazione dagli allegati, revisione agentica e importazione strutturata da CSV non disponibili. Per eliminare un documento apri prima Gestione locale in Impostazioni → Funzioni IA.", theme, false))
+            .child(notice("clinical-workspace-documents-native-limits", "Anteprima delle immagini diverse da PNG e JPEG, nuova estrazione dagli allegati, revisione agentica e importazione strutturata da CSV non disponibili. Per eliminare un documento apri prima Gestione locale in Impostazioni → Funzioni IA.", theme, false));
+        surface::section_tray(
+            "clinical-workspace-documents-heading",
+            "Documenti",
+            actions,
+            content.child(library),
+            theme,
+        )
     }
 
     pub(super) fn document_imports_view(&self, cx: &Context<Self>) -> Div {

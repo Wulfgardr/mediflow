@@ -289,7 +289,15 @@ for (const theme of ['light', 'dark'] as const) {
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
     await page.getByRole('button', { name: 'Blocca', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Sblocca MediFlow', exact: true })).toBeVisible();
-    await expect(page.locator('.type-brand')).toHaveCSS('font-size', '21px');
+    const brand = page.locator('[data-record-brand]');
+    await expect(brand).toHaveText('MediFlow');
+    await expect(brand).toHaveCSS('font-size', '15px');
+    await expect(brand).toHaveCSS('font-weight', '600');
+    const dots = brand.locator('[data-brand-glyph] > i');
+    await expect(dots).toHaveCount(3);
+    await expect(dots.nth(0)).toHaveCSS('width', '4px');
+    await expect(dots.nth(1)).toHaveCSS('width', '6px');
+    await expect(dots.nth(2)).toHaveCSS('width', '9px');
     await assertType(page, `sblocco-${theme}`, info, 2);
   });
 }

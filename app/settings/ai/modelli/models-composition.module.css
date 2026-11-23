@@ -6,28 +6,15 @@
     display: grid;
     gap: 8px;
     max-width: 70ch;
+    padding: 6px 6px 2px;
 }
-.title { composes: heading from "../../../../components/ink-section.module.css"; }
-.page.page .title,
-.page :global(#local-onboarding-title) {
+.title, .page :global(#local-onboarding-title) {
     margin: 0;
+    color: var(--lume-ink);
+    font: var(--type-record-island);
 }
-.section,
-.page [data-models-auxiliary='local'] > section {
-    display: grid;
-    min-width: 0;
-    gap: 12px;
-    padding: 20px 0;
-    border: 0;
-    border-top: 1px solid var(--lume-rule);
-    border-radius: 0;
-    background: transparent;
-    box-shadow: none;
-}
-.details {
-    padding-block: 12px;
-    border-top: 1px solid var(--lume-rule);
-}
+.section { composes: settingSurface from "../../../../components/settings/settings-lume.module.css"; }
+.details { composes: settingSurface from "../../../../components/settings/settings-lume.module.css"; }
 .page.page [data-models-auxiliary] :is(button:not([data-disclosure-control]), a[target='_blank']) {
     min-height: 40px;
     border: 1px solid var(--lume-rule-strong);
@@ -39,8 +26,12 @@
     outline: 2px solid var(--lume-accent);
     outline-offset: 2px;
 }
-.page [data-testid^='ai-model-selector-'] {
-    padding-block: 16px;
+.page.page :global([data-testid^='ai-model-selector-']) {
+    padding-block: 12px;
+    border: 0;
+    border-top: 1px solid var(--lume-record-island-rule);
+    border-radius: 0;
+    background: transparent;
     box-shadow: none;
 }
 .page :global(.truncate) {
@@ -54,3 +45,6 @@
         min-height: 44px;
     }
 }
+
+.details :is(h2, h3) :global(button[data-disclosure-control]) { font: var(--type-record-island); }
+.page .details [data-models-auxiliary='account'] > :global(section[data-testid='chatgpt-account-panel']) { padding: 0; border: 0; }

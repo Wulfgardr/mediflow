@@ -133,16 +133,26 @@ impl ClinicalApp {
             _ => {}
         }
         let theme = self.theme;
-        let mut view = div()
-            .reading_surface(theme)
-            .w_full()
-            .min_w_0()
-            .max_w(px(760.))
-            .flex()
-            .flex_col()
-            .gap(px(28.));
-        if self.settings_page != SettingsPage::Overview {
-            view = view.child(
+        let (id, title) = match self.settings_page {
+            SettingsPage::Access => ("settings-access-heading", "Accesso"),
+            SettingsPage::Danger => ("settings-danger-heading", "Zona pericolo"),
+            SettingsPage::Host => ("network-mode-heading", "Modo home-base"),
+            SettingsPage::Governance => ("governance-heading", "Governo Fabric"),
+            SettingsPage::Controls => ("controls-heading", "Controlli"),
+            SettingsPage::Archives => ("archive-heading", "Archivi e backup"),
+            SettingsPage::Retention => ("retention-heading", "Conservazione dei dati"),
+            SettingsPage::References => ("references-heading", "Repertori"),
+            #[cfg(target_os = "macos")]
+            SettingsPage::VoiceLocal => ("clinical-workspace-settings-heading", "Voce locale"),
+            SettingsPage::Profile => ("clinical-workspace-profile-heading", "PROFILO"),
+            SettingsPage::Appearance => ("clinical-workspace-settings-heading", "Aspetto"),
+            SettingsPage::Functions => ("clinical-workspace-settings-heading", "Funzioni IA"),
+            SettingsPage::Models => ("clinical-workspace-settings-heading", "Modelli e hardware"),
+            SettingsPage::Overview => ("clinical-workspace-settings-heading", "Impostazioni"),
+            SettingsPage::Ambulatories | SettingsPage::AiPreferences => unreachable!(),
+        };
+        let actions = div().when(self.settings_page != SettingsPage::Overview, |el| {
+            el.child(
                 self.settings_targets[0]
                     .attach(button(
                         "clinical-workspace-settings-back",
@@ -154,9 +164,13 @@ impl ClinicalApp {
                     .on_click(cx.listener(|this, _, window, cx| {
                         this.select_settings_page(SettingsPage::Overview, window, cx)
                     })),
-            );
-        }
-        match self.settings_page {
+            )
+        });
+        let header = surface::page(theme)
+            .max_w(px(760.))
+            .child(surface::page_header(id, title, None, actions, theme));
+        let view = surface::island(theme, false);
+        let content = match self.settings_page {
             SettingsPage::Access => view.child(self.access_view(cx)),
             SettingsPage::Danger => view.child(self.danger_view(cx)),
             SettingsPage::Host => view.child(self.network_mode_view(cx)),
@@ -166,47 +180,47 @@ impl ClinicalApp {
             SettingsPage::Retention => view.child(self.retention_view(cx)),
             SettingsPage::References => view.child(self.reference_administration_view(cx)),
             SettingsPage::Profile => view.child(self.account_profile_view(cx)).child(self.work_profile_view(cx)),
-            SettingsPage::Appearance => view.child(heading("clinical-workspace-settings-heading", "Aspetto", theme))
-            .child(div().flex().flex_col().gap(px(12.))
-                .child(section("clinical-workspace-appearance-heading", "ASPETTO", theme))
-                .child(self.appearance((layout.width-if layout.compact {0.} else {layout.navigation}-if layout.magnified {0.} else {16.}-2.*layout.margin).min(760.),false,cx)))
-            .child(div().flex().flex_col().gap(px(12.))
-                .child(section("clinical-workspace-text-scale-heading", "DIMENSIONE DEL TESTO", theme))
-                .child(div().text_color(theme.secondary).child(text!("La pagina passa a una sola colonna quando serve più spazio per leggere.")))
-                .child(div().flex().flex_wrap().gap(px(8.))
-                    .children([(1., "100%"), (1.25, "125%"), (1.5, "150%"), (2., "200%"), (3., "300%"), (4., "400%")].into_iter().map(|(scale, label)| {
-                        button(format!("clinical-workspace-text-scale-{}", (scale * 100.) as u32), label, theme, false, true)
-                            .aria_selected(self.text_scale == scale).when(self.text_scale == scale, |el| el.bg(theme.selected).border_color(theme.fresh))
-                            .on_click(cx.listener(move |this, _, _, cx| this.change_local_preference(PreferenceChange::TextScale(scale), cx)))
-                    }))))
-            .child(button("clinical-workspace-increased-contrast", if self.increased_contrast { "Contrasto dei filetti: aumentato" } else { "Aumenta il contrasto dei filetti" }, theme, false, true)
-                .on_click(cx.listener(|this, _, _, cx| this.change_local_preference(PreferenceChange::Contrast(!this.increased_contrast), cx))))
-            .child(self.local_preferences_status(cx))
-            .child(self.system_accessibility_view(cx))
-            .child(div().border_t_1().border_color(theme.rule).pt(px(24.)).flex().flex_col().gap(px(12.))
-                .child(section("clinical-workspace-privacy-heading", "Privacy", theme))
-                .child(div().text_color(theme.secondary).child(text!("Copre questa finestra e conserva la bozza. L’accesso resta aperto finché non scegli Blocca. Puoi oscurare e mostrare i contenuti anche con Ctrl/Cmd + Maiusc + P.")))
-                .child(button("clinical-workspace-privacy-cover", "Oscura contenuti", theme, false, true)
-                    .on_click(cx.listener(|this, _, window, cx| {
-                        this.change_local_preference(PreferenceChange::Privacy(true), cx);
-                        window.focus(&this.focus, cx);
-                    }))))
-,
-            SettingsPage::Functions => view.child(heading("clinical-workspace-settings-heading","Funzioni IA",theme))
+            SettingsPage::Appearance => {
+                let navigation = if layout.compact { 0. } else { layout.navigation };
+                let frame = if layout.magnified { 0. } else { 16. };
+                let width = (layout.width - navigation - frame - 2. * layout.margin).min(760.);
+                view.child(div().flex().flex_col().gap(px(12.))
+                    .child(surface::island_title("clinical-workspace-appearance-heading", "ASPETTO", None, theme))
+                    .child(self.appearance(width - 2. * surface::TRAY_ISLAND_INSET, false, cx)))
+                .child(div().flex().flex_col().gap(px(12.))
+                    .child(section("clinical-workspace-text-scale-heading", "DIMENSIONE DEL TESTO", theme))
+                    .child(div().flex().flex_wrap().gap(px(8.))
+                        .children([(1., "100%"), (1.25, "125%"), (1.5, "150%"), (2., "200%"), (3., "300%"), (4., "400%")].into_iter().map(|(scale, label)| {
+                            button(format!("clinical-workspace-text-scale-{}", (scale * 100.) as u32), label, theme, false, true)
+                                .aria_selected(self.text_scale == scale).when(self.text_scale == scale, |el| el.bg(theme.selected).border_color(theme.fresh))
+                                .on_click(cx.listener(move |this, _, _, cx| this.change_local_preference(PreferenceChange::TextScale(scale), cx)))
+                        }))))
+                .child(button("clinical-workspace-increased-contrast", if self.increased_contrast { "Contrasto dei filetti: aumentato" } else { "Aumenta il contrasto dei filetti" }, theme, false, true)
+                    .on_click(cx.listener(|this, _, _, cx| this.change_local_preference(PreferenceChange::Contrast(!this.increased_contrast), cx))))
+                .child(self.local_preferences_status(cx))
+                .child(self.system_accessibility_view(cx))
+                .child(div().border_t_1().border_color(theme.rule).pt(px(24.)).flex().flex_col().gap(px(12.))
+                    .child(section("clinical-workspace-privacy-heading", "Privacy", theme))
+                    .child(div().text_color(theme.secondary).child(text!("Copre questa finestra e conserva la bozza. L’accesso resta aperto finché non scegli Blocca. Puoi oscurare e mostrare i contenuti anche con Ctrl/Cmd + Maiusc + P.")))
+                    .child(button("clinical-workspace-privacy-cover", "Oscura contenuti", theme, false, true)
+                        .on_click(cx.listener(|this, _, window, cx| {
+                            this.change_local_preference(PreferenceChange::Privacy(true), cx);
+                            window.focus(&this.focus, cx);
+                        }))))
+            }
+            SettingsPage::Functions => view
                 .child(self.local_host_panel(cx))
                 .child(self.ai_status_view(cx))
                 .child(self.parameters_view(cx))
                 .child(self.chatgpt_account_view(cx))
                 .child(button("local-host-function-preferences","Preferenze e scelta del modello per funzione…",theme,false,!self.local_work_pending()).on_click(cx.listener(|this,_,window,cx|this.select_settings_page(SettingsPage::AiPreferences,window,cx)))),
-            SettingsPage::Models => view
-                .child(heading("clinical-workspace-settings-heading", "Modelli e hardware", theme))
-                .child(self.models_view(cx)),
+            SettingsPage::Models => view.child(self.models_view(cx)),
             #[cfg(target_os = "macos")]
             SettingsPage::VoiceLocal => view.child(self.voice_model_view(cx)),
             SettingsPage::Overview => {
                 let origin = self.session.as_ref().map(|session| session.base_url().to_owned()).unwrap_or_default();
-                view.child(heading("clinical-workspace-settings-heading", "Impostazioni", theme))
-                    .child(section("clinical-workspace-settings-postazione", "Postazione", theme))
+                let workstation = view
+                    .child(surface::island_title("clinical-workspace-settings-postazione", "POSTAZIONE", None, theme))
                     .children([
                         (SettingsPage::Profile, "Profilo", "Nome medico e ambulatorio"),
                         (SettingsPage::Access, "Accesso", "Passphrase, PIN e blocco della sessione"),
@@ -218,21 +232,28 @@ impl ClinicalApp {
                         (SettingsPage::Controls, "Controlli", "Evidenze, aggiornamenti, audit e redazione"),
                         (SettingsPage::References, "Repertori", "Stato, fonti e importazione dei cataloghi"),
                         (SettingsPage::Retention, "Conservazione dei dati", "Termini, blocchi e scarto dei fascicoli"),
-                    ].into_iter().map(|(page, label, description)| self.settings_item(page, label, description, cx)))
-                    .child(section("clinical-workspace-settings-intelligenza", "Intelligenza", theme))
+                    ].into_iter().map(|(page, label, description)| self.settings_item(page, label, description, cx)));
+                let intelligence = surface::island(theme, false)
+                    .child(surface::island_title("clinical-workspace-settings-intelligenza", "INTELLIGENZA", None, theme))
                     .children([
                         (SettingsPage::Models, "Modelli", "Stato della configurazione sull’home-base"),
                         (SettingsPage::Functions, "Funzioni IA", "Preferenze e scelta del modello per funzione"),
                         (SettingsPage::Governance, "Governo Fabric", "Registro, sedi e verifiche salvate"),
-                    ].into_iter().chain(voice_settings_row()).map(|(page, label, description)| self.settings_item(page, label, description, cx)))
-                    .child(section("clinical-workspace-connection-heading", "Archivio collegato", theme))
+                    ].into_iter().chain(voice_settings_row()).map(|(page, label, description)| self.settings_item(page, label, description, cx)));
+                let archive = surface::island(theme, false)
+                    .child(surface::island_title("clinical-workspace-connection-heading", "ARCHIVIO COLLEGATO", None, theme))
                     .child(text!(origin))
                     .child(button("clinical-workspace-settings-lock", "Blocca e nascondi i dati", theme, false, true)
                         .on_click(cx.listener(|this, _, _, cx| this.request_discard(Discard::Lock, cx))))
-                    .child(notice("clinical-workspace-settings-native-limits", "Il controllo account ChatGPT è disponibile. DEMO, consenso alle proposte e generazione nativa non sono ancora disponibili.", theme, false))
+                    .child(notice("clinical-workspace-settings-native-limits", "Il controllo account ChatGPT è disponibile. DEMO, consenso alle proposte e generazione nativa non sono ancora disponibili.", theme, false));
+                return header.child(surface::tray(theme)
+                    .child(workstation)
+                    .child(intelligence)
+                    .child(archive));
             }
             SettingsPage::Ambulatories | SettingsPage::AiPreferences => unreachable!(),
-        }
+        };
+        header.child(surface::tray(theme).child(content))
     }
 
     fn settings_item(

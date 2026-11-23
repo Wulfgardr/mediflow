@@ -7,6 +7,8 @@ macro_rules! text {
 
 pub(super) const TRAY_INSET: f32 = 10.;
 pub(super) const ISLAND_RADIUS: f32 = 14.;
+const ISLAND_INSET: f32 = 16.;
+pub(super) const TRAY_ISLAND_INSET: f32 = TRAY_INSET + ISLAND_INSET + 2.;
 pub(super) const SEGMENT_RADIUS: f32 = 12.;
 pub(super) const PILL_RADIUS: f32 = 8.;
 pub(super) const GLYPH_SIZE: f32 = 28.;
@@ -33,7 +35,7 @@ pub(super) fn tray(theme: Theme) -> Div {
 
 pub(super) fn island(theme: Theme, compact: bool) -> Div {
     column(10.)
-        .p(px(16.))
+        .p(px(ISLAND_INSET))
         .bg(if compact {
             theme.record.compact_island
         } else {
@@ -52,7 +54,7 @@ pub(super) fn island_highlight(theme: Theme, compact: bool) -> Div {
 
 pub(super) fn island_proposal(theme: Theme) -> Div {
     column(10.)
-        .p(px(16.))
+        .p(px(ISLAND_INSET))
         .border_1()
         .border_dashed()
         .border_color(theme.record.proposal_rule)
@@ -61,12 +63,13 @@ pub(super) fn island_proposal(theme: Theme) -> Div {
 
 pub(super) fn record_heading(
     id: impl Into<SharedString>,
-    label: &str,
+    label: impl Into<crate::title::TitleText>,
     count: Option<String>,
     theme: Theme,
     role: crate::theme::TitleRole,
 ) -> Stateful<Div> {
     let id = id.into();
+    let label = label.into();
     div()
         .id(SharedString::from(format!("{id}-row")))
         .min_w_0()
@@ -80,10 +83,10 @@ pub(super) fn record_heading(
                 .id(id.clone())
                 .accessibility_id(id)
                 .role(Role::Heading)
-                .aria_label(SharedString::from(label.to_owned()))
+                .aria_label(SharedString::from(label.text().to_owned()))
                 .min_w_0()
                 .text_color(theme.ink)
-                .child(crate::title::title(label.to_owned(), theme).with_role(role)),
+                .child(crate::title::title(label, theme).with_role(role)),
         )
         .when_some(count, |el, count| {
             el.child(
@@ -96,8 +99,8 @@ pub(super) fn record_heading(
 }
 
 pub(super) fn island_title(
-    id: &'static str,
-    label: &str,
+    id: impl Into<SharedString>,
+    label: impl Into<crate::title::TitleText>,
     count: Option<String>,
     theme: Theme,
 ) -> Stateful<Div> {
@@ -124,37 +127,30 @@ pub(super) fn glyph(kind: Icon, tint: Option<Hsla>, theme: Theme) -> Div {
         .child(icon(kind, tint.unwrap_or(theme.secondary), 15.))
 }
 
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "testata delle viste GPUI non-Riepilogo, adottata nell'ondata GPUI"
-    )
-)]
 pub(super) fn page_header(
     id: &'static str,
-    title: &str,
+    title: impl Into<crate::title::TitleText>,
     meta: Option<String>,
     actions: Div,
     theme: Theme,
 ) -> Div {
-    div()
-        .min_w_0()
-        .max_w_full()
-        .flex()
-        .flex_wrap()
+    header_row(theme)
         .items_start()
-        .justify_between()
-        .gap(px(12.))
-        .when(theme.scale >= 2.5, |el| el.flex_col().items_stretch())
+        .when(theme.scale >= 2.5, |el| el.items_stretch())
         .child(
             column(6.)
                 .flex_1()
-                .child(crate::components::heading_with_role(
-                    id,
-                    title.to_owned(),
-                    theme,
-                    crate::theme::TitleRole::RecordPerson,
+                .when(theme.scale < 2.5, |el| {
+                    el.min_w(px(144. * theme.scale.min(1.5)))
+                })
+                .max_w_full()
+                .child(crate::components::observe_control(
+                    crate::components::heading_with_role(
+                        id,
+                        title,
+                        theme,
+                        crate::theme::TitleRole::RecordPerson,
+                    ),
                 ))
                 .when_some(meta, |el, meta| {
                     el.child(
@@ -167,14 +163,60 @@ pub(super) fn page_header(
                     )
                 }),
         )
+        .child(header_actions(actions))
+}
+
+fn header_row(theme: Theme) -> Div {
+    div()
+        .min_w_0()
+        .max_w_full()
+        .flex()
+        .flex_wrap()
+        .justify_between()
+        .gap(px(12.))
+        .when(theme.scale >= 2.5, |el| el.flex_col())
+}
+
+fn header_actions(actions: Div) -> Div {
+    actions
+        .min_w_0()
+        .max_w_full()
+        .flex()
+        .flex_wrap()
+        .items_center()
+        .justify_end()
+        .gap(px(8.))
+}
+
+pub(super) fn page(theme: Theme) -> Div {
+    column(16.).w_full().reading_surface(theme)
+}
+
+pub(super) fn section_tray(
+    id: &'static str,
+    label: &str,
+    actions: Div,
+    content: Div,
+    theme: Theme,
+) -> Div {
+    tray(theme)
         .child(
-            actions
-                .flex()
-                .flex_wrap()
+            header_row(theme)
                 .items_center()
-                .justify_end()
-                .gap(px(8.)),
+                .px(px(8.))
+                .pt(px(8.))
+                .child(crate::components::observe_control(
+                    crate::components::heading_with_role(
+                        id,
+                        label,
+                        theme,
+                        crate::theme::TitleRole::RecordZone,
+                    )
+                    .debug_selector(move || id.into()),
+                ))
+                .child(header_actions(actions)),
         )
+        .child(content)
 }
 
 pub(super) fn segmented_bar(id: &'static str, label: &'static str, theme: Theme) -> Stateful<Div> {
@@ -191,6 +233,23 @@ pub(super) fn segmented_bar(id: &'static str, label: &'static str, theme: Theme)
         .border_1()
         .border_color(theme.record.island_rule)
         .rounded(px(SEGMENT_RADIUS))
+}
+
+pub(super) fn segment(
+    id: &'static str,
+    label: &'static str,
+    selected: bool,
+    theme: Theme,
+) -> Stateful<Div> {
+    tab(id, label, selected, theme)
+        .rounded(px(10.))
+        .border_1()
+        .border_color(if selected {
+            theme.record.island_rule
+        } else {
+            gpui::transparent_black()
+        })
+        .when(selected, |el| el.bg(theme.sheet).text_color(theme.ink))
 }
 
 pub(super) fn status_pill(text: impl Into<SharedString>, color: Hsla, theme: Theme) -> Div {

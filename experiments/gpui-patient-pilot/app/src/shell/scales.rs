@@ -1591,19 +1591,20 @@ impl ClinicalApp {
 
     pub(super) fn scales_view(&self, cx: &Context<Self>) -> Div {
         let theme = self.theme;
-        let mut pane = div().min_w_0().max_w_full().flex().flex_col().gap(px(24.))
-            .child(heading("clinical-scales-heading", "Scale", theme))
-            .child(div().text_color(theme.secondary).child(text!("Scegli una persona e uno strumento. Il risultato resta una bozza finché non lo rivedi e confermi nel Diario.")))
-            .child(button("clinical-scales-reload", "Rileggi catalogo e persone", theme, false, !matches!(self.scales.catalog, Load::Loading))
-                .when(!matches!(self.scales.catalog, Load::Loading), |el| el.on_click(cx.listener(|this, _, _, cx| this.load_scales(cx)))))
+        let actions = div().child(button("clinical-scales-reload", "Rileggi catalogo e persone", theme, false, !matches!(self.scales.catalog, Load::Loading))
+            .when(!matches!(self.scales.catalog, Load::Loading), |el| el.on_click(cx.listener(|this, _, _, cx| this.load_scales(cx)))));
+        let header = surface::page(theme).child(surface::page_header(
+            "clinical-scales-heading", "Scale", None, actions, theme,
+        ));
+        let mut pane = surface::island(theme, false)
             .when(self.verified.is_some(), |el| el.child(notice("clinical-scales-verified", self.verified.clone().unwrap_or_default(), theme, false)));
         if let Some(message) = self.scales.catalog.message() {
-            return pane.child(notice(
+            return header.child(surface::tray(theme).child(pane.child(notice(
                 "clinical-scales-state",
                 message.to_owned(),
                 theme,
                 matches!(self.scales.catalog, Load::Failed(_)),
-            ));
+            ))));
         }
         if let Some(patient) = self.patient.detail.ready() {
             pane = pane.child(
@@ -1736,9 +1737,10 @@ impl ClinicalApp {
             .detail
             .ready()
             .is_some_and(|patient| !patient.is_archived && patient.deleted_at.is_none());
-        pane.child(section(
+        let catalog = surface::island(theme, false).child(surface::island_title(
             "clinical-scales-catalog-label",
             "STRUMENTI DELL’ARCHIVIO",
+            None,
             theme,
         ))
         .children(
@@ -1809,7 +1811,8 @@ impl ClinicalApp {
                                 }),
                         )
                 }),
-        )
+        );
+        header.child(surface::tray(theme).child(pane).child(catalog))
     }
 
     pub(super) fn scale_workspace_view(&self, layout: Layout, cx: &Context<Self>) -> Stateful<Div> {
@@ -1856,9 +1859,11 @@ impl ClinicalApp {
                 },
                 theme,
             ))
-            .child(heading(
+            .child(surface::page_header(
                 "clinical-scale-title",
                 scale.descriptor.title.clone(),
+                None,
+                div(),
                 theme,
             ))
             .child(
@@ -1868,7 +1873,7 @@ impl ClinicalApp {
             );
         let question = &scale.descriptor.questions[scale.question];
         let question_index = scale.question;
-        let mut questions = div().min_w_0().flex_1().flex().flex_col().gap(px(16.));
+        let mut questions = surface::island(theme, false).flex_1();
         if scale.prepared.is_none() && !scale.has_attempt() {
             questions = questions.child(div().type_role(theme, crate::theme::TextRole::Meta).text_color(theme.secondary)
                 .child(text!(format!("Domanda {} di {} · {} risposte inserite", scale.question + 1, scale.descriptor.questions.len(), scale.answers.len()))))
@@ -1949,12 +1954,8 @@ impl ClinicalApp {
                         "La voce viene registrata nel contesto ambulatoriale selezionato."
                     )),
             );
-        let mut result = div()
-            .min_w_0()
+        let mut result = surface::island(theme, false)
             .flex_1()
-            .flex()
-            .flex_col()
-            .gap(px(16.))
             .child(section(
                 "clinical-scale-result-heading",
                 "RISULTATO E LIMITI",
@@ -2019,7 +2020,7 @@ impl ClinicalApp {
             .min_w_0()
             .flex()
             .flex_col()
-            .bg(theme.paper)
+            .bg(theme.sheet)
             .when(layout.magnified && self.message.is_some(), |el| {
                 let (message, error) = self.message.clone().unwrap_or_default();
                 el.child(
@@ -2039,11 +2040,8 @@ impl ClinicalApp {
                             .gap(px(24.))
                             .child(header)
                             .child(
-                                div()
-                                    .min_w_0()
-                                    .flex()
-                                    .gap(px(layout.gap))
-                                    .when(layout.compact || layout.magnified, |el| el.flex_col())
+                                surface::tray(theme)
+                                    .when(!layout.compact && !layout.magnified, |el| el.flex_row())
                                     .child(questions)
                                     .child(result),
                             ),
