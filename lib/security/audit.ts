@@ -87,6 +87,8 @@ export const AUDIT_EVENT_TYPES = [
     'ai.provider_probe.executed',
     /* terminal PHI-safe audit for the bounded semantic-query operation. */
     'agent.cassette.opened',
+    'agent.cassette.correction.opened',
+    'agent.cassette.superseded',
     'agent.item.deposited',
     'agent.cassette.closed',
     'agent.item.applied',

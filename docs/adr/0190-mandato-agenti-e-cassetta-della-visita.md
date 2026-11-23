@@ -100,6 +100,18 @@ non confermato o ambiguo impedisce l'applicazione automatica. La creazione di
 un paziente assente richiede PIN. Percorsi espliciti o hash identificano i
 file da depositare. L'orario può ordinare le visite, mai abbinarle.
 
+### Correzione di una cassetta in attesa
+
+La CLI può depositare una versione corretta indicando l’identificativo del deposito
+precedente. Il canale ammette la sostituzione solo per lo stesso agente, medico e
+generazione dell’archivio, con mandato corrente e permessi di apertura e chiusura.
+La nuova cassetta resta fuori da In arrivo finché il deposito è aperto. La chiusura
+verifica nella stessa transazione che la precedente sia ancora in attesa e che
+nessun elemento sia già stato applicato. Poi rende visibile la versione corretta,
+ritira la precedente e registra nell’audit il legame tra le due cassette.
+Anche una conferma già aperta deve ritrovare in attesa la versione da applicare.
+Per una versione già applicata si usa il percorso di correzione della cartella.
+
 ## Applicazione e vista In arrivo
 
 Alla chiusura della cassetta la scheda MediFlow sbloccata applica senza un

@@ -16,6 +16,7 @@ import { agentBytes, openAgentItem } from '../../../lib/agent-cassette-crypto';
 import { decryptData } from '../../../lib/security/security';
 import { AGENT_OPERATIONS, MANDATE_MAX_DURATION_MS } from '../../../lib/agent-mandate-contract';
 import { createAgentMandateStore } from '../../../lib/agent-mandate-store';
+import { readAgentCassetteIndex } from '../../../lib/agent-cassette-store';
 
 const cf = 'RSSMRA80A01H501U', sentinel = 'SYNTHETIC_CLI_VISIT_ONLY_6742';
 async function fixture(model: 'local' | 'openai' = 'local') {
@@ -83,7 +84,7 @@ async function fixture(model: 'local' | 'openai' = 'local') {
         const body = JSON.parse(raw); events.push(body.operation);
         if (denied) { response.writeHead(403, { 'Content-Type': 'application/json' }).end(JSON.stringify({ secret: f.token, text: sentinel })); return; }
         try {
-            const receipt = f.run(() => body.operation === 'visita.apri' ? f.store.open(f.principal, body.visitId, body.anchor)
+            const receipt = f.run(() => body.operation === 'visita.apri' ? f.store.open(f.principal, body.visitId, body.anchor, body.replaces)
                 : body.operation === 'visita.chiudi' ? f.store.close(f.principal, body.visitId, body.expectedRevision)
                     : f.store.add(f.principal, body.visitId, body.expectedRevision, body.item));
             if (body.operation === 'visita.nota') afterNote?.();
@@ -130,6 +131,36 @@ test('the real CLI reuses the kit extraction and deposits separate encrypted PDF
         const saved = fs.readFileSync(path.join(f.credentials, 'visit-' + receipt.visitId + '.json'), 'utf8');
         assert.ok(!saved.includes(sentinel)); assert.ok(!saved.includes(cf)); assert.ok(!saved.includes(f.token));
         if (process.platform !== 'win32') assert.equal(fs.statSync(path.join(f.credentials, 'visit-' + receipt.visitId + '.json')).mode & 0o777, 0o600);
+    } finally { await f.cleanup(); }
+});
+test('CLI replacement preserves the pending original until the corrected deposit closes and retries with the same receipt', async () => {
+    const f = await fixture();
+    try {
+        const previousId = randomUUID(), correctedId = randomUUID();
+        const deposit = (id: string, extra: string[] = []) => cli([
+            'deposita', '--credenziali', f.credentials, '--agente', f.principal.agentRef,
+            '--estrazione', f.file, '--cf', '-', '--visita', id, ...extra,
+        ], f.root, {}, cf + '\n');
+        const incoming = () => readAgentCassetteIndex(f.database, f.principal.actorRef, null).visits.map(visit => visit.id);
+        assert.equal((await deposit(previousId)).code, 0);
+        assert.deepEqual(incoming(), [previousId]);
+        f.extraction.sources[0].facts[0].values.text = 'Nota sintetica corretta.';
+        fs.writeFileSync(f.file, JSON.stringify(f.extraction));
+        const oldCommand = await deposit(previousId);
+        assert.equal(JSON.parse(oldCommand.stderr).error, 'AGENT_STATE_INVALID');
+
+        f.drop();
+        const replace = () => deposit(correctedId, ['--sostituisce', previousId]);
+        assert.equal(JSON.parse((await replace()).stderr).error, 'AGENT_HTTP_UNAVAILABLE');
+        assert.deepEqual(incoming(), [previousId]);
+        f.extraction.preparedAt = '2026-11-18T08:00:00Z';
+        fs.writeFileSync(f.file, JSON.stringify(f.extraction));
+        const corrected = await replace();
+        assert.equal(corrected.code, 0, corrected.stderr);
+        assert.equal(JSON.parse(corrected.stdout).visitId, correctedId);
+        assert.deepEqual(incoming(), [correctedId]);
+        assert.deepEqual(await replace(), corrected);
+        assert.deepEqual(incoming(), [correctedId]);
     } finally { await f.cleanup(); }
 });
 test('lost response after a committed element resumes the immutable encrypted plan without duplicate elements or audit', async () => {

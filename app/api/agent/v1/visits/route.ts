@@ -12,13 +12,13 @@ export async function POST(request: Request): Promise<Response> {
         const body = await readNativeNetworkJson(request, 24 * 1024 * 1024, { signal: request.signal, deadline: performance.now() + 10000 }) as Record<string, unknown>;
         const keys = body && typeof body === 'object' && !Array.isArray(body) ? Object.keys(body).sort().join(',') : '';
         const item = body?.item as AgentCassetteItem;
-        const operation = keys === 'anchor,operation,visitId' && body.operation === 'visita.apri' ? 'visita.apri'
+        const operation = (keys === 'anchor,operation,visitId' || keys === 'anchor,operation,replaces,visitId') && body.operation === 'visita.apri' ? 'visita.apri'
             : keys === 'expectedRevision,operation,visitId' && body.operation === 'visita.chiudi' ? 'visita.chiudi'
             : keys === 'expectedRevision,item,operation,visitId' && item && Object.hasOwn(AGENT_ITEM_OPERATION, item.kind) && body.operation === AGENT_ITEM_OPERATION[item.kind] ? AGENT_ITEM_OPERATION[item.kind] : null;
         if (!operation || typeof body.visitId !== 'string') throw new AgentCassetteDenied(400);
         const database = openDbServer(), store = createAgentCassetteStore(database);
         return withAuthenticatedAgentTransaction(database, request, operation, principal => {
-            const receipt = operation === 'visita.apri' ? store.open(principal, body.visitId as string, body.anchor as AgentEnvelope)
+            const receipt = operation === 'visita.apri' ? store.open(principal, body.visitId as string, body.anchor as AgentEnvelope, body.replaces)
                 : operation === 'visita.chiudi' ? store.close(principal, body.visitId as string, body.expectedRevision as number)
                 : store.add(principal, body.visitId as string, body.expectedRevision as number, item);
             return Response.json({ receipt }, { status: 201, headers: { 'Cache-Control': 'no-store' } });
