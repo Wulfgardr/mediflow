@@ -17,6 +17,7 @@ const LOCAL_KIT_ERROR_MESSAGES: Record<string, string> = {
     LOCAL_KIT_CONNECTED: 'Scollega Codex prima di cambiare la cartella del kit.',
     LOCAL_KIT_WRITE_FAILED: 'Impossibile scrivere le credenziali nella cartella del kit.',
     LOCAL_KIT_NOT_CONNECTED: 'Collega prima Codex · Ambulatorio.',
+    LOCAL_KIT_INACTIVE: 'Collega e attiva prima Codex · Ambulatorio.',
 };
 
 function formatMandateExpiry(expiresAt: number, now: number): string {
@@ -67,6 +68,7 @@ export default function AgentSettingsPage() {
     const [pinSubmitError, setPinSubmitError] = useState<string | null>(null);
     const [approvalPinSubmitError, setApprovalPinSubmitError] = useState<string | null>(null);
     const [localKit, setLocalKit] = useState<AgentLocalKitStatus | null>(null);
+    const [localKitContextCount, setLocalKitContextCount] = useState(0);
     const [kitPathDraft, setKitPathDraft] = useState('');
     const [localKitConfirming, setLocalKitConfirming] = useState(false);
     const [localKitPin, setLocalKitPin] = useState('');
@@ -85,11 +87,12 @@ export default function AgentSettingsPage() {
         }
     }
     async function refresh() {
-        const [response, requests, clients, kitResponse] = await Promise.all([
+        const [response, requests, clients, kitResponse, contextResponse] = await Promise.all([
             '/api/agent-mandates',
             '/api/agent-mandates/pairings',
             '/api/agent-mandates/registrations',
             '/api/agent-mandates/local-kit',
+            '/api/agent-mandates/local-kit/context',
         ].map(url => fetch(url, { cache: 'no-store' })));
         if (!response.ok || !requests.ok || !clients.ok || !kitResponse.ok) throw new Error('denied');
         setMandates(await response.json());
@@ -98,6 +101,12 @@ export default function AgentSettingsPage() {
         const nextKit = await kitResponse.json() as AgentLocalKitStatus;
         setLocalKit(nextKit);
         setKitPathDraft(nextKit.kitPath);
+        if (contextResponse.ok) {
+            const contextPayload = await contextResponse.json() as { count?: unknown };
+            setLocalKitContextCount(typeof contextPayload?.count === 'number' ? contextPayload.count : 0);
+        } else {
+            setLocalKitContextCount(0);
+        }
         setReadAt(Date.now());
     }
     useAgentSettingsLoad(() => refresh().catch(() => { setError('Operazione non riuscita. Riprova.'); }));
@@ -261,6 +270,30 @@ export default function AgentSettingsPage() {
                     </div>
                 </form>
             )}
+            {localKitContextCount > 0 ? (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--lume-rule)] px-3 py-2">
+                    <p className="[font:var(--type-meta)]">
+                        Contesti paziente pronti per Codex: {localKitContextCount}
+                    </p>
+                    <button
+                        type="button"
+                        className={SETTINGS_SECONDARY_BUTTON_CLASS}
+                        disabled={busy}
+                        onClick={() => {
+                            void run(async () => {
+                                const response = await fetch('/api/agent-mandates/local-kit/context', {
+                                    method: 'DELETE',
+                                    headers: { 'Content-Type': 'application/json' },
+                                });
+                                if (!response.ok) throw new Error(await readFailureMessage(response));
+                                await refresh();
+                            }, false);
+                        }}
+                    >
+                        Svuota contesti
+                    </button>
+                </div>
+            ) : null}
             <details className="space-y-3">
                 <summary className="cursor-pointer font-semibold">Cartella del kit</summary>
                 <form className="mt-3 space-y-3" onSubmit={event => {

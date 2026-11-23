@@ -74,6 +74,7 @@ import { buildPatientModuleRailGroups, filterTerritorialRailGroups } from '@/lib
 import { useTerritorialPacks } from '@/lib/territorial-pack-client';
 import FollowupSuggestions from '@/components/followup-suggestions';
 import { patientIdentifierLabel } from '@/lib/patient-identifier-label';
+import { buildAgentPatientContextPayload, sendPatientContextToLocalKit } from '@/lib/agent-local-kit-context-client';
 
 /* These helpers are invoked only from explicit UI events. Keeping their
    time and navigation side effects outside render makes that boundary visible
@@ -645,6 +646,43 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
         reportService.generatePatientReport(patient, nonScaleEntries, scaleEntries, reportTherapies, reportObservations);
     };
 
+    const handleSendToCodex = async () => {
+        if (!patient.taxCode?.trim()) {
+            showToast('Codice fiscale mancante: completa anagrafica prima di inviare a Codex.', 'error');
+            return;
+        }
+        try {
+            const [contextTherapies, contextObservations] = await Promise.all([
+                db.therapies.query({ patientId: id }).toArray(),
+                db.observations.query({ patientId: id }).toArray(),
+            ]);
+            const payload = await buildAgentPatientContextPayload({
+                patient,
+                entries: nonScaleEntries,
+                therapies: contextTherapies,
+                observations: contextObservations,
+                checkups: checkups ?? [],
+                exemptionCodes,
+            });
+            if (!payload) {
+                showToast('Impossibile preparare il contesto del paziente per Codex.', 'error');
+                return;
+            }
+            const result = await sendPatientContextToLocalKit(payload);
+            if (!result.ok) {
+                if (result.code === 'LOCAL_KIT_INACTIVE') {
+                    showToast('Collega e attiva Codex in Impostazioni · Agenti.', 'error');
+                    return;
+                }
+                showToast('Impossibile inviare il contesto a Codex.', 'error');
+                return;
+            }
+            showToast('Contesto pronto in Codex per 24 ore.', 'success');
+        } catch {
+            showToast('Impossibile inviare il contesto a Codex.', 'error');
+        }
+    };
+
     return (
         <Kree8WorkspaceShell
             variant="clinical"
@@ -686,6 +724,7 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
                     onExportFhir={() => setIsExportModalOpen(true)}
                     onShareFhir={handleShareFhir}
                     onReportPdf={handleReportPdf}
+                    onSendToCodex={handleSendToCodex}
                 /> : null}
                 </>
             )}

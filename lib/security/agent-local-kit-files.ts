@@ -3,6 +3,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { AgentCredential, AgentRegistrationCredential } from '../../packages/agent-client/src/credentials';
+import {
+    AGENT_PATIENT_CONTEXT_MAX_BYTES,
+    AGENT_PATIENT_CONTEXT_SCHEMA,
+    type AgentPatientContextEnvelope,
+} from '../agent-local-kit-context-contract';
 
 export class LocalKitPathError extends Error {
     constructor(readonly code: 'LOCAL_KIT_PATH_INVALID' | 'LOCAL_KIT_WRITE_FAILED' = 'LOCAL_KIT_PATH_INVALID') {
@@ -12,6 +17,8 @@ export class LocalKitPathError extends Error {
 
 const BLOCKED_HOME_FOLDERS = ['Documents', 'Desktop', 'Downloads', 'Library/Mobile Documents', 'Library/CloudStorage'];
 const MAX_DEPOSITO_BYTES = 65536;
+export const LOCAL_KIT_CONTEXT_DIR_NAME = 'contesto-pazienti';
+const CONTEXT_FILE_RE = /^([a-f0-9]{64})\.json$/u;
 
 function isInside(root: string, target: string): boolean {
     const relative = path.relative(root, target);
@@ -249,4 +256,105 @@ export function removeLocalKitCredentials(kitPath: string, agentRef: string): vo
         const updatedDeposito = { ...deposito, agente: null };
         writeAtomicPrivateFile(physicalKitDir, 'deposito.json', JSON.stringify(updatedDeposito, null, 2) + '\n', false);
     }
+    try {
+        clearLocalKitPatientContexts(physicalKitDir);
+    } catch {
+    }
+}
+
+function resolveKitContextDirectory(kitPath: string, createIfMissing: boolean): string | null {
+    const physicalKitDir = validateLocalKitDirectory(kitPath);
+    const contextDir = path.join(physicalKitDir, LOCAL_KIT_CONTEXT_DIR_NAME);
+    if (!fs.existsSync(contextDir)) {
+        if (!createIfMissing) return null;
+        fs.mkdirSync(contextDir, { mode: 0o700 });
+    }
+    const stat = fs.lstatSync(contextDir);
+    if (stat.isSymbolicLink() || !stat.isDirectory() || !isOwnedByCurrentUser(stat)
+        || (process.platform !== 'win32' && (stat.mode & 0o7777) !== 0o700)) {
+        throw new LocalKitPathError('LOCAL_KIT_PATH_INVALID');
+    }
+    return contextDir;
+}
+
+export type LocalKitPatientContextSummary = {
+    cfHash: string;
+    taxCodeLast4: string;
+    exportedAt: number;
+    expiresAt: number;
+};
+
+export function listLocalKitPatientContexts(kitPath: string, nowMs = Date.now()): LocalKitPatientContextSummary[] {
+    const contextDir = resolveKitContextDirectory(kitPath, false);
+    if (!contextDir) return [];
+    const items: LocalKitPatientContextSummary[] = [];
+    for (const name of fs.readdirSync(contextDir)) {
+        const match = CONTEXT_FILE_RE.exec(name);
+        if (!match) continue;
+        const filePath = path.join(contextDir, name);
+        let fd: number | undefined;
+        try {
+            fd = fs.openSync(filePath, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+            const stat = fs.fstatSync(fd);
+            if (!isPrivateFile(stat) || stat.size > AGENT_PATIENT_CONTEXT_MAX_BYTES + 4096) continue;
+            const parsed = JSON.parse(fs.readFileSync(fd, 'utf8')) as Partial<AgentPatientContextEnvelope>;
+            if (parsed.schema !== AGENT_PATIENT_CONTEXT_SCHEMA
+                || typeof parsed.expiresAt !== 'number'
+                || typeof parsed.exportedAt !== 'number'
+                || !parsed.patient
+                || parsed.patient.cfHash !== match[1]
+                || typeof parsed.patient.taxCodeLast4 !== 'string') {
+                continue;
+            }
+            if (parsed.expiresAt <= nowMs) {
+                fs.closeSync(fd);
+                fd = undefined;
+                unlinkSafeRegularFile(contextDir, name);
+                continue;
+            }
+            items.push({
+                cfHash: match[1],
+                taxCodeLast4: parsed.patient.taxCodeLast4,
+                exportedAt: parsed.exportedAt,
+                expiresAt: parsed.expiresAt,
+            });
+        } catch {
+        } finally {
+            if (fd !== undefined) fs.closeSync(fd);
+        }
+    }
+    items.sort((a, b) => b.exportedAt - a.exportedAt);
+    return items;
+}
+
+export function writeLocalKitPatientContext(kitPath: string, envelope: AgentPatientContextEnvelope, nowMs = Date.now()): void {
+    const contextDir = resolveKitContextDirectory(kitPath, true);
+    if (!contextDir) throw new LocalKitPathError('LOCAL_KIT_PATH_INVALID');
+    const filename = `${envelope.patient.cfHash}.json`;
+    if (!CONTEXT_FILE_RE.test(filename)) throw new LocalKitPathError('LOCAL_KIT_WRITE_FAILED');
+    listLocalKitPatientContexts(kitPath, nowMs);
+    writeAtomicPrivateFile(contextDir, filename, JSON.stringify(envelope, null, 2) + '\n', true);
+}
+
+export function removeLocalKitPatientContext(kitPath: string, cfHash: string): void {
+    const filename = `${cfHash}.json`;
+    if (!CONTEXT_FILE_RE.test(filename)) return;
+    const contextDir = resolveKitContextDirectory(kitPath, false);
+    if (!contextDir) return;
+    unlinkSafeRegularFile(contextDir, filename);
+}
+
+export function clearLocalKitPatientContexts(kitPath: string): number {
+    const contextDir = resolveKitContextDirectory(kitPath, false);
+    if (!contextDir) return 0;
+    let removed = 0;
+    for (const name of fs.readdirSync(contextDir)) {
+        if (!CONTEXT_FILE_RE.test(name)) continue;
+        try {
+            unlinkSafeRegularFile(contextDir, name);
+            removed += 1;
+        } catch {
+        }
+    }
+    return removed;
 }
