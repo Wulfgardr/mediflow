@@ -1219,3 +1219,26 @@ Il writer, le transizioni del comando di stato terapia e il controllo
 concorrente della versione corrispondono alla base. Le regressioni Web
 coprono il conflitto durante il ripristino portabile. TLC verifica il
 modello legacy entro i limiti del manifest.
+
+### Ripristino portabile, blocchi di conservazione e ritiri, WUL-944
+
+In `bceeecbd2dd3` il writer del ripristino in `lib/backup-restore-executor.ts`
+calcola il piano nella transazione SQLite, prima di ogni scrittura. Il piano
+rifiuta una copia che cambierebbe un record sotto blocco di conservazione ed
+esclude i fascicoli ritirati nell'archivio di destinazione. La revoca in
+memoria dei riferimenti agli allegati ora segue il piano e precede la prima
+scrittura: un ripristino fermato dal piano non la esegue.
+
+L'unione dei comandi di stato terapia resta quella dell'ADR 0168. Le righe del
+registro relative a un fascicolo ritirato restano storico, come dopo una
+cancellazione. Una riga nuova con stato richiesto o data di fine per un
+fascicolo ritirato ferma il ripristino prima delle scritture.
+`lib/backup-artifact.ts` rifiuta le schede con identificativo mancante o
+duplicato e non riporta identificativi nei messaggi. Il client in `lib/db.ts`
+legge dal server il numero dei fascicoli esclusi.
+
+Transizioni delle terapie, comandi, ricevute ed autorità di scrittura restano
+invariati, insieme a modello, statechart, invarianti, testimoni e mutanti. I
+digest dei tre file sono aggiornati dopo le prove di
+`lib/backup-restore-retention.test.ts`. TLC verifica il modello legacy entro i
+limiti del manifest.
