@@ -29,6 +29,7 @@ export const isValidItalianTaxCodeChecksum = isValidItalianTaxCode;
 const CF_LABEL_SOURCE = String.raw`(?:codice\s+fiscale\b|c\.?\s*f\.?(?![a-z0-9]))`;
 const PREP_SOURCE = String.raw`(?:dell['’]\s*|del(?:la|lo)?\s+)?`;
 const PHYSICIAN_ROLE_SOURCE = String.raw`(?:medico\s+refertante|dirigente\s+medico|medico\s+specialista|specialista|il\s+medico|medico|dott(?:\.ssa|\.|ore|oressa)?|dr(?:\.ssa|\.)?)`;
+const PATIENT_ROLE_CUE = /\b(?:assistit[oa]|paziente|cittadin[oa]|intestatari[oa]|utente)\b/i;
 const SIGNATURE_ROLE_SOURCE = String.raw`(?:(?:documento\s+)?(?:firmato|sottoscritto)(?:\s+digitalmente)?(?:\s+ai\s+sensi\s+[^:\n]{1,40})?\s+da|refertato\s+da|validato\s+da|firma\s+(?:digitale|del(?:lo)?\s+(?:medico|specialista|dirigente\s+medico)))`;
 
 const ROLE_PATTERNS: Array<{
@@ -42,7 +43,7 @@ const ROLE_PATTERNS: Array<{
             String.raw`(?:\b${CF_LABEL_SOURCE}\s+${PREP_SOURCE}(?:assistit[oa]|paziente|cittadin[oa]|intestatari[oa])\b|\b(?:assistit[oa]|paziente|cittadin[oa]|intestatari[oa])\s*[:,-]?\s*${CF_LABEL_SOURCE})`,
             'i',
         ),
-        medium: /\b(?:assistit[oa]|paziente|cittadin[oa]|intestatari[oa]|utente)\b/i,
+        medium: PATIENT_ROLE_CUE,
     },
     {
         role: 'prescriber_cf',
@@ -170,9 +171,29 @@ function inferRole(context: string, taxCodeStart: number, taxCodeEnd: number): P
     return { role: 'unknown_cf', confidence: 'low' };
 }
 
-const GENERIC_TAX_CODE_LINE = /^(?:codice[ \t\u00a0]+fiscale|c\.?[ \t\u00a0]*f\.?)[ \t\u00a0]*[:=]?[ \t\u00a0]*$/iu;
+const HORIZONTAL_SPACE = String.raw`[ \t\u00a0]`;
+const GENERIC_TAX_CODE_PREFIX = String.raw`(?:codice${HORIZONTAL_SPACE}+fiscale|c\.?${HORIZONTAL_SPACE}*f\.?)${HORIZONTAL_SPACE}*[:=]?${HORIZONTAL_SPACE}*`;
+const GENERIC_TAX_CODE_LINE = new RegExp(`^${GENERIC_TAX_CODE_PREFIX}$`, 'iu');
+const STAMP_NAME_WORD = String.raw`\p{L}{1,24}(?:['’-]\p{L}{1,24})?`;
+const PHYSICIAN_STAMP_PREFIX = new RegExp(
+    String.raw`(?:^|\n)(${HORIZONTAL_SPACE}*)(?:dott(?:\.ssa|\.|ore|oressa)?|dr(?:\.ssa|\.)?)${HORIZONTAL_SPACE}+`
+    + String.raw`(${STAMP_NAME_WORD}${HORIZONTAL_SPACE}+${STAMP_NAME_WORD})(?:${HORIZONTAL_SPACE}+|${HORIZONTAL_SPACE}*\r?\n\1)`
+    + `${GENERIC_TAX_CODE_PREFIX}$`,
+    'iu',
+);
 const PATIENT_SECTION_HEADER = /^(?:dati(?:\s+(?:anagrafici|personali))?\s+(?:dell['’]\s*|del(?:la)?\s+)?(?:assistit[oa]|paziente|cittadin[oa])|(?:assistit[oa]|paziente|cittadin[oa])\s*:)/iu;
 const NON_PATIENT_BLOCK_CUE = /\b(?:medico|prescrittore|refertante|specialista|dirigente|operatore|operatrice|compilatore|compilatrice|firmato|sottoscritto|firma|struttura|azienda|asl|ats|asst)\b/iu;
+
+function inferPhysicianStamp(
+    text: string,
+    start: number,
+    minLeft: number,
+): Pick<DocumentDecisionTaxCodeRole, 'role' | 'confidence'> | null {
+    const stamp = PHYSICIAN_STAMP_PREFIX.exec(text.slice(Math.max(0, minLeft - 1), start));
+    return stamp && !PATIENT_ROLE_CUE.test(stamp[2])
+        ? { role: 'physician_cf', confidence: 'high' }
+        : null;
+}
 
 function inferPatientSectionFallback(
     text: string,
@@ -216,9 +237,10 @@ export function resolveDocumentTaxCodeRoles(
         const context = contextAround(input.text, start, end, contextWindow, minLeft, maxRight);
         const evidenceId = `tax-code:${taxCodes.length + 1}`;
         const inferred = inferRole(context.snippet, context.taxCodeStart, context.taxCodeEnd);
-        const role = inferred.role === 'unknown_cf'
+        const stamp = inferred.confidence === 'high' ? null : inferPhysicianStamp(input.text, start, minLeft);
+        const role = stamp ?? (inferred.role === 'unknown_cf'
             ? (inferPatientSectionFallback(input.text, start, minLeft) ?? inferred)
-            : inferred;
+            : inferred);
 
         // Un CF con checksum non valido (tipico dei falsi positivi OCR O/0, I/1)
         // non puo mai essere high confidence: viene declassato a medium, cosi
