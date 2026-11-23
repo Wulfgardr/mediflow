@@ -141,7 +141,7 @@
     :global(main) > :global(div):has(> .workspace[data-runtime-settings]) { padding-inline: 0; }
     :global(main):has(> div > .workspace[data-runtime-settings]) { border-inline: 0; }
     :global(html[data-runtime-twin-design='proposal']) .workspace.workspace[data-runtime-settings],
-    .workspace[data-runtime-settings] { display: grid; padding-inline: 16px; }
+    .workspace[data-runtime-settings] { display: grid; grid-template-columns: minmax(0, 1fr); padding-inline: 16px; }
     :global(html[data-runtime-twin-design='proposal']) .workspace.workspace[data-runtime-settings] > :is(.indexPane, .content) {
         padding: 0;
         border: 0;

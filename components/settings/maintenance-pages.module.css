@@ -1,6 +1,6 @@
 .page { min-width: 0; display: grid; gap: 10px; color: var(--lume-ink); font: var(--type-body); }
 .intro { padding: 6px 6px 2px; }
-.page .intro h2, .page h3.heading,
+.page.page .intro h2, .page.page h3.heading,
 .page :global([data-disclosure]) > div:first-child h3 :global(button[data-disclosure-control]) {
     margin: 0;
     color: var(--lume-ink);

@@ -987,7 +987,7 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
                     count={followupRead.count}
                     summary={followupRead.summary}
                     surfaceClassName={workspaceStyles.clinicalSection}
-                    headerAction={<Link href={`/patients/${id}/edit#pianificazione`} className={surface.islandAction}>
+                    headerAction={<Link href={`/patients/${id}/edit#pianificazione`} className="mf-button-text">
                         Aggiungi follow-up
                     </Link>}
                 >

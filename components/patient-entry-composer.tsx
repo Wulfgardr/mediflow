@@ -1167,7 +1167,7 @@ export function PatientEntryComposer({ embedded = false, sheetSource, focusRef }
                                         checkups={checkupsRead}
                                     />}
                     </aside>
-                    <div className={composerStyles.writingColumn} >
+                    <div className={composerStyles.writingColumn} data-record-tray="voce">
                         <div className={composerStyles.columnHeading}>
                             <h2>Diario</h2>
                             <button type="button" className={`mf-button-text ${composerStyles.consultQuadro}`} onClick={consultQuadro}>Consulta il Quadro</button>

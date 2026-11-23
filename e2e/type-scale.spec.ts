@@ -276,11 +276,21 @@ for (const theme of ['light', 'dark'] as const) {
     let release!: () => void;
     const held = new Promise<void>(resolve => { release = resolve; });
     await page.route('**/api/auth/check', async route => { await held; await route.continue(); });
+    const expectRecordBrand = async () => {
+      const brand = page.locator('[data-record-brand]');
+      await expect(brand).toHaveText('MediFlow');
+      await expect(brand).toHaveCSS('font-size', '15px');
+      await expect(brand).toHaveCSS('font-weight', '600');
+      const dots = brand.locator('[data-brand-glyph] > i');
+      await expect(dots).toHaveCount(3);
+      await expect(dots.nth(0)).toHaveCSS('width', '4px');
+      await expect(dots.nth(1)).toHaveCSS('width', '6px');
+      await expect(dots.nth(2)).toHaveCSS('width', '9px');
+    };
     try {
       await page.goto('/');
       await expect(page.getByRole('heading', { name: 'Avvio di MediFlow', exact: true })).toBeVisible();
-      await expect(page.locator('.type-brand')).toHaveText('MediFlow');
-      await expect(page.locator('.type-brand')).toHaveCSS('font-size', '21px');
+      await expectRecordBrand();
       await assertType(page, `avvio-${theme}`, info, 2);
     } finally {
       release();
@@ -289,15 +299,7 @@ for (const theme of ['light', 'dark'] as const) {
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
     await page.getByRole('button', { name: 'Blocca', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Sblocca MediFlow', exact: true })).toBeVisible();
-    const brand = page.locator('[data-record-brand]');
-    await expect(brand).toHaveText('MediFlow');
-    await expect(brand).toHaveCSS('font-size', '15px');
-    await expect(brand).toHaveCSS('font-weight', '600');
-    const dots = brand.locator('[data-brand-glyph] > i');
-    await expect(dots).toHaveCount(3);
-    await expect(dots.nth(0)).toHaveCSS('width', '4px');
-    await expect(dots.nth(1)).toHaveCSS('width', '6px');
-    await expect(dots.nth(2)).toHaveCSS('width', '9px');
+    await expectRecordBrand();
     await assertType(page, `sblocco-${theme}`, info, 2);
   });
 }

@@ -110,6 +110,10 @@
   .patientCanvas .patientHeader, :global(html[data-twin-composition='stream']) .patientCanvas .patientHeader {
     position: relative; max-width: none; margin: 0; padding: 39px 24px 16px; align-items: flex-start;
   }
+  :global(html[data-twin-composition='stream']) .patientCanvas[data-writing='true'] .patientHeader,
+  .patientCanvas[data-writing='true'] .patientHeader {
+    position: sticky; top: 0; z-index: 20;
+  }
   .patientCanvas .patientBody, :global(html[data-twin-composition='stream']) .patientCanvas .patientBody[data-folder-section] {
     margin: 0; padding: 12px 24px 24px; max-width: none;
   }
