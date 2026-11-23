@@ -8,7 +8,7 @@ import test from 'node:test';
 import { createAgentMandateStore } from '../agent-mandate-store';
 import { createAgentPairingStore } from '../agent-pairing-store';
 import { createAgentRegistrationStore } from '../agent-registration-store';
-import { createAgentCassetteStore } from '../agent-cassette-store';
+import { createAgentCassetteStore, readAgentCassette, readAgentCassetteIndex } from '../agent-cassette-store';
 import { readSqliteArchiveGeneration } from '../archive-generation';
 import { AGENT_OPERATIONS, type AgentMandateInput } from '../agent-mandate-contract';
 import { agentBase64, type AgentItemKind } from '../agent-cassette-crypto';
@@ -166,3 +166,48 @@ for (const [provider, allowsClinicalEgress] of [['local', false], ['openai', tru
         assert.equal(started.status, 200);
     });
 }
+
+test('the real deposit route atomically replaces one pending cassette and refuses competing or foreign replacements', async () => {
+    const proposer = await agent('openai', true), other = await agent('openai', true);
+    const previous = proposer.deposited(true).visitId;
+    const endpoint = '/api/agent/v1/visits';
+    const related = new Set<string>([previous]);
+    const incoming = () => readAgentCassetteIndex(database, actor, null).visits
+        .filter(row => related.has(row.id)).map(row => row.id);
+    const prepare = async () => {
+        const visitId = randomUUID();
+        related.add(visitId);
+        const opening = { operation: 'visita.apri', visitId, anchor: proposer.anchor(visitId), replaces: previous };
+        assert.equal((await post(endpoint, proposer.headers, opening)).status, 201);
+        const note = await post(endpoint, proposer.headers, {
+            operation: 'visita.nota', visitId, expectedRevision: 1, item: proposer.note(visitId),
+        });
+        assert.equal(note.status, 201);
+        return {
+            opening,
+            close: () => post(endpoint, proposer.headers, {
+                operation: 'visita.chiudi', visitId, expectedRevision: 2,
+            }),
+        };
+    };
+    const foreignId = randomUUID();
+    const beforeForeign = snapshot();
+    assert.equal((await post(endpoint, other.headers, {
+        operation: 'visita.apri', visitId: foreignId, anchor: other.anchor(foreignId), replaces: previous,
+    })).status, 404);
+    assert.deepEqual(snapshot(), beforeForeign);
+
+    const first = await prepare(), second = await prepare();
+    assert.deepEqual(incoming(), [previous]);
+    assert.equal(readAgentCassette(database, first.opening.visitId, actor), undefined);
+    const closed = await first.close();
+    assert.equal(closed.status, 201);
+    const receipt = await closed.json();
+    assert.deepEqual(incoming(), [first.opening.visitId]);
+    assert.equal(readAgentCassette(database, previous, actor), undefined);
+    const after = snapshot();
+    assert.equal((await second.close()).status, 404);
+    assert.deepEqual(await (await post(endpoint, proposer.headers, first.opening)).json(), receipt);
+    assert.deepEqual(await (await first.close()).json(), receipt);
+    assert.deepEqual(snapshot(), after);
+});
