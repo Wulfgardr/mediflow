@@ -116,6 +116,38 @@ test('tax code resolver keeps plain physician CF out of patient identity', () =>
     assert.equal(result.humanRequired, true);
 });
 
+test('tax code resolver recognizes a physician stamp on a paper prescription', () => {
+    const indent = ' '.repeat(87);
+    const stamp = 'Dott. ALDO BRUNI';
+    const label = `CF: ${SYNTHETIC_PRESCRIBER_CF}`;
+
+    for (const physicianBlock of [`${indent}${stamp}\n${indent}${label}`, `${stamp} ${label}`]) {
+        const result = resolveDocumentTaxCodeRoles({
+            text: `Ricetta cartacea\nAssistito codice fiscale ${SYNTHETIC_PATIENT_CF}\n\n${physicianBlock}`,
+        });
+
+        assert.deepEqual(
+            result.taxCodes.map(({ value, role, confidence }) => [value, role, confidence]),
+            [
+                [SYNTHETIC_PATIENT_CF, 'patient_cf', 'high'],
+                [SYNTHETIC_PRESCRIBER_CF, 'physician_cf', 'high'],
+            ],
+        );
+        assert.equal(result.humanRequired, false);
+    }
+});
+
+test('tax code resolver keeps patient fields separate from physician stamps', () => {
+    for (const text of [
+        `Dott. ALDO BRUNI\nAssistito MARIO ROSSI\nCF: ${SYNTHETIC_PATIENT_CF}`,
+        `Dott. Assistito ROSSI\nCF: ${SYNTHETIC_PATIENT_CF}`,
+        `Dott. ALDO BRUNI\n\nCodice fiscale assistito: ${SYNTHETIC_PATIENT_CF}`,
+    ]) {
+        const result = resolveDocumentTaxCodeRoles({ text });
+        assert.equal(result.taxCodes[0].role, 'patient_cf');
+    }
+});
+
 test('tax code resolver separates patient, prescriber, operator, and facility roles', () => {
     const result = resolveDocumentTaxCodeRoles({
         text: [
