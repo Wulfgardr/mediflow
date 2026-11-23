@@ -325,10 +325,14 @@ async function main() {
         ...compareRestoredPayload(artifactModule, parsedArtifact, restoredArtifact),
         sealedValuesReadable: await countReadableSealedValues(restoredArtifact.payload, masterKey),
         auditCoverage: restoreResult.audit.coverage,
-        notCovered: ['unlock key and recovery material', 'durable review commands', 'local accounts and settings'],
+        excludedRetiredPatients: restoreResult.excludedRetiredPatients,
+        notCovered: ['unlock key and recovery material', 'durable review commands', 'local accounts and settings', 'destination retention holds and patient retirements'],
       };
     })();
     timings.realRestoreAndReexportMs = Math.round(Number(process.hrtime.bigint() - realRestoreStartedAt) / 1_000_000);
+    if (realRestore.excludedRetiredPatients !== 0) {
+      failures.push({ step: 'real-restore', message: 'Unexpected patient exclusions in the synthetic target.', remediation: 'Check fixture isolation.' });
+    }
     if (realRestore.differences.length > 0) {
       failures.push({ step: 'real-restore', message: `Restored collections differ from the backup: ${realRestore.differences.join(', ')}.`, remediation: 'Compare the exported and the re-exported artifact kept with --keep-work-dir.' });
     }

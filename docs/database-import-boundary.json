@@ -1862,6 +1862,7 @@
       "capability": "server:lib/db-server.ts",
       "form": "import",
       "symbols": [
+        "dbServer",
         "openDbServer"
       ],
       "count": 1,

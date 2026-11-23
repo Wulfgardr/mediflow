@@ -132,10 +132,20 @@ produce scaduti.
 
 ## Backup, copie e audit
 
-- Lo scarto non riscrive i backup già prodotti né le esportazioni consegnate.
-  Il ripristino completo di un backup precedente riporta il fascicolo, i blocchi
-  e le finestre dell'epoca; il fascicolo torna nell'elenco da rivedere. Limite noto.
-- Il ripristino portabile non sovrascrive `settings`: blocchi e finestre dell'host restano.
+- Lo scarto lascia intatti i backup già prodotti e le esportazioni già
+  consegnate. Il recupero completo di una copia precedente su una nuova
+  destinazione può riportare il fascicolo e le impostazioni dell’epoca.
+- Il ripristino portabile applica i blocchi e il registro dei ritiri della
+  destinazione. L’anteprima rifiuta una copia che rimuoverebbe o altererebbe
+  un fascicolo o un documento sotto blocco. Il server ripete la decisione
+  sotto lock prima di revocare l’autorità o scrivere.
+- Se la copia contiene fascicoli ritirati nella destinazione, il ripristino
+  esclude ciascun fascicolo con tutte le sue dipendenze e registra il numero
+  di esclusioni nell’anteprima e nella ricevuta. Conserva i marcatori di
+  ritiro e lo storico minimizzato secondo l’ADR 0173. Se la copia contiene
+  depositi o storico clinico che possono riguardare un fascicolo escluso,
+  il ripristino si ferma. Si può scegliere una copia successiva alla
+  cancellazione o usare il backup completo cifrato su una nuova destinazione.
 - WAL, pagine libere, snapshot del sistema e copie di riparazione possono
   conservare valori precedenti (matrice dei dati a riposo). Lo scarto non è
   una bonifica del supporto.

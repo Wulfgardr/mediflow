@@ -51,6 +51,7 @@ Restore drill pass. Report: tmp-backup-restore-drill/restore-drill-report.json
 | --- | --- |
 | `status` | `pass` |
 | `realRestore.differences` | elenco vuoto: nessuna collezione è tornata diversa |
+| `realRestore.excludedRetiredPatients` | `0` nell’archivio sintetico nuovo |
 | `realRestore.sealedValuesReadable` | `8`: i campi cifrati si leggono ancora |
 | `preflight.ok` | `true` |
 | `retention` | i tre valori a `true` |
@@ -65,6 +66,10 @@ Lo dice anche il rapporto, in `realRestore.notCovered`:
 - **i comandi di revisione durevoli**: finché esistono, il ripristino si ferma
   di proposito;
 - **account locali e impostazioni**: non fanno parte del backup.
+- **blocchi e ritiri della destinazione**. La prova parte da una destinazione
+  nuova. I test di ripristino su archivi sintetici esistenti verificano
+  separatamente il rifiuto per blocchi e il conteggio dei fascicoli ritirati
+  esclusi, dall’anteprima alla ricevuta.
 
 Non prova nemmeno il backup dello studio: lavora solo sugli archivi sintetici
 che crea.
