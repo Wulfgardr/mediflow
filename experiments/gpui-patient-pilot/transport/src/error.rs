@@ -15,6 +15,9 @@ pub enum RuntimeError {
     TerritorialPackDisabled,
     Missing,
     Conflict,
+    RestoreLegalHold,
+    RestoreRetentionUnreadable,
+    RestoreRetiredPatientMaterial,
     LegacyRevisionRequired,
     ArchiveReplaced,
     AnalyticsCancelled,
@@ -50,7 +53,10 @@ impl RuntimeError {
             Self::Forbidden | Self::TerritorialPackDisabled => Some(403),
             Self::Missing => Some(404),
             Self::Conflict | Self::ArchiveReplaced | Self::LegacyRevisionRequired => Some(409),
-            Self::AnalyticsCancelled => Some(409),
+            Self::AnalyticsCancelled
+            | Self::RestoreLegalHold
+            | Self::RestoreRetentionUnreadable
+            | Self::RestoreRetiredPatientMaterial => Some(409),
             Self::Rejected(status) => Some(*status),
             Self::ProfileTooLarge => Some(413),
             _ => None,
@@ -70,6 +76,9 @@ impl fmt::Display for RuntimeError {
             Self::TerritorialPackDisabled => "Funzione del modulo lombardo, non attiva su questa installazione.",
             Self::Forbidden => "L'operatore o il dispositivo non è autorizzato a questa operazione.",
             Self::Missing => "La risorsa non è disponibile in questo ambulatorio.",
+            Self::RestoreLegalHold => "Questo backup cambierebbe un fascicolo o un documento soggetto a un blocco di conservazione. Scegli una copia che lo conservi.",
+            Self::RestoreRetentionUnreadable => "MediFlow non riesce a leggere i blocchi di conservazione di questo archivio.",
+            Self::RestoreRetiredPatientMaterial => "Il backup contiene depositi o dati storici che potrebbero riguardare un fascicolo ritirato. Usa un backup successivo alla cancellazione oppure un backup completo cifrato per il recupero su una nuova destinazione.",
             Self::Conflict => "La versione è cambiata. Rileggi i dati prima di confermare una nuova modifica.",
             Self::LegacyRevisionRequired => "Per conservare il testo precedente, apri l’archivio con un client locale aggiornato e riprova.",
             Self::ArchiveReplaced => "L'archivio è stato ripristinato da una copia. Riapri l'archivio prima di continuare.",

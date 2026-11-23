@@ -1,11 +1,13 @@
 import { createHash } from 'node:crypto';
 import type Database from 'better-sqlite3';
-import { openDbServer } from './db-server';
+import { dbServer, openDbServer } from './db-server';
 import { readSqliteArchiveGeneration } from './archive-generation';
+import type { BackupArtifact } from './backup-artifact';
+import { planBackupRestore } from './backup-restore-policy';
 
 import { RESTORE_RECEIPT_PREFIX as PREFIX } from './backup-restore-receipt-contract';
 export type RestoreIntent = { id: string; expectedSnapshot: string; expectedSourceChecksum?: string };
-export type RestoreReceipt = { id: string; sourceChecksum: string; archiveGeneration: string; completedAt: string };
+export type RestoreReceipt = { id: string; sourceChecksum: string; archiveGeneration: string; completedAt: string; excludedRetiredPatients: number };
 export function parseRestoreIntent(request: Request): RestoreIntent | null {
     const id = request.headers.get('x-mediflow-restore-id');
     const expectedSnapshot = request.headers.get('x-mediflow-restore-snapshot');
@@ -24,6 +26,13 @@ export function readRestorePreviewSnapshot(): string {
     const db = openDbServer();
     return db.transaction(() => restoreSnapshot(db))();
 }
+export function readRestorePreview(artifact: BackupArtifact): { expectedSnapshot: string; excludedRetiredPatients: number } {
+    const db = openDbServer();
+    return db.transaction(() => {
+        const { excludedRetiredPatients } = planBackupRestore(db, artifact.payload, dbServer);
+        return { expectedSnapshot: restoreSnapshot(db), excludedRetiredPatients };
+    })();
+}
 export function readCurrentRestoreReceipt(id: string): RestoreReceipt | null {
     return readRestoreReceipt(openDbServer(), id);
 }
@@ -38,8 +47,8 @@ export function restoreSnapshot(db: Database.Database): string {
     }
     return hash.digest('hex');
 }
-export function writeRestoreReceipt(db: Database.Database, intent: RestoreIntent, sourceChecksum: string): RestoreReceipt {
-    const receipt = { id: intent.id, sourceChecksum, archiveGeneration: readSqliteArchiveGeneration(db), completedAt: new Date().toISOString() };
+export function writeRestoreReceipt(db: Database.Database, intent: RestoreIntent, sourceChecksum: string, excludedRetiredPatients: number): RestoreReceipt {
+    const receipt = { id: intent.id, sourceChecksum, archiveGeneration: readSqliteArchiveGeneration(db), completedAt: new Date().toISOString(), excludedRetiredPatients };
     const key = PREFIX + intent.id;
     const value = JSON.stringify(receipt);
     const inserted = db.prepare('INSERT INTO settings (key,value) VALUES (?,?)').run(key, value);
@@ -50,5 +59,7 @@ export function writeRestoreReceipt(db: Database.Database, intent: RestoreIntent
 export function readRestoreReceipt(db: Database.Database, id: string): RestoreReceipt | null {
     if (!/^[a-f0-9-]{36}$/u.test(id)) return null;
     const row = db.prepare('SELECT value FROM settings WHERE key=?').get(PREFIX + id) as { value: string } | undefined;
-    return row ? JSON.parse(row.value) as RestoreReceipt : null;
+    if (!row) return null;
+    const receipt = JSON.parse(row.value) as RestoreReceipt;
+    return { ...receipt, excludedRetiredPatients: receipt.excludedRetiredPatients ?? 0 };
 }
