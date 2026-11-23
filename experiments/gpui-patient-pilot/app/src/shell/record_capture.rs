@@ -1985,4 +1985,177 @@ mod concept {
             }
         }
     }
+
+    #[test]
+    fn capture_unified_views_on_the_fixture_host() {
+        let Ok(directory) = std::env::var("MEDIFLOW_UNIFIED_CAPTURES") else {
+            return;
+        };
+        std::fs::create_dir_all(&directory).unwrap();
+        let fixture = returning_patient();
+        let summary = json!({
+            "id": "patient-a",
+            "firstName": "Bianca",
+            "lastName": "Sintetica",
+            "birthDate": "1947-06-12",
+            "taxCode": "SNTBNC47H52Z000K",
+            "isAdi": true,
+            "version": 3
+        });
+        let summary_b = json!({
+            "id": "patient-b",
+            "firstName": "Marco",
+            "lastName": "Verdi",
+            "birthDate": "1953-04-19",
+            "taxCode": "VRDMRC53D19Z000K",
+            "isAdi": false,
+            "version": 1
+        });
+        let summary_c = json!({
+            "id": "patient-c",
+            "firstName": "Elena",
+            "lastName": "Bianchi",
+            "birthDate": "1960-11-02",
+            "taxCode": "BNCLNE60S42Z000W",
+            "isAdi": true,
+            "version": 2
+        });
+        let document = json!({
+            "id": "doc-sintetico",
+            "patientId": "patient-a",
+            "name": "Lettera dimissione cardiologia.pdf",
+            "path": "lettera-dimissione.pdf",
+            "type": "application/pdf",
+            "size": 42180,
+            "summarySnapshot": "Ricovero per scompenso cardiaco; dimissione con furosemide 25 mg e controllo elettroliti.",
+            "createdAt": "2026-11-10T09:30:00Z"
+        });
+        let checkup = json!({
+            "id": "checkup-a",
+            "patientId": "patient-a",
+            "date": "2026-12-04",
+            "title": "Controllo elettroliti e peso",
+            "notes": "Verifica potassio dopo sospensione spironolattone",
+            "status": "pending",
+            "version": 1
+        });
+        for (dark, theme) in [(false, "giorno"), (true, "grafite")] {
+            let host = notes_recovery_tests::Host::with_diary_and_documents(
+                json!(fixture.entries.clone()),
+                json!([document.clone()]),
+            );
+            let mut cx = context();
+            let session = host.session.clone();
+            let pairing = host.stored_pairing();
+            let window: AnyWindowHandle = cx
+                .open_window(gpui::size(px(1320.), px(880.)), move |window, cx| {
+                    cx.new(|cx| {
+                        let mut app = ClinicalApp::new(String::new(), window, cx);
+                        app.dark_override = Some(dark);
+                        app.pairing = Some(pairing);
+                        app.session = Some(session);
+                        app.scope = Some("scope-a".into());
+                        app.area = Area::Patients;
+                        app.directory = true;
+                        app
+                    })
+                })
+                .unwrap()
+                .into();
+            let mut run = Shots {
+                cx: &mut cx,
+                window,
+                directory: directory.clone(),
+            };
+            run.settle();
+            run.app(|app, _, cx| {
+                app.ambulatories = Load::Ready(rows!([json!({
+                    "id": "scope-a",
+                    "name": "Ambulatorio sintetico",
+                    "isDefault": true,
+                    "version": 1
+                })]));
+                app.patients = Load::Ready(rows!([
+                    summary.clone(),
+                    summary_b.clone(),
+                    summary_c.clone(),
+                ]));
+                app.selected_id = Some("patient-a".into());
+                cx.notify();
+            });
+            run.shot(&format!("{theme}-01-pazienti"));
+
+            run.app(|app, _, cx| {
+                app.area = Area::Agenda;
+                app.global_patients = ReadLoad::Ready(rows!([
+                    summary.clone(),
+                    summary_b.clone(),
+                    summary_c.clone(),
+                ]));
+                app.agenda = ReadLoad::Ready(rows!([checkup.clone()]));
+                app.agenda_flow
+                    .targets
+                    .insert("checkup-a".into(), ScrollTarget::new(&app.area_scroll, cx));
+                cx.notify();
+            });
+            run.shot(&format!("{theme}-02-agenda"));
+
+            run.app(|app, _, cx| {
+                app.area = Area::Diary;
+                app.global_patients = ReadLoad::Ready(rows!([
+                    summary.clone(),
+                    summary_b.clone(),
+                    summary_c.clone(),
+                ]));
+                app.global_entries = Load::Ready(rows!(fixture.entries.clone()));
+                cx.notify();
+            });
+            run.shot(&format!("{theme}-03-diario"));
+
+            run.app(|app, _, cx| app.navigate(Area::References, cx));
+            run.settle();
+            run.shot(&format!("{theme}-04-repertori"));
+
+            run.app(|app, _, cx| app.navigate(Area::Analytics, cx));
+            run.settle();
+            run.shot(&format!("{theme}-05-analisi"));
+
+            run.app(|app, _, cx| app.navigate(Area::Scales, cx));
+            run.settle();
+            run.shot(&format!("{theme}-06-scale"));
+
+            run.app(|app, _, cx| app.navigate(Area::Settings, cx));
+            run.settle();
+            run.shot(&format!("{theme}-07-impostazioni"));
+
+            run.app(|app, _, cx| app.select_patient("patient-a", true, cx));
+            run.settle();
+            run.app(|app, _, cx| {
+                apply(app, &fixture);
+                app.patient.attachments = ReadLoad::Ready(rows!([document.clone()]));
+                app.patient.checkups = ReadLoad::Ready(rows!([checkup.clone()]));
+                cx.notify();
+            });
+            run.shot(&format!("{theme}-08-scheda-riepilogo"));
+
+            run.app(|app, _, cx| app.section_selected(PatientSection::Therapies, cx));
+            run.shot(&format!("{theme}-09-scheda-terapie"));
+
+            run.app(|app, _, cx| app.section_selected(PatientSection::Documents, cx));
+            run.shot(&format!("{theme}-10-scheda-documenti"));
+
+            run.app(|app, _, cx| app.section_selected(PatientSection::Observations, cx));
+            run.shot(&format!("{theme}-11-scheda-parametri"));
+
+            run.app(|app, _, cx| app.section_selected(PatientSection::Diary, cx));
+            run.shot(&format!("{theme}-12-scheda-diario"));
+
+            run.app(|app, _, cx| app.section_selected(PatientSection::Checkups, cx));
+            run.shot(&format!("{theme}-13-scheda-controlli"));
+
+            run.app(|app, _, cx| app.disconnect(cx));
+            run.settle();
+            run.shot(&format!("{theme}-14-sblocco"));
+        }
+    }
 }
