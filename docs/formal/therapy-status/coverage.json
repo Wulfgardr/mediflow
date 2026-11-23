@@ -33,7 +33,7 @@
   "files": {
     "lib/therapy-status-confirmation.ts": "33eebc3197e988f3f1c134f1ac8499da1de95171e21d0ac7e3396c2a202c6486",
     "components/therapy-manager.tsx": "636419e0533f0368add66f0321d30ecfb0c99e69e02b1359d1ff1c7c513e6579",
-    "lib/db.ts": "635366dd87c81f20a3c91da42b40d20beb1a1de78bf0fef1e25a2fd686c4b8ad",
+    "lib/db.ts": "e69414da935b885f8ee7b3065f8161e54c1a28c434ea2f78bfb67f6b64087886",
     "lib/security/client-auth-api.ts": "9ac40b69b8c073644198e86d532591464f2c28a44fda1926fa9f082a93e25274",
     "lib/therapy-write-operation.ts": "8fa4abf13ad501bdb1d199b2abeaee5e18331f84e6dcdb19caa0b040b5c63345",
     "app/api/therapies/[id]/route.ts": "ecc8f661c1f2521e567a6666c4c9da89097ef8da2874281285066b266f6fdcc1",
@@ -53,14 +53,14 @@
     "lib/backup-import-provenance.ts": "13eb1cc6083b5a07489d64cc9d195b82b6b8b660cb9874e4dc46b93fdf25999e",
     "lib/sqlite-schema.ts": "784fa488d11577d5ce493fde0ad84b3353fbd76c8bbe3f64f1f6d0d0c127e41d",
     "lib/sqlite-schema-open.ts": "ce645331a3e1bd5c13ee25e04051c90c8e8ee982e0a0e6abb90eb298e006160e",
-    "lib/backup-restore-executor.ts": "2fda131ca62a4283cfa231dda9757f7dce2de9d2cd4a2e2660a0320b9ed0fabd",
+    "lib/backup-restore-executor.ts": "eee7696262a2b3d019d903a16c068fe5a45fd2e9454cb6e92964c50a2432a7a3",
     "lib/security/archive-maintenance-owner.ts": "57a026cca85845bf2ed3ae5b8c47dbc88caa8184b3d41639ea7ad9e90a420802",
     "lib/clinical-status-transitions.ts": "787915f339911dd4846d29d1fe3232be373242287390989d6a97d7a5dcea460f",
     "lib/status-normalization.ts": "fa2bbdeef55384ed1bf4a851f09a5d899d56e6331cde018f68f3d8a74d3a4e51",
     "docs/domain/clinical-status-transitions.json": "70233eaac55960b999f25768bb9f8897dcce27197ed99c1a692a2d98a0582f04",
     "lib/recovery-backup-server.ts": "71a1af2d0c4c5f24cb15d4588bb47ed411342eed6d0a2248f703c5925bf80342",
     "lib/schema.ts": "a63799addd6217f91f39794a25881376c052b8e2012a115ff129fdd0aec5394b",
-    "lib/backup-artifact.ts": "892514e9ae5f465507560e3df6bf5594d0ddc4ee65c72f14ab6213aa995a9814"
+    "lib/backup-artifact.ts": "cdbf37a1a5d9ee71c70a2a77242d7ca60afca394fd4bba3452f4482602baab76"
   },
   "verificationInputs": [
     "docs/formal/therapy-status/",
@@ -157,5 +157,5 @@
     }
   },
   "legacyModelSyncCommit": "64e190438da8287928f0903b9b719c18b329a7ec",
-  "filesSha256": "d38d56b106fbfc54a344c652c11b7c014749573518e9d99f9b62f3c77b90e288"
+  "filesSha256": "31a93892356e83db82b86c9518a887ccf04059ea475281f9f0e03c0e0381b5d1"
 }
