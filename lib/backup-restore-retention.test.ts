@@ -42,7 +42,7 @@ let session: ReturnType<typeof issueSyntheticWebSession>;
 test.beforeEach(() => {
     sqlite.transaction(() => {
         sqlite.prepare('DELETE FROM settings WHERE key=?').run(RETENTION_HOLDS_KEY);
-        sqlite.exec('DELETE FROM agent_cassettes; DELETE FROM entry_revisions');
+        sqlite.exec('DELETE FROM agent_cassettes; DELETE FROM entry_revisions; DELETE FROM patient_retired_ids');
         for (const table of archiveTables) sqlite.prepare(`DELETE FROM ${table}`).run();
         sqlite.exec('DELETE FROM patients; DELETE FROM ambulatories');
     }).immediate();
@@ -283,6 +283,42 @@ for (const kind of ['unbound-cassette', 'imported-cassette-audit', 'changed-cass
         await assertDenied(artifact, 'retired_patient_material');
     });
 }
+
+for (const kind of ['unbound-cassette', 'audit-values', 'therapy-values'] as const) {
+    test('refuses ' + kind + ' for a retired patient whose record is absent from the backup', async () => {
+        const id = 'synthetic-absent-' + kind;
+        seedPatient(id);
+        await retire(id);
+        const cassette = kind === 'unbound-cassette' ? await cassetteFixture() : null;
+        const artifact = await artifactWith(await exported(), payload => {
+            assert.equal(payload.patients.some(row => row.id === id), false);
+            if (cassette) payload.agentCassettes = [cassette];
+            if (kind === 'therapy-values') payload.therapyStatusCommands!.push(command(id, true));
+            if (kind === 'audit-values') payload.auditEvents!.push({ eventId: randomUUID(), schemaVersion: 1, occurredAt: second,
+                eventType: 'patient.updated', subjectType: 'patient', subjectRef: id, outcome: 'success',
+                actorType: 'user', actorRef: doctor.id, sourceSurface: 'web', requestId: null, createdAt: second,
+                redactedMetadata: JSON.stringify({ clinicalValue: 'Sintetico', resourceVersion: 2 }) });
+        });
+        await assertDenied(artifact, 'retired_patient_material');
+    });
+}
+
+test('a backup taken after a retirement restores with the cassettes and history the archive already holds', async () => {
+    const id = 'synthetic-after-retirement';
+    seedPatient(id);
+    seedPatient(id + '-kept');
+    const cassette = await cassetteFixture();
+    recordAppliedCassette(cassette, id + '-kept', true);
+    await retire(id);
+    const artifact = await exported();
+    const response = await preview(artifact);
+    assert.equal(response.status, 200);
+    const selection = await response.json();
+    assert.equal(selection.excludedRetiredPatients ?? 0, 0);
+    assert.equal((await execute(artifact, randomUUID(), selection.expectedSnapshot)).status, 200);
+    assert.deepEqual(readAgentCassette(sqlite, cassette.id, cassette.actorRef), cassette);
+    assert.equal(sqlite.prepare('SELECT 1 FROM patients WHERE id=?').get(id), undefined);
+});
 
 function recordAppliedCassette(cassette: Awaited<ReturnType<typeof cassetteFixture>>, patientId: string, imported: boolean) {
     const { id, actorRef, agentRef, mandateRef, modelProvider } = cassette;

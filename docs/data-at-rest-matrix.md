@@ -97,7 +97,7 @@ di un allegato verificano i formati previsti per quei percorsi.
 - In chiaro: `id`, `mandate_ref`, `agent_ref`, `actor_ref`, `archive_generation`, `public_key`, `model_provider`, `allows_clinical_egress`, `status`, `revision`, `deposited_at`, `modified_at`
 - L'àncora CF e tutti i valori clinici sono buste ECDH/HKDF/AES-GCM legate a mandato, visita, elemento e tipo. Il JSON degli elementi lascia leggibili identificativo opaco, tipo, dimensione ed eventuale hash del PDF. Non contiene nomi di file o testo clinico aperti. La privata è avvolta dalla master key nel browser.
 - I due formati di backup contengono le cassette e le chiavi private avvolte. Il controllo della chiave comprende anche queste ultime. La nuova generazione dell’archivio rende inutilizzabili i vecchi mandati e token.
-- Se il ripristino portabile esclude un fascicolo ritirato, ogni cassetta deve coincidere con un deposito della generazione corrente. L’audit locale deve provarne l’applicazione completa a un solo paziente non ritirato. Se manca questa attribuzione il ripristino si ferma.
+- Se il ripristino portabile esclude un fascicolo ritirato, ogni cassetta deve coincidere con un deposito della generazione corrente. L’audit locale deve provarne l’applicazione completa a un solo paziente non ritirato. Se manca questa attribuzione il ripristino si ferma. Quando la destinazione ha fascicoli ritirati ma la copia non ne contiene le schede, una cassetta entra solo se l’archivio la possiede già identica.
 
 ### `agent_mandates`: mandato locale e chiave avvolta
 
