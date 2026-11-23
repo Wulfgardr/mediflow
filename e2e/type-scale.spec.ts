@@ -51,9 +51,9 @@ async function measureText(page: Page) {
         const body = [400, 600].includes(weight) && isSize([12, 13, 14, 15]);
         const heading = element.closest('h1, h2, h3');
         const tray = heading?.closest('[data-record-tray]');
-        const person = heading?.matches('[data-folder-section="quadro"] [data-testid="lume-scheda-header"] h1');
+        const person = heading?.matches('[data-record-page] h1, [data-testid="lume-scheda-header"] h1');
         const zone = heading?.tagName === 'H2' && heading.parentElement === tray;
-        const island = tray && !zone && (heading?.tagName === 'H2' || element.closest('#diario > [data-section-header] > h3 span:first-child'));
+        const island = tray && !zone && (heading?.matches('h2, h3') || element.closest('#diario > [data-section-header] > h3 span:first-child'));
         const recordHeading = (person && weight === 600 && isSize([28]))
           || (zone && weight === 600 && isSize([20]))
           || (island && weight === 600 && isSize([17]));
@@ -300,12 +300,17 @@ test('il misuratore intercetta ereditarietà serif, controlli, stili inline e te
     <p>Testo valido</p><p style="font-weight:550">Peso errato</p><p style="font-size:11px">Corpo errato</p>
     <button class="voice">Comando serif</button><input value="Campo errato" style="font:600 13px Georgia">
     <p style="font:600 20px system-ui">Titolo fuori scheda</p>
+    <h1 style="font:600 28px system-ui">Titolo senza pagina unificata</h1>
+    <main data-record-page><h1 style="font:600 28px system-ui">Titolo di pagina</h1><h1 style="font:600 26px system-ui">Titolo di pagina fuori scala</h1>
+      <section data-record-tray="impostazioni"><h2 style="font:600 20px system-ui">Zona</h2>
+        <section><h3 style="font:600 17px system-ui">Isola</h3><h3 style="font:600 20px system-ui">Isola fuori scala</h3></section></section></main>
     <section data-record-tray="stabile"><h2 style="font:600 20px system-ui">Titolo vassoio</h2>
       <section><h2 style="font:600 20px system-ui">Corpo errato per isola</h2></section></section>
     <div class="hidden"><span style="font:700 10px Georgia">Non visibile</span></div>`);
   const measured = await measureText(page);
   expect(measured.samples.filter(sample => sample.issue).map(sample => sample.text).sort())
-    .toEqual(['Campo errato', 'Comando serif', 'Corpo errato', 'Corpo errato per isola', 'Peso errato', 'Titolo fuori scheda']);
+    .toEqual(['Campo errato', 'Comando serif', 'Corpo errato', 'Corpo errato per isola', 'Isola fuori scala', 'Peso errato',
+      'Titolo di pagina fuori scala', 'Titolo fuori scheda', 'Titolo senza pagina unificata']);
   expect(measured.samples.some(sample => sample.text === 'Non visibile')).toBe(false);
 });
 

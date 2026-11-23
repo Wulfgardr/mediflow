@@ -1,0 +1,242 @@
+.page {
+  --surface-island-radius: 14px;
+  --surface-tray-inset: 10px;
+  --surface-gap: 12px;
+  --surface-proposal-ink: color-mix(in oklab, var(--lume-record-proposal-rule) 72%, var(--lume-ink));
+  display: grid;
+  align-content: start;
+  gap: 18px;
+  min-width: 0;
+  padding: 24px;
+  color: var(--lume-ink);
+  font-family: var(--lume-font-sans);
+}
+
+.pageHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 20px;
+  min-width: 0;
+}
+
+.pageHeading { display: grid; gap: 6px; min-width: 0; }
+
+.pageTitle {
+  margin: 0;
+  color: var(--lume-ink);
+  font: var(--type-record-person);
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+
+.pageMeta {
+  margin: 0;
+  color: var(--lume-ink-muted);
+  font: var(--type-record-data);
+}
+
+.pageActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.pageActions > :is(a, button) { min-height: 36px; }
+
+.segmented {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--lume-record-island-rule);
+  border-radius: 12px;
+  background: var(--lume-record-compact-island);
+}
+
+.segmented > :is(a, button) {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px;
+  padding: 0 clamp(7px, .85vw, 14px);
+  border-radius: 10px;
+  color: var(--lume-ink-muted);
+  font: var(--type-record-data);
+  white-space: nowrap;
+}
+
+.segmented > :is(a, button):is([aria-current], [aria-pressed='true'], [aria-selected='true']) {
+  background: var(--lume-record-island);
+  color: var(--lume-ink);
+  box-shadow: 0 0 0 1px var(--lume-record-island-rule), 0 1px 2px color-mix(in srgb, var(--lume-ink) 9%, transparent);
+}
+
+.segmented > :is(a, button) > span { font: var(--type-record-meta); }
+
+.tray {
+  display: grid;
+  align-content: start;
+  gap: var(--surface-tray-inset, 10px);
+  min-width: 0;
+  padding: var(--surface-tray-inset, 10px);
+  border-radius: 24px;
+  background: var(--lume-record-tray);
+  box-shadow: inset 0 0 0 1px var(--lume-record-tray-rule),
+    inset 0 1px 0 var(--lume-record-tray-light),
+    inset 0 -12px 18px -18px var(--lume-record-tray-shadow);
+}
+
+.zoneTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 6px 6px 0;
+  color: var(--lume-ink);
+  font: var(--type-record-zone);
+}
+
+.island,
+.islandHighlight,
+.islandProposal {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--lume-record-island-rule);
+  border-radius: var(--surface-island-radius, 14px);
+  background: var(--lume-record-island);
+  overflow-wrap: anywhere;
+}
+
+.islandHighlight {
+  border-color: var(--lume-record-change-rule);
+  background: var(--lume-record-change);
+}
+
+.islandProposal {
+  border-style: dashed;
+  border-color: var(--lume-record-proposal-rule);
+  background: transparent;
+}
+
+.islandHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  min-width: 0;
+}
+
+.islandHeader > :is(h2, h3) {
+  flex: 1 1 auto;
+  margin: 0;
+  color: var(--lume-ink);
+  font: var(--type-record-island);
+}
+
+.islandHeader > :is(h2, h3) > span {
+  margin-inline-start: 6px;
+  color: var(--lume-ink-muted);
+  font: var(--type-meta);
+}
+
+.islandIcon {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--lume-record-island-rule);
+  border-radius: 8px;
+  background: var(--lume-record-island);
+  color: var(--lume-ink-muted);
+}
+
+.islandProposal .islandIcon {
+  border-color: transparent;
+  background: color-mix(in oklab, var(--lume-record-proposal-rule) 14%, transparent);
+  color: var(--surface-proposal-ink, var(--lume-ink));
+}
+
+.islandAction {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  margin-inline-start: auto;
+  color: var(--lume-accent);
+  font: var(--type-body);
+}
+
+.islandAction:hover { text-decoration: underline; }
+
+.pillNeutral,
+.pillChange,
+.pillWarning,
+.pillCritical,
+.pillSuccess,
+.pillProposal {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 1px 8px;
+  border-radius: 8px;
+  font: var(--type-section);
+  white-space: nowrap;
+}
+
+.pillNeutral { background: var(--lume-record-island); color: var(--lume-ink); box-shadow: inset 0 0 0 1px var(--lume-record-island-rule); }
+.pillChange { background: var(--lume-record-change); color: var(--lume-accent); }
+.pillWarning { background: var(--lume-record-warning-fill); color: var(--lume-signal-warning); }
+.pillCritical { background: var(--lume-record-critical-fill); color: var(--lume-signal-critical); }
+.pillSuccess { background: var(--lume-record-success-fill); color: var(--lume-signal-success); }
+.pillProposal { border: 1px dashed var(--lume-record-proposal-rule); color: var(--surface-proposal-ink, var(--lume-ink)); }
+
+.field {
+  min-height: 36px;
+  padding: 7px 10px;
+  border: 1px solid var(--lume-ink-muted);
+  border-radius: 10px;
+  background: var(--lume-surface-field);
+  color: var(--lume-ink);
+  font: var(--type-record-data);
+}
+
+.field::placeholder { color: var(--lume-ink-muted); }
+.field:focus-visible { outline: 2px solid var(--lume-accent); outline-offset: 1px; }
+
+.rowList {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rowList > * {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: 10px;
+  padding-block: 7px;
+}
+
+.rowList > * + * { border-top: 1px solid var(--lume-record-island-rule); }
+.rowList strong { color: var(--lume-ink); font: var(--type-record-row); }
+.rowList small { color: var(--lume-ink-muted); font: var(--type-meta); }
+
+@media (max-width: 699px) {
+  .page { gap: 14px; padding: 16px; }
+  .tray { border-radius: 16px; padding: 8px; }
+  .island, .islandHighlight, .islandProposal { padding: 12px 14px; }
+  .pageActions { justify-content: flex-start; }
+}
+
+@media (pointer: coarse) {
+  .segmented > :is(a, button), .islandAction, .pageActions > :is(a, button) { min-height: 44px; }
+}
