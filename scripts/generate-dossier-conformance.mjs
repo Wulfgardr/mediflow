@@ -4,8 +4,9 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-const directory = 'native/contracts/dossier-conformance';
-const testNames = ['dossier-prepared', 'dossier-import', 'clinical-context-lexicon'];
+const outIndex = process.argv.indexOf('--out-dir');
+const directory = outIndex >= 0 ? process.argv[outIndex + 1] : 'native/contracts/dossier-conformance';
+const testNames = ['dossier-prepared', 'dossier-import', 'clinical-context-lexicon', 'dossier-tabular-quote'];
 const captured = ['preparedDossierFacts', 'anchorPreparedQuote', 'verifyPreparedFields', 'preparedTokens', 'preparedPatientKey', 'parsePreparedExtraction', 'evaluateDossierGroupIdentity', 'collectDossierPatientNames', 'preparedBulkDecisions', 'preparedFactEligible', 'dossierFactBlockers'];
 await mkdir(directory, { recursive: true });
 const scratch = await mkdtemp(path.join(tmpdir(), 'mediflow-dossier-corpus-'));
@@ -28,6 +29,6 @@ try {
   }
   const calls = (await Promise.all(testNames.map(async n => JSON.parse(await readFile(path.join(scratch, `${n}.json`), 'utf8'))))).flat();
   const unique = [...new Map(calls.map(c => [JSON.stringify(c), c])).values()];
-  await writeFile(`${directory}/ts-cases.json`, JSON.stringify(unique));
+  await writeFile(path.join(directory, 'ts-cases.json'), JSON.stringify(unique));
   console.log(`Casi TS del verificatore: ${unique.length}`);
 } finally { await rm(scratch, { recursive: true, force: true }); }
