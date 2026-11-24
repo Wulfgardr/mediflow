@@ -1,8 +1,11 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
 import { catalogEntries, catalogCalls, verifyCall } from './dossier-conformance';
-const root = 'native/contracts/dossier-conformance/';
-const calls = [...JSON.parse(readFileSync(root + 'ts-cases.json', 'utf8')), ...JSON.parse(readFileSync(root + 'banco-cases.json', 'utf8')), ...catalogCalls()];
-writeFileSync(root + 'catalog-cases.json', JSON.stringify(catalogCalls()));
-writeFileSync(root + 'expected.json', JSON.stringify(calls.map(verifyCall)));
-writeFileSync(root + 'catalog.json', JSON.stringify(catalogEntries()));
+const outIndex = process.argv.indexOf('--out-dir');
+const outDir = outIndex >= 0 ? process.argv[outIndex + 1] : 'native/contracts/dossier-conformance';
+mkdirSync(outDir, { recursive: true });
+const calls = [...JSON.parse(readFileSync(path.join(outDir, 'ts-cases.json'), 'utf8')), ...JSON.parse(readFileSync(path.join(outDir, 'banco-cases.json'), 'utf8')), ...catalogCalls()];
+writeFileSync(path.join(outDir, 'catalog-cases.json'), JSON.stringify(catalogCalls()));
+writeFileSync(path.join(outDir, 'expected.json'), JSON.stringify(calls.map(verifyCall)));
+writeFileSync(path.join(outDir, 'catalog.json'), JSON.stringify(catalogEntries()));
 console.log(`${calls.length} risultati completi generati dal verificatore Web`);

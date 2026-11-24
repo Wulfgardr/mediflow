@@ -807,6 +807,7 @@ fn professional(code: &Value) -> bool {
             code["professionalLabelScope"].as_str(),
             Some(
                 "same_line"
+                    | "physician_stamp"
                     | "prescriber_block"
                     | "specialist_block"
                     | "signature_block"
@@ -1815,7 +1816,12 @@ mod tests {
             json!({"id":"pa","taxCode":"RSSMRA80A01F205X"}),
             json!({"id":"pb","taxCode":"RSSMRA85T10A562S"}),
         ];
-        for scope in ["specialist_block", "signature_block", "header_block"] {
+        for scope in [
+            "physician_stamp",
+            "specialist_block",
+            "signature_block",
+            "header_block",
+        ] {
             let docs = vec![json!({
                 "taxCodes": [
                     {"value":"RSSMRA80A01F205X","checksumValid":true,"role":"patient_cf"},

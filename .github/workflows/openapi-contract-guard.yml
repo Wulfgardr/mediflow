@@ -105,6 +105,11 @@ jobs:
         run: |
           npm run test:ci-guards-wired
           npm run check:ci-guards-wired
+      - name: Dossier conformance corpus drift guard and tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          npm run test:dossier-conformance-corpus
+          npm run check:dossier-conformance-corpus
 
       - name: Fabric generative runtime crosswalk
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
