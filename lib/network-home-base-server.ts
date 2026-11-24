@@ -32,12 +32,15 @@ import {
     confirmPendingPairingIntent,
     NETWORK_PAIRING_STATE_KEY,
     parseNetworkPairingState,
+    removePairedClient,
     serializeNetworkPairingState,
     type NetworkPairingState,
+    type RemovePairedClientResult,
 } from '@/lib/network-pairing-model';
 import { getNetworkAiRuntimeSummary as resolveNetworkAiRuntimeSummary } from '@/lib/network-ai-runtime';
 import { getNetworkIdentitySummary as resolveNetworkIdentitySummary } from '@/lib/network-identity';
 import type { ServerSession } from '@/lib/security/server-session';
+import { writeAuditEventInTransaction } from './security/audit';
 import { authenticatePairedClientRequest } from '@/lib/network-paired-client-auth';
 
 type NetworkSettingsSnapshot = Partial<Record<(typeof NETWORK_SETTINGS_KEYS)[number], string>>;
@@ -152,13 +155,13 @@ function pairingStateForGeneration(rawValue: string | null, generation: string):
 const PAIRING_STATE_CAS_ATTEMPTS = 5;
 
 export type PairingStateMutationOutcome<T> =
-    | { readonly write: true; readonly nextState: NetworkPairingState; readonly result: T }
+    | { readonly write: true; readonly nextState: NetworkPairingState; readonly result: T; readonly commit?: (generation: string) => void }
     | { readonly write: false; readonly result: T };
 
 export async function mutateNetworkPairingState<T>(
     mutator: (state: NetworkPairingState) => PairingStateMutationOutcome<T>,
+    generation = currentArchiveGeneration(),
 ): Promise<{ readonly conflict: false; readonly result: T } | { readonly conflict: true }> {
-    const generation = currentArchiveGeneration();
     for (let attempt = 0; attempt < PAIRING_STATE_CAS_ATTEMPTS; attempt += 1) {
         const rawValue = await loadSettingValue(NETWORK_PAIRING_STATE_KEY);
         if (currentArchiveGeneration() !== generation) return { conflict: true };
@@ -179,6 +182,7 @@ export async function mutateNetworkPairingState<T>(
                     .onConflictDoNothing()
                     .run();
                 if (insertResult.changes === 1) {
+                    outcome.commit?.(generation);
                     return true;
                 }
             } else {
@@ -191,6 +195,7 @@ export async function mutateNetworkPairingState<T>(
                     ))
                     .run();
                 if (updateResult.changes === 1) {
+                    outcome.commit?.(generation);
                     return true;
                 }
             }
@@ -290,4 +295,32 @@ export async function getNetworkOperatingMode(): Promise<NetworkOperatingMode> {
 export async function authenticateNetworkPairedClient(request: Request) {
     const pairingState = await loadNetworkPairingState();
     return authenticatePairedClientRequest(request, pairingState.clients);
+}
+
+export function revokeNetworkPairedClient(clientId: string, actor: {
+    actorRef: string;
+    sourceSurface: 'web' | 'api';
+    expectedGeneration?: string;
+}) {
+    return mutateNetworkPairingState<RemovePairedClientResult>(state => {
+        const result = removePairedClient(state, clientId);
+        if (!result.ok) return { write: false, result };
+        return {
+            write: true,
+            nextState: result.nextState,
+            result,
+            commit(archiveGeneration) {
+                writeAuditEventInTransaction(dbServer, {
+                    eventType: 'network.pairing.client.revoked',
+                    outcome: 'success',
+                    actorType: actor.sourceSurface === 'web' ? 'user' : 'system',
+                    actorRef: actor.actorRef,
+                    subjectType: 'network_pairing',
+                    subjectRef: clientId,
+                    sourceSurface: actor.sourceSurface,
+                    archiveGeneration,
+                });
+            },
+        };
+    }, actor.expectedGeneration);
 }

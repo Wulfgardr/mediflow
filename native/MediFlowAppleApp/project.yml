@@ -27,7 +27,6 @@ targets:
         CFBundleVersion: "86"
         LSApplicationCategoryType: public.app-category.medical
         UIApplicationSupportsIndirectInputEvents: true
-        # local navigation only; never pairing or an authenticated command.
         CFBundleURLTypes:
           - CFBundleTypeRole: Viewer
             CFBundleURLName: com.mediflow.navigation
@@ -80,7 +79,6 @@ targets:
         NSLocalNetworkUsageDescription: "MediFlow cerca il tuo home-base sulla rete locale per collegarsi in modo paired e cifrato."
         NSBonjourServices:
           - _mediflow-homebase._tcp
-        # same navigation grammar as iOS, scoped to the receiving window.
         CFBundleURLTypes:
           - CFBundleTypeRole: Viewer
             CFBundleURLName: com.mediflow.navigation

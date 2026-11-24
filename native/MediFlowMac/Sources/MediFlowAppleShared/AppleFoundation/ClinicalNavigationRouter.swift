@@ -63,6 +63,10 @@ extension EnvironmentValues {
 final class ClinicalNavigationRouter: ObservableObject {
     @Published private(set) var notice: String?
     @Published private(set) var patientPresentation: ClinicalPatientNavigationPresentation?
+    @Published private(set) var pairingOffer: HomeBasePairingLink?
+    @Published private(set) var pairingInProgress = false
+    @Published private(set) var pairingLogin = false
+    @Published private(set) var pairingMessage: String?
     private var requestID: UUID?
     private var pendingTask: Task<Void, Never>?
     private var interactionGuards: [UUID: @MainActor () -> Bool] = [:]
@@ -87,14 +91,59 @@ final class ClinicalNavigationRouter: ObservableObject {
 
     func dismissNotice() { notice = nil }
 
+    var isPresentingPairing: Bool { pairingOffer != nil || pairingLogin }
+
+    func dismissPairing() {
+        guard !pairingInProgress else { return }
+        pairingOffer = nil
+        pairingLogin = false
+        pairingMessage = nil
+    }
+
+    func confirmPairing(
+        _ offer: HomeBasePairingLink, model: PairedPatientsWorkspaceModel, replacing clientID: String?,
+        navigate: @MainActor (ClinicalNavigationArea) -> Void
+    ) async {
+        guard pairingOffer == offer, pairingMessage == nil, !pairingInProgress, !hasBlockedInteraction else { return }
+        pairingInProgress = true
+        defer { pairingInProgress = false }
+        do {
+            try await model.acceptPairing(offer, replacing: clientID)
+            pairingLogin = true
+            pairingOffer = nil
+            navigate(.patients)
+        } catch HomeBasePairingError.expired {
+            pairingMessage = "Il QR è scaduto o è già stato usato. Creane uno nuovo sul computer."
+        } catch HomeBasePairingError.storage {
+            pairingMessage = "Non ho potuto salvare il collegamento nel Portachiavi."
+        } catch HomeBasePairingError.contextChanged {
+            pairingMessage = "Il collegamento è cambiato. Chiudi e riapri il link."
+        } catch {
+            pairingMessage = "Collegamento non riuscito. Controlla la rete e l’impronta sul computer."
+        }
+    }
+
     @discardableResult
     func open(
         _ url: URL, platform: ClinicalNavigationPlatform,
         workspace: (any ClinicalNavigationWorkspace)?,
         navigate: @escaping @MainActor (ClinicalNavigationArea) -> Void
     ) -> Task<Void, Never> {
+        guard !isPresentingPairing else { return Task {} }
         cancel()
         notice = nil
+        if HomeBasePairingLink.isPairingURL(url) {
+            guard let offer = HomeBasePairingLink.parse(url) else {
+                notice = "Link di collegamento non valido."
+                return Task {}
+            }
+            guard !hasBlockedInteraction else {
+                notice = "Chiudi o completa il pannello aperto, poi riapri il collegamento."
+                return Task {}
+            }
+            pairingOffer = offer
+            return Task {}
+        }
         // Reserve the intent synchronously at URL receipt, before scheduling
         // work: actor task scheduling must not reverse two incoming links.
         let id = UUID()
@@ -192,7 +241,7 @@ final class ClinicalNavigationRouter: ObservableObject {
 struct ClinicalNavigationReception: ViewModifier {
     @ObservedObject var router: ClinicalNavigationRouter
     let platform: ClinicalNavigationPlatform
-    let workspace: (any ClinicalNavigationWorkspace)?
+    let workspace: PairedPatientsWorkspaceModel?
     let navigate: @MainActor (ClinicalNavigationArea) -> Void
     private let sessionChanges: AnyPublisher<Void, Never>
 
@@ -232,6 +281,21 @@ struct ClinicalNavigationReception: ViewModifier {
             .onReceive(sessionChanges) { router.cancel() }
             .onOpenURL { url in
                 router.open(url, platform: platform, workspace: workspace, navigate: navigate)
+            }
+            .sheet(isPresented: Binding(
+                get: { router.isPresentingPairing },
+                set: { if !$0 { router.dismissPairing() } }
+            )) {
+                if let workspace {
+                    if let offer = router.pairingOffer {
+                        HomeBasePairingConfirmationView(router: router, model: workspace, offer: offer, navigate: navigate)
+                    } else if router.pairingLogin {
+                        HomeBasePairingLoginView(model: workspace, dismiss: router.dismissPairing)
+                    }
+                } else {
+                    ProgressView("Apertura di MediFlow")
+                        .padding(24)
+                }
             }
             .alert("Collegamento MediFlow", isPresented: Binding(
                 get: { router.notice != nil },
