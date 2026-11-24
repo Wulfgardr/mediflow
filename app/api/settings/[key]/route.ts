@@ -11,6 +11,7 @@ import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/security
 import { auditContextFromRequest, listChangedFields, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from '@/lib/security/audit';
 import { isValidInsightSetting, normalizeSettingValue } from '@/lib/settings-value';
 import { evaluateSettingsWrite } from '@/lib/security/settings-write-policy';
+import { UI_REDUCE_MOTION_SETTING_KEY, UI_REDUCE_TRANSPARENCY_SETTING_KEY } from '@/lib/ui-accessibility-preferences';
 
 export async function GET(
     request: Request,
@@ -69,17 +70,24 @@ export async function PUT(
 
         const networkModeDenial = networkModeWriteDenial(request, session, key, persistedValue);
         if (networkModeDenial) return networkModeDenial;
-        if (key === 'network.mode' && Object.hasOwn(body, 'expectedValue')) {
+        const conditionalAccessibility = key === UI_REDUCE_MOTION_SETTING_KEY || key === UI_REDUCE_TRANSPARENCY_SETTING_KEY;
+        if ((key === 'network.mode' || conditionalAccessibility) && Object.hasOwn(body, 'expectedValue')) {
             if (!(body.expectedValue === null || typeof body.expectedValue === 'string')) {
-                return NextResponse.json({ error: 'Invalid network mode precondition' }, { status: 400 });
+                const error = conditionalAccessibility ? 'Invalid accessibility preference precondition' : 'Invalid network mode precondition';
+                return NextResponse.json({ error }, { status: 400 });
             }
-            const applied = runDbServerImmediateTransaction(() => {
+            const result = runDbServerImmediateTransaction(() => {
                 const before = dbServer.select().from(settings).where(eq(settings.key, key)).get()?.value ?? null;
-                if (before !== body.expectedValue) return false;
+                if (before !== body.expectedValue || (conditionalAccessibility && before === persistedValue)) {
+                    return { applied: false, before };
+                }
                 writeSettingWithFunctionModelGeneration(key, persistedValue);
-                return true;
+                return { applied: true, before };
             });
-            if (!applied) return NextResponse.json({ error: 'Network mode changed', code: 'NETWORK_MODE_CONFLICT' }, { status: 409 });
+            if (!result.applied) {
+                if (conditionalAccessibility) return NextResponse.json({ success: true, key, value: result.before });
+                return NextResponse.json({ error: 'Network mode changed', code: 'NETWORK_MODE_CONFLICT' }, { status: 409 });
+            }
         } else {
             writeSettingWithFunctionModelGeneration(key, persistedValue);
         }

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { syntheticWebClientRequest } from './loopback-ingress-test-fixture';
 import { randomUUID } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -23,7 +24,7 @@ function lockFixture(label: string, reason = 'manual') {
     const context = issueSyntheticWebSessionContext({ id: actor, username: actor, role: 'admin' }, randomUUID());
     const mandate = store.create({ id: randomUUID(), durationMs: 43200000, operations: ['visita.nota'], provider: 'local', allowsClinicalEgress: false,
         publicKey: 'B' + 'A'.repeat(86) + '=', wrappedPrivateKey: 'ENC:' + 'A'.repeat(16) + ':' + 'A'.repeat(64) }, actor, generation);
-    const request = new Request('http://127.0.0.1/api/auth/lock', { method: 'POST', headers: { 'x-mediflow-lock-reason': reason } });
+    const request = syntheticWebClientRequest('http://127.0.0.1/api/auth/lock', { method: 'POST', headers: { 'x-mediflow-lock-reason': reason } });
     const mutation = Object.freeze({ controlId: context.controlId, ifMatch: context.etag, idempotencyKey: randomUUID() });
     return { context, mandate, mutation, lock: (next = mutation) =>
         completeExactWebP3ApplicationLock({ name: 'mediflow_session', value: context.session.id }, next, request) };

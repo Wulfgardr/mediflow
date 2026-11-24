@@ -8,7 +8,7 @@ import {
   parsePatientInsightPreviewRequest,
   type PatientInsightPreviewRequest,
 } from '../lib/ai-providers/fabric/patient-insight-preview-contract';
-import { bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch, assertNoHorizontalOverflow, assertNotClippedInViewport } from './utils';
+import { bootstrapUnlockedSession, openUnlockedDocument, unlockIfNeeded, openPatientSection, setAiLaneKillSwitch, assertNoHorizontalOverflow, assertNotClippedInViewport } from './utils';
 
 const REVIEW_NOTICE = 'Controlla ogni frase sulla fonte che cita: il modello può scambiare ciò che è fatto con ciò che è da fare.';
 
@@ -68,7 +68,7 @@ test('Quadro paziente invia un payload strict e mostra una proposta review-only'
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(PATIENT_INSIGHT_CATALOG) });
   });
 
-  await page.goto(`/patients/${patientId}/modules#quadro`);
+  await openUnlockedDocument(page, `/patients/${patientId}/modules#quadro`);
   await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules#quadro$`));
   await openPatientSection(page, 'quadro');
   await expect(page.locator('#quadro #patient-insight')).toHaveCount(0);
@@ -175,7 +175,7 @@ test('Il riepilogo rende la sintesi, i dati mancanti e la ricevuta della propost
     response.preview.proposal = { ...response.preview.proposal, summary, currentState: [], alerts: [], nextSteps: [], gaps: [gap] };
     return route.fulfill({ json: response });
   });
-  await page.goto(`/patients/${patientId}/modules`);
+  await openUnlockedDocument(page, `/patients/${patientId}/modules`);
   const island = page.getByTestId('patient-proposals-summary');
   await island.getByRole('link', { name: 'Apri il Quadro e le fonti' }).click();
   const picker = page.getByTestId('model-picker-patient_insight');
@@ -214,7 +214,7 @@ for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '3
         return fail ? route.fulfill({ status: 503, json: { error: 'synthetic-provider-unavailable' } })
           : route.fulfill({ status: 200, json: availablePreview(request) });
       });
-      await page.goto(`/patients/${patientId}/modules`);
+      await openUnlockedDocument(page, `/patients/${patientId}/modules`);
       await openPatientSection(page, baseline ? 'quadro' : 'attenzione');
       const panel = page.locator('#patient-insight');
       await panel.locator(':scope > div > [data-disclosure-control]').click();
@@ -252,7 +252,9 @@ for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '3
       await expect(panel.getByRole('alert')).toContainText('Quadro paziente non è disponibile');
       await capture('errore');
       await setAiLaneKillSwitch(page, 'aiPatientInsightKillSwitch', 'disabled');
-      await page.reload(); await openPatientSection(page, baseline ? 'quadro' : 'attenzione');
+      await page.reload();
+      await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
+      await openPatientSection(page, baseline ? 'quadro' : 'attenzione');
       await panel.locator(':scope > div > [data-disclosure-control]').click();
       await expect(panel.getByTestId('patient-insight-disabled-card')).toBeVisible();
       await capture('spenta');
@@ -279,7 +281,7 @@ for (const width of [1440, 390]) test(`copy del Quadro paziente ${width}`, async
     preview.preview.proposal.summary = 'Proposta sintetica da revisionare. [S1]';
     return route.fulfill({ status: 200, json: preview });
   });
-  await page.goto(`/patients/${patientId}/modules`);
+  await openUnlockedDocument(page, `/patients/${patientId}/modules`);
   await openPatientSection(page, 'attenzione');
   const panel = page.locator('#patient-insight');
   await panel.locator(':scope > div > [data-disclosure-control]').click();
@@ -315,14 +317,14 @@ for (const width of [1440, 390]) test(`copy anagrafica e note ${width}`, async (
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   const directory = process.env.PATIENT_INSIGHT_CAPTURES;
   if (directory) await mkdir(directory, { recursive: true });
-  await page.goto('/patients/new');
+  await openUnlockedDocument(page, '/patients/new');
   const year = page.getByRole('checkbox', { name: baseline ? 'Conosco solo l’anno (stima)' : 'Conosco solo l’anno', exact: true });
   await expect(year).toBeVisible();
   await year.check();
   await year.scrollIntoViewIfNeeded();
   if (directory) await page.screenshot({ path: `${directory}/${width}-anno.png`, animations: 'disabled' });
   const patientId = await createSyntheticPatient(page);
-  await page.goto(`/patients/${patientId}/notes-review`);
+  await openUnlockedDocument(page, `/patients/${patientId}/notes-review`);
   const notes = page.getByRole('textbox', { name: 'Note da proporre' });
   await notes.fill('Bozza sintetica da conservare.');
   await page.route(`**/api/patients/${patientId}/notes-commit`, route => {
@@ -352,7 +354,7 @@ for (const width of [1440, 390]) test(`copy titolo parametri recenti ${width}`, 
   await page.setViewportSize({ width, height: 1000 });
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   const patientId = await createSyntheticPatient(page);
-  await page.goto(`/patients/${patientId}/modules`);
+  await openUnlockedDocument(page, `/patients/${patientId}/modules`);
   const section = page.locator('#quadro').getByRole('region', { name: baseline ? 'Misure recenti' : 'Parametri recenti', exact: true });
   await expect(section).toBeVisible();
   await section.scrollIntoViewIfNeeded();

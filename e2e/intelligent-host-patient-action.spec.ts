@@ -1,7 +1,7 @@
 
 import { expect, test, type Page } from '@playwright/test';
 
-import { bootstrapUnlockedSession } from './utils';
+import { bootstrapUnlockedSession, openUnlockedDocument } from './utils';
 
 type Fixture = Readonly<{
     patientId: string;
@@ -112,7 +112,7 @@ test('checkup host creates the fresh selection once and revokes A before selecti
         }) });
     });
 
-    await page.goto(`/patients/${fixture.patientId}/modules`);
+    await openUnlockedDocument(page, `/patients/${fixture.patientId}/modules`);
     const action = page.getByTestId('intelligent-host-checkup-action');
     const menuTrigger = page.getByRole('button', { name: 'Azioni', exact: true });
     await menuTrigger.click();

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { bootstrapUnlockedSession, openPatientSection } from './utils';
+import { bootstrapUnlockedSession, openPatientSection, openUnlockedDocument } from './utils';
 
 async function createPatient(
   page: Page,
@@ -84,7 +84,7 @@ test('patient insight renders stored markdown as read-only history without fallb
     ].join('\n'),
   });
 
-  await page.goto(`/patients/${patientId}/modules`);
+  await openUnlockedDocument(page, `/patients/${patientId}/modules`);
   await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules$`));
   await openPatientSection(page, 'quadro');
   await expect(page.getByTestId('patient-proposals-summary')).toContainText('Nessuna proposta da rivedere');

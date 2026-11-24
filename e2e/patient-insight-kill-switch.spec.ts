@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { bootstrapUnlockedSession, openAiFunzioniSettings, openPatientSection, setAiLaneKillSwitch } from './utils';
+import { bootstrapUnlockedSession, openAiFunzioniSettings, openPatientSection, setAiLaneKillSwitch, openUnlockedDocument } from './utils';
 
 test.afterEach(async ({ page }) => {
   await page.evaluate(async () => {
@@ -54,7 +54,7 @@ test('patient insight kill switch disables generation on patient detail', async 
     return payload.id;
   });
 
-  await page.goto(`/patients/${patientId}/modules`);
+  await openUnlockedDocument(page, `/patients/${patientId}/modules`);
   await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules$`));
   await openPatientSection(page, 'attenzione');
   const insightDisclosure = page.locator('#patient-insight');

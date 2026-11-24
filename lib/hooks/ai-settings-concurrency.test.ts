@@ -6,13 +6,13 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { harness } from './ai-settings-controller.test-support.ts';
 import { installNetworkPatientCookieFixture } from '../network-patient-authority-test-fixture';
-import { syntheticLoopbackRequest } from '../security/loopback-ingress-test-fixture';
+import { syntheticWebClientRequest } from '../security/loopback-ingress-test-fixture';
 import { issueSyntheticWebSessionContext, retireSyntheticWebSession } from '../security/web-auth-lifecycle-owner-test-fixture';
 import { readFunctionModelPreferences } from '../ai-providers/fabric/function-model-preferences';
 
 const root = mkdtempSync(join(tmpdir(), 'mf-d06-synthetic-'));
 process.env.MEDIFLOW_DATA_DIR = root;
-const cookieState = { cookies: new Map<string, string>(), headers: syntheticLoopbackRequest('http://127.0.0.1').headers };
+const cookieState = { cookies: new Map<string, string>(), headers: syntheticWebClientRequest('http://127.0.0.1').headers };
 const cleanup = installNetworkPatientCookieFixture(root, cookieState);
 const load = createRequire(import.meta.url);
 const { dbServer, openDbServer } = load('../db-server.ts') as typeof import('../db-server');
@@ -48,7 +48,7 @@ const value = (key: string) => sql.prepare('SELECT value FROM settings WHERE key
 function request(url: string, options: RequestInit = {}) {
     cookieState.cookies.set('mediflow_session', active.session.id);
     cookieState.cookies.set('mediflow_auth_control', active.controlId);
-    const input = syntheticLoopbackRequest('http://127.0.0.1' + url, { ...options, headers: {
+    const input = syntheticWebClientRequest('http://127.0.0.1' + url, { ...options, headers: {
         'content-type': 'application/json', origin: 'http://127.0.0.1', 'sec-fetch-site': 'same-origin',
         'x-mediflow-archive-generation': currentArchiveGeneration(), ...options.headers,
     } });
@@ -195,4 +195,34 @@ for (const concurrentParameters of [false, true]) test(`confirmed preference swi
     assert.deepEqual(responses, [concurrentParameters ? 409 : 200]);
     if (concurrentParameters) assert.deepEqual(snapshot(), before, 'switch readback cannot authorize a stale parameter draft');
     else { assert.equal(value('aiPatientInsightKillSwitch'), 'enabled'); assert.equal(value('aiInsightMode'), 'balanced'); }
+});
+
+test('concurrent migrations of an accessibility preference record one change', async () => {
+    reset(); active = clientA;
+    const key = 'uiReduceTransparency';
+    sql.prepare('INSERT INTO settings(key,value) VALUES (?,?)').run(key, 'true');
+    const audit = () => sql.prepare("SELECT COUNT(*) FROM audit_events WHERE event_type='settings.updated' AND subject_ref=?").pluck().get(key);
+    const before = audit();
+    const migrate = () => boundary('/api/settings/' + key, {
+        method: 'PUT', body: JSON.stringify({ value: false, expectedValue: 'true' }),
+    });
+    const [first, second] = await Promise.all([migrate(), migrate()]);
+    assert.equal(first.status, 200);
+    assert.equal(second.status, 200);
+    assert.equal(value(key), 'false');
+    assert.equal(audit(), Number(before) + 1);
+});
+
+test('an accessibility migration preserves a newer explicit setting', async () => {
+    reset(); active = clientA;
+    const key = 'uiReduceMotion';
+    const explicit = await boundary('/api/settings/' + key, { method: 'PUT', body: JSON.stringify({ value: false }) });
+    assert.equal(explicit.status, 200);
+    const before = snapshot();
+    const migration = await boundary('/api/settings/' + key, {
+        method: 'PUT', body: JSON.stringify({ value: true, expectedValue: null }),
+    });
+    assert.equal(migration.status, 200);
+    assert.equal(value(key), 'false');
+    assert.deepEqual(snapshot(), before);
 });

@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { bootstrapUnlockedSession } from './utils';
+import { documentRequests } from './fixtures/trusted-web-request';
+import { bootstrapUnlockedSession, openUnlockedDocument } from './utils';
 
 test('modifica note con CF storico invalido, mantenendo il rifiuto dei cambi invalidi', async ({ page }) => {
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
@@ -9,7 +10,7 @@ test('modifica note con CF storico invalido, mantenendo il rifiuto dei cambi inv
         if (response.status !== 201) throw new Error(`Creazione legacy: HTTP ${response.status}`);
         return (await response.json()).id as string;
     });
-    await page.goto(`/patients/${id}/edit`);
+    await openUnlockedDocument(page, `/patients/${id}/edit`);
     const code = page.getByLabel('Codice fiscale', { exact: true });
     await expect(code).toHaveValue('RSSMRA80A01H501X');
     await page.getByLabel('Note cliniche e contesto', { exact: true }).fill('Nota sintetica di compatibilità');
@@ -25,7 +26,9 @@ test('modifica note con CF storico invalido, mantenendo il rifiuto dei cambi inv
     expect(response.request().postDataJSON()).toMatchObject({ version: 1 });
     expect(response.request().postDataJSON()).not.toHaveProperty('taxCode');
     await expect(page).not.toHaveURL(new RegExp(`/patients/${id}/edit$`));
-    const stored = await (await page.request.get(`/api/patients/${id}`)).json();
+    const reloaded = await documentRequests(page).get(`/api/patients/${id}`);
+    expect(reloaded.status()).toBe(200);
+    const stored = await reloaded.json();
     expect(stored.taxCode).toBe('RSSMRA80A01H501X');
     expect(stored.identifierType).toBe('cf');
     expect(stored.version).toBe(2);

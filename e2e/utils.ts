@@ -1,7 +1,5 @@
 import { expect, Locator, Page } from '@playwright/test';
-import { generateMasterKey, wrapMasterKeyVersioned } from '../lib/security/security';
 import { checkPassphrase } from '../lib/security/unlock-credential';
-import { trustedWebRequestHeaders } from './fixtures/trusted-web-request';
 
 export const REFLOW_PROXY_VIEWPORTS = [
   { viewport: 'reflow-proxy-400', width: 320, height: 760 },
@@ -104,34 +102,47 @@ async function hasStableUnlockedShell(page: Page): Promise<boolean> {
   return (navigationVisible && lockControlVisible) || workProfileVisible;
 }
 
-type SyntheticOperator = { displayName: string; ambulatoryName: string };
+type SyntheticOperator = { displayName: string; ambulatoryName: string; passphrase?: string };
 const defaultOperator: SyntheticOperator = { displayName: 'Dr. E2E Smoke', ambulatoryName: 'Ambulatorio E2E' };
 
-export async function completeOnboardingIfNeeded(page: Page, pin: string, operator = defaultOperator): Promise<void> {
-  const stepProfile = page.getByRole('heading', { name: 'Chi sei?' });
-  if (!(await isVisible(stepProfile))) return;
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-  const encryptedMasterKey = await wrapMasterKeyVersioned(await generateMasterKey(), pin, salt);
-  const control = await page.request.get('/api/auth/check');
-  expect(control.status()).toBe(200);
-  const etag = control.headers()['etag'];
-  expect(etag).toBeTruthy();
-  const response = await page.request.post('/api/auth/setup', {
-    headers: { ...trustedWebRequestHeaders(page.url()), 'If-Match': etag, 'Idempotency-Key': crypto.randomUUID() },
-    data: { username: 'admin', password: pin, ...operator,
-      encryptedMasterKey, salt: Buffer.from(salt).toString('base64') },
-  });
-  expect(response.status()).toBe(200);
-  const closed = await page.request.post('/api/auth/lock', { headers: { ...trustedWebRequestHeaders(page.url()),
-    'If-Match': response.headers()['etag'], 'Idempotency-Key': crypto.randomUUID() } });
-  expect(closed.status()).toBe(200);
-  await page.reload();
+export function onboardingPassphrase(pin: string, operator = defaultOperator): string {
+  return operator.passphrase ?? `Accesso sintetico MediFlow ${pin}`;
+}
+
+export async function completeOnboardingIfNeeded(
+  page: Page, pin: string, operator = defaultOperator,
+): Promise<void> {
+  if (!(await isVisible(page.getByRole('heading', { name: 'Chi sei?' })))) return;
+  const wizard = page.getByTestId('onboarding-setup');
+  await wizard.getByLabel('Nome e cognome', { exact: true }).fill(operator.displayName);
+  await wizard.getByLabel('Nome dell’ambulatorio', { exact: true }).fill(operator.ambulatoryName);
+  await wizard.getByRole('button', { name: 'Avanti', exact: true }).click();
+  const passphrase = onboardingPassphrase(pin, operator);
+  await wizard.getByLabel('Passphrase di accesso', { exact: true }).fill(passphrase);
+  await wizard.getByLabel('Conferma passphrase', { exact: true }).fill(passphrase);
+  await wizard.getByLabel('PIN di conferma', { exact: true }).fill(pin);
+  await wizard.getByLabel('Conferma PIN', { exact: true }).fill(pin);
+  await wizard.getByRole('button', { name: 'Prepara il kit di recupero', exact: true }).click();
+  const kit = page.getByTestId('recovery-kit');
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    kit.getByRole('button', { name: 'Scarica kit di recupero', exact: true }).click(),
+  ]);
+  try {
+    expect(await download.failure()).toBeNull();
+    await kit.getByRole('checkbox').check();
+    await kit.getByRole('button', { name: 'Attiva la nuova passphrase', exact: true }).click();
+    await expect(kit).toBeHidden();
+    await expect(page.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeVisible();
+  } finally {
+    await download.delete();
+  }
 }
 
 export async function renewAccessIfNeeded(page: Page, credential: Locator): Promise<void> {
   const renew = page.getByRole('button', { name: 'Rinnova accesso', exact: true });
   if (!await renew.isVisible()) return;
-  const noPeer = page.getByText('Apri una scheda già sbloccata oppure blocca tutte le schede per accedere di nuovo.', { exact: true });
+  const noPeer = page.getByText('Apri una scheda già sbloccata oppure accedi di nuovo.', { exact: true });
   if (await renew.isEnabled() && !await noPeer.isVisible()) {
     try { await renew.click({ timeout: 1000 }); }
     catch (error) {
@@ -139,8 +150,7 @@ export async function renewAccessIfNeeded(page: Page, credential: Locator): Prom
       return;
     }
   }
-  await expect.poll(async () => !await credential.isVisible() || await credential.isEnabled() || await noPeer.isVisible()).toBe(true);
-  if (await noPeer.isVisible()) await page.getByRole('button', { name: 'Blocca tutte le schede', exact: true }).click();
+  await expect.poll(async () => !await credential.isVisible() || await credential.isEnabled()).toBe(true);
 }
 
 async function submitPin(page: Page, pin: string): Promise<void> {
@@ -161,25 +171,45 @@ async function submitPin(page: Page, pin: string): Promise<void> {
   }
 }
 
-export async function unlockIfNeeded(page: Page, pin: string): Promise<void> {
+export async function unlockIfNeeded(page: Page, pin: string, operator = defaultOperator): Promise<void> {
   const lockHeading = page.getByRole('heading', { name: 'Sblocca MediFlow' });
   if (!(await isVisible(lockHeading))) return;
-  await renewAccessIfNeeded(page, page.getByLabel('PIN operatore').first());
+  const passphrase = page.getByLabel('Passphrase', { exact: true });
+  const pinField = page.getByLabel('PIN operatore', { exact: true });
+  const credential = passphrase.or(pinField);
+  await expect(credential).toBeVisible();
+  if (!(await credential.isEnabled())) await renewAccessIfNeeded(page, credential);
   if (!await lockHeading.isVisible() || await hasStableUnlockedShell(page)) return;
-  await submitPin(page, pin);
+  if (await passphrase.isVisible()) {
+    await passphrase.fill(onboardingPassphrase(pin, operator));
+    await page.getByRole('button', { name: 'Sblocca', exact: true }).click();
+    await expect(lockHeading).toBeHidden();
+  } else await submitPin(page, pin);
+}
+
+export async function openUnlockedDocument(page: Page, href: string, pin = process.env.E2E_PIN || '1234'): Promise<void> {
+  await page.goto(href);
+  await unlockIfNeeded(page, pin);
 }
 
 export async function lockAllTabsAndSignIn(page: Page, pin: string): Promise<void> {
+  const heading = page.getByRole('heading', { name: 'Sblocca MediFlow' });
+  if (await isVisible(heading)) {
+    await page.getByRole('button', { name: 'Rinnova accesso', exact: true }).click();
+    await expect(heading).toBeHidden();
+  }
+  const lockAll = page.getByRole('button', { name: 'Blocca tutte le schede', exact: true });
+  const lockButton = await lockAll.isVisible() ? lockAll : page.getByRole('button', { name: 'Blocca', exact: true });
   const [lock] = await Promise.all([
     page.waitForResponse(response => new URL(response.url()).pathname === '/api/auth/lock'
       && response.request().method() === 'POST' && response.status() === 200, { timeout: 15_000 }),
-    page.getByRole('button', { name: 'Blocca tutte le schede', exact: true }).click({ timeout: 5_000 }),
+    lockButton.click({ timeout: 5_000 }),
   ]);
   expect(await lock.json()).toMatchObject({ state: 'server_invalidation_confirmed' });
   const [login] = await Promise.all([
     page.waitForResponse(response => new URL(response.url()).pathname === '/api/auth/login'
       && response.request().method() === 'POST', { timeout: 15_000 }),
-    submitPin(page, pin),
+    unlockIfNeeded(page, pin),
   ]);
   expect(login.status()).toBe(200);
 }
@@ -213,7 +243,7 @@ export async function bootstrapUnlockedSession(page: Page, pin: string, operator
 
     await completeOnboardingIfNeeded(page, pin, operator);
     await setupPinLegacyIfNeeded(page, pin);
-    await unlockIfNeeded(page, pin);
+    await unlockIfNeeded(page, pin, operator);
   }
 
   if (!(await hasStableUnlockedShell(page))) {
@@ -222,7 +252,7 @@ export async function bootstrapUnlockedSession(page: Page, pin: string, operator
 }
 
 async function openAiSettingsPage(page: Page, route: 'funzioni' | 'modelli'): Promise<void> {
-  await page.goto(`/settings/ai/${route}`);
+  await openUnlockedDocument(page, `/settings/ai/${route}`);
   await expect(page).toHaveURL(new RegExp(`/settings/ai/${route}$`));
   await expect(page.getByTestId('ai-settings-controls')
     .getByRole('button', { name: route === 'modelli' ? 'Salva configurazione' : 'Salva parametri avanzati', exact: true })).toBeEnabled();
