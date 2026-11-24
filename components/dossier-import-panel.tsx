@@ -17,6 +17,7 @@ import PrivacyBlur from '@/components/privacy-blur';
 import { useSecurity } from '@/components/security-provider';
 import PatientDocumentCreate from '@/components/patient-document-create';
 import { DossierBackupProposal, dossierBackupProposed, dossierWritablePatientCount, type DossierBackupChoice } from '@/components/dossier-backup-proposal';
+import { dossierCreationSource } from '@/lib/dossier-backup-gate';
 import { proposeIdentityFields } from '@/lib/domain/documents/dossier-sections';
 import { db } from '@/lib/db';
 import { createDossierPorts } from '@/lib/document-dossier-ports';
@@ -434,7 +435,7 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
                                             onClick={() => { void acquire(effectiveGroup); }}>Salva {formatCountLabel(acquirable, 'originale', 'originali')} nella scheda</button>
                                     </div>
                                     <NewPatientFromDocument group={group} identityBlocking={identity.blocking} busy={Boolean(busy) || backupProposed}
-                                        creating={creating?.groupKey === group.key ? creating.sourceKey : null}
+                                        creating={dossierCreationSource(creating, group.key, backupProposed)}
                                         onStart={(sourceKey) => setCreating({ groupKey: group.key, sourceKey })}
                                         onCancel={() => setCreating(null)}
                                         onCreated={async (patientId) => {
