@@ -1,5 +1,5 @@
 /* WUL-804: dossier from a Mac folder. The query parameter only preselects a sheet to resume; it grants nothing. */
-import styles from '@/components/patient-bulk-import-panel.module.css';
+import styles from './dossier-import.module.css';
 import DossierImportPanel from '@/components/dossier-import-panel';
 
 export default async function PatientDossierImportPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
