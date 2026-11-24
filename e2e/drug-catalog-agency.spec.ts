@@ -16,10 +16,12 @@ const AGENCY_CSV = Buffer.from([
 ].join('\n') + '\n', 'utf8');
 const AGENCY = 'Agenzia inventata J3';
 
+const SYNTHETIC_PIN = '314159';
+
 type TherapyCodes = { id: string; drug_name: string; aic: string | null; atc: string | null };
 
 async function openRepertori(page: Page, panel: RegExp) {
-  await openUnlockedDocument(page, '/settings/repertori');
+  await openUnlockedDocument(page, '/settings/repertori', SYNTHETIC_PIN);
   const toggle = page.getByRole('button', { name: panel });
   await expect(toggle).toBeVisible();
   if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
@@ -40,7 +42,7 @@ async function importAifa(page: Page, version: string) {
 }
 
 async function saveTherapyFromCatalog(page: Page, patientId: string, query: string, drugName: string) {
-  await openUnlockedDocument(page, `/patients/${patientId}/modules`);
+  await openUnlockedDocument(page, `/patients/${patientId}/modules`, SYNTHETIC_PIN);
   await openPatientSection(page, 'terapie');
   const pane = page.locator('#terapie');
   await pane.getByRole('button', { name: 'Nuova terapia', exact: true }).click();
@@ -55,7 +57,7 @@ test('J-3: catalogo di un’altra agenzia con fonte, colonne, anteprima e confer
   test.setTimeout(240_000);
   const evidence = process.env.DRUG_CATALOG_EVIDENCE_DIR || info.outputPath('catalogo-farmaci');
   mkdirSync(evidence, { recursive: true });
-  await bootstrapUnlockedSession(page, '314159');
+  await bootstrapUnlockedSession(page, SYNTHETIC_PIN);
   const patientId = await page.evaluate(async () => {
     const response = await fetch('/api/patients', { method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ firstName: 'Catalogo', lastName: 'Agenzia', taxCode: 'CTLGNZ80A01H501W', birthDate: '1980-01-01T00:00:00.000Z', diagnoses: [] }) });
@@ -127,7 +129,7 @@ test('J-3: catalogo di un’altra agenzia con fonte, colonne, anteprima e confer
     await expect(page.getByTestId('aifa-catalog-guide')).not.toContainText('Catalogo attivo da un’altra agenzia');
     expect(therapies(), 'J-3 terapie invariate dopo il ritorno ad AIFA').toEqual(beforeReturn);
 
-    await openUnlockedDocument(page, `/patients/${patientId}/modules`);
+    await openUnlockedDocument(page, `/patients/${patientId}/modules`, SYNTHETIC_PIN);
     await openPatientSection(page, 'terapie');
     const pane = page.locator('#terapie');
     await expect(pane.getByRole('row').filter({ hasText: 'ACIDO SINTETICO' })).toContainText('AIC 000000101');
