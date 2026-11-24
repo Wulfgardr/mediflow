@@ -633,10 +633,16 @@ si estende a tutte le viste Web e GPUI; la tabella sopra resta lo stato del
 - Web, controlli: la riga compatta del Diario nel Quadro misura 48 px di
   colonna data (prima 84 px); la vista Diario completa resta a 84 px.
 - GPUI: le viste del pilota si allineano agli stessi ruoli di vassoio e isola
-  nello stesso branch.
+  nello stesso branch, con 15 titoli residui portati in case frase e righe
+  Impostazioni a tutta larghezza.
 
-Non provato in questo aggiornamento: Playwright e build di produzione, GPUI a
-schermo.
+Provato in questo aggiornamento (archivio sintetico, senza dati reali): build
+standalone Web, 12 spec Playwright mirati (48/48), regressione identità UI
+(`scripts/ui-identita/prova.mjs`, 19/19), 3 copioni UI CLI Web (279 passi),
+suite Rust GPUI (`cargo fmt --check`, `clippy -Dwarnings`, 788 test), 10
+copioni UI CLI GPUI (`gpui-shell*.jsonl`) e 28 catture visive GPUI in Giorno e
+Grafite. Non provato qui: CI GitHub completa sul riallineamento finale dopo
+l'ingresso su `main` delle PR precedenti in coda.
 
 ## Prove e limiti
 
