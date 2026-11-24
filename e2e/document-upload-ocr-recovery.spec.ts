@@ -6,7 +6,7 @@ import type { AttachmentExtractionProjectionGrant } from '../lib/domain/document
 import { openDocumentActions, bootstrapUnlockedSession, openPatientSection } from './utils';
 import { observeAnyDocProjectResponse } from './anydoc-project-response';
 import { createAnyDocConsumerDiagnostic } from './anydoc-consumer-diagnostic';
-import { fetchInterceptedRequest } from './fixtures/trusted-web-request';
+import { documentRequests, fetchInterceptedRequest } from './fixtures/trusted-web-request';
 
 const TEXT = 'DOCUMENTO SINTETICO PER RECUPERO';
 const RTF = Buffer.from(`{\\rtf1\\ansi ${TEXT}}`);
@@ -218,7 +218,7 @@ test('OCR recovery UI: deleting a pending attachment releases the other extracti
     await expect(second).toBeEnabled();
     await expect(second).not.toHaveAttribute('aria-describedby');
     await expect(second).not.toContainText('Attendi la fine dell’estrazione in corso.');
-    expect((await page.request.get(`/api/attachments/${file.id}`)).status()).toBe(404);
+    expect((await documentRequests(page).get(`/api/attachments/${file.id}`)).status()).toBe(404);
     release.resolve();
     await expect(page.getByTestId('anydoc-local-extraction-preview')).toHaveCount(0);
     await second.click();

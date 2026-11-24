@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { test as isolatedTest } from './fixtures/isolated-runtime';
 import { switchPreset } from './fixtures/territorial-preset';
-import { bootstrapUnlockedSession, openPatientSection, openUnlockedDocument } from './utils';
+import { bootstrapUnlockedSession, openPatientSection } from './utils';
 import { sealDiaryEntry } from './fixtures/sealed-diary-entry';
 
 const PANES = ['quadro', 'attenzione', 'identita', 'clinica', 'amministrazione', 'parametri', 'terapie',
@@ -179,6 +179,7 @@ const ROUTES = ['/', '/?area=incarico', '/?area=turno', '/?area=diario', '/?area
   '/patients/[id]/entries/new', '/patients/[id]/edit', '/patients/new', '/patients/import', ...settingsRoutes()];
 
 const typographyTest = isolatedTest.extend<{ patientFixture: { id: string; name: string } }>({
+  existingPin: process.env.E2E_PIN || '1234',
   patientFixture: async ({ page }, runTest) => {
     const fixture = await createFixture(page);
     try {
@@ -259,7 +260,7 @@ for (const theme of ['light', 'dark'] as const) {
       await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
     });
     typographyTest('scheda a larghezze e dimensioni del testo diverse', async ({ page, patientFixture: fixture }, info) => {
-      await openUnlockedDocument(page, `/patients/${fixture.id}/modules`);
+      await page.goto(`/patients/${fixture.id}/modules`);
       await expect(page.getByRole('heading', { name: fixture.name, exact: true })).toBeVisible();
       for (const [width, rootSize] of [[390, 16], [1440, 20], [768, 32]]) {
         await page.setViewportSize({ width, height: 960 });

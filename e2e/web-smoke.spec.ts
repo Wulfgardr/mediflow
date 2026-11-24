@@ -1,12 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
-import { bootstrapUnlockedSession, openPatientSection, unlockIfNeeded } from './utils';
+import { bootstrapUnlockedSession, openPatientSection } from './utils';
 import { sealDiaryEntry } from './fixtures/sealed-diary-entry';
-
-async function reopenSession(page: Page) {
-  await expect(page.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeVisible();
-  await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
-}
 
 function webRequest<T>(page: Page, path: string, method: 'GET' | 'POST' | 'DELETE' = 'GET', body?: unknown) {
   return page.evaluate(async ({ path, method, body }) => {
@@ -149,7 +144,6 @@ test('web smoke: unlock/setup + patients filters + settings navigation', async (
     return { ...(await response.json()), taxCode } as { id: string; taxCode: string };
   });
   await page.reload();
-  await reopenSession(page);
   await patientsSearch.fill(patient.taxCode);
   const row = page.getByRole('option').filter({ hasText: 'Percorso Sintetico' });
   await row.focus();
@@ -173,7 +167,6 @@ test('web smoke: unlock/setup + patients filters + settings navigation', async (
   await update.focus(); await page.keyboard.press('Enter');
   await expect(page).toHaveURL(new RegExp(`/patients/${patient.id}/modules$`));
   await page.reload();
-  await reopenSession(page);
   await expect(page.getByTestId('lume-scheda-header')).toContainText('Modificato');
   const stored = await webRequest(page, `/api/patients/${patient.id}`);
   expect(stored.status).toBe(200);
@@ -210,7 +203,6 @@ test('web smoke: unlock/setup + patients filters + settings navigation', async (
 test('web smoke: Rivedi agenda focuses its controlled heading without leaving turno', async ({ page }) => {
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   await page.goto('/?area=turno');
-  await reopenSession(page);
 
   const reviewAgenda = page.getByRole('button', { name: 'Rivedi agenda', exact: true });
   const agendaHeading = page.getByRole('heading', { name: 'Appuntamenti', exact: true, level: 2 });
@@ -258,7 +250,6 @@ test('web smoke: live decision CTAs always open their declared patient context',
   const entry = entryResponse.data;
 
   await page.goto(`/?area=turno&paziente=${documentsPatient.id}`);
-  await reopenSession(page);
   const navigation = page.getByRole('navigation', { name: 'Navigazione principale', exact: true });
   await expect(page.getByRole('button', { name: 'Vai alla revisione', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Apri esenzioni', exact: true })).toHaveCount(0);

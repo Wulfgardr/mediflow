@@ -6,6 +6,8 @@ import { assertDocumentFlowRealRoutes } from './document-flow-real-route.accepta
 import { AI_DOCUMENT_SYNTHESIS_KILL_SWITCH_KEY } from '../lib/ai-document-synthesis-kill-switch';
 import { fetchInterceptedRequest } from './fixtures/trusted-web-request';
 
+test.use({ existingPin: process.env.E2E_PIN || '1234' });
+
 test('Documenti: upload, persistenza, consultazione e cancellazione senza generazione implicita', async ({ page, baseURL }, info) => {
     test.skip(process.env.E2E_DOCUMENTS_SYNTHETIC_ONLY !== '1', 'Requires explicit isolated synthetic data');
     expect(new URL(baseURL!).hostname).toMatch(/^(localhost|127\.0\.0\.1)$/);
