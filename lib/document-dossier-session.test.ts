@@ -8,7 +8,7 @@ import {
     retryDossierExtraction, saveDossierReview,
     type DossierAcquireOutcome, type DossierAttachmentMeta, type DossierInputFile, type DossierPatient, type DossierPorts, type DossierRecordTable,
 } from './document-dossier-session';
-import { readDossierRecord, type DossierHostExtraction, type DossierRecord } from './domain/documents/dossier-import';
+import { decideByPhysician, readDossierRecord, type DossierHostExtraction, type DossierRecord } from './domain/documents/dossier-import';
 import { parseDocumentParseEvidenceArtifactSnapshot } from './domain/documents/document-parse-evidence-artifact';
 import { DOSSIER_PREPARED_SCHEMA, parsePreparedExtraction, type PreparedExtraction } from './domain/documents/dossier-prepared';
 
@@ -744,19 +744,17 @@ test('without a tax code, a patient named in the document blocks a link to a rec
 
 test('accept verified and apply writes only what the source supports, with active principle and summary', async () => {
     const text = letterText(CF_A);
-    const { ports, files, records } = setup([['settimana/a.pdf', text]]);
-    const [group] = await buildDossierInventory(ports, files, { ...live, prepared: preparedFor([{ text, cf: CF_A }]) });
-    const source = group.sources[0];
-    assert.equal(source.prepared?.facts, 4);
-    assert.ok(source.facts.some((fact) => fact.origin === 'parser:document'), 'le proposte del parser restano visibili');
-    await acquireDossierGroup(ports, { group, patientId: 'pa', confirmed: true, ...live });
-    // Senza la scelta esplicita sulle sintesi: solo il verificato; sintesi e residuo restano al medico.
-    const cautious = await acceptVerifiedAndApply(ports, { patientId: 'pa', ...live });
-    assert.equal(cautious.accepted, 2, 'diagnosi e terapia');
-    assert.equal(cautious.residualAcknowledged, 0);
-    assert.equal([...records.keys()].filter((key) => key.startsWith('entries:')).length, 0);
+    const imported = async () => {
+        const fixture = setup([['settimana/a.pdf', text]]);
+        const [group] = await buildDossierInventory(fixture.ports, fixture.files, { ...live, prepared: preparedFor([{ text, cf: CF_A }]) });
+        assert.equal(group.sources[0].prepared?.facts, 4);
+        assert.ok(group.sources[0].facts.some((fact) => fact.origin === 'parser:document'), 'le proposte del parser restano visibili');
+        await acquireDossierGroup(fixture.ports, { group, patientId: 'pa', confirmed: true, ...live });
+        return fixture;
+    };
+    const { ports, records } = await imported();
     const result = await acceptVerifiedAndApply(ports, { patientId: 'pa', includeSummaries: true, ...live });
-    assert.equal(result.accepted, 1, 'la sintesi');
+    assert.equal(result.accepted, 3, 'diagnosi, terapia e sintesi');
     assert.ok(result.superseded >= 1, 'la voce col testo intero lascia il posto alla sintesi');
     assert.equal(result.residualAcknowledged, 1);
     const pending = (await loadPatientDossier(ports, 'pa', live.signal))!.documents[0].record.facts.filter((fact) => fact.decision === 'pending');
@@ -773,10 +771,73 @@ test('accept verified and apply writes only what the source supports, with activ
     const view = (await loadPatientDossier(ports, 'pa', live.signal))!;
     assert.deepEqual(view.documents[0].coverage.gaps, ['facts_pending']);
     assert.ok((await ports.getPatient('pa', live.signal))!.diagnoses.some((item) => item.description === 'Ipertensione arteriosa essenziale'));
-    // Ripetere non duplica nulla.
     const again = await acceptVerifiedAndApply(ports, { patientId: 'pa', includeSummaries: true, ...live });
     assert.equal(again.accepted, 0);
     assert.equal([...records.keys()].filter((key) => key.startsWith('therapies:')).length, 1);
+
+    const cautious = await imported();
+    const before = cautious.counts().artifactUpdates;
+    const first = await acceptVerifiedAndApply(cautious.ports, { patientId: 'pa', ...live });
+    assert.equal(first.accepted, 3, 'diagnosi, terapia e voce di diario col documento intero');
+    assert.equal(first.residualAcknowledged, 0);
+    const facts = (await loadPatientDossier(cautious.ports, 'pa', live.signal))!.documents[0].record.facts;
+    assert.deepEqual(facts.filter((fact) => fact.decision === 'pending').map((fact) => fact.values.drugName ?? fact.values.preparedCheck), ['Metformina', 'summary'],
+        'restano al medico la citazione non trovata e la sintesi');
+    assert.equal(facts.find((fact) => fact.origin === 'parser:document')?.decision, 'accepted');
+    assert.ok(facts.filter((fact) => fact.decision !== 'pending').every((fact) => fact.decidedBy === 'accept_verified'), 'ogni decisione porta il gesto unico');
+    assert.ok(facts.filter((fact) => fact.decision === 'rejected').every((fact) => fact.note), 'ogni voce messa da parte ha il motivo');
+    assert.equal(first.setAside + first.superseded, facts.filter((fact) => fact.decision === 'rejected').length);
+    assert.ok(cautious.counts().artifactUpdates > before, 'le decisioni passano dal salvataggio ordinario della revisione');
+    const cautiousEntries = [...cautious.records.entries()].filter(([key]) => key.startsWith('entries:')).map(([, value]) => value);
+    assert.equal(cautiousEntries.length, 1, 'la voce col testo intero è nel diario');
+
+    const summary = facts.find((fact) => fact.values.preparedCheck === 'summary')!;
+    const document = (await loadPatientDossier(cautious.ports, 'pa', live.signal))!.documents[0];
+    await saveDossierReview(cautious.ports, { patientId: 'pa', attachmentId: document.attachment.id, expected: document.attachment.currentness!, ...live,
+        change: (record) => ({ ...record, facts: record.facts.map((fact) => fact.factId === summary.factId ? { ...fact, decision: 'accepted' } : fact) }) });
+    const reviewed = await acceptVerifiedAndApply(cautious.ports, { patientId: 'pa', ...live });
+    assert.equal(reviewed.residualAcknowledged, 0, '«Ho letto» resta un gesto del medico');
+    assert.equal((await loadPatientDossier(cautious.ports, 'pa', live.signal))!.documents[0].record.residualReview.state, 'pending');
+});
+
+test('WUL-927 a voce set aside by the gesture stays listed with its reason and the physician can recover it', async () => {
+    const text = `${letterText(CF_A)}\nScala di Barthel 60/100.`;
+    const { ports, files, records } = setup([['settimana/a.pdf', text]]);
+    const [group] = await buildDossierInventory(ports, files, { ...live, prepared: preparedFor([{ text, cf: CF_A }]) });
+    await acquireDossierGroup(ports, { group, patientId: 'pa', confirmed: true, ...live });
+    const before = (await loadPatientDossier(ports, 'pa', live.signal))!.documents[0].record.facts;
+    await acceptVerifiedAndApply(ports, { patientId: 'pa', ...live });
+    const document = (await loadPatientDossier(ports, 'pa', live.signal))!.documents[0];
+    assert.equal(document.record.facts.length, before.length, 'nessuna voce sparisce');
+    const scale = document.record.facts.find((fact) => fact.origin === 'parser:scale')!;
+    assert.deepEqual([scale.decision, scale.decidedBy, scale.note], ['rejected', 'accept_verified', 'Lettura automatica non verificata.']);
+    assert.deepEqual(scale.values, before.find((fact) => fact.factId === scale.factId)!.values);
+    assert.equal([...records.keys()].filter((key) => key.startsWith('entries:')).length, 1, 'solo la voce col testo intero');
+    await saveDossierReview(ports, { patientId: 'pa', attachmentId: document.attachment.id, expected: document.attachment.currentness!, ...live,
+        change: (record) => ({ ...record, facts: record.facts.map((fact) => fact.factId === scale.factId ? decideByPhysician(fact, 'accepted') : fact) }) });
+    const reviewed = (await loadPatientDossier(ports, 'pa', live.signal))!.documents[0];
+    const recovered = reviewed.record.facts.find((fact) => fact.factId === scale.factId)!;
+    assert.deepEqual([recovered.decision, recovered.decidedBy, recovered.note], ['accepted', undefined, undefined], 'ora è una decisione del medico');
+    const applied = await applyDossierDocument(ports, { patientId: 'pa', attachmentId: reviewed.attachment.id, expected: reviewed.attachment.currentness!, ...live });
+    assert.equal(applied.outcomes.find((outcome) => outcome.factId === scale.factId)?.outcome, 'applied');
+    assert.equal([...records.keys()].filter((key) => key.startsWith('entries:')).length, 2);
+});
+
+test('WUL-927 a failed write of the full-text entry is reported per voce, never as success', async () => {
+    const text = letterText(CF_A);
+    const { ports, files, knobs } = setup([['settimana/a.pdf', text]]);
+    const [group] = await buildDossierInventory(ports, files, { ...live, prepared: preparedFor([{ text, cf: CF_A }]) });
+    await acquireDossierGroup(ports, { group, patientId: 'pa', confirmed: true, ...live });
+    knobs.rejectCreate = 'entries';
+    const result = await acceptVerifiedAndApply(ports, { patientId: 'pa', ...live });
+    assert.equal(result.applied.length, 1);
+    assert.equal(result.applied[0].partial, true);
+    const record = (await loadPatientDossier(ports, 'pa', live.signal))!.documents[0];
+    const entry = record.record.facts.find((fact) => fact.origin === 'parser:document')!;
+    assert.equal(entry.decision, 'accepted');
+    assert.equal(result.applied[0].outcomes.find((outcome) => outcome.factId === entry.factId)?.outcome, 'failed');
+    assert.ok(record.coverage.gaps.includes('apply_failed'));
+    assert.ok(result.applied[0].outcomes.some((outcome) => outcome.outcome === 'applied'), 'le altre voci sono scritte e lo dicono');
 });
 
 test('WUL-924 a prescription reminder without the physician code in the Profile names the cause and stays blocked', async () => {
