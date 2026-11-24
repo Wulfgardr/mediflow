@@ -1,6 +1,4 @@
-import {
-    WEB_CONTROL_LOCATOR_HEADER, WEB_DOCUMENT_AUTHORITY_STORAGE_KEY, WEB_SESSION_LOCATOR_HEADER, WEB_SESSION_PROOF_HEADER,
-} from './web-session-proof-header';
+import { WEB_CONTROL_LOCATOR_HEADER, WEB_SESSION_LOCATOR_HEADER, WEB_SESSION_PROOF_HEADER } from './web-session-proof-header';
 import type { PassphraseAdoptionPayload, PassphraseChangePayload, PassphraseRecoveryPayload } from './passphrase-adoption-validation';
 
 export type AuthHealthErrorCategory =
@@ -458,6 +456,7 @@ export function observeArchiveGeneration(value: unknown): void {
     rejectReplacedArchive();
 }
 
+const DOCUMENT_AUTHORITY_STORAGE_KEY = 'mediflow_web_document_authority';
 const PROOF_PATTERN = /^[a-f0-9]{64}$/u;
 const CONTROL_LOCATOR_PATTERN = /^[A-Za-z0-9_-]{32,256}$/u;
 const SESSION_LOCATOR_PATTERN = /^[a-f0-9]{64}$/u;
@@ -470,7 +469,7 @@ type RetainedDocumentAuthority = { proof: string; control: string; session: stri
 
 function readRetainedDocumentAuthority(): RetainedDocumentAuthority | null {
     try {
-        const stored = JSON.parse(sessionStorage.getItem(WEB_DOCUMENT_AUTHORITY_STORAGE_KEY) ?? 'null') as Partial<RetainedDocumentAuthority> | null;
+        const stored = JSON.parse(sessionStorage.getItem(DOCUMENT_AUTHORITY_STORAGE_KEY) ?? 'null') as Partial<RetainedDocumentAuthority> | null;
         if (typeof stored?.proof === 'string' && PROOF_PATTERN.test(stored.proof)
             && typeof stored.control === 'string' && CONTROL_LOCATOR_PATTERN.test(stored.control)
             && typeof stored.session === 'string' && SESSION_LOCATOR_PATTERN.test(stored.session)) {
@@ -497,12 +496,12 @@ function documentProof(): string {
 export function retainDocumentAuthorityForReload(): boolean {
     const proof = documentProof();
     if (!webControlLocator || !webSessionLocator) return false;
-    sessionStorage.setItem(WEB_DOCUMENT_AUTHORITY_STORAGE_KEY, JSON.stringify({ proof, control: webControlLocator, session: webSessionLocator }));
+    sessionStorage.setItem(DOCUMENT_AUTHORITY_STORAGE_KEY, JSON.stringify({ proof, control: webControlLocator, session: webSessionLocator }));
     return true;
 }
 
 export function releaseDocumentAuthorityForReload(): void {
-    sessionStorage.removeItem(WEB_DOCUMENT_AUTHORITY_STORAGE_KEY);
+    sessionStorage.removeItem(DOCUMENT_AUTHORITY_STORAGE_KEY);
 }
 
 export async function documentProofDigest(): Promise<string> {
