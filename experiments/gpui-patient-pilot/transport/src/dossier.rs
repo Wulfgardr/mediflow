@@ -1490,104 +1490,202 @@ fn same_subject(a: &Value, b: &Value) -> bool {
         && !b.is_empty()
         && (a.iter().all(|w| b.contains(w)) || b.iter().all(|w| a.contains(w)))
 }
+fn automatic_reading(f: &Value) -> bool {
+    [
+        "parser:lab",
+        "parser:icd",
+        "parser:exemption",
+        "parser:section",
+        "parser:scale",
+    ]
+    .contains(&string(&f["origin"]))
+}
+fn set_of(value: &Value) -> BTreeSet<String> {
+    array(value).iter().map(|v| string(v).to_owned()).collect()
+}
+fn decide(fact: &mut Value, decision: &str, note: Option<String>) {
+    fact["decision"] = json!(decision);
+    fact["decidedBy"] = json!("accept_verified");
+    if let Some(note) = note {
+        fact["note"] = json!(note);
+    }
+}
 pub fn bulk(input: &Value) -> Value {
     let record = &input["record"];
     let key = string(&input["documentKey"]);
     let mut facts = array(&record["facts"]).to_vec();
-    let mut accepted = vec![];
-    let mut counts = json!({"accepted":0,"alreadyPresent":0,"superseded":0,"leftPending":0});
+    let mut accepted: Vec<String> = vec![];
+    let mut set_aside: Vec<String> = vec![];
+    let mut counts =
+        json!({"accepted":0,"alreadyPresent":0,"superseded":0,"setAside":0,"leftPending":0});
     let inc = |counts: &mut Value, key: &str| {
         counts[key] = json!(counts[key].as_u64().unwrap() + 1);
     };
     if !facts.iter().any(|f| f["origin"] == "prepared") {
         counts["leftPending"] = json!(facts.iter().filter(|f| f["decision"] == "pending").count());
-        return json!({"facts":facts,"acknowledgeResidual":false,"accepted":accepted,"counts":counts});
+        return json!({"facts":facts,"acknowledgeResidual":false,"accepted":accepted,"setAside":set_aside,"counts":counts});
     }
-    let mut accepted_now: BTreeSet<_> = array(&input["acceptedElsewhere"])
-        .iter()
-        .map(|v| string(v).to_owned())
-        .collect();
+    let reference = |f: &Value| format!("{key}#{}", string(&f["factId"]));
+    let mut accepted_now = set_of(&input["acceptedElsewhere"]);
+    let mut set_aside_now = set_of(&input["setAsideElsewhere"]);
+    let conflicted = set_of(&input["conflicted"]);
+    let held = |f: &Value| {
+        let r = reference(f);
+        f["negated"] == true
+            || conflicted.contains(&r)
+            || input["assessments"][&r]["status"] == "conflict"
+    };
+    let duplicate_note = |related: &str, accepted_twin: bool| {
+        let document = related.split_once('#').map_or("", |(d, _)| d);
+        let voice = if accepted_twin {
+            "una voce accettata"
+        } else {
+            "una voce"
+        };
+        if document == key {
+            return format!("Doppione di {voice} di questo documento.");
+        }
+        let source = string(&input["documentNames"][document]);
+        if source.is_empty() {
+            format!("Doppione di {voice} di un altro documento.")
+        } else {
+            format!("Doppione di {voice} di «{source}».")
+        }
+    };
     let supersedable_here: BTreeSet<_> = facts
         .iter()
         .filter(|f| supersedable(f) && f["decision"] == "pending")
-        .map(|f| format!("{key}#{}", string(&f["factId"])))
+        .map(reference)
         .collect();
     for fact in &mut facts {
         if fact["decision"] != "pending"
-            || supersedable(fact)
             || fact["origin"] == "parser:document"
+            || fact["origin"] == "manual"
+            || held(fact)
         {
             continue;
         }
-        let reference = format!("{key}#{}", string(&fact["factId"]));
-        let mut assessment = input["assessments"][&reference].clone();
-        if fact["origin"] == "prepared" && assessment["status"] == "duplicate_in_dossier" {
-            let others: Vec<_> = array(&assessment["relatedFactRefs"])
-                .iter()
-                .filter(|v| !supersedable_here.contains(string(v)))
-                .cloned()
-                .collect();
-            assessment["relatedFactRefs"] = json!(others);
-            if others.is_empty() {
-                assessment["status"] = json!("new");
-            }
-        }
+        let r = reference(fact);
+        let assessment = &input["assessments"][&r];
         if assessment["status"] == "already_present" {
             inc(&mut counts, "alreadyPresent");
-            fact["decision"] = json!("already_present");
+            decide(fact, "already_present", None);
             continue;
         }
-        let related = array(&assessment["relatedFactRefs"]);
-        if assessment["status"] == "duplicate_in_dossier"
-            && !related.is_empty()
-            && related.iter().all(|v| accepted_now.contains(string(v)))
-        {
-            inc(&mut counts, "alreadyPresent");
-            fact["decision"] = json!("already_present");
-            fact["note"] = json!("Stesso contenuto di un’altra fonte accettata.");
+        if assessment["status"] == "duplicate_in_dossier" {
+            let prepared = fact["origin"] == "prepared";
+            let twins: Vec<String> = array(&assessment["relatedFactRefs"])
+                .iter()
+                .map(|v| string(v).to_owned())
+                .filter(|v| {
+                    !set_aside_now.contains(v) && !(prepared && supersedable_here.contains(v))
+                })
+                .collect();
+            if !twins.is_empty() && twins.iter().all(|v| accepted_now.contains(v)) {
+                inc(&mut counts, "alreadyPresent");
+                decide(
+                    fact,
+                    "already_present",
+                    Some(duplicate_note(&twins[0], true)),
+                );
+                continue;
+            }
+            if !twins.is_empty() {
+                inc(&mut counts, "setAside");
+                decide(fact, "rejected", Some(duplicate_note(&twins[0], false)));
+                set_aside.push(r.clone());
+                set_aside_now.insert(r);
+                continue;
+            }
+        }
+        if supersedable(fact) {
             continue;
         }
-        if (assessment.is_null() || assessment["status"] == "new")
-            && eligible(
-                fact,
-                array(&input["exemptionCodes"]),
-                input["includeSummaries"] == true,
-            )
-        {
+        if eligible(
+            fact,
+            array(&input["exemptionCodes"]),
+            input["includeSummaries"] == true,
+        ) {
             inc(&mut counts, "accepted");
-            accepted.push(reference.clone());
-            accepted_now.insert(reference);
-            fact["decision"] = json!("accepted");
+            decide(fact, "accepted", None);
+            accepted.push(r.clone());
+            accepted_now.insert(r);
         }
     }
+    let summary_accepted = facts
+        .iter()
+        .any(|f| summary(f) && f["decision"] == "accepted");
     let summary_written = facts
         .iter()
         .any(|f| summary(f) && f["decision"] == "accepted" && written(record, f));
-    let accepted_prepared: Vec<_> = facts
+    let kept_prepared: Vec<_> = facts
         .iter()
-        .filter(|f| f["origin"] == "prepared" && f["decision"] == "accepted" && !summary(f))
+        .filter(|f| {
+            f["origin"] == "prepared"
+                && (f["decision"] == "accepted" || f["decision"] == "already_present")
+                && !summary(f)
+        })
         .cloned()
         .collect();
     for fact in &mut facts {
         if fact["decision"] != "pending" {
             continue;
         }
-        if (fact["origin"] == "parser:document" && summary_written)
-            || (supersedable(fact)
-                && accepted_prepared
-                    .iter()
-                    .any(|o| o["kind"] == fact["kind"] && same_subject(o, fact)))
+        let r = reference(fact);
+        if fact["origin"] == "parser:document" {
+            if summary_written {
+                inc(&mut counts, "superseded");
+                set_aside.push(r.clone());
+                set_aside_now.insert(r);
+                decide(
+                    fact,
+                    "rejected",
+                    Some("Sostituita dalla sintesi accettata; il testo completo resta nell’allegato.".to_owned()),
+                );
+                continue;
+            }
+            if !summary_accepted
+                && array(&blockers(fact, Some(array(&input["exemptionCodes"])))).is_empty()
+            {
+                if input["assessments"][&r]["status"] == "already_present" {
+                    inc(&mut counts, "alreadyPresent");
+                    decide(fact, "already_present", None);
+                } else {
+                    inc(&mut counts, "accepted");
+                    decide(fact, "accepted", None);
+                    accepted.push(r.clone());
+                    accepted_now.insert(r);
+                }
+                continue;
+            }
+        } else if supersedable(fact)
+            && kept_prepared
+                .iter()
+                .any(|o| o["kind"] == fact["kind"] && same_subject(o, fact))
         {
             inc(&mut counts, "superseded");
-            fact["decision"] = json!("rejected");
-            fact["note"] = json!(if fact["origin"] == "parser:document" {
-                "Sostituita dalla sintesi accettata; il testo completo resta nell’allegato."
-            } else {
-                "Sostituita dall’estrazione preparata verificata dello stesso tipo."
-            });
-        } else {
-            inc(&mut counts, "leftPending");
+            set_aside.push(r.clone());
+            set_aside_now.insert(r);
+            decide(
+                fact,
+                "rejected",
+                Some(
+                    "Sostituita dall’estrazione preparata verificata dello stesso tipo.".to_owned(),
+                ),
+            );
+            continue;
+        } else if !held(fact) && automatic_reading(fact) {
+            inc(&mut counts, "setAside");
+            decide(
+                fact,
+                "rejected",
+                Some("Lettura automatica non verificata.".to_owned()),
+            );
+            set_aside.push(r.clone());
+            set_aside_now.insert(r);
+            continue;
         }
+        inc(&mut counts, "leftPending");
     }
     let pages = if record["extraction"]["state"] == "extracted"
         && record["extraction"]["unitBasis"] == "pages"
@@ -1596,13 +1694,14 @@ pub fn bulk(input: &Value) -> Value {
     } else {
         None
     };
-    let acknowledged = facts.iter().find(|f| summary(f)).is_some_and(|f| {
-        f["decision"] == "accepted"
-            && written(record, f)
-            && f["values"]["preparedCoverage"] == "complete"
-            && pages.is_none_or(|p| f["values"]["preparedPages"] == p)
-    });
-    json!({"facts":facts,"acknowledgeResidual":acknowledged,"accepted":accepted,"counts":counts})
+    let acknowledged = input["includeSummaries"] == true
+        && facts.iter().find(|f| summary(f)).is_some_and(|f| {
+            f["decision"] == "accepted"
+                && written(record, f)
+                && f["values"]["preparedCoverage"] == "complete"
+                && pages.is_none_or(|p| f["values"]["preparedPages"] == p)
+        });
+    json!({"facts":facts,"acknowledgeResidual":acknowledged,"accepted":accepted,"setAside":set_aside,"counts":counts})
 }
 /// Entry point usato dalla conformità; nessun campo del risultato viene escluso.
 pub fn verify_call(call: &Value) -> Value {

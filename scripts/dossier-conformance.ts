@@ -31,6 +31,8 @@ export function verifyCall(call: { op: string; args: unknown[] }): unknown {
         const input = args[0] as Record<string, unknown>;
         input.exemptionCodes = new Set(input.exemptionCodes as string[]);
         input.acceptedElsewhere = new Set(input.acceptedElsewhere as string[]);
+        input.setAsideElsewhere = new Set(input.setAsideElsewhere as string[]);
+        input.conflicted = new Set(input.conflicted as string[]);
         input.assessment = (ref: string) => (input.assessments as Record<string, unknown>)[ref] ?? undefined;
     }
     const functions = { ...prepared, ...dossier } as Record<string, unknown>;
