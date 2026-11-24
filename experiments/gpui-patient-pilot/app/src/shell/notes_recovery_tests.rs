@@ -39,6 +39,25 @@ pub(super) struct Host {
     responses: Arc<Mutex<std::collections::VecDeque<PlannedResponse>>>,
 }
 impl Host {
+    const DEVICE: &'static str = "synthetic-device";
+    const TOKEN_CHARACTER: &'static str = "x";
+
+    fn client(socket: std::net::SocketAddr) -> RuntimeClient {
+        RuntimeClient::new(RuntimeConfig {
+            base_url: format!("http://{socket}"),
+            tls_pin_sha256: None,
+        })
+        .unwrap()
+    }
+
+    pub(super) fn stored_pairing(&self) -> StoredPairing {
+        StoredPairing {
+            client: Self::client(self.socket),
+            id: Self::DEVICE.to_owned(),
+            token: Zeroizing::new(Self::TOKEN_CHARACTER.repeat(64)),
+        }
+    }
+
     pub(super) fn new() -> Self {
         Self::with_diary_and_documents(json!([]), json!([]))
     }
@@ -166,6 +185,18 @@ impl Host {
                     response
                 }
                 "GET /api/v1/network/patients" => json!([]),
+                value if value.starts_with("GET /api/v1/network/entries?") => diary.as_ref().clone(),
+                "GET /api/v1/network/drugs?count=1" | "GET /api/v1/network/exemptions?count=1" => json!({"count":0}),
+                "GET /api/v1/network/terminology/systems" => json!([]),
+                value if value.starts_with("GET /api/v1/network/drugs?") => json!([]),
+                "GET /api/v1/network/scales" => super::scales::tests::catalog_wire(),
+                value if value.starts_with("GET /api/v1/network/analytics/demographics?") =>
+                    super::analytics::tests::empty_demographics_wire(value),
+                "GET /api/auth/profile" => json!({"operation":"account-profile.read.v1", "contractVersion":1,
+                    "userId":"synthetic-user", "username":"synthetic", "displayName":"Medico sintetico",
+                    "ambulatoryName":"Ambulatorio sintetico", "profileVersion":"p1:synthetic",
+                    "archiveGeneration":"synthetic-generation"}),
+                "GET /api/v1/network/ai-runtime" => synthetic_ai_runtime(),
                 "GET /api/v1/network/patients/patient-a/entries" => diary.as_ref().clone(),
                 "GET /api/v1/network/patients/patient-a/attachments" => json!(listed_documents.as_ref()),
                 value if value.starts_with("GET /api/v1/network/patients/patient-a/attachments/") && !documents.is_empty() => {
@@ -178,7 +209,10 @@ impl Host {
                 value if value.starts_with("GET /api/v1/network/checkups?") => json!([]),
                 "POST /api/auth/native/logout" => json!({"success":true}),
                 value if value.starts_with("GET /api/v1/network/patients/") => json!([]),
-                value => panic!("unexpected fixture route: {value}"),
+                value => {
+                    drop(state);
+                    panic!("unexpected fixture route: {value}");
+                },
             }.to_string();
                 drop(state);
                 let extra = if route == "GET /api/auth/check" { format!("ETag: \"{}\"\r\nSet-Cookie: mediflow_auth_control={}; Path=/; HttpOnly\r\n", "e".repeat(64), "c".repeat(43)) } else { String::new() };
@@ -189,14 +223,9 @@ impl Host {
                 worker.join().unwrap();
             }
         });
-        let client = RuntimeClient::new(RuntimeConfig {
-            base_url: format!("http://{socket}"),
-            tls_pin_sha256: None,
-        })
-        .unwrap();
-        let session = client
+        let session = Self::client(socket)
             .login(
-                PairingCredentials::new("synthetic-device", "x".repeat(64)).unwrap(),
+                PairingCredentials::new(Self::DEVICE, Self::TOKEN_CHARACTER.repeat(64)).unwrap(),
                 "synthetic",
                 "Synthetic scales fixture passphrase",
             )
@@ -270,6 +299,24 @@ impl Drop for Host {
         self.worker.take().unwrap().join().unwrap();
     }
 }
+fn synthetic_ai_runtime() -> Value {
+    json!({
+        "plane":"ai-plane-separate-from-data-plane", "mode":"centralized-available",
+        "localRuntime": { "provider":"ollama", "state":"configured", "targetPolicy":"loopback-only",
+            "hardwareProfile":"unknown", "clinicalModel":"synthetic-model", "reasoningModel":null, "ocrModel":null },
+        "centralRuntime": { "state":"available", "capabilityStatus":"available", "requiresPairing":true,
+            "executionTarget":"paired-home-base", "accessMode":"status-only", "executionAuthorized":false },
+        "fabric": { "schemaVersion":"mediflow.ai.network-fabric-status.v1", "contractVersion":"mediflow.ai.fabric.v1",
+            "access":"status_only", "pairedExecution":"not_authorized", "egressGateOpen":false,
+            "readinessNote":"available_unqualified", "fallback":"denied_by_contract",
+            "venues": { "local_process":"configured", "home_base":"host_configured", "on_device":"not_implemented", "cloud":"egress_profile_closed" } },
+        "fallbackPolicy":"ai-unavailable-no-automatic-fallback", "rolloutGate":"lane-benchmarks-and-rollout-governance-required",
+        "surfaces":["patient-insight","smart-import","document-synthesis","treatment-reasoning"],
+        "killSwitches": { "patientInsight":"enabled", "smartImport":"disabled", "documentSynthesis":"enabled", "treatmentReasoning":"disabled" },
+        "guardrails":[]
+    })
+}
+
 fn request(stream: &mut TcpStream) -> Option<(String, Value)> {
     let mut header = vec![];
     let mut byte = [0];

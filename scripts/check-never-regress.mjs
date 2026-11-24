@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import ts from 'typescript';
+import { validateHtmlSinkSource } from './html-sink-guard.mjs';
 import { NEVER_REGRESS_ALLOWLIST } from './never-regress-allowlist.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -11,6 +12,8 @@ const __dirname = path.dirname(__filename);
 const ROOT_DIR = path.resolve(__dirname, '..');
 
 const RUNTIME_ROOTS = ['app', 'lib', 'native'];
+const HTML_SINK_ROOTS = [...RUNTIME_ROOTS, 'components', 'hooks', 'packages', 'plugins'];
+const HTML_SINK_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.mts', '.cjs', '.cts']);
 const RUNTIME_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.swift']);
 const SKIPPED_DIRS = new Set([
     '.git',
@@ -72,6 +75,7 @@ function main() {
     runLegacyOcrRetirementCheck();
     runLegacyPdfRetirementCheck();
     runAgentRouteChannelCheck();
+    runHtmlSinkChecks();
     reportAndExit();
 }
 
@@ -214,8 +218,7 @@ export function validateAgentRouteSource(source, relativePath) {
 }
 
 function runAgentRouteChannelCheck() {
-    const routes = [];
-    walkRuntimeTree(path.join(ROOT_DIR, AGENT_ROUTE_ROOT), routes);
+    const routes = collectRuntimeFiles([AGENT_ROUTE_ROOT]);
     for (const route of routes.filter((file) => path.basename(file) === 'route.ts')) {
         const relativePath = path.relative(ROOT_DIR, route).split(path.sep).join('/');
         for (const issue of validateAgentRouteSource(fs.readFileSync(route, 'utf8'), relativePath)) addFinding({
@@ -474,15 +477,26 @@ function runLegacyPdfRetirementCheck() {
     });
 }
 
-function collectRuntimeFiles() {
+function collectRuntimeFiles(roots = RUNTIME_ROOTS, extensions = RUNTIME_EXTENSIONS) {
     const files = [];
-    for (const root of RUNTIME_ROOTS) {
-        walkRuntimeTree(path.join(ROOT_DIR, root), files);
+    for (const root of roots) {
+        walkRuntimeTree(path.join(ROOT_DIR, root), files, extensions);
     }
     return files;
 }
 
-function walkRuntimeTree(currentPath, files) {
+function runHtmlSinkChecks() {
+    for (const file of collectRuntimeFiles(HTML_SINK_ROOTS, HTML_SINK_EXTENSIONS)) {
+        const relativePath = toRelative(file);
+        if (/(?:^|\/)(?:fixtures|test-fixtures)\/|\.(?:test|spec|test-support)\./u.test(relativePath)) continue;
+        const source = fs.readFileSync(file, 'utf8');
+        for (const { line, message } of validateHtmlSinkSource(source, relativePath)) {
+            addFinding({ code: 'NR-HTML', file: relativePath, line, message, snippet: '' });
+        }
+    }
+}
+
+function walkRuntimeTree(currentPath, files, extensions) {
     if (!fs.existsSync(currentPath)) return;
     const stat = fs.statSync(currentPath);
     if (!stat.isDirectory()) return;
@@ -491,11 +505,11 @@ function walkRuntimeTree(currentPath, files) {
         if (SKIPPED_DIRS.has(entry.name)) continue;
         const fullPath = path.join(currentPath, entry.name);
         if (entry.isDirectory()) {
-            walkRuntimeTree(fullPath, files);
+            walkRuntimeTree(fullPath, files, extensions);
             continue;
         }
         if (!entry.isFile()) continue;
-        if (!RUNTIME_EXTENSIONS.has(path.extname(entry.name))) continue;
+        if (!extensions.has(path.extname(entry.name))) continue;
         files.push(fullPath);
     }
 }
@@ -784,6 +798,7 @@ function reportAndExit() {
     if (findings.length === 0) {
         console.log('check:never-regress passed');
         console.log(`Scanned ${RUNTIME_ROOTS.join(', ')} for default creds, egress drift, telemetry, and zero-knowledge invariants.`);
+        console.log(`Checked HTML assignments in ${HTML_SINK_ROOTS.join(', ')}.`);
         process.exit(0);
     }
 

@@ -148,6 +148,8 @@ async function setup(page: Page, info?: TestInfo) {
     await expect(ambulatory).toBeFocused();
     await ambulatory.fill('Ambulatorio Primo Avvio Sintetico');
     await page.keyboard.press('Tab');
+    await expect(root.getByLabel('Codice fiscale', { exact: true })).toBeFocused();
+    await page.keyboard.press('Tab');
     await expect(next).toBeFocused();
     await expect(next).toBeEnabled();
     if (info) await capture(page, info, 'identity', setupSelector);

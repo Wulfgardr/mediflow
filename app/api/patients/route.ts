@@ -10,25 +10,20 @@ import { v4 as uuidv4 } from 'uuid';
 import { and, asc, desc, eq } from 'drizzle-orm';
 import { cookies } from 'next/headers';
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
-// WUL-306 (ADR 0066): list reads must exclude soft-deleted patients
 import { activePatients } from '@/lib/patient-lifecycle';
-/* STREAM B: server-side list params (whitelisted, plaintext columns only). */
-import { parseListParams } from '@/lib/list-query-params';
+import { definePlaintextSortColumns, parseListParams } from '@/lib/list-query-params';
 
-/* opt-in fenced create; all legacy read/write contracts remain separate. */
 import * as patientCreateOwner from '@/lib/security/web-auth-lifecycle-owner-adapter';
 import { patientCreateContexts, readPatientCreateLane } from '@/lib/security/patient-create-context';
 import { createPatientAtPreviewDestination, PatientCreateFenceError, PatientCreateConflictError, PatientCreateDestinationNotFoundError } from '@/lib/patient-create-service';
 
-// address/phone/caregiver/notes etc are ENC:. firstName/lastName/taxCode/dates
-// are plaintext in the schema, so they are safe sort targets.
-const PATIENT_SORT_COLUMNS = {
+const PATIENT_SORT_COLUMNS = definePlaintextSortColumns('patients', {
     updatedAt: patients.updatedAt,
     createdAt: patients.createdAt,
     lastName: patients.lastName,
     firstName: patients.firstName,
     birthDate: patients.birthDate,
-} as const;
+});
 import { normalizePatientCreateInput } from '@/lib/patient-write-normalization';
 import {
     auditContextFromSession,
@@ -42,9 +37,9 @@ export async function GET(request: Request) {
     const session = await requireSession();
     if (!session) return unauthorizedResponse();
 
-    /* STREAM B */
     const { searchParams } = new URL(request.url);
     const parsed = parseListParams(searchParams, {
+        table: 'patients',
         sortableColumns: Object.keys(PATIENT_SORT_COLUMNS),
         defaultOrderBy: 'updatedAt',
         defaultOrderDir: 'desc',

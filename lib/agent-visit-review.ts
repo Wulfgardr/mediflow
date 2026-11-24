@@ -1,11 +1,12 @@
 'use client';
 
 import { db, type Patient } from './db';
+import { isClinicalRichTextHtml, sanitizeClinicalRichTextHtml } from './clinical-rich-text';
 import { cassetteItems } from './agent-cassette-contract';
 import { agentBytes } from './agent-cassette-crypto';
 import { openAgentVisit, type OpenedAgentVisit } from './agent-cassette-client';
 import { agentApplicationSchema, agentStructuredKind, type AgentApplicationInput, type AgentCassetteIndexEntry, type IncomingAgentCassette } from './agent-visit-application-contract';
-import { collectDossierTaxCodes, evaluateDossierGroupIdentity, dossierFactBlockers } from './domain/documents/dossier-import';
+import { collectDossierTaxCodes, evaluateDossierGroupIdentity, excludedProfessionalCode, dossierFactBlockers } from './domain/documents/dossier-import';
 import { verifyPreparedFields, preparedTokens } from './domain/documents/dossier-prepared';
 import { clinicalFactContext, contextReview, isHistoricalTherapy } from './domain/documents/clinical-context-lexicon';
 import { servicePrescriptionCreateSchema } from './api-schemas/prescriptions';
@@ -59,9 +60,11 @@ export async function inspectAgentVisit(row: IncomingAgentCassette, patients: Pa
             documents.set(hash, { ...read, id: item.id, name: text(item.value.name), hash });
             const identity = evaluateDossierGroupIdentity([{ taxCodes: codes }], patient ? [patient] : [], patient?.id, physicianTaxCode);
             const foreign = codes.filter(code => code.checksumValid && code.value !== physicianTaxCode
-                && !(code.role === 'professional_cf' && code.explicitProfessional));
+                && !excludedProfessionalCode(code));
             if (identity.status !== 'matched' || identity.blocking || foreign.length === 0
-                || foreign.some(code => code.value !== cf || code.role !== 'patient_cf')) blockers.push('Identità da verificare nel PDF ' + text(item.value.name) + ': ' + identity.documentPatientCodes.join(', '));
+                || foreign.some(code => code.value !== cf || code.role !== 'patient_cf')) {
+                blockers.push(identity.missingPhysicianTaxCode ? identity.message + ' PDF: ' + text(item.value.name) : 'Identità da verificare nel PDF ' + text(item.value.name) + ': ' + identity.documentPatientCodes.join(', '));
+            }
         } catch (error) {
             if (signal.aborted) throw error;
             blockers.push('PDF non verificabile: ' + text(item.value.name));
@@ -151,11 +154,13 @@ export async function prepareAgentApplication(review: AgentVisitReview, signal: 
         const base = { id: item.id, kind: item.kind };
         switch (item.kind) {
             case 'note': case 'transcription': {
-                if (!text(item.value.text)) throw new Error('Nota vuota.');
+                const original = typeof item.value.text === 'string' ? item.value.text : '';
+                const content = isClinicalRichTextHtml(original) ? sanitizeClinicalRichTextHtml(original) : original;
+                if (!content.trim()) throw new Error('Nota vuota.');
                 const title = item.kind === 'note' ? 'Visita' : 'Trascrizione della visita';
                 const metadata = { sourceLabel: 'Cassetta della visita', provenance };
                 prepared.push({ ...base, values: {
-                    title: await db.sealLocalDraft(title), content: await db.sealLocalDraft(item.value.text),
+                    title: await db.sealLocalDraft(title), content: await db.sealLocalDraft(content),
                     metadata: await db.sealLocalDraft(metadata), date: text(item.value.date) || new Date(review.visit.cassette.depositedAt).toISOString(),
                 } });
                 break;

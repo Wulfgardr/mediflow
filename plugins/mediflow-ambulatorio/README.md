@@ -20,7 +20,7 @@ Il comando di configurazione accetta dopo l'origine una cartella PDF assoluta in
 
 Apri una nuova chat Codex da una cartella qualsiasi. Al primo uso abilita la skill Ambulatorio dalla lista delle skill o richiamala esplicitamente. Se necessario, autorizza il server del plugin secondo le impostazioni di Codex per la cartella. Con MediFlow aperto e sbloccato, crea in **Impostazioni → Agenti** un mandato per OpenAI che autorizzi il passaggio dei dati clinici al fornitore. Scrivi «Collega MediFlow» in Codex, confronta il codice, scegli «Rinnova allo sblocco» e approva con il PIN in MediFlow. Scrivi «Fatto» per completare la registrazione.
 
-Dal successivo sblocco con PIN o passphrase, o con «Rinnova accesso» quando MediFlow recupera la chiave da un’altra scheda, il plugin ritira da solo il mandato di 12 ore quando gli serve. Per revocare la registrazione o vedere l’ultimo rinnovo apri **Impostazioni → Agenti**.
+Dal successivo sblocco con PIN o passphrase, o con «Rinnova accesso» quando MediFlow recupera la chiave da un’altra scheda, il plugin ritira da solo il mandato di 24 ore quando gli serve. Per revocare la registrazione o vedere l’ultimo rinnovo apri **Impostazioni → Agenti**.
 
 Per ogni visita apri una chat e detta «Visita…». Il plugin chiede conferma se il CF manca, è invalido o è ambiguo. Prima del deposito puoi dire «Correggi…» nella stessa chat. Il plugin aggiunge la correzione al dettato, conserva il Dossier precedente e prepara una nuova versione. Con «Fine visita» usa la ricevuta di deposito per ritrovare la visita in «In arrivo».
 

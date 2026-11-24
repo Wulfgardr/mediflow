@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useId, useImperativeHandle, useRef, useState, type Ref } from 'react';
+import { useCallback, useId, useImperativeHandle, useRef, useState, type Ref } from 'react';
 import { Bold, Ellipsis, Heading1, Heading2, IndentDecrease, IndentIncrease, Italic, List, ListOrdered, Pilcrow, Strikethrough, Underline } from 'lucide-react';
 
-import { clinicalRichTextToPlainText } from '@/lib/clinical-rich-text';
+import { decodeClinicalRichTextEntities, isClinicalRichTextHtml, sanitizeClinicalRichTextHtml } from '@/lib/clinical-rich-text';
 import { cn } from '@/lib/utils';
 import styles from './clinical-rich-text-editor.module.css';
 
@@ -83,10 +83,19 @@ interface ClinicalRichTextEditorProps {
 /* #75: toolbar e canvas usano solo superfici Lume opache. */
 const TOOLBAR_BUTTON_CLASS = 'mf-button-icon';
 
-function updateEditorEmptyState(node: HTMLDivElement | null) {
-    if (!node) return;
-    const plainText = clinicalRichTextToPlainText(node.innerHTML);
-    node.dataset.empty = plainText.trim() ? 'false' : 'true';
+const HTML_SYNTAX = /<[a-z/!?]|&(?:#[a-z0-9]+|[a-z][a-z0-9]*);/iu;
+
+function readEditorValue(editor: HTMLDivElement): string {
+    const text = editor.textContent ?? '';
+    if (!editor.firstElementChild && !HTML_SYNTAX.test(text)) return text;
+
+    const html = sanitizeClinicalRichTextHtml(editor.innerHTML.replace(/\n/g, '<br>'));
+    if (!html || isClinicalRichTextHtml(html)) return html;
+    return `<p>${html}</p>`;
+}
+
+function updateEditorEmptyState(editor: HTMLDivElement) {
+    editor.dataset.empty = String(!editor.textContent?.trim());
 }
 
 export function ClinicalRichTextEditor({
@@ -100,6 +109,20 @@ export function ClinicalRichTextEditor({
     value,
 }: ClinicalRichTextEditorProps) {
     const editorRef = useRef<HTMLDivElement | null>(null);
+    const emittedValue = useRef<string | null>(null);
+    const attachEditor = useCallback((editor: HTMLDivElement | null) => {
+        editorRef.current = editor;
+        if (!editor) return;
+        if (value !== emittedValue.current) {
+            emittedValue.current = null;
+            if (isClinicalRichTextHtml(value)) {
+                editor.innerHTML = sanitizeClinicalRichTextHtml(value);
+            } else {
+                editor.textContent = decodeClinicalRichTextEntities(value);
+            }
+        }
+        updateEditorEmptyState(editor);
+    }, [value]);
     const selectionRef = useRef<{ anchor: Node; anchorOffset: number; focus: Node; focusOffset: number }>(null);
     useImperativeHandle(ref, () => ({
         resume() {
@@ -128,42 +151,28 @@ export function ClinicalRichTextEditor({
     const [expandedTools, setExpandedTools] = useState(false);
     const moreToolsRef = useRef<HTMLButtonElement>(null);
 
-    useEffect(() => {
-        execCommandSafe('defaultParagraphSeparator', 'p', true);
-    }, []);
-
-    useEffect(() => {
-        const editor = editorRef.current;
-        if (!editor) return;
-
-        if (editor.innerHTML !== value) {
-            editor.innerHTML = value;
-        }
-
-        updateEditorEmptyState(editor);
-    }, [value]);
-
     const syncValue = () => {
         const editor = editorRef.current;
         if (!editor) return;
         updateEditorEmptyState(editor);
-        onChange(editor.innerHTML);
+        const nextValue = readEditorValue(editor);
+        if (nextValue === (emittedValue.current ?? value)) return;
+        emittedValue.current = nextValue;
+        onChange(nextValue);
     };
 
     const runCommand = (command: string, value?: string) => {
         const editor = editorRef.current;
         if (!editor) return;
         editor.focus();
-        execCommandSafe(command, value);
-        syncValue();
+        if (execCommandSafe(command, value)) syncValue();
         setExpandedTools(false);
     };
 
     const handlePaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
         event.preventDefault();
         const text = event.clipboardData.getData('text/plain');
-        execCommandSafe('insertText', text);
-        syncValue();
+        if (execCommandSafe('insertText', text)) syncValue();
     };
 
     return (
@@ -259,7 +268,7 @@ export function ClinicalRichTextEditor({
                 )}
             >
                 <div
-                    ref={editorRef}
+                    ref={attachEditor}
                     id={editorId}
                     role="textbox"
                     aria-describedby={descriptionId}
@@ -271,15 +280,20 @@ export function ClinicalRichTextEditor({
                     data-empty="true"
                     data-lume-editor-surface="field"
                     data-placeholder={placeholder}
-                    className="clinical-rich-editor min-h-[320px] min-w-0 max-w-full break-words bg-[color:var(--lume-surface-focal)] outline-none"
+                    className="clinical-rich-editor min-h-[320px] min-w-0 max-w-full whitespace-pre-wrap break-words bg-[color:var(--lume-surface-focal)] outline-none"
                     onBlur={() => {
                         rememberSelection();
                         setIsFocused(false);
-                        syncValue();
                     }}
-                    onFocus={() => setIsFocused(true)}
+                    onFocus={() => {
+                        execCommandSafe('defaultParagraphSeparator', 'p', true);
+                        setIsFocused(true);
+                    }}
                     onInput={syncValue}
                     onPaste={handlePaste}
+                    onDrop={event => {
+                        if (event.dataTransfer.types.includes('text/html')) event.preventDefault();
+                    }}
                 />
                 <p id={descriptionId} className="mt-3 text-xs leading-5 text-[color:var(--lume-ink-muted)]">
                     {description}
