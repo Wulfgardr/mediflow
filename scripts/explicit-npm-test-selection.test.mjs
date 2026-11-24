@@ -253,6 +253,7 @@ test('required npm script bodies and CI bindings select the actual independent e
     'npm:test:attachment-currentness-writers': ['scripts/check-attachment-currentness-writers.test.mjs'],
     'npm:test:anydoc-local-only': ['scripts/check-anydoc-local-only.test.mjs'],
     'npm:test:ci-guards-wired': ['scripts/check-ci-guards-wired.test.mjs'],
+    'npm:test:dossier-conformance-corpus': ['scripts/check-dossier-conformance-corpus.test.mjs'],
   });
   for (const suite of Object.values(actual)) assert.deepEqual(suite.errors, []);
   assert.equal(actual['npm:test:native-launcher'].binding.stepIf, "runner.os == 'macOS'");
@@ -266,6 +267,7 @@ test('required npm script bodies and CI bindings select the actual independent e
   assert.deepEqual(actual['npm:test:attachment-currentness-writers'].binding.commands, ['test:attachment-currentness-writers', 'check:attachment-currentness-writers']);
   assert.deepEqual(actual['npm:test:anydoc-local-only'].binding.commands, ['test:anydoc-local-only', 'check:anydoc-local-only']);
   assert.deepEqual(actual['npm:test:ci-guards-wired'].binding.commands, ['test:ci-guards-wired', 'check:ci-guards-wired']);
+  assert.deepEqual(actual['npm:test:dossier-conformance-corpus'].binding.commands, ['test:dossier-conformance-corpus', 'check:dossier-conformance-corpus']);
   assert.equal(collectUnitTestFiles(sourceRoot).filter(file => file === 'scripts/explicit-npm-test-selection.test.mjs').length, 1);
 });
 
