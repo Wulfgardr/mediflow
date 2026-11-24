@@ -31,8 +31,8 @@ export function isValidItalianTaxCode(value: string): boolean {
     }
     return cf[15] === String.fromCharCode(65 + sum % 26);
 }
-export function taxCodeBirthDetails(value: string): { yearSuffix: number; month: number; day: number; sex: 'M' | 'F' } | null {
-    if (!isValidItalianTaxCode(value)) return null;
+export function taxCodeBirthDetails(value: string | null | undefined): { yearSuffix: number; month: number; day: number; sex: 'M' | 'F' } | null {
+    if (typeof value !== 'string' || !isValidItalianTaxCode(value)) return null;
     const code = value.trim().toUpperCase();
     const dayCode = Number(decodeTaxCodeDigits(code.slice(9, 11)));
     return {
