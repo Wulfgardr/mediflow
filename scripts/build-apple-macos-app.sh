@@ -309,7 +309,6 @@ WEB_NATIVE_TARGETS=(
   "$FRAMEWORKS/mediflow-web-sharp.node"
   "$FRAMEWORKS/mediflow-web-canvas.node"
   "$FRAMEWORKS/mediflow-web-better-sqlite3.node"
-  "$FRAMEWORKS/mediflow-web-fsevents.node"
 )
 echo "Injecting WebRuntime into the app bundle..."
 node "$ROOT_DIR/scripts/build-input-metadata.mjs" --source "$ROOT_DIR" --payload "$STANDALONE_DIR" --materialized
@@ -370,9 +369,6 @@ if [[ -n "${MEDIFLOW_CODESIGN_IDENTITY:-}" ]]; then
   else
     SIGN_ARGS=(--force --options runtime --timestamp --sign "$MEDIFLOW_CODESIGN_IDENTITY")
   fi
-  # sign only the six rewritten Web dependencies. The independently
-  # signed, pinned Codex helper is already verified and MUST NOT be re-signed.
-  # --deep is verification-only. No mutation follows the OUTER app seal below.
   for native_code in "${WEB_NATIVE_TARGETS[@]}"; do
     codesign "${SIGN_ARGS[@]}" "$native_code"
     codesign --verify --strict "$native_code"
