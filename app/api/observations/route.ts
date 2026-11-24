@@ -8,17 +8,15 @@ import { and, asc, desc, eq, isNull, type SQL } from 'drizzle-orm';
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 import { auditContextFromSession, requestIdFromRequest } from '@/lib/security/audit';
 import { normalizeObservationCreateInput } from '@/lib/api-v1-clinical-write-normalization';
-/* STREAM B: server-side list params (whitelisted, plaintext columns only). */
-import { parseListParams } from '@/lib/list-query-params';
+import { definePlaintextSortColumns, parseListParams } from '@/lib/list-query-params';
 import { createObservationOperation } from '@/lib/observation-write-operation';
 import { observationChangedFields, observationCreateId, readObservationJsonObject, validateObservationInput } from '@/lib/observation-write-input';
 
-// notes is ENC:, not sortable. Only plaintext columns here.
-const OBSERVATION_SORT_COLUMNS = {
+const OBSERVATION_SORT_COLUMNS = definePlaintextSortColumns('observations', {
     observedAt: observations.observedAt,
     createdAt: observations.createdAt,
     updatedAt: observations.updatedAt,
-} as const;
+});
 
 export async function GET(request: Request) {
     const session = await requireSession();
@@ -28,8 +26,8 @@ export async function GET(request: Request) {
     const patientId = searchParams.get('patientId');
     const includeDeleted = searchParams.get('includeDeleted') === 'true';
 
-    /* STREAM B */
     const parsed = parseListParams(searchParams, {
+        table: 'observations',
         sortableColumns: Object.keys(OBSERVATION_SORT_COLUMNS),
         defaultOrderBy: 'observedAt',
         defaultOrderDir: 'desc',

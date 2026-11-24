@@ -9,6 +9,8 @@ import styles from '@/components/settings/account-pages.module.css';
 import { cn } from '@/lib/utils';
 import { useSecurity } from '@/components/security-provider';
 import { PassphraseAccessForm } from '@/components/recovery-kit';
+import { validatePinChangeInput } from '@/lib/security/pin-change';
+import { confirmationPinError } from '@/lib/security/pin-input';
 import {
     SETTINGS_INPUT_CLASS,
     SETTINGS_LABEL_CLASS,
@@ -25,11 +27,32 @@ export default function SettingsAccessPage() {
     const [openForm, setOpenForm] = useState<'passphrase' | 'pin' | null>('passphrase');
     const [pinFeedback, setPinFeedback] = useState<null | { tone: 'success' | 'error'; message: string }>(null);
 
+    const newPinError = confirmationPinError(pinForm.newPin);
+    const confirmPinError = confirmationPinError(pinForm.confirmPin);
+    const pinLengthError = newPinError ?? confirmPinError;
+    const visiblePinFeedback = pinLengthError ? { tone: 'error' as const, message: pinLengthError } : pinFeedback;
+
+    const updatePinField = (field: 'currentPin' | 'newPin' | 'confirmPin', rawValue: string) => {
+        setPinForm({ ...pinForm, [field]: rawValue });
+        setPinFeedback(null);
+    };
+
     const handleChangePin = async () => {
         setPinFeedback(null);
 
+        if (pinLengthError) {
+            setPinFeedback({ tone: 'error', message: pinLengthError });
+            return;
+        }
+
         if (pinForm.newPin !== pinForm.confirmPin) {
             setPinFeedback({ tone: 'error', message: 'La conferma del nuovo PIN non corrisponde.' });
+            return;
+        }
+
+        const validationError = validatePinChangeInput(pinForm.currentPin, pinForm.newPin);
+        if (validationError) {
+            setPinFeedback({ tone: 'error', message: validationError });
             return;
         }
 
@@ -73,27 +96,29 @@ export default function SettingsAccessPage() {
                     <p className={styles.copy}>Cambia il PIN mantenendo accessibili i dati clinici.</p>
                     <div>
                         <label htmlFor="current-pin" className={SETTINGS_LABEL_CLASS}>PIN attuale</label>
-                        <input id="current-pin" name="currentPin" type="password" inputMode="numeric"
-                            value={pinForm.currentPin} onChange={e => setPinForm({ ...pinForm, currentPin: e.target.value })}
+                        <input id="current-pin" name="currentPin" type="password" inputMode="text"
+                            value={pinForm.currentPin} onChange={e => updatePinField('currentPin', e.target.value)}
                             placeholder="Inserisci il PIN attuale" autoComplete="current-password" spellCheck={false} className={SETTINGS_INPUT_CLASS} />
                     </div>
                     <div>
                         <label htmlFor="new-pin" className={SETTINGS_LABEL_CLASS}>Nuovo PIN</label>
-                        <input id="new-pin" name="newPin" type="password" inputMode="numeric"
-                            value={pinForm.newPin} onChange={e => setPinForm({ ...pinForm, newPin: e.target.value })}
+                        <input id="new-pin" name="newPin" type="password" inputMode="text"
+                            aria-invalid={Boolean(newPinError)}
+                            value={pinForm.newPin} onChange={e => updatePinField('newPin', e.target.value)}
                             placeholder="4-8 caratteri" autoComplete="new-password" spellCheck={false} className={SETTINGS_INPUT_CLASS} />
                     </div>
                     <div>
                         <label htmlFor="confirm-pin" className={SETTINGS_LABEL_CLASS}>Conferma nuovo PIN</label>
-                        <input id="confirm-pin" name="confirmPin" type="password" inputMode="numeric"
-                            value={pinForm.confirmPin} onChange={e => setPinForm({ ...pinForm, confirmPin: e.target.value })}
+                        <input id="confirm-pin" name="confirmPin" type="password" inputMode="text"
+                            aria-invalid={Boolean(confirmPinError)}
+                            value={pinForm.confirmPin} onChange={e => updatePinField('confirmPin', e.target.value)}
                             placeholder="Ripeti il nuovo PIN" autoComplete="new-password" spellCheck={false} className={SETTINGS_INPUT_CLASS} />
                     </div>
-                    {pinFeedback && <div role="status" className={cn('mf-alert text-xs', pinFeedback.tone === 'success' ? 'mf-alert-success' : 'mf-alert-critical')}>
-                        {pinFeedback.message}
+                    {visiblePinFeedback && <div role="status" className={cn('mf-alert text-xs', visiblePinFeedback.tone === 'success' ? 'mf-alert-success' : 'mf-alert-critical')}>
+                        {visiblePinFeedback.message}
                     </div>}
                     <div className={styles.actions}>
-                        <button onClick={handleChangePin} disabled={isChangingPin} className={SETTINGS_PRIMARY_BUTTON_CLASS}>
+                        <button onClick={handleChangePin} disabled={isChangingPin || Boolean(pinLengthError)} className={SETTINGS_PRIMARY_BUTTON_CLASS}>
                             <Shield className="w-4 h-4" />{isChangingPin ? 'Aggiornamento...' : 'Aggiorna PIN'}
                         </button>
                     </div>

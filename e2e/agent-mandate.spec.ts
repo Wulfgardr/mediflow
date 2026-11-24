@@ -46,7 +46,7 @@ test('doctor creates, reloads and revokes a mandate; inactivity preserves it and
     expect(listing.status()).toBe(200);
     let mandate = (await listing.json()).find((value: { id: string }) => value.id === createdId);
     expect(mandate).toBeTruthy();
-    expect(mandate.expiresAt - mandate.createdAt).toBe(43200000);
+    expect(mandate.expiresAt - mandate.createdAt).toBe(86400000);
     expect(mandate.wrappedPrivateKey).toMatch(/^ENC:/u);
     expect(mandate).not.toHaveProperty('pin');
     await expect(page.getByRole('button', { name: 'Revoca', exact: true })).toBeVisible();

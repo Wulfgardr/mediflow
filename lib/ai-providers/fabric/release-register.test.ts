@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { readFileSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { FABRIC_CAPABILITY_DESCRIPTORS, getFabricCapabilityDescriptor } from './catalog';
+import { deriveCellQualification, LOCAL_RUN_RECEIPT_SCHEMA } from './release-register-qualification';
 
 const root = new URL('../../../', import.meta.url);
 const register = JSON.parse(readFileSync(new URL('docs/quality/intelligence/registro-0.9.1.json', root), 'utf8'));
@@ -39,13 +40,23 @@ test('I-0 copre esattamente le sei celle del gate e separa API opzionali e Treat
     assert.equal(register.deferral.runtimeUnavailabilityVerified, false);
     for (const cell of [...register.cells, ...register.conditionalCells]) {
         assert.equal(cell.conditional, register.conditionalCells.includes(cell));
-        assert.equal(cell.qualification, 'not_qualified');
+        const derived = deriveCellQualification(register, cell, (path: string) => readFileSync(new URL(path, root)));
+        assert.equal(cell.qualification, derived.qualification, cell.id);
+        assert.deepEqual([...cell.blockedBy].sort(), [...derived.blockedBy].sort(), cell.id);
+        assert.deepEqual(cell.criteria, derived.criteria, cell.id);
         if (cell.provider === 'ollama') {
             const evidence = JSON.parse(readFileSync(new URL(cell.proof.path, root), 'utf8'));
-            assert.deepEqual(cell.modelIdentity, evidence.modelIdentity);
-            assert.equal(cell.proof.status, 'executed_with_limits');
-            assert.equal(evidence.qualification, false);
-            assert.equal(evidence.admission.status, 'passed');
+            if (evidence.schema === LOCAL_RUN_RECEIPT_SCHEMA) {
+                assert.ok(cell.receipts.some((ref: { path: string }) => ref.path === cell.proof.path), cell.id);
+                assert.equal(evidence.modelIdentity.digest, cell.modelIdentity.digest);
+                assert.equal(evidence.admission.status, 'passed');
+                assert.equal(cell.proof.status, derived.qualification === 'qualified' ? 'executed' : 'executed_with_limits');
+            } else {
+                assert.deepEqual(cell.modelIdentity, evidence.modelIdentity);
+                assert.equal(cell.proof.status, 'executed_with_limits');
+                assert.equal(evidence.qualification, false);
+                assert.equal(evidence.admission.status, 'passed');
+            }
         } else {
             assert.equal(cell.modelIdentity, null);
             assert.equal(cell.proof, null);
@@ -53,7 +64,7 @@ test('I-0 copre esattamente le sei celle del gate e separa API opzionali e Treat
         assert.equal(cell.dataClass, 'synthetic_only');
         assert.ok(cell.blockedBy.length > 0);
         assert.ok(cell.blockedBy.every((criterion: string) => !['I-3', 'I-3b', 'I-7'].includes(criterion)));
-        assert.deepEqual(cell.surfaces, { web: 'not_verified', gpui: 'not_verified', chat: 'not_verified', headless: 'not_verified' });
+        assert.deepEqual(cell.surfaces, derived.surfaces, cell.id);
     }
 });
 

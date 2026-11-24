@@ -1012,7 +1012,9 @@ impl Render for TextInput {
             element.style().border_color.unwrap(),
         );
         #[cfg(test)]
-        let element = if self.secret || self.read_only {
+        let element = if self.secret && !self.read_only {
+            crate::shell::rendered_command::observe_focus(element, self.focus.clone())
+        } else if self.secret || self.read_only {
             crate::shell::rendered_command::observe(element)
         } else {
             crate::shell::rendered_command::observe_editor(element, cx.entity())

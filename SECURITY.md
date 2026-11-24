@@ -105,7 +105,11 @@ esplicito registra `patient.restored`.
 
 Poiché i pazienti rimossi logicamente restano nei backup, una richiesta di
 erasure deve comprendere anche gli artefatti già esportati. La purge non li
-raggiunge.
+raggiunge. Nel ripristino portabile la destinazione conserva il registro dei
+ritiri ed esclude i fascicoli già cancellati. L’anteprima e la ricevuta
+indicano quanti ne ha esclusi. Il ripristino si ferma se la copia altererebbe
+dati soggetti a un blocco di conservazione o se un deposito o lo storico
+potrebbero riportare contenuto clinico di un fascicolo ritirato.
 
 ### Chiavi, passphrase e recupero
 
@@ -316,7 +320,7 @@ conserva ordine, provenienza e hash ed è pubblicato soltanto se la sorgente
 è ancora corrente. Errori, formati ambigui, documenti cifrati e motori
 indisponibili fermano il percorso. La qualifica GPUI riguarda il client
 installato sul Mac fissato dal contratto. Queste policy appartengono ai
-worker del runtime Web. Vedi [ADR 0196](docs/adr/0196-document-child-platform-boundary.md).
+worker del runtime Web. Vedi [ADR 0198](docs/adr/0198-document-child-platform-boundary.md).
 
 DeepSeek-OCR 2/CUDA, benchmark di qualifica e readiness universale hanno stato
 `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`. Le route OCR legacy, dopo

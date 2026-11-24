@@ -8253,7 +8253,7 @@ mod tests {
                 local_host_reply(
                     &mut stream,
                     200,
-                    json!({"success":true,"format":"mediflow-backup","version":1,"counts":{"patients":1},"expectedSnapshot":"a".repeat(64),"sourceChecksum":"b".repeat(64)}),
+                    json!({"success":true,"format":"mediflow-backup","version":1,"counts":{"patients":1},"excludedRetiredPatients":1,"expectedSnapshot":"a".repeat(64),"sourceChecksum":"b".repeat(64)}),
                     "",
                 );
                 if status != 0 {
@@ -8285,7 +8285,11 @@ mod tests {
                     local_host_reply(
                         &mut stream,
                         status,
-                        json!({"success":true,"sourceChecksum":"b".repeat(64),"receipt":{"id":id}}),
+                        if status == 409 {
+                            json!({"success":false,"code":"restore_blocked","reason":"retired_patient_material"})
+                        } else {
+                            json!({"success":true,"sourceChecksum":"b".repeat(64),"receipt":{"id":id,"excludedRetiredPatients":1}})
+                        },
                         "",
                     );
                 }
@@ -8301,6 +8305,7 @@ mod tests {
                 .prepare_archive_restore(br#"{"payload":{}}"#)
                 .unwrap();
             assert_eq!(prepared.records(), 1);
+            assert_eq!(prepared.excluded_retired_patients(), 1);
             if status != 0 {
                 let result = access.restore_archive(
                     &prepared,
@@ -8311,7 +8316,7 @@ mod tests {
                     result,
                     match status {
                         200 => Ok(()),
-                        409 => Err(RuntimeError::Conflict),
+                        409 => Err(RuntimeError::RestoreRetiredPatientMaterial),
                         _ => Err(RuntimeError::Rejected(500)),
                     }
                 );
@@ -8415,7 +8420,7 @@ mod tests {
                 local_host_reply(
                     &mut stream,
                     200,
-                    json!({"id":"12345678-1234-4123-8123-123456789012","sourceChecksum":checksum,"archiveGeneration":generation,"completedAt":"2026-10-30T12:00:00.000Z"}),
+                    json!({"id":"12345678-1234-4123-8123-123456789012","sourceChecksum":checksum,"archiveGeneration":generation,"completedAt":"2026-10-30T12:00:00.000Z","excludedRetiredPatients":2}),
                     "",
                 );
             });
@@ -8433,8 +8438,41 @@ mod tests {
             let observed = access.read_restore_receipt(&lookup);
             let _ = finished.send(());
             assert_eq!(observed.is_ok(), valid);
+            if let Ok(receipt) = observed {
+                assert_eq!(receipt.excluded_retired_patients, 2);
+            }
             worker.join().unwrap();
         }
+    }
+    #[test]
+    fn local_host_archive_preview_reports_a_retention_hold() {
+        use std::{net::TcpListener, thread};
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let session = session_at(&format!("http://{}", listener.local_addr().unwrap()));
+        let worker = thread::spawn(move || {
+            local_host_login(&listener);
+            let (mut stream, _) = crate::test_loopback::accept(&listener).unwrap();
+            assert!(
+                read_request(&mut stream).starts_with("POST /api/system/backup-restore/verify ")
+            );
+            local_host_reply(
+                &mut stream,
+                409,
+                json!({"success":false,"code":"restore_blocked","reason":"legal_hold"}),
+                "",
+            );
+        });
+        let access = session
+            .authenticate_local_host(
+                "Local host synthetic passphrase",
+                crate::RetirementNotice::new(None),
+            )
+            .unwrap();
+        assert!(matches!(
+            access.prepare_archive_restore(br#"{"payload":{}}"#),
+            Err(RuntimeError::RestoreLegalHold)
+        ));
+        worker.join().unwrap();
     }
     fn local_host_document() -> serde_json::Value {
         json!({"id":"file-a","patientId":"patient-a","name":"Referto sintetico.txt","path":"referto.txt","type":"text/plain","size":5,"data":"data:text/plain;base64,cHJvdmE=","currentness":{"sourceRef":"a".repeat(64),"revision":7,"freshnessEpoch":9}})

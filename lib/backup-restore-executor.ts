@@ -44,11 +44,15 @@ import {
 import { backupArtifactInputChecksum, type BackupArtifact, type BackupCollectionName } from './backup-artifact';
 import { backupAuditCoverage, backupAuditsEqual, canonicalizeBackupAuditRows, snapshotBackupAudit,
     type BackupAuditCoverage, type BackupAuditRow } from './backup-audit';
-import { derivePatientAmbulatoryLinks } from './backup-patient-ambulatory-links';
 import { revokeAttachmentExtractionLocatorGeneration } from './domain/documents/attachment-extraction-locator-revocation';
 import { DATE_FIELDS } from '../scripts/scheduled-backup-date-fields.mjs';
 
+import { normalizeRestoreRow } from './backup-restore-row';
+import { planBackupRestore } from './backup-restore-policy';
+import { BackupRestoreBlockedError } from './backup-restore-blocked';
+
 export { DATE_FIELDS };
+export { BackupRestoreBlockedError } from './backup-restore-blocked';
 
 const CLEAR_ORDER: BackupCollectionName[] = [
     'agentCassettes',
@@ -141,51 +145,12 @@ type InsertRunner = Pick<typeof dbServer, 'insert'>;
 type InsertableTable = (typeof TABLE_LOOKUP)[BackupCollectionName] | typeof patientsToAmbulatories;
 export type BackupRestoreMutationFence = () => boolean;
 
-export type BackupRestoreBlockedReason = 'audit' | 'runtime_fence' | 'therapy_status_commands' | 'ambulatory_destructive_commands' | 'snapshot';
-
-/* The restore stopped inside its transaction: the target archive is unchanged. Callers report it as blocked, not as failed. */
-export class BackupRestoreBlockedError extends Error {
-    constructor(readonly reason: BackupRestoreBlockedReason, detail: string) {
-        super(`Restore blocked: ${detail}`);
-        this.name = 'BackupRestoreBlockedError';
-    }
-}
-
 function chunk<T>(items: T[], size: number): T[][] {
     const chunks: T[][] = [];
     for (let index = 0; index < items.length; index += size) {
         chunks.push(items.slice(index, index + size));
     }
     return chunks;
-}
-
-function normalizeDateValue(value: unknown): unknown {
-    if (value === null || value === undefined || value === '') return null;
-    if (value instanceof Date) return value;
-    if (typeof value === 'number') {
-        // Scheduled-runner artifacts predating WUL-319 carry raw SQLite unix-seconds
-        // integers; unix-milliseconds for any contemporary date are >= 10^12.
-        const milliseconds = Number.isInteger(value) && Math.abs(value) < 1_000_000_000_000
-            ? value * 1000
-            : value;
-        const parsed = new Date(milliseconds);
-        return Number.isNaN(parsed.getTime()) ? value : parsed;
-    }
-    if (typeof value === 'string') {
-        const parsed = new Date(value);
-        return Number.isNaN(parsed.getTime()) ? value : parsed;
-    }
-    return value;
-}
-
-function normalizeInsertRow<T extends Record<string, unknown>>(row: T): T {
-    const normalized: Record<string, unknown> = { ...row };
-    for (const field of DATE_FIELDS) {
-        if (Object.prototype.hasOwnProperty.call(normalized, field)) {
-            normalized[field] = normalizeDateValue(normalized[field]);
-        }
-    }
-    return normalized as T;
 }
 
 function clearRows(table: InsertableTable): void {
@@ -207,7 +172,7 @@ function insertRows<T extends Record<string, unknown>>(
     }) : rows;
     for (const group of chunk(insertableRows, 250)) {
         /* Repertory dates are declared source text, not clinical timestamp columns. */
-        const inserted = runner.insert(table).values((table === prostheticsCatalogEntries || table === prostheticsCatalogSources) ? group : group.map(normalizeInsertRow)).run();
+        const inserted = runner.insert(table).values((table === prostheticsCatalogEntries || table === prostheticsCatalogSources) ? group : group.map(normalizeRestoreRow)).run();
         if (inserted.changes !== group.length) throw new Error('RESTORE_ROWS_NOT_PERSISTED');
     }
 }
@@ -237,6 +202,7 @@ function physicianAttestationsWithoutRestoredAuthority(rows: Record<string, unkn
 
 export type BackupRestoreResult = {
     sourceChecksum: string;
+    excludedRetiredPatients: number;
     receipt?: RestoreReceipt;
     audit: { coverage: BackupAuditCoverage; inserted: number; reused: number };
 };
@@ -302,8 +268,8 @@ export function restoreBackupArtifact(
     const coverage = backupAuditCoverage(artifact.payload);
     let audit: BackupRestoreResult['audit'] = { coverage, inserted: 0, reused: 0 };
     let receipt: RestoreReceipt | undefined;
-    revokeAttachmentExtractionLocatorGeneration();
-    runDbServerImmediateTransaction(() => {
+    const excludedRetiredPatients = runDbServerImmediateTransaction(() => {
+        const restore = planBackupRestore(openDbServer(), artifact.payload, dbServer);
         if (intent && restoreSnapshot(openDbServer()) !== intent.expectedSnapshot) {
             throw new BackupRestoreBlockedError('snapshot', 'archive changed after preview.');
         }
@@ -317,6 +283,7 @@ export function restoreBackupArtifact(
         const importedCommands = therapyCommands.filter(row => !openDbServer().prepare('SELECT 1 FROM therapy_status_commands WHERE command_id=?').get(row.commandId)).map(row => row.commandId as string);
         const plan = planBackupAuditRestore(rows);
         const physicianAttestations = physicianAttestationsWithoutRestoredAuthority(artifact.payload.physicianReviewAttestations ?? []);
+        revokeAttachmentExtractionLocatorGeneration();
         runMutationFence(beforeMutation);
         rotateSqliteArchiveGeneration(openDbServer());
         clearAllSessions();
@@ -327,17 +294,18 @@ export function restoreBackupArtifact(
 
         for (const collection of INSERT_ORDER) {
             insertRows(dbServer, TABLE_LOOKUP[collection], collection === 'physicianReviewAttestations'
-                ? physicianAttestations : artifact.payload[collection] ?? []);
+                ? physicianAttestations : restore.payload[collection] ?? []);
         }
 
         migrateProstheticsSources(dbServer.$client);
-        insertRows(dbServer, patientsToAmbulatories, derivePatientAmbulatoryLinks(artifact.payload.patients));
+        insertRows(dbServer, patientsToAmbulatories, restore.memberships);
         if (coverage === 'included') insertBackupAudits(plan);
         insertTherapyStatusCommandUnion(openDbServer(), therapyCommands);
         insertAmbulatoryCommandUnion(openDbServer(), ambulatoryCommands);
         recordPortableImport(plan, backupArtifactInputChecksum(artifact), importedCommands, actorRef);
-        if (intent) receipt = writeRestoreReceipt(openDbServer(), intent, backupArtifactInputChecksum(artifact));
+        if (intent) receipt = writeRestoreReceipt(openDbServer(), intent, backupArtifactInputChecksum(artifact), restore.excludedRetiredPatients);
         audit = { coverage, inserted: plan.filter(item => !item.reused).length, reused: plan.filter(item => item.reused).length };
+        return restore.excludedRetiredPatients;
     });
-    return { sourceChecksum: backupArtifactInputChecksum(artifact), audit, ...(receipt ? { receipt } : {}) };
+    return { sourceChecksum: backupArtifactInputChecksum(artifact), excludedRetiredPatients, audit, ...(receipt ? { receipt } : {}) };
 }

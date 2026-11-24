@@ -432,6 +432,8 @@ struct StoredPairing {
     token: Zeroizing<String>,
 }
 
+const UNLOCK_FIELD_ID: &str = "clinical-workspace-passphrase";
+
 pub struct ClinicalApp {
     #[cfg(unix)]
     chat_access: chat_access::ChatAccess,
@@ -632,7 +634,7 @@ impl ClinicalApp {
                 cx,
             ),
             Field::new(
-                "clinical-workspace-passphrase",
+                UNLOCK_FIELD_ID,
                 "Frase di accesso o PIN precedente",
                 "",
                 false,
@@ -3132,34 +3134,36 @@ impl ClinicalApp {
                             })),
                     )
                     .child(
-                        button("clinical-workspace-appearance", "", theme, false, true)
-                            .aria_label(if self.dark {
+                        crate::components::icon_button(
+                            "clinical-workspace-appearance",
+                            if self.dark {
                                 "Passa al tema Giorno"
                             } else {
                                 "Passa al tema Grafite"
-                            })
-                            .min_h(px(32.))
-                            .size(px(32.))
-                            .px(px(0.))
-                            .py(px(0.))
-                            .rounded(px(10.))
-                            .border_color(gpui::transparent_black())
-                            .child(icon(
-                                if self.dark { Icon::Sun } else { Icon::Moon },
-                                theme.secondary,
-                                15.,
-                            ))
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                let dark = !this.dark;
-                                this.change_local_preference(
-                                    PreferenceChange::Appearance(Some(dark)),
-                                    cx,
-                                )
-                            })),
+                            },
+                            theme,
+                        )
+                        .min_h(px(32.))
+                        .size(px(32.))
+                        .px(px(0.))
+                        .py(px(0.))
+                        .rounded(px(10.))
+                        .border_color(gpui::transparent_black())
+                        .child(icon(
+                            if self.dark { Icon::Sun } else { Icon::Moon },
+                            theme.secondary,
+                            15.,
+                        ))
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            let dark = !this.dark;
+                            this.change_local_preference(
+                                PreferenceChange::Appearance(Some(dark)),
+                                cx,
+                            )
+                        })),
                     )
                     .child(
-                        button("clinical-workspace-lock", "", theme, false, true)
-                            .aria_label("Blocca")
+                        crate::components::icon_button("clinical-workspace-lock", "Blocca", theme)
                             .min_h(px(32.))
                             .size(px(32.))
                             .px(px(0.))
@@ -3364,7 +3368,7 @@ impl ClinicalApp {
                     .into_iter()
                     .enumerate()
                     .map(|(index, (value, id, label))| {
-                        crate::components::appearance_segment(
+                        let segment = crate::components::appearance_segment(
                             value,
                             self.dark_override,
                             id,
@@ -3375,7 +3379,11 @@ impl ClinicalApp {
                         .track_focus(&targets[index].focus)
                         .on_click(cx.listener(move |this, _, _, cx| {
                             this.change_local_preference(PreferenceChange::Appearance(value), cx)
-                        }))
+                        }));
+                        #[cfg(test)]
+                        let segment =
+                            rendered_command::observe_focus(segment, targets[index].focus.clone());
+                        segment
                     }),
             )
     }
@@ -3391,7 +3399,7 @@ impl ClinicalApp {
                 .child(self.appearance((layout.width-2.*layout.margin).min(640.)-2.*if layout.compact {16.} else {28.},true,cx)))
             .child(self.local_preferences_status(cx))
             .child(div().flex().flex_col().gap(px(8.))
-                .child(crate::components::heading_with_role("clinical-workspace-connect-heading", if paired { "Accedi al tuo archivio" } else { "Collega questo dispositivo" }, theme, crate::theme::TitleRole::Threshold))
+                .child(crate::components::observe_control(crate::components::heading_with_role("clinical-workspace-connect-heading", if paired { "Accedi al tuo archivio" } else { "Collega questo dispositivo" }, theme, crate::theme::TitleRole::Threshold)))
                 .child(div().text_color(theme.secondary).type_role(theme, crate::theme::TextRole::Body)
                     .child(text!(if paired { "Sblocca i dati con il tuo account personale." } else { "Usa i dati di abbinamento già assegnati al dispositivo sul computer che ospita l'archivio." }))));
         if let Some(pairing) = &self.pairing {
@@ -5544,8 +5552,11 @@ impl Render for ClinicalApp {
                             }),
                         )
                         .child(
-                            button("clinical-workspace-magnified-lock", "", theme, false, true)
-                                .aria_label("Blocca e nascondi i dati")
+                            crate::components::icon_button(
+                                "clinical-workspace-magnified-lock",
+                                "Blocca e nascondi i dati",
+                                theme,
+                            )
                                 .child(icon(Icon::Lock, theme.ink, 24.))
                                 .on_click(cx.listener(|this, _, _, cx| {
                                     this.request_discard(Discard::Lock, cx)

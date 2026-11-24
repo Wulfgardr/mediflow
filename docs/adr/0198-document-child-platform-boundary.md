@@ -1,4 +1,4 @@
-# ADR 0196: Confine dei processi documentali per piattaforma
+# ADR 0198: Confine dei processi documentali per piattaforma
 
 Date: 2026-11-19
 Status: Proposed

@@ -1,0 +1,35 @@
+{"op":"click","target":{"role":"button","name":"Nuova voce"}}
+{"op":"fill","value":"Bozza sintetica della seduta. Da rivedere.","target":{"role":"textbox","name":"Testo della voce"}}
+{"op":"resize","width":760,"height":610}
+{"op":"discover"}
+{"op":"scroll","deltaY":140,"target":{"role":"region","name":"Contenuto della scheda"}}
+{"op":"discover"}
+{"op":"scroll","deltaY":140,"target":{"role":"region","name":"Contenuto della scheda"}}
+{"op":"discover"}
+{"op":"scroll","deltaY":140,"target":{"role":"region","name":"Contenuto della scheda"}}
+{"op":"discover"}
+{"op":"scroll","deltaY":140,"target":{"role":"region","name":"Contenuto della scheda"}}
+{"op":"discover"}
+{"op":"scroll","deltaY":140,"target":{"role":"region","name":"Contenuto della scheda"}}
+{"op":"discover"}
+{"op":"scroll","deltaY":140,"target":{"role":"region","name":"Contenuto della scheda"}}
+{"op":"discover"}
+{"op":"click","target":{"role":"button","name":"Tutto il diario"}}
+{"op":"discover"}
+{"op":"click","target":{"role":"button","name":"Storico delle rettifiche, Nota sintetica con rettifiche"}}
+{"op":"expect","state":"expanded","target":{"role":"button","name":"Storico delle rettifiche, Nota sintetica con rettifiche"}}
+{"op":"discover"}
+{"op":"discover"}
+{"op":"scroll","deltaY":90,"target":{"role":"region","name":"Contenuto della scheda"}}
+{"op":"discover"}
+{"op":"press","key":"Tab"}
+{"op":"press","key":"Enter"}
+{"op":"expect","state":"selected","target":{"role":"button","name":"Versione 1"}}
+{"op":"scroll","deltaY":475,"target":{"role":"region","name":"Contenuto della scheda"}}
+{"op":"discover"}
+{"op":"discover"}
+{"op":"scroll","deltaY":-120,"target":{"role":"region","name":"Contenuto della scheda"}}
+{"op":"discover"}
+{"op":"click","target":{"role":"button","name":"Torna alla bozza"}}
+{"op":"discover"}
+{"op":"expectValue","value":"Bozza sintetica della seduta. Da rivedere.","target":{"role":"textbox","name":"Testo della voce"}}

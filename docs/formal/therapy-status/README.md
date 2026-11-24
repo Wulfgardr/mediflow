@@ -8,7 +8,11 @@ Il test di composizione controlla il consumer reale e impedisce di ripristinare
 implicitamente una PUT dal nuovo controller. Le proprietà del nuovo ledger non
 sono una prova TLA né un'estensione implicita degli invarianti legacy sottostanti.
 
-Il recovery cifrato supporta lo schema corrente 16 e i predecessori canonici 3, 4, 5, 6, 9, 10, 11, 12, 13, 14 e 15; le prove di compatibilità sono esterne a TLC, che non copre schema, migrazione, cifratura o ricevute. Restano aperte la verifica verticale Rust-host e quella della GUI.
+Il recovery cifrato supporta lo schema corrente 18 e i predecessori canonici 3, 4, 5, 6, 9, 10, 11, 12, 13, 14, 15, 16 e 17; le prove di compatibilità sono esterne a TLC, che non copre schema, migrazione, cifratura o ricevute. Restano aperte la verifica verticale Rust-host e quella della GUI.
+
+## Raccordo schema 18 del 22 novembre 2026
+
+Lo schema SQLite corrente passa da 17 a 18 in `lib/sqlite-schema-open.ts` per estendere da 12 a 24 ore il tetto del vincolo `CHECK` di `agent_mandates` (`lib/sqlite-agent-mandate-duration-upgrade.ts`, ADR 0190 e ADR 0196). La ricostruzione dei predecessori v13..v17 ripristina il vincolo storico a 12 ore e conserva invariate tutte le impronte precedenti; la versione 17 entra fra i predecessori canonici di `lib/recovery-backup-server.ts`. Transizioni, CAS, audit e ricevute del comando di stato terapia non cambiano.
 
 ## WUL-909. Validità dell’intervallo terapeutico
 
@@ -321,6 +325,17 @@ agisce solo sulla copia cifrata del browser, prima della navigazione, senza
 scritture cliniche. Il confronto non estende TLC a lease o bozze.
 Dopo questo riesame sono aggiornati il digest del solo tipo modificato e
 `syncCommit`; modello, invarianti, limiti, mutanti e testimoni restano invariati.
+
+## Raccordo WUL-924: codice fiscale del medico al primo avvio
+
+Riesaminato `0d587ad7a` rispetto a `fd9eff8e3`. Fra i file coperti cambia solo
+`lib/security/client-auth-api.ts`: il tipo `SetupRequestPayload` aggiunge il
+campo opzionale `doctorTaxCode`. Il codice eseguibile del modulo resta
+identico: nessuna modifica a richieste HTTP, fence, segnali, recupero,
+transizioni, guardie o posizione degli await. Il valore viaggia nel corpo
+della richiesta di setup e non tocca terapie, writer, CAS, ledger o audit.
+Sono aggiornati il digest del solo tipo modificato e `syncCommit`; modello,
+invarianti, limiti, mutanti e testimoni restano invariati.
 
 ## Raccordo HC-A2 del 29 ottobre 2026: esiti delle scale
 
@@ -1205,6 +1220,29 @@ concorrente della versione corrispondono alla base. Le regressioni Web
 coprono il conflitto durante il ripristino portabile. TLC verifica il
 modello legacy entro i limiti del manifest.
 
+### Ripristino portabile, blocchi di conservazione e ritiri, WUL-944
+
+In `bceeecbd2dd3` il writer del ripristino in `lib/backup-restore-executor.ts`
+calcola il piano nella transazione SQLite, prima di ogni scrittura. Il piano
+rifiuta una copia che cambierebbe un record sotto blocco di conservazione ed
+esclude i fascicoli ritirati nell'archivio di destinazione. La revoca in
+memoria dei riferimenti agli allegati ora segue il piano e precede la prima
+scrittura: un ripristino fermato dal piano non la esegue.
+
+L'unione dei comandi di stato terapia resta quella dell'ADR 0168. Le righe del
+registro relative a un fascicolo ritirato restano storico, come dopo una
+cancellazione. Una riga nuova con stato richiesto o data di fine per un
+fascicolo ritirato ferma il ripristino prima delle scritture.
+`lib/backup-artifact.ts` rifiuta le schede con identificativo mancante o
+duplicato e non riporta identificativi nei messaggi. Il client in `lib/db.ts`
+legge dal server il numero dei fascicoli esclusi.
+
+Transizioni delle terapie, comandi, ricevute ed autorità di scrittura restano
+invariati, insieme a modello, statechart, invarianti, testimoni e mutanti. I
+digest dei tre file sono aggiornati dopo le prove di
+`lib/backup-restore-retention.test.ts`. TLC verifica il modello legacy entro i
+limiti del manifest.
+
 ### Prova del documento Web, WUL-898
 
 Il trasporto aggiunge la prova del documento alle richieste API della stessa
@@ -1214,3 +1252,9 @@ Una risposta di rifiuto su altre letture resta al chiamante. Il comando di
 stato terapia conserva ammissione, CAS, ledger e riconciliazione. Il modello
 TLC continua a rappresentare il controller legacy. La prova della sessione,
 il rinnovo e il blocco tra schede hanno regressioni proprie.
+
+Dopo l'unione con `main` a `d7403e6918162a5f425c9e905b8f8d7ecc5e4fb5`, che
+porta il ripristino di WUL-944, cambia solo il digest di
+`lib/security/client-auth-api.ts`: la parte di `main` aggiunge il codice
+fiscale del medico al primo avvio, la parte del ramo il trasporto della prova.
+Le altre impronte coincidono con `main`.

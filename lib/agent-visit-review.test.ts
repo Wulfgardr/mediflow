@@ -179,7 +179,7 @@ test('a patient revision changed after the displayed review cannot be silently a
 });
 
 
-test('a deposited note has readable diary metadata and preserves the document reference', async () => {
+test('a deposited note normalizes rich text and preserves the original provenance and plain transcription', async () => {
     const f = await fixture();
     const get = mock.method(db.patients, 'get', async () => patient(cfA));
     const quote = 'Sintesi clinica sintetica';
@@ -187,11 +187,20 @@ test('a deposited note has readable diary metadata and preserves the document re
     try {
         const signal = new AbortController().signal;
         const review = await inspectAgentVisit(f.row, [patient(cfA)], null, signal, pdfText('Paziente CF ' + cfA));
-        review.visit.items.push({ kind: 'note', id: randomUUID(), value: { text: quote, quote, source } });
+        const formatted = `<p data-fixture="remove"><mark>${quote}</mark></p>`;
+        const transcription = 'PA <120 e A & B\n**Controllo sintetico**';
+        review.visit.items.push(
+            { kind: 'note', id: randomUUID(), value: { text: formatted, quote, source } },
+            { kind: 'transcription', id: randomUUID(), value: { text: transcription, quote, source } },
+        );
         const application = await prepareAgentApplication(review, signal);
-        assert.deepEqual(application?.items.map(item => item.kind), ['pdf', 'note']);
+        assert.deepEqual(application?.items.map(item => item.kind), ['pdf', 'note', 'transcription']);
         const note = application?.items.find(item => item.kind === 'note');
-        assert.ok(note?.kind === 'note');
+        const transcript = application?.items.find(item => item.kind === 'transcription');
+        assert.ok(note?.kind === 'note' && transcript?.kind === 'transcription');
+        assert.equal(await db.openLocalDraft(note.values.content), `<p>${quote}</p>`);
+        assert.equal(await db.openLocalDraft(transcript.values.content), transcription);
+        assert.equal(review.visit.items.find(item => item.kind === 'note')?.value.text, formatted);
         const metadata = readPatientDiaryMetadata(await db.openLocalDraft(note.values.metadata));
         assert.equal(metadata.state, 'readable');
         assert.equal(metadata.value?.sourceLabel, 'Cassetta della visita');
@@ -237,4 +246,26 @@ test('an observation code absent from its cited source remains a proposal with a
         assert.deepEqual(review.blockers, []);
         assert.match(review.proposalBlockers.join(' '), /Codice dell’osservazione/);
     } finally { query.mock.restore(); f.close(); }
+});
+
+test('WUL-925: REDACTED with specialist CF in header, footer, or signature passes without profile physician CF, while unlabeled CF blocks', async () => {
+    const specialistCf = 'MEDPRS00A01A000W';
+    const reports = [
+        `ASST Sintetica - U.O. Cardiologia - Medico refertante: Dott. Luca Bianchi - C.F.: ${specialistCf}\nAssistito: Mario Rossi\nCodice fiscale assistito: ${cfA}`,
+        `REDACTED\nAssistito codice fiscale ${cfA}\nIl medico\nDott. Luca Bianchi\nC.F.: ${specialistCf}`,
+        `REDACTED\nPaziente codice fiscale ${cfA}\nFirmato digitalmente da: BIANCHI LUCA (CF: ${specialistCf})`,
+    ];
+    for (const text of reports) {
+        const f = await fixture(cfA);
+        try {
+            const review = await inspectAgentVisit(f.row, [patient(cfA), patient(cfB)], null, new AbortController().signal, pdfText(text));
+            assert.deepEqual(review.blockers, [], text);
+            assert.equal(review.patient?.taxCode, cfA);
+        } finally { f.close(); }
+    }
+    const f = await fixture(cfA);
+    try {
+        const blocked = await inspectAgentVisit(f.row, [patient(cfA), patient(cfB)], null, new AbortController().signal, pdfText(`Assistito codice fiscale ${cfA}\n${specialistCf}`));
+        assert.ok(blocked.blockers.length > 0);
+    } finally { f.close(); }
 });

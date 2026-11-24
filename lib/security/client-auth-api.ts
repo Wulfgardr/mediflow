@@ -76,6 +76,7 @@ type SetupRequestPayload = {
     salt: string;
     displayName: string;
     ambulatoryName: string;
+    doctorTaxCode?: string;
     verifier?: string;
     recovery?: { wrappedMasterKey: string; salt: string; verifier: string };
 };

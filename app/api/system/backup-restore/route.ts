@@ -54,7 +54,9 @@ import {
     serializeBackupArtifact,
 } from '@/lib/backup-artifact';
 import { enrichBackupPatientsWithAmbulatoryLinks } from '@/lib/backup-patient-ambulatory-links';
-import { BackupRestoreBlockedError, restoreBackupArtifact, type BackupRestoreBlockedReason } from '@/lib/backup-restore-executor';
+import { restoreBackupArtifact } from '@/lib/backup-restore-executor';
+import { BackupRestoreBlockedError } from '@/lib/backup-restore-blocked';
+import { blockedRestoreResponse } from './blocked-restore-response';
 import { runBackupRestorePreflight } from '@/lib/backup-restore-preflight';
 import { apiFailure, apiInternalError } from '@/lib/api-error-response';
 import { disposeCheckupStatusTransitionForHostV1 } from
@@ -62,13 +64,6 @@ import { disposeCheckupStatusTransitionForHostV1 } from
 import { isTrustedWebMutationRequest } from '@/lib/security/request-transport';
 
 export const dynamic = 'force-dynamic';
-
-function blockedRestoreResponse(reason: BackupRestoreBlockedReason | 'source') {
-    return NextResponse.json({
-        success: false, code: 'restore_blocked', reason,
-        error: 'Ripristino bloccato: i dati attuali non sono stati modificati.',
-    }, { status: 409, headers: { 'Cache-Control': 'no-store' } });
-}
 
 function sortBackupRows<T extends Record<string, unknown>>(rows: T[]): T[] {
     return [...rows].sort((left, right) => {
