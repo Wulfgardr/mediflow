@@ -89,8 +89,8 @@ export function DevicePairingPanel({ networkEnabled, clients, onClientsChange }:
         setPending(true);
         try {
             const list = await readDevicePairingList();
-            if (!list) throw new Error('Pairing list unavailable');
-            onClientsChange(list.clients);
+            if (list) onClientsChange(list.clients);
+            else setMessage('Elenco dei dispositivi non disponibile.');
         } catch {
             setMessage('Elenco dei dispositivi non disponibile.');
         } finally {
