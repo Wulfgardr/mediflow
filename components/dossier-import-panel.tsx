@@ -28,7 +28,7 @@ import {
     type DossierPatient, type DossierPatientView,
 } from '@/lib/document-dossier-session';
 import {
-    DOSSIER_FACT_KIND_LABELS, DOSSIER_GAP_LABELS, buildDossierReceipt, createManualDossierFact, dossierFactBlockers, dossierFactRef,
+    DOSSIER_FACT_KIND_LABELS, DOSSIER_GAP_LABELS, buildDossierReceipt, createManualDossierFact, decideByPhysician, dossierFactBlockers, dossierFactRef,
     excludedProfessionalCode, extractDossierCandidates, latestAppliedOutcome, unitText,
     type DossierFact, type DossierFactKind, type DossierRecord,
 } from '@/lib/domain/documents/dossier-import';
@@ -532,6 +532,7 @@ function DossierReview({ view, busy, ports, operation, setBusy, setNotice, reloa
             const outcome = await acceptVerifiedAndApply(ports, { patientId: view.patient.id, includeSummaries, ...op });
             if (!op.isCurrent()) return;
             setBulkResult(outcome);
+            setResults((current) => ({ ...current, ...Object.fromEntries(outcome.applied.map((item) => [item.attachmentId, item])) }));
             await reload();
         } catch (error) {
             if (op.isCurrent()) setNotice(error instanceof DossierStaleError || error instanceof DossierAbortedError ? `${error.message} Rileggi il dossier: le scritture confermate restano registrate.`
@@ -542,17 +543,17 @@ function DossierReview({ view, busy, ports, operation, setBusy, setNotice, reloa
     const withPrepared = view.documents.some((document) => document.record.facts.some((fact) => fact.origin === 'prepared'));
     return <>
         {withPrepared ? <div className={styles.section} data-testid="dossier-bulk-panel">
-            <p className={styles.muted}>Per i documenti con estrazione preparata: accetta le proposte la cui citazione e i cui valori si ritrovano nel testo del documento, nuove rispetto alla scheda e complete, e le scrive. Rifiuta le proposte del parser dello stesso tipo che sostituiscono. Conflitti, negazioni, riformulazioni e citazioni non trovate restano a te.</p>
+            <p className={styles.muted}>Per i documenti con estrazione preparata: accetta e scrive le proposte la cui citazione si ritrova nel documento e la voce di diario con il documento intero. Mette da parte doppioni e altre letture automatiche, che restano nell’elenco con il motivo. Sintesi, conflitti, negazioni e citazioni non trovate restano a te.</p>
             <label className={styles.consent}>
                 <input type="checkbox" checked={includeSummaries} disabled={busy} data-testid="dossier-bulk-summaries" onChange={(event) => setIncludeSummaries(event.currentTarget.checked)} />
-                <span>Ho letto le sintesi dei documenti e accetto anche quelle: sono testo riassunto, non verificabile parola per parola. Con la sintesi accettata, il residuo si considera rivisto solo se le pagine lette coincidono.</span>
+                <span>Ho letto le sintesi dei documenti e accetto anche quelle: sono testo riassunto, non verificabile parola per parola. La sintesi prende il posto della voce con il documento intero e il residuo si considera rivisto solo se le pagine lette coincidono.</span>
             </label>
             <div className={styles.actions}>
                 <button type="button" className={styles.primary} disabled={busy || complete === view.documents.length} data-testid="dossier-bulk" onClick={() => { void bulk(); }}>Accetta il verificato e applica</button>
             </div>
         </div> : null}
         {bulkResult ? <p role="status" data-testid="dossier-bulk-result">
-            {formatCountLabel(bulkResult.accepted, 'proposta accettata', 'proposte accettate')}, {formatCountLabel(bulkResult.alreadyPresent, 'già presente', 'già presenti')}, {formatCountLabel(bulkResult.superseded, 'proposta del parser sostituita', 'proposte del parser sostituite')}; {formatCountLabel(bulkResult.leftPending, 'resta da decidere', 'restano da decidere')}.
+            {formatCountLabel(bulkResult.accepted, 'proposta accettata', 'proposte accettate')}, {formatCountLabel(bulkResult.alreadyPresent, 'già presente', 'già presenti')}, {formatCountLabel(bulkResult.superseded + bulkResult.setAside, 'messa da parte', 'messe da parte')}; {formatCountLabel(bulkResult.leftPending, 'resta da decidere', 'restano da decidere')}.
             {' '}{formatCountLabel(bulkResult.applied.reduce((sum, item) => sum + item.outcomes.filter((entry) => entry.outcome === 'applied' || entry.outcome === 'already_present').length, 0), 'scrittura confermata', 'scritture confermate')}
             {bulkResult.applied.some((item) => item.partial) ? '; alcune applicazioni sono parziali: controlla i documenti segnati.' : '.'}</p> : null}
         <p data-testid="dossier-summary"><strong>{complete} di {formatCountLabel(view.documents.length, 'documento', 'documenti')} completi.</strong> Un documento è completo solo con originale riletto, testo verificato, ogni proposta decisa, il residuo rivisto e le scritture confermate.</p>
@@ -661,7 +662,7 @@ function DossierDocument({ document, view, busy, result, onSave, onApply, onRetr
                     const locked = written(fact) || busy || Boolean(record.pendingWrites?.some((claim) => claim.factId === fact.factId));
                     const evidence = fact.evidence;
                     const canShowEvidence = verifiedPassage(fact);
-                    return <tr key={fact.factId} role="row" data-testid="dossier-fact" data-kind={fact.kind} data-origin={fact.origin} data-decision={fact.decision}>
+                    return <tr key={fact.factId} role="row" data-testid="dossier-fact" data-kind={fact.kind} data-origin={fact.origin} data-decision={fact.decision} data-decided-by={fact.decidedBy}>
                         <td role="cell" data-label="Tipo">{DOSSIER_FACT_KIND_LABELS[fact.kind]}<small className={styles.muted}>{ORIGIN_LABEL[fact.origin] ?? fact.origin}</small></td>
                         <td role="cell" data-label="Contenuto">
                             {evidence ? <small>Evidenza, unità {evidence.unit}: <PrivacyBlur>{evidence.excerpt}</PrivacyBlur></small> : null}
@@ -681,10 +682,11 @@ function DossierDocument({ document, view, busy, result, onSave, onApply, onRetr
                         <td role="cell" data-label="Decisione">
                             <label htmlFor={`${ids}-${fact.factId}-decision`} className={styles.muted}>Decisione</label>
                             <select id={`${ids}-${fact.factId}-decision`} value={fact.decision} disabled={locked}
-                                onChange={(event) => { const decision = event.currentTarget.value as DossierFact['decision']; updateFact(fact.factId, (item) => ({ ...item, decision })); }}>
+                                onChange={(event) => { const decision = event.currentTarget.value as DossierFact['decision']; updateFact(fact.factId, (item) => decideByPhysician(item, decision)); }}>
                                 <option value="pending">Da decidere</option><option value="accepted">Accetta</option>
                                 <option value="rejected">Rifiuta</option><option value="already_present">Già in scheda, non scrivere</option>
                             </select>
+                            {fact.decidedBy ? <small data-testid="dossier-fact-decided-by">Da «Accetta il verificato»{fact.note ? `: ${fact.note}` : '.'}</small> : null}
                         </td>
                     </tr>;
                 })}</tbody>

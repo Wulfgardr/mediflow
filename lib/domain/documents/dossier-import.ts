@@ -603,6 +603,7 @@ export const DOSSIER_FACT_TARGET: Record<DossierFactKind, 'patient_diagnoses' | 
 
 export type DossierFactValues = Record<string, string>;
 export type DossierFactDecision = 'pending' | 'accepted' | 'rejected' | 'already_present';
+export type DossierFactDecider = 'accept_verified';
 
 export interface DossierEvidence { unit: number; start: number; end: number; excerpt: string }
 
@@ -617,10 +618,21 @@ export interface DossierFact {
     values: DossierFactValues;
     decision: DossierFactDecision;
     note?: string;
+    /** Decisione presa da «Accetta il verificato» e non ancora rivista dal medico; assente per le decisioni del medico. */
+    decidedBy?: DossierFactDecider;
     /** Identità opaca del record, persistita nell'artefatto prima della scrittura. */
     recordId?: string;
 }
 
+
+/** Decisione del medico su una voce: se era del gesto unico, motivo e provenienza del gesto non valgono più. */
+export function decideByPhysician(fact: DossierFact, decision: DossierFactDecision): DossierFact {
+    const physician: DossierFact = { ...fact, decision };
+    if (!fact.decidedBy) return physician;
+    delete physician.decidedBy;
+    delete physician.note;
+    return physician;
+}
 
 function hashText(value: string): string {
     let hash = 0x811c9dc5;
@@ -1275,7 +1287,8 @@ function validFact(value: unknown): value is DossierFact {
         || typeof value.negated !== 'boolean' || !isRecord(value.values) || typeof value.decision !== 'string') return false;
     return Object.values(value.values).every((entry) => typeof entry === 'string')
         && ['pending', 'accepted', 'rejected', 'already_present'].includes(value.decision)
-        && (value.recordId === undefined || typeof value.recordId === 'string');
+        && (value.recordId === undefined || typeof value.recordId === 'string')
+        && (value.decidedBy === undefined || value.decidedBy === 'accept_verified');
 }
 
 /** Legge la chiave `dossier` dall'artefatto. Un record malformato vale come assente-ma-presente: `invalid`. */

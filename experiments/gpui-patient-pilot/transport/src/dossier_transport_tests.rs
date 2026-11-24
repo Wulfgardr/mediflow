@@ -414,7 +414,11 @@ fn dossier_apply_partial_resume_and_duplicate_follow_the_web_session() {
     );
     fixture.store.lock().unwrap().fail_second = false;
     let result = worker.apply(key, "p-a", false).unwrap();
-    assert_eq!(fixture.store.lock().unwrap().clinical, 2);
+    assert_eq!(
+        fixture.store.lock().unwrap().clinical,
+        3,
+        "two therapies and the full-text diary entry"
+    );
     assert_eq!(fixture.store.lock().unwrap().attachments.len(), 1);
     assert!(!result["documents"].as_array().unwrap().is_empty());
     worker.retire();
@@ -423,7 +427,7 @@ fn dossier_apply_partial_resume_and_duplicate_follow_the_web_session() {
     worker
         .apply(string(&preview["groups"][0]["key"]), "p-a", false)
         .unwrap();
-    assert_eq!(fixture.store.lock().unwrap().clinical, 2);
+    assert_eq!(fixture.store.lock().unwrap().clinical, 3);
     assert_eq!(fixture.store.lock().unwrap().attachments.len(), 1);
     worker.retire();
 }
@@ -457,7 +461,12 @@ fn dossier_lock_revocation_archive_replacement_and_host_close_stop_later_writes(
             .apply(string(&preview["groups"][0]["key"]), "p-a", false)
             .is_err()
     );
-    assert_eq!(fixture.store.lock().unwrap().clinical, 1);
+    assert_eq!(
+        fixture.store.lock().unwrap().clinical,
+        2,
+        "the full-text diary entry, then the first therapy locks the session"
+    );
+    assert_eq!(fixture.store.lock().unwrap().therapies.len(), 1);
     worker.retire();
     let fixture = Fixture::new(TEXT);
     let worker = fixture.worker();

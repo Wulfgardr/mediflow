@@ -4,10 +4,10 @@ import type { Observation } from '../../db';
 import { projectQuadroMeasures } from '../../patient-quadro';
 
 import {
-    DOSSIER_PREPARED_SCHEMA, anchorPreparedQuote, parsePreparedExtraction, preparedBulkDecisions, preparedDossierFacts, preparedFactEligible, preparedPatientKey, verifyPreparedFields,
+    BULK_NOTE, DOSSIER_PREPARED_SCHEMA, anchorPreparedQuote, parsePreparedExtraction, preparedBulkDecisions, preparedDossierFacts, preparedFactEligible, preparedPatientKey, verifyPreparedFields,
     preparedTokens, type PreparedFactInput, type PreparedSource,
 } from './dossier-prepared';
-import { extractDossierCandidates, splitDossierUnits, type DossierFact, type DossierRecord } from './dossier-import';
+import { extractDossierCandidates, splitDossierUnits, type DossierFact, type DossierFactAssessment, type DossierRecord } from './dossier-import';
 
 // Dati sintetici. CF con carattere di controllo valido calcolato per i test del dossier.
 const CF_A = 'RSSMRA80A01F205X';
@@ -223,6 +223,7 @@ const fact = (factId: string, extra: Partial<DossierFact>): DossierFact => ({ fa
     evidence: { unit: 0, start: 0, end: 5, excerpt: 'x' }, values: { drugName: 'Ramipril', dosage: '5 mg', status: 'completed', startDate: '2026-10-20', preparedCheck: 'verified' }, ...extra });
 const summary = (extra: Record<string, string> = {}): DossierFact => ({ factId: 'sum', kind: 'document_entry', origin: 'prepared', evidence: null, negated: false, decision: 'pending',
     values: { title: 'Sintesi', date: '2026-10-20', text: 'Testo', textSource: 'prepared', preparedCheck: 'summary', preparedCoverage: 'complete', preparedPages: '1', ...extra } });
+const bulkContext = { setAsideElsewhere: new Set<string>(), conflicted: new Set<string>(), documentNames: {} };
 const parserDocument: DossierFact = { factId: 'doc', kind: 'document_entry', origin: 'parser:document', evidence: null, negated: false, decision: 'pending',
     values: { title: 'Documento', date: '2026-10-20', text: '', textSource: 'document' } };
 
@@ -248,19 +249,19 @@ test('bulk decisions accept only verified, new, complete proposals', () => {
         'doc#conflict': { status: 'conflict', detail: '', relatedFactRefs: [] },
         'doc#dup': { status: 'duplicate_in_dossier', detail: '', relatedFactRefs: ['doc#ok'] },
     };
-    const run = (includeSummaries: boolean, pages: number | null = null) => preparedBulkDecisions({ record: record(facts, pages), documentKey: 'doc', assessment: (ref) => assessments[ref],
+    const run = (includeSummaries: boolean, pages: number | null = null) => preparedBulkDecisions({ ...bulkContext, record: record(facts, pages), documentKey: 'doc', assessment: (ref) => assessments[ref],
         exemptionCodes: new Set(), acceptedElsewhere: new Set(), includeSummaries });
     const without = run(false);
     const decision = Object.fromEntries(without.facts.map((item) => [item.factId, item.decision]));
     assert.deepEqual(decision, { ok: 'accepted', approx: 'accepted', missing: 'pending', paraphrase: 'pending', negated: 'pending', blocked: 'pending', present: 'already_present',
-        conflict: 'pending', dup: 'already_present', section: 'rejected', scale: 'pending', icdAnamnesis: 'pending', sum: 'pending', doc: 'pending', decided: 'rejected' });
+        conflict: 'pending', dup: 'already_present', section: 'rejected', scale: 'rejected', icdAnamnesis: 'rejected', sum: 'pending', doc: 'accepted', decided: 'rejected' });
     assert.equal(without.acknowledgeResidual, false, 'senza sintesi accettata il residuo resta al medico');
     const withSummaries = run(true);
     assert.equal(withSummaries.facts.find((item) => item.factId === 'sum')!.decision, 'accepted');
     assert.equal(withSummaries.facts.find((item) => item.factId === 'doc')!.decision, 'pending', 'prima della scrittura della sintesi la voce col testo intero resta');
     assert.equal(withSummaries.acknowledgeResidual, false);
     // Sintesi scritta e riletta: ora sostituisce e il residuo si conferma, se le pagine coincidono.
-    const written = (pages: number | null) => preparedBulkDecisions({ record: { ...record(facts.map((item) => item.factId === 'sum' ? { ...item, decision: 'accepted' as const } : item), pages),
+    const written = (pages: number | null) => preparedBulkDecisions({ ...bulkContext, record: { ...record(facts.map((item) => item.factId === 'sum' ? { ...item, decision: 'accepted' as const } : item), pages),
         applied: [{ factId: 'sum', target: 'entries', recordId: 'r', outcome: 'applied', at: 'x' }] } as unknown as DossierRecord, documentKey: 'doc', assessment: (ref) => assessments[ref],
         exemptionCodes: new Set(), acceptedElsewhere: new Set(), includeSummaries: true });
     assert.equal(written(null).facts.find((item) => item.factId === 'doc')!.decision, 'rejected');
@@ -271,17 +272,89 @@ test('bulk decisions accept only verified, new, complete proposals', () => {
 
 test('bulk leaves the residual pending when the summary cannot be applied, and ignores documents without prepared facts', () => {
     // Caso H: sintesi senza data.
-    const undated = preparedBulkDecisions({ record: record([summary({ date: '' })]), documentKey: 'doc', assessment: () => undefined, exemptionCodes: new Set(),
+    const undated = preparedBulkDecisions({ ...bulkContext, record: record([summary({ date: '' })]), documentKey: 'doc', assessment: () => undefined, exemptionCodes: new Set(),
         acceptedElsewhere: new Set(), includeSummaries: true });
     assert.equal(undated.facts[0].decision, 'pending');
     assert.equal(undated.acknowledgeResidual, false);
-    // Caso G: nessuna sintesi, la voce col testo intero resta.
-    const noSummary = preparedBulkDecisions({ record: record([fact('missing', { evidence: null, values: { drugName: 'Zzz', dosage: '1', status: 'completed', startDate: '2026-10-20', preparedCheck: 'not_found' } }), parserDocument]),
+    const noSummary = preparedBulkDecisions({ ...bulkContext, record: record([fact('missing', { evidence: null, values: { drugName: 'Zzz', dosage: '1', status: 'completed', startDate: '2026-10-20', preparedCheck: 'not_found' } }), parserDocument]),
         documentKey: 'doc', assessment: () => undefined, exemptionCodes: new Set(), acceptedElsewhere: new Set(), includeSummaries: true });
-    assert.equal(noSummary.facts[1].decision, 'pending');
-    const parserOnly = preparedBulkDecisions({ record: record([fact('lab', { origin: 'parser:lab', kind: 'observation', values: { display: 'Creatinina', value: '0,9', code: '2160-0', unitCode: 'mg/dL', observedAt: '2026-10-20' } })]),
+    assert.equal(noSummary.facts[1].decision, 'accepted');
+    const parserOnly = preparedBulkDecisions({ ...bulkContext, record: record([fact('lab', { origin: 'parser:lab', kind: 'observation', values: { display: 'Creatinina', value: '0,9', code: '2160-0', unitCode: 'mg/dL', observedAt: '2026-10-20' } })]),
         documentKey: 'doc', assessment: () => undefined, exemptionCodes: new Set(), acceptedElsewhere: new Set(), includeSummaries: true });
     assert.equal(parserOnly.facts[0].decision, 'pending', 'senza estrazione preparata nulla cambia');
+});
+
+test('WUL-927 accept verified: one class per voce, nothing in doubt is decided', () => {
+    const therapy = (factId: string, drugName: string, extra: Partial<DossierFact> = {}, values: Record<string, string> = {}) =>
+        fact(factId, { ...extra, values: { drugName, dosage: '5 mg', status: 'completed', startDate: '2026-10-20', preparedCheck: 'verified', ...values } });
+    const facts: DossierFact[] = [
+        therapy('prepared', 'Ramipril'),
+        therapy('dupHere', 'Ramipril'),
+        { ...parserDocument, factId: 'document' },
+        fact('icdCode', { origin: 'parser:icd', kind: 'diagnosis', values: { description: 'Ipertensione', code: 'I10', system: 'ICD-10', date: '2026-10-20' } }),
+        therapy('automatic', 'Atenololo', { origin: 'parser:section' }),
+        therapy('dupOther', 'Bisoprololo'),
+        therapy('dupAccepted', 'Furosemide'),
+        therapy('dupOfSetAside', 'Amlodipina'),
+        summary(),
+        therapy('conflict', 'Metformina'),
+        therapy('conflictPeer', 'Metformina', { origin: 'parser:section' }, { dosage: '1000 mg' }),
+        therapy('negatedReading', 'Warfarin', { origin: 'parser:section', negated: true }),
+        therapy('negatedPrepared', 'Digossina', { negated: true }),
+        therapy('unverified', 'Simvastatina', { evidence: null }, { preparedCheck: 'not_found' }),
+        therapy('manual', 'Lansoprazolo', { origin: 'manual', evidence: null }),
+        therapy('physicianRejected', 'Lorazepam', { origin: 'parser:section', decision: 'rejected' }),
+        therapy('readingOfAccepted', 'Ramipril', { origin: 'parser:section' }, { dosage: '5 mg al mattino e altre righe' }),
+        therapy('readingOfPresent', 'Furosemide', { origin: 'parser:section' }),
+    ];
+    const assessments: Record<string, DossierFactAssessment> = {
+        'b#dupHere': { status: 'duplicate_in_dossier', detail: '', relatedFactRefs: ['b#prepared'] },
+        'b#dupOther': { status: 'duplicate_in_dossier', detail: '', relatedFactRefs: ['a#pending'] },
+        'b#dupAccepted': { status: 'duplicate_in_dossier', detail: '', relatedFactRefs: ['a#accepted'] },
+        'b#dupOfSetAside': { status: 'duplicate_in_dossier', detail: '', relatedFactRefs: ['a#reading'] },
+        'b#conflict': { status: 'conflict', detail: '', relatedFactRefs: ['b#conflictPeer'] },
+    };
+    const run = (input: { record?: DossierRecord; includeSummaries?: boolean } = {}) => preparedBulkDecisions({ record: input.record ?? record(facts), documentKey: 'b',
+        assessment: (ref) => assessments[ref], exemptionCodes: new Set(), acceptedElsewhere: new Set(['a#accepted']), setAsideElsewhere: new Set(['a#reading']),
+        conflicted: new Set(['b#conflict', 'b#conflictPeer', 'b#readingOfAccepted']), documentNames: { a: 'a.pdf', b: 'b.pdf' }, includeSummaries: input.includeSummaries ?? false });
+    const result = run();
+    const by = Object.fromEntries(result.facts.map((item) => [item.factId, item]));
+    const decisions = Object.fromEntries(result.facts.map((item) => [item.factId, [item.decision, item.decidedBy ?? null, item.note ?? null]]));
+    assert.deepEqual(decisions, {
+        prepared: ['accepted', 'accept_verified', null],
+        dupHere: ['already_present', 'accept_verified', 'Doppione di una voce accettata di questo documento.'],
+        document: ['accepted', 'accept_verified', null],
+        icdCode: ['accepted', 'accept_verified', null],
+        automatic: ['rejected', 'accept_verified', BULK_NOTE.automaticReading],
+        dupOther: ['rejected', 'accept_verified', 'Doppione di una voce di «a.pdf».'],
+        dupAccepted: ['already_present', 'accept_verified', 'Doppione di una voce accettata di «a.pdf».'],
+        dupOfSetAside: ['accepted', 'accept_verified', null],
+        sum: ['pending', null, null],
+        conflict: ['pending', null, null],
+        conflictPeer: ['pending', null, null],
+        negatedReading: ['pending', null, null],
+        negatedPrepared: ['pending', null, null],
+        unverified: ['pending', null, null],
+        manual: ['pending', null, null],
+        physicianRejected: ['rejected', null, null],
+        readingOfAccepted: ['rejected', 'accept_verified', BULK_NOTE.supersededByPrepared],
+        readingOfPresent: ['rejected', 'accept_verified', BULK_NOTE.supersededByPrepared],
+    });
+    assert.deepEqual(result.counts, { accepted: 4, alreadyPresent: 2, superseded: 2, setAside: 2, leftPending: 7 });
+    assert.deepEqual(result.accepted, ['b#prepared', 'b#icdCode', 'b#dupOfSetAside', 'b#document']);
+    assert.deepEqual(result.setAside, ['b#dupOther', 'b#automatic', 'b#readingOfAccepted', 'b#readingOfPresent']);
+    assert.equal(result.facts.length, facts.length, 'mettere da parte non toglie voci');
+    assert.deepEqual(by.automatic.values, facts.find((item) => item.factId === 'automatic')!.values, 'la voce messa da parte resta intatta e recuperabile');
+    const writtenSummary = { ...record(facts.map((item) => item.factId === 'sum' ? { ...item, decision: 'accepted' as const } : item), 1),
+        applied: [{ factId: 'sum', target: 'entries', recordId: 'r', outcome: 'applied', at: 'x' }] } as unknown as DossierRecord;
+    const undeclared = run({ record: writtenSummary });
+    assert.equal(undeclared.acknowledgeResidual, false, '«Ho letto» resta un gesto del medico');
+    assert.equal(undeclared.facts.find((item) => item.factId === 'document')!.decision, 'rejected', 'la sintesi scritta sostituisce la voce col testo intero');
+    assert.equal(undeclared.facts.find((item) => item.factId === 'document')!.note, BULK_NOTE.supersededBySummary);
+    assert.equal(run({ record: writtenSummary, includeSummaries: true }).acknowledgeResidual, true, 'con la dichiarazione sulle sintesi il residuo si conferma');
+    const withSummaries = run({ includeSummaries: true });
+    assert.equal(withSummaries.facts.find((item) => item.factId === 'sum')!.decision, 'accepted');
+    assert.equal(withSummaries.facts.find((item) => item.factId === 'document')!.decision, 'pending', 'la voce col testo intero aspetta la sintesi scritta');
 });
 
 test('patients group by valid tax code, otherwise by name and birth date', () => {
@@ -366,7 +439,7 @@ test('negation, suspension and family history stop the bulk path', () => {
     assert.equal(narrative?.check, 'subject_conflict');
     assert.equal(narrative?.values.title, 'Anamnesi da documento', 'il titolo proposto non entra');
     const facts = onLine('Il paziente non assume warfarin 5 mg da anni', { kind: 'therapy', values: { drugName: 'warfarin', dosage: '5 mg', status: 'active' }, quote: 'Il paziente non assume warfarin 5 mg da anni' });
-    const bulk = preparedBulkDecisions({ record: { facts, residualReview: { state: 'pending' }, applied: [], extraction: { state: 'extracted', unitBasis: 'document', units: [] } } as unknown as DossierRecord,
+    const bulk = preparedBulkDecisions({ ...bulkContext, record: { facts, residualReview: { state: 'pending' }, applied: [], extraction: { state: 'extracted', unitBasis: 'document', units: [] } } as unknown as DossierRecord,
         documentKey: 'doc', assessment: () => undefined, exemptionCodes: new Set(), acceptedElsewhere: new Set(), includeSummaries: false });
     assert.equal(bulk.facts[0].decision, 'pending', 'negato: mai in blocco');
 });
@@ -394,14 +467,16 @@ test('one accepted drug supersedes only the section proposal of the same drug', 
     const prepared: DossierFact = fact('prep', { values: { drugName: 'Ramipril', dosage: '5 mg', status: 'completed', startDate: '2026-10-20', preparedCheck: 'verified' } });
     const sectionSame: DossierFact = fact('secR', { origin: 'parser:section', evidence: { unit: 0, start: 0, end: 1, excerpt: 'x' }, values: { drugName: 'Ramipril', dosage: '5 mg', status: 'completed', startDate: '' } });
     const sectionOther: DossierFact = fact('secW', { origin: 'parser:section', evidence: { unit: 0, start: 0, end: 1, excerpt: 'x' }, values: { drugName: 'Warfarin', dosage: '5 mg', status: 'completed', startDate: '' } });
-    const result = preparedBulkDecisions({ record: record([prepared, sectionSame, sectionOther]), documentKey: 'doc', assessment: () => undefined, exemptionCodes: new Set(), acceptedElsewhere: new Set(), includeSummaries: false });
-    assert.deepEqual(result.facts.map((item) => item.decision), ['accepted', 'rejected', 'pending']);
+    const result = preparedBulkDecisions({ ...bulkContext, record: record([prepared, sectionSame, sectionOther]), documentKey: 'doc', assessment: () => undefined, exemptionCodes: new Set(), acceptedElsewhere: new Set(), includeSummaries: false });
+    assert.deepEqual(result.facts.map((item) => [item.decision, item.note ?? null]),
+        [['accepted', null], ['rejected', BULK_NOTE.supersededByPrepared], ['rejected', BULK_NOTE.automaticReading]]);
+    assert.deepEqual(result.setAside, ['doc#secR', 'doc#secW'], 'anche la voce sostituita non vale più come gemella di un doppione');
 });
 
 test('the full-text entry is replaced and the residual acknowledged only once the summary is written', () => {
     const accepted = { ...summary(), decision: 'accepted' as const };
     const base = { facts: [accepted, parserDocument], residualReview: { state: 'pending' }, extraction: { state: 'extracted', unitBasis: 'document', units: [] } };
-    const run = (applied: unknown[]) => preparedBulkDecisions({ record: { ...base, applied } as unknown as DossierRecord, documentKey: 'doc', assessment: () => undefined,
+    const run = (applied: unknown[]) => preparedBulkDecisions({ ...bulkContext, record: { ...base, applied } as unknown as DossierRecord, documentKey: 'doc', assessment: () => undefined,
         exemptionCodes: new Set(), acceptedElsewhere: new Set(), includeSummaries: true });
     const before = run([]);
     assert.equal(before.facts[1].decision, 'pending');
