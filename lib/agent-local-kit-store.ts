@@ -89,7 +89,7 @@ export function createAgentLocalKitStore(database: Database.Database, now = Date
             }).immediate();
             return this.status(actorRef);
         },
-        status(actorRef: string, isUnlockActive?: (ref: string, actorRef: string) => boolean): AgentLocalKitStatus {
+        status(actorRef: string): AgentLocalKitStatus {
             const kitPath = this.readKitPath();
             const agentRef = readSetting(database, LOCAL_KIT_AGENT_SETTING_KEY);
             if (!agentRef) {
@@ -104,7 +104,7 @@ export function createAgentLocalKitStore(database: Database.Database, now = Date
                 current.revoked_at AS currentRevokedAt,
                 template.expires_at AS templateExpiresAt,
                 template.revoked_at AS templateRevokedAt,
-                grant.unlock_ref AS unlockRef,
+                grant.mandate_ref IS NOT NULL AS granted,
                 client.revoked_at AS clientRevokedAt,
                 client.expires_at AS clientExpiresAt
                 FROM agent_registrations AS registration
@@ -122,7 +122,7 @@ export function createAgentLocalKitStore(database: Database.Database, now = Date
                     currentRevokedAt: number | null;
                     templateExpiresAt: number;
                     templateRevokedAt: number | null;
-                    unlockRef: string | null;
+                    granted: 0 | 1;
                     clientRevokedAt: number | null;
                     clientExpiresAt: number | null;
                 } | undefined;
@@ -131,8 +131,7 @@ export function createAgentLocalKitStore(database: Database.Database, now = Date
             }
             const currentTime = now();
             if (row.currentMandateRef !== null) {
-                const unlockValid = row.unlockRef !== null && (!isUnlockActive || isUnlockActive(row.unlockRef, actorRef));
-                const active = row.currentRevokedAt === null && row.currentExpiresAt !== null && row.currentExpiresAt > currentTime && unlockValid;
+                const active = row.granted === 1 && row.currentRevokedAt === null && row.currentExpiresAt !== null && row.currentExpiresAt > currentTime;
                 return {
                     kitPath,
                     connected: true,
@@ -218,12 +217,11 @@ export function createAgentLocalKitStore(database: Database.Database, now = Date
             actorRef: string,
             subjectRef: string,
             generation: string,
-            isUnlockActive?: (ref: string, actorRef: string) => boolean,
         ): void {
             database.transaction(() => {
                 if (readSqliteArchiveGeneration(database) !== generation) throw new ArchiveReplacedError();
                 if (eventType === 'agent.context.exported') {
-                    const current = this.status(actorRef, isUnlockActive);
+                    const current = this.status(actorRef);
                     if (!current.connected || !current.active) throw new AgentMandateDenied();
                 }
                 const time = now();

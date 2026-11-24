@@ -2,17 +2,19 @@
 
 Il modello esplora un client e un medico per tre sessioni e tre avanzamenti
 del tempo. Ogni sessione può ricevere un trasferimento di chiave, con retry
-dello stesso gesto. Un'unità rappresenta la durata del mandato. Il modello tratta la
-scadenza della sessione come un blocco. La durata esatta, gli scope e i dati
+dello stesso gesto. Un'unità rappresenta la durata del mandato. Il blocco per
+inattività chiude la scheda e lascia valido il mandato emesso; il blocco manuale
+lo revoca. La durata esatta, gli scope e i dati
 della cassetta sono verificati dalle prove TypeScript e HTTP.
 
 | Transizione | Codice |
 | --- | --- |
 | Registra e revoca | `approve` e `register`, `revoke` in agent-pairing-store e agent-registration-store |
-| Login, conferma tardiva, blocco | `beginAgentUnlock`, `confirmAgentUnlock` e il ritiro della risorsa dal proprietario della sessione |
+| Login, conferma tardiva | `beginAgentUnlock`, `confirmAgentUnlock` |
+| Blocco per inattività, blocco manuale | `completeExactWebP3ApplicationLock`; solo il manuale chiama `revokeAll` |
 | Trasferimento e recupero | `confirmSharedAgentUnlock` con la generazione e il controllo Web della scheda. Il recupero ritira l’accesso prima che lo sblocco possa ripartire. |
 | Emissione | `renew` in agent-registration-store, una transazione IMMEDIATE per tutti i client |
-| Ritiro | `retrieve` verifica sessione, scadenza, corrente e revoca prima di consegnare il token |
+| Ritiro | `retrieve` verifica scadenza, corrente e revoca prima di consegnare il token, senza richiedere la sessione Web |
 | Deposito | `principal` rilegge gli stessi vincoli dentro la transazione del deposito |
 
 La conferma, il controllo della sessione e la transazione SQLite sono
@@ -29,11 +31,13 @@ TLC 2.19 dal pacchetto TLA+ 1.7.4. Dalla directory del modello, con
 java -XX:+UseParallelGC -cp "$TLA_JAR" tlc2.TLC -deadlock -config MC.cfg AgentUnlock.tla
 ```
 
-Con `IgnoreLock = TRUE`, ci si aspetta che fallisca
-`NoUnauthorizedDeposit` dopo ritiro, blocco e deposito. Sostituendo la riga
+Con `IgnoreManualLock = TRUE`, ci si aspetta che fallisca
+`NoUnauthorizedDeposit` dopo ritiro, blocco manuale e deposito. Sostituendo la riga
 `INVARIANTS` con `INVARIANT NoSharedWitness`, il controesempio deve
-raggiungere il ritiro dopo «Rinnova accesso». La prova browser esercita lo stesso
-ordine di ritiro, blocco e rifiuto su route reali.
+raggiungere il ritiro dopo «Rinnova accesso»; con `INVARIANT NoIdleDepositWitness`
+deve raggiungere un deposito a scheda bloccata per inattività. La prova browser
+esercita ritiro e contesto dopo il blocco per inattività su route reali.
 
-Al 18 novembre 2026, 2.792 stati distinti senza violazioni. Il mutante viola
-`NoUnauthorizedDeposit`. Il testimone raggiunge il ritiro.
+Al 24 novembre 2026, 8.284 stati distinti senza violazioni. Il mutante viola
+`NoUnauthorizedDeposit`. I due testimoni raggiungono il ritiro condiviso e il
+deposito dopo il blocco per inattività.

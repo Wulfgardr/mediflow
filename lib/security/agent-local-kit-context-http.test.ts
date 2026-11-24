@@ -58,13 +58,12 @@ function wrappedStore() {
             actorRef: string,
             subjectRef: string,
             generation: string,
-            isUnlockActive?: (ref: string, actorRef: string) => boolean,
         ) {
             if (failAuditOnce) {
                 failAuditOnce = false;
                 throw new Error('synthetic audit failure');
             }
-            return base.recordContextAudit(eventType, actorRef, subjectRef, generation, isUnlockActive);
+            return base.recordContextAudit(eventType, actorRef, subjectRef, generation);
         },
     };
 }

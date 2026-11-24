@@ -13,6 +13,9 @@ const database = openDbServer();
 const { createAgentMandateStore } = await import('../agent-mandate-store.ts');
 const { readSqliteArchiveGeneration } = await import('../archive-generation.ts');
 const { completeExactWebP3ApplicationLock } = await import('./web-auth-application-lock-server.ts');
+const { createAgentPairingStore } = await import('../agent-pairing-store.ts');
+const { createAgentRegistrationStore } = await import('../agent-registration-store.ts');
+const { withAuthenticatedAgentTransaction } = await import('./agent-channel.ts');
 const { issueSyntheticWebSessionContext } = await import('./web-auth-lifecycle-owner-test-fixture.ts');
 const { bootstrapControl, resolve } = await import('./web-auth-lifecycle-owner-adapter.ts');
 const generation = readSqliteArchiveGeneration(database);
@@ -68,4 +71,28 @@ test('failed mandate audit retires the Web session and cannot confirm the lock o
         const retry = await lock(Object.freeze({ ...mutation, ifMatch: etag, idempotencyKey: randomUUID() }));
         assert.equal((await retry.json()).state, 'server_invalidation_unconfirmed');
     } finally { database.exec('DROP TRIGGER synthetic_revoke_audit_failure'); }
+});
+
+function renewedAgent(actor: string, templateRef: string) {
+    const pairings = createAgentPairingStore(database);
+    const registrations = createAgentRegistrationStore(database);
+    const pairing = pairings.request('Synthetic renewed agent', ['visita.nota']);
+    pairings.approve(pairing.request.id, pairing.request.code, templateRef, actor, generation, true);
+    const polled = pairings.poll(pairing.request.id, pairing.claim);
+    assert.ok('registrationCredential' in polled && polled.registrationCredential);
+    registrations.renew(actor, generation, 'synthetic-unlock-' + randomUUID());
+    const { token, mandateRef } = registrations.retrieve(polled.registrationCredential.token);
+    const deposit = () => withAuthenticatedAgentTransaction(database, syntheticWebClientRequest('http://127.0.0.1/api/agent/v1/visits',
+        { method: 'POST', headers: { authorization: 'Bearer ' + token } }), 'visita.nota', principal => principal.mandateRef);
+    return { mandateRef, deposit };
+}
+
+for (const ending of ['inactivity', 'manual'] as const) test(`a mandate renewed at unlock ${ending === 'inactivity' ? 'survives' : 'ends with'} the ${ending} lock`, async () => {
+    const { context, mandate, lock } = lockFixture('renewed-' + ending, ending);
+    const agent = renewedAgent(context.session.userId, mandate.id);
+    assert.equal(agent.deposit(), agent.mandateRef);
+    assert.equal((await (await lock()).json()).state, 'server_invalidation_confirmed');
+    assert.notEqual(resolve(context.session.id, context.controlId).status, 'active');
+    if (ending === 'inactivity') assert.equal(agent.deposit(), agent.mandateRef);
+    else assert.throws(agent.deposit, /AGENT_CHANNEL_DENIED/);
 });
