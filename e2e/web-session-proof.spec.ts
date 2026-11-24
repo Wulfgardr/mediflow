@@ -3,7 +3,7 @@ import { isAbsolute, join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { test as standalone } from './fixtures/isolated-runtime';
 import { documentRequests } from './fixtures/trusted-web-request';
-import { bootstrapUnlockedSession, openPatientSection, unlockIfNeeded } from './utils';
+import { bootstrapUnlockedSession, onboardingPassphrase, openPatientSection, unlockIfNeeded } from './utils';
 
 test.use({ trace: 'off', video: 'off', screenshot: 'off' });
 standalone.use({ trace: 'off', video: 'off', screenshot: 'off' });
@@ -23,6 +23,12 @@ async function recordNote(page: Page, note: string): Promise<string> {
     await expect(page.getByRole('region', { name: 'Esito della registrazione' })).toContainText(note);
     await page.getByRole('link', { name: 'Chiudi la voce', exact: true }).click();
     return entryId;
+}
+
+async function documentSession(page: Page): Promise<string | undefined> {
+    const observed = page.waitForRequest(request => new URL(request.url()).pathname === '/api/auth/check');
+    expect(await (await documentRequests(page).get('/api/auth/check')).json()).toMatchObject({ hasSession: true });
+    return (await observed).headers()['x-mediflow-web-session'];
 }
 
 async function lockAndWaitForConfirmation(page: Page): Promise<void> {
@@ -91,6 +97,20 @@ standalone('al primo avvio il medico accede, legge una scheda, registra una nota
         expect(exportedNote).toMatchObject({ id: entryId, type: 'note', content: expect.stringMatching(/^ENC:/u) });
     } finally { await backup.delete(); }
 
+    await standalone.step('la ricarica di /settings/backup lascia entrare con la credenziale senza bloccare le schede', async () => {
+        await expect(page).toHaveURL(/\/settings\/backup$/u);
+        await page.reload();
+        await expect(page.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Blocca tutte le schede', exact: true })).toBeHidden();
+        const passphrase = page.getByLabel('Passphrase', { exact: true });
+        await expect(passphrase).toBeEnabled();
+        await passphrase.fill(onboardingPassphrase(pin, operator));
+        await page.getByRole('button', { name: 'Sblocca', exact: true }).click();
+        await expect(page.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeHidden();
+        await expect(page).toHaveURL(/\/settings\/backup$/u);
+        await expect(page.getByRole('button', { name: 'Scarica Backup', exact: true })).toBeVisible();
+    });
+
     const peer = await page.context().newPage();
     await peer.goto(`/patients/${patientId}/modules`);
     await expect(peer.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeVisible();
@@ -102,8 +122,19 @@ standalone('al primo avvio il medico accede, legge una scheda, registra una nota
     await recordNote(peer, peerNote);
     await openPatientSection(peer, 'diario');
     await expect(peer.locator('#diario')).toContainText(peerNote);
+    await standalone.step('una scheda ricaricata rinnova l’accesso e ritrova la stessa sessione', async () => {
+        const session = await documentSession(peer);
+        expect(session).toMatch(/^[a-f0-9]{64}$/u);
+        await page.reload();
+        await expect(page.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeVisible();
+        await page.getByRole('button', { name: 'Rinnova accesso', exact: true }).click();
+        await expect(page.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeHidden();
+        await expect(page).toHaveURL(/\/settings\/backup$/u);
+        expect(await documentSession(page)).toBe(session);
+    });
     await lockAndWaitForConfirmation(peer);
     await expect(page.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeVisible();
+    expect(await (await documentRequests(page).get('/api/auth/check')).json()).toMatchObject({ hasSession: false });
 
     await standalone.step('il riavvio richiede un nuovo accesso e conserva il diario', async () => {
         await unlockIfNeeded(peer, pin, operator);
