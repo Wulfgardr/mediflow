@@ -1028,7 +1028,12 @@ impl ClinicalApp {
                     },
                 )
             });
-        view = view.child(surface::island_title("ambulatory-command-title", title, None, theme));
+        view = view.child(surface::island_title(
+            "ambulatory-command-title",
+            title,
+            None,
+            theme,
+        ));
         if dialog.mode.recovery() {
             view = view.child(notice(
                 "ambulatory-command-previous-session",

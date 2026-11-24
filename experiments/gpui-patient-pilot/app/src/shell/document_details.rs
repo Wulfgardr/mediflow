@@ -270,7 +270,10 @@ impl ClinicalApp {
     pub(super) fn document_original_view(&self, cx: &Context<Self>) -> Div {
         let theme = self.theme;
         let view = surface::island(theme, true).child(surface::island_title(
-            "document-original-heading", "ORIGINALE", None, theme,
+            "document-original-heading",
+            "ORIGINALE",
+            None,
+            theme,
         ));
         match &self.patient.document_original {
             Some(original) => {
@@ -755,25 +758,24 @@ impl ClinicalApp {
 
     pub(super) fn document_details_view(&self, attachment: &Attachment, cx: &Context<Self>) -> Div {
         let id = format!("clinical-workspace-document-source-{}", attachment.id);
-        surface::island(self.theme, true)
-            .children(
-                presentation(attachment)
-                    .into_iter()
-                    .enumerate()
-                    .map(|(index, block)| {
-                        div()
-                            .min_w_0()
-                            .max_w_full()
-                            .flex()
-                            .flex_col()
-                            .gap(px(8.))
-                            .children(self.document_detail_elements(
-                                &format!("{id}-{index}"),
-                                block,
-                                cx,
-                            ))
-                    }),
-            )
+        surface::island(self.theme, true).children(
+            presentation(attachment)
+                .into_iter()
+                .enumerate()
+                .map(|(index, block)| {
+                    div()
+                        .min_w_0()
+                        .max_w_full()
+                        .flex()
+                        .flex_col()
+                        .gap(px(8.))
+                        .children(self.document_detail_elements(
+                            &format!("{id}-{index}"),
+                            block,
+                            cx,
+                        ))
+                }),
+        )
     }
 }
 

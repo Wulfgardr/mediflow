@@ -783,18 +783,52 @@ if let Some(web)=editor.web.take(){web.cancel_local();cx.background_executor().s
         let management = &self.ambulatory_management;
         let busy = management.is_saving();
         let loaded = matches!(self.ambulatories, Load::Ready(_));
-        let actions = div().flex().flex_wrap().gap(px(12.))
-                .child(self.ambulatory_button("clinical-workspace-ambulatories-back", "Torna alle Impostazioni", theme, false, !busy)
-                    .on_click(cx.listener(|this, _, window, cx| { if this.ambulatory_management.is_saving() { return; } this.withdraw_ambulatory_command_view(cx); this.select_settings_page(SettingsPage::Overview, window, cx); })))
-                .child(self.ambulatory_button("clinical-workspace-ambulatories-reread", "Rileggi le sedi", theme, false, !busy && !matches!(self.ambulatories, Load::Loading))
-                    .on_click(cx.listener(|this, _, _, cx| {
-                            if this.ambulatory_management.is_saving() || matches!(this.ambulatories,Load::Loading) { return; }
-                            this.ambulatory_management.rebase=true; this.load_ambulatories(cx);
-                        })));
+        let actions = div()
+            .flex()
+            .flex_wrap()
+            .gap(px(12.))
+            .child(
+                self.ambulatory_button(
+                    "clinical-workspace-ambulatories-back",
+                    "Torna alle Impostazioni",
+                    theme,
+                    false,
+                    !busy,
+                )
+                .on_click(cx.listener(|this, _, window, cx| {
+                    if this.ambulatory_management.is_saving() {
+                        return;
+                    }
+                    this.withdraw_ambulatory_command_view(cx);
+                    this.select_settings_page(SettingsPage::Overview, window, cx);
+                })),
+            )
+            .child(
+                self.ambulatory_button(
+                    "clinical-workspace-ambulatories-reread",
+                    "Rileggi le sedi",
+                    theme,
+                    false,
+                    !busy && !matches!(self.ambulatories, Load::Loading),
+                )
+                .on_click(cx.listener(|this, _, _, cx| {
+                    if this.ambulatory_management.is_saving()
+                        || matches!(this.ambulatories, Load::Loading)
+                    {
+                        return;
+                    }
+                    this.ambulatory_management.rebase = true;
+                    this.load_ambulatories(cx);
+                })),
+            );
         let header = surface::page(theme)
             .max_w(px(760.))
             .child(surface::page_header(
-                "clinical-workspace-ambulatories-heading", "Ambulatori", None, actions, theme,
+                "clinical-workspace-ambulatories-heading",
+                "Ambulatori",
+                None,
+                actions,
+                theme,
             ));
         let mut view = surface::island(theme, false)
             .child(div().text_color(theme.secondary).child(text!("La sede corrente limita le cartelle visualizzate. La sede predefinita viene proposta al nuovo accesso; cambiarla non sposta la selezione di questa sessione.")));

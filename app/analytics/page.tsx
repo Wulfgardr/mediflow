@@ -197,9 +197,11 @@ export default function AnalyticsPage() {
                         >
                             {populationSummary}
                         </p>
-                        {stats.withBirthDate > 0 && <p className={styles.mutedNote}>
-                            {percent(stats.totalInRange, stats.withBirthDate)}% delle schede con età nota.
-                        </p>}
+                        <p className={styles.mutedNote}>
+                            {stats.totalInRange > 0
+                                ? `${percent(stats.totalInRange, stats.withBirthDate)}% delle schede con età nota.`
+                                : 'Nessuna scheda attiva con età nota rientra nel filtro corrente.'}
+                        </p>
                     </div>
 
                     <div className={`${surface.island} ${styles.filterField}`} data-testid="analytics-filter-field">

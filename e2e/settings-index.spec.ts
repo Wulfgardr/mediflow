@@ -168,8 +168,8 @@ test('Indice Impostazioni: diniego reale, ricevuta positiva e riconciliazione no
         await page.reload(); await expect(value).toContainText('Locale');
         const overview = page.getByTestId('settings-overview-section');
         await expect(overview.getByRole('heading', { level: 1 })).toHaveCount(0);
-        await expect(overview.getByRole('heading', { name: 'Postazione', level: 2, exact: true })).toHaveCSS('font-size', '15px');
-        await expect(overview.getByRole('heading', { name: 'Aspetto', level: 2, exact: true })).toHaveCSS('font-size', '15px');
+        await expect(overview.getByRole('heading', { name: 'Postazione', level: 2, exact: true })).toHaveCSS('font-size', '17px');
+        await expect(overview.getByRole('heading', { name: 'Aspetto', level: 2, exact: true })).toHaveCSS('font-size', '17px');
         const appearance = page.locator('a[href="/settings/aspetto"]:visible');
         await appearance.focus(); await expect(appearance).toBeFocused(); await page.keyboard.press('Enter'); await expect(page).toHaveURL(/\/settings\/aspetto$/u);
         await page.goBack(); await expect(value).toContainText('Locale');

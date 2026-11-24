@@ -268,7 +268,13 @@ impl ClinicalApp {
                 pane.children(read.standalone_loops.iter().map(|row| loop_row(row, theme)))
             }
         };
-        surface::section_tray("clinical-open-loops-heading", "Follow-up aperti", actions, pane, theme)
+        surface::section_tray(
+            "clinical-open-loops-heading",
+            "Follow-up aperti",
+            actions,
+            pane,
+            theme,
+        )
     }
 }
 fn loop_text(

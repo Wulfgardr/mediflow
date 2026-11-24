@@ -1242,3 +1242,20 @@ invariati, insieme a modello, statechart, invarianti, testimoni e mutanti. I
 digest dei tre file sono aggiornati dopo le prove di
 `lib/backup-restore-retention.test.ts`. TLC verifica il modello legacy entro i
 limiti del manifest.
+
+### Unificazione grafica Vassoio opaco su TherapyManager, WUL-894
+
+Confrontato `components/therapy-manager.tsx` di `fd0984e28fc8` rispetto a
+`0d587ad7ac7d` e `origin/main` (`7b4d9c415`): il diff tocca soltanto markup e
+presentazione (import di `record-surface.module.css` e icona decorativa `Pill`
+con `aria-hidden="true"` nella testata non incorporata e come prop `icon` su
+`CollapsibleSection`, conteggio `formatCountLabel` nella testata dei gruppi
+Attive/Sospese/Concluse, sostituzione del segnaposto vuoto da `—` a `–` nelle
+celle Indicazione e Periodo).
+
+Nessuna transizione di stato, condizione, guardia `disabled`, chiamata ai
+controller ADR0168 o ADR0156, confine di `await`, CAS, audit, ricevuta o ordine
+degli effetti cambia. Modello, statechart, invarianti, limiti, testimoni e
+mutanti restano invariati; è aggiornato il solo digest di
+`components/therapy-manager.tsx` e `filesSha256`, con esecuzione completa di
+`npm run verify:therapy-status`.

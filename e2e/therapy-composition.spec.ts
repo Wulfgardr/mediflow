@@ -59,7 +59,7 @@ test('creazione testuale accanto al titolo anche nel vuoto', async ({ page }) =>
     await expect(heading).toHaveCSS('font-size', '15px');
     await expect(heading).toHaveCSS('text-transform', 'none');
     const visibleTitle = heading.getByText('Terapie farmacologiche', { exact: true });
-    await expect(visibleTitle).toHaveCSS('font-size', '15px');
+    await expect(visibleTitle).toHaveCSS('font-size', '17px');
     await expect(visibleTitle).toHaveCSS('font-weight', '600');
     await expect(visibleTitle).toHaveCSS('letter-spacing', 'normal');
     const titleBox = await heading.boundingBox();

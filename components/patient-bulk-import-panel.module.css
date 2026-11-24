@@ -110,11 +110,6 @@
 }
 
 .fileLabel select { border-color: var(--lume-ink-muted); }
-.fileControl {
-    padding: 10px;
-    border: 1px dashed var(--lume-record-proposal-rule);
-    border-radius: 10px;
-}
 
 @media (max-width: 699px) {
     .importWorkspace :global([data-testid='dossier-import']) { padding: 8px; border-radius: 16px; }

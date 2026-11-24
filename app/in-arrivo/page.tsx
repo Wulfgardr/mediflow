@@ -157,7 +157,8 @@ function UnlockedIncoming() {
                     <section className={surface.island} aria-label="PDF della visita">
                         <div className={surface.islandHeader}>
                             <span className={surface.islandIcon} aria-hidden="true"><FileText size={15} /></span>
-                            <h3>PDF <span>{pdfItems.length}</span></h3>
+                            <h3>PDF</h3>
+                            <span className={css.pdfCount}>{pdfItems.length}</span>
                         </div>
                         <div className={css.pdfList}>
                             {pdfItems.map(item => typeof item.value.name === 'string' && (

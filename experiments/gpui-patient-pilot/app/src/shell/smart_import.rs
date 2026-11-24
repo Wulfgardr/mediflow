@@ -356,7 +356,10 @@ impl ClinicalApp {
 
     pub(super) fn smart_import_view(&self, cx: &Context<Self>) -> Div {
         let theme = self.theme;
-        let proposal = matches!(self.patient.smart_import.phase, ImportPhase::Proposal { .. });
+        let proposal = matches!(
+            self.patient.smart_import.phase,
+            ImportPhase::Proposal { .. }
+        );
         let mut pane = if proposal {
             surface::island_proposal(theme)
         } else {
@@ -380,9 +383,9 @@ impl ClinicalApp {
                     theme,
                 )),
         )
-            .when_some(self.import_chat_notice(), |el, message| {
-                el.child(notice("smart-import-chat-step", message, theme, false))
-            });
+        .when_some(self.import_chat_notice(), |el, message| {
+            el.child(notice("smart-import-chat-step", message, theme, false))
+        });
         let muted = |text: String| {
             div()
                 .min_w_0()

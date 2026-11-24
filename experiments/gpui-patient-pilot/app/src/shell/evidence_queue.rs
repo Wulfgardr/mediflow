@@ -246,8 +246,8 @@ impl ClinicalApp {
                         session.evidence_queue_sources_are_current(read, sources)
                     })
                 }) {
-                    return panel(pane
-                        .child(notice(
+                    return panel(
+                        pane.child(notice(
                             "evidence-queue-stale",
                             "Documenti cambiati.",
                             theme,
@@ -264,7 +264,8 @@ impl ClinicalApp {
                             .on_click(
                                 cx.listener(|this, _, _, cx| this.request_evidence_queue(cx)),
                             ),
-                        ));
+                        ),
+                    );
                 }
                 pane = pane.child(queue_text(
                     "evidence-queue-receipt",

@@ -73,12 +73,14 @@
 .segment { display: contents; }
 .segment > a { display: inline-flex; align-items: center; gap: 7px; padding: 12px 10px; font-size: 0.8125rem; color: var(--lume-ink-muted); }
 .segment > a[aria-current] { color: var(--lume-ink); box-shadow: inset 0 -2px var(--lume-ink); }
+.workspace[data-unified-shell='true'] {
+  --lume-surface-focal: var(--lume-record-panel);
+  --lume-ink: var(--lume-record-ink);
+  --lume-accent: var(--lume-record-accent);
+}
 @media (min-width: 1001px) {
   .workspace[data-unified-shell='true'] {
     --twin-rail: 232px;
-    --lume-surface-focal: var(--lume-record-panel);
-    --lume-ink: var(--lume-record-ink);
-    --lume-accent: var(--lume-record-accent);
     --record-chrome: var(--lume-record-rail);
     --record-field: var(--lume-surface-focal);
     --record-soft: var(--lume-record-compact-island);
@@ -89,7 +91,6 @@
     --lume-record-success: var(--lume-signal-success);
     --lume-record-critical-bg: var(--lume-record-critical-fill);
     --lume-record-critical: var(--lume-signal-critical);
-    --lume-font-sans: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
     padding: 6px;
     gap: 6px;
     background: var(--lume-record-canvas);
@@ -125,7 +126,7 @@
   .workspace[data-unified-shell='true'] .railBottom > a {
     min-height: 34px; gap: 10px; padding: 5px 10px; border-radius: 10px; font: var(--type-record-data); color: var(--record-hint);
   }
-  .workspace[data-unified-shell='true'] .navigation a[aria-current] { background: var(--record-field); color: var(--lume-ink); box-shadow: 0 0 0 1px var(--record-line), 0 1px 2px color-mix(in srgb, var(--lume-ink) 5%, transparent); }
+  .workspace[data-unified-shell='true'] .navigation a[aria-current] { background: var(--record-field); color: var(--lume-ink); font-weight: 600; box-shadow: 0 0 0 1px var(--record-line), 0 1px 2px color-mix(in srgb, var(--lume-ink) 5%, transparent); }
   .workspace[data-unified-shell='true'] .navigation svg, .workspace[data-unified-shell='true'] .railBottom svg { width: 15px; height: 15px; }
   .workspace[data-unified-shell='true'] .railGroup { display: block; padding: 12px 10px 4px; font: var(--type-record-label); color: var(--record-hint); }
   .workspace[data-unified-shell='true'] .proposalNav { display: grid; }
