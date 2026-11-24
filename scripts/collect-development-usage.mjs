@@ -44,6 +44,11 @@ export async function* files(root) {
   }
 }
 const day = timestamp => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Rome', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(timestamp));
+export function lastCompleteDay(now) {
+  const date = new Date(day(now) + 'T00:00:00Z');
+  date.setUTCDate(date.getUTCDate() - 1);
+  return date.toISOString().slice(0, 10);
+}
 const count = n => Number.isSafeInteger(n) && n >= 0 ? n : 0;
 export async function collectRecords(roots, accepts) {
   const records = new Map();
@@ -113,6 +118,7 @@ export function codexBarFallback(report, records, accepts) {
 }
 const sum = rows => rows.reduce((n,r) => n + r.tokens, 0);
 export function mergeHistory(baseline, records, snapshotDate) {
+  if (snapshotDate < baseline.snapshotDate) throw new Error('Cannot replace a newer usage snapshot');
   const data = structuredClone(baseline);
   const fresh = records.filter(r => r.date > baseline.snapshotDate && r.date <= snapshotDate);
   data.snapshotDate = snapshotDate;
@@ -139,15 +145,17 @@ export function mergeHistory(baseline, records, snapshotDate) {
 }
 export async function main() {
   const root = path.resolve(import.meta.dirname, '..');
-  const baseline = JSON.parse(fs.readFileSync(path.join(root, 'docs/data/development-usage-2026-09-27.json')));
+  const dataset = path.join(root, 'docs/data/development-usage.json');
+  const baseline = validate(JSON.parse(fs.readFileSync(dataset)));
+  const snapshotDate = lastCompleteDay(new Date());
   const result = await collectRecords({ codex: [path.join(os.homedir(), '.codex/sessions'), path.join(os.homedir(), '.codex/archived_sessions')], claude: [path.join(os.homedir(), '.claude/projects')] }, attribution(root));
   console.log(`Excluded malformed lines: ${result.malformed}; coverage remains partial`);
   try {
     const report = JSON.parse(execFileSync('codexbar', ['cost', '--provider', 'codex', '--period', 'all', '--group-by', 'project', '--format', 'json'], { encoding: 'utf8', maxBuffer: 128 * 1024 * 1024, timeout: 60000, stdio: ['ignore', 'pipe', 'ignore'] }));
     result.records.push(...codexBarFallback(report, result.records, attribution(root)));
   } catch { console.log('CodexBar export unavailable; using local records only'); }
-  const data = mergeHistory(baseline, result.records, day(new Date()));
-  fs.writeFileSync(path.join(root, 'docs/data/development-usage.json'), JSON.stringify(data, null, 2) + '\n');
+  const data = mergeHistory(baseline, result.records, snapshotDate);
+  fs.writeFileSync(dataset, JSON.stringify(data, null, 2) + '\n');
   console.log(JSON.stringify(data.environments));
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(fs.realpathSync(process.argv[1])).href) await main();

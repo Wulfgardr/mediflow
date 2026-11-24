@@ -106,6 +106,17 @@ function attachmentCurrentness(overrides: Record<string, unknown> = {}) {
     };
 }
 
+test('patient identities must already be unique text before the SQLite restore', async () => {
+    for (const invalid of [[{ id: 42 }], [{ id: 'synthetic' }, { id: 'synthetic' }]]) {
+        const artifact = JSON.parse(JSON.stringify(await createBackupArtifact(basePayload)));
+        artifact.payload.patients = invalid;
+        artifact.payload.documentDiagnosisProposals = [];
+        artifact.payload.entries = [];
+        await reauthor(artifact);
+        await assert.rejects(parseBackupArtifact(artifact), { code: 'invalid-patient-link' });
+    }
+});
+
 test('creates a stable backup artifact with checksum and manifest', async () => {
     const artifact = await createBackupArtifact(basePayload);
 

@@ -10,6 +10,7 @@ import { Activity, BookOpen, CalendarDays, CircleDashed, ChevronDown, CircleHelp
 import { db } from '@/lib/db';
 import { currentWorkspaceDestination } from '@/lib/workspace-destination';
 import { useLiveQuery } from '@/lib/live-query';
+import { agentIncomingCountServerSnapshot, agentIncomingCountSnapshot, subscribeAgentIncomingCount } from '@/lib/agent-incoming-count';
 import { useSecurity } from '@/components/security-provider';
 import { useTheme } from '@/components/theme-provider';
 import PrivacyBlur from '@/components/privacy-blur';
@@ -70,6 +71,7 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
   const { lock, user } = useSecurity();
   const { setTheme } = useTheme();
   const desktop = useSyncExternalStore(watchRecordWidth, desktopRecord, serverRecordWidth);
+  const incomingCount = useSyncExternalStore(subscribeAgentIncomingCount, agentIncomingCountSnapshot, agentIncomingCountServerSnapshot);
   const pathname = usePathname();
   const patientId = pathname.match(/^\/patients\/([^/]+)\//)?.[1] ?? null;
   const wideRecord = !!patientId && proposal && desktop;
@@ -179,7 +181,7 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
         <nav aria-label="Navigazione principale" className={styles.navigation}>
           {destinations.map(({ href, label, icon: Icon }, index) => <Fragment key={href}>
             {patientId && proposal && (index === 0 || index === 4) ? <span className={styles.railGroup}>{index === 0 ? 'Lavoro' : 'Archivio'}</span> : null}
-            <Link key={href} href={href} className={index > 2 ? styles.secondaryDestination : undefined} title={label} aria-label={label} aria-current={currentDestinationHref === href ? 'page' : undefined}><Icon size={17} aria-hidden /><span>{label}</span></Link></Fragment>)}
+            <Link key={href} href={href} className={index > 2 ? styles.secondaryDestination : undefined} title={label} aria-label={label} aria-current={currentDestinationHref === href ? 'page' : undefined}><Icon size={17} aria-hidden /><span>{label}</span>{href === '/in-arrivo' && incomingCount > 0 ? <small>{incomingCount}</small> : null}</Link></Fragment>)}
           {patientId && proposal ? <div className={styles.proposalNav}>
             <span className={styles.railGroup}>Proposte del modello</span>
             <Link href={`/patients/${patientId}/modules#patient-insight`} title="Proposte del Quadro paziente">

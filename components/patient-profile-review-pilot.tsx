@@ -9,6 +9,7 @@ import { isProfileReviewView, PROFILE_REVIEW_POLICY, type ProfileReviewInput,
     type ProfileReviewView } from '@/packages/patient-profile-contracts/src/review';
 import { isProfileNotesCommitReceipt, isProfileNotesCommitReference, isProfileNotesCommitView, PROFILE_NOTES_COMMIT_POLICY,
     type ProfileNotesCommitInput, type ProfileNotesCommitView, type ProfileNotesCommitReceipt } from '@/packages/patient-profile-contracts/src/notes-commit';
+import { confirmationPinError, isValidConfirmationPin, validateConfirmationPinSubmission } from '@/lib/security/pin-input';
 
 type Mode = 'review-only' | 'commit';
 type Prepared = ProfileReviewView | ProfileNotesCommitView;
@@ -58,6 +59,8 @@ export function PatientProfileNotesReview({ patientId, mode }: Readonly<{ patien
     const [scoped, setScoped] = useState<ScopedValue>({ patientId, userId: user?.id, signal, mode, value: { kind: 'loading' } });
     const [pin, setPin] = useState('');
     const [attempt, setAttempt] = useState(0);
+    const [pinSubmitError, setPinSubmitError] = useState<string | null>(null);
+    const pinError = confirmationPinError(pin) ?? pinSubmitError;
     const generation = useRef(0);
     const pending = useRef<AbortController | null>(null);
     const activeReview = useRef<Prepared | null>(null);
@@ -66,7 +69,7 @@ export function PatientProfileNotesReview({ patientId, mode }: Readonly<{ patien
     const value: Value = current ? scoped.value : unavailable;
     const setValue = (next: Value) => setScoped({ patientId, userId: user?.id, signal, mode, value: next });
     const retire = () => {
-        generation.current++; pending.current?.abort(); pending.current = null; setPin('');
+        generation.current++; pending.current?.abort(); pending.current = null; setPin(''); setPinSubmitError(null);
         const review = activeReview.current; activeReview.current = null;
         if (review && !signal.aborted) void requestReview(endpoint, { kind: 'cancel', reference: review.reference }, signal).catch(() => undefined);
     };
@@ -163,9 +166,11 @@ export function PatientProfileNotesReview({ patientId, mode }: Readonly<{ patien
         } catch { if (token === generation.current) setValue({ kind: 'recover', expected }); }
     }
     async function confirm(view: Prepared) {
+        const pinProblem = validateConfirmationPinSubmission(pin);
+        if (pinProblem) { setPinSubmitError(pinProblem); return; }
         if (!current || value.kind !== 'review' || activeReview.current !== view || Date.now() >= view.expiresAt) return;
         activeReview.current = null;
-        const candidatePin = pin; setPin(''); setValue({ kind: 'pending' });
+        const candidatePin = pin; setPin(''); setPinSubmitError(null); setValue({ kind: 'pending' });
         const token = generation.current;
         const operationSignal = AbortSignal.any([signal, pending.current?.signal ?? AbortSignal.abort()]);
         try {
@@ -228,10 +233,13 @@ export function PatientProfileNotesReview({ patientId, mode }: Readonly<{ patien
             </div>
             <p>{mode === 'commit' ? 'Verifica il paziente e il contenuto completo. Per salvare, inserisci nuovamente il tuo PIN.'
                 : 'Leggi il contenuto completo. Per confermare questa prova, inserisci nuovamente il tuo PIN.'}</p>
-            <label className="block">PIN di conferma<input className="mf-input mt-2" type="password" inputMode="numeric"
-                autoComplete="off" value={pin} onChange={event => setPin(event.target.value)} /></label>
+            <label className="block">PIN di conferma<input className="mf-input mt-2" type="password" inputMode="text"
+                autoComplete="off" aria-invalid={Boolean(pinError)} value={pin} onChange={event => {
+                    setPin(event.target.value); setPinSubmitError(null);
+                }} /></label>
+            {pinError ? <p role="alert">{pinError}</p> : null}
             <div className="flex flex-wrap gap-3">
-                <Button disabled={!pin} onClick={() => void confirm(value.view)}>{mode === 'commit' ? 'Conferma e salva le note' : 'Conferma la prova senza salvare'}</Button>
+                <Button disabled={!isValidConfirmationPin(pin)} onClick={() => void confirm(value.view)}>{mode === 'commit' ? 'Conferma e salva le note' : 'Conferma la prova senza salvare'}</Button>
                 <Button variant="secondary" onClick={() => { retire(); setValue(unavailable); }}>Annulla la revisione</Button>
             </div>
         </> : null}

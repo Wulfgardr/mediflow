@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { sealDiaryEntry } from './fixtures/sealed-diary-entry';
 import { assertNoHorizontalOverflow, bootstrapUnlockedSession, openPatientSection } from './utils';
 
 test('due rettifiche e rilettura selettiva nella scheda del paziente', async ({ page }, info) => {
@@ -97,4 +98,56 @@ test('due rettifiche e rilettura selettiva nella scheda del paziente', async ({ 
         expect(row.correctedBy).toBeTruthy();
     }
     expect(backup.containsPlainText).toBe(false);
+});
+
+test('rettifica note già registrate con formattazione o testo semplice', async ({ page }) => {
+    test.setTimeout(150_000);
+    await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+    const patientId = await page.evaluate(async () => {
+        const response = await fetch('/api/patients', {
+            method: 'POST', headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ firstName: 'Formato', lastName: 'Paziente sintetico', birthDate: '1980-01-01', taxCode: crypto.randomUUID() }),
+        });
+        if (!response.ok) throw new Error(`Synthetic patient: ${response.status}`);
+        return (await response.json()).id as string;
+    });
+
+    const plainText = 'PA <120 e A & B\n**Controllo sintetico**';
+    const notes = [
+        { title: 'Nota formattata', content: '<p data-fixture="remove"><strong>Controllo sintetico</strong> <mark>rivisto</mark></p>' },
+        { title: 'Nota semplice', content: plainText },
+    ];
+    for (const note of notes) {
+        const body = await sealDiaryEntry(page, { ...note, patientId, type: 'visit', setting: 'ambulatory', date: new Date().toISOString() });
+        const status = await page.evaluate(async entry => (await fetch('/api/entries', {
+            method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(entry),
+        })).status, body);
+        expect(status).toBe(201);
+    }
+
+    await page.goto(`/patients/${patientId}/modules`);
+    await openPatientSection(page, 'diario');
+    const row = (title: string) => page.locator('#diario article').filter({ hasText: title });
+    const rich = row(notes[0].title);
+    await rich.getByRole('button', { name: 'Rettifica', exact: true }).click();
+    const richEditor = rich.getByRole('textbox', { name: 'Testo della rettifica' });
+    await expect(richEditor.locator('strong')).toHaveText('Controllo sintetico');
+    await expect(richEditor.locator('mark, [data-fixture]')).toHaveCount(0);
+    await rich.getByRole('button', { name: 'Annulla', exact: true }).click();
+
+    const plain = row(notes[1].title);
+    await plain.getByRole('button', { name: 'Rettifica', exact: true }).click();
+    const plainEditor = plain.getByRole('textbox', { name: 'Testo della rettifica' });
+    expect(await plainEditor.innerText()).toBe(plainText);
+    await plainEditor.focus();
+    await plainEditor.evaluate(element => {
+        window.getSelection()?.selectAllChildren(element);
+        window.getSelection()?.collapseToEnd();
+    });
+    await page.keyboard.insertText(' rivisto');
+    await plain.getByRole('button', { name: 'Salva rettifica', exact: true }).click();
+    await expect(plain).toContainText('PA <120 e A & B');
+    await expect(plain).toContainText('Controllo sintetico rivisto');
+    await plain.getByRole('button', { name: 'Rettifica', exact: true }).click();
+    expect(await plainEditor.innerText()).toBe(plainText + ' rivisto');
 });
