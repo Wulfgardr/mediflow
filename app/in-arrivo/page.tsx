@@ -2,6 +2,7 @@
 
 import { useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
+import { taxCodeBirthDetails } from '@/lib/patient-identity';
 import { useSecurity } from '@/components/security-provider';
 import { agentIncomingSnapshot, agentIncomingServerSnapshot, subscribeAgentIncoming, refreshAgentIncoming, applyReviewedAgentVisits, readIncomingAgentPdf } from '@/lib/agent-incoming';
 import { agentVisitAwaitsReview, type AgentVisitReview } from '@/lib/agent-visit-review';
@@ -117,22 +118,23 @@ function UnlockedIncoming() {
             const actionMessagesId = `visita-${visit.cassette.id}-esito`;
             const isApplicable = applicable.includes(review);
             const fiscalCode = typeof visit.anchor.fiscalCode === 'string' ? visit.anchor.fiscalCode : null;
+            const birth = review.newPatient && taxCodeBirthDetails(review.newPatient.taxCode);
             const statusText = visit.cassette.status !== 'closed'
                 ? 'Deposito in corso'
-                : allBlockers.length > 0
-                ? 'Da verificare'
-                : 'Pronta da applicare';
+                : isApplicable
+                ? 'Pronta da applicare'
+                : 'Da verificare';
             const statusColor = visit.cassette.status !== 'closed'
                 ? 'var(--lume-ink-muted)'
-                : allBlockers.length > 0
-                ? 'var(--lume-signal-warning)'
-                : 'var(--lume-signal-success)';
+                : isApplicable
+                ? 'var(--lume-signal-success)'
+                : 'var(--lume-signal-warning)';
 
             return <section key={visit.cassette.id} className="space-y-5 rounded-xl border border-[var(--lume-rule)] bg-[var(--lume-surface-field)] p-5" aria-label={'Visita ' + visit.cassette.id}>
                 <header className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--lume-rule)] pb-4">
                     <div className="space-y-1">
                         <div className="flex flex-wrap items-center gap-2">
-                            {review.patient ? (
+                            {review.patient && (review.patient.firstName || review.patient.lastName) ? (
                                 <h2 className="[font:var(--type-person-preview)]">
                                     {review.patient.lastName} {review.patient.firstName}
                                 </h2>
@@ -144,7 +146,7 @@ function UnlockedIncoming() {
                             </span>
                         </div>
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 [font:var(--type-meta)] text-[var(--lume-ink-muted)]">
-                            {review.patient && fiscalCode ? <span className="[font:var(--type-code)]">{fiscalCode}</span> : null}
+                            {review.patient && (review.patient.firstName || review.patient.lastName) && fiscalCode ? <span className="[font:var(--type-code)]">{fiscalCode}</span> : null}
                             <span>{visit.cassette.status === 'closed' ? 'Visita chiusa' : 'Deposito in corso'}</span>
                             <span>Depositata {formatDepositTime(visit.cassette.depositedAt)}</span>
                             <span>
@@ -259,6 +261,10 @@ function UnlockedIncoming() {
                 })}
 
                 <footer className="space-y-3 border-t border-[var(--lume-rule)] pt-4">
+                    {isApplicable && review.newPatient && <p className="[font:var(--type-meta)]">
+                        Applicando questa visita crei anche la scheda del paziente.
+                        {birth && ` Sesso nel CF: ${birth.sex}.`}
+                    </p>}
                     {actionMessages.length > 0 && (
                         <div id={actionMessagesId} className="space-y-1.5 rounded-lg border border-[var(--lume-signal-critical)] p-3">
                             {actionMessages.map((message, index) => <p role="alert" key={index} className="[font:var(--type-body)] text-[var(--lume-signal-critical)]">{message}</p>)}

@@ -2,13 +2,15 @@ import { createHash } from 'node:crypto';
 import { normalizeTherapyCreateInput, normalizeObservationCreateInput } from './api-v1-clinical-write-normalization';
 import { and, eq } from 'drizzle-orm';
 import { dbServer } from './db-server';
-import { patients, auditEvents, therapies, observations, servicePrescriptions } from './schema';
+import { patients, auditEvents, therapies, observations, servicePrescriptions, ambulatories, patientsToAmbulatories, patientRetiredIds } from './schema';
 import { activePatients } from './patient-lifecycle';
+import { hasPatientIdentifierConflict } from './patient-identifier-conflict';
+import { birthDateMatchesTaxCode, isValidItalianTaxCode } from './patient-identity';
 import { createAgentRegistrationStore } from './agent-registration-store';
 import { createAgentMandateStore } from './agent-mandate-store';
 import { AGENT_CASSETTE_COMPLETE, readAgentCassette } from './agent-cassette-store';
 import { AGENT_ITEM_OPERATION, cassetteItems } from './agent-cassette-contract';
-import { agentApplicationSchema, type AgentApplication, type AgentApplicationReceipt } from './agent-visit-application-contract';
+import { agentApplicationSchema, reviewedAgentApplicationSchema, type AgentApplicationReceipt } from './agent-visit-application-contract';
 import { createEntryOperationInTransaction } from './entry-write-operation';
 import { createTherapyOperationInTransaction } from './therapy-write-operation';
 import { createObservationOperationInTransaction } from './observation-write-operation';
@@ -45,18 +47,19 @@ export function agentAppliedItemIds(visitId: string): string[] {
     return [...new Set(dbServer.select({ id: auditEvents.subjectRef }).from(auditEvents).where(and(eq(auditEvents.eventType, 'agent.item.applied'),
         eq(auditEvents.requestId, visitId), eq(auditEvents.outcome, 'success'), eq(auditEvents.sourceSurface, 'agent'))).all().flatMap(row => row.id ? [row.id] : []))];
 }
-export function applyAgentVisit(request: Request, session: ServerSession, value: unknown): AgentApplicationReceipt {
-    return commitAgentVisit(request, session, value);
+export function applyAgentVisit(request: Request, session: ServerSession, value: unknown, selectedAmbulatoryId?: string | null): AgentApplicationReceipt {
+    return commitAgentVisit(request, session, value, undefined, selectedAmbulatoryId);
 }
 
 export function applyConfirmedAgentVisit(request: Request, session: ServerSession, value: unknown, confirmation: NativeConfirmation): AgentApplicationReceipt {
     return commitAgentVisit(request, session, value, confirmation);
 }
 
-function commitAgentVisit(request: Request, session: ServerSession, value: unknown, confirmation?: NativeConfirmation): AgentApplicationReceipt {
-    const parsed = agentApplicationSchema.safeParse(value);
+function commitAgentVisit(request: Request, session: ServerSession, value: unknown, confirmation?: NativeConfirmation, selectedAmbulatoryId?: string | null): AgentApplicationReceipt {
+    const parsed = reviewedAgentApplicationSchema.safeParse(value);
     if (!parsed.success) throw new AgentApplicationDenied(409);
-    const input: AgentApplication = parsed.data;
+    const input = parsed.data;
+    if (confirmation && !agentApplicationSchema.safeParse(value).success) throw new AgentApplicationDenied(409);
     const fingerprint = createHash('sha256').update(JSON.stringify(input)).digest('hex');
     const normalizedValues = <T,>(result: { ok: true; values: T } | { ok: false; error: string }): T => {
         if (!result.ok) throw new AgentApplicationDenied(409);
@@ -115,11 +118,29 @@ function commitAgentVisit(request: Request, session: ServerSession, value: unkno
             return { visitId: cassette.id, phase: input.phase, status: 'applied', eventId: replay.eventId, itemCount: selected.length,
                 patientVersion: metadata.resourceVersion, modelProvider: cassette.modelProvider, allowsClinicalEgress: Boolean(cassette.allowsClinicalEgress) };
         }
+        const audit: RequiredAuditContext = { actorType: 'user', actorRef: session.userId, sourceSurface: 'agent', archiveGeneration: generation,
+            agentProvenance: provenance, requestId: cassette.id, flags: [input.phase, ...confirmationFlags] };
+        if (input.newPatient) {
+            const { taxCode, birthDate, ambulatoryId } = input.newPatient;
+            const target = selectedAmbulatoryId
+                ? tx.select({ id: ambulatories.id }).from(ambulatories).where(eq(ambulatories.id, selectedAmbulatoryId)).get()
+                : tx.select({ id: ambulatories.id }).from(ambulatories).where(eq(ambulatories.isDefault, true)).get();
+            const id = input.patientId;
+            if (selectedAmbulatoryId === undefined || target?.id !== ambulatoryId || id !== cassette.id || input.expectedVersion !== 1
+                || appliedIds.length || !selected.some(item => item.kind === 'pdf') || !isValidItalianTaxCode(taxCode)
+                || (birthDate && !birthDateMatchesTaxCode(taxCode, birthDate))
+                || tx.select({ id: patientRetiredIds.id }).from(patientRetiredIds).where(eq(patientRetiredIds.id, id)).get()
+                || tx.select({ id: patients.id }).from(patients).where(eq(patients.id, id)).get()
+                || hasPatientIdentifierConflict(tx, { id, ambulatoryId, taxCode, identifierType: 'cf' })) throw new AgentApplicationDenied(409);
+            tx.insert(patients).values({ id, firstName: '', lastName: '', taxCode, identifierType: 'cf', ambulatoryId,
+                birthDate: birthDate ? new Date(birthDate) : null, birthDatePrecision: birthDate ? 'exact' : 'unknown' }).run();
+            tx.insert(patientsToAmbulatories).values({ patientId: id, ambulatoryId }).run();
+            writeAuditEventInTransaction(tx, { ...audit, eventType: 'patient.created', outcome: 'success', subjectType: 'patient', subjectRef: id,
+                redactedMetadata: { flags: audit.flags, resourceVersion: 1 } });
+        }
         const patient = tx.select().from(patients).where(and(eq(patients.id, input.patientId), activePatients())).get();
         if (!patient || patient.isArchived) throw new AgentApplicationDenied(404);
         if (patient.version !== input.expectedVersion) throw new AgentApplicationDenied(409);
-        const audit: RequiredAuditContext = { actorType: 'user', actorRef: session.userId, sourceSurface: 'agent', archiveGeneration: generation,
-            agentProvenance: provenance, requestId: cassette.id, flags: [input.phase, ...confirmationFlags] };
         let version = input.expectedVersion;
         for (const item of input.items) {
             const base = { id: item.id, patientId: input.patientId };
