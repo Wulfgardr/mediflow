@@ -15,7 +15,7 @@
 import { clinicalFactContext, contextHeading, contextReview, isHistoricalTherapy, legacyIcdPattern, legacySectionNegation, negationCues, structuredContextApplies, suspensionHeadings } from './clinical-context-lexicon';
 import { routeDocumentClass, parseFileNameHints } from './document-class-router';
 import type { DocumentDecisionClassification } from './document-decision';
-import { hasPhysicianTaxCodeStamp, isValidItalianTaxCodeChecksum, resolveDocumentTaxCodeRoles } from './document-identity-resolution';
+import { hasPhysicianTaxCodeStamp, isValidItalianTaxCodeChecksum, resolveDocumentTaxCodeRoles, whiteElectronicPrescriberEvidence } from './document-identity-resolution';
 import { parseItalianLabReport } from './lab-report-parser';
 import {
     catalogObservationCode, findInvalidityMentions, findIsoCode, findPrescriptionReference, findPriority, findScaleMentions, invalidityDetails,
@@ -321,6 +321,7 @@ function professionalOccurrenceScope(prefix: string, suffix = ''): DossierProfes
 export function collectDossierTaxCodes(text: string): DossierTaxCodeEvidence[] {
     const resolved = resolveDocumentTaxCodeRoles({ text });
     const paperPrescription = PAPER_PRESCRIPTION_HEADING.test(text.trimStart());
+    const whitePrescriptionEvidence = whiteElectronicPrescriberEvidence(text);
     const seen = new Set<string>();
     const result: DossierTaxCodeEvidence[] = [];
     for (const code of resolved.taxCodes) {
@@ -328,6 +329,7 @@ export function collectDossierTaxCodes(text: string): DossierTaxCodeEvidence[] {
         const canReadStamp = paperPrescription && code.role === 'physician_cf' && code.confidence === 'high'
             && resolved.taxCodes.every(other => other.value !== code.value || other.role === 'physician_cf');
         const scopes = occurrences.map(match => {
+            if (code.role === 'prescriber_cf' && whitePrescriptionEvidence.has(match.index!)) return 'prescriber_block' as const;
             const prefix = text.slice(0, match.index!);
             const suffix = text.slice(match.index! + match[0].length);
             return professionalOccurrenceScope(prefix, suffix)

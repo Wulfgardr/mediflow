@@ -172,6 +172,34 @@ function inferRole(context: string, taxCodeStart: number, taxCodeEnd: number): P
 }
 
 const HORIZONTAL_SPACE = String.raw`[ \t\u00a0]`;
+const WHITE_ELECTRONIC_PRESCRIPTION_HEADER = /^(?:prescrizione di farmaci non a carico del SSN[ \t]+[-–][ \t]+)?ricetta bianca elettronica(?:[ \t]+[-–][ \t]+promemoria per il paziente)?[ \t]*(?:\r?\n|$)/iu;
+const WHITE_ELECTRONIC_PRESCRIBER_BLOCK = new RegExp(
+    String.raw`^[ \t]*cognome e nome del medico:[ \t]+[\p{L} .'’-]{1,120}?[ \t]{2,}codice fiscale[ \t]*:?\r?\n`
+    + String.raw`[ \t]*indirizzo dello studio e numero di telefono:[^\r\n]*\r?\n`
+    + String.raw`(?:[^\r\n:]+[ \t]+tel\.[^\r\n]*\r?\n)?`
+    + String.raw`[ \t]*specializzazione:[^:\r\n]{0,120}?[ \t]{2,}(${ITALIAN_TAX_CODE_REGEX.source})[ \t]*$`,
+    'gimu',
+);
+
+export function whiteElectronicPrescriberEvidence(text: string): ReadonlyMap<number, string> {
+    const evidence = new Map<number, string>();
+    let pageOffset = 0;
+    for (const page of text.split('\f')) {
+        if (WHITE_ELECTRONIC_PRESCRIPTION_HEADER.test(page.trimStart())) {
+            const [block, secondBlock] = page.matchAll(WHITE_ELECTRONIC_PRESCRIBER_BLOCK);
+            if (block && !secondBlock) {
+                const [snippet, value] = block;
+                const [code, secondCode] = snippet.matchAll(ITALIAN_TAX_CODE_REGEX);
+                if (code && !secondCode && isValidItalianTaxCode(value)) {
+                    evidence.set(pageOffset + block.index + code.index, normalizeText(snippet));
+                }
+            }
+        }
+        pageOffset += page.length + 1;
+    }
+    return evidence;
+}
+
 const GENERIC_TAX_CODE_PREFIX = String.raw`(?:codice${HORIZONTAL_SPACE}+fiscale|c\.?${HORIZONTAL_SPACE}*f\.?)${HORIZONTAL_SPACE}*[:=]?${HORIZONTAL_SPACE}*`;
 const GENERIC_TAX_CODE_LINE = new RegExp(`^${GENERIC_TAX_CODE_PREFIX}$`, 'iu');
 const STAMP_NAME_WORD = String.raw`\p{L}{1,24}(?:['’-]\p{L}{1,24})?`;
@@ -214,6 +242,7 @@ export function resolveDocumentTaxCodeRoles(
     const sourceId = input.sourceId ?? 'document';
     const contextWindow = input.contextWindow ?? 90;
     const matches = Array.from(input.text.matchAll(ITALIAN_TAX_CODE_REGEX));
+    const whitePrescriptionEvidence = whiteElectronicPrescriberEvidence(input.text);
     const evidenceRefs: DocumentDecisionEvidenceRef[] = [];
     const taxCodes: DocumentDecisionTaxCodeRole[] = [];
     const seen = new Set<string>();
@@ -232,7 +261,9 @@ export function resolveDocumentTaxCodeRoles(
         const evidenceId = `tax-code:${taxCodes.length + 1}`;
         const inferred = inferRole(context.snippet, context.taxCodeStart, context.taxCodeEnd);
         const stamp = inferred.confidence !== 'high' && hasPhysicianTaxCodeStamp(input.text.slice(Math.max(0, minLeft - 1), start));
-        const role = stamp ? { role: 'physician_cf', confidence: 'high' } as const
+        const prescriberEvidence = inferred.confidence !== 'high' ? whitePrescriptionEvidence.get(start) : undefined;
+        const role = prescriberEvidence ? { role: 'prescriber_cf', confidence: 'high' } as const
+            : stamp ? { role: 'physician_cf', confidence: 'high' } as const
             : inferred.role === 'unknown_cf' ? (inferPatientSectionFallback(input.text, start, minLeft) ?? inferred)
                 : inferred;
 
@@ -245,7 +276,7 @@ export function resolveDocumentTaxCodeRoles(
 
         if (seen.has(`${value}:${role.role}`)) continue;
         seen.add(`${value}:${role.role}`);
-        evidenceRefs.push(createDocumentDecisionEvidenceRef(evidenceId, context.snippet, sourceId));
+        evidenceRefs.push(createDocumentDecisionEvidenceRef(evidenceId, prescriberEvidence ?? context.snippet, sourceId));
         taxCodes.push({
             value,
             identifierType,
