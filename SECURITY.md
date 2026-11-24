@@ -105,7 +105,11 @@ esplicito registra `patient.restored`.
 
 Poiché i pazienti rimossi logicamente restano nei backup, una richiesta di
 erasure deve comprendere anche gli artefatti già esportati. La purge non li
-raggiunge.
+raggiunge. Nel ripristino portabile la destinazione conserva il registro dei
+ritiri ed esclude i fascicoli già cancellati. L’anteprima e la ricevuta
+indicano quanti ne ha esclusi. Il ripristino si ferma se la copia altererebbe
+dati soggetti a un blocco di conservazione o se un deposito o lo storico
+potrebbero riportare contenuto clinico di un fascicolo ritirato.
 
 ### Chiavi, passphrase e recupero
 
@@ -193,7 +197,14 @@ non un accesso remoto generale. Restano valide le seguenti condizioni:
 - `/api/v1/network/patients/{id}/observations*` richiede capability osservazioni
   dedicate, sessione operatore e `observations.version`. Abilita solo
   create/update/soft-delete delle osservazioni LOINC/UCUM
-- restano esclusi cancellazione fisica remota, scritture remote di allegati/documenti, cataloghi, sincronizzazione per record, campi AI/documentali e ripieghi automatici su percorsi alternativi
+- per creare un allegato per un paziente del proprio ambulatorio, il dispositivo
+  abbinato usa la sessione operatore e la capability `network.replica.write-documents`.
+  Nome, percorso e contenuto del file devono essere cifrati. La lettura richiede
+  la capability distinta `network.replica.readonly-documents`. Modifica e
+  cancellazione degli allegati si eseguono sul Web locale. [ADR 0076](./docs/adr/0076-paired-document-domain-write-policy.md)
+- restano esclusi cancellazione fisica remota, cataloghi, sincronizzazione per
+  record, scrittura dei campi AI o derivati dai documenti e ripieghi automatici
+  su percorsi alternativi
 
 ### Lockout autenticazione PIN
 
@@ -310,7 +321,7 @@ conserva ordine, provenienza e hash ed è pubblicato soltanto se la sorgente
 è ancora corrente. Errori, formati ambigui, documenti cifrati e motori
 indisponibili fermano il percorso. La qualifica GPUI riguarda il client
 installato sul Mac fissato dal contratto. Queste policy appartengono ai
-worker del runtime Web. Vedi [ADR 0196](docs/adr/0196-document-child-platform-boundary.md).
+worker del runtime Web. Vedi [ADR 0198](docs/adr/0198-document-child-platform-boundary.md).
 
 DeepSeek-OCR 2/CUDA, benchmark di qualifica e readiness universale hanno stato
 `OUT_OF_SCOPE_FOR_0.8.5_NON_BLOCKING`. Le route OCR legacy, dopo

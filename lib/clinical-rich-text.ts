@@ -34,7 +34,7 @@ const HTML_ENTITY_MAP: Record<string, string> = {
     '&#39;': "'",
 };
 
-function decodeHtmlEntities(value: string): string {
+export function decodeClinicalRichTextEntities(value: string): string {
     return value.replace(/&(nbsp|amp|lt|gt|quot|#39);/g, (entity) => HTML_ENTITY_MAP[entity] ?? entity);
 }
 
@@ -87,7 +87,7 @@ export function clinicalRichTextToPlainText(value: string | null | undefined): s
 
     const normalized = isClinicalRichTextHtml(input) ? sanitizeClinicalRichTextHtml(input) : input;
 
-    return decodeHtmlEntities(
+    return decodeClinicalRichTextEntities(
         normalized
             .replace(/<br>/gi, '\n')
             .replace(/<li>/gi, '\n- ')

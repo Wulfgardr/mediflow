@@ -27,7 +27,7 @@ export const CONTRACT = [
     record('lib/backup-restore-executor.ts', 'restore-clear-binding', '88772d371f093518', 1),
     record('lib/backup-restore-executor.ts', 'restore-delete', '1a219fd82037778f', 1),
     record('lib/backup-restore-executor.ts', 'restore-insert-binding', '7142914480386ef9', 1),
-    record('lib/backup-restore-executor.ts', 'restore-insert', '22d0440fcf60801b', 1),
+    record('lib/backup-restore-executor.ts', 'restore-insert', '86c21e4f4c0d941a', 1),
     record('lib/backup-restore-executor.ts', 'restore-table-binding', '5c2f6f3f599e2f3e', 1),
     record('lib/sqlite-schema.ts', 'raw-insert-into', 'ad4d3f978bf6eeb3', 1, 'migration'),
     record('lib/patient-document-create-command.ts', 'orm-insert', '36203f9803dd0370', 1),

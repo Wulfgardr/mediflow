@@ -11,7 +11,7 @@ export function ensureAgentMandateSchema(sqlite: Database.Database): void {
         public_key TEXT NOT NULL,
         wrapped_private_key TEXT NOT NULL CHECK (wrapped_private_key GLOB 'ENC:*'),
         created_at INTEGER NOT NULL,
-        expires_at INTEGER NOT NULL CHECK (expires_at > created_at AND expires_at <= created_at + 43200000),
+        expires_at INTEGER NOT NULL CHECK (expires_at > created_at AND expires_at <= created_at + 86400000),
         revoked_at INTEGER,
         CHECK (provider != 'local' OR allows_clinical_egress = 0),
         CHECK (revoked_at IS NULL OR revoked_at >= created_at)

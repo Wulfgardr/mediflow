@@ -1,0 +1,19 @@
+{
+  "syncCommit": "be96ee535",
+  "tool": {
+    "release": "v1.7.4",
+    "url": "https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar",
+    "sha256": "936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88",
+    "verifier": {
+      "name": "TLC",
+      "version": "2.19"
+    }
+  },
+  "files": {
+    "lib/security/ambulatory-destructive-service.ts": "9400582205544124d3d9b097b15780807d930190a84aada65867797d3edb0c41",
+    "lib/security/web-auth-control-transport.ts": "5a5821dcdb96b101605f1bc7846ed832a91ad03205bf4843efdd53ad6e52fb1f",
+    "docs/formal/ambulatory-destructive-flow/AmbulatoryDestructiveFlow.tla": "d7ea81006f9fca1ddd09504cdf69c045ac9e67e33a5e61500648db278d83962f",
+    "docs/formal/ambulatory-destructive-flow/MC.cfg": "8685fbab083bd8f40898fcf8cfeaae6e63aff260fdd39f35a7eeed7b863282bf"
+  },
+  "filesSha256": "c9ef9a6477a2cafbb1f7e7111f7feeb71a36b7177b5eab44e6b08f1a3de1bb82"
+}

@@ -16,9 +16,10 @@ const LINE_COMMENT = new Map([
 const BLOCK_START = /^\s*\/\*(?!\*)/;
 const DOC_BLOCK = /^\s*\/\*\*/;
 const BLOCK_CONTINUATION = /^\s*\*(?!\/)/;
+const FORBIDDEN_MARKER = /@Codex\b/i;
 const ALLOWED = /SPDX-License-Identifier|Copyright|License|prettier-ignore|https?:\/\/|(eslint-disable\S*|@ts-expect-error|#\[allow\(|swiftlint:disable|noqa|type: ignore).*(--|reason:)\s*\S/i;
 
-export const GUIDANCE = 'Commenti aggiunti non ammessi. Rendi ovvio il codice (nome, estrazione, tipo, architettura) '
+export const GUIDANCE = 'Commenti aggiunti o marcatori @Codex non ammessi. Rendi ovvio il codice (nome, estrazione, tipo, architettura) '
     + 'o codifica il vincolo in un test o in un lint, poi togli il commento. Ammessi: licenze, doc comment '
     + 'di API pubbliche, vincoli esterni con link alla fonte, prettier-ignore, soppressioni con motivo dopo `--`.';
 
@@ -118,7 +119,8 @@ function typescriptCommentLines(file, source) {
         for (let kind = scanner.scan(); kind !== ts.SyntaxKind.EndOfFileToken; kind = scanner.scan()) {
             if (kind !== ts.SyntaxKind.SingleLineCommentTrivia && kind !== ts.SyntaxKind.MultiLineCommentTrivia) continue;
             const comment = scanner.getTokenText();
-            if (DOC_BLOCK.test(comment) || comment.startsWith('///') || ALLOWED.test(comment)) continue;
+            const hasForbiddenMarker = FORBIDDEN_MARKER.test(comment);
+            if (!hasForbiddenMarker && (DOC_BLOCK.test(comment) || comment.startsWith('///') || ALLOWED.test(comment))) continue;
 
             const firstLine = ast.getLineAndCharacterOfPosition(scanner.getTokenPos()).line;
             const lastLine = ast.getLineAndCharacterOfPosition(scanner.getTextPos() - 1).line;
@@ -127,7 +129,14 @@ function typescriptCommentLines(file, source) {
     }
 
     function visit(node) {
-        if (ts.isJSDoc(node)) return;
+        if (ts.isJSDoc(node)) {
+            if (FORBIDDEN_MARKER.test(node.getText(ast))) {
+                const firstLine = ast.getLineAndCharacterOfPosition(node.getStart(ast)).line;
+                const lastLine = ast.getLineAndCharacterOfPosition(node.end - 1).line;
+                for (let line = firstLine; line <= lastLine; line += 1) lines.add(line + 1);
+            }
+            return;
+        }
         const children = node.getChildren(ast);
         if (children.length > 0) {
             children.forEach(visit);
@@ -157,7 +166,9 @@ export function findNewComments(repo, base) {
             continue;
         }
         const kind = commentKind(file, text);
-        if (kind === null || kind === 'doc') continue;
+        if (kind === null) continue;
+        if (FORBIDDEN_MARKER.test(text)) { report(); continue; }
+        if (kind === 'doc') continue;
         if (kind === 'continuation' && insideDocBlock(readSource(revision, file).split('\n'), lineNumber)) continue;
         if (!ALLOWED.test(text)) report();
     }

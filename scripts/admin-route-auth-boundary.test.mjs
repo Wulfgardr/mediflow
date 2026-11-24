@@ -64,9 +64,15 @@ test('backup restore rejects cross-port and text/plain transport before prefligh
         import { registerHooks } from 'node:module';
         const routeUrl = ${JSON.stringify(routeUrl)};
         const verifyUrl = ${JSON.stringify(verifyUrl)};
+        const blockedUrl = ${JSON.stringify(pathToFileURL(path.join(ROOT, 'lib/backup-restore-blocked.ts')).href)};
+        const responseUrl = ${JSON.stringify(pathToFileURL(path.join(ROOT, 'app/api/system/backup-restore/blocked-restore-response.ts')).href)};
+        globalThis.SyntheticBlockedError = (await import(blockedUrl)).BackupRestoreBlockedError;
         const modules = new Map([
+            ['@/lib/backup-restore-blocked', blockedUrl],
+            ['./blocked-restore-response', responseUrl],
+            ['../blocked-restore-response', responseUrl],
             ['@/lib/server-error-log', ${JSON.stringify(toDataModule(`export { logServerError } from ${JSON.stringify(pathToFileURL(path.join(ROOT, 'lib/server-error-log.ts')).href)};`))}],
-            ['@/lib/backup-restore-receipt', ${JSON.stringify(toDataModule("export function parseRestoreIntent() { return { id: 'synthetic', expectedSnapshot: 'a'.repeat(64), expectedSourceChecksum: 'b'.repeat(64) }; } export function readRestorePreviewSnapshot() { return 'a'.repeat(64); }"))}],
+            ['@/lib/backup-restore-receipt', ${JSON.stringify(toDataModule("export function parseRestoreIntent() { return { id: 'synthetic', expectedSnapshot: 'a'.repeat(64), expectedSourceChecksum: 'b'.repeat(64) }; } export function readRestorePreview() { return { expectedSnapshot: 'a'.repeat(64), excludedRetiredPatients: 0 }; }"))}],
             ['@/lib/security/loopback-ingress.mjs', ${JSON.stringify(toDataModule("export function isLocalClientSession() { return false; }"))}],
             ['next/server', ${JSON.stringify(toDataModule("export const NextResponse = Response;"))}],
             ['@/lib/db-server', ${JSON.stringify(toDataModule("export const dbServer = { transaction() { globalThis.dbCalls = (globalThis.dbCalls ?? 0) + 1; throw new Error('database touched'); } };"))}],
@@ -91,14 +97,15 @@ test('backup restore rejects cross-port and text/plain transport before prefligh
             ['@/lib/backup-artifact', ${JSON.stringify(toDataModule("export const BACKUP_COLLECTIONS = Object.freeze([]); export function backupArtifactInputChecksum() { return 'b'.repeat(64); } export async function serializeBackupArtifact() { return '{}'; }"))}],
             ['@/lib/backup-patient-ambulatory-links', ${JSON.stringify(toDataModule("export function enrichBackupPatientsWithAmbulatoryLinks(rows) { return rows; }"))}],
             ['@/lib/backup-restore-preflight', ${JSON.stringify(toDataModule("export async function runBackupRestorePreflight() { globalThis.preflightCalls = (globalThis.preflightCalls ?? 0) + 1; return { artifact: { format: 'mediflow-backup', version: 1, manifest: { recordCounts: {} } }, result: { ok: true } }; }"))}],
-            ['@/lib/backup-restore-executor', ${JSON.stringify(toDataModule("export class BackupRestoreBlockedError extends Error { constructor(reason, detail) { super(detail); this.reason = reason; } } export function restoreBackupArtifact(_artifact, fence) { globalThis.restoreCalls = (globalThis.restoreCalls ?? 0) + 1; if (globalThis.blockRestore) throw new BackupRestoreBlockedError('audit', 'synthetic block'); fence(); }"))}],
+            ['@/lib/backup-restore-executor', ${JSON.stringify(toDataModule("export function restoreBackupArtifact(_artifact, fence) { globalThis.restoreCalls = (globalThis.restoreCalls ?? 0) + 1; if (globalThis.blockRestore) throw new globalThis.SyntheticBlockedError('audit', 'synthetic block'); fence(); }"))}],
             ['@/lib/api-error-response', ${JSON.stringify(toDataModule("export function archiveReplacementResponse() { return null; } export function apiFailure(code, error, status) { const response = Response.json({ error, code }, { status }); response.headers.set('Cache-Control', 'no-store'); return response; } export function apiInternalError() { return Response.json({ error: 'internal' }, { status: 500 }); }"))}],
             ['@/lib/security/headless-checkup-status-transition-web-production', ${JSON.stringify(toDataModule("export function disposeCheckupStatusTransitionForHostV1() { globalThis.fenceCalls = (globalThis.fenceCalls ?? 0) + 1; return true; }"))}],
             ['@/lib/security/request-transport', ${JSON.stringify(toDataModule(`export { isTrustedWebMutationRequest } from ${JSON.stringify(transportUrl)};`))}],
         ]);
         registerHooks({ resolve(specifier, context, nextResolve) {
-            if ((context.parentURL === routeUrl || context.parentURL === verifyUrl) && modules.has(specifier)) {
-                return { shortCircuit: true, url: modules.get(specifier), format: 'module' };
+            if ((context.parentURL === routeUrl || context.parentURL === verifyUrl || context.parentURL === responseUrl) && modules.has(specifier)) {
+                const url = modules.get(specifier);
+                return url.startsWith('file:') ? { shortCircuit: true, url } : { shortCircuit: true, url, format: 'module' };
             }
             return nextResolve(specifier, context);
         } });
@@ -133,7 +140,7 @@ test('backup restore rejects cross-port and text/plain transport before prefligh
         }));
         const blockedObserved = { status: blocked.status, cacheControl: blocked.headers.get('cache-control'), body: await blocked.json() };
         const blockedExpected = { status: 409, cacheControl: 'no-store', body: { success: false, code: 'restore_blocked',
-            reason: 'audit', error: 'Ripristino bloccato: i dati attuali non sono stati modificati.' } };
+            reason: 'audit', error: 'Ripristino bloccato. I dati attuali sono rimasti intatti.' } };
         if (JSON.stringify(blockedObserved) !== JSON.stringify(blockedExpected)) throw new Error(JSON.stringify(blockedObserved));
         const { POST: VERIFY } = await import(verifyUrl);
         for (const handler of [POST, VERIFY]) {

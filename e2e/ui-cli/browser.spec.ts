@@ -17,10 +17,11 @@ test('censisce e guida un controllo appena scoperto con ruolo e nome', async ({ 
 });
 
 test('blocca un controllo ambiguo, anche se il primo sarebbe azionabile', async ({ page }, info) => {
-  await page.setContent('<button>Conferma</button><section aria-label="Dettaglio"><button>Conferma</button></section>');
+  await page.setContent('<button>Conferma</button><section aria-label="Dettaglio"><button id="conferma-dettaglio">Conferma</button></section>');
   const target = { role: 'button', name: 'Conferma' };
   await expect(drive(page, { op: 'click', target }, info.outputDir)).rejects.toThrow('Controllo ambiguo');
   await drive(page, { op: 'focus', target: [{ role: 'region', name: 'Dettaglio' }, target] }, info.outputDir);
+  await drive(page, { op: 'expect', target: { ...target, id: 'conferma-dettaglio' }, state: 'focused' }, info.outputDir);
 });
 
 test('rifiuta azioni, percorsi e selettori fuori dal formato', () => {
@@ -33,6 +34,7 @@ test('rifiuta azioni, percorsi e selettori fuori dal formato', () => {
     { op: 'eval', code: '1+1' },
     { op: 'click', target: { css: 'button' } },
     { op: 'click', target: { role: 'button', name: '', nth: 0 } },
+    { op: 'click', target: { role: 'button', name: 'Avanti', id: 'pulsante"]' } },
     { op: 'uploadText', target: { role: 'button', name: 'Carica' }, file: '../file', value: 'Test' },
     { op: 'screenshot', file: '../file' },
   ]) expect(actionSchema.safeParse(input).success).toBe(false);

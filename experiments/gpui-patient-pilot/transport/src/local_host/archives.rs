@@ -7,6 +7,8 @@ pub struct RestoreReceipt {
     pub source_checksum: String,
     pub archive_generation: String,
     pub completed_at: String,
+    #[serde(default)]
+    pub excluded_retired_patients: u64,
 }
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -31,6 +33,7 @@ pub struct PreparedArchiveRestore {
     snapshot: String,
     lookup: RestoreLookup,
     records: u64,
+    excluded_retired_patients: u64,
     submitted: AtomicBool,
 }
 impl PreparedArchiveRestore {
@@ -39,6 +42,9 @@ impl PreparedArchiveRestore {
     }
     pub fn records(&self) -> u64 {
         self.records
+    }
+    pub fn excluded_retired_patients(&self) -> u64 {
+        self.excluded_retired_patients
     }
 }
 fn digest(value: &Value) -> Result<String> {
@@ -121,6 +127,13 @@ impl LocalHostAccess {
                     .filter(|n| *n <= crate::MAX_SAFE_VERSION)
             })
             .ok_or(RuntimeError::InvalidResponse)?;
+        let excluded_retired_patients = match preview.get("excludedRetiredPatients") {
+            None => 0,
+            Some(count) => count
+                .as_u64()
+                .filter(|&n| n <= crate::MAX_SAFE_VERSION && n <= records)
+                .ok_or(RuntimeError::InvalidResponse)?,
+        };
         Ok(PreparedArchiveRestore {
             owner: Arc::downgrade(&self.owner),
             artifact,
@@ -131,6 +144,7 @@ impl LocalHostAccess {
                 origin: self.client.base_url().into(),
             },
             records,
+            excluded_retired_patients,
             submitted: AtomicBool::new(false),
         })
     }
@@ -195,6 +209,11 @@ impl LocalHostAccess {
         if value["success"] != true
             || value["sourceChecksum"] != command.lookup.source_checksum
             || value["receipt"]["id"] != command.lookup.id
+            || value["receipt"]
+                .get("excludedRetiredPatients")
+                .unwrap_or(&Value::from(0))
+                .as_u64()
+                != Some(command.excluded_retired_patients)
         {
             return Err(RuntimeError::Indeterminate);
         }
@@ -217,6 +236,7 @@ impl LocalHostAccess {
             || receipt.source_checksum != lookup.source_checksum
             || receipt.archive_generation != self.generation
             || chrono::DateTime::parse_from_rfc3339(&receipt.completed_at).is_err()
+            || receipt.excluded_retired_patients > crate::MAX_SAFE_VERSION
         {
             return Err(RuntimeError::InvalidResponse);
         }
