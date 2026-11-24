@@ -103,11 +103,11 @@ test('WUL-929: dieci esami comuni della tabella LOINC diventano osservazioni; es
     const table = readLoincLabTable();
     const exams = [
         ['Acido urico', '5,2', 'mg/dL'], ['Magnesio', '2,1', 'mg/dL'], ['Proteine totali', '7,1', 'g/dL'], ['Lipasi', '35', 'U/L'],
-        ['Ferritina', '80', 'ng/mL'], ['Vitamina B12', '400', 'pg/mL'], ['Vitamina D', '32', 'ng/mL'], ['FT4', '15', 'pmol/L'],
-        ['INR', '1,1', '{INR}'], ['Calcio totale', '2,3', 'mmol/L'],
+        ['Ferritina', '80', 'ng/mL'], ['Vitamina B12', '400', 'pg/mL'], ['Vitamina D', '32', 'ng/mL'], ['Transferrina', '250', 'mg/dL'],
+        ['INR', '1,1', '{INR}'], ['NT-proBNP', '80', 'pg/mL'],
     ] as const;
     const uncoded = [
-        ['Ceruloplasmina', '30', 'mg/dL'], ['Fosforo', '3,4', 'mg/L'], ['Azotemia', '40', 'mg/dL'], ['Acido urico totale', '5,2', 'mg/dL'],
+        ['Calcio', '2,3', 'mmol/L'], ['Calcio totale', '2,3', 'mmol/L'], ['FT4', '15', 'pmol/L'], ['FT3', '5', 'pmol/L'], ['Ceruloplasmina', '30', 'mg/dL'], ['Fosforo', '3,4', 'mg/L'], ['Azotemia', '40', 'mg/dL'], ['Acido urico totale', '5,2', 'mg/dL'],
         ['Lipasi pancreatica', '35', 'U/L'], ['Sideremia', 'negativo', 'ug/dL'], ['PSA totale', '<0,1', 'ng/mL'], ['FT4', '1,1', 'ng/dL'], ['Glicemia', '95', 'mg/dL'],
     ] as const;
     const proposals = [...exams, ...uncoded].map(([display, value, unit]): PreparedFactInput => ({

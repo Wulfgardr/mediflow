@@ -1787,6 +1787,38 @@ mod tests {
     }
 
     #[test]
+    fn molar_calcium_ft4_and_ft3_stay_uncoded_until_the_clinical_choice() {
+        let exams = [
+            ("Calcio", "2,3", "mmol/L"),
+            ("Calcio totale", "2,3", "mmol/L"),
+            ("FT4", "15", "pmol/L"),
+            ("FT3", "5", "pmol/L"),
+        ];
+        for (name, value, unit) in exams {
+            assert_eq!(catalog(name, unit, value), Value::Null, "{name} {unit}");
+        }
+        assert!(!catalog("Calcio ionizzato", "mmol/L", "1,2").is_null());
+        let facts: Vec<Value> = exams
+            .iter()
+            .map(|(name, value, unit)| {
+                json!({"kind": "observation", "values": {"display": name, "value": value, "unit": unit}})
+            })
+            .collect();
+        let result = prepared_facts(&json!({
+            "source": {
+                "sha256": "b".repeat(64),
+                "facts": facts,
+                "summary": {"title": "Referto sintetico", "text": "Risultati di laboratorio"}
+            },
+            "now": "2026-11-25T12:00:00Z"
+        }));
+        assert_eq!(
+            result["notes"],
+            json!(["Esami senza codice LOINC: Calcio, Calcio totale, FT4, FT3."])
+        );
+    }
+
+    #[test]
     fn physician_code_is_never_a_patient_candidate() {
         let patients = vec![
             json!({"id":"p","taxCode":"RSSMRA80A01F205X"}),

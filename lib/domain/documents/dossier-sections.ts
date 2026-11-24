@@ -193,17 +193,20 @@ const normalizedName = (value: string) => value.toLocaleLowerCase('it-IT').norma
 
 const NUMERIC_VALUE = /^-?[0-9]+(?:[.,][0-9]+)?$/u;
 const observationKey = (name: string, unit: string) => `${normalizedName(name)}\u0000${unit}`;
-const OBSERVATION_CODES = loincObservationNames().reduce((index, entry) => {
+const OBSERVATION_NAMES = loincObservationNames();
+const PENDING_NAMES = new Set(OBSERVATION_NAMES.filter((entry) => !entry.active).map((entry) => normalizedName(entry.name)));
+const OBSERVATION_CODES = OBSERVATION_NAMES.filter((entry) => entry.active).reduce((index, entry) => {
     const key = observationKey(entry.name, entry.unit);
-    index.set(key, [...(index.get(key) ?? []).filter((known) => known.code !== entry.code), { code: entry.code, active: entry.active }]);
+    index.set(key, new Set([...(index.get(key) ?? []), entry.code]));
     return index;
-}, new Map<string, Array<{ code: string; active: boolean }>>());
+}, new Map<string, Set<string>>());
 
 export function catalogObservationCode(analyte: string, unit: string, value: string): { code: string; unitCode: string } | null {
     const unitCode = unit.trim();
-    if (!normalizedName(analyte) || !unitCode || !NUMERIC_VALUE.test(value.trim())) return null;
+    const name = normalizedName(analyte);
+    if (!name || PENDING_NAMES.has(name) || !unitCode || !NUMERIC_VALUE.test(value.trim())) return null;
     const [only, ...others] = OBSERVATION_CODES.get(observationKey(analyte, unitCode)) ?? [];
-    return only?.active && others.length === 0 ? { code: only.code, unitCode } : null;
+    return only && others.length === 0 ? { code: only, unitCode } : null;
 }
 
 export interface DossierIdentityProposal { field: 'taxCode' | 'firstName' | 'lastName' | 'birthDate'; value: string; excerpt: string }
