@@ -2,7 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { bootstrapUnlockedSession, openPatientSection } from './utils';
+import { bootstrapUnlockedSession, openPatientSection, openUnlockedDocument } from './utils';
 
 async function seedPatient(page: Page) {
   const id = `command-roles-${randomUUID()}`;
@@ -86,7 +86,7 @@ for (const theme of ['giorno', 'grafite']) for (const width of [1440, 768]) {
     await page.setViewportSize({ width, height: 960 });
     await page.emulateMedia({ reducedMotion: 'reduce', colorScheme: theme === 'giorno' ? 'light' : 'dark' });
     const id = await seedPatient(page);
-    await page.goto(`/patients/${id}/modules`);
+    await openUnlockedDocument(page, `/patients/${id}/modules`);
     await openPatientSection(page, 'terapie');
     await setTheme(page, theme);
     await page.getByRole('button', { name: 'Altre azioni per Ramipril', exact: true }).click();
@@ -120,7 +120,7 @@ for (const theme of ['giorno', 'grafite']) for (const width of [1440, 768]) {
     await page.setViewportSize({ width, height: 1800 });
     await page.emulateMedia({ reducedMotion: 'reduce', colorScheme: theme === 'giorno' ? 'light' : 'dark' });
     const id = await seedPatient(page);
-    await page.goto(`/patients/${id}/edit`);
+    await openUnlockedDocument(page, `/patients/${id}/edit`);
     await setTheme(page, theme);
     await page.getByRole('button', { name: 'Aggiungi passaggio', exact: true }).click();
     for (const [label, state] of [['Rimuovi diagnosi', 'diagnosi'], ['Rimuovi pianificazione', 'pianificazione']]) {

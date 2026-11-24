@@ -1,5 +1,6 @@
+import { documentRequests } from './fixtures/trusted-web-request';
 import { test, expect } from './fixtures/isolated-runtime';
-import { bootstrapUnlockedSession, openPatientSection } from './utils';
+import { bootstrapUnlockedSession, openPatientSection, openUnlockedDocument } from './utils';
 import Database from 'better-sqlite3';
 import { join } from 'node:path';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -18,7 +19,7 @@ const AGENCY = 'Agenzia inventata J3';
 type TherapyCodes = { id: string; drug_name: string; aic: string | null; atc: string | null };
 
 async function openRepertori(page: Page, panel: RegExp) {
-  await page.goto('/settings/repertori');
+  await openUnlockedDocument(page, '/settings/repertori');
   const toggle = page.getByRole('button', { name: panel });
   await expect(toggle).toBeVisible();
   if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
@@ -39,7 +40,7 @@ async function importAifa(page: Page, version: string) {
 }
 
 async function saveTherapyFromCatalog(page: Page, patientId: string, query: string, drugName: string) {
-  await page.goto(`/patients/${patientId}/modules`);
+  await openUnlockedDocument(page, `/patients/${patientId}/modules`);
   await openPatientSection(page, 'terapie');
   const pane = page.locator('#terapie');
   await pane.getByRole('button', { name: 'Nuova terapia', exact: true }).click();
@@ -62,7 +63,7 @@ test('J-3: catalogo di un’altra agenzia con fonte, colonne, anteprima e confer
     return (await response.json() as { id: string }).id;
   });
   const status = async () => {
-    const response = await page.request.get('/api/drugs?count=1');
+    const response = await documentRequests(page).get('/api/drugs?count=1');
     expect(response.status()).toBe(200);
     return await response.json() as { count: number; state: string; manifest: { version: string } | null; source?: { kind: string; agency: string; codeSystem: string; version: string } };
   };
@@ -126,7 +127,7 @@ test('J-3: catalogo di un’altra agenzia con fonte, colonne, anteprima e confer
     await expect(page.getByTestId('aifa-catalog-guide')).not.toContainText('Catalogo attivo da un’altra agenzia');
     expect(therapies(), 'J-3 terapie invariate dopo il ritorno ad AIFA').toEqual(beforeReturn);
 
-    await page.goto(`/patients/${patientId}/modules`);
+    await openUnlockedDocument(page, `/patients/${patientId}/modules`);
     await openPatientSection(page, 'terapie');
     const pane = page.locator('#terapie');
     await expect(pane.getByRole('row').filter({ hasText: 'ACIDO SINTETICO' })).toContainText('AIC 000000101');

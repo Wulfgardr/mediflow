@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { bootstrapUnlockedSession, openAiFunzioniSettings, openPatientSection, setAiLaneKillSwitch } from './utils';
+import { bootstrapUnlockedSession, openAiFunzioniSettings, openPatientSection, setAiLaneKillSwitch, openUnlockedDocument } from './utils';
 
 test('[E2E fixture] smart import kill switch disables analysis on patient detail', async ({ page }) => {
   const pin = process.env.E2E_PIN || '1234';
@@ -82,7 +82,7 @@ test('[E2E fixture] smart import kill switch disables analysis on patient detail
       return payload.id;
     }, { firstName, lastName, taxCode, address: 'Via Test 1', phone: '1234567890', notes: patientNotes });
 
-    await page.goto(`/patients/${patientId}/modules`);
+    await openUnlockedDocument(page, `/patients/${patientId}/modules`);
     await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules$`));
     const summaryLink = page.getByRole('navigation', { name: 'Sezioni della vista', exact: true })
       .getByRole('link', { name: 'Riepilogo', exact: true });

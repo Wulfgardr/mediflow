@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { bootstrapUnlockedSession, openPatientSection } from './utils';
+import { bootstrapUnlockedSession, openPatientSection, openUnlockedDocument, unlockIfNeeded } from './utils';
 import { fetchInterceptedRequest } from './fixtures/trusted-web-request';
 import { sealDiaryEntry } from './fixtures/sealed-diary-entry';
 
@@ -18,7 +18,7 @@ test('SISS: comandi esterni, stati leggibili, diario e disclosure', async ({ pag
         if (!response.ok) throw new Error(`Creazione paziente sintetico: ${response.status}`);
         return (await response.json()).id as string;
     });
-    await page.goto(`/patients/${patientId}/modules`);
+    await openUnlockedDocument(page, `/patients/${patientId}/modules`);
     await openPatientSection(page, 'siss');
     const pane = page.locator('#siss');
     await expect(pane.getByRole('button', { name: 'Requisiti e controllo locale dei dati', exact: true })).toHaveAttribute('aria-expanded', 'true');
@@ -84,7 +84,9 @@ test('SISS: comandi esterni, stati leggibili, diario e disclosure', async ({ pag
         const response = await fetch('/api/siss-handoffs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: crypto.randomUUID(), patientId, action: 'registry.lookup', moduleLabel: 'Anagrafe', reason: 'Verifica sintetica HC10', startedAt: now, outcome: 'started', createdAt: now, updatedAt: now }) });
         if (!response.ok) throw new Error(`Diario sintetico: ${response.status}`);
     }, patientId);
-    await page.reload(); await openPatientSection(page, 'siss');
+    await page.reload();
+    await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
+    await openPatientSection(page, 'siss');
     await expect(pane.getByText('1 passaggio registrato', { exact: true })).toBeVisible();
 });
 
@@ -128,7 +130,7 @@ for (const first of ['validation', 'bundle'] as const) {
             if ((first === 'validation') === validation) observed();
         });
         try {
-            await page.goto(`/patients/${id}/modules`); await openPatientSection(page, 'siss');
+            await openUnlockedDocument(page, `/patients/${id}/modules`); await openPatientSection(page, 'siss');
             await completed;
             const exports = page.locator('#siss').getByRole('region', { name: 'Esportazione locale', exact: true });
             await expect(exports.getByText('Controllo dei dati per l’esportazione FSE in corso.', { exact: true })).toBeVisible();
@@ -148,7 +150,7 @@ for (const failure of ['http', 'network'] as const) {
         if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL || new URL(baseURL).port === '3000') throw new Error('Runtime sintetico isolato richiesto');
         const id = await readinessPatient(page, false);
         await page.route('**/api/fse/validate-patient?*', route => failure === 'http' ? route.fulfill({ status: 503, json: { error: 'Controllo sintetico indisponibile' } }) : route.abort('failed'));
-        await page.goto(`/patients/${id}/modules`); await openPatientSection(page, 'siss');
+        await openUnlockedDocument(page, `/patients/${id}/modules`); await openPatientSection(page, 'siss');
         const pane = page.locator('#siss');
         const exports = pane.getByRole('region', { name: 'Esportazione locale', exact: true });
         const alert = exports.getByRole('alert').filter({ hasText: 'Controllo dei dati per l’esportazione FSE non disponibile.' });

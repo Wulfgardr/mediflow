@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
-import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow, assertNotClippedInViewport } from './utils';
+import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow, assertNotClippedInViewport, openUnlockedDocument, unlockIfNeeded } from './utils';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 
 const baseline = process.env.W11_BASELINE === '1';
@@ -26,7 +26,7 @@ async function fixture(page: Page, count = 1) {
         });
         return patient.id as string;
     }, count);
-    await page.goto(`/patients/${id}/modules`);
+    await openUnlockedDocument(page, `/patients/${id}/modules`);
     await openPatientSection(page, 'parametri');
     return id;
 }
@@ -88,6 +88,7 @@ for (const state of ['loading', 'error', 'denied'] as const) test(`Misure: lettu
         const requested = page.waitForRequest(request => request.method() === 'GET'
             && request.url().includes(`/api/observations?patientId=${id}`));
         await page.reload();
+        await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
         const readRequest = await requested;
         await test.info().attach('richiesta-lettura-osservata', { contentType: 'application/json',
             body: JSON.stringify({ method: readRequest.method(), url: readRequest.url(), state }) });
@@ -243,7 +244,7 @@ for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '3
                 await assertNoHorizontalOverflow(page, [{ label: 'Misure', selector: '#parametri' }, { label: 'Pagina', selector: 'document' }]);
             }
             await page.route('**/api/observations?**', route => route.fulfill({ json: [] }));
-            await page.goto(`/patients/${id}/modules`);
+            await openUnlockedDocument(page, `/patients/${id}/modules`);
             await openPatientSection(page, 'parametri');
             await expect(register(page)).toContainText('Nessun');
             await page.evaluate(theme => { document.documentElement.classList.toggle('dark', theme === 'grafite'); document.documentElement.classList.toggle('light', theme === 'giorno'); }, theme);
