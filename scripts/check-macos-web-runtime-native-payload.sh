@@ -225,7 +225,7 @@ validate_framework_macho() {
 package_web_runtime_machos() {
   local node_arch resources contents expected_frameworks native source target resolved link loader required_files required_path
   local physical_count=0 framework_count=0 old_vips_ref old_vips_count=0 rpath index
-  local sharp_candidates=() libvips_candidates=() sources=() targets=() loaders=() before=() after=()
+  local sharp_candidates=() libvips_candidates=() sources=() targets=() retired_targets=() loaders=() before=() after=()
   local normalize="$normalize"
 
   node_arch="$(node -p 'process.arch')"
@@ -269,6 +269,7 @@ package_web_runtime_machos() {
     "$frameworks/mediflow-web-libvips.dylib" "$frameworks/mediflow-web-canvas.node"
     "$frameworks/mediflow-web-better-sqlite3.node"
   )
+  retired_targets=( "$frameworks/mediflow-web-fsevents.node" )
   # a second normalization of a complete relocated tree is read-only.
   # A partial tree still fails the full validation below; do not delete its targets.
   if [[ "$normalize" == "1" ]]; then
@@ -332,7 +333,7 @@ package_web_runtime_machos() {
     done
     native="$(first_physical_macho "$resources" "${sources[@]}")"
     [[ -z "$native" ]] || fail "unexpected physical Mach-O below Contents/Resources: $native"
-    for target in "${targets[@]}"; do
+    for target in "${targets[@]}" "${retired_targets[@]}"; do
       if [[ -e "$target" || -L "$target" ]]; then
         [[ -f "$target" || -L "$target" ]] || fail "owned native target is not a file or symlink: $target"
         rm -f -- "$target"
@@ -402,7 +403,7 @@ package_web_runtime_machos() {
 run_self_test() {
   local temp_dir fake_bin fixture valid_web worker_path binding_path event_log state_file events
   local layout_bin layout_state layout_log layout_web layout_frameworks bad_app bad_web bad_frameworks path
-  local missing_required_app bad_pattern_app bad_pattern_web extensionless_app extensionless_web real_node legacy_app legacy_web idempotent_events alias_root partial_app
+  local retired_app missing_required_app bad_pattern_app bad_pattern_web extensionless_app extensionless_web real_node legacy_app legacy_web idempotent_events alias_root partial_app
   local scripts_dir pe_case pe_app pe_web pe_dir arch
   temp_dir="$(mktemp -d "${TMPDIR:-/tmp}/mediflow-macho-guard.XXXXXX")"
   temp_dir="$(real_path "$temp_dir")"
@@ -717,6 +718,17 @@ run_self_test() {
     fail "self-test accepted the legacy extensionless codex in Resources"
   fi
   [[ ! -s "$layout_log" ]] || fail "self-test changed native dependencies before rejecting legacy codex"
+  retired_app="$temp_dir/retired/MediFlow.app"
+  mkdir -p "$(dirname "$retired_app")" "$temp_dir/retired-state"
+  cp -R "$temp_dir/layout/MediFlow.app" "$retired_app"
+  mkdir -p "$retired_app/Contents/Frameworks"
+  printf '\xfe\xed\xfa\xcf' > "$retired_app/Contents/Frameworks/mediflow-web-fsevents.node"
+  MEDIFLOW_LAYOUT_STATE_DIR="$temp_dir/retired-state" MEDIFLOW_LAYOUT_EVENT_LOG="$temp_dir/retired-events" \
+    PATH="$layout_bin:$PATH" "$script_path" --normalize --web-runtime "$retired_app/Contents/Resources/WebRuntime" \
+    --frameworks "$retired_app/Contents/Frameworks" >/dev/null || \
+    fail "self-test could not repackage an unsigned app built before fsevents was retired"
+  [[ ! -e "$retired_app/Contents/Frameworks/mediflow-web-fsevents.node" ]] || \
+    fail "self-test kept the retired fsevents target in Contents/Frameworks"
   MEDIFLOW_LAYOUT_STATE_DIR="$layout_state" MEDIFLOW_LAYOUT_EVENT_LOG="$layout_log" \
     PATH="$layout_bin:$PATH" "$script_path" --normalize --web-runtime "$layout_web" --frameworks "$layout_frameworks" >/dev/null
   MEDIFLOW_LAYOUT_STATE_DIR="$layout_state" MEDIFLOW_LAYOUT_EVENT_LOG="$layout_log" \
