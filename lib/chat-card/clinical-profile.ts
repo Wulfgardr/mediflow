@@ -4,11 +4,13 @@ import { z } from 'zod';
 import type { ClinicalPreparedRead } from './clinical-preparation';
 
 export const CLINICAL_PROFILE_VERSION = 'mediflow.clinical-chat-profile.v1';
-const row = z.strictObject({ text: z.string().min(1).max(4096), sourceRef: z.string().regex(/^src_[a-f0-9]{32}$/u) });
+const textWithinUtf16Limit = (maxUnits: number) => z.string().min(1).refine(text => text.length <= maxUnits);
+const selectionText = textWithinUtf16Limit(2048);
+const row = z.strictObject({ text: textWithinUtf16Limit(4096), sourceRef: z.string().regex(/^src_[a-f0-9]{32}$/u) });
 export const clinicalSchema = z.strictObject({ profile: z.literal(CLINICAL_PROFILE_VERSION), version: z.literal(1),
     pseudonym: z.string().regex(/^card_[a-f0-9]{32}$/u), diagnoses: z.array(row).max(16), noteExcerpts: z.array(row).max(8) });
-export const clinicalSelectionSchema = z.strictObject({ diagnoses: z.array(z.string().min(1).max(2048)).max(16),
-    noteExcerpts: z.array(z.string().min(1).max(2048)).max(8) }).refine(v => v.diagnoses.length + v.noteExcerpts.length > 0)
+export const clinicalSelectionSchema = z.strictObject({ diagnoses: z.array(selectionText).max(16),
+    noteExcerpts: z.array(selectionText).max(8) }).refine(v => v.diagnoses.length + v.noteExcerpts.length > 0)
     .refine(v => [...v.diagnoses, ...v.noteExcerpts].reduce((n, t) => n + t.length, 0) <= 6000);
 export type ClinicalProfile = z.infer<typeof clinicalSchema>;
 export type ClinicalSelection = z.infer<typeof clinicalSelectionSchema>;
