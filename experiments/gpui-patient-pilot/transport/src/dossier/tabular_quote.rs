@@ -7,10 +7,11 @@ const MAX_ROW_CELLS: usize = 24;
 const MAX_QUOTE_LINES: usize = 16;
 const MAX_SEARCH_STEPS: usize = 2000;
 
-static TABLE_SEPARATOR_ROW: LazyLock<Regex> =
-    LazyLock::new(|| re(r"^\|(?:\s*:?-{3,}:?\s*\|)+$"));
+static TABLE_SEPARATOR_ROW: LazyLock<Regex> = LazyLock::new(|| re(r"^\|(?:\s*:?-{3,}:?\s*\|)+$"));
 static COLUMN_GAP: LazyLock<Regex> = LazyLock::new(|| re(r"[ \t]*\|[ \t]*|\t|[ ]{2,}"));
 static WHITESPACE: LazyLock<Regex> = LazyLock::new(|| re(r"\s+"));
+
+type TableRow = Vec<Vec<Token>>;
 
 #[derive(Clone, Copy)]
 struct CellCursor {
@@ -23,7 +24,13 @@ struct QuoteLine<'a> {
     words: Vec<String>,
 }
 
-fn split_row_cells(body: &str, line_start: usize, line_end: usize) -> Vec<Vec<Token>> {
+struct UnitRows<'a> {
+    body: String,
+    unit_index: &'a Value,
+    rows: Vec<TableRow>,
+}
+
+fn split_row_cells(body: &str, line_start: usize, line_end: usize) -> TableRow {
     let line = &body[line_start..line_end];
     let Some(open_rel) = line.find('|') else {
         return vec![];
@@ -45,7 +52,7 @@ fn split_row_cells(body: &str, line_start: usize, line_end: usize) -> Vec<Vec<To
             backslashes += 1;
             continue;
         }
-        let is_pipe = ch == '|' && backslashes % 2 == 0;
+        let is_pipe = ch == '|' && backslashes.is_multiple_of(2);
         backslashes = 0;
         if !is_pipe {
             continue;
@@ -79,7 +86,7 @@ fn split_row_cells(body: &str, line_start: usize, line_end: usize) -> Vec<Vec<To
     cells
 }
 
-fn extract_markdown_table_rows(body: &str) -> Vec<Vec<Vec<Token>>> {
+fn extract_markdown_table_rows(body: &str) -> Vec<TableRow> {
     let mut lines = vec![];
     let mut pos = 0usize;
     loop {
@@ -97,9 +104,8 @@ fn extract_markdown_table_rows(body: &str) -> Vec<Vec<Vec<Token>>> {
             None => break,
         }
     }
-    let is_pipe = |trimmed: &str| {
-        trimmed.len() >= 3 && trimmed.starts_with('|') && trimmed.ends_with('|')
-    };
+    let is_pipe =
+        |trimmed: &str| trimmed.len() >= 3 && trimmed.starts_with('|') && trimmed.ends_with('|');
     let mut rows = vec![];
     let mut i = 0usize;
     while i < lines.len() {
@@ -417,18 +423,27 @@ pub(super) fn anchor_tabular(text: &str, units: &[Value], quote: &str) -> Option
     if lines.is_empty() || lines.len() > MAX_QUOTE_LINES {
         return None;
     }
-    let wanted: Vec<String> = lines.iter().flat_map(|line| line.words.iter().cloned()).collect();
-    let unit_rows: Vec<(String, &Value, Vec<Vec<Vec<Token>>>)> = units
+    let wanted: Vec<String> = lines
+        .iter()
+        .flat_map(|line| line.words.iter().cloned())
+        .collect();
+    let unit_rows: Vec<UnitRows<'_>> = units
         .iter()
         .map(|unit| {
             let body = unit_text(text, unit);
             let rows = extract_markdown_table_rows(&body);
-            (body, &unit["index"], rows)
+            UnitRows {
+                body,
+                unit_index: &unit["index"],
+                rows,
+            }
         })
         .collect();
-    for (body, unit_index, rows) in &unit_rows {
-        for cells in rows {
-            if let Some(matched) = match_complete_row(body, unit_index, cells, &lines, &wanted) {
+    for entry in &unit_rows {
+        for cells in &entry.rows {
+            if let Some(matched) =
+                match_complete_row(&entry.body, entry.unit_index, cells, &lines, &wanted)
+            {
                 return Some(matched);
             }
         }
@@ -446,9 +461,10 @@ pub(super) fn anchor_tabular(text: &str, units: &[Value], quote: &str) -> Option
     if !segmented_lines.iter().any(|segments| segments.len() >= 2) {
         return None;
     }
-    for (body, unit_index, rows) in &unit_rows {
-        for cells in rows {
-            if let Some(matched) = match_visual_lines_row(body, unit_index, cells, &segmented_lines)
+    for entry in &unit_rows {
+        for cells in &entry.rows {
+            if let Some(matched) =
+                match_visual_lines_row(&entry.body, entry.unit_index, cells, &segmented_lines)
             {
                 return Some(matched);
             }
