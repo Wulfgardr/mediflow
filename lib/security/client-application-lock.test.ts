@@ -553,6 +553,33 @@ assert.equal(reloads,2); dispose();`;
     execFileSync(process.execPath, ['--input-type=module', '--eval', script]);
 });
 
+test('a reloaded PIN document presents the retained proof and locators; malformed or released storage starts a new document', () => {
+    const source = isolatedAuthApiSource();
+    const script = `import assert from 'node:assert/strict'; import ts from 'typescript';
+const output=ts.transpileModule(${JSON.stringify(source)},{compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText;
+const load=async()=>import('data:text/javascript;base64,'+Buffer.from(output+'\\n//'+Math.random()).toString('base64'));
+const store=new Map(); globalThis.sessionStorage={getItem:k=>store.has(k)?store.get(k):null,setItem:(k,v)=>store.set(k,String(v)),removeItem:k=>store.delete(k)};
+const proof='ab'.repeat(32), control='C'.repeat(43), session='cd'.repeat(32); let observed;
+const browser=()=>{globalThis.window={location:{href:'http://localhost/settings/backup',origin:'http://localhost',reload(){}},dispatchEvent(){},
+fetch:async(input,init)=>{observed=new Headers(init.headers);const headers=new Headers();if(String(input).endsWith('/api/auth/check'))headers.set('x-mediflow-web-control',control);if(String(input).endsWith('/api/auth/login'))headers.set('x-mediflow-web-session',session);return new Response('{}',{status:200,headers});}};};
+browser(); let api=await load(); let dispose=api.installArchiveGenerationTransport();
+await window.fetch('/api/auth/check'); const first=observed.get('x-mediflow-web-instance');
+assert.match(first,/^[a-f0-9]{64}$/u); assert.equal(observed.has('x-mediflow-web-session'),false);
+assert.equal(api.retainDocumentAuthorityForReload(),false); assert.equal(store.size,0);
+await window.fetch('/api/auth/login',{method:'POST'}); assert.equal(api.retainDocumentAuthorityForReload(),true); dispose();
+browser(); api=await load(); dispose=api.installArchiveGenerationTransport();
+await window.fetch('/api/patients');
+assert.equal(observed.get('x-mediflow-web-instance'),first); assert.equal(observed.get('x-mediflow-web-control'),control); assert.equal(observed.get('x-mediflow-web-session'),session);
+api.releaseDocumentAuthorityForReload(); assert.equal(store.size,0); dispose();
+browser(); api=await load(); dispose=api.installArchiveGenerationTransport();
+await window.fetch('/api/patients'); assert.notEqual(observed.get('x-mediflow-web-instance'),first); assert.equal(observed.has('x-mediflow-web-session'),false); dispose();
+for (const forged of ['{"proof":"'+proof+'","control":"'+control+'"}','{"proof":"AB","control":"'+control+'","session":"'+session+'"}','not json']) {
+ store.set('mediflow_web_document_authority',forged); browser(); api=await load(); dispose=api.installArchiveGenerationTransport();
+ await window.fetch('/api/patients'); assert.notEqual(observed.get('x-mediflow-web-instance'),proof); assert.equal(observed.has('x-mediflow-web-session'),false,forged); dispose();
+}`;
+    execFileSync(process.execPath, ['--input-type=module', '--eval', script]);
+});
+
 test('archive transport fences only the exact scoped epoch GET and rejects archive replacement', () => {
     const source = isolatedAuthApiSource();
     const script = `import assert from 'node:assert/strict'; import ts from 'typescript';

@@ -6,6 +6,7 @@ import { bootstrapUnlockedSession } from './utils';
 const ALPHANUMERIC_PIN = 'demo086086';
 const NUMERIC_PIN = '086086';
 const CONTROL_ETAG = /^"[A-Za-z0-9_-]{32,256}"$/u;
+type WrappedKey = Readonly<{ encryptedMasterKey: string; salt: string }>;
 
 test.describe.configure({ retries: 0 });
 
@@ -23,17 +24,18 @@ async function expectUnlocked(page: Page): Promise<void> {
   expect((await documentRequests(page).get('/api/patients')).status()).toBe(200);
 }
 
-async function openLegacyPinArchive(page: Page, pin: string): Promise<void> {
+async function openLegacyPinArchive(page: Page, pin: string): Promise<WrappedKey> {
   const responsePromise = page.waitForResponse(response => isPost(response, '/api/auth/login'));
   await bootstrapUnlockedSession(page, pin);
   const response = await responsePromise;
   expect(response.status()).toBe(200);
   expect(response.request().postDataJSON().password).toBe(pin);
-  expect(await response.json()).toMatchObject({
-    encryptedMasterKey: expect.stringMatching(/\S+/u), salt: expect.stringMatching(/\S+/u),
-  });
+  const wrapping = await response.json() as WrappedKey;
+  expect(wrapping.encryptedMasterKey).toMatch(/^v2:/u);
+  expect(wrapping.salt.length).toBeGreaterThan(0);
   await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
   expect((await documentRequests(page).get('/api/patients')).status()).toBe(200);
+  return { encryptedMasterKey: wrapping.encryptedMasterKey, salt: wrapping.salt };
 }
 
 async function expectReadyLock(page: Page): Promise<void> {
@@ -42,7 +44,7 @@ async function expectReadyLock(page: Page): Promise<void> {
   await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toHaveCount(0);
 }
 
-async function unlock(page: Page, pin: string, gesture: 'click' | 'enter'): Promise<void> {
+async function unlock(page: Page, pin: string, key: WrappedKey, gesture: 'click' | 'enter'): Promise<void> {
   const input = page.getByLabel('PIN operatore', { exact: true });
   await expectReadyLock(page);
   await expect(input).toHaveAttribute('type', 'password');
@@ -62,9 +64,7 @@ async function unlock(page: Page, pin: string, gesture: 'click' | 'enter'): Prom
   expect(response.request().postDataJSON().password).toBe(pin);
   expect(response.status()).toBe(200);
   expect(response.headers().etag).toMatch(CONTROL_ETAG);
-  expect(await response.json()).toMatchObject({
-    success: true, encryptedMasterKey: expect.stringMatching(/\S+/u), salt: expect.stringMatching(/\S+/u),
-  });
+  expect(await response.json()).toMatchObject({ success: true, ...key });
   await expectUnlocked(page);
 }
 
@@ -75,10 +75,11 @@ for (const { name, pin, pinAccount } of [
   { name: 'numeric control including leading zero', pin: NUMERIC_PIN, pinAccount: numeric },
 ]) {
   pinAccount(`${name}: legacy PIN archive, same-PIN lock/unlock and fresh browser context`, async ({ browser, baseURL }) => {
+    let key: WrappedKey;
     const initial = await browser.newContext({ baseURL });
     try {
       const page = await initial.newPage();
-      await openLegacyPinArchive(page, pin);
+      key = await openLegacyPinArchive(page, pin);
       const check = await page.evaluate(async () => {
         const reply = await fetch('/api/auth/check', { cache: 'no-store' });
         const { status, hasSession } = await reply.json();
@@ -94,7 +95,7 @@ for (const { name, pin, pinAccount } of [
       });
       expect((await documentRequests(page).get('/api/patients')).status()).toBe(401);
       await page.reload();
-      await unlock(page, pin, 'click');
+      await unlock(page, pin, key, 'click');
     } finally {
       await initial.close();
     }
@@ -102,7 +103,7 @@ for (const { name, pin, pinAccount } of [
     try {
       const page = await reopened.newPage();
       await page.goto('/');
-      await unlock(page, pin, 'enter');
+      await unlock(page, pin, key, 'enter');
     } finally {
       await reopened.close();
     }
@@ -144,7 +145,7 @@ async function holdRealResponse(
 
 alphanumeric('explicit lock and PIN recovery: pending, short and wrong PIN, loading and focus recovery', async ({ page, browserName }) => {
   expect(browserName, 'Response-gated negative case requires Chromium/CDP; it must not silently skip').toBe('chromium');
-  await openLegacyPinArchive(page, ALPHANUMERIC_PIN);
+  const key = await openLegacyPinArchive(page, ALPHANUMERIC_PIN);
   const loginRequests: string[] = [];
   const observeLogin = (request: Request) => {
     if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/auth/login') {
@@ -206,7 +207,7 @@ alphanumeric('explicit lock and PIN recovery: pending, short and wrong PIN, load
     await expect(input).toBeFocused();
     await expect(shell).toBeVisible();
     expect((await documentRequests(page).get('/api/patients')).status()).toBe(401);
-    await unlock(page, ALPHANUMERIC_PIN, 'enter');
+    await unlock(page, ALPHANUMERIC_PIN, key, 'enter');
     expect(loginRequests).toEqual([wrong, ALPHANUMERIC_PIN]);
     await expect(page.locator('#mediflow-lock-error')).toHaveCount(0);
   } finally {

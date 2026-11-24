@@ -86,7 +86,7 @@ pinAccount('renewing tab B preserves tab A authority and transfers the key witho
     } finally { await second.close(); }
 });
 
-for (const donor of ['fresh', 'reopened', 'old stored value'] as const) pinAccount('a renewed tab can rotate the PIN and recover the same note with a ' + donor + ' donor session', async ({ page, context, isolatedRuntime }) => {
+for (const donor of ['fresh', 'restored', 'legacy'] as const) pinAccount('a renewed tab can rotate the PIN and recover the same note with a ' + donor + ' donor session', async ({ page, context, isolatedRuntime }) => {
     await bootstrapUnlockedSession(page, agentVisitPin);
     const patientId = await page.evaluate(async () => {
         const response = await fetch('/api/patients', { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -98,14 +98,14 @@ for (const donor of ['fresh', 'reopened', 'old stored value'] as const) pinAccou
     await page.getByRole('link', { name: 'Nuova voce', exact: true }).click();
     const note = 'SYNTHETIC_PIN_ROTATION_NOTE';
     await saveSharedNote(page, note);
-    if (donor === 'old stored value') {
-        await page.evaluate(() => sessionStorage.setItem('mediflow_session_key', '{}'));
-    }
+    if (donor === 'legacy') await page.evaluate(() => {
+        const stored = JSON.parse(sessionStorage.getItem('mediflow_session_key')!);
+        sessionStorage.setItem('mediflow_session_key', JSON.stringify(stored.jwk ?? stored));
+    });
     if (donor !== 'fresh') {
         await page.reload();
-        await expect(page.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeVisible();
-        await unlockIfNeeded(page, agentVisitPin);
         await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
+        await expect(page.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeHidden();
     }
     const second = await context.newPage();
     try {
@@ -129,6 +129,15 @@ for (const donor of ['fresh', 'reopened', 'old stored value'] as const) pinAccou
             await changePin.click();
             await expect(second.getByText('PIN attuale non valido o chiave non verificabile.', { exact: true })).toBeVisible();
             expect(status).toBe(0);
+        }
+        if (donor === 'legacy') {
+            await fillPinChange(agentVisitPin);
+            await changePin.click();
+            await expect(second.getByText('Per cambiare il PIN, blocca le schede e accedi con il PIN attuale.', { exact: true })).toBeVisible();
+            expect(status).toBe(0);
+            await second.getByRole('button', { name: 'Blocca', exact: true }).click();
+            await expect(second.getByLabel('PIN operatore', { exact: true })).toBeVisible();
+            await unlockIfNeeded(second, agentVisitPin);
         }
         await fillPinChange(agentVisitPin);
         await changePin.click();
