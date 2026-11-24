@@ -426,15 +426,19 @@ fn set_default(values: &mut Value, key: &str, value: &str) {
         values[key] = json!(value);
     }
 }
-fn catalog(analyte: &str, unit: &str) -> Value {
+fn catalog(analyte: &str, unit: &str, value: &str) -> Value {
+    if !re(r"^-?[0-9]+(?:[.,][0-9]+)?$").is_match(value.trim_matches(crate::js_whitespace)) {
+        return Value::Null;
+    }
     let entries: Value = serde_json::from_str(include_str!(
         "../../../../native/contracts/dossier-conformance/catalog.json"
     ))
     .unwrap();
     let wanted = normalized_name(analyte);
+    let unit = unit.trim_matches(crate::js_whitespace);
     array(&entries)
         .iter()
-        .find(|e| string(&e["name"]) == wanted && string(&e["unit"]) == unit.trim())
+        .find(|e| string(&e["name"]) == wanted && string(&e["unit"]) == unit)
         .map(|e| json!({"code":e["code"],"unitCode":e["unit"]}))
         .unwrap_or(Value::Null)
 }
@@ -542,7 +546,7 @@ pub fn prepared_facts(input: &Value) -> Value {
                 v.as_object_mut().unwrap().remove("code");
                 v.as_object_mut().unwrap().remove("unitCode");
                 let display = string(&item["values"]["display"]);
-                let coded = catalog(display, string(&v["unit"]));
+                let coded = catalog(display, string(&v["unit"]), string(&v["value"]));
                 if coded.is_null() {
                     let name = display.trim_matches(crate::js_whitespace);
                     let name = if name.is_empty() {
@@ -1723,7 +1727,7 @@ pub fn bulk(input: &Value) -> Value {
 pub fn verify_call(call: &Value) -> Value {
     let a = array(&call["args"]);
     match string(&call["op"]) {
-        "catalog" => catalog(string(&a[0]), string(&a[1])),
+        "catalog" => catalog(string(&a[0]), string(&a[1]), string(&a[2])),
         "preparedTokens" => json!(tokens(string(&a[0]))),
         "anchorPreparedQuote" => anchor(string(&a[0]), array(&a[1]), string(&a[2])),
         "verifyPreparedFields" => verify_fields(
