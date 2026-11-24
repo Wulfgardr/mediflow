@@ -79,7 +79,9 @@ for (const reviewed of process.env.MEDIFLOW_VISIT_MAC_TRIAL ? [false] : [false, 
         return Buffer.from(await pdf.save());
     };
     const writeVisitInput = async (directory: string, taxCode: string) => {
-        const original = await makePdf(['Paziente CF ' + taxCode, sentinel, therapy, service, diagnosis, exemption]);
+        const heading = reviewed ? ['Ricetta cartacea'] : [];
+        const stamp = reviewed ? ['Dott. ALDO BRUNI CF: RSSMRA85T10A562S'] : [];
+        const original = await makePdf([...heading, 'Paziente CF ' + taxCode, sentinel, therapy, service, diagnosis, exemption, ...stamp]);
         const notePdf = await makePdf(['Codice fiscale paziente: ' + taxCode, 'Data visita: 2026-11-17', '', ...note]);
         const document = (bytes: Buffer, fileName: string, facts: unknown[]) => ({ sha256: createHash('sha256').update(bytes).digest('hex'), fileName,
             patient: { taxCode }, documentDate: '2026-11-17', documentType: 'visita', summary: null, coverage: { pages: 1, unreadablePages: [], complete: true, note: '' }, facts });
@@ -120,6 +122,10 @@ for (const reviewed of process.env.MEDIFLOW_VISIT_MAC_TRIAL ? [false] : [false, 
     const incomingLink = page.getByRole('complementary', { name: 'MediFlow', exact: true }).getByRole('link', { name: 'In arrivo', exact: true });
     await incomingLink.click();
     await expect(page.getByRole('region', { name: 'Visita ' + visitId })).toBeVisible({ timeout: 30000 });
+    await page.getByRole('main').getByRole('link', { name: 'Agenti', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Agenti', exact: true })).toBeVisible();
+    await incomingLink.click();
+    await expect(page.getByRole('region', { name: 'Visita ' + visitId })).toBeVisible();
     expect(await counts()).toEqual([0, 0, 0, 0]);
     expect(plainBodies).toEqual([]);
     const patientAfter = await (await page.request.get('/api/patients/' + patient.id)).json();
@@ -289,8 +295,9 @@ for (const reviewed of process.env.MEDIFLOW_VISIT_MAC_TRIAL ? [false] : [false, 
         await expect(validVisit.getByRole('button', { name: 'Applica la visita', exact: true })).toBeEnabled();
         await expect(secondVisit.getByRole('button', { name: 'Applica la visita', exact: true })).toBeEnabled();
         await expect(concurrentVisit.getByRole('button', { name: 'Applica la visita', exact: true })).toBeEnabled();
-        await expect(doubtfulVisit.getByText('Codice fiscale non confermato in una scheda esistente.', { exact: true })).toBeVisible();
-        await expect(doubtfulVisit.getByRole('button', { name: 'Applica la visita', exact: true })).toBeDisabled();
+        const blockedApply = doubtfulVisit.getByRole('button', { name: 'Applica la visita', exact: true });
+        await expect(blockedApply).toBeDisabled();
+        await expect(blockedApply).toHaveAccessibleDescription(/Nessuna scheda attiva con questo codice fiscale nell’ambulatorio selezionato/);
         expect(await counts()).toEqual([0, 0, 0, 0]);
         expect(plainBodies).toEqual([]);
         const batchOrder: string[] = [];
@@ -314,6 +321,10 @@ for (const reviewed of process.env.MEDIFLOW_VISIT_MAC_TRIAL ? [false] : [false, 
             && response.request().method() === 'POST' && response.request().postDataJSON().visitId === concurrentId);
         await page.getByRole('button', { name: 'Applica tutte le visite senza dubbi', exact: true }).click();
         expect((await rejected).status()).toBe(409);
+        const applicationError = page.getByRole('alert').filter({ hasText: 'La visita non è stata applicata. Rileggi la cassetta.' });
+        await expect(applicationError).toBeVisible();
+        await page.getByRole('button', { name: 'Aggiorna', exact: true }).click();
+        await expect(applicationError).toBeVisible();
         await expect.poll(counts).toEqual([2, 4, 2, 2]);
         expect(batchOrder).toEqual([visitId, concurrentId, secondVisitId]);
         expect(plainBodies.map(body => JSON.parse(body).visitId)).toEqual(batchOrder);
