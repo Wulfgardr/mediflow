@@ -22,6 +22,7 @@
 import { clinicalFactContext, clinicalSentence, clinicalTokens, contextReview, isHistoricalTherapy, legacyPreparedFamily, legacyPreparedNegation, structuredContextApplies, type ClinicalContext } from './clinical-context-lexicon';
 import { isValidItalianTaxCodeChecksum } from './document-identity-resolution';
 import { catalogObservationCode } from './dossier-sections';
+import { anchorTabularQuote } from './dossier-tabular-quote';
 import {
     DOSSIER_FACT_TARGET, dossierFactBlockers, dossierFactId, latestAppliedOutcome, unitText,
     type DossierEvidence, type DossierFact, type DossierFactAssessment, type DossierFactKind, type DossierRecord, type DossierUnit,
@@ -242,10 +243,18 @@ export function anchorPreparedQuote(text: string, units: readonly DossierUnit[],
         }
         if (best?.differences === 0) break;
     }
+    if (best?.differences === 0) {
+        const body = unitText(text, best.unit);
+        const first = best.tokens[best.from]; const last = best.tokens[best.from + wanted.length - 1];
+        return { match: 'exact', words: best.tokens.slice(best.from, best.from + wanted.length).map((token) => token.text),
+            evidence: { unit: best.unit.index, start: first.start, end: last.end, excerpt: body.slice(first.start, last.end).replace(/\s+/gu, ' ').trim() } };
+    }
+    const tabular = anchorTabularQuote(text, units, quote);
+    if (tabular) return { match: tabular.match, words: tabular.words, evidence: tabular.evidence };
     if (!best) return null;
     const body = unitText(text, best.unit);
     const first = best.tokens[best.from]; const last = best.tokens[best.from + wanted.length - 1];
-    return { match: best.differences === 0 ? 'exact' : 'approximate', words: best.tokens.slice(best.from, best.from + wanted.length).map((token) => token.text),
+    return { match: 'approximate', words: best.tokens.slice(best.from, best.from + wanted.length).map((token) => token.text),
         evidence: { unit: best.unit.index, start: first.start, end: last.end, excerpt: body.slice(first.start, last.end).replace(/\s+/gu, ' ').trim() } };
 }
 
@@ -500,7 +509,8 @@ export function preparedDossierFacts(input: PreparedFactsInput): PreparedFactsRe
         else if (NARRATIVE.has(item.kind)) {
             // Un testo descrittivo è verificato solo se è esso stesso un passo del documento; il titolo è quello del tipo.
             values.title = NARRATIVE_TITLES[item.kind] ?? values.title ?? '';
-            const passage = values.text ? anchorPreparedQuote(text, units, values.text) : null;
+            const textAnchor = values.text ? anchorPreparedQuote(text, units, values.text) : null;
+            const passage = textAnchor && textAnchor.words.length === preparedTokens(values.text).length ? textAnchor : null;
             const quoted = item.quote ? anchorPreparedQuote(text, units, item.quote) : null;
             evidence = passage?.evidence ?? quoted?.evidence ?? null;
             check = passage ? (passage.match === 'exact' ? 'verified' : 'approximate') : 'paraphrase';

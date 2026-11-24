@@ -7,11 +7,13 @@ use std::{collections::BTreeSet, ops::Range, sync::LazyLock};
 use unicode_normalization::{UnicodeNormalization, char::is_combining_mark};
 
 mod clinical_context;
+mod tabular_quote;
 
 use clinical_context::{
     ClinicalContext, clinical_fact_context, historical_therapy, legacy_family, legacy_negation,
     sentence_after, structured,
 };
+use tabular_quote::anchor_tabular;
 
 fn re(pattern: &str) -> Regex {
     Regex::new(pattern).expect("static dossier expression")
@@ -205,6 +207,12 @@ pub fn anchor(text: &str, units: &[Value], quote: &str) -> Value {
         if best.as_ref().is_some_and(|(diff, _)| *diff == 0) {
             break;
         }
+    }
+    if let Some((0, value)) = best {
+        return value;
+    }
+    if let Some(tabular) = anchor_tabular(text, units, quote) {
+        return tabular;
     }
     best.map(|(_, v)| v).unwrap_or(Value::Null)
 }
@@ -587,7 +595,14 @@ pub fn prepared_facts(input: &Value) -> Value {
                     "invalidity" => "Invalidità da documento",
                     _ => "Passo del documento",
                 });
-                let passage = anchor(text, units, string(&v["text"]));
+                let text_anchor = anchor(text, units, string(&v["text"]));
+                let passage = if !text_anchor.is_null()
+                    && array(&text_anchor["words"]).len() == words(string(&v["text"])).len()
+                {
+                    text_anchor
+                } else {
+                    Value::Null
+                };
                 let quoted = anchor(text, units, string(&item["quote"]));
                 evidence = if !passage.is_null() {
                     passage["evidence"].clone()
