@@ -12,7 +12,7 @@
  */
 
 import { clinicalHeadingPattern, contextReview, familyHeadings, headingQualifiers, legacySectionFamily, legacySectionNegation, suspensionHeadings } from './clinical-context-lexicon';
-import { LOINC_PENDING_VALIDATION, searchStaticTerminology } from '../../terminology';
+import { loincObservationNames } from '../../terminology';
 
 export type DossierSectionKind =
     | 'diagnosis' | 'anamnesis' | 'anamnesis_family' | 'medication' | 'services' | 'clinical_question' | 'prosthetic'
@@ -191,25 +191,19 @@ export function invalidityDetails(text: string): { percentage: string; allowance
 
 const normalizedName = (value: string) => value.toLocaleLowerCase('it-IT').normalize('NFKD').replace(/[̀-ͯ]/gu, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 
-/**
- * Codice LOINC e unità UCUM solo per corrispondenza esatta col catalogo locale: nome
- * italiano (o sigla fra parentesi) uguale all'analita E unità uguale all'unità predefinita.
- * Le voci in validazione clinica non sono nel catalogo e non vengono mai proposte.
- */
-export function catalogObservationCode(analyte: string, unit: string): { code: string; unitCode: string } | null {
-    const wanted = normalizedName(analyte);
-    if (!wanted) return null;
-    // Un nome con una variante ancora in validazione clinica (matrice, unità, metodo) è ambiguo: nessuna proposta.
-    if (LOINC_PENDING_VALIDATION.some((item) => normalizedName((item.displayIt ?? '').replace(/\(.*\)/u, '')) === wanted)) return null;
-    for (const item of searchStaticTerminology('LOINC', '', 1000)) {
-        const label = item.displayIt ?? '';
-        const base = normalizedName(label.replace(/\(.*\)/u, ''));
-        const abbreviation = normalizedName(/\(([^)]+)\)/u.exec(label)?.[1] ?? '');
-        if ((base === wanted || (abbreviation && abbreviation === wanted)) && item.defaultUnit && item.defaultUnit === unit.trim()) {
-            return { code: item.code, unitCode: item.defaultUnit };
-        }
-    }
-    return null;
+const NUMERIC_VALUE = /^-?[0-9]+(?:[.,][0-9]+)?$/u;
+const observationKey = (name: string, unit: string) => `${normalizedName(name)}\u0000${unit}`;
+const OBSERVATION_CODES = loincObservationNames().reduce((index, entry) => {
+    const key = observationKey(entry.name, entry.unit);
+    index.set(key, [...(index.get(key) ?? []).filter((known) => known.code !== entry.code), { code: entry.code, active: entry.active }]);
+    return index;
+}, new Map<string, Array<{ code: string; active: boolean }>>());
+
+export function catalogObservationCode(analyte: string, unit: string, value: string): { code: string; unitCode: string } | null {
+    const unitCode = unit.trim();
+    if (!normalizedName(analyte) || !unitCode || !NUMERIC_VALUE.test(value.trim())) return null;
+    const [only, ...others] = OBSERVATION_CODES.get(observationKey(analyte, unitCode)) ?? [];
+    return only?.active && others.length === 0 ? { code: only.code, unitCode } : null;
 }
 
 export interface DossierIdentityProposal { field: 'taxCode' | 'firstName' | 'lastName' | 'birthDate'; value: string; excerpt: string }
