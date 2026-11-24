@@ -144,7 +144,7 @@ impl ClinicalApp {
             SettingsPage::References => ("references-heading", "Repertori"),
             #[cfg(target_os = "macos")]
             SettingsPage::VoiceLocal => ("clinical-workspace-settings-heading", "Voce locale"),
-            SettingsPage::Profile => ("clinical-workspace-profile-heading", "PROFILO"),
+            SettingsPage::Profile => ("clinical-workspace-profile-heading", "Profilo"),
             SettingsPage::Appearance => ("clinical-workspace-settings-heading", "Aspetto"),
             SettingsPage::Functions => ("clinical-workspace-settings-heading", "Funzioni IA"),
             SettingsPage::Models => ("clinical-workspace-settings-heading", "Modelli e hardware"),
@@ -167,7 +167,7 @@ impl ClinicalApp {
             )
         });
         let header = surface::page(theme)
-            .max_w(px(760.))
+            .max_w(px(880.))
             .child(surface::page_header(id, title, None, actions, theme));
         let view = surface::island(theme, false);
         let content = match self.settings_page {
@@ -189,12 +189,12 @@ impl ClinicalApp {
                     layout.navigation
                 };
                 let frame = if layout.magnified { 0. } else { 16. };
-                let width = (layout.width - navigation - frame - 2. * layout.margin).min(760.);
+                let width = (layout.width - navigation - frame - 2. * layout.margin).min(880.);
                 view.child(div().flex().flex_col().gap(px(12.))
-                    .child(surface::island_title("clinical-workspace-appearance-heading", "ASPETTO", None, theme))
+                    .child(surface::island_title("clinical-workspace-appearance-heading", "Aspetto", None, theme))
                     .child(self.appearance(width - 2. * surface::TRAY_ISLAND_INSET, false, cx)))
                 .child(div().flex().flex_col().gap(px(12.))
-                    .child(section("clinical-workspace-text-scale-heading", "DIMENSIONE DEL TESTO", theme))
+                    .child(section("clinical-workspace-text-scale-heading", "Dimensione del testo", theme))
                     .child(div().flex().flex_wrap().gap(px(8.))
                         .children([(1., "100%"), (1.25, "125%"), (1.5, "150%"), (2., "200%"), (3., "300%"), (4., "400%")].into_iter().map(|(scale, label)| {
                             button(format!("clinical-workspace-text-scale-{}", (scale * 100.) as u32), label, theme, false, true)
@@ -243,7 +243,7 @@ impl ClinicalApp {
                 let workstation = view
                     .child(surface::island_title(
                         "clinical-workspace-settings-postazione",
-                        "POSTAZIONE",
+                        "Postazione",
                         None,
                         theme,
                     ))
@@ -308,7 +308,7 @@ impl ClinicalApp {
                 let intelligence = surface::island(theme, false)
                     .child(surface::island_title(
                         "clinical-workspace-settings-intelligenza",
-                        "INTELLIGENZA",
+                        "Intelligenza",
                         None,
                         theme,
                     ))
@@ -337,7 +337,7 @@ impl ClinicalApp {
                         }),
                     );
                 let archive = surface::island(theme, false)
-                    .child(surface::island_title("clinical-workspace-connection-heading", "ARCHIVIO COLLEGATO", None, theme))
+                    .child(surface::island_title("clinical-workspace-connection-heading", "Archivio collegato", None, theme))
                     .child(text!(origin))
                     .child(button("clinical-workspace-settings-lock", "Blocca e nascondi i dati", theme, false, true)
                         .on_click(cx.listener(|this, _, _, cx| this.request_discard(Discard::Lock, cx))))
@@ -362,34 +362,75 @@ impl ClinicalApp {
         cx: &Context<Self>,
     ) -> Stateful<Div> {
         let theme = self.theme;
-        div()
-            .id(format!("clinical-workspace-settings-item-{}", page.index()))
-            .min_w_0()
-            .border_b_1()
-            .border_color(theme.rule)
-            .pb(px(16.))
-            .flex()
-            .flex_col()
-            .gap(px(4.))
-            .child(
-                self.settings_targets[page.index()]
-                    .attach(button(
-                        format!("clinical-workspace-settings-page-{}", page.index()),
-                        label,
-                        theme,
-                        false,
-                        true,
-                    ))
-                    .on_click(cx.listener(move |this, _, window, cx| {
-                        this.select_settings_page(page, window, cx)
-                    })),
+        let id = SharedString::from(format!("clinical-workspace-settings-page-{}", page.index()));
+        #[cfg(test)]
+        rendered_command::record_button_id(&id);
+        let row = div();
+        #[cfg(test)]
+        let row = {
+            let id = id.clone();
+            row.on_children_prepainted(move |bounds, window, _| {
+                rendered_command::record_shared_button(&id, label, true, &bounds, window)
+            })
+        };
+        self.settings_targets[page.index()]
+            .attach(
+                row.id(id.clone())
+                    .accessibility_id(id)
+                    .role(Role::Button)
+                    .aria_label(label)
+                    .focusable()
+                    .tab_stop(true)
+                    .w_full()
+                    .min_w_0()
+                    .min_h(px(44.))
+                    .px(px(12.))
+                    .py(px(12.))
+                    .flex()
+                    .items_center()
+                    .gap(px(12.))
+                    .border_b_1()
+                    .border_color(theme.rule)
+                    .rounded(px(theme.control_radius))
+                    .cursor_pointer()
+                    .hover(move |style| style.bg(theme.hover))
+                    .active(move |style| style.bg(theme.selected))
+                    .focus(move |style| {
+                        style
+                            .border_color(theme.fresh)
+                            .shadow(vec![theme.focus_ring(false)])
+                    })
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .flex()
+                            .flex_col()
+                            .gap(px(2.))
+                            .child(
+                                div()
+                                    .text_left()
+                                    .font_weight(gpui::FontWeight::SEMIBOLD)
+                                    .text_color(theme.ink)
+                                    .child(text!(label)),
+                            )
+                            .child(div().text_left().text_color(theme.secondary).child({
+                                let text = text!(description);
+                                #[cfg(test)]
+                                let text = rendered_command::observe_text(text);
+                                text
+                            })),
+                    )
+                    .child(
+                        div()
+                            .flex_none()
+                            .text_color(theme.secondary)
+                            .child(text!("›")),
+                    ),
             )
-            .child(div().text_color(theme.secondary).child({
-                let text = text!(description);
-                #[cfg(test)]
-                let text = rendered_command::observe_text(text);
-                text
-            }))
+            .on_click(
+                cx.listener(move |this, _, window, cx| this.select_settings_page(page, window, cx)),
+            )
     }
 }
 

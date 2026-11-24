@@ -207,6 +207,7 @@ function AreaContent({
             patient={selectedPatient}
             workspace={patientWorkspace}
             onOpenArea={onOpenArea}
+            commandTrigger={commandTrigger}
           />
         );
     case 'repertori':
@@ -214,16 +215,24 @@ function AreaContent({
     case 'handoff':
       if (isReview) return <HandoffArea />;
       return territorialHandoff
-        ? <LiveHandoffArea patient={selectedPatient} onOpenArea={onOpenArea} />
+        ? <LiveHandoffArea patient={selectedPatient} onOpenArea={onOpenArea} commandTrigger={commandTrigger} />
         : <SchedaArea patient={selectedPatient} isReview={false} onOpenArea={onOpenArea} />;
     case 'governance':
       return isReview
         ? <GovernanceArea />
-        : <LiveGovernanceArea patientCount={patientState.patients.length} />;
+        : <LiveGovernanceArea patientCount={patientState.patients.length} commandTrigger={commandTrigger} />;
   }
 }
 
-const RECORD_PAGE_AREAS: ReadonlySet<AreaId> = new Set<AreaId>(['turno', 'incarico', 'diario', 'repertori']);
+const RECORD_PAGE_AREAS: ReadonlySet<AreaId> = new Set<AreaId>(['turno', 'incarico', 'diario', 'repertori', 'revisione', 'handoff', 'governance']);
+const LIVE_ONLY_RECORD_PAGE_AREAS: ReadonlySet<AreaId> = new Set<AreaId>(['revisione', 'handoff', 'governance']);
+
+function isRecordPageArea(area: AreaId, isReview: boolean, territorialHandoff: boolean): boolean {
+  if (!RECORD_PAGE_AREAS.has(area)) return false;
+  if (!LIVE_ONLY_RECORD_PAGE_AREAS.has(area)) return true;
+  if (isReview) return false;
+  return area !== 'handoff' || territorialHandoff;
+}
 
 type Kree8ClinicalCockpitProps = {
   surface?: 'live' | 'review';
@@ -582,7 +591,7 @@ export function Kree8ClinicalCockpit({
         ? String(diaryState.activeCount)
         : '…';
 
-  const recordPage = proposal && RECORD_PAGE_AREAS.has(area);
+  const recordPage = proposal && isRecordPageArea(area, isReview, territorialHandoff);
   const commandTrigger = recordPage ? (
     <button
       type="button"

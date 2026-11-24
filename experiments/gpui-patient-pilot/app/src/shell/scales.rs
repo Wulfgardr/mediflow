@@ -1760,7 +1760,7 @@ impl ClinicalApp {
         let catalog = surface::island(theme, false)
             .child(surface::island_title(
                 "clinical-scales-catalog-label",
-                "STRUMENTI DELL’ARCHIVIO",
+                "Strumenti dell’archivio",
                 None,
                 theme,
             ))

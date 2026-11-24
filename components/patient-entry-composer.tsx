@@ -1146,7 +1146,7 @@ export function PatientEntryComposer({ embedded = false, sheetSource, focusRef }
                         Torna alla scheda paziente
                     </Link>
                     <div className={composerStyles.titleRow}>
-                        <h1 className="type-page-title">Nuova voce clinica<span aria-hidden="true">.</span></h1>
+                        <h1>Nuova voce clinica</h1>
                         <p>{patient ? <PrivacyBlur>{`${patient.lastName} ${patient.firstName}`}</PrivacyBlur> : patientRead.loading ? 'Caricamento paziente…' : 'Paziente non disponibile.'}</p>
                     </div>
                     {patient ? <PatientHeaderAllergies details={patientAllergiesForHeader(patient.allergies)} /> : null}

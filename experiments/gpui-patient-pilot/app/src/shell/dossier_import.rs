@@ -226,7 +226,7 @@ impl ClinicalApp {
                 .child(surface::glyph(Icon::Diary, None, theme))
                 .child(surface::island_title(
                     "dossier-import-heading",
-                    "IMPORTA DOSSIER",
+                    "Importa dossier",
                     None,
                     theme,
                 )),

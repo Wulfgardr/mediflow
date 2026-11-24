@@ -349,7 +349,7 @@ impl ClinicalApp {
         let id = row.id.clone();
         let mut pane = surface::island(theme, true).child(surface::island_title(
             format!("document-synthesis-heading-{id}"),
-            "NUOVA SINTESI · PROPOSTA",
+            "Nuova sintesi · Proposta",
             None,
             theme,
         ));
