@@ -1219,6 +1219,7 @@ export type BackupVerification = {
     createdAt: string | null;
     collections: number;
     records: number;
+    excludedRetiredPatients: number;
 };
 
 export type PreparedBackupRestore = {
@@ -1253,19 +1254,29 @@ async function postBackup(url: string, jsonString: string, failure: string, head
 }
 
 export async function importRawDatabase(decision: PreparedBackupRestore, credential: { pin: string } | { verifier: string }) {
-    await postBackup('/api/system/backup-restore', decision.json, 'Restore failed', {
+    const response = await postBackup('/api/system/backup-restore', decision.json, 'Restore failed', {
         'x-mediflow-restore-credential': JSON.stringify(credential),
         'x-mediflow-restore-id': decision.id,
         'x-mediflow-restore-snapshot': decision.verification.expectedSnapshot,
         'x-mediflow-restore-source-checksum': decision.verification.sourceChecksum,
         'x-mediflow-restore-confirmation': 'RIPRISTINA',
     });
+    const result = await response.json();
+    return { excludedRetiredPatients: readExcludedRetiredPatients(result?.receipt?.excludedRetiredPatients) };
+}
+
+function readExcludedRetiredPatients(value: unknown): number {
+    if (value === undefined) return 0;
+    if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
+        throw new Error('Conteggio dei fascicoli esclusi non valido.');
+    }
+    return value;
 }
 
 /* Same key check and preflight as a restore, through a route that cannot write. */
 export async function verifyRawDatabase(jsonString: string): Promise<BackupVerification> {
     const response = await postBackup('/api/system/backup-restore/verify', jsonString, 'Verify failed');
-    const payload = await response.json() as { expectedSnapshot?: unknown; sourceChecksum?: unknown; createdAt?: unknown; collections?: unknown; counts?: unknown };
+    const payload = await response.json() as { expectedSnapshot?: unknown; sourceChecksum?: unknown; createdAt?: unknown; collections?: unknown; counts?: unknown; excludedRetiredPatients?: unknown };
     const { expectedSnapshot, sourceChecksum } = payload;
     const digest = /^[a-f0-9]{64}$/u;
     if (typeof expectedSnapshot !== 'string' || !digest.test(expectedSnapshot)
@@ -1278,6 +1289,7 @@ export async function verifyRawDatabase(jsonString: string): Promise<BackupVerif
         sourceChecksum,
         createdAt: typeof payload.createdAt === 'string' ? payload.createdAt : null,
         collections: Array.isArray(payload.collections) ? payload.collections.length : 0,
+        excludedRetiredPatients: readExcludedRetiredPatients(payload.excludedRetiredPatients),
         records: counts.reduce<number>((total, count) => total + (typeof count === 'number' ? count : 0), 0),
     };
 }

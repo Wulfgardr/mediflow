@@ -94,6 +94,12 @@ diario via LAN continuano a leggere i contratti correnti. Nello storico
 l'operatore e l'ora su una versione precedente indicano la rettifica che l'ha
 sostituita. La versione vigente riporta l'ultima rettifica del testo.
 
+Nel Web lo stesso editor gestisce nuove voci e rettifiche. Applica il formato
+clinico ammesso quando apre o restituisce HTML e mantiene il testo semplice
+modificabile. Una nota applicata dalla Cassetta della visita passa dallo stesso
+sanitizzatore quando contiene HTML, prima della cifratura. La provenienza resta
+quella del deposito.
+
 Lo storico è sospeso alla cancellazione logica e riappare al ripristino della
 nota o del paziente. La cancellazione definitiva della nota elimina le
 versioni tramite la relazione SQLite. Il backup portabile v1 aggiunge la

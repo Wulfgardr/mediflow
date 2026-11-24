@@ -1,4 +1,6 @@
-import { readRestorePreviewSnapshot } from '@/lib/backup-restore-receipt';
+import { readRestorePreview } from '@/lib/backup-restore-receipt';
+import { blockedRestoreResponse } from '../blocked-restore-response';
+import { BackupRestoreBlockedError } from '@/lib/backup-restore-blocked';
 import { backupArtifactInputChecksum } from '@/lib/backup-artifact';
 import { NextResponse } from 'next/server';
 import {
@@ -33,7 +35,7 @@ export async function POST(request: Request) {
         }
         const response = NextResponse.json({
             success: true,
-            expectedSnapshot: readRestorePreviewSnapshot(),
+            ...readRestorePreview(artifact),
             sourceChecksum: backupArtifactInputChecksum(artifact),
             format: artifact.format,
             version: artifact.version,
@@ -44,6 +46,7 @@ export async function POST(request: Request) {
         response.headers.set('Cache-Control', 'no-store');
         return response;
     } catch (error) {
+        if (error instanceof BackupRestoreBlockedError) return blockedRestoreResponse(error.reason);
         const malformato = error instanceof SyntaxError;
         return apiInternalError('Backup verify failed', error, {
             status: malformato ? 400 : 500,

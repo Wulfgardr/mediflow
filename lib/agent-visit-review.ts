@@ -1,6 +1,7 @@
 'use client';
 
 import { db, type Patient } from './db';
+import { isClinicalRichTextHtml, sanitizeClinicalRichTextHtml } from './clinical-rich-text';
 import { cassetteItems } from './agent-cassette-contract';
 import { agentBytes } from './agent-cassette-crypto';
 import { openAgentVisit, type OpenedAgentVisit } from './agent-cassette-client';
@@ -153,11 +154,13 @@ export async function prepareAgentApplication(review: AgentVisitReview, signal: 
         const base = { id: item.id, kind: item.kind };
         switch (item.kind) {
             case 'note': case 'transcription': {
-                if (!text(item.value.text)) throw new Error('Nota vuota.');
+                const original = typeof item.value.text === 'string' ? item.value.text : '';
+                const content = isClinicalRichTextHtml(original) ? sanitizeClinicalRichTextHtml(original) : original;
+                if (!content.trim()) throw new Error('Nota vuota.');
                 const title = item.kind === 'note' ? 'Visita' : 'Trascrizione della visita';
                 const metadata = { sourceLabel: 'Cassetta della visita', provenance };
                 prepared.push({ ...base, values: {
-                    title: await db.sealLocalDraft(title), content: await db.sealLocalDraft(item.value.text),
+                    title: await db.sealLocalDraft(title), content: await db.sealLocalDraft(content),
                     metadata: await db.sealLocalDraft(metadata), date: text(item.value.date) || new Date(review.visit.cassette.depositedAt).toISOString(),
                 } });
                 break;

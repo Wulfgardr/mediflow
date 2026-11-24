@@ -105,7 +105,11 @@ esplicito registra `patient.restored`.
 
 Poiché i pazienti rimossi logicamente restano nei backup, una richiesta di
 erasure deve comprendere anche gli artefatti già esportati. La purge non li
-raggiunge.
+raggiunge. Nel ripristino portabile la destinazione conserva il registro dei
+ritiri ed esclude i fascicoli già cancellati. L’anteprima e la ricevuta
+indicano quanti ne ha esclusi. Il ripristino si ferma se la copia altererebbe
+dati soggetti a un blocco di conservazione o se un deposito o lo storico
+potrebbero riportare contenuto clinico di un fascicolo ritirato.
 
 ### Chiavi, passphrase e recupero
 
