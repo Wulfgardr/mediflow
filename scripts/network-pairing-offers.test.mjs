@@ -59,6 +59,8 @@ test('offer creation requires an active loopback administrator, trusted mutation
     const untrusted = { ...fixture.webHeaders, 'Sec-Fetch-Site': 'cross-site' };
     assert.equal((await issue(untrusted)).status, 403, 'Cross-origin mutation');
     assert.equal((await issue(undefined, '734185')).status, 403, 'Wrong confirmation PIN');
+    assert.equal((await issue(undefined, 'ab12cd')).status, 403, 'Alphanumeric confirmation PIN reaches verification');
+    assert.equal((await issue(undefined, 'ab12cd345')).status, 400, 'Confirmation PIN longer than the configured limit');
     assert.equal((await fixture.lan(adminRoute, {
         method: 'POST', headers: fixture.webHeaders, body: JSON.stringify({ pin }),
     })).status, 403, 'Genuine non-loopback TLS peer with copied cookies');

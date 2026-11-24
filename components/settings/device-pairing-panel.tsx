@@ -105,7 +105,7 @@ export function DevicePairingPanel({ networkEnabled, clients, onClientsChange }:
                     onClick={() => { setConfirmingOffer(true); setMessage(''); }}>Collega un dispositivo</button>}
                 {confirmingOffer && <form className="flex flex-wrap items-end gap-2" onSubmit={event => void createOffer(event)}>
                     <label className="grid gap-1">PIN di conferma
-                        <input name="pin" type="password" inputMode="numeric" pattern="[0-9]{4,8}" required
+                        <input name="pin" type="password" minLength={4} maxLength={8} required
                             autoComplete="off" className="rounded-md border border-[var(--lume-rule)] px-3 py-2" />
                     </label>
                     <button type="submit" className={styles.primaryAction} disabled={pending}>Mostra QR</button>
@@ -118,7 +118,7 @@ export function DevicePairingPanel({ networkEnabled, clients, onClientsChange }:
                     <p>Inquadra il QR con l’iPhone entro cinque minuti.</p>
                     <details>
                         <summary>Impronta del computer</summary>
-                        <p className="font-mono text-sm">{new URL(offer.link).searchParams.get('fingerprint')?.match(/.{4}/gu)?.join(' ')}</p>
+                        <p className="lume-code">{new URL(offer.link).searchParams.get('fingerprint')?.match(/.{4}/gu)?.join(' ')}</p>
                     </details>
                     <div className="flex flex-wrap gap-2">
                         <a className={styles.primaryAction} href={offer.link} referrerPolicy="no-referrer">Apri nell’app</a>
