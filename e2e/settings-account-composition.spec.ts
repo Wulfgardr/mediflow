@@ -2,7 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 import { bootstrapUnlockedSession, unlockIfNeeded, assertNoHorizontalOverflow, lockAllTabsAndSignIn } from './utils';
-import { fetchInterceptedRequest } from './fixtures/trusted-web-request';
+import { documentRequests, fetchInterceptedRequest } from './fixtures/trusted-web-request';
 
 function requireSynthetic(baseURL?: string) {
     if (process.env.MF085_SYNTHETIC_E2E !== '1' || process.env.MEDIFLOW_E2E_DISABLE_LEGACY_COPY !== '1'
@@ -170,11 +170,17 @@ test('access and profile settings preserve form drafts and denied outcomes', asy
             await sibling.goto('/');
             await test.step('lock all tabs from the new tab and sign in', () => lockAllTabsAndSignIn(sibling, '1234'));
             await page.bringToFront();
-            await page.evaluate(() => window.dispatchEvent(new Event('focus')));
-            await expect(profile.getByRole('status')).toContainText('La sessione è cambiata');
-            await expect(save).toBeDisabled(); await keepDraft();
+            await expect(page.getByRole('heading', { name: 'Sblocca MediFlow', exact: true })).toBeVisible();
+            await expect(save).toHaveCount(0);
+            const readback = page.waitForResponse(response => new URL(response.url()).pathname === '/api/auth/profile'
+                && response.request().method() === 'GET');
+            await unlockIfNeeded(page, '1234');
+            expect((await readback).status()).toBe(200);
+            await expect(name).toHaveValue('Bozza W19 inventata non salvata');
+            await expect(save).toBeDisabled();
+            await page.getByRole('button', { name: 'Rileggi profilo mantenendo la bozza', exact: true }).click();
+            await expect(save).toBeEnabled(); await keepDraft();
         } finally { await sibling.close(); }
-        await page.getByRole('button', { name: 'Rileggi profilo mantenendo la bozza', exact: true }).click(); await expect(save).toBeEnabled();
         await save.click(); await expect(profile.getByRole('status')).toHaveText('Profilo aggiornato.');
         await back.click(); await expect(page).toHaveURL(new URL('/settings', baseURL!).href); await expect(page.getByRole('dialog')).toHaveCount(0);
         await page.getByRole('link', { name: 'Profilo', exact: true }).click(); await expect(name).toHaveValue('Bozza W19 inventata non salvata');
@@ -251,7 +257,7 @@ test('appearance settings preserve selection and keyboard focus', async ({ baseU
         await motion.focus(); await page.keyboard.press('Space'); await expect(motion).toHaveAttribute('aria-pressed', 'true'); await expect(motion).toBeFocused();
         const privacy = page.getByTestId('settings-privacy-mode-pointer');
         await privacy.focus(); await page.keyboard.press('Space'); await expect(privacy).toHaveAttribute('aria-pressed', 'true'); await expect(privacy).toBeFocused();
-        expect((await page.request.get(new URL('/api/patients', baseURL!).href)).status()).toBe(200);
+        expect((await documentRequests(page).get('/api/patients')).status()).toBe(200);
         await page.reload(); await unlockIfNeeded(page, '1234');
         await expect(motion).toHaveAttribute('aria-pressed', 'true'); await expect(privacy).toHaveAttribute('aria-pressed', 'true');
         await motion.click(); await privacy.click(); await capture(page, zoom, 'aspetto', privacy);

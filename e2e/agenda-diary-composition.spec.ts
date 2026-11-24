@@ -56,7 +56,7 @@ async function installAgendaDiaryFixture(page: Page, baseURL: string) {
       if (method !== 'GET') return deny();
       return route.fulfill({ json: [] });
     }
-    const ownedAuth = ['/api/auth/check', '/api/auth/setup', '/api/auth/login', '/api/auth/lock', '/api/auth/rewrap-master-key'].includes(path);
+    const ownedAuth = ['/api/auth/check', '/api/auth/setup', '/api/auth/login', '/api/auth/lock', '/api/auth/tab-access', '/api/auth/rewrap-master-key'].includes(path);
     const ownedRead = method === 'GET' && (path === '/api/onboarding/work-profile' || path === '/api/settings' || path.startsWith('/api/settings/') || path === '/api/system/revision' || path === '/api/system/territorial-packs');
     if (path.startsWith('/api/') && !ownedAuth && !ownedRead) return deny();
     return route.continue();
@@ -252,7 +252,10 @@ for (const area of ['turno', 'diario'] as const) test(`Agenda and global diary: 
     for (const status of [401, 403]) {
       f.state[endpoint] = status; await refresh.click();
       await expect(page.getByLabel('MediFlow lock screen')).toBeVisible(); await expect(surface).toHaveCount(0);
-      f.state[endpoint] = 200; await unlockIfNeeded(page, '1234'); await ready();
+      f.state[endpoint] = 200;
+      await page.reload();
+      await unlockIfNeeded(page, '1234');
+      await ready();
     }
   } finally {
     release();

@@ -9,9 +9,8 @@ import {
     withAuditContextMetadata,
     writeAuditEvent,
 } from './audit';
-import { strongWebAuthControlEtag } from './web-auth-control-transport';
+import { resolveProvenWebSession, strongWebAuthControlEtag } from './web-auth-control-transport';
 import {
-    resolve as resolveWebSession,
     retire as retireWebSession,
     type WebRetirementReceipt,
     type WebSessionProjection,
@@ -34,7 +33,7 @@ const CONTROL_ID = /^[A-Za-z0-9_-]{32,256}$/u;
 type ExactRecord = Readonly<Record<string, unknown>>;
 
 export type WebAuthLogoutSources = Readonly<{
-    resolve(sessionId: unknown, controlId: unknown): WebSessionResolution;
+    resolve(sessionId: string, controlId: string, request: Request): WebSessionResolution;
     retire(projection: unknown, reason: 'delete'): WebRetirementReceipt;
     audit(session: WebSessionProjection, sessionId: string, request: Request): unknown;
 }>;
@@ -96,7 +95,7 @@ function empty(status: 204 | 401 | 409, etag: string | null = null): Response {
 }
 
 const productionSources: WebAuthLogoutSources = Object.freeze({
-    resolve: resolveWebSession,
+    resolve: resolveProvenWebSession,
     retire: retireWebSession,
     audit: async (session: WebSessionProjection, sessionId: string, request: Request) => {
         const context = auditContextFromSession(session);
@@ -108,7 +107,7 @@ const productionSources: WebAuthLogoutSources = Object.freeze({
     },
 });
 
-/** Retires only the exact ACTIVE Web projection bound to both fixed cookies. */
+/** Retires only the exact ACTIVE Web projection bound to the presented client and both fixed cookies. */
 export async function completeExactWebP3Logout(
     bearerCookie: unknown,
     controlCookie: unknown,
@@ -119,7 +118,7 @@ export async function completeExactWebP3Logout(
     const controlId = exactCookie(controlCookie, CONTROL_COOKIE_NAME, CONTROL_ID);
     if (!sessionId || !controlId) return empty(401);
     let projection: WebSessionProjection | null;
-    try { projection = exactActiveWebProjection(sources.resolve(sessionId, controlId), sessionId); }
+    try { projection = exactActiveWebProjection(sources.resolve(sessionId, controlId, request), sessionId); }
     catch { return empty(401); }
     if (!projection) return empty(401);
     let receipt: ReturnType<typeof retirementReceipt>;

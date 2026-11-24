@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { bootstrapUnlockedSession } from './utils';
+import { bootstrapUnlockedSession, openUnlockedDocument } from './utils';
 
 type ShareOutcome = 'success' | 'abort' | 'failure';
 
@@ -62,7 +62,7 @@ for (const outcome of ['success', 'abort', 'failure'] as const) {
     await installShareCapability(page, outcome);
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
     const patient = await createSyntheticPatient(page);
-    await page.goto(`/patients/${patient.id}/modules`);
+    await openUnlockedDocument(page, `/patients/${patient.id}/modules`);
 
     await page.getByRole('button', { name: 'Azioni', exact: true }).click();
     const actionsMenu = page.getByRole('menu', { name: 'Azioni scheda', exact: true });
@@ -100,7 +100,7 @@ test('Condividi FHIR resta assente quando il browser non accetta file', async ({
   await installUnavailableShareCapability(page);
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   const patient = await createSyntheticPatient(page);
-  await page.goto(`/patients/${patient.id}/modules`);
+  await openUnlockedDocument(page, `/patients/${patient.id}/modules`);
 
   await page.getByRole('button', { name: 'Azioni', exact: true }).click();
   const actionsMenu = page.getByRole('menu', { name: 'Azioni scheda', exact: true });

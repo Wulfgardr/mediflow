@@ -1,5 +1,5 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
-import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow, unlockIfNeeded } from './utils';
+import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow, unlockIfNeeded, openUnlockedDocument } from './utils';
 import { fetchInterceptedRequest } from './fixtures/trusted-web-request';
 
 test.beforeEach(({ baseURL }) => {
@@ -44,7 +44,7 @@ async function fixture(page: Page): Promise<Fixture> {
 }
 
 async function openDraft(page: Page, data: Fixture): Promise<void> {
-  await page.goto(`/patients/${data.patientId}/modules`);
+  await openUnlockedDocument(page, `/patients/${data.patientId}/modules`);
   await openPatientSection(page, 'terapie');
   await page.locator('#terapie').getByRole('row').filter({ has: page.getByText('Farmaco sintetico principale', { exact: true }) }).getByRole('button', { name: 'Modifica', exact: true }).click();
   await dosage(page).fill('Dose della bozza sintetica');
@@ -106,6 +106,7 @@ for (const width of [1440, 390]) {
 
     await page.reload();
     await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
+    await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
     await openPatientSection(page, 'terapie');
     const suspendedCard = page.locator('#terapie').getByRole('row').filter({ has: page.getByText('Farmaco sintetico principale', { exact: true }) });
     await expect(page.locator('#terapie').getByRole('heading', { name: 'Sospese', exact: true })).toBeVisible();
@@ -154,7 +155,7 @@ test('an invalid form keeps input and does not issue a write', async ({ page }) 
 
 test('a rejected create can be explicitly retried with the same identity after readback', async ({ page }) => {
   const data = await fixture(page);
-  await page.goto(`/patients/${data.patientId}/modules`);
+  await openUnlockedDocument(page, `/patients/${data.patientId}/modules`);
   await openPatientSection(page, 'terapie');
   await page.getByRole('button', { name: 'Nuova terapia', exact: true }).click();
   await page.getByText('Farmaco manuale o galenico', { exact: true }).click();
@@ -215,7 +216,7 @@ test('changing patient requires deliberate discard and never carries the therapy
   await patients.click();
   await confirmation.getByRole('button', { name: 'Esci senza salvare', exact: true }).click();
   await expect(page).toHaveURL(/area=incarico/);
-  await page.goto(`/patients/${other.patientId}/modules`);
+  await openUnlockedDocument(page, `/patients/${other.patientId}/modules`);
   await expect(page).toHaveURL(new RegExp(`/patients/${other.patientId}/modules`));
   await openPatientSection(page, 'terapie');
   await expect(dosage(page)).toHaveCount(0);
@@ -252,7 +253,7 @@ test('a failed write and a failed reread retain the draft without resubmitting',
 
 test('a lost create response is reconciled by stable identity without a duplicate write', async ({ page }) => {
   const data = await fixture(page);
-  await page.goto(`/patients/${data.patientId}/modules`);
+  await openUnlockedDocument(page, `/patients/${data.patientId}/modules`);
   await openPatientSection(page, 'terapie');
   await page.getByRole('button', { name: 'Nuova terapia', exact: true }).click();
   await page.getByText('Farmaco manuale o galenico', { exact: true }).click();
@@ -286,7 +287,7 @@ const reviewedDelete = (page: Page) => deleteRecovery(page).getByRole('button', 
 const deletionReason = 'Inserimento duplicato sintetico: motivazione da conservare';
 
 async function openTherapies(page: Page, data: Fixture): Promise<void> {
-  await page.goto(`/patients/${data.patientId}/modules`);
+  await openUnlockedDocument(page, `/patients/${data.patientId}/modules`);
   await openPatientSection(page, 'terapie');
   await expect(page.locator('#terapie').getByText('Farmaco sintetico principale', { exact: true })).toBeVisible();
 }

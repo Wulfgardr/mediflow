@@ -1,9 +1,9 @@
 import { expect, test } from './fixtures/isolated-runtime';
 import { randomUUID } from 'node:crypto';
 import { bootstrapUnlockedSession } from './utils';
-import { trustedWebRequestHeaders } from './fixtures/trusted-web-request';
+import { documentRequests, localClientProofHeaders, trustedWebRequestHeaders } from './fixtures/trusted-web-request';
 
-test.use({ initialRuntimeServices: true });
+test.use({ initialRuntimeServices: true, existingPin: process.env.E2E_PIN || '1234' });
 
 const STRONG_AUTH_CONTROL_ETAG = /^"[A-Za-z0-9_-]{32,256}"$/u;
 
@@ -15,19 +15,22 @@ function mutationHeaders(etag: string, baseURL: string | undefined): Record<stri
   };
 }
 
-test('Web access recovers across application lock, logout, and synthetic admin reset', async ({ page, browser, baseURL }) => {
+test('Web access recovers across application lock, logout, and synthetic admin reset', async ({ page, browser, baseURL, request: client }) => {
   const pin = process.env.E2E_PIN || '1234';
-  const request = page.request;
+  const local = localClientProofHeaders();
+  type Options = { headers?: Record<string, string>; data?: unknown };
+  const request = {
+    get: (path: string, options: Options = {}) => client.get(path, { ...options, headers: { ...local, ...options.headers } }),
+    post: (path: string, options: Options = {}) => client.post(path, { ...options, headers: { ...local, ...options.headers } }),
+  };
 
   const setupContext = await browser.newContext({ baseURL });
   try {
     const setupPage = await setupContext.newPage();
     await bootstrapUnlockedSession(setupPage, pin);
     await expect(setupPage.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
+    expect((await documentRequests(setupPage).post('/api/auth/logout', { data: {} })).status()).toBe(204);
     await setupPage.close();
-    expect((await setupContext.request.post('/api/auth/logout', {
-      headers: trustedWebRequestHeaders(baseURL),
-    })).status()).toBe(204);
   } finally {
     await setupContext.close();
   }
@@ -113,7 +116,7 @@ test('Web access recovers across application lock, logout, and synthetic admin r
   await bootstrapUnlockedSession(page, '5678');
   await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
 
-  const afterSetup = await request.get('/api/patients');
+  const afterSetup = await documentRequests(page).get('/api/patients');
   expect(afterSetup.status()).toBe(200);
 
   const recoveredContext = await browser.newContext({ baseURL });

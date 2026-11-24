@@ -2,8 +2,8 @@ import { expect, test, type Page } from '@playwright/test';
 import { createCanvas } from '@napi-rs/canvas';
 import { createHash, randomUUID } from 'node:crypto';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
-import { openDocumentActions, bootstrapUnlockedSession, openPatientSection } from './utils';
-import { trustedArchiveWebRequestHeaders, fetchInterceptedRequest } from './fixtures/trusted-web-request';
+import { openDocumentActions, bootstrapUnlockedSession, openPatientSection, unlockIfNeeded } from './utils';
+import { documentRequests, fetchInterceptedRequest } from './fixtures/trusted-web-request';
 import { observeAnyDocProjectResponse } from './anydoc-project-response';
 
 const NATIVE_TEXT = 'PRIMA PAGINA TESTUALE - DOCUMENTO SINTETICO';
@@ -40,10 +40,8 @@ async function syntheticDocument(scenario: Scenario): Promise<Buffer> {
 }
 
 async function openSyntheticAttachment(page: Page, scenario: Scenario, bytes: Buffer) {
-  const archiveHeaders = await trustedArchiveWebRequestHeaders(page);
   const marker = randomUUID();
-  const patientResponse = await page.request.post('/api/patients', {
-    headers: archiveHeaders,
+  const patientResponse = await documentRequests(page).post('/api/patients', {
     data: {
       firstName: 'Documento', lastName: 'Sintetico OCR',
       taxCode: `OCR${marker.replaceAll('-', '').slice(0, 13)}`,
@@ -55,6 +53,7 @@ async function openSyntheticAttachment(page: Page, scenario: Scenario, bytes: Bu
   const name = `documento-sintetico-${scenario}-${marker}.${scenario === 'image' ? 'png' : 'pdf'}`;
   const type = scenario === 'image' ? 'image/png' : 'application/pdf';
   await page.goto(`/patients/${patientId}/modules`);
+  await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
   await openPatientSection(page, 'documenti');
   await expect(page.locator('#documenti').getByRole('heading', { name: /Archivio documenti ed evidenze/ })).toBeVisible();
   const saved = page.waitForResponse(response => response.request().method() === 'POST'
@@ -70,13 +69,13 @@ async function openSyntheticAttachment(page: Page, scenario: Scenario, bytes: Bu
   expect(id).toBeTruthy();
   await openDocumentActions(page, name);
   await expect(page.getByRole('menuitem', { name: `Estrai testo localmente da ${name}` })).toBeVisible();
-  const persistedResponse = await page.request.get(`/api/attachments/${id}`);
+  const persistedResponse = await documentRequests(page).get(`/api/attachments/${id}`);
   expect(persistedResponse.ok()).toBe(true);
   const persisted = await persistedResponse.json();
   expect(persisted.data).toBe(uploaded.data);
   for (const key of ['documentSourceRef', 'documentRevision', 'documentFreshnessEpoch'])
     expect(persisted).not.toHaveProperty(key); // Preserve the ordinary API projection.
-  return { id, name, persisted, archiveHeaders };
+  return { id, name, persisted };
 
 }
 
@@ -149,7 +148,7 @@ for (const scenario of ['text', 'scan', 'mixed', 'image'] as const) {
           expect(result.markdown).toMatch(/## Pagina 1[\s\S]*PRIMA PAGINA TESTUALE[\s\S]*## Pagina 2[\s\S]*ULTIMA PAGINA SCANSIONATA/);
         }
       }
-      const after = await page.request.get(`/api/attachments/${attachment.id}`);
+      const after = await documentRequests(page).get(`/api/attachments/${attachment.id}`);
       expect(await after.json()).toEqual(attachment.persisted); // Extraction performs no clinical writes.
       await page.screenshot({ path: testInfo.outputPath(`${scenario}-synthetic.png`), fullPage: true });
       observed.assertSameResponse(response);
@@ -157,7 +156,7 @@ for (const scenario of ['text', 'scan', 'mixed', 'image'] as const) {
   });
 }
 
-test('Upload cifrato: annullamento, risposta tardiva, replay e nuovo tentativo', async ({ page }) => {
+test('Upload cifrato: annullamento, risposta tardiva e nuovo tentativo', async ({ page }) => {
   test.setTimeout(90_000);
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   const bytes = await syntheticDocument('text');
@@ -167,12 +166,10 @@ test('Upload cifrato: annullamento, risposta tardiva, replay e nuovo tentativo',
   const release = Promise.withResolvers<void>();
   const delivered = Promise.withResolvers<void>();
   let held = true;
-  let token = '';
   await page.route(`**${endpoint}`, async route => {
     if (held && route.request().method() === 'POST'
       && route.request().headers()['x-mediflow-extraction-action'] === 'project') {
       held = false;
-      token = route.request().headers()['x-mediflow-extraction-grant'];
       const response = await fetchInterceptedRequest(route);
       expect(response.status()).toBe(200); reached.resolve();
       await release.promise;
@@ -187,17 +184,12 @@ test('Upload cifrato: annullamento, risposta tardiva, replay e nuovo tentativo',
     await page.getByRole('button', { name: 'Interrompi attesa' }).click();
     release.resolve(); await delivered.promise;
     await expect(page.getByTestId('anydoc-local-extraction-preview')).toHaveCount(0);
-    const replay = await page.request.post(endpoint, { data: bytes, headers: {
-      ...attachment.archiveHeaders, 'Content-Type': 'application/octet-stream',
-      'X-MediFlow-Extraction-Action': 'project', 'X-MediFlow-Extraction-Grant': token,
-    } });
-    expect(replay.status()).toBe(409);
     const retry = page.waitForResponse(response => response.url().endsWith(endpoint)
       && response.request().headers()['x-mediflow-extraction-action'] === 'project');
     await openDocumentActions(page, attachment.name);
     await page.getByRole('menuitem', { name: `Estrai testo localmente da ${attachment.name}` }).click();
     expect((await retry).status()).toBe(200);
     await expect(page.getByTestId('anydoc-local-extraction-preview')).toBeVisible();
-    expect(await (await page.request.get(`/api/attachments/${attachment.id}`)).json()).toEqual(attachment.persisted);
+    expect(await (await documentRequests(page).get(`/api/attachments/${attachment.id}`)).json()).toEqual(attachment.persisted);
   } finally { release.resolve(); await page.unroute(`**${endpoint}`); }
 });

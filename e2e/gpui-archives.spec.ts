@@ -1,5 +1,6 @@
 import { generateMasterKey, wrapMasterKeyVersioned } from '../lib/security/security';
 import { test, expect } from './fixtures/isolated-runtime';
+import { localClientProofHeaders } from './fixtures/trusted-web-request';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -7,6 +8,7 @@ import path from 'node:path';
 import Database from 'better-sqlite3';
 
 test.describe.configure({ retries: 0 });
+test.use({ extraHTTPHeaders: localClientProofHeaders() });
 test('GPUI local authority restores with confirmation, atomic snapshot and durable receipt after new login', async ({ request, isolatedRuntime, baseURL }) => {
     test.setTimeout(120_000);
     const base = new URL(baseURL!);

@@ -6,6 +6,8 @@ import path from 'node:path';
 import net from 'node:net';
 import { spawn, spawnSync } from 'node:child_process';
 import { chromium, expect } from '@playwright/test';
+import { secureLaunch } from '../e2e/fixtures/secure-browser.ts';
+import { retainedDocumentAuthorityHeaders } from '../e2e/fixtures/trusted-web-request.ts';
 import { archiveBrowserPort } from './local-ui-runtime.mjs';
 import { localUiArchiveLock } from './launcher-state.mjs';
 
@@ -37,7 +39,7 @@ test('real browser and plugin launcher: UI owns lease, encrypted draft survives 
     const port = await archiveBrowserPort(data); env.PORT = String(port);
     const url = `http://127.0.0.1:${port}`;
     const children = [];
-    const browser = await chromium.launch({ headless: true });
+    const browser = await chromium.launch(secureLaunch({ headless: true }));
     const context = await browser.newContext({ baseURL: url });
     let output = '';
     const outputs = new Map();
@@ -116,7 +118,8 @@ test('real browser and plugin launcher: UI owns lease, encrypted draft survives 
         if (evidence) await page.screenshot({ path: path.join(evidence, `draft-before-${theme}.png`), fullPage: true });
     }
     const headers = { Origin: url, 'Sec-Fetch-Site': 'same-origin', 'Content-Type': 'application/json' };
-    assert.equal((await context.request.post('/api/plugin-local-ui/lease', { headers: { ...headers, Origin: 'http://evil.example' }, data: { tab: crypto.randomUUID(), action: 'renew' } })).status(), 403);
+    const authority = await retainedDocumentAuthorityHeaders(page);
+    assert.equal((await context.request.post('/api/plugin-local-ui/lease', { headers: { ...headers, ...authority, Origin: 'http://evil.example' }, data: { tab: crypto.randomUUID(), action: 'renew' } })).status(), 403);
     first.disconnect();
     await pause(17000);
     assert.equal(terminal(first), false, 'Last host exit killed a browser-held runtime');
@@ -145,8 +148,11 @@ test('real browser and plugin launcher: UI owns lease, encrypted draft survives 
         await page.evaluate(theme => { document.documentElement.classList.remove('light', 'dark'); document.documentElement.classList.add(theme); }, theme);
         if (evidence) await page.screenshot({ path: path.join(evidence, `draft-after-${theme}.png`), fullPage: true });
     }
-    const entries = await page.request.get(`/api/entries?patientId=${patient.id}`);
-    assert.equal(entries.status(), 200); assert.deepEqual(await entries.json(), []);
+    const entries = await page.evaluate(async id => {
+        const response = await fetch(`/api/entries?patientId=${id}`);
+        return { status: response.status, entries: await response.json() };
+    }, patient.id);
+    assert.deepEqual(entries, { status: 200, entries: [] });
     // Missing pagehide: the server must also stop with a silently lost document.
     await page.route('**/api/plugin-local-ui/lease', route => route.abort());
     second.disconnect(); await page.close();
