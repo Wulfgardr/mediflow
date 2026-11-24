@@ -1,5 +1,9 @@
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { expect, type Page, type Route } from '@playwright/test';
+import {
+  LOCAL_CLIENT_SESSION_PROOF_HEADER, WEB_CONTROL_LOCATOR_HEADER, WEB_DOCUMENT_AUTHORITY_STORAGE_KEY,
+  WEB_SESSION_LOCATOR_HEADER, WEB_SESSION_PROOF_HEADER,
+} from '../../lib/security/web-session-proof-header.ts';
 
 /* APIRequestContext does not synthesize browser Origin or Fetch Metadata, so a
    test that wants a Web mutation admitted passes these headers on that call.
@@ -13,6 +17,23 @@ export function trustedWebRequestHeaders(baseURL: string | undefined): Record<st
     throw new Error('Trusted Web test requests require an HTTP(S) base URL.');
   }
   return { Origin: url.origin, 'Sec-Fetch-Site': 'same-origin' };
+}
+
+export async function retainedDocumentAuthorityHeaders(page: Page): Promise<Record<string, string>> {
+  const authority = await page.evaluate(key => JSON.parse(sessionStorage.getItem(key) ?? 'null') as
+    { proof?: unknown; control?: unknown; session?: unknown } | null, WEB_DOCUMENT_AUTHORITY_STORAGE_KEY);
+  if (typeof authority?.proof !== 'string' || typeof authority.control !== 'string' || typeof authority.session !== 'string') {
+    throw new Error('Only a tab unlocked with the transient PIN retains its document authority.');
+  }
+  return {
+    [WEB_SESSION_PROOF_HEADER]: authority.proof,
+    [WEB_CONTROL_LOCATOR_HEADER]: authority.control,
+    [WEB_SESSION_LOCATOR_HEADER]: authority.session,
+  };
+}
+
+export function localClientProofHeaders(): Record<string, string> {
+  return { [LOCAL_CLIENT_SESSION_PROOF_HEADER]: randomBytes(32).toString('hex') };
 }
 
 type DocumentRequestOptions = {

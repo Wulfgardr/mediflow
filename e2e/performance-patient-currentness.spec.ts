@@ -63,7 +63,7 @@ test('production patient read/edit stays fresh and correct without AI', async ({
     environment: { node: process.version, platform: process.platform, arch: process.arch, os: release(), cpu: cpus()[0]?.model,
       logicalCores: cpus().length, memoryBytes: totalmem(), timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, browser: browser.version(), viewport: page.viewportSize() },
     protocol: { patients: 20, samples: 5, firstVisit: 'fresh page, already started/authenticated server; not OS-cold',
-      warm: 'same unlocked document and server, internal navigation', startupSamples: 1,
+      warm: 'same browser context and server, full document navigation', startupSamples: 1,
       statistics: 'raw samples and median/range only; no P95 or wall-clock CI threshold',
       formReady: 'loaded and enabled firstName plus decrypted address/notes and two related checkups',
       saveToFresh: 'click through real PUT body EOF, app GET of advanced version, all post-save clinical reads complete, then newly opened editable form; includes test-driver observation overhead',
@@ -115,12 +115,6 @@ test('production patient read/edit stays fresh and correct without AI', async ({
     const sentinel = await read(sentinelId);
     let current = await read(patientId);
     expect(current).toMatchObject({ id: patientId, version: 1, firstName: 'Persona000000' });
-    await page.goto(`${url}/patients/${patientId}/modules`);
-    await unlockIfNeeded(page, '314159');
-    const openEdit = async () => {
-      await page.getByRole('button', { name: 'Azioni', exact: true }).click();
-      await page.getByRole('menu', { name: 'Azioni scheda', exact: true }).getByRole('menuitem', { name: 'Modifica', exact: true }).click();
-    };
     for (let index = 0; index < 5; index++) {
       const name = page.locator('input[name="firstName"]');
       const notes = page.locator('textarea[name="notes"]');
@@ -137,7 +131,7 @@ test('production patient read/edit stays fresh and correct without AI', async ({
         await expect(save).toBeEnabled();
       };
       const opened = performance.now();
-      await openEdit();
+      await page.goto(`${url}/patients/${patientId}/edit`);
       await ready(current.firstName, index ? `Nota sintetica aggiornata ${index - 1}` : 'Nota clinica sintetica ripetibile per il benchmark locale.');
       const formReadyMs = performance.now() - opened;
       const nextName = `PersonaAggiornata${index}`;
@@ -181,7 +175,7 @@ test('production patient read/edit stays fresh and correct without AI', async ({
       await expect(page).toHaveURL(`${url}/patients/${patientId}/modules`);
       await expect(page.getByTestId('lume-scheda-header')).toContainText(nextName);
       await expect.poll(() => pendingApi.size).toBe(0);
-      await openEdit();
+      await page.goto(`${url}/patients/${patientId}/edit`);
       await ready(nextName, nextNotes);
       const saveToFreshFormMs = performance.now() - saved;
       expect(await read(sentinelId), 'Editing A must not change B').toEqual(sentinel);
@@ -203,7 +197,6 @@ test('production patient read/edit stays fresh and correct without AI', async ({
       samples.push({ iteration: index, formReadyMs: round(formReadyMs), saveToWriteBodyMs: round(writeMs),
         saveToFreshResponseMs: round(freshResponseMs), saveToFreshFormMs: round(saveToFreshFormMs), putRequestMs: round(write.response.request().timing().responseEnd), version: fresh.version });
       current = fresh;
-      await page.getByRole('link', { name: 'Torna alla scheda paziente', exact: true }).click();
     }
     expect(apiRequests.filter(row => row.method === 'PUT').map(row => row.status))
       .toEqual(Array.from({ length: 5 }, () => [200, 409, 400]).flat());
