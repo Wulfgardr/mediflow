@@ -1,11 +1,15 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
 import { parsePreparedExtraction, preparedDossierFacts } from '../lib/domain/documents/dossier-prepared';
 import { collectDossierPatientNames, collectDossierTaxCodes, findExplicitDocumentDate, splitDossierUnits } from '../lib/domain/documents/dossier-import';
 import type { DossierFact } from '../lib/domain/documents/dossier-import';
-const root = 'native/contracts/dossier-conformance/';
-const banco = JSON.parse(readFileSync(root + 'banco.json', 'utf8'));
-const parser = JSON.parse(readFileSync(root + 'parser.json', 'utf8'));
-const mutations = JSON.parse(readFileSync(root + 'mutations.json', 'utf8'));
+const sourceDir = 'native/contracts/dossier-conformance';
+const outIndex = process.argv.indexOf('--out-dir');
+const outDir = outIndex >= 0 ? process.argv[outIndex + 1] : sourceDir;
+mkdirSync(outDir, { recursive: true });
+const banco = JSON.parse(readFileSync(path.join(sourceDir, 'banco.json'), 'utf8'));
+const parser = JSON.parse(readFileSync(path.join(sourceDir, 'parser.json'), 'utf8'));
+const mutations = JSON.parse(readFileSync(path.join(sourceDir, 'mutations.json'), 'utf8'));
 const calls: Array<{ op: string; args: unknown[] }> = [];
 const manifest: Array<{ name: string; facts: number; identity: number; eligible: number[]; mutation: boolean }> = [];
 function add(input: { id: string; text: string; pages: number | null; fileName: string; extraction: unknown; parserFacts?: DossierFact[] }, mutation = false) {
@@ -32,6 +36,6 @@ for (const row of banco.documents) {
     add({ ...row, id: row.id + '-candidate', extraction: banco.candidates.find((p: { id: string }) => p.id === row.id).extraction });
 }
 for (const mutation of mutations) add({ id: mutation.name, text: mutation.text, fileName: mutation.extraction.sources[0].fileName, pages: 1, extraction: mutation.extraction }, true);
-writeFileSync(root + 'banco-cases.json', JSON.stringify(calls));
-writeFileSync(root + 'banco-index.json', JSON.stringify(manifest));
+writeFileSync(path.join(outDir, 'banco-cases.json'), JSON.stringify(calls));
+writeFileSync(path.join(outDir, 'banco-index.json'), JSON.stringify(manifest));
 console.log(`${calls.length} casi del banco, dieci falsificazioni esplicite`);

@@ -737,3 +737,52 @@ test('WUL-925: uncertain CF role isolates the single document instead of marking
     assert.equal(stillMixed.blocking, true);
     assert.equal(stillMixed.uncertainDocuments, undefined);
 });
+
+test('WUL-926: paper prescription physician_stamp and white electronic prescription prescriber_block match the patient', () => {
+    const patients = [{ id: 'pa', taxCode: CF_A }, { id: 'pb', taxCode: CF_B }];
+    const indent = ' '.repeat(87);
+    const stamped = `Ricetta cartacea\nAssistito codice fiscale ${CF_A}\n\n${indent}Dott. ALDO BRUNI\n${indent}CF: ${CF_B}`;
+    const stampCodes = collectDossierTaxCodes(stamped);
+    assert.deepEqual(
+        stampCodes.map((entry) => [entry.value, entry.role, entry.explicitProfessional ?? false, entry.professionalLabelScope ?? null]),
+        [
+            [CF_A, 'patient_cf', false, null],
+            [CF_B, 'professional_cf', true, 'physician_stamp'],
+        ],
+    );
+    const stampMatched = evaluateDossierGroupIdentity([{ taxCodes: stampCodes }], patients, 'pa', null);
+    assert.equal(stampMatched.status, 'matched');
+    assert.equal(stampMatched.blocking, false);
+    const stampSuggested = evaluateDossierGroupIdentity([{ taxCodes: stampCodes }], patients, null, null);
+    assert.equal(stampSuggested.status, 'suggested');
+    assert.deepEqual(stampSuggested.candidatePatientIds, ['pa']);
+
+    const repeatedStampCodes = collectDossierTaxCodes(`${stamped}\nAssistito codice fiscale ${CF_B}`);
+    const repeatedStampEval = evaluateDossierGroupIdentity([{ taxCodes: repeatedStampCodes }], patients, 'pa', null);
+    assert.equal(repeatedStampEval.status, 'mixed');
+    assert.equal(repeatedStampEval.blocking, true);
+
+    const whitePrescription = [
+        'Prescrizione di farmaci non a carico del SSN - Ricetta Bianca Elettronica - Promemoria per il paziente',
+        'NRBE            CODICE FISCALE PAZIENTE            PIN-NRBE',
+        `                ${CF_A}                   00000`,
+        'COGNOME E NOME DEL MEDICO: MEDICO SINTETICO             CODICE FISCALE',
+        'INDIRIZZO DELLO STUDIO E NUMERO DI TELEFONO: Via di Prova 100',
+        'Citta di Prova XX, tel. 0000000000',
+        `SPECIALIZZAZIONE: Continuita assistenziale              ${CF_B}`,
+    ].join('\n\n');
+    const whiteCodes = collectDossierTaxCodes(whitePrescription);
+    assert.deepEqual(
+        whiteCodes.map((entry) => [entry.value, entry.role, entry.professionalLabelScope ?? null]),
+        [
+            [CF_A, 'patient_cf', null],
+            [CF_B, 'professional_cf', 'prescriber_block'],
+        ],
+    );
+    const whiteMatched = evaluateDossierGroupIdentity([{ taxCodes: whiteCodes }], patients, 'pa', null);
+    assert.equal(whiteMatched.status, 'matched');
+    assert.equal(whiteMatched.blocking, false);
+    const whiteWrong = evaluateDossierGroupIdentity([{ taxCodes: whiteCodes }], patients, 'pb', null);
+    assert.equal(whiteWrong.status, 'discordant');
+    assert.equal(whiteWrong.blocking, true);
+});
