@@ -1,9 +1,10 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { expect, type Page, type Route } from '@playwright/test';
 import {
-  LOCAL_CLIENT_SESSION_PROOF_HEADER, WEB_CONTROL_LOCATOR_HEADER, WEB_DOCUMENT_AUTHORITY_STORAGE_KEY,
-  WEB_SESSION_LOCATOR_HEADER, WEB_SESSION_PROOF_HEADER,
+  LOCAL_CLIENT_SESSION_PROOF_HEADER, WEB_CONTROL_LOCATOR_HEADER, WEB_SESSION_LOCATOR_HEADER, WEB_SESSION_PROOF_HEADER,
 } from '../../lib/security/web-session-proof-header.ts';
+
+const RETAINED_DOCUMENT_AUTHORITY_KEY = 'mediflow_web_document_authority';
 
 /* APIRequestContext does not synthesize browser Origin or Fetch Metadata, so a
    test that wants a Web mutation admitted passes these headers on that call.
@@ -21,7 +22,7 @@ export function trustedWebRequestHeaders(baseURL: string | undefined): Record<st
 
 export async function retainedDocumentAuthorityHeaders(page: Page): Promise<Record<string, string>> {
   const authority = await page.evaluate(key => JSON.parse(sessionStorage.getItem(key) ?? 'null') as
-    { proof?: unknown; control?: unknown; session?: unknown } | null, WEB_DOCUMENT_AUTHORITY_STORAGE_KEY);
+    { proof?: unknown; control?: unknown; session?: unknown } | null, RETAINED_DOCUMENT_AUTHORITY_KEY);
   if (typeof authority?.proof !== 'string' || typeof authority.control !== 'string' || typeof authority.session !== 'string') {
     throw new Error('Only a tab unlocked with the transient PIN retains its document authority.');
   }
