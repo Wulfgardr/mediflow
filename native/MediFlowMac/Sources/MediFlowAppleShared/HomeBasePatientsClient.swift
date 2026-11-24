@@ -1728,11 +1728,21 @@ public actor HomeBasePatientsClient {
     }
 }
 
-private final class HomeBaseTLSSessionDelegate: NSObject, URLSessionDelegate {
+final class HomeBaseTLSSessionDelegate: NSObject, URLSessionTaskDelegate {
     private let expectedPin: String
 
-    init(expectedPin: String) {
+    private let rejectsRedirects: Bool
+
+    init(expectedPin: String, rejectsRedirects: Bool = false) {
         self.expectedPin = expectedPin
+        self.rejectsRedirects = rejectsRedirects
+    }
+
+    func urlSession(
+        _ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void
+    ) {
+        completionHandler(rejectsRedirects ? nil : request)
     }
 
     func urlSession(

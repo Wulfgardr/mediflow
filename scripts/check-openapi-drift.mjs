@@ -153,6 +153,12 @@ function hasScopedProfileAdmission(sourcePath, source) {
 }
 
 function hasRecognizedApiV1AuthGuard(sourcePath, source) {
+    const hasPairingOfferAdmission = sourcePath === 'app/api/v1/network/pairing-offers/redeem/route.ts'
+        && extractMethods(source).join(',') === 'POST'
+        && source.includes('if (!requireAttestedTlsProxyContext(request)) return')
+        && source.includes('const claim = readDevicePairingClaim(payload)')
+        && source.includes('if (!claim || signal.aborted) return invalid()')
+        && source.includes('await redeemDevicePairingOffer(claim)');
     const hasLocalTokenGuard = source.includes('requireLocalApiToken(');
     const hasPairedClientGuard = source.includes('authenticateNetworkPairedClient(')
         || source.includes('requireNetworkCapabilityContext(')
@@ -202,7 +208,7 @@ function hasRecognizedApiV1AuthGuard(sourcePath, source) {
         return ts.isReturnStatement(returned)
             && returned.expression?.getText(file).replace(/\s/gu, '') === 'handleNativeAuthorityRetirementHttp(request)';
     })();
-    return hasNativeAuthorityRetirementGuard || hasLocalTokenGuard || hasPairedClientGuard || hasNativeConfigurationGuard || hasNativeOrdinaryGuard || hasNativeFabricGuard
+    return hasPairingOfferAdmission || hasNativeAuthorityRetirementGuard || hasLocalTokenGuard || hasPairedClientGuard || hasNativeConfigurationGuard || hasNativeOrdinaryGuard || hasNativeFabricGuard
         || hasProfileFseAdmission(sourcePath, source) || hasScopedProfileAdmission(sourcePath, source);
 }
 
