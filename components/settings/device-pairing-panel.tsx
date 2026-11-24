@@ -114,7 +114,7 @@ export function DevicePairingPanel({ networkEnabled, clients, onClientsChange }:
                 </form>}
                 {offer && <div className="space-y-2">
                     <Image src={offer.image} alt="QR per collegare un dispositivo MediFlow"
-                        width={232} height={232} unoptimized className="bg-white [image-rendering:pixelated]" />
+                        width={232} height={232} unoptimized className="[image-rendering:pixelated]" />
                     <p>Inquadra il QR con l’iPhone entro cinque minuti.</p>
                     <details>
                         <summary>Impronta del computer</summary>
