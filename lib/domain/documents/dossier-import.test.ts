@@ -353,10 +353,15 @@ test('WUL-929: right name in an unexpected unit, an exam awaiting validation and
         'Ferritina sierica 30 ng/mL 15-150',
         'Ca 2,3 mmol/L 2,1-2,6',
         'FT4 1,1 ng/dL 0,9-1,7',
+        'Calcio 2,3 mmol/L 2,1-2,6',
+        'Calcio totale 2,3 mmol/L 2,1-2,6',
+        'FT4 15 pmol/L 10-22',
+        'FT3 5 pmol/L 3,1-6,8',
     ].join('\n');
     const observations = candidates(text).filter((fact) => fact.kind === 'observation');
-    assert.deepEqual(observations.map((fact) => [fact.values.display, fact.values.code]),
-        [['Acido urico', ''], ['Azotemia', ''], ['LDH', ''], ['Ferritina sierica', ''], ['Ca', ''], ['FT4', '']]);
+    assert.deepEqual(observations.map((fact) => fact.values.code), observations.map(() => ''));
+    assert.deepEqual(observations.map((fact) => fact.values.display).slice(0, 8),
+        ['Acido urico', 'Azotemia', 'LDH', 'Ferritina sierica', 'Ca', 'FT4', 'Calcio', 'Calcio totale']);
 });
 
 test('residual text is everything no proposal covers, per unit', async () => {

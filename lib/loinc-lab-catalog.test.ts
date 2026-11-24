@@ -31,8 +31,8 @@ test('the active catalog is generated from the committed table: same codes, offi
         LOINC_LAB_TABLE.map((row) => [row.code, row.longCommonName, row.unit]));
 });
 
-test('48 active rows enter the static LOINC catalog with official name and unit; the 36 awaiting validation do not', () => {
-    assert.deepEqual([active.length, pending.length], [48, 36]);
+test('45 active rows enter the static LOINC catalog with official name and unit; the 39 awaiting validation do not', () => {
+    assert.deepEqual([active.length, pending.length], [45, 39]);
     for (const row of active) {
         assert.deepEqual(resolveStaticTerminology('LOINC', row.code), {
             system: 'LOINC', code: row.code, display: row.longCommonName, displayIt: row.nameIt,
@@ -51,10 +51,26 @@ test('a row awaiting validation never codes, under any of its names', () => {
     for (const item of LOINC_PENDING_VALIDATION) assert.equal(catalogObservationCode(item.displayIt ?? '', item.defaultUnit ?? '', '1'), null, item.code);
 });
 
-test('every active row with a unit codes under its names, except names another row claims in the same unit', () => {
+test('a name awaiting validation blocks coding in every unit, as on main', () => {
+    const names = loincObservationNames();
+    const units = [...new Set(names.map((entry) => entry.unit).filter(Boolean))];
+    const pendingNames = names.filter((entry) => !entry.active);
+    assert.ok(pendingNames.length > 0 && units.length > 1);
+    for (const { name, code } of pendingNames) {
+        for (const unit of units) assert.equal(catalogObservationCode(name, unit, '1'), null, `${code} ${name} ${unit}`);
+    }
+    for (const [name, unit, value] of [['Calcio', 'mmol/L', '2,3'], ['Calcio totale', 'mmol/L', '2,3'], ['FT4', 'pmol/L', '15'], ['FT3', 'pmol/L', '5']] as const) {
+        assert.equal(catalogObservationCode(name, unit, value), null, `${name} ${unit} awaits the clinical choice between mass and molar units`);
+    }
+    assert.equal(catalogObservationCode('Glicemia', 'mg/dL', '95'), null, 'the pilot glucose shares its name with the serum/plasma entry awaiting validation');
+});
+
+test('every active row with a unit codes under its names, except names another row claims in the same unit or a name awaiting validation', () => {
     const normalized = (value: string) => value.toLocaleLowerCase('it-IT').normalize('NFKD').replace(/[\u0300-\u036f]/gu, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
     const owners = new Map<string, Set<string>>();
-    for (const entry of loincObservationNames()) {
+    const names = loincObservationNames();
+    const pendingNames = new Set(names.filter((entry) => !entry.active).map((entry) => normalized(entry.name)));
+    for (const entry of names.filter((candidate) => candidate.active)) {
         const key = `${normalized(entry.name)}|${entry.unit}`;
         owners.set(key, new Set([...(owners.get(key) ?? []), entry.code]));
     }
@@ -65,7 +81,7 @@ test('every active row with a unit codes under its names, except names another r
             continue;
         }
         for (const [name, code] of outcomes) {
-            const shared = (owners.get(`${normalized(name)}|${row.unit}`)?.size ?? 0) > 1;
+            const shared = (owners.get(`${normalized(name)}|${row.unit}`)?.size ?? 0) > 1 || pendingNames.has(normalized(name));
             assert.equal(code, shared ? null : row.code, `${row.code} ${name}`);
         }
         assert.ok(outcomes.some(([, code]) => code === row.code), `${row.code} must be reachable`);
@@ -83,10 +99,7 @@ test('two units of the same analyte choose two different codes and never share a
         assert.notEqual(codes[0], codes[1], name);
         assert.equal(catalogObservationCode(name, 'g/L', '1'), null, name);
     }
-    for (const [name, unit] of [['Calcio totale', 'mmol/L'], ['FT4', 'pmol/L'], ['FT3', 'pmol/L']] as const) {
-        assert.equal(catalogObservationCode(name, unit, '1')?.code, loincLabTableCode(table, name, unit), name);
-    }
-    for (const [name, unit] of [['Calcio totale', 'mg/dL'], ['FT4', 'ng/dL'], ['FT3', 'pg/mL']] as const) {
+    for (const [name, unit] of [['Calcio totale', 'mmol/L'], ['Calcio totale', 'mg/dL'], ['FT4', 'pmol/L'], ['FT4', 'ng/dL'], ['FT3', 'pmol/L'], ['FT3', 'pg/mL']] as const) {
         assert.equal(catalogObservationCode(name, unit, '1'), null, `${name} ${unit} is still awaiting validation`);
     }
 });
