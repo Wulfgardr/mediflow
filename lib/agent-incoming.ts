@@ -63,7 +63,8 @@ async function apply(review: AgentVisitReview, signal: AbortSignal) {
     signal.throwIfAborted();
     if (receipt.status !== 'applied' || receipt.visitId !== input.visitId || receipt.phase !== input.phase || receipt.itemCount !== input.items.length) throw new Error('Ricevuta non verificabile. Rileggi la cassetta.');
     notifyDbChange();
-    return { ...review, patient: review.patient ? { ...review.patient, version: receipt.patientVersion } : null,
+    const patient = review.patient ?? (review.newPatient && await db.patients.get(input.patientId, { signal }));
+    return { ...review, patient: patient ? { ...patient, version: receipt.patientVersion } : null, newPatient: null,
         appliedItemIds: [...new Set([...review.appliedItemIds, ...input.items.map(item => item.id)])] };
 }
 export async function attemptNativeConfirmation(signal: AbortSignal, readPdf?: Parameters<typeof inspectAgentVisit>[4]) {
@@ -81,16 +82,15 @@ export async function attemptNativeConfirmation(signal: AbortSignal, readPdf?: P
     if (!prepare.ok) return;
     try {
         const { agreementPublicKey } = await prepare.json();
-        const [row, patients, profile, exemptions] = await Promise.all([
+        const [row, patients, profile] = await Promise.all([
             fetchIncoming<IncomingAgentCassette>('?visit=' + ticket.visitId, signal),
             db.patients.toArray({ signal, rejectAuthUnavailable: true }),
             fetch('/api/auth/profile', { cache: 'no-store', signal }),
-            db.exemptions.toArray({ signal, rejectAuthUnavailable: true }),
         ]);
         if (!profile.ok || row.id !== ticket.visitId || row.revision !== ticket.revision || row.archiveGeneration !== clientArchiveGeneration()
             || row.status !== 'closed') return;
         const { doctorTaxCode } = await profile.json();
-        const review = await inspectAgentVisit(row, patients, doctorTaxCode ?? null, signal, readPdf, new Set(exemptions.map(value => value.code)));
+        const review = await inspectAgentVisit(row, patients, doctorTaxCode ?? null, signal, readPdf);
         const plan = await prepareAgentApplication(review, signal);
         if (!plan || plan.patientId !== existing.patient.id || plan.expectedVersion !== existing.patient.version) return;
         const presentation = await sealVisitConfirmationPresentation(reference, agreementPublicKey, await agentVisitPresentation(review, plan));
@@ -114,11 +114,13 @@ export async function refreshAgentIncoming(signal = db.getSessionReadSignal(), r
                 publish({ ...empty, applicationError: snapshot.applicationError });
                 return;
             }
-            const [patients, profileResponse, exemptions] = await Promise.all([db.patients.toArray({ signal, rejectAuthUnavailable: true }),
-                fetch('/api/auth/profile', { cache: 'no-store', signal }), db.exemptions.toArray({ signal, rejectAuthUnavailable: true })]);
+            const [patients, profileResponse, contextResponse] = await Promise.all([db.patients.toArray({ signal, rejectAuthUnavailable: true }),
+                fetch('/api/auth/profile', { cache: 'no-store', signal }), fetch('/api/context', { cache: 'no-store', signal })]);
             if (!profileResponse.ok) throw new Error('Profilo medico non disponibile.');
             const profile: { doctorTaxCode?: string } = await profileResponse.json();
-            const codes = new Set(exemptions.map(value => value.code));
+            const context: { ambulatoryId?: string } = contextResponse.ok ? await contextResponse.json() : {};
+            const ambulatoryId = contextResponse.ok ? context.ambulatoryId
+                ?? (await db.ambulatories.toArray({ signal, rejectAuthUnavailable: true })).find(value => value.isDefault)?.id : undefined;
             const visits: AgentVisitReview[] = [];
             let unreadable = false;
             for (;;) {
@@ -127,7 +129,7 @@ export async function refreshAgentIncoming(signal = db.getSessionReadSignal(), r
                     let review: AgentVisitReview;
                     try {
                         const row = await fetchIncoming<IncomingAgentCassette>('?visit=' + summary.id, signal);
-                        review = await inspectAgentVisit(row, patients, profile.doctorTaxCode ?? null, signal, readPdf, codes);
+                        review = await inspectAgentVisit(row, patients, profile.doctorTaxCode ?? null, signal, readPdf, ambulatoryId);
                     } catch (error) {
                         if (signal.aborted) throw error;
                         unreadable = true;
@@ -170,21 +172,27 @@ export async function applyReviewedAgentVisits(ids: string[]): Promise<void> {
     const task = (async () => {
         publish({ ...snapshot, busy: true, applicationError: null });
         const versions = new Map<string, { reviewed: number; committed: number }>();
+        const createdPatients = new Map<string, NonNullable<AgentVisitReview['patient']>>();
         try {
             for (const id of ids) {
                 if (signal.aborted) return;
                 const review = snapshot.visits.find(value => value.visit.cassette.id === id);
-                const patient = review?.patient;
                 if (!review) continue;
+                const newPatient = review.newPatient;
+                const created = newPatient && createdPatients.get(newPatient.taxCode);
+                const patient = review.patient ?? created;
                 try {
-                    if (!patient?.version || !agentVisitAwaitsReview(review)) throw new Error(notApplied);
-                    const known = versions.get(patient.id);
-                    const expectedVersion = known?.reviewed === patient.version ? known.committed : patient.version;
+                    if (!agentVisitAwaitsReview(review)) throw new Error(notApplied);
                     const reopened = await reopenForApplication(review, signal);
-                    const current = expectedVersion === patient.version ? reopened : { ...reopened, patient: { ...patient, version: expectedVersion } };
+                    if (created && newPatient?.birthDate && created.birthDate?.toISOString().slice(0, 10) !== newPatient.birthDate) throw new Error(notApplied);
+                    const known = patient && versions.get(patient.id);
+                    const expectedVersion = known?.reviewed === patient?.version ? known?.committed : patient?.version;
+                    const current = patient ? { ...reopened, patient: { ...patient, version: expectedVersion }, newPatient: null } : reopened;
                     const applied = await apply(current, signal);
-                    if (!applied.patient?.version) throw new Error(notApplied);
-                    versions.set(patient.id, { reviewed: patient.version, committed: applied.patient.version });
+                    if (applied.patient?.version) {
+                        if (newPatient) createdPatients.set(newPatient.taxCode, applied.patient);
+                        if (patient?.version) versions.set(patient.id, { reviewed: patient.version, committed: applied.patient.version });
+                    }
                     publish({ ...snapshot, visits: snapshot.visits.map(value => value === review ? { ...applied, visit: review.visit } : value) });
                 } catch (error) {
                     if (!signal.aborted && !snapshot.applicationError) {
