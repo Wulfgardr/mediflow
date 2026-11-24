@@ -16,6 +16,7 @@ type Props = {
     onExportFhir: () => void;
     onShareFhir: () => void;
     onReportPdf: () => void;
+    onSendToCodex?: () => void;
 };
 
 export function PatientHeaderActions({patientId,ambulatoryId,checkups,...actions}:Props) {

@@ -13,7 +13,7 @@ si eseguono dalla radice della repository.
 ## Collegare il client
 
 In MediFlow, sbloccare con la credenziale dell’account, aprire Impostazioni, Agenti e creare
-un mandato di dodici ore. Il PIN conferma il mandato, che indica operazioni,
+un mandato fino a 24 ore. Il PIN conferma il mandato, che indica operazioni,
 fornitore del modello e autorizzazione ad inviare dati clinici al fornitore.
 
 ```sh
@@ -28,7 +28,7 @@ npm run agent:visita -- completa --richiesta UUID-DELLA-RICHIESTA
 ```
 
 Conservare `agentRef` dalla ricevuta. Dopo lo sblocco con PIN o passphrase, o dopo
-«Rinnova accesso» riuscito, il client registrato può ritirare il mandato di 12 ore. Il blocco, la scadenza
+«Rinnova accesso» riuscito, il client registrato può ritirare il mandato di 24 ore. Il blocco, la scadenza
 della sessione o la revoca in Agenti interrompono l’accesso.
 
 ```sh

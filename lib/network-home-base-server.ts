@@ -155,11 +155,6 @@ export type PairingStateMutationOutcome<T> =
     | { readonly write: true; readonly nextState: NetworkPairingState; readonly result: T }
     | { readonly write: false; readonly result: T };
 
-// Unica primitiva di scrittura dello stato pairing, con compare-and-swap sul
-// valore serializzato. OGNI writer (creazione intent, conferma, revoca) DEVE
-// passare da qui: due sequenze load->modifica->save concorrenti si
-// sovrascrivono a vicenda e una conferma puo' resuscitare un client appena
-// revocato. Il perdente della gara rilegge lo stato aggiornato e riprova.
 export async function mutateNetworkPairingState<T>(
     mutator: (state: NetworkPairingState) => PairingStateMutationOutcome<T>,
 ): Promise<{ readonly conflict: false; readonly result: T } | { readonly conflict: true }> {

@@ -1,6 +1,6 @@
 {
   "name": "medical-record-app",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "private": false,
   "engines": {
     "node": ">=24 <25"
@@ -9,6 +9,7 @@
     "recovery:restore": "node scripts/run-strip-types.mjs scripts/restore-recovery-backup.ts",
     "maintenance:web": "node --experimental-strip-types --import ./scripts/register-strip-types-loader.mjs scripts/mediflow-headless-supervisor.mjs --maintenance-web",
     "verify:therapy-status": "node scripts/verify-therapy-status.mjs",
+    "verify:formal-models": "node scripts/verify-formal-models.mjs",
     "verify:local-operation": "node scripts/verify-local-operation.mjs",
     "verify:specialist-operation": "node scripts/verify-specialist-operation.mjs",
     "test:clinical-http": "node scripts/run-clinical-http-suite.mjs",
@@ -61,6 +62,12 @@
     "test:new-comments": "node --test scripts/check-new-comments.test.mjs",
     "check:use-effect-ratchet": "node scripts/use-effect-ratchet.mjs",
     "test:use-effect-ratchet": "node --test scripts/use-effect-ratchet.test.mjs",
+    "check:pairing-state-writers": "node scripts/check-pairing-state-writers.mjs",
+    "test:pairing-state-writers": "node --test scripts/check-pairing-state-writers.test.mjs",
+    "check:test-fake-schema-ratchet": "node scripts/check-test-fake-schema-ratchet.mjs",
+    "test:test-fake-schema-ratchet": "node --test scripts/check-test-fake-schema-ratchet.test.mjs",
+    "check:ci-guards-wired": "node scripts/check-ci-guards-wired.mjs",
+    "test:ci-guards-wired": "node --test scripts/check-ci-guards-wired.test.mjs",
     "check:web-auth-lifecycle-owner-boundary": "node scripts/run-strip-types.mjs --test --test-concurrency=1 lib/security/web-auth-lifecycle-owner-boundary.test.ts lib/security/web-auth-next-producer-boundary.test.ts lib/security/web-auth-lifecycle-owner-resolver-boundary.test.ts lib/security/server-auth.test.ts",
     "check:type-scale": "node scripts/check-type-scale.mjs",
     "check:lume-tokens": "node scripts/check-lume-tokens.mjs",

@@ -8,6 +8,7 @@ import { inspectAgentVisit, prepareAgentApplication, reopenReviewedAgentItems, t
 import { agentVisitPresentation, sealVisitConfirmationPresentation } from './agent-visit-confirmation-browser';
 import type { VisitConfirmationTicket } from './agent-visit-confirmation-contract';
 import type { AgentApplicationReceipt, AgentCassetteIndexPage, IncomingAgentCassette } from './agent-visit-application-contract';
+import { publishAgentIncomingCount } from './agent-incoming-count';
 
 const empty = { visits: [] as AgentVisitReview[], busy: false, error: null as string | null };
 let snapshot = empty;
@@ -16,7 +17,7 @@ let inFlight: Promise<void> | null = null;
 export const agentIncomingSnapshot = () => snapshot;
 export const agentIncomingServerSnapshot = () => empty;
 export function subscribeAgentIncoming(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; }
-function publish(value: typeof empty) { snapshot = value; for (const listener of listeners) listener(); }
+function publish(value: typeof empty) { snapshot = value; publishAgentIncomingCount(value.visits.length); for (const listener of listeners) listener(); }
 const inbox = '/api/agent-mandates/incoming';
 
 async function fetchIncoming<T>(query: string, signal: AbortSignal): Promise<T> {

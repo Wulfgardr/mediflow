@@ -2629,7 +2629,7 @@ impl ClinicalApp {
                 .flex_col()
                 .items_start()
                 .gap(px(8.))
-                .child(
+                .child(crate::components::observe_control(
                     button(
                         format!("clinical-workspace-entry-history-{id}"),
                         "Storico delle rettifiche",
@@ -2638,6 +2638,16 @@ impl ClinicalApp {
                         true,
                     )
                     .debug_selector(|| format!("clinical-workspace-entry-history-{id}"))
+                    .when(
+                        !entry.title.trim().is_empty()
+                            && !entry.locked_fields.iter().any(|field| field == "title"),
+                        |el| {
+                            el.aria_label(SharedString::from(format!(
+                                "Storico delle rettifiche, {}",
+                                entry.title.trim()
+                            )))
+                        },
+                    )
                     .aria_expanded(history.is_some())
                     .on_click(cx.listener(move |this, _, _, cx| {
                         if this.patient.record.history.as_ref().is_some_and(|history| {
@@ -2649,7 +2659,7 @@ impl ClinicalApp {
                             this.read_diary_history(id.clone(), version, vec![0], cx);
                         }
                     })),
-                );
+                ));
         let Some(history) = history else {
             return panel.child(current).into_any_element();
         };
@@ -2723,9 +2733,10 @@ impl ClinicalApp {
                 entry.id,
                 selection.unwrap_or(version)
             );
-            options = options.child(
+            options = options.child(crate::components::observe_control(
                 button(control_id.clone(), label, theme, is_selected, true)
                     .debug_selector(move || control_id)
+                    .aria_selected(is_selected)
                     .on_click(cx.listener(move |this, _, _, cx| {
                         if let Some(history) =
                             this.patient.record.history.as_mut().filter(|history| {
@@ -2736,7 +2747,7 @@ impl ClinicalApp {
                             cx.notify();
                         }
                     })),
-            );
+            ));
         }
         panel = panel
             .child(

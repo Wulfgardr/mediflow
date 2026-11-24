@@ -8,6 +8,7 @@ enum Input {
     Activate(Option<FocusHandle>),
     Keyboard(FocusHandle),
     Text(Entity<TextInput>),
+    Masked(FocusHandle),
     Scroll(ScrollHandle),
     Observe,
 }
@@ -18,13 +19,14 @@ struct Control {
     node: gpui::accesskit::Node,
     bounds: Bounds<Pixels>,
     input: Input,
+    shared_name: bool,
 }
 
 impl Control {
     fn focus_handle(&self, cx: &App) -> Option<FocusHandle> {
         match &self.input {
             Input::Activate(focus) => focus.clone(),
-            Input::Keyboard(focus) => Some(focus.clone()),
+            Input::Keyboard(focus) | Input::Masked(focus) => Some(focus.clone()),
             Input::Text(editor) => Some(editor.read(cx).focus_handle(cx)),
             Input::Observe | Input::Scroll(_) => None,
         }
@@ -40,6 +42,7 @@ impl Control {
             Input::Activate(Some(_)) => &["click", "focus", "press", "expect"],
             Input::Activate(None) => &["click", "expect"],
             Input::Keyboard(_) => &["focus", "press", "expect"],
+            Input::Masked(_) => &["focus", "fill", "press", "expect"],
             Input::Text(_) => &["click", "focus", "fill", "press", "expect", "expectValue"],
             Input::Scroll(_) => &["scroll", "expect"],
             Input::Observe => &["expect"],
@@ -64,6 +67,8 @@ impl Control {
         json!({"role":self.role, "name":self.name, "id":self.node.author_id(),
                "actions": operations, "accessKitActions": ax_actions,
                "selected":self.node.is_selected(), "expanded":self.node.is_expanded(),
+               "enabled": !self.node.is_disabled(),
+               "nameSource": if self.shared_name { "shared-button" } else { "accesskit-node" },
                "focused":self.focused(window, cx), "selection":selection,
                "bounds": {
                    "x": f32::from(self.bounds.origin.x), "y": f32::from(self.bounds.origin.y),
@@ -73,20 +78,61 @@ impl Control {
     }
 }
 
-fn frame(cx: &mut VisualTestContext) -> (Vec<Control>, Vec<Value>) {
+fn frame(cx: &mut VisualTestContext) -> (Vec<Control>, Vec<Value>, Vec<Value>) {
     let painted = rendered_command::controls(|| {
         cx.update(|window, cx| {
             window.refresh();
             window.draw(cx).clear(cx);
         });
     });
+    let observed_ids = painted
+        .observed
+        .iter()
+        .filter_map(|control| control.node.author_id())
+        .collect::<std::collections::BTreeSet<_>>();
+    let unobserved = painted
+        .shared_buttons
+        .iter()
+        .filter(|button| !observed_ids.contains(button.id.as_str()));
+    let outside_census = unobserved
+        .clone()
+        .filter(|button| button.label.is_empty())
+        .map(|button| {
+            json!({"id":button.id,"label":button.label,"enabled":button.enabled,
+                             "reason":"accessible-name-not-at-shared-component"})
+        })
+        .collect();
+    let shared_controls = unobserved
+        .filter(|button| !button.label.is_empty())
+        .map(|button| {
+            let mut node = gpui::accesskit::Node::new(Role::Button);
+            node.set_author_id(button.id.clone());
+            node.set_label(button.label.clone());
+            if !button.enabled {
+                node.set_disabled();
+            }
+            let input = if button.enabled {
+                Input::Activate(None)
+            } else {
+                Input::Observe
+            };
+            Control {
+                role: "button",
+                name: button.label.clone(),
+                node,
+                bounds: button.bounds,
+                input,
+                shared_name: true,
+            }
+        })
+        .collect::<Vec<_>>();
     let mut controls = vec![];
     let mut excluded = vec![];
     for RenderedControl {
         node,
         bounds,
         input: probe,
-    } in painted
+    } in painted.observed
     {
         let role = match node.role() {
             Role::Button => "button",
@@ -97,6 +143,7 @@ fn frame(cx: &mut VisualTestContext) -> (Vec<Control>, Vec<Value>) {
             Role::Region => "region",
             Role::Heading => "heading",
             Role::TextInput | Role::MultilineTextInput => "textbox",
+            Role::PasswordInput if node.author_id() == Some(UNLOCK_FIELD_ID) => "password",
             _ => "other",
         };
         let id = node.author_id().unwrap_or_default();
@@ -121,6 +168,10 @@ fn frame(cx: &mut VisualTestContext) -> (Vec<Control>, Vec<Value>) {
             continue;
         }
         let input = match role {
+            "password" => match focus {
+                Some(focus) => Input::Masked(focus),
+                None => Input::Observe,
+            },
             "textbox" => match probe {
                 Some(InputProbe::Editor(editor)) => Input::Text(editor),
                 _ => {
@@ -150,24 +201,30 @@ fn frame(cx: &mut VisualTestContext) -> (Vec<Control>, Vec<Value>) {
             node,
             bounds,
             input,
+            shared_name: false,
         });
     }
-    (controls, excluded)
+    controls.extend(shared_controls);
+    (controls, excluded, outside_census)
 }
 
-fn resolve<'a>(controls: &'a [Control], target: &Value) -> Result<&'a Control, String> {
+fn resolve<'a>(controls: &'a [Control], target: &Value) -> Result<Option<&'a Control>, String> {
     let matches = controls
         .iter()
         .filter(|control| {
             if let Some(label) = target["label"].as_str() {
                 return control.name == label;
             }
-            target["role"] == control.role && target["name"] == control.name
+            target["role"] == control.role
+                && target["name"] == control.name
+                && target["id"]
+                    .as_str()
+                    .is_none_or(|id| control.node.author_id() == Some(id))
         })
         .collect::<Vec<_>>();
     match matches.as_slice() {
-        [control] => Ok(control),
-        [] => Err(format!("Controllo assente: {target}")),
+        [control] => Ok(Some(control)),
+        [] => Ok(None),
         _ => Err(format!("Controllo ambiguo: {target}")),
     }
 }
@@ -182,7 +239,7 @@ pub(super) fn drive(action: &Value, cx: &mut VisualTestContext) -> Result<Value,
     if op == "resize" {
         return resize(action, cx);
     }
-    let (controls, excluded) = frame(cx);
+    let (controls, excluded, outside_census) = frame(cx);
     let target = &action["target"];
     if op == "discover" && target.is_null() {
         let mut by_role = BTreeMap::new();
@@ -195,6 +252,8 @@ pub(super) fn drive(action: &Value, cx: &mut VisualTestContext) -> Result<Value,
         return Ok(cx.update(|window, cx| {
             json!({ "tree": controls.iter().map(|control| control.describe(window, cx)).collect::<Vec<_>>(),
                     "total": controls.len(), "byRole":by_role, "excluded": excluded,
+                    "visibleSharedButtonsOutsideCensus": outside_census,
+                    "visibleSharedButtonsOutsideCensusCount": outside_census.len(),
                     "focus": focused_control(&controls, window, cx), "viewport": viewport(window),
                     "accessKit": { "active": window.is_a11y_active(),
                                    "treeAvailable": window.debug_a11y_tree_json().is_some() } })
@@ -204,11 +263,19 @@ pub(super) fn drive(action: &Value, cx: &mut VisualTestContext) -> Result<Value,
         let before = cx.update(|window, cx| focused_control(&controls, window, cx));
         press(key()?, cx)?;
         notes_recovery_tests::draw(cx);
-        let (controls, _) = frame(cx);
+        let (controls, _, _) = frame(cx);
         let after = cx.update(|window, cx| focused_control(&controls, window, cx));
         return Ok(json!({"focusBefore":before,"focusAfter":after}));
     }
     let control = resolve(&controls, target)?;
+    if op == "expect" && action["state"] == "hidden" {
+        return if control.is_none() {
+            Ok(json!({"state":"hidden","presence":"absent"}))
+        } else {
+            Err(format!("Controllo ancora raggiungibile: {target}"))
+        };
+    }
+    let control = control.ok_or_else(|| format!("Controllo assente: {target}"))?;
     let before = cx.update(|window, cx| control.describe(window, cx));
     let focus_before = cx.update(|window, cx| focused_control(&controls, window, cx));
     match (&control.input, op) {
@@ -241,13 +308,14 @@ pub(super) fn drive(action: &Value, cx: &mut VisualTestContext) -> Result<Value,
         }
         (_, "expect")
             if action["state"] == "visible" && !matches!(control.input, Input::Keyboard(_)) => {}
+        (_, "expect") if action["state"] == "enabled" && !control.node.is_disabled() => {}
         (_, "expect")
             if action["state"] == "selected" && control.node.is_selected() == Some(true) => {}
         (_, "expect")
             if action["state"] == "expanded" && control.node.is_expanded() == Some(true) => {}
-        (Input::Text(editor), "focus" | "fill" | "press") => {
+        (Input::Text(_) | Input::Masked(_), "focus" | "fill" | "press") => {
             cx.update(|window, cx| {
-                let focus = gpui::Focusable::focus_handle(editor.read(cx), cx);
+                let focus = control.focus_handle(cx).unwrap();
                 window.focus(&focus, cx);
             });
             if op == "fill" {
@@ -273,7 +341,7 @@ pub(super) fn drive(action: &Value, cx: &mut VisualTestContext) -> Result<Value,
         return Ok(before);
     }
     notes_recovery_tests::draw(cx);
-    let (painted, _) = frame(cx);
+    let (painted, _, _) = frame(cx);
     Ok(cx.update(|window, cx| {
         let mut matching = painted.iter().filter(|other| {
             control.node.author_id().is_some()
@@ -325,13 +393,20 @@ fn resize(action: &Value, cx: &mut VisualTestContext) -> Result<Value, String> {
     })
 }
 
-#[gpui::test]
-fn shell_ui_cli(cx: &mut gpui::TestAppContext) {
+const HISTORY_ROUTE: &str = "GET /api/v1/network/patients/patient-a/entries/synthetic-gpui-legacy-entry/revisions?afterVersion=0";
+
+fn shell_fixture(
+    cx: &mut gpui::TestAppContext,
+) -> (notes_recovery_tests::Host, &mut VisualTestContext) {
     cx.update(|cx| {
         bind_keys(cx);
         crate::text_input::bind_keys(cx);
     });
-    let diary: Vec<_> = (1..=14)
+    let revisions: Value = serde_json::from_str(include_str!(
+        "../../../../../e2e/ui-cli/fixtures/gpui-diary-revisions.json"
+    ))
+    .unwrap();
+    let mut diary: Vec<_> = (1..14)
         .map(|index| {
             json!({
                 "id": format!("voce-{index}"), "patientId": "patient-a", "type": "visit",
@@ -340,6 +415,7 @@ fn shell_ui_cli(cx: &mut gpui::TestAppContext) {
             })
         })
         .collect();
+    diary.push(revisions["current"].clone());
     let document = json!({
         "id": "documento-sintetico",
         "patientId": "patient-a",
@@ -352,10 +428,13 @@ fn shell_ui_cli(cx: &mut gpui::TestAppContext) {
     });
     let host =
         notes_recovery_tests::Host::with_diary_and_documents(json!(diary), json!([document]));
-    let original_route = "GET /api/v1/network/patients/patient-a/attachments/documento-sintetico";
+    host.plan(HISTORY_ROUTE)
+        .send((200, revisions["history"].clone()))
+        .unwrap();
     let (view, cx) = cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
     cx.simulate_resize(gpui::size(px(1360.), px(900.)));
     view.update(cx, |app, cx| {
+        app.pairing = Some(host.stored_pairing());
         app.session = Some(host.session.clone());
         app.scope = Some("scope-a".into());
         app.area = Area::Patients;
@@ -367,6 +446,13 @@ fn shell_ui_cli(cx: &mut gpui::TestAppContext) {
         assert_eq!(app.patient.detail.ready().unwrap().last_name, "Sintetica");
         assert_eq!(app.patient.entries.ready().map(Vec::len), Some(14));
     });
+    (host, cx)
+}
+
+#[gpui::test]
+fn shell_ui_cli(cx: &mut gpui::TestAppContext) {
+    let (host, cx) = shell_fixture(cx);
+    let original_route = "GET /api/v1/network/patients/patient-a/attachments/documento-sintetico";
     let terminal = std::env::var_os("MEDIFLOW_UI_CLI").is_some();
     if !terminal {
         let invalid = json!({"op":"resize", "width":640.5, "height":880});
@@ -402,4 +488,156 @@ fn shell_ui_cli(cx: &mut gpui::TestAppContext) {
             1
         );
     }
+}
+
+#[gpui::test]
+fn shell_ui_cli_shared_therapy_button(cx: &mut gpui::TestAppContext) {
+    let (_host, cx) = shell_fixture(cx);
+    run(
+        include_str!("../../../../../e2e/ui-cli/gpui-shell-therapy.jsonl"),
+        |action| {
+            let receipt = drive(action, cx)?;
+            if action["op"] == "click" {
+                assert_eq!(receipt["nameSource"], "shared-button");
+            }
+            Ok(receipt)
+        },
+    );
+}
+
+#[gpui::test]
+fn shell_ui_cli_shared_observation_button(cx: &mut gpui::TestAppContext) {
+    let (_host, cx) = shell_fixture(cx);
+    run(
+        include_str!("../../../../../e2e/ui-cli/gpui-shell-observation.jsonl"),
+        |action| {
+            let receipt = drive(action, cx)?;
+            if action["op"] == "click" {
+                assert_eq!(receipt["nameSource"], "shared-button");
+            }
+            Ok(receipt)
+        },
+    );
+}
+
+#[gpui::test]
+fn shell_ui_cli_review_returns_without_registering(cx: &mut gpui::TestAppContext) {
+    let (host, cx) = shell_fixture(cx);
+    let requests_before_review = host.routes().len();
+    run(
+        include_str!("../../../../../e2e/ui-cli/gpui-shell-review.jsonl"),
+        |action| drive(action, cx),
+    );
+    assert!(
+        host.routes()[requests_before_review..]
+            .iter()
+            .all(|route| route.starts_with("GET "))
+    );
+}
+
+#[gpui::test]
+fn shell_ui_cli_requires_an_id_for_homonymous_buttons(cx: &mut gpui::TestAppContext) {
+    let (_host, cx) = shell_fixture(cx);
+    drive(
+        &json!({"op":"press","target":{"role":"tab","name":"Diario"},"key":"Enter"}),
+        cx,
+    )
+    .unwrap();
+    let ambiguous = json!({"op":"click","target":{"role":"button","name":"Copia voce"}});
+    assert!(
+        drive(&ambiguous, cx)
+            .unwrap_err()
+            .starts_with("Controllo ambiguo:")
+    );
+    let copy = json!({"op":"click","target":{"role":"button","name":"Copia voce",
+        "id":"clinical-workspace-copy-entry-synthetic-gpui-legacy-entry"}});
+    let receipt = drive(&copy, cx).unwrap();
+    assert_eq!(receipt["nameSource"], "shared-button");
+    let copied = cx.update(|_, cx| cx.read_from_clipboard().and_then(|item| item.text()));
+    assert!(copied.unwrap().contains("Nota sintetica con rettifiche"));
+}
+
+#[gpui::test]
+fn shell_ui_cli_selects_history_in_diary(cx: &mut gpui::TestAppContext) {
+    let (_host, cx) = shell_fixture(cx);
+    run(
+        include_str!("../../../../../e2e/ui-cli/gpui-shell-diary.jsonl"),
+        |action| drive(action, cx),
+    );
+}
+
+#[gpui::test]
+fn shell_ui_cli_selects_history_and_returns_to_draft(cx: &mut gpui::TestAppContext) {
+    let (_host, cx) = shell_fixture(cx);
+    run(
+        include_str!("../../../../../e2e/ui-cli/gpui-shell-diary-draft.jsonl"),
+        |action| drive(action, cx),
+    );
+}
+
+#[gpui::test]
+fn shell_ui_cli_changes_and_reopens_appearance(cx: &mut gpui::TestAppContext) {
+    let (_host, cx) = shell_fixture(cx);
+    run(
+        include_str!("../../../../../e2e/ui-cli/gpui-shell-appearance.jsonl"),
+        |action| drive(action, cx),
+    );
+}
+
+fn lock_and_unlock(cx: &mut gpui::TestAppContext, fixture: &'static str) {
+    let (host, cx) = shell_fixture(cx);
+    let before = host.routes().len();
+    let clinical = json!({"op":"click","target":{"role":"button",
+        "name":"Conferma e registra nella scheda di Sintetica Amina"}});
+    let read_password = json!({"op":"expectValue","target":{"role":"password",
+        "name":"Frase di accesso o PIN precedente"},"value":""});
+    run(fixture, |action| {
+        let result = drive(action, cx)?;
+        if action["op"] == "expect"
+            && action["target"]["name"] == "Accedi al tuo archivio"
+            && action["state"] == "visible"
+        {
+            assert!(
+                drive(&clinical, cx)
+                    .unwrap_err()
+                    .starts_with("Controllo assente:")
+            );
+            assert!(
+                drive(&read_password, cx)
+                    .unwrap_err()
+                    .starts_with("Azione expectValue non disponibile")
+            );
+        }
+        Ok(result)
+    });
+    let routes = host.routes();
+    let mut non_reads: Vec<_> = routes[before..]
+        .iter()
+        .map(String::as_str)
+        .filter(|route| !route.starts_with("GET "))
+        .collect();
+    non_reads.sort_unstable();
+    assert_eq!(
+        non_reads,
+        [
+            "POST /api/auth/native/login",
+            "POST /api/auth/native/logout"
+        ]
+    );
+}
+
+#[gpui::test]
+fn shell_ui_cli_locks_review_and_unlocks(cx: &mut gpui::TestAppContext) {
+    lock_and_unlock(
+        cx,
+        include_str!("../../../../../e2e/ui-cli/gpui-shell-lock.jsonl"),
+    );
+}
+
+#[gpui::test]
+fn shell_ui_cli_locks_magnified_and_unlocks(cx: &mut gpui::TestAppContext) {
+    lock_and_unlock(
+        cx,
+        include_str!("../../../../../e2e/ui-cli/gpui-shell-magnified-lock.jsonl"),
+    );
 }
