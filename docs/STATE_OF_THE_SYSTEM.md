@@ -348,8 +348,10 @@ Documenti/ADR principali:
 Prima di ricavare una proposta occorre poter risalire al documento e al punto
 che la sostiene. Per questo il percorso è `artifact-first`: riconosce il
 formato dai byte e affida ad AnyDoc locale, in un processo con limiti
-espliciti, la produzione di Markdown normalizzato, evidenza e provenienza,
-senza rete o servizi hosted.
+espliciti, la produzione di Markdown normalizzato, evidenza e provenienza.
+Il percorso elabora i documenti in locale. Le restrizioni di rete applicate
+dal sistema al figlio dipendono dal
+[profilo di esecuzione](../SECURITY.md#processi-documentali).
 
 Nella 0.8.5, per i PDF supportati, solo le pagine `needsOcr` vengono
 materializzate e renderizzate entro i limiti previsti, quindi riconosciute con
@@ -415,8 +417,8 @@ attribuite alle revisioni precedenti, non una nuova attestazione della 0.8.6.
 | macOS Apple shell | Implementata; seguito nativo separato | Fronte nativo piu maturo: shell Apple/home-base, workspace paziente condiviso, runtime panel e store locale verificabile; Lume e consegnata nella card clinica opaca, mentre le altre superfici restano in migrazione | Firma/notarizzazione esplicite, Ollama/MLX non app-managed |
 | `MediFlowCore` tri-OS | Prove storiche tri-OS | Core Swift condiviso per logica clinica, cifratura, contratti, filtri, conflict handling, clinical scales e SQLite locale | CI Linux/macOS/Windows; non equivale a app complete Windows/Linux |
 | iPhone/iPad | Paired | Client paired non-AI, cache cifrata degradabile e workflow online versionati sui moduli core | No SQLite diretto |
-| AnyDoc | Estrazione locale | Conversione deterministica degli allegati supportati in Markdown normalizzato | Processo figlio bounded; nessuna rete; non è un provider Fabric |
-| Fallback `needsOcr` | Integrato sul Mac | Routing, manifest, rendering selettivo e riconoscimento Apple Vision | Review-only; fail-closed fuori da macOS o senza motore disponibile |
+| AnyDoc | Estrazione locale | Conversione deterministica degli allegati supportati in Markdown normalizzato | Processo figlio con limiti e [protezioni per profilo](../SECURITY.md#processi-documentali) |
+| Fallback `needsOcr` | Integrato | Routing, manifest, rendering selettivo e riconoscimento locale con Apple Vision o Tesseract WASM | Revisione obbligatoria. Il percorso si arresta quando il motore è indisponibile. |
 | Selector Fabric | Integrato | Discovery compatibile, smoke sintetico e binding atomico per cinque capability | Nessun segreto persistito; discovery non equivale a readiness |
 | Ollama | Provider locale capability-specific | Percorsi generativi Fabric ammessi dalla capability | Solo loopback; nessun OCR o fallback implicito |
 | ATHENA/MLX | Provider locale capability-specific | Solo Treatment Reasoning review-only; nella 0.9.1 negato su ogni superficie per l'emendamento del 30/10/2026 | Nessuna prescrizione o apply clinico |
