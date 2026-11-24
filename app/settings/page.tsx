@@ -164,8 +164,6 @@ export default function SettingsPage() {
                         <p>Esportazione e backup restano percorsi separati ed espliciti.</p>
                     </Disclosure>
                     {currentNetworkMode && networkError ? <p className={overviewStyles.notice} role="status">{networkError}</p> : null}
-                    {pairings && <DevicePairingPanel networkEnabled={isHomeBase} clients={pairings.clients}
-                        onClientsChange={clients => setPairings({ clients })} />}
                 </div>
                 <div className={overviewStyles.actions}>
                     <button type="button" className={styles.primaryAction} data-settings-primary="true"
@@ -180,6 +178,13 @@ export default function SettingsPage() {
                     </Link>
                 </div>
             </section>
+            {pairings && <section className={overviewStyles.section} aria-labelledby="settings-devices-title">
+                <div>
+                    <h2 id="settings-devices-title" className={overviewStyles.sectionTitle}>Dispositivi</h2>
+                    <DevicePairingPanel networkEnabled={isHomeBase} clients={pairings.clients}
+                        onClientsChange={clients => setPairings({ clients })} />
+                </div>
+            </section>}
             <section className={overviewStyles.section} aria-labelledby="settings-appearance-title"
                 data-testid="settings-preview-section" data-settings-section="appearance-preview">
                 <div>
