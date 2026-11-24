@@ -1,3 +1,4 @@
+import { PAIRING_OFFERS_KEY } from '@/lib/network-pairing-offer-contract';
 import { logServerError, logServerWarning } from '@/lib/server-error-log';
 import { RESTORE_RECEIPT_PREFIX } from '@/lib/backup-restore-receipt-contract';
 import { writeSettingWithFunctionModelGeneration } from '@/lib/ai-providers/fabric/function-model-settings-write';
@@ -22,7 +23,7 @@ export async function GET(
 
     try {
         const { key } = await params;
-        if (key.startsWith('accountProfile.doctorTaxCode:')) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+        if (key.startsWith('accountProfile.doctorTaxCode:') || key === PAIRING_OFFERS_KEY) return NextResponse.json({ error: 'Not found' }, { status: 404 });
         if (key.startsWith(RESTORE_RECEIPT_PREFIX)) return NextResponse.json({ error: 'Dedicated restore receipt service required' }, { status: 403 });
         const result = await dbServer.select().from(settings).where(eq(settings.key, key)).get();
 

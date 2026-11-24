@@ -267,3 +267,58 @@ Negativo:
 separato dalla cache legata alla sessione. Lo sblocco locale dopo riavvio riguarda
 soltanto quella copia derivata e gli appunti cifrati; non crea una sessione host.
 La cache precedente conserva integralmente il binding, incluso sessionDigest.
+
+## Emendamento WUL-951 del 24 novembre 2026
+
+Il collegamento delle app Apple appartiene a questo ADR perché estende il
+bootstrap dei client del computer MediFlow. Riprende dall'[ADR 0196](./0196-collegamento-agente-locale-senza-codice.md)
+le condizioni per il gesto in Impostazioni: sessione Web admin attiva, loopback
+attestato, mutazione same-origin con generazione dell'archivio e verifica del
+PIN di conferma. L'host riconferma la sessione dopo la verifica del PIN.
+
+L'host emette fino a quattro offerte attive per cinque minuti. Il QR viene
+generato nel browser con `qr`, libreria senza dipendenze runtime. QR e pulsante
+usano lo stesso URI `mediflow://collega` con origine HTTPS, nome del computer,
+impronta SHA-256 del certificato, riferimento all'offerta e segreto casuale di
+256 bit. L'host conserva solo l'hash del segreto. QR e link vanno mostrati alla
+persona che sta collegando il dispositivo: chi fotografa il QR e possiede il
+link entro la scadenza può riscattare l'offerta per primo.
+
+Le offerte sono in una voce SQLite separata da `network.pairing.state`, legata
+alla generazione dell'archivio. Un segreto errato, scaduto o già usato riceve
+lo stesso rifiuto. I riscatti respinti prima della transazione non leggono
+l'elenco dei client, non aggiornano SQLite e non competono per la scrittura del
+pairing (WUL-897). Una sola transazione SQLite IMMEDIATE ricontrolla modalità,
+generazione e validità dell'offerta, consuma il segreto, persiste il nuovo
+client attraverso il writer condiviso e scrive l'audit. La rotta limita
+dimensione, durata e letture contemporanee del corpo. Il server sceglie le
+capability del dispositivo a partire da quelle disponibili con sessione
+operatore. Creazione e revoca sono registrate in transazione. Nessun segreto
+o token entra nell'audit. Solo la risposta del riscatto contiene il token del
+client. Dopo la revoca il token non apre nuove richieste paired.
+
+L'app mostra nome, indirizzo e impronta prima del riscatto e chiede conferma
+anche per la sostituzione di un collegamento. Il nome mostrato proviene dal
+link e non è una prova di identità. L'app usa HTTPS con pin del certificato e
+rifiuta i redirect. Un'app Mac che riconosce l'IP del link fra i propri
+indirizzi può raggiungere lo stesso proxy sul loopback, sempre con la stessa
+impronta. L'app conserva l'indirizzo effettivamente verificato per il login.
+Il pin protegge il riscatto su una rete ostile quando il
+link proviene dal computer atteso. L'app salva la credenziale del dispositivo
+nel Portachiavi. L'offerta concede fiducia al dispositivo: per accedere
+all'archivio serve ancora la passphrase dell'operatore, oppure il PIN sugli
+account che usano la credenziale precedente, secondo l'[ADR 0075](./0075-paired-account-operations-and-pin-rotation.md).
+
+Il contratto OpenAPI v1 aggiunge `POST /api/v1/network/pairing-offers/redeem`,
+ammesso dal proxy HTTPS LAN. Creazione, elenco e revoca Web restano sul loopback.
+
+Il collegamento richiede il proxy TLS LAN già configurato per il runtime
+home-base. L'host ricava porta e certificato da `runtime-status.json` e
+verifica il certificato presentato dal listener prima di emettere il QR.
+
+`npm run test:network:pairing-offers` avvia un archivio sintetico, Next e il
+proxy TLS di prodotto. Controlla l'ammissione Web, l'accesso da un peer non
+loopback, il login operatore, la revoca, due riscatti simultanei e il
+rollback in caso di errore di audit. I test Swift in
+`HomeBasePairingLinkTests` coprono la grammatica del link, la conferma e
+l'esito della scrittura nel Portachiavi.

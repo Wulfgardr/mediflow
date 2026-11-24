@@ -1,40 +1,28 @@
-/* @Codex */
-import { logServerError } from '@/lib/server-error-log';
-import { NextResponse } from 'next/server';
-
-import { mutateNetworkPairingState } from '@/lib/network-home-base-server';
-import { removePairedClient, type RemovePairedClientResult } from '@/lib/network-pairing-model';
+import { revokeNetworkPairedClient } from '@/lib/network-home-base-server';
 import { requireLocalApiToken } from '@/lib/security/local-api-auth';
+import { requireDevicePairingAdminSession } from '@/lib/security/device-pairing-web-auth';
+
+const reply = (body: unknown, status: number) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
 
 export async function DELETE(
     request: Request,
     { params }: { params: Promise<{ clientId: string }> },
 ) {
-    const authError = requireLocalApiToken(request);
-    if (authError) return authError;
-
     try {
         const { clientId } = await params;
-
-        // Tutte le mutazioni dello stato pairing passano dalla primitiva CAS
-        // condivisa: una conferma concorrente non puo' resuscitare un client
-        // appena revocato.
-        const persisted = await mutateNetworkPairingState<RemovePairedClientResult>((state) => {
-            const result = removePairedClient(state, clientId);
-            return result.ok
-                ? { write: true, nextState: result.nextState, result }
-                : { write: false, result };
-        });
-        if (persisted.conflict) {
-            return NextResponse.json(
-                { error: 'Conflict', code: 'PAIRING_STATE_CONFLICT', message: 'Pairing state changed, retry.' },
-                { status: 409 },
-            );
+        const access = await requireDevicePairingAdminSession(request, true);
+        if (!access) {
+            const authError = requireLocalApiToken(request);
+            if (authError) return authError;
         }
-
-        return NextResponse.json(persisted.result.value, { status: persisted.result.status });
-    } catch (error) {
-        logServerError('API DELETE /api/v1/network/pairing-clients/[clientId] error', error);
-        return NextResponse.json({ error: 'Failed to revoke paired client' }, { status: 500 });
+        const persisted = await revokeNetworkPairedClient(clientId, access
+            ? { actorRef: access.session.userId, sourceSurface: 'web', expectedGeneration: access.generation }
+            : { actorRef: 'local-api', sourceSurface: 'api' });
+        if (persisted.conflict) {
+            return reply({ error: 'Conflict', code: 'PAIRING_STATE_CONFLICT', message: 'Pairing state changed, retry.' }, 409);
+        }
+        return reply(persisted.result.value, persisted.result.status);
+    } catch {
+        return reply({ error: 'Failed to revoke paired client' }, 500);
     }
 }

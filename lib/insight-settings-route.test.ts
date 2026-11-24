@@ -13,6 +13,7 @@ function route() {
     const routeModule = { exports: {} as { PUT: (request: Request, context: unknown) => Promise<Response>; GET: (request: Request, context: unknown) => Promise<Response> } };
     const imports: Record<string, unknown> = {
         '@/lib/backup-restore-receipt-contract': { RESTORE_RECEIPT_PREFIX: 'restore.' },
+        '@/lib/network-pairing-offer-contract': { PAIRING_OFFERS_KEY: 'network.pairing.offers' },
         '@/lib/ai-providers/fabric/function-model-settings-write': { writeSettingWithFunctionModelGeneration: (...args: unknown[]) => writes.push(args) },
         '@/lib/security/archive-write-request': { archiveWriteRequestDenial: () => null },
         '@/lib/security/network-mode-write': { networkModeWriteDenial: () => null },
