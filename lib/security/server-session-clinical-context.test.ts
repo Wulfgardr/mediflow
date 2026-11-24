@@ -4,6 +4,7 @@ import { afterEach, test } from 'node:test';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 
+import { initializeSqliteSchema } from '../sqlite-schema.ts';
 import {
     createCanonicalClinicalContextResolver,
     ServerSessionClinicalContextError,
@@ -34,17 +35,14 @@ function webSession(): ServerSession {
 
 function fixture() {
     const sqlite = new Database(':memory:');
+    initializeSqliteSchema(sqlite);
     sqlite.exec(`
-        CREATE TABLE patients (id TEXT PRIMARY KEY NOT NULL, version INTEGER NOT NULL,
-            deleted_at INTEGER, is_archived INTEGER DEFAULT 0);
-        CREATE TABLE ambulatories (id TEXT PRIMARY KEY NOT NULL);
-        CREATE TABLE patients_to_ambulatories (
-            patient_id TEXT NOT NULL,
-            ambulatory_id TEXT NOT NULL,
-            PRIMARY KEY (patient_id, ambulatory_id)
-        );
-        INSERT INTO patients (id, version) VALUES ('patient.synthetic.01', 3), ('patient.synthetic.02', 5);
-        INSERT INTO ambulatories (id) VALUES ('ambulatory.synthetic.01'), ('ambulatory.synthetic.02');
+        INSERT INTO patients (id, first_name, last_name, tax_code, version) VALUES
+            ('patient.synthetic.01', 'Ada', 'Sintetica', 'SYNTH00A01H501A', 3),
+            ('patient.synthetic.02', 'Bice', 'Sintetica', 'SYNTH00B02H501B', 5);
+        INSERT INTO ambulatories (id, name) VALUES
+            ('ambulatory.synthetic.01', 'Ambulatorio sintetico 1'),
+            ('ambulatory.synthetic.02', 'Ambulatorio sintetico 2');
         INSERT INTO patients_to_ambulatories (patient_id, ambulatory_id) VALUES
             ('patient.synthetic.01', 'ambulatory.synthetic.01'),
             ('patient.synthetic.01', 'ambulatory.synthetic.02'),

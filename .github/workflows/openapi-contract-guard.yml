@@ -65,9 +65,11 @@ jobs:
         run: |
           npm run check:api-error-leak
           npm run check:api-error-leak -- --self-test
-      - name: Never-regress guard
+      - name: Never-regress guard and HTML sink fixtures
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: npm run check:never-regress
+        run: |
+          npm run check:never-regress
+          node --test scripts/html-sink-guard.test.mjs
       - name: New comments ratchet and tests
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: |
@@ -78,6 +80,31 @@ jobs:
         run: |
           npm run test:use-effect-ratchet
           npm run check:use-effect-ratchet
+      - name: Pairing state single-writer guard and tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          npm run test:pairing-state-writers
+          npm run check:pairing-state-writers
+      - name: Test fake-schema ratchet and tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          npm run test:test-fake-schema-ratchet
+          npm run check:test-fake-schema-ratchet
+      - name: Attachment currentness writer guard and tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          npm run test:attachment-currentness-writers
+          npm run check:attachment-currentness-writers
+      - name: AnyDoc local-only guard and tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          npm run test:anydoc-local-only
+          npm run check:anydoc-local-only
+      - name: CI guard wiring check and tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          npm run test:ci-guards-wired
+          npm run check:ci-guards-wired
 
       - name: Fabric generative runtime crosswalk
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}

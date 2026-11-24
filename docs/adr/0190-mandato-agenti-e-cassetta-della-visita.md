@@ -18,7 +18,7 @@ visita confermata. L'orario non identifica il paziente.
 
 Il medico crea un mandato nella UI fidata dopo lo sblocco con la credenziale
 dell’account e la conferma con PIN. Sceglie durata, operazioni consentite e fornitore del
-modello. La durata massima è 12 ore. Il fornitore attuale è OpenAI tramite
+modello. La durata massima è 24 ore. Il fornitore attuale è OpenAI tramite
 Codex. Il mandato deve dichiarare l'eventuale passaggio di trascrizione e
 documenti a quel fornitore e le ricevute devono registrarlo. Un abbonamento
 all'host non costituisce una credenziale API del provider.
@@ -31,7 +31,10 @@ mandato per il deposito. Revoca e blocco manuale revocano il mandato.
 Scadenza e revoca negano ogni nuovo deposito, anche con un token già emesso.
 
 Ogni agente chiede un abbinamento con codice di otto caratteri. Solo il
-medico, confrontando il codice nella UI fidata, approva l'abbinamento. Il
+medico, confrontando il codice nella UI fidata, approva l'abbinamento. Per il
+kit locale sullo stesso Mac dello stesso utente macOS, l'[ADR 0196](0196-collegamento-agente-locale-senza-codice.md)
+ammette il collegamento diretto dalla UI fidata sbloccata senza codice, con
+scrittura atomica delle credenziali nella cartella configurata del kit. Il
 token opaco identifica agente, mandato, perimetro e scadenza, mai successiva
 a quella del mandato. Il token locale preesistente non accede al canale
 agenti. Il token agente non legge dati clinici decifrati, non conferma
@@ -52,7 +55,7 @@ un client, confermando col PIN il perimetro, il fornitore e l’eventuale
 passaggio di documenti e trascrizioni già scelti. Ogni sblocco riuscito
 con PIN o passphrase e ogni «Rinnova accesso» che ottiene la chiave da
 un’altra scheda confermano il gesto nella sessione Web corrente. Il server
-emette un mandato di 12 ore per ciascun client registrato, con il perimetro
+emette un mandato di 24 ore per ciascun client registrato, con il perimetro
 approvato. Riusa la chiave pubblica e l’involucro registrati. La conferma
 trasporta solo il ticket di login o l’identificativo del gesto, legato
 alla stessa sessione e alla stessa generazione di archivio.
@@ -96,6 +99,18 @@ blocca la cassetta intera e la vista mostra i due CF al medico. Un CF assente,
 non confermato o ambiguo impedisce l'applicazione automatica. La creazione di
 un paziente assente richiede PIN. Percorsi espliciti o hash identificano i
 file da depositare. L'orario può ordinare le visite, mai abbinarle.
+
+### Correzione di una cassetta in attesa
+
+La CLI può depositare una versione corretta indicando l’identificativo del deposito
+precedente. Il canale ammette la sostituzione solo per lo stesso agente, medico e
+generazione dell’archivio, con mandato corrente e permessi di apertura e chiusura.
+La nuova cassetta resta fuori da In arrivo finché il deposito è aperto. La chiusura
+verifica nella stessa transazione che la precedente sia ancora in attesa e che
+nessun elemento sia già stato applicato. Poi rende visibile la versione corretta,
+ritira la precedente e registra nell’audit il legame tra le due cassette.
+Anche una conferma già aperta deve ritrovare in attesa la versione da applicare.
+Per una versione già applicata si usa il percorso di correzione della cartella.
 
 ## Applicazione e vista In arrivo
 

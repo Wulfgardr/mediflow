@@ -1,0 +1,348 @@
+{
+  "schema": "mediflow.intelligence-local-run-receipt.v1",
+  "admission": {
+    "status": "passed",
+    "lifecycle": "available_unqualified"
+  },
+  "method": "real",
+  "plan": "contract",
+  "sourceRevision": "bfddf87a5334fd7d86d7c184deac77630a332042",
+  "buildId": "9cA97OtPjSbZv7nm6GyzX",
+  "path": "web_production_host_api",
+  "surface": "bench_cli",
+  "profile": {
+    "model": "Mac17,10",
+    "osBuild": "26C5035r",
+    "memoryBytes": 51539607552
+  },
+  "host": {
+    "ollamaVersion": "0.40.16",
+    "ollamaBinarySha256": "5c3cf935be8d896433a5caefefc8857bc2bb9e32c77c35e7c3d38b7c5919822f",
+    "node": "24.21.0"
+  },
+  "modelIdentity": {
+    "name": "qwen3.5:35b-a3b",
+    "digest": "26025611beeb3fe9e4850b1fdae686bebba7cdfa7f13ddb04955f19872ee022a"
+  },
+  "memory": {
+    "gpuMeasured": false
+  },
+  "sources": {
+    "docs/quality/intelligence/2026-11-14-ollama/measurements.json": "15fd4123dd5c5c6fc6a0258d51148a6e5880f29702ac499e995d1c70bb0c96cd",
+    "docs/quality/intelligence/2026-11-14-ollama/i2-interventions.json": "4fb56073622f402a29b8247b317ceb27c32a84379d6c9932ae8b4d896c113cde"
+  },
+  "functions": {
+    "patient_insight": {
+      "memory": {
+        "rss": {
+          "source": "process_tree_rss",
+          "budgetBytes": null
+        },
+        "modelAllocation": {
+          "source": "ollama_api_ps_size_vram",
+          "peakBytes": null,
+          "note": "size_vram non registrato durante i campioni il 14/11"
+        },
+        "systemGpu": null,
+        "summed": false
+      },
+      "i2": {
+        "complete": "available",
+        "error": "rejected",
+        "cancel": {
+          "publication": "denied",
+          "physical": "not_proved"
+        },
+        "revoke": {
+          "publication": "denied",
+          "physical": "not_proved"
+        }
+      },
+      "cl": {
+        "groups": [
+          {
+            "scenario": "fragile-realistic",
+            "mode": "cold",
+            "n": 30,
+            "errors": 4,
+            "timeouts": 0,
+            "p50Ms": 27491.36033300002,
+            "p95Ms": 31138.30958300001,
+            "maxMs": 31320.409042
+          },
+          {
+            "scenario": "fragile-realistic",
+            "mode": "warm",
+            "n": 30,
+            "errors": 4,
+            "timeouts": 0,
+            "p50Ms": 3652.3622500000056,
+            "p95Ms": 7329.1286660000915,
+            "maxMs": 7879.861957999994
+          },
+          {
+            "scenario": "load-100-30-10",
+            "mode": "cold",
+            "n": 30,
+            "errors": 13,
+            "timeouts": 0,
+            "p50Ms": 28749.053916999983,
+            "p95Ms": 36059.31791700004,
+            "maxMs": 42750.793625
+          },
+          {
+            "scenario": "load-100-30-10",
+            "mode": "warm",
+            "n": 30,
+            "errors": 15,
+            "timeouts": 0,
+            "p50Ms": 6502.611708999961,
+            "p95Ms": 10562.481625000015,
+            "maxMs": 11306.097540999996
+          }
+        ],
+        "functionBudget": {
+          "latencyMs": null,
+          "rssBytes": null,
+          "gpuBytes": null
+        },
+        "verification": [
+          {
+            "kind": "i2-verify",
+            "available": false,
+            "withinLatencyBudget": null,
+            "withinRssBudget": null
+          },
+          {
+            "kind": "cl-verify",
+            "scenario": "load-100-30-10",
+            "mode": "cold",
+            "available": false,
+            "withinLatencyBudget": null,
+            "withinRssBudget": null
+          },
+          {
+            "kind": "cl-verify",
+            "scenario": "load-100-30-10",
+            "mode": "warm",
+            "available": false,
+            "withinLatencyBudget": null,
+            "withinRssBudget": null
+          },
+          {
+            "kind": "cl-verify",
+            "scenario": "fragile-realistic",
+            "mode": "cold",
+            "available": false,
+            "withinLatencyBudget": null,
+            "withinRssBudget": null
+          },
+          {
+            "kind": "cl-verify",
+            "scenario": "fragile-realistic",
+            "mode": "warm",
+            "available": true,
+            "withinLatencyBudget": null,
+            "withinRssBudget": null
+          }
+        ]
+      }
+    },
+    "smart_import": {
+      "memory": {
+        "rss": {
+          "source": "process_tree_rss",
+          "budgetBytes": 24456816231
+        },
+        "modelAllocation": {
+          "source": "ollama_api_ps_size_vram",
+          "peakBytes": null,
+          "note": "size_vram non registrato durante i campioni il 14/11"
+        },
+        "systemGpu": null,
+        "summed": false
+      },
+      "i2": {
+        "complete": "available",
+        "error": "rejected",
+        "cancel": {
+          "publication": "denied",
+          "physical": "not_proved"
+        },
+        "revoke": {
+          "publication": "denied",
+          "physical": "not_proved"
+        }
+      },
+      "cl": {
+        "groups": [
+          {
+            "scenario": "smart-import-load",
+            "mode": "cold",
+            "n": 30,
+            "errors": 0,
+            "timeouts": 0,
+            "p50Ms": 27615.77908300003,
+            "p95Ms": 28598.70879200002,
+            "maxMs": 29478.352334
+          },
+          {
+            "scenario": "smart-import-load",
+            "mode": "warm",
+            "n": 30,
+            "errors": 0,
+            "timeouts": 0,
+            "p50Ms": 3137.899666000041,
+            "p95Ms": 3318.785416000057,
+            "maxMs": 3346.1635839999653
+          }
+        ],
+        "functionBudget": {
+          "latencyMs": 34319,
+          "rssBytes": 24456816231,
+          "gpuBytes": null
+        },
+        "verification": [
+          {
+            "kind": "i2-verify",
+            "available": true,
+            "withinLatencyBudget": true,
+            "withinRssBudget": true
+          },
+          {
+            "kind": "cl-verify",
+            "scenario": "smart-import-load",
+            "mode": "cold",
+            "available": true,
+            "withinLatencyBudget": true,
+            "withinRssBudget": true
+          },
+          {
+            "kind": "cl-verify",
+            "scenario": "smart-import-load",
+            "mode": "warm",
+            "available": true,
+            "withinLatencyBudget": true,
+            "withinRssBudget": true
+          }
+        ]
+      }
+    },
+    "document_synthesis": {
+      "memory": {
+        "rss": {
+          "source": "process_tree_rss",
+          "budgetBytes": null
+        },
+        "modelAllocation": {
+          "source": "ollama_api_ps_size_vram",
+          "peakBytes": null,
+          "note": "size_vram non registrato durante i campioni il 14/11"
+        },
+        "systemGpu": null,
+        "summed": false
+      },
+      "i2": {
+        "complete": "available",
+        "error": "rejected",
+        "cancel": {
+          "publication": "denied",
+          "physical": "not_proved"
+        },
+        "revoke": {
+          "publication": "denied",
+          "physical": "not_proved"
+        }
+      },
+      "cl": {
+        "groups": [
+          {
+            "scenario": "pdf-scan-10p-10MiB",
+            "mode": "cold",
+            "n": 30,
+            "errors": 29,
+            "timeouts": 0,
+            "p50Ms": 71744.95704200002,
+            "p95Ms": 83125.46875,
+            "maxMs": 84220.639875
+          },
+          {
+            "scenario": "pdf-scan-10p-10MiB",
+            "mode": "warm",
+            "n": 30,
+            "errors": 28,
+            "timeouts": 0,
+            "p50Ms": 15882.806791000068,
+            "p95Ms": 33268.14404199971,
+            "maxMs": 33398.34054199979
+          },
+          {
+            "scenario": "pdf-text-10p-10MiB",
+            "mode": "cold",
+            "n": 30,
+            "errors": 4,
+            "timeouts": 0,
+            "p50Ms": 32449.925708000002,
+            "p95Ms": 58892.679957999964,
+            "maxMs": 60209.779125
+          },
+          {
+            "scenario": "pdf-text-10p-10MiB",
+            "mode": "warm",
+            "n": 30,
+            "errors": 4,
+            "timeouts": 0,
+            "p50Ms": 7248.155584000051,
+            "p95Ms": 16030.898750000168,
+            "maxMs": 16825.626750000054
+          }
+        ],
+        "functionBudget": {
+          "latencyMs": null,
+          "rssBytes": null,
+          "gpuBytes": null
+        },
+        "verification": [
+          {
+            "kind": "i2-verify",
+            "available": true,
+            "withinLatencyBudget": null,
+            "withinRssBudget": null
+          },
+          {
+            "kind": "cl-verify",
+            "scenario": "pdf-text-10p-10MiB",
+            "mode": "cold",
+            "available": true,
+            "withinLatencyBudget": null,
+            "withinRssBudget": null
+          },
+          {
+            "kind": "cl-verify",
+            "scenario": "pdf-text-10p-10MiB",
+            "mode": "warm",
+            "available": true,
+            "withinLatencyBudget": null,
+            "withinRssBudget": null
+          },
+          {
+            "kind": "cl-verify",
+            "scenario": "pdf-scan-10p-10MiB",
+            "mode": "cold",
+            "available": false,
+            "withinLatencyBudget": null,
+            "withinRssBudget": null
+          },
+          {
+            "kind": "cl-verify",
+            "scenario": "pdf-scan-10p-10MiB",
+            "mode": "warm",
+            "available": false,
+            "withinLatencyBudget": null,
+            "withinRssBudget": null
+          }
+        ]
+      }
+    }
+  }
+}

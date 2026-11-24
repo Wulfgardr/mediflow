@@ -7,13 +7,11 @@ import { eq, asc, desc } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 import { normalizeStoredMessagePayload } from '@/lib/message-persistence';
-/* STREAM B: server-side list params (whitelisted, plaintext columns only). */
-import { parseListParams } from '@/lib/list-query-params';
+import { definePlaintextSortColumns, parseListParams } from '@/lib/list-query-params';
 
-// content/metadata/attachmentBase64 are ENC:. Only createdAt sortable.
-const MESSAGE_SORT_COLUMNS = {
+const MESSAGE_SORT_COLUMNS = definePlaintextSortColumns('messages', {
     createdAt: messages.createdAt,
-} as const;
+});
 
 export async function GET(request: Request) {
     const session = await requireSession();
@@ -22,8 +20,8 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const conversationId = searchParams.get('conversationId');
 
-    /* STREAM B: messages default to chronological (asc) order for chat rendering. */
     const parsed = parseListParams(searchParams, {
+        table: 'messages',
         sortableColumns: Object.keys(MESSAGE_SORT_COLUMNS),
         defaultOrderBy: 'createdAt',
         defaultOrderDir: 'asc',

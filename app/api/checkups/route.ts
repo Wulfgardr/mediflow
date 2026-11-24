@@ -11,17 +11,15 @@ import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth
 import { normalizeCheckupStatus, parseCheckupStatus } from '@/lib/status-normalization';
 import { auditContextFromSession, listChangedFields, requestIdFromRequest } from '@/lib/security/audit';
 import { createCheckupOperation } from '@/lib/checkup-write-operation';
-/* STREAM B: server-side list params (whitelisted, plaintext columns only). */
-import { parseListParams } from '@/lib/list-query-params';
+import { definePlaintextSortColumns, parseListParams } from '@/lib/list-query-params';
 import { checkupCreateSchema } from '@/lib/api-schemas/clinical-writes';
 import { parseApiBody } from '@/lib/api-schemas/parse';
 
-// Only plaintext columns are sortable server-side (notes is ENC:, not sortable).
-const CHECKUP_SORT_COLUMNS = {
+const CHECKUP_SORT_COLUMNS = definePlaintextSortColumns('checkups', {
     date: checkups.date,
     createdAt: checkups.createdAt,
     updatedAt: checkups.updatedAt,
-} as const;
+});
 
 function parseRequiredDate(value: unknown): Date | null {
     if (typeof value !== 'string' && typeof value !== 'number') return null;
@@ -37,8 +35,8 @@ export async function GET(request: Request) {
     const patientId = searchParams.get('patientId');
     const includeDeleted = searchParams.get('includeDeleted') === 'true';
 
-    /* STREAM B */
     const parsed = parseListParams(searchParams, {
+        table: 'checkups',
         sortableColumns: Object.keys(CHECKUP_SORT_COLUMNS),
         defaultOrderBy: 'date',
         defaultOrderDir: 'desc',

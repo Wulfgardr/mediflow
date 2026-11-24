@@ -31,6 +31,10 @@ const BLOCKED_NEXT_STEP: Record<string, string> = {
     runtime_fence: 'Riavvia MediFlow e riprova.',
 };
 
+function retiredPatientsLabel(count: number): string {
+    return count === 1 ? '1 fascicolo ritirato' : `${count.toLocaleString('it-IT')} fascicoli ritirati`;
+}
+
 function failedOutcome(err: unknown, action: 'verify' | 'restore'): Outcome {
     const message = err instanceof Error ? err.message : 'Il file potrebbe essere corrotto.';
     if (err instanceof BackupRestorePreflightError) {
@@ -58,6 +62,9 @@ function failedOutcome(err: unknown, action: 'verify' | 'restore'): Outcome {
                 message: changed + ' dopo la verifica. I dati sono rimasti intatti.',
                 nextStep: 'Verifica di nuovo il file selezionandolo per il ripristino.',
             };
+        }
+        if (['legal_hold', 'retention_unreadable', 'retired_patient_material'].includes(err.reason ?? '')) {
+            return { type: 'error', title: 'Ripristino bloccato', message };
         }
         return { type: 'error', title: 'Ripristino bloccato', message, nextStep: BLOCKED_NEXT_STEP[err.reason ?? ''] ?? 'Riprova; se si ripete, conserva il backup e segnala il problema.' };
     }
@@ -119,10 +126,12 @@ export default function BackupRestoreUI({ recoveryPrimary = true, onRestorePendi
         setStatus({ type: 'info', message: 'Verifica in corso...' });
         try {
             const verified = await verifyRawDatabase(await file.text());
+            const exclusions = verified.excludedRetiredPatients > 0
+                ? ` Il ripristino escluderà ${retiredPatientsLabel(verified.excludedRetiredPatients)}.` : '';
             const created = verified.createdAt ? `, creato il ${new Date(verified.createdAt).toLocaleString('it-IT')}` : '';
             setStatus({
                 type: 'success', title: 'Backup verificato',
-                message: `Formato e integrità sono validi e la chiave sbloccata lo legge: ${verified.records.toLocaleString('it-IT')} record in ${formatCountLabel(verified.collections, 'collezione', 'collezioni')}${created}.`,
+                message: `Formato e integrità sono validi e la chiave sbloccata lo legge: ${verified.records.toLocaleString('it-IT')} record in ${formatCountLabel(verified.collections, 'collezione', 'collezioni')}${created}.${exclusions}`,
                 nextStep: 'Verificato non significa provato: che un backup si ripristini lo dimostra la prova di ripristino, descritta qui sotto.',
             });
         } catch (err) {
@@ -183,9 +192,11 @@ export default function BackupRestoreUI({ recoveryPrimary = true, onRestorePendi
                 ? { verifier: (await deriveUnlockMaterial(restoreSecret, Uint8Array.from(atob(plan.salt), c => c.charCodeAt(0)))).verifier }
                 : { pin: restoreSecret };
             setRestoreSecret('');
-            await importRawDatabase(pendingRestoreFile, credential);
+            const { excludedRetiredPatients } = await importRawDatabase(pendingRestoreFile, credential);
             cancelRestore();
-            setStatus({ type: 'success', title: 'Ripristino completato', message: 'I dati sono stati sostituiti con quelli del backup. L\'applicazione si blocca per ricaricare le chiavi.' });
+            setStatus({ type: 'success', title: 'Ripristino completato', message: excludedRetiredPatients > 0
+                ? `Il ripristino ha escluso ${retiredPatientsLabel(excludedRetiredPatients)}.`
+                : 'I dati del backup sono stati ripristinati.' });
 
             // Wait a sec then lock/reload
             setTimeout(() => {
@@ -195,7 +206,8 @@ export default function BackupRestoreUI({ recoveryPrimary = true, onRestorePendi
 
         } catch (err) {
             console.error(err);
-            if (err instanceof BackupRestoreBlockedError && (err.reason === 'snapshot' || err.reason === 'source')) {
+            if (err instanceof BackupRestoreBlockedError && (err.reason === 'snapshot' || err.reason === 'source'
+                || err.reason === 'legal_hold' || err.reason === 'retired_patient_material' || err.reason === 'retention_unreadable')) {
                 cancelRestore();
             } else {
                 setRestoreSecret('');
@@ -301,6 +313,9 @@ export default function BackupRestoreUI({ recoveryPrimary = true, onRestorePendi
                             {formatCountLabel(pendingRestoreFile.verification.records, 'record', 'record')}
                             {pendingRestoreFile.verification.createdAt && (' · ' + new Date(pendingRestoreFile.verification.createdAt).toLocaleString('it-IT'))}
                         </p>
+                        {pendingRestoreFile.verification.excludedRetiredPatients > 0 && (
+                            <p>Il ripristino escluderà {retiredPatientsLabel(pendingRestoreFile.verification.excludedRetiredPatients)}.</p>
+                        )}
                         <label className="block text-sm mb-3">
                             {unlockCredential === 'passphrase' ? 'Passphrase amministrativa' : 'PIN amministrativo'}
                             <input type="password" autoComplete="current-password" value={restoreSecret}

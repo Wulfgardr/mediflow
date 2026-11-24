@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 const name = z.string().max(512);
 const selector = z.union([
-  z.strictObject({ role: z.string().regex(/^[a-z]+$/u), name }),
+  z.strictObject({ role: z.string().regex(/^[a-z]+$/u), name, id: z.string().regex(/^[A-Za-z0-9_:-]{1,128}$/u).optional() }),
   z.strictObject({ label: name.min(1) }),
   z.strictObject({ text: name.min(1) }),
 ]);

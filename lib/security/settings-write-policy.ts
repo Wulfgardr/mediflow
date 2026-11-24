@@ -96,6 +96,8 @@ export const SETTINGS_WRITE_REGISTRY: Record<string, SettingsKeyPolicy> = {
     // Deny via the generic settings route so it can only move through the
     // web-admin-gated system route. ---
     backupScheduler: { write: [], note: 'backup config (app/api/system/backup-scheduler route, web-admin only)' },
+    'agent.localKitPath': { write: [], note: 'ADR 0196 local kit path (app/api/agent-mandates/local-kit route only)' },
+    'agent.localKitAgentRef': { write: [], note: 'ADR 0196 local kit active agent reference (app/api/agent-mandates/local-kit route only)' },
 };
 
 export function settingsWriteChannelForSession(session: ServerSession): SettingsWriteChannel {

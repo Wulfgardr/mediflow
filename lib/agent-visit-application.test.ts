@@ -69,7 +69,19 @@ async function visit(provider: AgentMandateInput['provider'] = 'local', allowsCl
         documentHash: item.kind === 'pdf' ? 'a'.repeat(64) : null,
     })).immediate();
     receipt = database.transaction(() => store.close(principal, id, receipt.revision)).immediate();
-    return { id, mandate, mandates, principal, operations,
+    function prepareCorrection() {
+        const replacement = randomUUID();
+        const bytes = new TextEncoder().encode(JSON.stringify({ text: 'SYNTHETIC_APPLICATION_CORRECTION' }));
+        const sealCorrection = (itemId: string, kind: 'anchor' | 'note') =>
+            sealAgentItemNode(publicKey, { mandateRef: mandate.id, visitId: replacement, itemId, kind }, bytes);
+        const opened = database.transaction(() => store.open(principal, replacement, sealCorrection(replacement, 'anchor'), id)).immediate();
+        const itemId = randomUUID();
+        const staged = database.transaction(() => store.add(principal, replacement, opened.revision, {
+            id: itemId, kind: 'note', envelope: sealCorrection(itemId, 'note'), byteLength: bytes.length, documentHash: null,
+        })).immediate();
+        return { replacement, close: () => database.transaction(() => store.close(principal, replacement, staged.revision)).immediate() };
+    }
+    return { id, mandate, mandates, principal, operations, prepareCorrection,
         whole(): AgentApplicationInput { return { visitId: id, phase: 'review', patientId: fixture.patientId, expectedVersion: version(), cassetteRevision: receipt.revision, items }; } };
 }
 
@@ -124,6 +136,21 @@ test('one explicit review commits all structured proposals, service lines and pr
     assert.deepEqual(snapshot(), after);
 });
 
+test('review before the corrected deposit closes prevents the replacement; review after it closes writes nothing', async () => {
+    const reviewedFirst = await visit(), lateCorrection = reviewedFirst.prepareCorrection();
+    assert.equal(applyAgentVisit(request, fixture.session, reviewedFirst.whole()).status, 'applied');
+    const afterReview = snapshot();
+    assert.throws(lateCorrection.close, /AGENT_CASSETTE_DENIED/);
+    assert.throws(reviewedFirst.prepareCorrection, /AGENT_CASSETTE_DENIED/);
+    assert.equal(readAgentCassette(database, lateCorrection.replacement, fixture.session.userId), undefined);
+    assert.deepEqual(snapshot(), afterReview);
+
+    const replacedFirst = await visit(), oldPlan = replacedFirst.whole(), correction = replacedFirst.prepareCorrection();
+    assert.equal(correction.close().status, 'closed');
+    const afterCorrection = snapshot();
+    assert.throws(() => applyAgentVisit(request, fixture.session, oldPlan), /AGENT_APPLICATION_DENIED/);
+    assert.deepEqual(snapshot(), afterCorrection);
+});
 test('a stale patient revision or a revoked mandate applies nothing and leaves the cassette recoverable', async () => {
     const f = await visit(), stale = { ...f.whole(), expectedVersion: version() - 1 }, before = snapshot();
     assert.throws(() => applyAgentVisit(request, fixture.session, stale));
