@@ -57,6 +57,7 @@ test('Dossier: a batch of five patients proposes a complete backup before writin
 
         const proposal = panel.getByTestId('dossier-backup-proposal');
         await expect(proposal).toContainText('Stai per scrivere in 5 schede.');
+        await proposal.screenshot({ path: testInfo.outputPath('dossier-backup-proposal.png') });
         const group = panel.locator('[data-testid="dossier-group"][data-group="Scheda-1"]');
         await expect(group.getByLabel('Scheda di destinazione')).toHaveValue(patientId);
         await group.getByLabel('Ho controllato le fonti e confermo che appartengono alla scheda scelta.').check();
