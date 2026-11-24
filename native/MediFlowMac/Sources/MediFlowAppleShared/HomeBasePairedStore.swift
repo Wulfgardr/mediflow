@@ -107,18 +107,18 @@ struct HomeBasePairedStore {
     }
 
     func save(settings: HomeBasePairedSettings, pairedClientToken: String) throws {
-        persist(settings.serverURL, forKey: Keys.serverURL)
-        persist(settings.tlsPin, forKey: Keys.tlsPin)
-        persist(settings.pairedClientId, forKey: Keys.pairedClientId)
-        persist(settings.username, forKey: Keys.username)
-        persist(settings.ambulatoryId, forKey: Keys.ambulatoryId)
-
         let trimmedToken = normalized(pairedClientToken) ?? ""
         if trimmedToken.isEmpty {
             try keychainDeleter(service, account).get()
         } else {
             try keychainWriter(service, account, trimmedToken).get()
         }
+
+        persist(settings.serverURL, forKey: Keys.serverURL)
+        persist(settings.tlsPin, forKey: Keys.tlsPin)
+        persist(settings.pairedClientId, forKey: Keys.pairedClientId)
+        persist(settings.username, forKey: Keys.username)
+        persist(settings.ambulatoryId, forKey: Keys.ambulatoryId)
     }
 
     func clear() throws {

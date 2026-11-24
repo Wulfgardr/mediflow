@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 
+import { DevicePairingPanel, readDevicePairingList } from '@/components/settings/device-pairing-panel';
+import type { DevicePairingList } from '@/lib/network-pairing-offer-contract';
 import { Disclosure } from '@/components/disclosure';
 import { ViewState } from '@/components/ui/view-state';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -35,6 +37,7 @@ async function readNetworkOverview(): Promise<NetworkOverviewPayload> {
 /* LUME-110/68 */
 export default function SettingsPage() {
     const router = useRouter();
+    const [pairings, setPairings] = useState<DevicePairingList | null>(null);
     const [networkOverview, setNetworkOverview] = useState<NetworkOverviewPayload | null>(null);
     const [confirmedNetworkMode, setConfirmedNetworkMode] = useState<
         NetworkOverviewPayload['session']['operatingMode'] | null
@@ -56,6 +59,9 @@ export default function SettingsPage() {
 
     useEffect(() => {
         let cancelled = false;
+        void readDevicePairingList().then(list => {
+            if (!cancelled) setPairings(list);
+        }).catch(() => {});
         void readNetworkOverview()
             .then((overview) => {
                 if (!cancelled) {
@@ -158,6 +164,8 @@ export default function SettingsPage() {
                         <p>Esportazione e backup restano percorsi separati ed espliciti.</p>
                     </Disclosure>
                     {currentNetworkMode && networkError ? <p className={overviewStyles.notice} role="status">{networkError}</p> : null}
+                    {pairings && <DevicePairingPanel networkEnabled={isHomeBase} clients={pairings.clients}
+                        onClientsChange={clients => setPairings({ clients })} />}
                 </div>
                 <div className={overviewStyles.actions}>
                     <button type="button" className={styles.primaryAction} data-settings-primary="true"

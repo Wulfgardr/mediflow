@@ -221,6 +221,21 @@ export function hashNetworkPairedClientToken(token: string): string {
     return createHash('sha256').update(token).digest('hex');
 }
 
+export function createNetworkPairedClient(input: Pick<StoredNetworkPairedClient,
+    'deviceName' | 'clientPlatform' | 'appVersion' | 'sourceIntentId' | 'grantedCapabilities'>
+    & { now: Date }) {
+    const { now, ...details } = input;
+    const pairedClientToken = randomBytes(24).toString('base64url');
+    const client: StoredNetworkPairedClient = {
+        ...details,
+        clientId: randomUUID(),
+        pairedAt: now.toISOString(),
+        lastSeenAt: null,
+        tokenHash: hashNetworkPairedClientToken(pairedClientToken),
+    };
+    return { client, pairedClientToken };
+}
+
 function notFoundError(): ConfirmPairingFailure {
     return {
         ok: false,
@@ -258,24 +273,16 @@ export function confirmPendingPairingIntent(input: {
         return expiredError();
     }
 
-    const clientId = randomUUID();
-    const pairedClientToken = randomBytes(24).toString('base64url');
-    const pairedAt = requestedAt.toISOString();
-    const nextClient: StoredNetworkPairedClient = {
-        clientId,
-        deviceName: originalIntent.requestedBy.deviceName,
-        clientPlatform: originalIntent.requestedBy.clientPlatform,
-        appVersion: originalIntent.requestedBy.appVersion,
-        grantedCapabilities: originalIntent.requestedCapabilities,
-        pairedAt,
-        lastSeenAt: null,
+    const { client, pairedClientToken } = createNetworkPairedClient({
+        ...originalIntent.requestedBy,
         sourceIntentId: originalIntent.intentId,
-        tokenHash: hashNetworkPairedClientToken(pairedClientToken),
-    };
+        grantedCapabilities: originalIntent.requestedCapabilities,
+        now: requestedAt,
+    });
 
     const nextState: NetworkPairingState = {
         intents: input.state.intents.filter((item) => item.intentId !== input.intentId),
-        clients: [...input.state.clients.filter((item) => item.clientId !== clientId), nextClient],
+        clients: [...input.state.clients, client],
     };
 
     return {
@@ -283,8 +290,8 @@ export function confirmPendingPairingIntent(input: {
         status: 201,
         value: createConfirmedPairingResponse({
             intent: originalIntent,
-            clientId,
-            pairedAt,
+            clientId: client.clientId,
+            pairedAt: client.pairedAt,
             pairedClientToken,
         }),
         nextState,
