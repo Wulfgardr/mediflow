@@ -118,15 +118,23 @@ impl ClinicalApp {
         let show_import = true;
         let writable =
             self.document_import_available() && self.patient.attachments.ready().is_some();
-        let actions = div().child(observe_control(button(
-            "clinical-workspace-new-document",
-            "Aggiungi documenti…",
-            theme,
-            true,
-            writable && !self.document_imports.pending(),
-        )
-        .when(writable, |el| el.on_click(cx.listener(|this, _, _, cx| this.pick_document(cx))))));
-        let content = div().min_w_0().flex().flex_col().gap(px(10.))
+        let actions = div().child(observe_control(
+            button(
+                "clinical-workspace-new-document",
+                "Aggiungi documenti…",
+                theme,
+                true,
+                writable && !self.document_imports.pending(),
+            )
+            .when(writable, |el| {
+                el.on_click(cx.listener(|this, _, _, cx| this.pick_document(cx)))
+            }),
+        ));
+        let content = div()
+            .min_w_0()
+            .flex()
+            .flex_col()
+            .gap(px(10.))
             .child(self.dossier_import_view(cx))
             .when(show_import, |el| el.child(self.smart_import_view(cx)))
             .child(self.document_imports_view(cx))

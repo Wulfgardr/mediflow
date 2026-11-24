@@ -179,9 +179,15 @@ impl ClinicalApp {
             SettingsPage::Archives => view.child(self.archives_view(cx)),
             SettingsPage::Retention => view.child(self.retention_view(cx)),
             SettingsPage::References => view.child(self.reference_administration_view(cx)),
-            SettingsPage::Profile => view.child(self.account_profile_view(cx)).child(self.work_profile_view(cx)),
+            SettingsPage::Profile => view
+                .child(self.account_profile_view(cx))
+                .child(self.work_profile_view(cx)),
             SettingsPage::Appearance => {
-                let navigation = if layout.compact { 0. } else { layout.navigation };
+                let navigation = if layout.compact {
+                    0.
+                } else {
+                    layout.navigation
+                };
                 let frame = if layout.magnified { 0. } else { 16. };
                 let width = (layout.width - navigation - frame - 2. * layout.margin).min(760.);
                 view.child(div().flex().flex_col().gap(px(12.))
@@ -213,43 +219,135 @@ impl ClinicalApp {
                 .child(self.ai_status_view(cx))
                 .child(self.parameters_view(cx))
                 .child(self.chatgpt_account_view(cx))
-                .child(button("local-host-function-preferences","Preferenze e scelta del modello per funzione…",theme,false,!self.local_work_pending()).on_click(cx.listener(|this,_,window,cx|this.select_settings_page(SettingsPage::AiPreferences,window,cx)))),
+                .child(
+                    button(
+                        "local-host-function-preferences",
+                        "Preferenze e scelta del modello per funzione…",
+                        theme,
+                        false,
+                        !self.local_work_pending(),
+                    )
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        this.select_settings_page(SettingsPage::AiPreferences, window, cx)
+                    })),
+                ),
             SettingsPage::Models => view.child(self.models_view(cx)),
             #[cfg(target_os = "macos")]
             SettingsPage::VoiceLocal => view.child(self.voice_model_view(cx)),
             SettingsPage::Overview => {
-                let origin = self.session.as_ref().map(|session| session.base_url().to_owned()).unwrap_or_default();
+                let origin = self
+                    .session
+                    .as_ref()
+                    .map(|session| session.base_url().to_owned())
+                    .unwrap_or_default();
                 let workstation = view
-                    .child(surface::island_title("clinical-workspace-settings-postazione", "POSTAZIONE", None, theme))
-                    .children([
-                        (SettingsPage::Profile, "Profilo", "Nome medico e ambulatorio"),
-                        (SettingsPage::Access, "Accesso", "Passphrase, PIN e blocco della sessione"),
-                        (SettingsPage::Appearance, "Aspetto", "Tema, dimensione del testo e privacy"),
-                        (SettingsPage::Ambulatories, "Ambulatori", "Sedi e contesti clinici"),
-                        (SettingsPage::Host, "Modo home-base", "Accesso locale o nodo della rete fidata"),
-                        (SettingsPage::Danger, "Zona pericolo", "Credenziali e recupero dell’accesso"),
-                        (SettingsPage::Archives, "Archivi e backup", "Esportazione, verifica e ripristino"),
-                        (SettingsPage::Controls, "Controlli", "Evidenze, aggiornamenti, audit e redazione"),
-                        (SettingsPage::References, "Repertori", "Stato, fonti e importazione dei cataloghi"),
-                        (SettingsPage::Retention, "Conservazione dei dati", "Termini, blocchi e scarto dei fascicoli"),
-                    ].into_iter().map(|(page, label, description)| self.settings_item(page, label, description, cx)));
+                    .child(surface::island_title(
+                        "clinical-workspace-settings-postazione",
+                        "POSTAZIONE",
+                        None,
+                        theme,
+                    ))
+                    .children(
+                        [
+                            (
+                                SettingsPage::Profile,
+                                "Profilo",
+                                "Nome medico e ambulatorio",
+                            ),
+                            (
+                                SettingsPage::Access,
+                                "Accesso",
+                                "Passphrase, PIN e blocco della sessione",
+                            ),
+                            (
+                                SettingsPage::Appearance,
+                                "Aspetto",
+                                "Tema, dimensione del testo e privacy",
+                            ),
+                            (
+                                SettingsPage::Ambulatories,
+                                "Ambulatori",
+                                "Sedi e contesti clinici",
+                            ),
+                            (
+                                SettingsPage::Host,
+                                "Modo home-base",
+                                "Accesso locale o nodo della rete fidata",
+                            ),
+                            (
+                                SettingsPage::Danger,
+                                "Zona pericolo",
+                                "Credenziali e recupero dell’accesso",
+                            ),
+                            (
+                                SettingsPage::Archives,
+                                "Archivi e backup",
+                                "Esportazione, verifica e ripristino",
+                            ),
+                            (
+                                SettingsPage::Controls,
+                                "Controlli",
+                                "Evidenze, aggiornamenti, audit e redazione",
+                            ),
+                            (
+                                SettingsPage::References,
+                                "Repertori",
+                                "Stato, fonti e importazione dei cataloghi",
+                            ),
+                            (
+                                SettingsPage::Retention,
+                                "Conservazione dei dati",
+                                "Termini, blocchi e scarto dei fascicoli",
+                            ),
+                        ]
+                        .into_iter()
+                        .map(|(page, label, description)| {
+                            self.settings_item(page, label, description, cx)
+                        }),
+                    );
                 let intelligence = surface::island(theme, false)
-                    .child(surface::island_title("clinical-workspace-settings-intelligenza", "INTELLIGENZA", None, theme))
-                    .children([
-                        (SettingsPage::Models, "Modelli", "Stato della configurazione sull’home-base"),
-                        (SettingsPage::Functions, "Funzioni IA", "Preferenze e scelta del modello per funzione"),
-                        (SettingsPage::Governance, "Governo Fabric", "Registro, sedi e verifiche salvate"),
-                    ].into_iter().chain(voice_settings_row()).map(|(page, label, description)| self.settings_item(page, label, description, cx)));
+                    .child(surface::island_title(
+                        "clinical-workspace-settings-intelligenza",
+                        "INTELLIGENZA",
+                        None,
+                        theme,
+                    ))
+                    .children(
+                        [
+                            (
+                                SettingsPage::Models,
+                                "Modelli",
+                                "Stato della configurazione sull’home-base",
+                            ),
+                            (
+                                SettingsPage::Functions,
+                                "Funzioni IA",
+                                "Preferenze e scelta del modello per funzione",
+                            ),
+                            (
+                                SettingsPage::Governance,
+                                "Governo Fabric",
+                                "Registro, sedi e verifiche salvate",
+                            ),
+                        ]
+                        .into_iter()
+                        .chain(voice_settings_row())
+                        .map(|(page, label, description)| {
+                            self.settings_item(page, label, description, cx)
+                        }),
+                    );
                 let archive = surface::island(theme, false)
                     .child(surface::island_title("clinical-workspace-connection-heading", "ARCHIVIO COLLEGATO", None, theme))
                     .child(text!(origin))
                     .child(button("clinical-workspace-settings-lock", "Blocca e nascondi i dati", theme, false, true)
                         .on_click(cx.listener(|this, _, _, cx| this.request_discard(Discard::Lock, cx))))
                     .child(notice("clinical-workspace-settings-native-limits", "Il controllo account ChatGPT è disponibile. DEMO, consenso alle proposte e generazione nativa non sono ancora disponibili.", theme, false));
-                return header.child(surface::tray(theme)
-                    .child(workstation)
-                    .child(intelligence)
-                    .child(archive));
+                return header.child(
+                    surface::tray(theme)
+                        .child(workstation)
+                        .child(intelligence)
+                        .child(archive),
+                );
             }
             SettingsPage::Ambulatories | SettingsPage::AiPreferences => unreachable!(),
         };

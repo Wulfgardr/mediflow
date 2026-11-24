@@ -346,14 +346,49 @@ impl ClinicalApp {
         let theme = self.theme;
         let state = &self.ai_preferences;
         let idle = state.working.is_none();
-        let actions = div().flex().flex_wrap().gap(px(8.))
-                .child(state.targets[0].attach_enabled(button("clinical-workspace-ai-preferences-back", "Torna alle impostazioni", theme, false, idle), idle)
-                    .on_click(cx.listener(|this, _, window, cx| this.close_ai_preferences(window, cx))))
-                .child(state.targets[1].attach_enabled(button("clinical-workspace-ai-preferences-reload", "Rileggi preferenze dall’home-base", theme, false, idle), idle)
-                    .on_click(cx.listener(|this, _, _, cx| this.load_ai_preferences(cx))));
+        let actions = div()
+            .flex()
+            .flex_wrap()
+            .gap(px(8.))
+            .child(
+                state.targets[0]
+                    .attach_enabled(
+                        button(
+                            "clinical-workspace-ai-preferences-back",
+                            "Torna alle impostazioni",
+                            theme,
+                            false,
+                            idle,
+                        ),
+                        idle,
+                    )
+                    .on_click(
+                        cx.listener(|this, _, window, cx| this.close_ai_preferences(window, cx)),
+                    ),
+            )
+            .child(
+                state.targets[1]
+                    .attach_enabled(
+                        button(
+                            "clinical-workspace-ai-preferences-reload",
+                            "Rileggi preferenze dall’home-base",
+                            theme,
+                            false,
+                            idle,
+                        ),
+                        idle,
+                    )
+                    .on_click(cx.listener(|this, _, _, cx| this.load_ai_preferences(cx))),
+            );
         let header = surface::page(theme)
             .max_w(px(760.))
-            .child(surface::page_header("clinical-workspace-ai-preferences-heading", "Preferenze funzioni IA", None, actions, theme));
+            .child(surface::page_header(
+                "clinical-workspace-ai-preferences-heading",
+                "Preferenze funzioni IA",
+                None,
+                actions,
+                theme,
+            ));
         let mut view = surface::island(theme, false)
             .child(div().type_role(theme, crate::theme::TextRole::Strong)
                 .child(text!("Le preferenze valgono per tutti gli operatori dell’home-base.")))

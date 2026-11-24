@@ -241,8 +241,10 @@ impl ClinicalApp {
                     .as_deref()
                     .is_some_and(|id| self.who.patient_is(id)) =>
             {
-                Some(surface::tray(self.theme)
-                    .child(surface::island(self.theme, false).child(self.who_view(cx))))
+                Some(
+                    surface::tray(self.theme)
+                        .child(surface::island(self.theme, false).child(self.who_view(cx))),
+                )
             }
             Function::Icd => None,
         }

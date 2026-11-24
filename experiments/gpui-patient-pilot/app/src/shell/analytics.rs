@@ -237,7 +237,11 @@ impl ClinicalApp {
         let header = surface::page(theme)
             .max_w(px(760.))
             .child(surface::page_header(
-                "clinical-analytics-heading", "Analisi", None, div(), theme,
+                "clinical-analytics-heading",
+                "Analisi",
+                None,
+                div(),
+                theme,
             ));
         let mut pane = surface::island(theme, false);
         if let Some(session) = &self.session
@@ -251,7 +255,12 @@ impl ClinicalApp {
             ));
         }
         pane = pane
-            .child(surface::island_title("clinical-analytics-range", "FASCIA DI ETÀ", None, theme))
+            .child(surface::island_title(
+                "clinical-analytics-range",
+                "FASCIA DI ETÀ",
+                None,
+                theme,
+            ))
             .child(
                 div()
                     .flex()

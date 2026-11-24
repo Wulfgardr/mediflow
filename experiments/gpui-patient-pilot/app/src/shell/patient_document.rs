@@ -700,11 +700,19 @@ impl ClinicalApp {
                 .flex()
                 .flex_col()
                 .items_center()
-                .child(surface::page(theme).max_w(px(820.)).flex_shrink_0()
-                    .child(surface::page_header(
-                        "document-create-title", "Nuova scheda da PDF", None, div(), theme,
-                    ))
-                    .child(surface::tray(theme).child(content))),
+                .child(
+                    surface::page(theme)
+                        .max_w(px(820.))
+                        .flex_shrink_0()
+                        .child(surface::page_header(
+                            "document-create-title",
+                            "Nuova scheda da PDF",
+                            None,
+                            div(),
+                            theme,
+                        ))
+                        .child(surface::tray(theme).child(content)),
+                ),
         )
     }
 }

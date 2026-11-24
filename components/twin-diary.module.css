@@ -66,4 +66,3 @@
 :global([data-record-tray='diario']) .diary { padding-bottom: 0; }
 :global([data-record-tray='diario']) .diary > .entry { padding-block: 12px; border-color: var(--lume-record-island-rule); }
 :global([data-record-tray='diario']) .diary > .entry:last-child { border-bottom: 0; }
-:global([data-record-tray='diario']) .patientEntry :global(.prose) { font: var(--type-record-text); }

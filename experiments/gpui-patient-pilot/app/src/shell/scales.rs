@@ -1591,13 +1591,33 @@ impl ClinicalApp {
 
     pub(super) fn scales_view(&self, cx: &Context<Self>) -> Div {
         let theme = self.theme;
-        let actions = div().child(button("clinical-scales-reload", "Rileggi catalogo e persone", theme, false, !matches!(self.scales.catalog, Load::Loading))
-            .when(!matches!(self.scales.catalog, Load::Loading), |el| el.on_click(cx.listener(|this, _, _, cx| this.load_scales(cx)))));
+        let actions = div().child(
+            button(
+                "clinical-scales-reload",
+                "Rileggi catalogo e persone",
+                theme,
+                false,
+                !matches!(self.scales.catalog, Load::Loading),
+            )
+            .when(!matches!(self.scales.catalog, Load::Loading), |el| {
+                el.on_click(cx.listener(|this, _, _, cx| this.load_scales(cx)))
+            }),
+        );
         let header = surface::page(theme).child(surface::page_header(
-            "clinical-scales-heading", "Scale", None, actions, theme,
+            "clinical-scales-heading",
+            "Scale",
+            None,
+            actions,
+            theme,
         ));
-        let mut pane = surface::island(theme, false)
-            .when(self.verified.is_some(), |el| el.child(notice("clinical-scales-verified", self.verified.clone().unwrap_or_default(), theme, false)));
+        let mut pane = surface::island(theme, false).when(self.verified.is_some(), |el| {
+            el.child(notice(
+                "clinical-scales-verified",
+                self.verified.clone().unwrap_or_default(),
+                theme,
+                false,
+            ))
+        });
         if let Some(message) = self.scales.catalog.message() {
             return header.child(surface::tray(theme).child(pane.child(notice(
                 "clinical-scales-state",
@@ -1737,81 +1757,82 @@ impl ClinicalApp {
             .detail
             .ready()
             .is_some_and(|patient| !patient.is_archived && patient.deleted_at.is_none());
-        let catalog = surface::island(theme, false).child(surface::island_title(
-            "clinical-scales-catalog-label",
-            "STRUMENTI DELL’ARCHIVIO",
-            None,
-            theme,
-        ))
-        .children(
-            self.scales
-                .catalog
-                .ready()
-                .into_iter()
-                .flat_map(|catalog| &catalog.scales)
-                .map(|scale| {
-                    let id = scale.id;
-                    div()
-                        .id(SharedString::from(format!(
-                            "clinical-scale-catalog-row-{}",
-                            id.as_str()
-                        )))
-                        .min_w_0()
-                        .max_w_full()
-                        .border_t_1()
-                        .border_color(theme.rule)
-                        .pt(px(20.))
-                        .flex()
-                        .flex_col()
-                        .gap(px(12.))
-                        .child(
-                            div()
-                                .type_role(theme, crate::theme::TextRole::Strong)
-                                .child({
-                                    let text = text!(scale.title.clone());
-                                    #[cfg(test)]
-                                    let text = rendered_command::observe_text(text);
-                                    text
-                                }),
-                        )
-                        .child(div().text_color(theme.secondary).child({
-                            let text = text!(scale.description.clone());
-                            #[cfg(test)]
-                            let text = rendered_command::observe_text(text);
-                            text
-                        }))
-                        .child({
-                            let text = text!(format!(
-                                "{} domande · tutte le risposte sono richieste",
-                                scale.questions.len()
-                            ));
-                            #[cfg(test)]
-                            let text = rendered_command::observe_text(text);
-                            text
-                        })
-                        .child(
-                            self.scales
-                                .targets
-                                .get(&format!("scale-{}", id.as_str()))
-                                .expect("catalog target")
-                                .attach_enabled(
-                                    button(
-                                        format!("clinical-scale-open-{}", id.as_str()),
-                                        "Compila la valutazione",
-                                        theme,
-                                        true,
+        let catalog = surface::island(theme, false)
+            .child(surface::island_title(
+                "clinical-scales-catalog-label",
+                "STRUMENTI DELL’ARCHIVIO",
+                None,
+                theme,
+            ))
+            .children(
+                self.scales
+                    .catalog
+                    .ready()
+                    .into_iter()
+                    .flat_map(|catalog| &catalog.scales)
+                    .map(|scale| {
+                        let id = scale.id;
+                        div()
+                            .id(SharedString::from(format!(
+                                "clinical-scale-catalog-row-{}",
+                                id.as_str()
+                            )))
+                            .min_w_0()
+                            .max_w_full()
+                            .border_t_1()
+                            .border_color(theme.rule)
+                            .pt(px(20.))
+                            .flex()
+                            .flex_col()
+                            .gap(px(12.))
+                            .child(
+                                div()
+                                    .type_role(theme, crate::theme::TextRole::Strong)
+                                    .child({
+                                        let text = text!(scale.title.clone());
+                                        #[cfg(test)]
+                                        let text = rendered_command::observe_text(text);
+                                        text
+                                    }),
+                            )
+                            .child(div().text_color(theme.secondary).child({
+                                let text = text!(scale.description.clone());
+                                #[cfg(test)]
+                                let text = rendered_command::observe_text(text);
+                                text
+                            }))
+                            .child({
+                                let text = text!(format!(
+                                    "{} domande · tutte le risposte sono richieste",
+                                    scale.questions.len()
+                                ));
+                                #[cfg(test)]
+                                let text = rendered_command::observe_text(text);
+                                text
+                            })
+                            .child(
+                                self.scales
+                                    .targets
+                                    .get(&format!("scale-{}", id.as_str()))
+                                    .expect("catalog target")
+                                    .attach_enabled(
+                                        button(
+                                            format!("clinical-scale-open-{}", id.as_str()),
+                                            "Compila la valutazione",
+                                            theme,
+                                            true,
+                                            selected,
+                                        ),
                                         selected,
-                                    ),
-                                    selected,
-                                )
-                                .when(selected, |el| {
-                                    el.on_click(cx.listener(move |this, _, _, cx| {
-                                        this.open_scale_form(id, cx)
-                                    }))
-                                }),
-                        )
-                }),
-        );
+                                    )
+                                    .when(selected, |el| {
+                                        el.on_click(cx.listener(move |this, _, _, cx| {
+                                            this.open_scale_form(id, cx)
+                                        }))
+                                    }),
+                            )
+                    }),
+            );
         header.child(surface::tray(theme).child(pane).child(catalog))
     }
 
@@ -1954,13 +1975,11 @@ impl ClinicalApp {
                         "La voce viene registrata nel contesto ambulatoriale selezionato."
                     )),
             );
-        let mut result = surface::island(theme, false)
-            .flex_1()
-            .child(section(
-                "clinical-scale-result-heading",
-                "RISULTATO E LIMITI",
-                theme,
-            ));
+        let mut result = surface::island(theme, false).flex_1().child(section(
+            "clinical-scale-result-heading",
+            "RISULTATO E LIMITI",
+            theme,
+        ));
         if let Some(prepared) = &scale.prepared {
             let metadata = &prepared.submission().metadata;
             result = result

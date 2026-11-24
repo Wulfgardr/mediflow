@@ -237,6 +237,6 @@
   .pageActions { justify-content: flex-start; }
 }
 
-@media (pointer: coarse) {
+@media (max-width: 700px), (pointer: coarse) {
   .segmented > :is(a, button), .islandAction, .pageActions > :is(a, button) { min-height: 44px; }
 }

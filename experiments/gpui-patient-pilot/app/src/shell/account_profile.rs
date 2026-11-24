@@ -434,18 +434,14 @@ impl ClinicalApp {
         let theme = self.theme;
         let state = &self.account_profile;
         let save_enabled = state.can_save(cx);
-        let mut view = div()
-            .flex()
-            .flex_col()
-            .gap(px(12.))
-            .child(
-                div()
-                    .type_role(theme, crate::theme::TextRole::Body)
-                    .text_color(theme.secondary)
-                    .child(text!(
-                        "Mostrati in intestazione, ricette e referti generati."
-                    )),
-            );
+        let mut view = div().flex().flex_col().gap(px(12.)).child(
+            div()
+                .type_role(theme, crate::theme::TextRole::Body)
+                .text_color(theme.secondary)
+                .child(text!(
+                    "Mostrati in intestazione, ricette e referti generati."
+                )),
+        );
         for (editor, id, label) in [
             (
                 &state.display,

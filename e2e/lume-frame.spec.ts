@@ -65,8 +65,8 @@ for (const frameCase of FRAME_CASES) {
     const panel = page.getByTestId('lume-frame-panel');
     const focus = page.getByTestId('lume-frame-focus');
     const expected = {
-      chrome: await resolveColorVariable(page, '--lume-surface-chrome'),
-      focal: await resolveColorVariable(page, '--lume-surface-focal'),
+      chrome: await resolveColorVariable(page, frameCase.width >= 1001 ? '--lume-record-rail' : '--lume-surface-chrome'),
+      focal: await resolveColorVariable(page, '--lume-record-panel'),
     };
 
     await expect(rail).toHaveCSS('background-color', expected.chrome);
@@ -83,8 +83,8 @@ for (const frameCase of FRAME_CASES) {
       turnNav.evaluate((element) => Number(getComputedStyle(element).fontWeight)),
     ]);
     expect(weights).toEqual([600, 400]);
-    await expect(page.locator('aside strong').filter({ hasText: 'MediFlow' })).toHaveCSS('font-weight', '500');
-    await expect(page.locator('aside strong').filter({ hasText: 'MediFlow' })).toHaveCSS('font-size', '21px');
+    await expect(page.locator('aside strong').filter({ hasText: 'MediFlow' })).toHaveCSS('font-weight', frameCase.width >= 1001 ? '600' : '500');
+    await expect(page.locator('aside strong').filter({ hasText: 'MediFlow' })).toHaveCSS('font-size', frameCase.width >= 1001 ? '15px' : '21px');
 
     const selectedGeometry = await patientsNav.evaluate((element) => {
       const style = getComputedStyle(element);

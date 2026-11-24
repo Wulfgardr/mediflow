@@ -32,7 +32,7 @@
   },
   "files": {
     "lib/therapy-status-confirmation.ts": "33eebc3197e988f3f1c134f1ac8499da1de95171e21d0ac7e3396c2a202c6486",
-    "components/therapy-manager.tsx": "636419e0533f0368add66f0321d30ecfb0c99e69e02b1359d1ff1c7c513e6579",
+    "components/therapy-manager.tsx": "78698513ca3d092725d6e6def10c3a7b8e2b5d58656b1206f89e92ccb58f695b",
     "lib/db.ts": "e69414da935b885f8ee7b3065f8161e54c1a28c434ea2f78bfb67f6b64087886",
     "lib/security/client-auth-api.ts": "9ac40b69b8c073644198e86d532591464f2c28a44fda1926fa9f082a93e25274",
     "lib/therapy-write-operation.ts": "8fa4abf13ad501bdb1d199b2abeaee5e18331f84e6dcdb19caa0b040b5c63345",
@@ -157,5 +157,5 @@
     }
   },
   "legacyModelSyncCommit": "64e190438da8287928f0903b9b719c18b329a7ec",
-  "filesSha256": "31a93892356e83db82b86c9518a887ccf04059ea475281f9f0e03c0e0381b5d1"
+  "filesSha256": "eef1344193ee1398f32d68a6efe8ca380d17acf7bfded938ccb71ee034b3ef3d"
 }

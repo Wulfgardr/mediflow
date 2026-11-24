@@ -34,6 +34,7 @@
 .blockers > p { margin: 0; color: var(--lume-signal-critical); font: var(--type-body); }
 
 .pdfList { display: flex; flex-wrap: wrap; gap: 8px; }
+.pdfCount { color: var(--lume-ink-muted); font: var(--type-meta); }
 
 .soap { display: grid; margin: 0; }
 
