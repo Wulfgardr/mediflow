@@ -4,6 +4,7 @@ import { issueDevicePairingOffer } from '@/lib/network-pairing-offers-server';
 import { readNativeNetworkJson } from '@/lib/native-network-json-body';
 import { requireDevicePairingAdminSession } from '@/lib/security/device-pairing-web-auth';
 import { verifyHostCredentials } from '@/lib/security/host-credential-verification';
+import { isValidConfirmationPin } from '@/lib/security/pin-input';
 
 const reply = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
 
@@ -29,7 +30,7 @@ export async function POST(request: Request) {
         }).catch(() => null);
         const pin = (payload as { pin?: unknown } | null)?.pin;
         if (!payload || Object.keys(payload).join(',') !== 'pin' || typeof pin !== 'string'
-            || !/^[0-9]{4,8}$/u.test(pin) || /\s/u.test(pin)) return reply({ code: 'PIN_INVALID' }, 400);
+            || !isValidConfirmationPin(pin)) return reply({ code: 'PIN_INVALID' }, 400);
 
         const verified = await verifyHostCredentials({ username: access.session.username, pin });
         if (verified.kind !== 'verified' || verified.account.id !== access.session.userId) {
