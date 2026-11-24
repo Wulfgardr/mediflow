@@ -405,3 +405,112 @@ test('Dossier: estrazione preparata su una cartella mista di più pazienti, cita
         rmSync(root, { recursive: true, force: true });
     }
 });
+
+async function auditSubjects(page: Page, eventType: string): Promise<string[]> {
+    return page.evaluate(async (type) => {
+        const rows = await (await fetch(`/api/system/audit?eventType=${encodeURIComponent(type)}&limit=200`, { cache: 'no-store' })).json() as Array<{ subjectRef: string | null }>;
+        return rows.map((row) => row.subjectRef ?? '');
+    }, eventType);
+}
+
+async function attachmentIds(page: Page, patientId: string): Promise<string[]> {
+    return page.evaluate(async (id) => {
+        const rows = await (await fetch(`/api/attachments?patientId=${encodeURIComponent(id)}&metadata=true`, { cache: 'no-store' })).json() as Array<{ id: string; patientId: string }>;
+        return rows.filter((row) => row.patientId === id).map((row) => row.id);
+    }, patientId);
+}
+
+test('WUL-927 Dossier: «Accetta il verificato» lascia aperte solo le sintesi, mette da parte doppione e lettura errata, e il medico le recupera', async ({ page, baseURL }, testInfo) => {
+    test.skip(process.env.E2E_DOCUMENTS_SYNTHETIC_ONLY !== '1', 'Requires explicit isolated synthetic data');
+    test.setTimeout(240_000);
+    expect(new URL(baseURL!).hostname).toMatch(/^(localhost|127\.0\.0\.1)$/);
+    const root = mkdtempSync(path.join(tmpdir(), 'mediflow-dossier-wul927-'));
+    let code = syntheticTaxCode();
+    while ([CF_A, CF_B, CF_C].includes(code)) code = syntheticTaxCode();
+    try {
+        await bootstrapUnlockedSession(page, PIN);
+        const inbox = path.join(root, 'Scheda');
+        mkdirSync(inbox, { recursive: true });
+        const yesterday = new Date(Date.now() - 86_400_000);
+        const day = { it: `${String(yesterday.getDate()).padStart(2, '0')}/${String(yesterday.getMonth() + 1).padStart(2, '0')}/${yesterday.getFullYear()}`,
+            iso: `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}` };
+        const letter = await textPdf(['Lettera di dimissione sintetica', `Codice fiscale paziente: ${code}`, `Data referto: ${day.it}`,
+            'Diagnosi: Ipertensione arteriosa essenziale', 'Terapia: Ramipril 5 mg 1 cp al mattino', 'Indice di Barthel 60/100',
+            'Il paziente riferisce dispnea da sforzo da circa due mesi.']);
+        const reminder = await textPdf(['Promemoria terapia sintetico', `Codice fiscale paziente: ${code}`, `Data referto: ${day.it}`,
+            'Terapia: Ramipril 5 mg 1 cp al mattino']);
+        writeFileSync(path.join(inbox, 'lettera.pdf'), letter);
+        writeFileSync(path.join(inbox, 'promemoria.pdf'), reminder);
+        const sha = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
+        const ramipril = { kind: 'therapy', values: { drugName: 'Ramipril', activePrinciple: 'ramipril', dosage: '5 mg 1 cp al mattino', status: 'active' }, quote: 'Terapia: Ramipril 5 mg 1 cp al mattino' };
+        const source = (bytes: Uint8Array, fileName: string, documentDate: string, facts: unknown[]) => ({ sha256: sha(bytes), fileName, documentDate,
+            patient: { taxCode: code, lastName: 'Rossi', firstName: 'Mario' }, summary: { title: `Sintesi ${fileName}`, text: 'Sintesi sintetica del documento.' },
+            coverage: { pages: 1, unreadablePages: [], complete: true }, facts });
+        const preparedPath = path.join(root, 'estrazione.json');
+        writeFileSync(preparedPath, JSON.stringify({ schema: 'mediflow.dossier_prepared_extraction.v1', preparedAt: new Date().toISOString(), preparedBy: 'e2e', sources: [
+            source(letter, 'lettera.pdf', day.iso, [{ kind: 'diagnosis', values: { description: 'Ipertensione arteriosa essenziale' }, quote: 'Diagnosi: Ipertensione arteriosa essenziale' }, ramipril]),
+            source(reminder, 'promemoria.pdf', day.iso, [ramipril]),
+        ] }));
+        const patientId = await createPatient(page, code);
+
+        await openUnlockedDocument(page, '/patients/import/dossier');
+        const panel = page.getByTestId('dossier-import');
+        await panel.getByTestId('dossier-prepared').setInputFiles(preparedPath);
+        await panel.getByTestId('dossier-folder').setInputFiles(inbox);
+        const group = panel.locator(`[data-testid="dossier-group"][data-group="cf:${code}"]`);
+        await expect(group).toHaveAttribute('data-identity', 'matched', { timeout: 180_000 });
+        await group.getByLabel('Ho controllato le fonti e confermo che appartengono alla scheda scelta.').check();
+        await group.getByRole('button', { name: /^Salva 2 originali nella scheda$/u }).click();
+        await expect(group.getByTestId('dossier-acquire-outcome')).toHaveText(['Originale salvato e riletto identico', 'Originale salvato e riletto identico'], { timeout: 60_000 });
+        await expect(panel.getByTestId('dossier-document')).toHaveCount(2);
+        const attachments = await attachmentIds(page, patientId);
+        expect(attachments).toHaveLength(2);
+        const updatedBefore = await auditSubjects(page, 'attachment.updated');
+
+        await expect(panel.getByTestId('dossier-bulk-summaries')).not.toBeChecked();
+        await panel.getByTestId('dossier-bulk').click();
+        await expect(panel.getByTestId('dossier-bulk-result')).toContainText('2 restano da decidere', { timeout: 60_000 });
+        const facts = panel.getByTestId('dossier-fact');
+        const pending = panel.locator('[data-testid="dossier-fact"][data-decision="pending"]');
+        await expect(pending).toHaveCount(2);
+        await expect(panel.locator('[data-testid="dossier-fact"][data-decision="pending"][data-kind="document_entry"][data-origin="prepared"]')).toHaveCount(2);
+        const decided = panel.locator('[data-testid="dossier-fact"]:not([data-decision="pending"])');
+        await expect(decided).toHaveCount(await facts.count() - 2);
+        await expect(panel.locator('[data-testid="dossier-fact"]:not([data-decision="pending"]):not([data-decided-by="accept_verified"])')).toHaveCount(0);
+        const wholeDocuments = panel.locator('[data-testid="dossier-fact"][data-origin="parser:document"]');
+        await expect(wholeDocuments).toHaveCount(2);
+        for (const row of await wholeDocuments.all()) await expect(row).toHaveAttribute('data-decision', 'accepted');
+        const preparedRamipril = panel.locator('[data-testid="dossier-fact"][data-kind="therapy"][data-origin="prepared"]');
+        await expect(preparedRamipril.and(panel.locator('[data-decision="accepted"]'))).toHaveCount(1);
+        const duplicate = preparedRamipril.and(panel.locator('[data-decision="already_present"]'));
+        await expect(duplicate).toHaveCount(1);
+        await expect(duplicate.getByTestId('dossier-fact-decided-by')).toHaveText(/^Da «Accetta il verificato»: Doppione di una voce accettata di «(lettera|promemoria)\.pdf»\.$/u);
+        const misread = panel.locator('[data-testid="dossier-fact"][data-origin="parser:scale"]');
+        await expect(misread).toHaveAttribute('data-decision', 'rejected');
+        await expect(misread.getByTestId('dossier-fact-decided-by')).toHaveText('Da «Accetta il verificato»: Lettura automatica non verificata.');
+        await expect(panel.locator('[data-testid="dossier-fact"][data-decision="rejected"]:not(:has([data-testid="dossier-fact-decided-by"]))')).toHaveCount(0);
+        await page.setViewportSize({ width: 1280, height: 6000 });
+        await page.screenshot({ path: testInfo.outputPath('wul-927-dopo-il-gesto.png') });
+        await page.setViewportSize({ width: 1280, height: 720 });
+
+        expect(await countOf(page, 'therapies', patientId)).toBe(1);
+        expect(await countOf(page, 'entries', patientId)).toBe(2);
+        const updatedAfter = await auditSubjects(page, 'attachment.updated');
+        for (const id of attachments) {
+            expect(updatedAfter.filter((ref) => ref === id).length, 'decisioni salvate come la revisione ordinaria').toBeGreaterThan(updatedBefore.filter((ref) => ref === id).length);
+        }
+        expect((await auditSubjects(page, 'therapy.created')).length).toBeGreaterThanOrEqual(1);
+        expect((await auditSubjects(page, 'entry.created')).length).toBeGreaterThanOrEqual(2);
+
+        const letterDocument = panel.getByTestId('dossier-document').filter({ has: page.locator('[data-testid="dossier-fact"][data-origin="parser:scale"]') });
+        await misread.getByLabel('Decisione').selectOption('accepted');
+        await letterDocument.getByRole('button', { name: 'Salva revisione' }).click();
+        await expect(misread).toHaveAttribute('data-decision', 'accepted', { timeout: 30_000 });
+        await expect(misread).not.toHaveAttribute('data-decided-by', /./u);
+        await letterDocument.getByRole('button', { name: 'Applica 1 fatto accettato' }).click();
+        await expect(misread.getByTestId('dossier-applied-outcome')).toHaveText('Ultima scrittura: applied', { timeout: 30_000 });
+        expect(await countOf(page, 'entries', patientId)).toBe(3);
+    } finally {
+        rmSync(root, { recursive: true, force: true });
+    }
+});
