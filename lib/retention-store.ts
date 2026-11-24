@@ -28,7 +28,7 @@ export type RetentionAuditPort = (event: RetentionAuditEvent) => void;
 
 const quote = (name: string) => `"${name.replaceAll('"', '""')}"`;
 
-function readSetting(tx: RetentionRunner, key: string): string | undefined {
+function readSetting(tx: Pick<RetentionRunner, 'get'>, key: string): string | undefined {
     return tx.get<{ value: string } | undefined>(sql`SELECT value FROM settings WHERE key = ${key}`)?.value;
 }
 function writeSetting(tx: RetentionRunner, key: string, value: string): void {
@@ -48,6 +48,11 @@ function parseDocument<T>(raw: string | undefined, schema: { safeParse(value: un
     } catch { return null; }
 }
 
+export function readRetentionHolds(tx: Pick<RetentionRunner, 'get'>): RetentionHoldsDocument | null {
+    return parseDocument(readSetting(tx, RETENTION_HOLDS_KEY), retentionHoldsDocumentSchema,
+        { schemaVersion: RETENTION_SCHEMA, revision: 0, holds: [] });
+}
+
 /** Uno stato illeggibile non abilita mai uno scarto: la configurazione risulta in errore. */
 export function readRetentionConfiguration(tx: RetentionRunner): RetentionConfiguration {
     const packRaw = readSetting(tx, TERRITORIAL_PACK_SETTING_KEY);
@@ -55,8 +60,7 @@ export function readRetentionConfiguration(tx: RetentionRunner): RetentionConfig
     const pack = projectTerritorialPacks(packRaw !== undefined && marker === undefined ? 'invalid' : packRaw);
     const windows = parseDocument(readSetting(tx, RETENTION_WINDOWS_KEY), retentionWindowsDocumentSchema,
         { schemaVersion: RETENTION_SCHEMA, revision: 0, windows: {} });
-    const holds = parseDocument(readSetting(tx, RETENTION_HOLDS_KEY), retentionHoldsDocumentSchema,
-        { schemaVersion: RETENTION_SCHEMA, revision: 0, holds: [] });
+    const holds = readRetentionHolds(tx);
     if (pack.status !== 'ready' || !windows || !holds) return { status: 'configuration_error' };
     return { status: 'ready', preset: pack.preset, profileId: retentionProfileForPreset(pack.preset), windows, holds };
 }
@@ -198,18 +202,14 @@ export function releaseRetentionHold(tx: RetentionRunner, input: unknown, audit:
 
 /** Ogni percorso di cancellazione definitiva di un paziente lo chiama sotto il proprio lock di scrittura. */
 export function assertNoRetentionHold(tx: RetentionRunner, patientId: string): void {
-    const raw = readSetting(tx, RETENTION_HOLDS_KEY);
-    if (raw === undefined) return;
-    const holds = parseDocument(raw, retentionHoldsDocumentSchema, null);
+    const holds = readRetentionHolds(tx);
     // Un elenco illeggibile vale come blocco: meglio fermare che cancellare.
     if (!holds || holds.holds.some(hold => hold.patientId === patientId)) throw new RetentionError('legal_hold');
 }
 
 /** La cancellazione di un documento allegato si ferma se il documento o l'intero fascicolo sono bloccati. */
 export function assertAttachmentNotHeld(tx: RetentionRunner, patientId: string, attachmentId: string): void {
-    const raw = readSetting(tx, RETENTION_HOLDS_KEY);
-    if (raw === undefined) return;
-    const holds = parseDocument(raw, retentionHoldsDocumentSchema, null);
+    const holds = readRetentionHolds(tx);
     if (!holds || holds.holds.some(hold => hold.patientId === patientId
         && (hold.scope === 'patient' || hold.attachmentId === attachmentId))) throw new RetentionError('legal_hold');
 }

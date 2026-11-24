@@ -200,6 +200,11 @@ impl ClinicalApp {
         if let ArchiveOperation::Review(review) = &area.operation {
             pane = pane.child(div().id("archive-review").flex().flex_col().gap(px(12.))
                 .child(text!(format!("File: {} ({} byte).", review.name, review.bytes)))
+                .children(match review.command.excluded_retired_patients() {
+                    0 => None,
+                    1 => Some(text!("Il ripristino escluderà 1 fascicolo ritirato.")),
+                    count => Some(text!(format!("Il ripristino escluderà {count} fascicoli ritirati."))),
+                })
                 .child(text!(format!("Ripristino del file portabile: {} record. I dati esportabili verranno sostituiti. Account e chiavi restano invariati; lo storico protetto viene conservato. L’operazione non è reversibile. I dispositivi abbinati dovranno essere abbinati di nuovo.", review.command.records())))
                 .child(text!("Reinserisci la passphrase amministrativa prima di sostituire i dati. Le attestazioni attive tornano inattive; gli eventi importati sono identificati nello storico locale."))
                 .child(crate::text_input::themed(self.local_host.secret.clone(), theme))
@@ -389,12 +394,14 @@ impl ClinicalApp {
         self.run_local_host(
             move || access.restore_archive(&command, confirmation, &passphrase),
             |this, result, cx| {
-                let rejected = matches!(result, Err(RuntimeError::Conflict | RuntimeError::Forbidden | RuntimeError::Authentication | RuntimeError::Rejected(400 | 401 | 412 | 423)));
+                let policy_blocked = matches!(result, Err(RuntimeError::RestoreLegalHold | RuntimeError::RestoreRetentionUnreadable | RuntimeError::RestoreRetiredPatientMaterial));
+                let rejected = policy_blocked || matches!(result, Err(RuntimeError::Conflict | RuntimeError::Forbidden | RuntimeError::Authentication | RuntimeError::Rejected(400 | 401 | 412 | 423)));
                 let released = rejected && this.local_host.archives.clear_journal().is_ok();
                 this.local_host.archives.journal_error |= rejected && !released;
                 this.disconnect(cx);
                 let message = match result {
                     Ok(()) => "Ripristino eseguito. Riapri l’archivio e rileggi la ricevuta in Archivi e backup.".into(),
+                    Err(error) if policy_blocked && released => ui_error(error),
                     Err(error) if released => format!("{} Ripristino bloccato: i dati non sono stati modificati. Riapri l’archivio e prepara di nuovo il file; nessun reinvio automatico.", ui_error(error)),
                     Err(error) => format!("{} Riapri l’archivio e rileggi la ricevuta prima di procedere.", ui_error(error)),
                 };
@@ -435,10 +442,15 @@ impl ClinicalApp {
                 this.local_host.archives.receipt_verified = result.is_ok();
                 this.local_host.archives.status = Some(match result {
                     Ok(receipt) => format!(
-                        "Ricevuta riletta: ripristino completato il {}. Archivio {}. Impronta {}.",
+                        "Ricevuta riletta: ripristino completato il {}. Archivio {}. Impronta {}.{}",
                         crate::components::display_instant(&receipt.completed_at),
                         receipt.archive_generation,
-                        receipt.source_checksum
+                        receipt.source_checksum,
+                        match receipt.excluded_retired_patients {
+                            0 => String::new(),
+                            1 => " Il ripristino ha escluso 1 fascicolo ritirato.".into(),
+                            count => format!(" Il ripristino ha escluso {count} fascicoli ritirati."),
+                        },
                     ),
                     Err(error) => format!(
                         "Ricevuta non confermata: {} Conserva il registro e il backup.",

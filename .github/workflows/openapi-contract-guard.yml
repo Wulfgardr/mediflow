@@ -65,9 +65,11 @@ jobs:
         run: |
           npm run check:api-error-leak
           npm run check:api-error-leak -- --self-test
-      - name: Never-regress guard
+      - name: Never-regress guard and HTML sink fixtures
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: npm run check:never-regress
+        run: |
+          npm run check:never-regress
+          node --test scripts/html-sink-guard.test.mjs
       - name: New comments ratchet and tests
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: |
