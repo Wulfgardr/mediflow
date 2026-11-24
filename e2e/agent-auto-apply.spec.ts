@@ -440,7 +440,9 @@ test('a kit visit creates the missing chart at review while mismatched and mixed
         expect(database.prepare("SELECT event_type, subject_ref FROM audit_events WHERE request_id = ? AND event_type = 'patient.created'").all(good))
             .toEqual([{ event_type: 'patient.created', subject_ref: id }]);
         for (const visitId of [wrong, mixed]) {
-            const row = await (await page.request.get('/api/agent-mandates/incoming?visit=' + visitId)).json();
+            const response = await documentRequests(page).get('/api/agent-mandates/incoming?visit=' + visitId);
+            expect(response.status(), await response.text()).toBe(200);
+            const row = await response.json();
             expect(row.appliedItemIds).toEqual([]);
         }
         await page.screenshot({ path: info.outputPath('visite-sintetiche-dopo.png'), fullPage: true });
