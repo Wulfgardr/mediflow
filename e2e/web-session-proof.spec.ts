@@ -152,6 +152,28 @@ standalone('al primo avvio il medico accede, legge una scheda, registra una nota
     });
 });
 
+const pinAccount = standalone.extend({ existingPin: '24682468' });
+
+pinAccount('con il PIN transitorio la ricarica di /settings/backup lascia la pagina sbloccata finché la sessione vale', async ({ page }) => {
+    pinAccount.setTimeout(120_000);
+    await bootstrapUnlockedSession(page, '24682468');
+    await page.getByRole('link', { name: 'Impostazioni', exact: true }).click();
+    await page.locator('a[href="/settings/backup"]:visible').first().click();
+    await expect(page.getByRole('button', { name: 'Scarica Backup', exact: true })).toBeVisible();
+    const session = await documentSession(page);
+
+    await page.reload();
+    await expect(page).toHaveURL(/\/settings\/backup$/u);
+    await expect(page.getByRole('button', { name: 'Scarica Backup', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeHidden();
+    expect(await documentSession(page)).toBe(session);
+
+    await lockAndWaitForConfirmation(page);
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeVisible();
+    expect(await (await documentRequests(page).get('/api/auth/check')).json()).toMatchObject({ hasSession: false });
+});
+
 test('il client API locale autorizzato legge la lista pazienti', async ({ baseURL }) => {
     const token = process.env.MEDIFLOW_SESSION_PROOF_SYNTHETIC_API_TOKEN;
     const dataDirectory = process.env.MEDIFLOW_DATA_DIR;

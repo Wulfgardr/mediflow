@@ -1257,4 +1257,7 @@ Dopo l'unione con `main` a `d7403e6918162a5f425c9e905b8f8d7ecc5e4fb5`, che
 porta il ripristino di WUL-944, cambia solo il digest di
 `lib/security/client-auth-api.ts`: la parte di `main` aggiunge il codice
 fiscale del medico al primo avvio, la parte del ramo il trasporto della prova.
-Le altre impronte coincidono con `main`.
+Le altre impronte coincidono con `main`. Il digest successivo comprende la
+conservazione della prova accanto alla chiave del PIN transitorio (WUL-931):
+riguarda solo intestazioni e `sessionStorage` della scheda, non il comando di
+stato terapia.
