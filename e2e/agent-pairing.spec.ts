@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures/isolated-runtime';
-import { bootstrapUnlockedSession } from './utils';
+import { bootstrapUnlockedSession, onboardingPassphrase } from './utils';
 import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -16,7 +16,7 @@ test('agent obtains its scoped credential only after the doctor compares and app
     await bootstrapUnlockedSession(page, pin);
     await page.getByRole('complementary', { name: 'MediFlow', exact: true }).getByRole('link', { name: 'Impostazioni', exact: true }).click();
     await page.getByRole('link', { name: 'Accesso', exact: true }).click();
-    await page.getByLabel('PIN attuale', { exact: true }).first().fill(pin);
+    await page.getByLabel('Passphrase attuale', { exact: true }).fill(onboardingPassphrase(pin));
     await page.getByLabel('Nuova passphrase', { exact: true }).fill(passphrase);
     await page.getByLabel('Conferma nuova passphrase', { exact: true }).fill(passphrase);
     await page.getByRole('button', { name: 'Prepara il nuovo kit', exact: true }).click();

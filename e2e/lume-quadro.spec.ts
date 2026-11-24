@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import {
+  openUnlockedDocument,
   assertKeyboardFocusProgresses,
   assertNoHorizontalOverflow,
   assertNotClippedInViewport,
@@ -74,7 +75,7 @@ async function openSyntheticQuadro(page: Page, quadroCase: QuadroCase): Promise<
   await page.setViewportSize({ width: quadroCase.width, height: quadroCase.height });
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   const patient = await createLivePatientFixture(page);
-  await page.goto(`/patients/${patient.id}/modules#quadro`);
+  await openUnlockedDocument(page, `/patients/${patient.id}/modules#quadro`);
   await setRegister(page, quadroCase.register);
   const quadro = page.getByRole('region', { name: 'Riepilogo clinico', exact: true });
   await expect(quadro).toBeVisible();
@@ -177,7 +178,7 @@ async function assertReflowStack(quadro: Locator): Promise<void> {
 test('la navigazione Quadro del paziente selezionato converge sulla Scheda', async ({ page }) => {
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   const patient = await createLivePatientFixture(page);
-  await page.goto(`/?area=incarico&paziente=${patient.id}`);
+  await openUnlockedDocument(page, `/?area=incarico&paziente=${patient.id}`);
   const row = page.getByRole('option').filter({ has: page.getByText(patient.name, { exact: true }) });
   await expect(row).toBeVisible();
   await row.focus();

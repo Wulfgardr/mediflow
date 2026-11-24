@@ -2,7 +2,7 @@ import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { assertNoHorizontalOverflow, bootstrapUnlockedSession, unlockIfNeeded } from './utils';
+import { assertNoHorizontalOverflow, bootstrapUnlockedSession, openUnlockedDocument, unlockIfNeeded } from './utils';
 
 const enabled = process.env.MEDIFLOW_TEST_OFFICIAL_UI === '1';
 const pin = process.env.E2E_PIN || '086086';
@@ -35,6 +35,13 @@ const noComparison = async (target = page) => {
   await expect(target.locator('body')).not.toContainText(/Runtime Twin|Prototipo 0\.8\.6/);
   await expect(target.locator('nextjs-error-overlay')).toHaveCount(0);
 };
+
+async function renewFromOpenTab(target: Page) {
+  const lock = target.getByRole('heading', { name: 'Sblocca MediFlow' });
+  await expect(lock).toBeVisible();
+  await target.getByRole('button', { name: 'Rinnova accesso', exact: true }).click();
+  await expect(lock).toBeHidden();
+}
 
 test.beforeAll(async ({ browser, baseURL }) => {
   if (!enabled) return;
@@ -95,7 +102,7 @@ test('ordinary PIN and manual onboarding preserve default B without comparison c
   const workspace = await page.locator('[data-twin-workspace]').boundingBox();
   expect(workspace!.y).toBe(0);
   expect(workspace!.height).toBe(960);
-  await page.goto('/settings/profilo');
+  await openUnlockedDocument(page, '/settings/profilo', pin);
   const settings = page.getByTestId('settings-profile-section');
   await expect(settings.getByRole('heading', { name: 'Il tuo modo di lavorare', exact: true })).toBeVisible();
   await settings.getByRole('button', { name: 'Il tuo modo di lavorare', exact: true }).click();
@@ -175,7 +182,7 @@ test('diagnosis-only edit guards navigation and retains the draft after cancella
     const code = page.locator('input[name="diagnoses.0.code"]');
     const reference = page.locator('summary').filter({ hasText: 'Riferimento della selezione WHO' });
     const leave = page.getByRole('dialog', { name: 'Lasciare la compilazione?' });
-    await page.goto(editPath);
+    await openUnlockedDocument(page, editPath, pin);
     await expect(diagnosis).toHaveValue(`${originalDiagnosis.code} - ${originalDiagnosis.description}`);
     await expect(code).toHaveAttribute('readonly', '');
     await expect(reference).toBeVisible();
@@ -183,7 +190,7 @@ test('diagnosis-only edit guards navigation and retains the draft after cancella
     await expect(page).toHaveURL(/[?&]area=incarico/);
     await expect(leave).toHaveCount(0);
     await page.waitForLoadState('networkidle');
-    await page.goto(editPath);
+    await openUnlockedDocument(page, editPath, pin);
     await expect(diagnosis).toHaveValue(`${originalDiagnosis.code} - ${originalDiagnosis.description}`);
     const updatedDiagnosis = 'Diagnosi sintetica modificata senza cambiare altri campi';
     const disabledSearch = page.waitForResponse(response => new URL(response.url()).pathname === '/api/icd/proxy' && response.status() === 503);
@@ -205,7 +212,7 @@ test('diagnosis-only edit guards navigation and retains the draft after cancella
     await leave.getByRole('button', { name: 'Esci senza salvare', exact: true }).click();
     await expect(page).toHaveURL(/[?&]area=incarico/);
     await page.waitForLoadState('networkidle');
-    await page.goto(editPath);
+    await openUnlockedDocument(page, editPath, pin);
     await expect(diagnosis).toHaveValue(`${originalDiagnosis.code} - ${originalDiagnosis.description}`);
     await expect(reference).toBeVisible();
     expect(patientWrites).toBe(0);
@@ -226,7 +233,7 @@ test('diagnosis-only edit guards navigation and retains the draft after cancella
 
 test('entry survives disclosure, cross-tab layout change and cancelled navigation before encrypted save', async () => {
   test.setTimeout(90_000);
-  await page.goto(`/patients/${patients[0].id}/entries/new`);
+  await openUnlockedDocument(page, `/patients/${patients[0].id}/entries/new`, pin);
   const editor = page.getByRole('textbox', { name: 'Resoconto clinico', exact: true });
   const draft = `Nota sintetica integrazione UI ${randomUUID()}.`;
   await editor.fill(draft);
@@ -237,20 +244,12 @@ test('entry survives disclosure, cross-tab layout change and cancelled navigatio
   const sibling = await context.newPage();
   try {
     await sibling.goto('/settings/aspetto');
-    await sibling.waitForLoadState('networkidle');
-    try { await unlockIfNeeded(sibling, pin); }
-    catch (error) {
-      await test.info().attach('sibling-access-state.txt', { body: await sibling.locator('body').innerText(), contentType: 'text/plain' });
-      const renew = sibling.getByRole('button', { name: 'Rinnova accesso', exact: true });
-      if (!await renew.isVisible()) throw error;
-      await renew.click();
-      await unlockIfNeeded(sibling, pin);
-    }
+    await renewFromOpenTab(sibling);
     await sibling.getByRole('radio', { name: 'Barra laterale', exact: true }).check();
     await expect(page.locator('html')).toHaveAttribute('data-twin-composition', 'workbench');
     await expect(editor).toContainText(draft);
     await sibling.reload();
-    await unlockIfNeeded(sibling, pin);
+    await renewFromOpenTab(sibling);
     await expect(sibling.getByRole('radio', { name: 'Barra laterale', exact: true })).toBeChecked();
     await noComparison(sibling);
   } finally { await sibling.close(); }
@@ -276,20 +275,21 @@ test('both layouts reload and reflow at desktop, phone, narrow and short viewpor
   for (const [width, height] of [[1440, 960], [390, 844], [320, 760], [900, 620]]) {
     await page.setViewportSize({ width, height });
     for (const [label, value, entry] of [['Barra laterale', 'workbench', 'quadro'], ['Barra superiore', 'stream', 'diario']]) {
-      await page.goto('/settings/aspetto');
+      await openUnlockedDocument(page, '/settings/aspetto', pin);
       await page.getByRole('radio', { name: label, exact: true }).check();
       await page.reload();
+      await unlockIfNeeded(page, pin);
       await expect(page.getByRole('radio', { name: label, exact: true })).toBeChecked();
       await assertNoHorizontalOverflow(page, [{ label: 'document', selector: 'document' }, { label: 'appearance', selector: '[data-testid="settings-appearance-section"]' }]);
       await noComparison();
-      await page.goto(modules());
+      await openUnlockedDocument(page, modules(), pin);
       await expect(page.locator('html')).toHaveAttribute('data-twin-composition', value);
       await expect(page.locator(`#${entry}`)).toBeVisible();
       await expect(page.getByRole('heading', { name: name(), exact: true })).toBeVisible();
       await assertNoHorizontalOverflow(page, [{ label: 'document', selector: 'document' }, { label: 'workspace', selector: '[data-twin-workspace]' }]);
       await page.screenshot({ path: test.info().outputPath(`${value}-${width}.png`) });
     }
-    await page.goto(`/patients/${patients[0].id}/entries/new`);
+    await openUnlockedDocument(page, `/patients/${patients[0].id}/entries/new`, pin);
     await expect(page.getByRole('textbox', { name: 'Resoconto clinico', exact: true })).toBeVisible();
     await assertNoHorizontalOverflow(page, [{ label: 'document', selector: 'document' }]);
     await page.screenshot({ path: test.info().outputPath(`entry-${width}.png`) });
@@ -298,7 +298,7 @@ test('both layouts reload and reflow at desktop, phone, narrow and short viewpor
 
 test('unavailable preference storage is transient and ordinary lock clears open records', async () => {
   await page.setViewportSize({ width: 1440, height: 960 });
-  await page.goto('/settings/aspetto');
+  await openUnlockedDocument(page, '/settings/aspetto', pin);
   await page.evaluate(() => {
     const original = Storage.prototype.setItem;
     Storage.prototype.setItem = function(key: string, value: string) {
@@ -309,6 +309,7 @@ test('unavailable preference storage is transient and ordinary lock clears open 
   await page.getByRole('radio', { name: 'Barra laterale', exact: true }).check();
   await expect(page.locator('html')).toHaveAttribute('data-twin-composition', 'workbench');
   await page.reload();
+  await unlockIfNeeded(page, pin);
   await expect(page.getByRole('radio', { name: 'Barra superiore', exact: true })).toBeChecked();
   const pending: import('@playwright/test').Request[] = [];
   const afterLock: string[] = [];
@@ -329,7 +330,7 @@ test('unavailable preference storage is transient and ordinary lock clears open 
   };
   await page.route('**/api/attachments?**', hold);
   try {
-    await page.goto(modules());
+    await openUnlockedDocument(page, modules(), pin);
     await expect(page.getByRole('heading', { name: name(), exact: true })).toBeVisible();
     await expect.poll(() => pending.length).toBeGreaterThan(0);
     await page.getByRole('button', { name: 'Blocca', exact: true }).click();

@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { db } from '@/lib/db';
 import {
     normalizeAccessibilityPreference,
@@ -38,58 +38,59 @@ function applyPreferenceToDocument(key: 'uiReduceMotion' | 'uiReduceTransparency
 export function UIAccessibilityProvider({ children }: UIAccessibilityProviderProps) {
     const [reduceMotion, setReduceMotionState] = useState<boolean>(() => readStoredPreference(UI_REDUCE_MOTION_STORAGE_KEY));
 
+    const explicitMotionChoice = useRef(false);
+
     useEffect(() => {
         applyPreferenceToDocument('uiReduceMotion', reduceMotion);
         try {
-            localStorage.setItem(UI_REDUCE_MOTION_STORAGE_KEY, String(reduceMotion));
-        } catch {
-            // No-op: best effort persistence.
-        }
+            const stored = localStorage.getItem(UI_REDUCE_MOTION_STORAGE_KEY);
+            if (stored !== String(reduceMotion) && (stored !== null || reduceMotion)) {
+                localStorage.setItem(UI_REDUCE_MOTION_STORAGE_KEY, String(reduceMotion));
+            }
+        } catch {}
     }, [reduceMotion]);
 
     useEffect(() => {
         applyPreferenceToDocument('uiReduceTransparency', false);
         try {
-            localStorage.removeItem(UI_REDUCE_TRANSPARENCY_STORAGE_KEY);
-        } catch {
-            // No-op: best effort cleanup.
-        }
-        void db.settings.put({ key: UI_REDUCE_TRANSPARENCY_SETTING_KEY, value: false }, { suppressNotify: true }).catch(() => {
-            // No-op.
-        });
+            if (localStorage.getItem(UI_REDUCE_TRANSPARENCY_STORAGE_KEY) !== null) {
+                localStorage.removeItem(UI_REDUCE_TRANSPARENCY_STORAGE_KEY);
+            }
+        } catch {}
+
+        let cancelled = false;
+        const migrateTransparency = async () => {
+            const stored = await db.settings.get(UI_REDUCE_TRANSPARENCY_SETTING_KEY);
+            if (!cancelled && normalizeAccessibilityPreference(stored?.value)) {
+                await db.settings.update(UI_REDUCE_TRANSPARENCY_SETTING_KEY,
+                    { value: false, expectedValue: stored.value }, { suppressNotify: true });
+            }
+        };
+        void migrateTransparency().catch(() => {});
+        return () => { cancelled = true; };
     }, []);
 
     useEffect(() => {
         let cancelled = false;
-
-        const syncPersistedPreferences = async () => {
-            try {
-                const storedReduceMotion = await db.settings.get(UI_REDUCE_MOTION_SETTING_KEY);
-
-                const nextReduceMotion = normalizeAccessibilityPreference(storedReduceMotion?.value, reduceMotion);
-
-                if (!cancelled && storedReduceMotion?.value !== undefined && nextReduceMotion !== reduceMotion) {
-                    setReduceMotionState(nextReduceMotion);
-                }
-
-                if (storedReduceMotion?.value === undefined) {
-                    await db.settings.put({ key: UI_REDUCE_MOTION_SETTING_KEY, value: reduceMotion }, { suppressNotify: true });
-                }
-            } catch {
-                // No-op: rendering shouldn't block on settings availability.
+        const syncReduceMotion = async () => {
+            const stored = await db.settings.get(UI_REDUCE_MOTION_SETTING_KEY);
+            if (cancelled || explicitMotionChoice.current || !stored) return;
+            const cached = readStoredPreference(UI_REDUCE_MOTION_STORAGE_KEY);
+            if (stored.value != null) {
+                setReduceMotionState(normalizeAccessibilityPreference(stored.value, cached));
+            } else if (cached) {
+                await db.settings.update(UI_REDUCE_MOTION_SETTING_KEY,
+                    { value: true, expectedValue: null }, { suppressNotify: true });
             }
         };
-
-        void syncPersistedPreferences();
-
-        return () => {
-            cancelled = true;
-        };
-    }, [reduceMotion]);
+        void syncReduceMotion().catch(() => {});
+        return () => { cancelled = true; };
+    }, []);
 
     const value = useMemo<UIAccessibilityState>(() => ({
         reduceMotion,
         setReduceMotion: (enabled: boolean) => {
+            explicitMotionChoice.current = true;
             setReduceMotionState(enabled);
             void db.settings.put({ key: UI_REDUCE_MOTION_SETTING_KEY, value: enabled }, { suppressNotify: true }).catch(() => {
                 // No-op.

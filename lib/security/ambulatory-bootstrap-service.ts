@@ -9,6 +9,7 @@ import { revalidatePairedCommitAuthority } from '../network-patient-commit-autho
 import { archiveGenerationForSession } from './archive-session-generation';
 import { isCurrentServerSession, type PairedNativeBinding } from './current-session-authority';
 import type { ServerSession } from './server-session';
+import { presentedWebSessionProof, webSessionProofBindings } from './web-session-proof';
 import { resolve, type WebSessionProjection } from './web-auth-lifecycle-owner-adapter';
 import { bootstrapWebAuthControl, webAuthControlIdFromRequest, webAuthSessionIdFromRequest } from './web-auth-control-transport';
 import { completeExactWebP3Logout } from './web-auth-logout-server';
@@ -65,6 +66,7 @@ export function createAmbulatoryBootstrapService(options: { now?: () => number }
         const control = webAuthControlIdFromRequest(request);
         const id = webAuthSessionIdFromRequest(request);
         if (control !== flow.controlId || !id || (flow.webId !== null && id !== flow.webId)) return null;
+        if (!webSessionProofBindings.admits(control, id, presentedWebSessionProof(request.headers))) return null;
         const resolution = resolve(id, control);
         if (resolution.status !== 'active' || resolution.projection.authChannel !== 'web') return null;
         const session = resolution.projection;
@@ -137,6 +139,7 @@ export function createAmbulatoryBootstrapService(options: { now?: () => number }
             const flow = locate(request);
             const controlId = webAuthControlIdFromRequest(request), id = webAuthSessionIdFromRequest(request);
             if (!flow || controlId !== flow.controlId || !id || (flow.webId !== null && id !== flow.webId)) return new Response(null, { status: 401 });
+            if (!webSessionProofBindings.admits(controlId, id, presentedWebSessionProof(request.headers))) return new Response(null, { status: 401 });
             const resolution = resolve(id, controlId);
             if (resolution.status !== 'active' || resolution.projection.userId !== flow.native.userId
                 || resolution.projection.createdAt < flow.createdAt) return new Response(null, { status: 401 });

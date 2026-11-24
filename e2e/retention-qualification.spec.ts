@@ -1,7 +1,6 @@
 import { test, expect } from './fixtures/isolated-runtime';
-import { bootstrapUnlockedSession, openDocumentActions, openPatientSection } from './utils';
-import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
-import { loginWithWebAuthControl } from '../scripts/web-auth-control-test-client.mjs';
+import { unlockIfNeeded, bootstrapUnlockedSession, openDocumentActions, openPatientSection } from './utils';
+import { documentRequests } from './fixtures/trusted-web-request';
 import Database from 'better-sqlite3';
 import { join } from 'node:path';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -26,17 +25,16 @@ test('conservazione: profilo, finestre, blocchi, scarto e autorizzazione su runt
     negatives.push({ case: 'no-session', method, status: 401, body: { error: 'Unauthorized' } });
   }
   await bootstrapUnlockedSession(page, '314159');
-  let headers = await trustedArchiveWebRequestHeaders(page);
   let db = new Database(join(isolatedRuntime.dataDirectory, 'medical.db'), { fileMustExist: true });
   try {
     const setting = db.prepare('INSERT INTO settings(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value');
     setting.run('territorial.packs', JSON.stringify({ schemaVersion: 'mediflow.territorial-packs.v1', revision: 1, preset: 'core+it+lom' }));
     setting.run('territorial.packs.initialization', 'synthetic');
     const overview = async () => {
-      const response = await page.request.get(endpoint); expect(response.status()).toBe(200); return response.json();
+      const response = await documentRequests(page).get(endpoint); expect(response.status()).toBe(200); return response.json();
     };
     const reject = async (method: 'POST' | 'PUT', data: unknown, status: number, body: unknown, path = endpoint) => {
-      const response = await page.request.fetch(path, { method, headers, data });
+      const response = await documentRequests(page).fetch(path, { method, data });
       expect(response.status()).toBe(status); expect(await response.json()).toEqual(body);
       negatives.push({ case: path, method, input: data, status, body });
     };
@@ -45,6 +43,7 @@ test('conservazione: profilo, finestre, blocchi, scarto e autorizzazione su runt
       await reject(method, [], 400, { code: 'input_invalid' });
     }
     await page.goto('/settings/conservazione');
+    await unlockIfNeeded(page, '314159');
     await expect(page.getByTestId('retention-profile')).toContainText('Lombardia, massimario rev04');
     await expect(page.getByTestId('retention-profile').getByRole('link', { name: /Regione Lombardia/ })).toHaveAttribute('href', /^https:\/\//);
     expect(await overview()).toMatchObject({ preset: 'core+it+lom', profileId: 'it-lom-rev04', review: [] });
@@ -56,7 +55,9 @@ test('conservazione: profilo, finestre, blocchi, scarto e autorizzazione su runt
     await page.getByTestId('retention-save-windows').click();
     await page.getByRole('dialog').getByRole('button', { name: 'Salva finestre', exact: true }).click();
     await expect(page.getByText('Finestre salvate', { exact: true })).toBeVisible();
-    await page.reload(); await expect(input).toHaveValue('12');
+    await page.reload();
+    await unlockIfNeeded(page, '314159');
+    await expect(input).toHaveValue('12');
     const saved = await overview();
     expect(saved.windows.ambulatory_record).toEqual({ kind: 'years', years: 12 });
     await reject('PUT', { confirmed: true, expectedRevision: saved.windowsRevision - 1, windows: {} }, 409, { code: 'conflict' });
@@ -66,14 +67,16 @@ test('conservazione: profilo, finestre, blocchi, scarto e autorizzazione su runt
     await page.getByRole('dialog').getByRole('button', { name: 'Salva finestre', exact: true }).click();
     await expect(page.getByText('La finestra è più breve del minimo del profilo attivo.', { exact: true })).toBeVisible();
     expect((await overview()).windows).toEqual(saved.windows);
-    await page.reload(); await expect(input).toHaveValue('12');
+    await page.reload();
+    await unlockIfNeeded(page, '314159');
+    await expect(input).toHaveValue('12');
 
     db.close();
     await isolatedRuntime.restart();
     db = new Database(join(isolatedRuntime.dataDirectory, 'medical.db'), { fileMustExist: true });
     await bootstrapUnlockedSession(page, '314159');
-    headers = await trustedArchiveWebRequestHeaders(page);
     await page.goto('/settings/conservazione');
+    await unlockIfNeeded(page, '314159');
     await expect(input).toHaveValue('12');
     const afterRestart = await overview();
     expect(afterRestart.windows).toEqual(saved.windows);
@@ -88,6 +91,7 @@ test('conservazione: profilo, finestre, blocchi, scarto e autorizzazione su runt
     db.prepare(`INSERT INTO entries(id,patient_id,type,date,content,created_at,updated_at)
       VALUES ('retention-entry','retention-synthetic','visit',?,'Sintetico',?,?)`).run(at, at, at);
     await page.reload();
+    await unlockIfNeeded(page, '314159');
     const row = page.getByTestId('retention-review-item');
     await expect(row).toContainText('Sintetica Persona');
     await expect(row).toHaveAttribute('data-status', 'expired');
@@ -129,12 +133,11 @@ test('conservazione: profilo, finestre, blocchi, scarto e autorizzazione su runt
     expect(db.pragma('foreign_key_check')).toEqual([]);
     const user = db.prepare('SELECT * FROM users LIMIT 1').get() as { id: string; username: string };
     db.prepare("UPDATE users SET role='doctor' WHERE id=?").run(user.id);
-    const login = await loginWithWebAuthControl(isolatedRuntime.url, { username: user.username, password: '314159' });
-    expect(login.response.status).toBe(200);
-    if (!login.webHeaders?.Cookie) throw new Error('Sessione sintetica non disponibile');
+    await page.reload();
+    await unlockIfNeeded(page, '314159');
     for (const method of ['GET', 'PUT', 'POST']) {
-      const response = await fetch(isolatedRuntime.url + endpoint, { method, headers: { ...login.webHeaders!, ...headers, Cookie: login.webHeaders!.Cookie, 'Content-Type': 'application/json' }, ...(method === 'GET' ? {} : { body: '{}' }) });
-      expect(response.status).toBe(403); expect(await response.json()).toEqual({ error: 'Forbidden' });
+      const response = await documentRequests(page).fetch(endpoint, { method, ...(method === 'GET' ? {} : { data: {} }) });
+      expect(response.status()).toBe(403); expect(await response.json()).toEqual({ error: 'Forbidden' });
       negatives.push({ case: 'non-admin', method, status: 403, body: { error: 'Forbidden' } });
     }
     writeFileSync(join(evidence, 'audit.json'), JSON.stringify(audit, null, 2));
@@ -163,6 +166,7 @@ test('blocco su documento dal browser: il documento resta finché il blocco non 
     const name = 'Referto sintetico sotto blocco.txt';
     const openDocuments = async () => {
       await page.goto(`/patients/${patientId}/modules`);
+      await unlockIfNeeded(page, '314159');
       await openPatientSection(page, 'documenti');
       const docs = page.getByTestId('patient-documents');
       await expect(docs.locator('[data-document-area="list"]')).toHaveAttribute('aria-busy', 'false');
@@ -175,6 +179,7 @@ test('blocco su documento dal browser: il documento resta finché il blocco non 
     expect(attachmentId).toBeTruthy();
 
     await page.goto('/settings/conservazione');
+    await unlockIfNeeded(page, '314159');
     await page.getByTestId('retention-hold-patient').selectOption(patientId);
     const holds = page.getByTestId('retention-holds');
     await holds.getByRole('combobox', { name: 'Documento' }).selectOption(attachmentId);
@@ -193,10 +198,13 @@ test('blocco su documento dal browser: il documento resta finché il blocco non 
     await expect(page.getByTestId('attachment-delete-held')).toBeVisible();
     await page.screenshot({ path: join(evidence, 'eliminazione-respinta.png'), fullPage: true });
     expect(db.prepare('SELECT id FROM attachments WHERE id=?').get(attachmentId)).toBeTruthy();
-    await page.reload(); await openPatientSection(page, 'documenti');
+    await page.reload();
+    await unlockIfNeeded(page, '314159');
+    await openPatientSection(page, 'documenti');
     await expect(docs.getByRole('button', { name: `Visualizza ${name}`, exact: true })).toBeVisible();
 
     await page.goto('/settings/conservazione');
+    await unlockIfNeeded(page, '314159');
     await holds.getByRole('button', { name: 'Revoca', exact: true }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Revoca blocco', exact: true }).click();
     await expect(holds).toContainText('Nessun blocco attivo.');
@@ -221,7 +229,7 @@ test('R-1: profilo di conservazione per nucleo, Italia e Lombardia con minimi e 
   mkdirSync(evidence, { recursive: true });
   await bootstrapUnlockedSession(page, '314159');
   const overview = async () => {
-    const response = await page.request.get(endpoint); expect(response.status()).toBe(200);
+    const response = await documentRequests(page).get(endpoint); expect(response.status()).toBe(200);
     return await response.json() as { preset: string; profileId: RetentionProfileId; windows: RetentionWindows; windowsRevision: number; review: unknown[] };
   };
   const observed: unknown[] = [];
@@ -235,6 +243,7 @@ test('R-1: profilo di conservazione per nucleo, Italia e Lombardia con minimi e 
     const profile = RETENTION_PROFILES[profileId];
     await switchPreset(page, preset);
     await page.goto('/settings/conservazione');
+    await unlockIfNeeded(page, '314159');
     const state = await overview();
     expect(state, `R-1 profilo ${profileId} per ${preset}`).toMatchObject({ preset, profileId, review: [] });
     const card = page.getByTestId('retention-profile');
@@ -263,6 +272,7 @@ test('R-1: profilo di conservazione per nucleo, Italia e Lombardia con minimi e 
       await expect(page.getByText('La finestra è più breve del minimo del profilo attivo.', { exact: true })).toBeVisible();
       expect((await overview()).windows, `R-1 finestra sotto il minimo respinta per ${profileId}`).toEqual(state.windows);
       await page.reload();
+      await unlockIfNeeded(page, '314159');
     } else {
       expect(RETENTION_CATEGORIES.filter(category => profile.terms[category].term.kind === 'owner')).toHaveLength(RETENTION_CATEGORIES.length - 1);
     }
@@ -271,6 +281,7 @@ test('R-1: profilo di conservazione per nucleo, Italia e Lombardia con minimi e 
     await saveWindow(category, years);
     await expect(page.getByText('Finestre salvate', { exact: true })).toBeVisible();
     await page.reload();
+    await unlockIfNeeded(page, '314159');
     await expect(page.getByTestId(`retention-term-${category}`).getByRole('spinbutton')).toHaveValue(String(years));
     await expect(page.getByTestId(`retention-term-${category}`)).toContainText(`Applicato: ${years} anni`);
     const saved = await overview();

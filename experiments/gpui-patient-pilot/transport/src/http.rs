@@ -11,6 +11,8 @@ use serde_json::{Value, json};
 use std::{net::IpAddr, sync::OnceLock, time::Duration};
 use zeroize::{Zeroize, Zeroizing};
 
+pub(crate) const LOCAL_CLIENT_SESSION_PROOF_HEADER: &str = "x-mediflow-local-client-instance";
+
 pub(crate) const JSON_LIMIT: usize = 8 * 1024 * 1024;
 pub(crate) const DOCUMENT_LIMIT: usize = 24 * 1024 * 1024;
 #[derive(Clone, Copy)]
@@ -1194,6 +1196,7 @@ pub struct HostBootstrapSession {
     generation: String,
     reference: Zeroizing<String>,
     control: Zeroizing<String>,
+    proof: Zeroizing<String>,
     cookie: Zeroizing<String>,
     sent: std::sync::atomic::AtomicBool,
 }
@@ -1266,6 +1269,7 @@ impl HostBootstrapSession {
             generation: open.archive_generation,
             reference: Zeroizing::new(open.reference),
             control,
+            proof: local_client_session_proof()?,
             cookie: Zeroizing::new(String::new()),
             sent: std::sync::atomic::AtomicBool::new(false),
         };
@@ -1291,6 +1295,10 @@ impl HostBootstrapSession {
             )
         });
         headers.insert(COOKIE, sensitive_header(&cookie)?);
+        headers.insert(
+            LOCAL_CLIENT_SESSION_PROOF_HEADER,
+            sensitive_header(&self.proof)?,
+        );
         headers.insert(
             "x-mediflow-bootstrap-reference",
             sensitive_header(&self.reference)?,
@@ -1505,6 +1513,14 @@ pub(crate) fn control_cookie(
     }
     found.ok_or(RuntimeError::InvalidResponse)
 }
+pub(crate) fn local_client_session_proof() -> Result<Zeroizing<String>> {
+    let mut bytes = Zeroizing::new([0u8; 32]);
+    getrandom::fill(&mut *bytes).map_err(|_| RuntimeError::Crypto)?;
+    Ok(Zeroizing::new(
+        bytes.iter().map(|value| format!("{value:02x}")).collect(),
+    ))
+}
+
 pub(crate) fn operation_uuid() -> Result<String> {
     let mut bytes = [0u8; 16];
     getrandom::fill(&mut bytes).map_err(|_| RuntimeError::Crypto)?;
@@ -1766,6 +1782,7 @@ mod tests {
             generation: "generation".into(),
             reference: Zeroizing::new("f".repeat(64)),
             control: Zeroizing::new("b".repeat(64)),
+            proof: Zeroizing::new("a".repeat(64)),
             cookie: Zeroizing::new("d".repeat(64)),
             sent: std::sync::atomic::AtomicBool::new(false),
         }

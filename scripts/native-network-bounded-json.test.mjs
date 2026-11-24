@@ -8,6 +8,7 @@ const root = path.resolve(import.meta.dirname, '..');
 const operations = [
     ['auth/native/login', 'POST'],
     ['v1/network/pairing-intents', 'POST'],
+    ['v1/network/pairing-offers/redeem', 'POST'],
     ['v1/network/patients', 'POST'],
     ['v1/network/patients/[id]', 'PUT', 'DELETE'],
     ['v1/network/patients/[id]/restore', 'POST'],
@@ -40,6 +41,11 @@ function harness(route, { deny = 0, cap, stage = null } = {}) {
         requireNetworkWriteContext: auth,
         requireNetworkCapabilityContext: auth,
         admitNativeBootstrapRouteRequest: async () => { events.push('auth'); return deny ? null : {}; },
+        requireAttestedTlsProxyContext: () => { events.push('auth'); return !deny; },
+        redeemDevicePairingOffer: async (...args) => {
+            events.push('service'); calls.push(args);
+            return { clientId: 'synthetic-client', pairedClientToken: 'synthetic-token' };
+        },
         nativeLoginDeniedResponse: denied,
         unauthorizedResponse: denied,
         forbiddenResponse: denied,
@@ -73,7 +79,7 @@ function harness(route, { deny = 0, cap, stage = null } = {}) {
         if (cache.has(relative)) return cache.get(relative);
         assert.ok([`app/api/${route}/route.ts`, 'lib/native-network-json-body.ts', 'lib/bounded-request-body.ts', 'lib/attachment-payload.ts', 'lib/patient-json-object.ts', 'lib/prescription-json-body.ts',
             'lib/entry-write-input.ts', 'lib/therapy-write-input.ts', 'lib/api-v1-clinical-write-normalization.ts', 'lib/status-normalization.ts', 'lib/clinical-date.ts',
-            'lib/network-write-context.ts', 'lib/network-request-scope.ts', 'lib/security/native-document-context.ts'].includes(relative), `unexpected production import ${relative}`);
+            'lib/network-pairing-offer-contract.ts', 'lib/network-write-context.ts', 'lib/network-request-scope.ts', 'lib/security/native-document-context.ts'].includes(relative), `unexpected production import ${relative}`);
         const source = fs.readFileSync(path.join(root, relative), 'utf8');
         const exports = {};
         cache.set(relative, exports);
@@ -88,6 +94,9 @@ function harness(route, { deny = 0, cap, stage = null } = {}) {
             }
             if (name === '@/lib/native-network-json-body') {
                 return load('lib/native-network-json-body.ts');
+            }
+            if (name === '@/lib/network-pairing-offer-contract') {
+                return load('lib/network-pairing-offer-contract.ts');
             }
             if (name === '@/lib/prescription-json-body') {
                 return load('lib/prescription-json-body.ts');
@@ -148,9 +157,11 @@ const ctx = { params: Promise.resolve({ id: 'synthetic-patient', entryId: 'synth
 for (const [route, ...methods] of operations) {
     for (const method of methods) {
         const bootstrap = route === 'v1/network/pairing-intents';
+        const redeem = route === 'v1/network/pairing-offers/redeem';
+        const contentType = redeem ? { 'content-type': 'application/json' } : {};
         test(`${method} ${route}: admission precedes body; bounded 413 and valid payload`, async () => {
             if (!bootstrap) {
-                for (const deny of [401, 403]) {
+                for (const deny of redeem ? [403] : [401, 403]) {
                     const h = harness(route, { deny });
                     const f = request(h, '{}', { 'content-length': '999999999' });
                     assert.equal((await h.route[method](f.req, ctx)).status, deny);
@@ -161,7 +172,7 @@ for (const [route, ...methods] of operations) {
             for (const mode of ['declared', 'chunked', 'lying-length']) {
                 const h = harness(route, { cap: 8 });
                 const headers = mode === 'declared' ? { 'content-length': '9' } : mode === 'lying-length' ? { 'content-length': '0' } : { 'transfer-encoding': 'chunked' };
-                const f = request(h, '{"note":"è"}', headers);
+                const f = request(h, '{"note":"è"}', { ...contentType, ...headers });
                 const response = await h.route[method](f.req, ctx);
                 assert.equal(response.status, 413);
                 assert.deepEqual(await response.json(), { error: 'JSON payload too large', code: 'JSON_BODY_TOO_LARGE' });
@@ -170,16 +181,19 @@ for (const [route, ...methods] of operations) {
                 if (!bootstrap) assert.ok(h.events.indexOf('auth') < h.events.indexOf('parse'));
                 assert.deepEqual(f.counts(), { pulls: mode === 'declared' ? 0 : 3, cancels: 1 });
                 assert.equal(f.body.locked, false);
-                const expectedCap = route === 'auth/native/login' || bootstrap ? 65_536 : route.endsWith('/attachments') ? 30_408_704 : 4_194_304;
+                const expectedCap = redeem ? 2048 : route === 'auth/native/login' || bootstrap ? 65_536 : route.endsWith('/attachments') ? 30_408_704 : 4_194_304;
                 assert.deepEqual(h.budgets, [expectedCap]);
             }
             const h = harness(route);
-            const payload = route === 'auth/native/login' ? { username: ' synthetic ', password: 'synthetic-pin' }
+            const payload = redeem ? {
+                offerId: '35ab4d95-49da-46e7-b8c4-72bc95ef13a2', secret: 'A'.repeat(43),
+                clientPlatform: 'macos', deviceName: 'Mac sintetico',
+            } : route === 'auth/native/login' ? { username: ' synthetic ', password: 'synthetic-pin' }
                 : { version: 2, notes: 'è 🩺 ENC:aQ==:ZGF0YQ==', ambulatoryId: 'synthetic-scope',
                     ...(route === 'v1/network/visit-draft' ? { transcript: 'Nota sintetica' } : { patientId: 'synthetic-patient' }) };
-            const f = request(h, JSON.stringify(payload));
+            const f = request(h, JSON.stringify(payload), contentType);
             const response = await h.route[method](f.req, ctx);
-            assert.equal(response.status, 200);
+            assert.equal(response.status, redeem ? 201 : 200);
             assert.equal(h.calls.length, 1);
             assert.ok(h.events.indexOf('parse') < h.events.indexOf('service'));
             const delivered = h.calls[0].at(-1);

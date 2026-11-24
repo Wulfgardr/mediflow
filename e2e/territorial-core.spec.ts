@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures/isolated-runtime';
-import { bootstrapUnlockedSession, openPatientSection } from './utils';
-import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
+import { unlockIfNeeded, bootstrapUnlockedSession, openPatientSection } from './utils';
+import { documentRequests } from './fixtures/trusted-web-request';
 import { switchPreset } from './fixtures/territorial-preset';
 import Database from 'better-sqlite3';
 import { join } from 'node:path';
@@ -31,6 +31,7 @@ test('J-2: con il solo nucleo SISS, portali e PRREG spariscono dalla scheda e i 
   const pane = page.locator('#siss');
   const scheda = async () => {
     await page.goto(`/patients/${patientId}/modules`);
+    await unlockIfNeeded(page, '314159');
     await expect(navigation).toBeVisible();
   };
   const reason = 'Passaggio sintetico J-2 da conservare';
@@ -40,7 +41,7 @@ test('J-2: con il solo nucleo SISS, portali e PRREG spariscono dalla scheda e i 
     if (await diary.getAttribute('aria-expanded') !== 'true') await diary.click();
   };
   const archived = async () => {
-    const response = await page.request.get(`/api/siss-handoffs?patientId=${patientId}`);
+    const response = await documentRequests(page).get(`/api/siss-handoffs?patientId=${patientId}`);
     expect(response.status()).toBe(200);
     return await response.json() as { id: string; action: string; outcome: string }[];
   };
@@ -71,6 +72,7 @@ test('J-2: con il solo nucleo SISS, portali e PRREG spariscono dalla scheda e i 
     await expect(navigation.locator('a[href="#siss"]'), 'J-2 SISS assente dalla navigazione con il solo nucleo').toHaveCount(0);
     await page.screenshot({ path: join(evidence, 'nucleo.png'), fullPage: true });
     await page.goto(`/patients/${patientId}/modules#siss`);
+    await unlockIfNeeded(page, '314159');
     await expect(navigation).toBeVisible();
     await expect(pane, 'J-2 sezione SISS assente con il solo nucleo').toHaveCount(0);
     await expect(page.getByText('SISS e FSE', { exact: true })).toHaveCount(0);
@@ -82,14 +84,13 @@ test('J-2: con il solo nucleo SISS, portali e PRREG spariscono dalla scheda e i 
     expect((await archived()).map(row => row.id), 'J-2 storico conservato con il solo nucleo (API)').toEqual([handoffId]);
     expect(db.prepare('SELECT id FROM siss_handoff_events WHERE patient_id=?').pluck().all(patientId), 'J-2 storico conservato con il solo nucleo (database)').toEqual([handoffId]);
 
-    const headers = await trustedArchiveWebRequestHeaders(page);
     const writers: unknown[] = [];
     for (const [path, data] of [
       ['/api/siss/context', { patientId }],
       ['/api/siss/prescription', { patientId }],
       ['/api/siss-handoffs', { patientId, action: 'registry.lookup', outcome: 'completed' }],
     ] as const) {
-      const response = await page.request.post(path, { headers, data });
+      const response = await documentRequests(page).post(path, { data });
       expect(response.status()).toBe(403);
       expect(await response.json()).toEqual({ code: 'TERRITORIAL_PACK_DISABLED', error: 'Pacchetto Lombardia non attivo' });
       writers.push({ path, status: 403 });
@@ -119,7 +120,9 @@ test('J-4: con il solo nucleo la protesica chiede un prontuario con fonte dichia
   const name = 'Deambulatore sintetico J4';
   const db = new Database(join(isolatedRuntime.dataDirectory, 'medical.db'), { fileMustExist: true });
   try {
-    await page.goto(`/patients/${patientId}/modules`); await openPatientSection(page, 'protesica');
+    await page.goto(`/patients/${patientId}/modules`);
+    await unlockIfNeeded(page, '314159');
+    await openPatientSection(page, 'protesica');
     const pane = page.locator('#protesica');
     await pane.getByRole('button', { name: /^Nuova voce(?: protesica)?$/u }).click();
     await pane.getByLabel('Descrizione ausilio').fill(name);
@@ -144,7 +147,9 @@ test('J-4: con il solo nucleo la protesica chiede un prontuario con fonte dichia
       return sources.sources.find((row: { name: string }) => row.name === sourceName) as { id: string; name: string };
     }, name);
 
-    await page.reload(); await openPatientSection(page, 'protesica');
+    await page.reload();
+    await unlockIfNeeded(page, '314159');
+    await openPatientSection(page, 'protesica');
     await pane.getByRole('button', { name: /^Nuova voce(?: protesica)?$/u }).click();
     await pane.getByRole('button', { name: 'Cerca un ausilio nel repertorio', exact: true }).click();
     await pane.getByRole('combobox', { name: 'Fonte', exact: true }).selectOption(source.id);

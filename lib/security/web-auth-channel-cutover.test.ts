@@ -1,4 +1,4 @@
-import { syntheticLoopbackRequest as localRequest } from './loopback-ingress-test-fixture';
+import { syntheticWebClientRequest as localRequest } from './loopback-ingress-test-fixture';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
@@ -180,12 +180,12 @@ test('routes make Web authority literal, do not read source-surface, and retain 
     assert.match(loginSource, /verifyUnlockCredentials\(\s*verifier \? \{ username: requestedUsername, verifier \} : \{ username: requestedUsername, pin: password \},\s*\)/u);
     assert.doesNotMatch(loginSource, /verifyHostCredentials/u);
     assert.match(loginSource, /authFailureResponse\(verification\.body, verification\.status, mutation\.ifMatch\)/u);
-    assert.match(loginSource, /beginWebAuthControl\('login', mutation\)/u);
+    assert.match(loginSource, /beginWebAuthControl\('login', mutation, request\)/u);
     assert.match(loginSource, /issueWebAuthControl\(attempt,\s*\{[\s\S]*?id:\s*user\.id[\s\S]*?\}\);/u);
     assert.doesNotMatch(loginSource, /createSession\(/u);
-    assert.match(setupSource, /beginWebAuthControl\('setup', mutation\)/u);
+    assert.match(setupSource, /beginWebAuthControl\('setup', mutation, request\)/u);
     assert.match(setupSource, /issueWebAuthControl\(attempt,[\s\S]*?id:\s*userId[\s\S]*?\)/u);
-    assert.match(setupSource, /const session = issueWebAuthControl[\s\S]*?if \(!session\)[\s\S]*?response\.cookies\.set/u);
+    assert.match(setupSource, /const session = issueWebAuthControl[\s\S]*?if \(!session\)[\s\S]*?setWebAuthSessionLocator/u);
     assert.doesNotMatch(setupSource, /createSession\(/u);
     assert.doesNotMatch(loginSource, /auditSourceSurfaceFromRequest|sourceSurface === 'native'/u);
     assert.doesNotMatch(setupSource, /auditSourceSurfaceFromRequest|sourceSurface === 'native'/u);

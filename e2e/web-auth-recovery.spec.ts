@@ -1,11 +1,12 @@
 import { expect, test, type Page, type Request } from '@playwright/test';
 import { bootstrapUnlockedSession, unlockIfNeeded } from './utils';
-import { fetchInterceptedRequest } from './fixtures/trusted-web-request';
+import { documentRequests, fetchInterceptedRequest } from './fixtures/trusted-web-request';
 
 const pin = process.env.E2E_PIN || '1234';
 const authPath = (request: Request) => new URL(request.url()).pathname;
 const navigation = (page: Page) => page.getByRole('navigation', { name: 'Navigazione principale', exact: true });
 const renewButton = (page: Page) => page.getByRole('button', { name: 'Rinnova accesso', exact: true });
+const lock = (page: Page) => page.getByRole('button', { name: 'Blocca', exact: true });
 const lockAll = (page: Page) => page.getByRole('button', { name: 'Blocca tutte le schede', exact: true });
 const pinField = (page: Page) => page.getByLabel('PIN operatore', { exact: true });
 
@@ -29,28 +30,37 @@ async function openSibling(page: Page) {
   await sibling.goto('/settings/aspetto');
   const check = await checked;
   expect(check.status()).toBe(200);
-  expect(await check.json()).toMatchObject({ isSetup: true, hasSession: true });
+  expect(await check.json()).toMatchObject({ isSetup: true, hasSession: false });
   await expect(sibling.getByRole('heading', { name: 'Sblocca MediFlow', exact: true })).toBeVisible();
   return { sibling, mutations, errors };
 }
 
-test('a restored PIN session can open and reload patient import without another login', async ({ page }) => {
+test('patient import requires explicit renewal after opening and reloading a second document', async ({ page }) => {
   await bootstrapUnlockedSession(page, pin);
+  const sibling = await page.context().newPage();
   const authMutations: string[] = [];
-  page.on('request', request => {
+  sibling.on('request', request => {
     if (request.method() === 'POST' && authPath(request).startsWith('/api/auth/')) authMutations.push(authPath(request));
   });
-  await page.goto('/patients/import');
-  await expect(page.getByTestId('patient-bulk-file')).toBeEnabled();
-  await expect(page.getByLabel('MediFlow lock screen')).toHaveCount(0);
-  await page.reload();
-  await expect(page.getByTestId('patient-bulk-file')).toBeEnabled();
-  await expect(page.getByLabel('MediFlow lock screen')).toHaveCount(0);
-  expect(authMutations).toEqual([]);
+  try {
+    await sibling.goto('/patients/import');
+    for (const step of ['open', 'reload']) {
+      if (step === 'reload') await sibling.reload();
+      await expect(sibling.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeVisible();
+      await expect(sibling.getByTestId('patient-bulk-file')).toHaveCount(0);
+      await renewButton(sibling).click();
+      await expect(sibling.getByTestId('patient-bulk-file')).toBeEnabled();
+    }
+    expect(authMutations).toEqual(['/api/auth/tab-access', '/api/auth/tab-access']);
+    await expect(navigation(page)).toBeVisible();
+  } finally { await sibling.close(); }
 });
 
 test('an explicit lock of all tabs waits for its real receipt before PIN entry', async ({ page }) => {
   const { sibling, mutations, errors } = await openSibling(page);
+  await renewButton(sibling).click();
+  await expect(navigation(sibling)).toBeVisible();
+  mutations.length = 0;
   const consoleErrors: string[] = [];
   sibling.on('console', message => { if (message.type() === 'error') consoleErrors.push(message.text()); });
   const received = deferred();
@@ -69,16 +79,10 @@ test('an explicit lock of all tabs waits for its real receipt before PIN entry',
     await route.fulfill({ response });
   });
   try {
-    await expect(sibling.getByRole('status')).toContainText('Una sessione è già attiva');
-    await expect(renewButton(sibling)).toBeEnabled();
-    await expect(pinField(sibling)).toBeDisabled();
-    await expect(sibling.locator('button[type="submit"]')).toBeDisabled();
-    await sibling.waitForLoadState('networkidle');
-    expect(mutations).toHaveLength(0); // Mounting the sibling must not revoke or attempt a login.
-    expect((await page.request.get('/api/patients')).status()).toBe(200);
+    expect((await documentRequests(page).get('/api/patients')).status()).toBe(200);
     await expect(navigation(page)).toBeVisible();
 
-    await lockAll(sibling).click();
+    await lock(sibling).click();
     await received.promise;
     await expect(sibling.getByRole('status')).toHaveText('Verifica dell’accesso…');
     await expect(sibling.locator('form')).toHaveAttribute('aria-busy', 'true');
@@ -112,11 +116,14 @@ test('an explicit lock of all tabs waits for its real receipt before PIN entry',
 
 test('a failed explicit lock keeps the PIN disabled until a confirmed lock', async ({ page }) => {
   const { sibling, mutations, errors } = await openSibling(page);
+  await renewButton(sibling).click();
+  await expect(navigation(sibling)).toBeVisible();
+  mutations.length = 0;
   const failedPaths: string[] = [];
   sibling.on('requestfailed', request => failedPaths.push(authPath(request)));
   await sibling.route('**/api/auth/lock', route => route.abort('failed'));
   try {
-    await lockAll(sibling).click();
+    await lock(sibling).click();
     await expect(sibling.getByRole('status')).toContainText('Chiusura della sessione non confermata');
     await expect(sibling.locator('form')).toHaveAttribute('aria-busy', 'false');
     await expect(pinField(sibling)).toBeDisabled();
@@ -124,7 +131,7 @@ test('a failed explicit lock keeps the PIN disabled until a confirmed lock', asy
     await expect(lockAll(sibling)).toBeEnabled();
     expect(mutations.map(authPath)).toEqual(['/api/auth/lock', '/api/auth/lock']);
     expect(failedPaths).toEqual(['/api/auth/lock', '/api/auth/lock']);
-    expect((await page.request.get('/api/patients')).status()).toBe(200);
+    expect((await documentRequests(page).get('/api/patients')).status()).toBe(200);
 
     await sibling.unrouteAll({ behavior: 'wait' });
     await lockAll(sibling).click();

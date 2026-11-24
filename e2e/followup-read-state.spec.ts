@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { expect, type Page } from '@playwright/test';
 import { test, closureGallery } from './fixtures/patient-closure-gallery';
-import { bootstrapUnlockedSession, openPatientSection } from './utils';
+import { bootstrapUnlockedSession, openPatientSection, openUnlockedDocument } from './utils';
 
 async function fixture(page: Page) {
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
@@ -49,7 +49,7 @@ for (const state of ['loading', 'error', 'empty', 'available'] as const) test(`F
         replied++;
     });
     try {
-        await page.goto(`/patients/${id}/modules`);
+        await openUnlockedDocument(page, `/patients/${id}/modules`);
         if (state !== 'loading') { await expect.poll(() => replied).toBeGreaterThan(0); await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))); }
         await openPatientSection(page, 'follow-up');
         const section = page.locator('#follow-up');
@@ -89,7 +89,7 @@ for (const state of ['loading', 'unavailable', 'available'] as const) test(`Note
         else await route.continue();
     });
     try {
-        await page.goto(`/patients/${id}/modules`);
+        await openUnlockedDocument(page, `/patients/${id}/modules`);
         const notes = page.getByTestId('patient-profile-notes');
         if (state === 'loading') {
             await expect.poll(() => requests).toBeGreaterThan(0);

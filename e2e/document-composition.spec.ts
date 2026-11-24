@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { openDocumentActions, bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch, assertNoHorizontalOverflow } from './utils';
+import { openDocumentActions, bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch, assertNoHorizontalOverflow, openUnlockedDocument, unlockIfNeeded } from './utils';
 import { sealDiaryEntry } from './fixtures/sealed-diary-entry';
 
 test.describe.configure({ retries: 0 });
@@ -26,7 +26,7 @@ async function documents(page: Page) {
         if (!update.ok) throw new Error(`Synthetic document archive fixture: HTTP ${update.status}`);
         return id;
     });
-    await page.goto(`/patients/${patientId}/modules`);
+    await openUnlockedDocument(page, `/patients/${patientId}/modules`);
     await openPatientSection(page, 'documenti');
     const docs = page.getByTestId('patient-documents');
     await expect(docs.locator('[data-document-area="list"]')).toHaveAttribute('aria-busy', 'false');
@@ -34,7 +34,9 @@ async function documents(page: Page) {
     await docs.locator('input[type="file"]').setInputFiles(names.map((name, index) => ({ name,
         mimeType: 'text/plain', buffer: Buffer.from(`Originale sintetico ${index === 0 ? 'A' : 'B'}. Nessun dato reale.`) })));
     await expect(docs.getByRole('status').filter({ hasText: '2 allegati salvati' })).toBeVisible();
-    await page.reload(); await openPatientSection(page, 'documenti');
+    await page.reload();
+    await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
+    await openPatientSection(page, 'documenti');
     await expect(docs.locator('[data-document-area="list"]')).toHaveAttribute('aria-busy', 'false');
     return { docs, names, original: page.getByRole('complementary', { name: 'Originale del documento' }) };
 }
@@ -318,6 +320,7 @@ test('Documenti e Diario: scansioni 400 e 600 dpi conservano il salvataggio espl
         if (!entry.ok) throw new Error(`Synthetic diary HTTP ${entry.status}`);
     }, diaryEntry);
     await page.reload();
+    await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
     await openPatientSection(page, 'diario');
     await page.locator('#diario').getByRole('button', { name: /Scansione sintetica 600.pdf/u }).click();
     const viewer = page.getByTestId('document-viewer');

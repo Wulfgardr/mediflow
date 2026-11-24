@@ -1242,3 +1242,22 @@ invariati, insieme a modello, statechart, invarianti, testimoni e mutanti. I
 digest dei tre file sono aggiornati dopo le prove di
 `lib/backup-restore-retention.test.ts`. TLC verifica il modello legacy entro i
 limiti del manifest.
+
+### Prova del documento Web, WUL-898
+
+Il trasporto aggiunge la prova del documento alle richieste API della stessa
+origine. Le scritture e la lettura di selection epoch conservano il controllo
+della generazione dell’archivio ed elaborano il rifiuto `ARCHIVE_REPLACED`.
+Una risposta di rifiuto su altre letture resta al chiamante. Il comando di
+stato terapia conserva ammissione, CAS, ledger e riconciliazione. Il modello
+TLC continua a rappresentare il controller legacy. La prova della sessione,
+il rinnovo e il blocco tra schede hanno regressioni proprie.
+
+Dopo l'unione con `main` a `d7403e6918162a5f425c9e905b8f8d7ecc5e4fb5`, che
+porta il ripristino di WUL-944, cambia solo il digest di
+`lib/security/client-auth-api.ts`: la parte di `main` aggiunge il codice
+fiscale del medico al primo avvio, la parte del ramo il trasporto della prova.
+Le altre impronte coincidono con `main`. Il digest successivo comprende la
+conservazione della prova accanto alla chiave del PIN transitorio (WUL-931):
+riguarda solo intestazioni e `sessionStorage` della scheda, non il comando di
+stato terapia.

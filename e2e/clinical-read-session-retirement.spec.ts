@@ -1,7 +1,7 @@
 import { diaryEntrySealer } from './fixtures/sealed-diary-entry';
 import { test, expect, type Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
-import { bootstrapUnlockedSession, openPatientSection, unlockIfNeeded } from './utils';
+import { bootstrapUnlockedSession, openPatientSection, openUnlockedDocument, unlockIfNeeded } from './utils';
 
 type ClinicalReadGate = {
     captured: boolean; denied: boolean; returned: boolean; status?: number;
@@ -30,7 +30,7 @@ async function installGate(page: Page, query: Record<string, string>) {
             state.request = { method, url: url.pathname + url.search };
             state.signal = init?.signal ?? undefined;
             await requestGate;
-            const response = await original(input, { ...init, signal: undefined });
+            const response = new Response(null, { status: 401 });
             state.status = response.status;
             state.denied = true;
             await responseGate;
@@ -40,7 +40,7 @@ async function installGate(page: Page, query: Record<string, string>) {
     }, query);
 }
 
-for (const consumer of ['EntryAttachments', 'NewEntryPage']) test(`${consumer}: a real old 401 preserves the new session and populated attachments`, async ({ page }) => {
+for (const consumer of ['EntryAttachments', 'NewEntryPage']) test(`${consumer}: a delayed read denial preserves the new session and populated attachments`, async ({ page }) => {
     test.setTimeout(90_000);
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
     const fixture = await page.evaluate(async seal => {
@@ -63,7 +63,7 @@ for (const consumer of ['EntryAttachments', 'NewEntryPage']) test(`${consumer}: 
     const query: Record<string, string> = consumer === 'NewEntryPage' ? { patientId: fixture.patientId, metadata: 'true' } : {};
     await installGate(page, query);
     const path = `/patients/${fixture.patientId}/${consumer === 'NewEntryPage' ? 'entries/new' : 'modules'}`;
-    await page.goto(path);
+    await openUnlockedDocument(page, path);
     if (consumer === 'EntryAttachments') await openPatientSection(page, 'diario');
     await page.waitForFunction(() => window.clinicalReadGate.captured);
     expect(await page.evaluate(() => window.clinicalReadGate.request)).toEqual({

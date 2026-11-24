@@ -1,7 +1,7 @@
 import type { Page, APIRequestContext } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { expect } from '@playwright/test';
-import { bootstrapUnlockedSession } from './utils';
+import { bootstrapUnlockedSession, onboardingPassphrase } from './utils';
 import { AGENT_OPERATIONS, type AgentOperation } from '../lib/agent-mandate-contract';
 
 export const agentVisitPin = '24682468';
@@ -13,10 +13,18 @@ export async function createSyntheticAgentMandate(page: Page, credential: 'passp
     await page.getByRole('complementary', { name: 'MediFlow', exact: true }).getByRole('link', { name: 'Impostazioni', exact: true }).click();
     if (credential === 'passphrase') {
         await page.getByRole('link', { name: 'Accesso', exact: true }).click();
-        await page.getByLabel('PIN attuale', { exact: true }).first().fill(pin);
-        await page.getByLabel('Nuova passphrase', { exact: true }).fill(passphrase);
-        await page.getByLabel('Conferma nuova passphrase', { exact: true }).fill(passphrase);
-        await page.getByRole('button', { name: 'Prepara il nuovo kit', exact: true }).click();
+        const adoption = page.getByTestId('settings-access-adopt');
+        const change = page.getByTestId('settings-access-passphrase');
+        const accessForm = adoption.or(change);
+        await expect(accessForm).toBeVisible();
+        if (await adoption.isVisible()) {
+            await adoption.getByLabel('PIN attuale', { exact: true }).fill(pin);
+        } else {
+            await change.getByLabel('Passphrase attuale', { exact: true }).fill(onboardingPassphrase(pin));
+        }
+        await accessForm.getByLabel('Nuova passphrase', { exact: true }).fill(passphrase);
+        await accessForm.getByLabel('Conferma nuova passphrase', { exact: true }).fill(passphrase);
+        await accessForm.getByRole('button', { name: 'Prepara il nuovo kit', exact: true }).click();
         const kit = page.getByTestId('recovery-kit');
         const download = page.waitForEvent('download');
         const key = captureRecovery ? await kit.getByLabel('Chiave di recupero', { exact: true }).innerText() : null;

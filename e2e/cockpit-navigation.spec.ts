@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
-import { bootstrapUnlockedSession } from './utils';
-import { trustedArchiveWebRequestHeaders, fetchInterceptedRequest } from './fixtures/trusted-web-request';
+import { unlockIfNeeded, bootstrapUnlockedSession } from './utils';
+import { documentRequests, fetchInterceptedRequest } from './fixtures/trusted-web-request';
 import { sealDiaryEntry } from './fixtures/sealed-diary-entry';
 
 function barrier() {
@@ -53,6 +53,7 @@ test('a patient read completing during navigation cannot restore the previous ar
   });
   try {
     await page.goto('/?area=turno');
+    await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
     await patientsReceived.promise;
     const navigation = page.getByRole('navigation', { name: 'Navigazione principale', exact: true });
     await expect(page.getByRole('heading', { name: /^Agenda/, level: 1 })).toBeVisible();
@@ -80,6 +81,7 @@ test('deferred row focus yields to a newer focus outside the list', async ({ pag
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   const marker = await createPatients(page, 2);
   await page.goto('/?area=incarico');
+  await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
   await page.getByRole('searchbox', { name: 'Cerca nella lista pazienti', exact: true }).fill(marker);
   const rows = page.getByTestId('lume-patient-row');
   await expect(rows).toHaveCount(2);
@@ -129,14 +131,13 @@ test('deferred row focus yields to a newer focus outside the list', async ({ pag
 
 test('Apri quadro has one destination while folder navigation is pending', async ({ page }) => {
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-  const archiveHeaders = await trustedArchiveWebRequestHeaders(page);
   const marker = await createPatients(page, 1);
-  const response = await page.request.get('/api/patients');
+  const response = await documentRequests(page).get('/api/patients');
   expect(response.status()).toBe(200);
   const patients = await response.json() as Array<{ id: string; lastName: string }>;
   const patient = patients.find(value => value.lastName.includes(marker));
   expect(patient).toBeTruthy();
-  const entryResponse = await page.request.post('/api/entries', { headers: archiveHeaders, data: await sealDiaryEntry(page, {
+  const entryResponse = await documentRequests(page).post('/api/entries', { data: await sealDiaryEntry(page, {
     patientId: patient!.id, type: 'note', title: `Navigazione ${marker}`,
     content: 'Verifica sintetica del ritorno al diario.', date: new Date().toISOString(), setting: 'ambulatory',
   }) });
@@ -146,6 +147,7 @@ test('Apri quadro has one destination while folder navigation is pending', async
   const released = barrier();
   const folder = `/patients/${patient!.id}/modules`;
   await page.goto('/?area=diario');
+  await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
   await page.waitForLoadState('networkidle');
   const row = page.locator('article').filter({ hasText: `Navigazione ${marker}` });
   await expect(row).toHaveCount(1);
@@ -171,11 +173,11 @@ test('Apri quadro has one destination while folder navigation is pending', async
   } finally {
     released.release();
     await page.unrouteAll({ behavior: 'wait' });
-    const removedEntry = await page.request.delete(`/api/entries/${entry.id}`, { headers: archiveHeaders, data: { version: entry.version } });
+    const removedEntry = await documentRequests(page).delete(`/api/entries/${entry.id}`, { data: { version: entry.version } });
     expect(removedEntry.status()).toBe(200);
-    const current = await page.request.get(`/api/patients/${patient!.id}`);
+    const current = await documentRequests(page).get(`/api/patients/${patient!.id}`);
     expect(current.status()).toBe(200);
     const { version } = await current.json() as { version: number };
-    expect((await page.request.delete(`/api/patients/${patient!.id}`, { headers: archiveHeaders, data: { version } })).status()).toBe(200);
+    expect((await documentRequests(page).delete(`/api/patients/${patient!.id}`, { data: { version } })).status()).toBe(200);
   }
 });

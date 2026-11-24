@@ -19,7 +19,7 @@ struct PairedHomeBaseCredentialsView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Collegamento MediFlow")
                 .font(.headline)
-            Text("Configura il collegamento al computer MediFlow e accedi con la passphrase o il PIN precedente.")
+            Text("Per collegare il dispositivo, apri Impostazioni sul computer MediFlow e scegli «Collega un dispositivo».")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
             Label(model.connectionState.title, systemImage: model.connectionState.symbolName)

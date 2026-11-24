@@ -1,9 +1,9 @@
 import { expect, test } from '@playwright/test';
-import { bootstrapUnlockedSession } from './utils';
+import { openUnlockedDocument, bootstrapUnlockedSession } from './utils';
 
 test('Fabric settings renders the read-only venue and capability registry', async ({ page }) => {
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-  await page.goto('/settings/ai/fabric');
+  await openUnlockedDocument(page, '/settings/ai/fabric');
   await expect(page).toHaveURL(/\/settings\/ai\/fabric$/);
 
   const surface = page.getByTestId('settings-ai-fabric-section');
@@ -81,7 +81,7 @@ test('Fabric settings renders the read-only venue and capability registry', asyn
 
 test('Models settings scopes Ollama roles and no longer mentions ATHENA', async ({ page }) => {
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-  await page.goto('/settings/ai/modelli');
+  await openUnlockedDocument(page, '/settings/ai/modelli');
 
   const surface = page.getByTestId('settings-ai-models-section');
   await expect(surface).toBeVisible();

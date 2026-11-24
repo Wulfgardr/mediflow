@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { assertNoHorizontalOverflow, assertNotClippedInViewport, bootstrapUnlockedSession,
+import { openUnlockedDocument, assertNoHorizontalOverflow, assertNotClippedInViewport, bootstrapUnlockedSession,
   openPatientSection, REFLOW_PROXY_VIEWPORTS } from './utils';
 
 async function openSyntheticWorklist(page: Page, width: number, height: number, theme = 'light') {
@@ -19,7 +19,7 @@ async function openSyntheticWorklist(page: Page, width: number, height: number, 
       if (!response.ok) throw new Error(`Fixture: HTTP ${response.status}`);
     }
   }, marker);
-  await page.goto('/?area=incarico');
+  await openUnlockedDocument(page, '/?area=incarico');
   await expect(page.getByTestId('lume-worklist')).toBeVisible();
   await page.getByRole('searchbox', { name: 'Cerca nella lista pazienti' }).fill(marker);
   await expect(page.getByText('3 risultati', { exact: true })).toBeVisible();
@@ -136,7 +136,7 @@ test('la worklist virtuale attraversa l’indice completo e apre la sola Scheda'
     }));
     await Promise.all(responses);
   }, marker);
-  await page.goto('/?area=incarico');
+  await openUnlockedDocument(page, '/?area=incarico');
 
   const listbox = page.getByRole('listbox', { name: 'Elenco pazienti in carico', exact: true });
   await expect(listbox).toBeVisible();
