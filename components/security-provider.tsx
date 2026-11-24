@@ -17,6 +17,7 @@ import {
 } from '@/lib/security/pin-change';
 import { db } from '@/lib/db';
 import { encryptRecoveryBackup, decryptRecoveryBackup, MAX_RECOVERY_DATABASE_BYTES } from '@/lib/recovery-backup';
+import { recoveryBackupRefusalMessage } from '@/lib/recovery-backup-refusal';
 import { OnboardingWizard, type SecuritySetup } from '@/components/onboarding-wizard';
 import { RecoveryKitPanel, type PreparedRecoveryKit, type RecoveryKit, type AccessResult } from './recovery-kit';
 import { LockScreen } from '@/components/lock-screen';
@@ -778,13 +779,15 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
             }
             const response = await fetch('/api/system/recovery-backup', { method: 'POST', cache: 'no-store',
                 headers: { 'Content-Type': 'application/json' }, body: '{}' });
-            if (response.status === 422 && current()) {
+            if (!current()) throw new Error('Accesso scaduto. Rinnova l’accesso.');
+            if (!response.ok) {
                 const problem = await response.json().catch(() => null);
-                if (current() && ['backup_directory_existing', 'backup_directory_filesystem', 'backup_directory_blocked'].includes(problem?.code)
+                if (response.status === 422 && ['backup_directory_existing', 'backup_directory_filesystem', 'backup_directory_blocked'].includes(problem?.code)
                     && typeof problem.error === 'string' && problem.error.length <= 500) throw new Error(problem.error);
+                throw new Error(recoveryBackupRefusalMessage(response.status, problem?.code));
             }
-            if (!response.ok || Number(response.headers.get('Content-Length')) > MAX_RECOVERY_DATABASE_BYTES || !current()) {
-                throw new Error('Backup completo non disponibile. Rinnova l’accesso e verifica l’archivio.');
+            if (Number(response.headers.get('Content-Length')) > MAX_RECOVERY_DATABASE_BYTES) {
+                throw new Error(recoveryBackupRefusalMessage(413, 'archive_too_large'));
             }
             bytes = new Uint8Array(await response.arrayBuffer());
             if (!current()) throw new Error('Accesso scaduto. Rinnova l’accesso.');
