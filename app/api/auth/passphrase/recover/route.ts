@@ -42,7 +42,7 @@ export async function POST(request: Request) {
     const mutation = webAuthControlMutationFromRequest(request);
     if (!mutation) return unavailable();
     const archiveGeneration = currentArchiveGeneration();
-    let attempt: unknown | null = beginWebAuthControl('login', mutation);
+    let attempt: unknown | null = beginWebAuthControl('login', mutation, request);
     if (!attempt) return unavailable(mutation.ifMatch);
     // Whatever the outcome, the browser needs the fence the control holds now.
     const currentEtag = () => bootstrapWebAuthControl(mutation.controlId)?.etag ?? mutation.ifMatch;
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
                 const pending = attempt;
                 attempt = null;
                 const issued = issueWebAuthControl(pending, { id: account.id, username: account.username, role: account.role || 'user' });
-                const resolution = issued ? resolveWebAuthControlSession(issued.sessionId, mutation.controlId) : null;
+                const resolution = issued ? resolveWebAuthControlSession(issued.sessionId, mutation.controlId, request) : null;
                 return resolution?.status === 'active' ? resolution.projection as WebSessionProjection : null;
             },
         });

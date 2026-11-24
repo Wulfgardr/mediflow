@@ -187,11 +187,10 @@ test('audit failure is awaited and cannot change terminal retirement', async () 
     }
 });
 
-test('route reads both cookies once and denies a rejected cookie Promise', () => {
+test('route delegates both request locators and denies their absence', () => {
     const route = readFileSync(new URL('../../app/api/auth/logout/route.ts', import.meta.url), 'utf8');
-    assert.equal(route.match(/cookies\(\)/gu)?.length, 1);
-    assert.match(route, /bearerCookie = cookieStore\.get\(SESSION_COOKIE_NAME\)/u);
-    assert.match(route, /controlCookie = cookieStore\.get\(CONTROL_COOKIE_NAME\)/u);
+    assert.match(route, /value: webAuthSessionIdFromRequest\(request\)/u);
+    assert.match(route, /value: webAuthControlIdFromRequest\(request\)/u);
     assert.match(route, /completeExactWebP3Logout\(bearerCookie, controlCookie, request\)/u);
     const forbidden = ['requireSession', 'server-session', 'deleteSession', 'clearAllSessions',
         'cookies.set', 'cookies.delete', 'maxAge', 'Set-Cookie'];
@@ -203,7 +202,7 @@ test('route reads both cookies once and denies a rejected cookie Promise', () =>
         import { registerHooks } from 'node:module';
         const routeUrl = ${JSON.stringify(routeUrl)};
         const modules = new Map([
-            ['next/headers', ${JSON.stringify(toDataModule("export const cookies = () => { globalThis.cookieCalls = (globalThis.cookieCalls ?? 0) + 1; return Promise.reject(new Error('synthetic rejection')); }"))}],
+            ['@/lib/security/web-auth-control-transport', ${JSON.stringify(toDataModule("export function webAuthSessionIdFromRequest() { return null; } export function webAuthControlIdFromRequest() { return null; }"))}],
             ['@/lib/security/web-auth-logout-server', ${JSON.stringify(toDataModule("export async function completeExactWebP3Logout(bearer, control) { globalThis.serviceCalls = (globalThis.serviceCalls ?? 0) + 1; globalThis.observed = [bearer, control]; return new Response(null, { status: 401, headers: { 'Cache-Control': 'no-store' } }); }"))}],
             ['@/lib/security/portable-supervisor-web-lifecycle', ${JSON.stringify(toDataModule("export async function completePortableSupervisorWebLifecycleMutationV1(mutation) { return mutation; }"))}],
         ]);
@@ -216,8 +215,8 @@ test('route reads both cookies once and denies a rejected cookie Promise', () =>
         const { POST } = await import(routeUrl);
         const response = await POST(new Request('http://127.0.0.1/api/auth/logout', { method: 'POST' }));
         await new Promise((resolve) => setImmediate(resolve));
-        const observed = { status: response.status, body: await response.text(), cacheControl: response.headers.get('cache-control'), cookieCalls: globalThis.cookieCalls, serviceCalls: globalThis.serviceCalls, cookies: globalThis.observed, unhandled };
-        if (JSON.stringify(observed) !== JSON.stringify({ status: 401, body: '', cacheControl: 'no-store', cookieCalls: 1, serviceCalls: 1, cookies: [null, null], unhandled: 0 })) process.exitCode = 1;
+        const observed = { status: response.status, body: await response.text(), cacheControl: response.headers.get('cache-control'), serviceCalls: globalThis.serviceCalls, cookies: globalThis.observed, unhandled };
+        if (JSON.stringify(observed) !== JSON.stringify({ status: 401, body: '', cacheControl: 'no-store', serviceCalls: 1, cookies: [{ name: 'mediflow_session', value: null }, { name: 'mediflow_auth_control', value: null }], unhandled: 0 })) process.exitCode = 1;
     `;
     const child = spawnSync(process.execPath, ['--experimental-strip-types', '--input-type=module', '--eval', program], { encoding: 'utf8' });
     assert.equal(child.status, 0, child.stderr || child.stdout);

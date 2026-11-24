@@ -1,8 +1,8 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
-import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow, assertNotClippedInViewport } from './utils';
+import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow, assertNotClippedInViewport, openUnlockedDocument } from './utils';
 
 const NAME = 'Ausilio sintetico W14b di verifica';
 
@@ -53,7 +53,7 @@ test('Protesica: bozza, provenienza e azioni nei due temi e allo zoom reale', as
             const document = await post('documents', { sourceId: source.id, revision: sources.revision, name: 'originale-w14b-sintetico.txt', base64: btoa(original), page: '1' });
             return { id: source.id as string, name: sourceName, sha256: source.sha256 as string, document: { id: document.id as string, name: document.name as string, sha256: document.sha256 as string } };
         }, { name: NAME, original });
-        await page.goto(`/patients/${patientId}/modules`); await openPatientSection(page, 'protesica');
+        await openUnlockedDocument(page, `/patients/${patientId}/modules`); await openPatientSection(page, 'protesica');
         const pane = page.locator('#protesica');
         const create = pane.getByRole('button', { name: /^Nuova voce(?: protesica)?$/u });
         const headerCreate = page.getByRole('link', { name: 'Nuova voce', exact: true });
@@ -129,10 +129,20 @@ test('Protesica: bozza, provenienza e azioni nei due temi e allo zoom reale', as
         await captures('dettagli', row);
         await row.getByRole('button', { name: 'Provenienza registrata', exact: true }).click();
         await expect(row).toContainText(source.sha256);
-        const link = row.getByRole('link', { name: `${source.document.name} · pagina 1`, exact: true });
-        await expect(link).toHaveAttribute('href', `/api/prosthetics/catalog/documents?id=${source.document.id}&sha256=${source.document.sha256}`);
-        const downloaded = await page.request.get((await link.getAttribute('href'))!);
-        expect(downloaded.status()).toBe(200); expect(await downloaded.body()).toEqual(Buffer.from(original));
+        const link = row.getByRole('button', { name: `${source.document.name} · pagina 1`, exact: true });
+        const received = page.waitForResponse(response => {
+            const url = new URL(response.url());
+            return url.pathname === '/api/prosthetics/catalog/documents'
+                && url.searchParams.get('id') === source.document.id
+                && url.searchParams.get('sha256') === source.document.sha256;
+        });
+        const downloaded = page.waitForEvent('download');
+        await link.click();
+        expect((await received).status()).toBe(200);
+        const file = await downloaded;
+        expect(await file.failure()).toBeNull();
+        expect(await readFile((await file.path())!)).toEqual(Buffer.from(original));
+        await file.delete();
         await captures('fonte', link, true);
         const menuTrigger = row.getByRole('button', { name: `Azioni voce protesica ${NAME}`, exact: true });
         if (!baseline) {

@@ -38,3 +38,15 @@ Eseguito in CI da `npm run verify:formal-models` con TLA+ `v1.7.4` (TLC `2.19`):
 - `scripts/verify-formal-models.mjs` applica inoltre una mutazione isolata a
   `lib/security/ambulatory-destructive-service.ts` e verifica che
   `lib/security/ambulatory-destructive-capacity.test.ts` fallisca sul codice mutato.
+
+## Prova del documento Web, WUL-898
+
+Con l'ADR 0199 `web()` e `retire()` chiedono anche la prova del documento
+legato alla coppia di sessione e controllo, prima di `resolve`. Una richiesta
+senza la prova riceve `null` o `401` e lascia invariati controllo e flow, come
+un passo di attesa del modello. In `lib/security/web-auth-control-transport.ts`
+`beginWebAuthControl` rifiuta un controllo legato a un'altra prova e
+`issueWebAuthControl` lega la prova alla sessione appena emessa; se il legame
+non riesce ritira la sessione, che quindi non diventa attiva. Le transizioni
+`BeginLogin`, `IssueSession`, `RecordWebId`, `PruneExpired` e `Retire` restano
+quelle del modello. I digest sono aggiornati a `1fdb10821`.

@@ -41,7 +41,13 @@ test('bootstraps one control and binds the synthetic login mutation to its cooki
     assert.deepEqual(JSON.parse(calls[1].init.body), { username: 'synthetic-admin', password: '2468' });
     assert.equal(result.response.status, 200);
     assert.deepEqual(result.json, { id: 'synthetic-user', archiveGeneration: ARCHIVE_GENERATION });
-    assert.deepEqual(result.webHeaders, { Cookie: result.cookieHeader, 'x-mediflow-archive-generation': ARCHIVE_GENERATION });
+    const proof = new Headers(calls[0].init.headers).get('x-mediflow-local-client-instance');
+    assert.match(proof ?? '', /^[a-f0-9]{64}$/u);
+    assert.equal(headers.get('x-mediflow-local-client-instance'), proof);
+    assert.deepEqual(result.webHeaders, {
+        'x-mediflow-local-client-instance': proof,
+        Cookie: result.cookieHeader, 'x-mediflow-archive-generation': ARCHIVE_GENERATION,
+    });
     assert.equal(result.sessionCookie, `mediflow_session=${SESSION_ID}`);
     assert.equal(
         result.cookieHeader,

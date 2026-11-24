@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { functionScenarios, installFunctionsMocks, installFunctionsEgressGuard } from './fixtures/settings-functions';
-import { bootstrapUnlockedSession, assertNoHorizontalOverflow } from './utils';
+import { openUnlockedDocument, bootstrapUnlockedSession, assertNoHorizontalOverflow } from './utils';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 
 function requireSynthetic(baseURL?: string): asserts baseURL is string {
@@ -72,7 +72,7 @@ for (const scenario of functionScenarios) test(`Funzioni baseline: ${scenario}`,
     try {
         mock = await installFunctionsMocks(page, baseURL, scenario);
         await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-        await page.goto('/settings/ai/funzioni');
+        await openUnlockedDocument(page, '/settings/ai/funzioni');
         await expect(page).toHaveURL(new URL('/settings/ai/funzioni', baseURL).href);
         await expect(region(page)).toBeVisible();
         if (scenario === 'pending') {
@@ -151,7 +151,7 @@ test('Funzioni: anteprima, applicazione e salvataggio avanzato restano distinti;
     const mock = await installFunctionsMocks(page, baseURL, 'off');
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
     try {
-        await page.goto('/settings/ai/funzioni');
+        await openUnlockedDocument(page, '/settings/ai/funzioni');
         const preferences = region(page).getByTestId('function-preferences');
         await expect(preferences.getByRole('switch')).toHaveCount(3);
         const allOff = preferences.getByRole('button', { name: 'Spegni tutte', exact: true });
@@ -229,7 +229,7 @@ test('D06 Funzioni: conflitto conserva la bozza, rilettura e nuova conferma salv
     const mock = await installFunctionsMocks(page, baseURL, 'off');
     try {
         await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-        await page.goto('/settings/ai/funzioni');
+        await openUnlockedDocument(page, '/settings/ai/funzioni');
         await expect(region(page).getByTestId('function-preferences').getByRole('switch')).toHaveCount(3);
         const save = region(page).getByRole('button', { name: 'Salva parametri avanzati', exact: true });
         await expect(save).toBeEnabled();
@@ -270,7 +270,7 @@ for (const preset of ['Ripristina predefiniti', 'Spegni tutte']) test(`Preset ${
     const mock = await installFunctionsMocks(page, baseURL, 'configured');
     try {
         await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-        await page.goto('/settings/ai/funzioni');
+        await openUnlockedDocument(page, '/settings/ai/funzioni');
         const preferences = region(page).getByTestId('function-preferences');
         await expect(preferences.getByRole('switch')).toHaveCount(3);
         await preferences.getByRole('button', { name: preset, exact: true }).click();

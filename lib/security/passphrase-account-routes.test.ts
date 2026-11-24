@@ -1,9 +1,10 @@
-import { syntheticLoopbackRequest as localRequest } from './loopback-ingress-test-fixture';
+import { syntheticLoopbackRequest, syntheticWebClientRequest as localRequest } from './loopback-ingress-test-fixture';
 /* ADR 0143, step 2: the real check and login routes on a real archive, for an account that
    unlocks with a passphrase. The migration that writes such an account arrives with step 3:
    here the test writes the columns itself, with what the browser primitives produce. */
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
+import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -139,7 +140,7 @@ test('auth check returns the current control fence after retiring a session from
     const control = transport.bootstrapWebAuthControl(null)!;
     const attempt = transport.beginWebAuthControl('login', Object.freeze({
         controlId: control.controlId, ifMatch: control.etag, idempotencyKey: randomUUID(),
-    }));
+    }), localRequest('http://127.0.0.1/api/auth/login'));
     const issued = transport.issueWebAuthControl(attempt, { id: account().id, username: USERNAME, role: 'admin' })!;
     assert.ok(issued);
     dbServer.$client.transaction(() => rotateSqliteArchiveGeneration(dbServer.$client)).immediate();
@@ -148,4 +149,47 @@ test('auth check returns the current control fence after retiring a session from
     }));
     assert.equal((await response.json()).hasSession, false);
     assert.equal(response.headers.get('etag'), transport.strongWebAuthControlEtag(transport.bootstrapWebAuthControl(control.controlId)!.etag));
+});
+
+test('an authorized Web document and a local API client use their respective authorizers', async () => {
+    const load = createRequire(import.meta.url);
+    const { installNetworkPatientCookieFixture } = load('../network-patient-authority-test-fixture.ts') as typeof import('../network-patient-authority-test-fixture');
+    const transport = await import('./web-auth-control-transport');
+    const { WEB_CONTROL_LOCATOR_HEADER, WEB_SESSION_LOCATOR_HEADER, WEB_SESSION_PROOF_HEADER } = await import('./web-session-proof-header');
+    const owner = await import('./web-auth-lifecycle-owner-adapter');
+    const request = syntheticLoopbackRequest('http://127.0.0.1/api/patients', {
+        headers: { [WEB_SESSION_PROOF_HEADER]: randomBytes(32).toString('hex') },
+    });
+    const control = transport.bootstrapWebAuthControl(null)!;
+    const attempt = transport.beginWebAuthControl('login', Object.freeze({
+        controlId: control.controlId, ifMatch: control.etag, idempotencyKey: randomUUID(),
+    }), request);
+    const user = account();
+    const issued = transport.issueWebAuthControl(attempt, { id: user.id, username: user.username, role: 'admin' });
+    assert.ok(issued);
+    request.headers.set(WEB_CONTROL_LOCATOR_HEADER, control.controlId);
+    request.headers.set(WEB_SESSION_LOCATOR_HEADER, issued.sessionId);
+    const state = { cookies: new Map<string, string>(), headers: request.headers };
+    const cleanup = installNetworkPatientCookieFixture(dataDir, state);
+    const originalToken = process.env.MEDIFLOW_LOCAL_API_TOKEN;
+    try {
+        const { requireSession } = load('./server-auth.ts') as typeof import('./server-auth');
+        assert.equal((await requireSession())?.userId, user.id);
+        const resolution = owner.resolve(issued.sessionId, control.controlId);
+        assert.equal(resolution.status, 'active');
+        if (resolution.status === 'active') assert.equal(owner.retire(resolution.projection, 'delete').outcome, 'completed');
+
+        const token = randomBytes(32).toString('hex');
+        process.env.MEDIFLOW_LOCAL_API_TOKEN = token;
+        state.headers = new Headers();
+        const { GET: readPatients } = load('../../app/api/v1/patients/route.ts') as typeof import('../../app/api/v1/patients/route');
+        const response = await readPatients(new Request('http://127.0.0.1/api/v1/patients', {
+            headers: { Authorization: `Bearer ${token}` },
+        }));
+        assert.equal(response.status, 200);
+    } finally {
+        if (originalToken === undefined) delete process.env.MEDIFLOW_LOCAL_API_TOKEN;
+        else process.env.MEDIFLOW_LOCAL_API_TOKEN = originalToken;
+        cleanup();
+    }
 });

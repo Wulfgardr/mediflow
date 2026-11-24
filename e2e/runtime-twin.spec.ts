@@ -4,6 +4,7 @@ import path from 'node:path';
 import { bootstrapUnlockedSession, unlockIfNeeded } from './utils';
 import { twinPin, withTwinRuntime } from './fixtures/runtime-twin';
 import { actionSchema } from './ui-cli/commands';
+import { documentRequests } from './fixtures/trusted-web-request';
 import { drive } from './ui-cli/browser';
 
 const enabled = process.env.MEDIFLOW_TEST_RUNTIME_TWIN === '1';
@@ -220,13 +221,14 @@ test.describe('Qualifica Q-8', () => {
                 await expect(peer.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeVisible();
                 await peer.getByRole('button', { name: 'Rinnova accesso', exact: true }).click();
                 await expect(peer.getByLabel('Nome medico', { exact: true })).toHaveValue(original);
+                expect(await (await documentRequests(page).get('/api/auth/check')).json()).toMatchObject({ hasSession: true });
                 const locked = peer.waitForResponse(res => new URL(res.url()).pathname === '/api/auth/lock' && res.request().method() === 'POST');
                 await peer.getByRole('button', { name: 'Blocca', exact: true }).click();
                 const receipt = await locked;
                 expect(receipt.status()).toBe(200);
                 expect(await receipt.json()).toMatchObject({ state: 'server_invalidation_confirmed' });
                 await expect(peer.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeVisible();
-                const auth = await page.request.get(new URL('/api/auth/check', page.url()).href);
+                const auth = await documentRequests(page).get('/api/auth/check');
                 expect(auth.status()).toBe(200);
                 expect(await auth.json()).toMatchObject({ hasSession: false });
                 await page.reload();

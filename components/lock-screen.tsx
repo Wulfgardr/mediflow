@@ -191,7 +191,7 @@ export function LockScreen() {
                             </>
                         )}
                     </button>
-                    {!requiresSetup && (visibleError || authRecoveryState !== 'ready') && (
+                    {!requiresSetup && (
                         <div className="text-center text-sm">
                             <button type="button" disabled={loading || recoveryPending}
                                 className="mf-button-text min-h-11"
@@ -204,7 +204,7 @@ export function LockScreen() {
                                 }}>
                                 Rinnova accesso
                             </button>
-                            <button type="button" disabled={loading || recoveryPending} className="min-h-11 px-4 py-2 underline underline-offset-4" onClick={() => lock()}>Blocca tutte le schede</button>
+                            {authRecoveryState !== 'ready' && <button type="button" disabled={loading || recoveryPending} className="min-h-11 px-4 py-2 underline underline-offset-4" onClick={() => lock()}>Blocca tutte le schede</button>}
                         </div>
                     )}
                 </form>

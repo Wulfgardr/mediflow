@@ -60,8 +60,8 @@ test('paired and local-token discovery, public revision, identity scope, and FSE
 
         const login = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: PIN });
         assert.equal(login.response.status, 200);
-        const cookieHeader = login.cookieHeader;
-        const scopedCookieHeader = `${cookieHeader}; ambulatory_id=${ambulatoryId}`;
+        assert.ok(login.webHeaders);
+        const scopedWebHeaders = { ...login.webHeaders, Cookie: `${login.webHeaders.Cookie}; ambulatory_id=${ambulatoryId}` };
 
         const localCapabilities = await request('GET', '/api/v1/network/capabilities', {
             headers: localApiHeaders(),
@@ -102,7 +102,7 @@ test('paired and local-token discovery, public revision, identity scope, and FSE
         const pairedIdentity = await request('GET', '/api/v1/network/identity', {
             headers: {
                 ...pairedHeaders(discoveryClient),
-                Cookie: scopedCookieHeader,
+                ...scopedWebHeaders,
             },
         });
         assert.equal(pairedIdentity.response.status, 200);
@@ -119,7 +119,7 @@ test('paired and local-token discovery, public revision, identity scope, and FSE
         const fseValidation = await request('GET', `/api/v1/network/fse/validate-patient?patientId=${encodeURIComponent(patientId)}`, {
             headers: {
                 ...pairedHeaders(discoveryClient),
-                Cookie: scopedCookieHeader,
+                ...scopedWebHeaders,
             },
         });
         assert.equal(fseValidation.response.status, 200);
@@ -128,7 +128,7 @@ test('paired and local-token discovery, public revision, identity scope, and FSE
         const fseOutsideScope = await request('GET', `/api/v1/network/fse/validate-patient?patientId=${encodeURIComponent(outsideScopePatientId)}`, {
             headers: {
                 ...pairedHeaders(discoveryClient),
-                Cookie: scopedCookieHeader,
+                ...scopedWebHeaders,
             },
         });
         assert.equal(fseOutsideScope.response.status, 404);
@@ -136,7 +136,7 @@ test('paired and local-token discovery, public revision, identity scope, and FSE
         const fseMissingCapability = await request('GET', `/api/v1/network/fse/validate-patient?patientId=${encodeURIComponent(patientId)}`, {
             headers: {
                 ...pairedHeaders(noFseClient),
-                Cookie: scopedCookieHeader,
+                ...scopedWebHeaders,
             },
         });
         assert.equal(fseMissingCapability.response.status, 403);

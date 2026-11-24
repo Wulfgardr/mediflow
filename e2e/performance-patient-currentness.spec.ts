@@ -14,7 +14,7 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSy
 import { tmpdir, cpus, release, totalmem } from 'node:os';
 import path from 'node:path';
 import { unlockIfNeeded, waitForUnlockedInteractiveShell } from './utils';
-import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
+import { documentRequests } from './fixtures/trusted-web-request';
 import { isolatedRuntimeArguments } from './fixtures/isolated-runtime';
 
 const root = path.resolve(__dirname, '..');
@@ -107,9 +107,8 @@ test('production patient read/edit stays fresh and correct without AI', async ({
     await expect(page.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeVisible();
     await unlockIfNeeded(page, '314159');
     await waitForUnlockedInteractiveShell(page);
-    const archiveHeaders = await trustedArchiveWebRequestHeaders(page);
     const read = async (id: string) => {
-      const response = await page.request.get(`${url}/api/patients/${id}`, { headers: { 'Cache-Control': 'no-cache' } });
+      const response = await documentRequests(page).get(`${url}/api/patients/${id}`, { headers: { 'Cache-Control': 'no-cache' } });
       expect(response.status()).toBe(200);
       return response.json();
     };
@@ -180,13 +179,13 @@ test('production patient read/edit stays fresh and correct without AI', async ({
       await ready(nextName, nextNotes);
       const saveToFreshFormMs = performance.now() - saved;
       expect(await read(sentinelId), 'Editing A must not change B').toEqual(sentinel);
-      const replay = await page.request.put(`${url}/api/patients/${patientId}`, { headers: archiveHeaders, data: payload });
+      const replay = await documentRequests(page).put(`${url}/api/patients/${patientId}`, { data: payload });
       expect(replay.status()).toBe(409);
       const replayBody = await replay.json();
       expect(replayBody).toEqual({ error: 'Conflict', code: 'VERSION_CONFLICT', entity: 'patient', recordId: patientId,
         expectedVersion: current.version, currentVersion: current.version + 1, currentState: 'present', currentUpdatedAt: fresh.updatedAt,
         currentSnapshot: { id: patientId, version: current.version + 1, updatedAt: fresh.updatedAt, isArchived: fresh.isArchived } });
-      const invalid = await page.request.put(`${url}/api/patients/${patientId}`, { headers: archiveHeaders, data: { version: fresh.version, birthDate: 'invalid' } });
+      const invalid = await documentRequests(page).put(`${url}/api/patients/${patientId}`, { data: { version: fresh.version, birthDate: 'invalid' } });
       expect(invalid.status()).toBe(400);
       const invalidBody = await invalid.json();
       expect(invalidBody).toEqual({ error: 'Invalid birthDate' });
@@ -199,7 +198,8 @@ test('production patient read/edit stays fresh and correct without AI', async ({
         saveToFreshResponseMs: round(freshResponseMs), saveToFreshFormMs: round(saveToFreshFormMs), putRequestMs: round(write.response.request().timing().responseEnd), version: fresh.version });
       current = fresh;
     }
-    expect(apiRequests.filter(row => row.method === 'PUT')).toHaveLength(5);
+    expect(apiRequests.filter(row => row.method === 'PUT').map(row => row.status))
+      .toEqual(Array.from({ length: 5 }, () => [200, 409, 400]).flat());
     expect(apiRequests.filter(row => row.method === 'POST' && /(?:chat|generate|synthesis|insight|reasoning|ocr)/i.test(row.path))).toEqual([]);
     expect(apiRequests.filter(row => (row.status ?? 0) >= 500)).toEqual([]);
     expect(failures.filter(failure => /^\w+ \/api\//.test(failure)), 'No API work may be dropped to improve the measurement').toEqual([]);

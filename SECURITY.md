@@ -144,7 +144,7 @@ separati, non una conseguenza della password.
 Ho separato l’accesso della UI web da quello dei client nativi e dei
 dispositivi abbinati all’host. MediFlow espone tre superfici API:
 
-- `/api/*` (web UI): protetta da sessione
+- `/api/*` (web UI): le operazioni riservate richiedono una sessione attiva e la prova della scheda o del client locale autenticato.
 - `/api/v1/*` (client native): protetta da token, versionata
 - `/api/v1/network/*` (home-base opt-in): richiede un dispositivo abbinato, o paired, e parte dalla sola lettura. Le scritture sono limitate a profilo/status paziente, diario, terapie, checkup e osservazioni. La protezione richiede credenziale del dispositivo e sessione dell’operatore
 
@@ -152,8 +152,7 @@ Regole minime:
 - Non esporre endpoint sensibili senza autenticazione.
 - Mantieni `/api/v1/*` stabile e retrocompatibile.
 - Il bearer token locale non equivale a una sessione amministrativa umana:
-  route di sistema distruttive o amministrative richiedono session cookie con
-  admin web. In particolare audit, backup export/restore, backup scheduler,
+  le route di sistema distruttive o amministrative richiedono una sessione Web amministrativa con la prova del client. In particolare audit, backup export/restore, backup scheduler,
   repair DB, purge e restore paziente e start/stop MLX non devono accettare
   solo il token locale.
 - Le eccezioni che riconoscono il token fuori da `/api/v1/*` servono soltanto al supporto e all’avvio locale: cataloghi locali, settings/native bootstrap, proxy AI locale, controlli locali di salute e oscuramento dei dati identificativi, panoramica di rete e stato MLX in sola lettura. Non conferiscono privilegi amministrativi generali. Ogni nuova eccezione deve documentare perché non richieda una sessione admin web.

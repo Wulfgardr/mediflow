@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow, assertNotClippedInViewport } from './utils';
+import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow, assertNotClippedInViewport, openUnlockedDocument, unlockIfNeeded } from './utils';
 
 async function fixture(page: Page) {
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
@@ -9,7 +9,7 @@ async function fixture(page: Page) {
     if (!response.ok) throw new Error(`Fixture: ${response.status}`);
     return (await response.json()).id as string;
   });
-  await page.goto(`/patients/${id}/modules`);
+  await openUnlockedDocument(page, `/patients/${id}/modules`);
   await expect(page.getByTestId('lume-scheda-header')).toBeVisible();
   return id;
 }
@@ -167,6 +167,7 @@ for (const command of ['storia', 'attenzione']) {
       }
     }, patientId);
     await page.reload();
+    await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
     await openPatientSection(page, 'parametri');
     const control = page.getByRole('button', { name: 'Nuova misura', exact: true });
     const content = page.locator(`[id="${await control.getAttribute('aria-controls')}"]`);

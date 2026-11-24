@@ -1,5 +1,8 @@
+import { documentRequests } from './fixtures/trusted-web-request';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import {
+  unlockIfNeeded,
+  openUnlockedDocument,
   assertKeyboardFocusProgresses,
   assertNoHorizontalOverflow,
   assertNotClippedInViewport,
@@ -113,7 +116,7 @@ async function createEntry(
 type DiaryBaseline = { signatures: string[]; nextDate: number };
 
 async function readGlobalWindow(page: Page): Promise<Array<{ date: string }>> {
-  const response = await page.request.get('/api/entries?limit=50&orderBy=date&orderDir=desc');
+  const response = await documentRequests(page).get('/api/entries?limit=50&orderBy=date&orderDir=desc');
   expect(response.status()).toBe(200);
   return response.json();
 }
@@ -164,7 +167,7 @@ async function diarySignatures(entries: Locator): Promise<string[]> {
 
 async function captureBaseline(page: Page): Promise<DiaryBaseline> {
   const rows = await readGlobalWindow(page);
-  await page.goto('/diary');
+  await openUnlockedDocument(page, '/diary');
   const cards = page.getByTestId('lume-diario').getByTestId('lume-diario-entry');
   await expect(cards).toHaveCount(rows.length);
   const lastDate = Math.max(Date.now(), ...rows.map((row) => Date.parse(row.date)).filter(Number.isFinite));
@@ -224,7 +227,7 @@ async function openDiary(page: Page, diaryCase?: DiaryCase): Promise<Locator> {
   const baseline = await captureBaseline(page);
   const patientId = await createSequence(page, baseline.nextDate);
   if (diaryCase) await setRegister(page, diaryCase.register);
-  await page.goto('/diary');
+  await openUnlockedDocument(page, '/diary');
   await page.waitForLoadState('domcontentloaded');
   const diary = page.getByTestId('lume-diario');
   await expect(diary).toBeVisible();
@@ -372,7 +375,7 @@ test.describe.serial('Diario globale Lume', () => {
       source: 'Ambulatorio sintetico',
       author: 'Dr.ssa Demo',
     });
-    await page.reload();
+    await page.reload(); await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
     await assertWindowPreserved(diary, patientId, 1, baseline);
 
     await createEntry(page, patientId, {
@@ -388,7 +391,7 @@ test.describe.serial('Diario globale Lume', () => {
       source: 'Dettatura sintetica',
       author: 'Dr.ssa Demo',
     });
-    await page.reload();
+    await page.reload(); await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
 
     const entries = diary.getByTestId('lume-diario-entry');
     const feed = page.getByRole('feed', { name: 'Diario clinico globale' });

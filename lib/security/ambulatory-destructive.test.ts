@@ -1,3 +1,4 @@
+import { syntheticWebClientRequest as localRequest } from './loopback-ingress-test-fixture';
 import assert from 'node:assert/strict';
 import { mkdtempSync } from 'node:fs';
 import Database from 'better-sqlite3';
@@ -44,7 +45,7 @@ function setClients(clients: Native['pairedClient'][]) {
         .where(eq(settings.key, NETWORK_PAIRING_STATE_KEY)).run();
 }
 function request(headers: Record<string, string> = {}) {
-    return new Request(`${origin}/api/auth/ambulatory-commands`, { method: 'POST', headers: {
+    return localRequest(`${origin}/api/auth/ambulatory-commands`, { method: 'POST', headers: {
         origin, 'sec-fetch-site': 'same-origin', 'content-type': 'application/json', 'x-mediflow-archive-generation': currentArchiveGeneration(), ...headers } });
 }
 function open(service: Service, native: Native, marker?: AmbulatoryCommandMarker, operation = 'ambulatory.clear-test.v1') {
@@ -53,7 +54,7 @@ function open(service: Service, native: Native, marker?: AmbulatoryCommandMarker
     const opened = service.begin(initial, native.session, native.pairedClient, { purpose: marker ? 'recover' : 'execute', command }, marker ? null : 'scope');
     assert.equal(opened.status, 200, JSON.stringify(opened.value)); assert.ok(opened.control);
     const login = () => {
-        const attempt = beginWebAuthControl('login', Object.freeze({ controlId: opened.control!.controlId, ifMatch: opened.control!.etag, idempotencyKey: randomUUID() }));
+        const attempt = beginWebAuthControl('login', Object.freeze({ controlId: opened.control!.controlId, ifMatch: opened.control!.etag, idempotencyKey: randomUUID() }), request());
         assert.ok(attempt);
         const web = issueWebAuthControl(attempt, { id: native.session.userId, username: native.session.username, role: native.session.role }); assert.ok(web);
         return { 'x-mediflow-archive-generation': initial.headers.get('x-mediflow-archive-generation')!, [AMBULATORY_COMMAND_REFERENCE_HEADER]: String(opened.value.reference), cookie: `mediflow_session=${web.sessionId}; mediflow_auth_control=${opened.control!.controlId}` };
@@ -362,15 +363,15 @@ test('production HTTP adapter admits only the dedicated control and named confir
     cookieState.cookies.set('mediflow_session', native.session.id); cookieState.cookies.set('ambulatory_id', 'scope');
     const base = { ...Object.fromEntries(native.request.headers), origin, 'sec-fetch-site': 'same-origin', 'content-type': 'application/json' };
     async function httpBegin(body: unknown, scoped: boolean) {
-        const req = new Request(`${origin}/api/auth/ambulatory-commands/begin`, { method: 'POST', headers: { ...base, ...(scoped ? { 'x-mediflow-expected-ambulatory-id': 'scope' } : {}) }, body: JSON.stringify(body) });
+        const req = localRequest(`${origin}/api/auth/ambulatory-commands/begin`, { method: 'POST', headers: { ...base, ...(scoped ? { 'x-mediflow-expected-ambulatory-id': 'scope' } : {}) }, body: JSON.stringify(body) });
         const response = await ambulatoryDestructiveHttp(req, 'begin'); assert.equal(response.status, 200, await response.clone().text());
         const opened = await response.json(), control = /mediflow_auth_control=([^;]+)/u.exec(response.headers.get('set-cookie')!)![1];
-        const attempt = beginWebAuthControl('login', Object.freeze({ controlId: control, ifMatch: response.headers.get('etag')!.slice(1, -1), idempotencyKey: randomUUID() })); assert.ok(attempt);
+        const attempt = beginWebAuthControl('login', Object.freeze({ controlId: control, ifMatch: response.headers.get('etag')!.slice(1, -1), idempotencyKey: randomUUID() }), req); assert.ok(attempt);
         const issued = issueWebAuthControl(attempt, { id: native.session.userId, username: native.session.username, role: 'admin' }); assert.ok(issued);
         return { [AMBULATORY_COMMAND_REFERENCE_HEADER]: opened.reference, cookie: `mediflow_session=${issued.sessionId}; mediflow_auth_control=${control}` };
     }
     const headers = await httpBegin({ purpose: 'execute', command: { operation: 'ambulatory.clear-test.v1', originalScopeId: 'scope', ambulatoryId: 'target', expectedVersion: 1 } }, true);
-    const call = (action: Parameters<typeof ambulatoryDestructiveHttp>[1], body: unknown, headers: Record<string, string>) => ambulatoryDestructiveHttp(new Request(`${origin}/api/auth/ambulatory-commands/${action}`, { method: 'POST', headers: { ...base, ...headers }, body: JSON.stringify(body) }), action);
+    const call = (action: Parameters<typeof ambulatoryDestructiveHttp>[1], body: unknown, headers: Record<string, string>) => ambulatoryDestructiveHttp(localRequest(`${origin}/api/auth/ambulatory-commands/${action}`, { method: 'POST', headers: { ...base, ...headers }, body: JSON.stringify(body) }), action);
     const preview = await call('preview', {}, headers); assert.equal(preview.status, 200); const marker = (await preview.json()).marker;
     const before = snapshot();
     assert.equal((await call('execute', { operation: marker.operation, planDigest: marker.planDigest, confirmation: true }, headers)).status, 400); assert.deepEqual(snapshot(), before);

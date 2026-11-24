@@ -1,13 +1,20 @@
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
+import type { Page } from '@playwright/test';
 import Database from 'better-sqlite3';
 import { stableStringify, type BackupArtifact } from '../lib/backup-artifact';
 import { expect, test } from './fixtures/isolated-runtime';
-import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
-import { bootstrapUnlockedSession } from './utils';
+import { documentRequests } from './fixtures/trusted-web-request';
+import { bootstrapUnlockedSession, onboardingPassphrase, unlockIfNeeded } from './utils';
 
 const backupPath = '/api/system/backup-restore';
 const pin = '1234';
+
+async function openBackup(page: Page) {
+    await page.getByRole('link', { name: 'Impostazioni', exact: true }).click();
+    await page.locator('a[href="/settings/backup"]:visible').first().click();
+    await expect(page.getByText('Seleziona file .mediflow v1', { exact: true })).toBeVisible();
+}
 
 function withUpdatedManifest(artifact: BackupArtifact): Buffer {
     artifact.manifest.recordCounts = Object.fromEntries(Object.entries(artifact.payload)
@@ -35,16 +42,16 @@ function integrity(db: Database.Database) {
 test('il Web rifiuta una conferma superata e consente il ripristino e il recupero della copia precedente', async ({ page, isolatedRuntime }, testInfo) => {
     test.setTimeout(90_000);
     await bootstrapUnlockedSession(page, pin);
-    await page.goto('/settings/backup');
-    const headers = await trustedArchiveWebRequestHeaders(page);
-    const created = await page.request.post('/api/patients', {
-        headers, data: { firstName: 'Paziente', lastName: 'Sintetico', taxCode: 'SYN-WUL908-WEB' },
+    await openBackup(page);
+    const web = documentRequests(page);
+    const created = await web.post('/api/patients', {
+        data: { firstName: 'Paziente', lastName: 'Sintetico', taxCode: 'SYN-WUL908-WEB' },
     });
     expect(created.status(), await created.text()).toBe(201);
     const { id } = await created.json();
     const db = new Database(join(isolatedRuntime.dataDirectory, 'medical.db'), { fileMustExist: true });
     try {
-        const exported = await page.request.get(backupPath);
+        const exported = await web.get(backupPath);
         expect(exported.ok()).toBe(true);
         const legacy = await exported.json() as BackupArtifact;
         delete legacy.payload.auditEvents;
@@ -54,12 +61,12 @@ test('il Web rifiuta una conferma superata e consente il ripristino e il recuper
         const input = page.getByText('Seleziona file .mediflow v1', { exact: true }).locator('input');
         const panel = page.getByTestId('restore-confirmation-panel');
         const keyword = page.getByTestId('restore-confirmation-input');
-        const credential = page.getByLabel('PIN amministrativo', { exact: true });
+        const credential = page.getByLabel('Passphrase amministrativa', { exact: true });
         const submit = page.getByTestId('restore-confirmation-submit');
         const outcome = page.getByTestId('backup-outcome');
         const enterConfirmation = async () => {
             await keyword.fill('RIPRISTINA');
-            await credential.fill(pin);
+            await credential.fill(onboardingPassphrase(pin));
             await expect(submit).toBeEnabled();
         };
         const waitForRestore = () => page.waitForResponse(response =>
@@ -70,7 +77,7 @@ test('il Web rifiuta una conferma superata e consente il ripristino e il recuper
         await enterConfirmation();
         db.prepare('UPDATE patients SET version=version+1 WHERE id=?').run(id);
 
-        const previous = await page.request.get(backupPath);
+        const previous = await web.get(backupPath);
         expect(previous.ok()).toBe(true);
         const previousFile = backupFile('prima-del-ripristino.mediflow', await previous.body());
         const before = archiveRows(db);
@@ -94,28 +101,44 @@ test('il Web rifiuta una conferma superata e consente il ripristino e il recuper
         await expect(submit).toBeDisabled();
         await panel.screenshot({ path: testInfo.outputPath('nuova-conferma.png') });
         await enterConfirmation();
+        const beforeRestore = await web.get('/api/auth/check');
+        expect(await beforeRestore.json()).toMatchObject({ hasSession: true });
         const restored = waitForRestore();
+        const reload = page.waitForEvent('framenavigated', { predicate: frame => frame === page.mainFrame() });
         await submit.click();
         const completed = await restored;
         expect(completed.status(), await completed.text()).toBe(200);
-        const sent = completed.request().headers();
-        expect(sent['x-mediflow-restore-snapshot']).toBe(reviewed.expectedSnapshot);
-        expect(sent['x-mediflow-restore-source-checksum']).toBe(legacy.manifest.checksum);
-        expect(sent['x-mediflow-restore-confirmation']).toBe('RIPRISTINA');
+        const sent = completed.request();
+        expect(await sent.headerValue('x-mediflow-restore-snapshot')).toBe(reviewed.expectedSnapshot);
+        expect(await sent.headerValue('x-mediflow-restore-source-checksum')).toBe(legacy.manifest.checksum);
+        expect(await sent.headerValue('x-mediflow-restore-confirmation')).toBe('RIPRISTINA');
         const receipt = (await completed.json()).receipt;
-        expect(receipt).toMatchObject({ id: sent['x-mediflow-restore-id'], sourceChecksum: legacy.manifest.checksum });
+        expect(receipt).toMatchObject({ id: await sent.headerValue('x-mediflow-restore-id'), sourceChecksum: legacy.manifest.checksum });
         expect(db.prepare('SELECT version FROM patients WHERE id=?').get(id)).toEqual({ version: 1 });
         await expect(outcome).toContainText('Ripristino completato');
-        await expect.poll(async () => (await page.request.get('/api/auth/check')).json()).toMatchObject({ hasSession: false });
-        await bootstrapUnlockedSession(page, pin);
-        await page.goto('/settings/backup');
+        await expect.poll(async () => (await web.get('/api/auth/check')).json()).toMatchObject({ hasSession: false });
+        await reload;
+        await expect(page.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeVisible();
+        await unlockIfNeeded(page, pin);
+        await expect(input).toBeVisible();
+        const readback = await web.get(`/api/patients/${id}`);
+        expect(readback.status()).toBe(200);
+        expect(await readback.json()).toMatchObject({ id, version: 1 });
 
         await input.setInputFiles(previousFile);
         await expect(panel).toBeVisible();
         await enterConfirmation();
         const recovered = waitForRestore();
+        const reloaded = page.waitForEvent('framenavigated', { predicate: frame => frame === page.mainFrame() });
         await submit.click();
         expect((await recovered).status()).toBe(200);
+        expect((await web.get(`/api/patients/${id}`)).status()).toBe(401);
+        await reloaded;
+        await expect(page.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeVisible();
+        await unlockIfNeeded(page, pin);
+        const previousVersion = await web.get(`/api/patients/${id}`);
+        expect(previousVersion.status()).toBe(200);
+        expect(await previousVersion.json()).toMatchObject({ id, version: 2 });
         const after = archiveRows(db);
         expect(after.patients).toEqual(before.patients);
         expect(after.users).toEqual(before.users);
@@ -128,8 +151,8 @@ test('il Web rifiuta una conferma superata e consente il ripristino e il recuper
 test('copie con riferimenti clinici incoerenti vengono rifiutate in verifica e ripristino', async ({ page, isolatedRuntime }) => {
     test.setTimeout(90_000);
     await bootstrapUnlockedSession(page, pin);
-    await page.goto('/settings/backup');
-    const headers = await trustedArchiveWebRequestHeaders(page);
+    await openBackup(page);
+    const web = documentRequests(page);
     const db = new Database(join(isolatedRuntime.dataDirectory, 'medical.db'), { fileMustExist: true });
     try {
         db.transaction(() => {
@@ -140,28 +163,27 @@ test('copie con riferimenti clinici incoerenti vengono rifiutate in verifica e r
             db.prepare("INSERT INTO service_prescription_items(id,prescription_id,patient_id,service_name) VALUES ('item','rx','synthetic-1','Prestazione')").run();
             db.prepare("INSERT INTO observations(id,patient_id,code_system,code,display,unit_system,unit_code,value,observed_at,service_prescription_item_id) VALUES ('obs','synthetic-1','synthetic','obs','Osservazione','synthetic','u','1',100,'item')").run();
         })();
-        const exported = await page.request.get(backupPath);
+        const exported = await web.get(backupPath);
         expect(exported.status(), await exported.text()).toBe(200);
         const valid = await exported.json() as BackupArtifact;
-        const verify = (data: Buffer) => page.request.post(backupPath + '/verify', {
-            headers: { ...headers, 'Content-Type': 'application/json' }, data,
+        const verify = (data: Buffer) => web.post(backupPath + '/verify', {
+            data,
         });
+        const beforePreview = archiveRows(db);
         const preview = await verify(Buffer.from(JSON.stringify(valid)));
         expect(preview.status(), await preview.text()).toBe(200);
+        expect(archiveRows(db)).toEqual(beforePreview);
         const { expectedSnapshot, sourceChecksum } = await preview.json();
         const before = archiveRows(db);
         const restoreHeaders = {
-            ...headers,
-            'Content-Type': 'application/json',
             'x-mediflow-restore-id': '12345678-1234-4123-8123-123456789012',
             'x-mediflow-restore-snapshot': expectedSnapshot,
             'x-mediflow-restore-source-checksum': sourceChecksum,
             'x-mediflow-restore-confirmation': 'RIPRISTINA',
-            'x-mediflow-restore-credential': JSON.stringify({ pin }),
         };
         const other = structuredClone(valid);
         other.payload.observations[0].value = '2';
-        const different = await page.request.post(backupPath, { data: withUpdatedManifest(other), headers: restoreHeaders });
+        const different = await web.post(backupPath, { data: withUpdatedManifest(other), headers: restoreHeaders });
         expect(different.status(), await different.text()).toBe(409);
         expect(await different.json()).toMatchObject({ reason: 'source' });
         expect(archiveRows(db)).toEqual(before);
@@ -177,7 +199,8 @@ test('copie con riferimenti clinici incoerenti vengono rifiutate in verifica e r
             const failed = await verify(data);
             expect(failed.status(), await failed.text()).toBe(412);
             expect((await failed.json()).preflight.checks).toContainEqual(expect.objectContaining({ id: 'artifact-references', status: 'fail' }));
-            const restore = await page.request.post(backupPath, { data, headers: restoreHeaders });
+            expect(archiveRows(db)).toEqual(before);
+            const restore = await web.post(backupPath, { data, headers: restoreHeaders });
             expect(restore.status(), await restore.text()).toBe(412);
             expect(archiveRows(db)).toEqual(before);
         }

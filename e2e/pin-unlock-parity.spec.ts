@@ -1,7 +1,6 @@
-import { randomUUID } from 'node:crypto';
-import type { Page, Response } from '@playwright/test';
+import type { Page, Request, Response } from '@playwright/test';
 import { expect, test } from './fixtures/isolated-runtime';
-import { trustedWebRequestHeaders } from './fixtures/trusted-web-request';
+import { documentRequests } from './fixtures/trusted-web-request';
 import { bootstrapUnlockedSession } from './utils';
 
 const ALPHANUMERIC_PIN = 'demo086086';
@@ -22,21 +21,20 @@ async function expectUnlocked(page: Page): Promise<void> {
   await expect(navigation.or(manualEntry).first()).toBeVisible();
   if (await manualEntry.isVisible()) await manualEntry.click();
   await expect(navigation).toBeVisible();
-  expect((await page.request.get('/api/patients')).status()).toBe(200);
+  expect((await documentRequests(page).get('/api/patients')).status()).toBe(200);
 }
 
-async function openLegacyPinArchive(page: Page, pin: string): Promise<WrappedKey> {
+async function openLegacyPinArchive(page: Page, pin: string): Promise<void> {
   const responsePromise = page.waitForResponse(response => isPost(response, '/api/auth/login'));
   await bootstrapUnlockedSession(page, pin);
   const response = await responsePromise;
   expect(response.status()).toBe(200);
   expect(response.request().postDataJSON().password).toBe(pin);
   const wrapping = await response.json() as WrappedKey;
-  expect(wrapping.encryptedMasterKey).toMatch(/^v2:/u);
+  expect(wrapping.encryptedMasterKey.length).toBeGreaterThan(0);
   expect(wrapping.salt.length).toBeGreaterThan(0);
   await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
-  expect((await page.request.get('/api/patients')).status()).toBe(200);
-  return { encryptedMasterKey: wrapping.encryptedMasterKey, salt: wrapping.salt };
+  expect((await documentRequests(page).get('/api/patients')).status()).toBe(200);
 }
 
 async function expectReadyLock(page: Page): Promise<void> {
@@ -45,7 +43,7 @@ async function expectReadyLock(page: Page): Promise<void> {
   await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toHaveCount(0);
 }
 
-async function unlock(page: Page, pin: string, key: WrappedKey, gesture: 'click' | 'enter'): Promise<void> {
+async function unlock(page: Page, pin: string, gesture: 'click' | 'enter', previous?: WrappedKey): Promise<WrappedKey> {
   const input = page.getByLabel('PIN operatore', { exact: true });
   await expectReadyLock(page);
   await expect(input).toHaveAttribute('type', 'password');
@@ -65,34 +63,42 @@ async function unlock(page: Page, pin: string, key: WrappedKey, gesture: 'click'
   expect(response.request().postDataJSON().password).toBe(pin);
   expect(response.status()).toBe(200);
   expect(response.headers().etag).toMatch(CONTROL_ETAG);
-  expect(await response.json()).toMatchObject({ success: true, ...key });
+  const body = await response.json() as WrappedKey & { success: boolean };
+  expect(body.success).toBe(true);
+  expect(body.encryptedMasterKey).toMatch(/^v2:/u);
+  if (previous) expect(body).toMatchObject(previous);
   await expectUnlocked(page);
+  return { encryptedMasterKey: body.encryptedMasterKey, salt: body.salt };
 }
 
-for (const { name, pin } of [
-  { name: 'original alphanumeric reproduction', pin: ALPHANUMERIC_PIN },
-  { name: 'numeric control including leading zero', pin: NUMERIC_PIN },
+const alphanumeric = test.extend({ existingPin: ALPHANUMERIC_PIN });
+const numeric = test.extend({ existingPin: NUMERIC_PIN });
+for (const { name, pin, pinAccount } of [
+  { name: 'legacy alphanumeric PIN', pin: ALPHANUMERIC_PIN, pinAccount: alphanumeric },
+  { name: 'numeric control including leading zero', pin: NUMERIC_PIN, pinAccount: numeric },
 ]) {
-  test(`${name}: legacy PIN archive, same-PIN lock/unlock and fresh browser context`, async ({ browser, baseURL }) => {
+  pinAccount(`${name}: legacy PIN archive, same-PIN lock/unlock and fresh browser context`, async ({ browser, baseURL }) => {
     let key: WrappedKey;
     const initial = await browser.newContext({ baseURL });
     try {
       const page = await initial.newPage();
-      key = await openLegacyPinArchive(page, pin);
-      const check = await page.request.get('/api/auth/check', { headers: { 'Cache-Control': 'no-store' } });
-      expect(check.status()).toBe(200);
-      expect(check.headers().etag).toMatch(CONTROL_ETAG);
-      const locked = await page.request.post('/api/auth/lock', { headers: {
-        ...trustedWebRequestHeaders(baseURL),
-        'If-Match': check.headers().etag, 'Idempotency-Key': randomUUID(),
-      } });
+      await openLegacyPinArchive(page, pin);
+      const check = await page.evaluate(async () => {
+        const reply = await fetch('/api/auth/check', { cache: 'no-store' });
+        const { status, hasSession } = await reply.json();
+        return { code: reply.status, etag: reply.headers.get('etag'), status, hasSession };
+      });
+      expect(check).toMatchObject({ code: 200, status: 'ok', etag: expect.stringMatching(CONTROL_ETAG), hasSession: true });
+      const receipt = page.waitForResponse(response => isPost(response, '/api/auth/lock'));
+      await page.getByRole('button', { name: 'Blocca', exact: true }).click();
+      const locked = await receipt;
       expect(locked.status()).toBe(200);
       expect(await locked.json()).toEqual({
         schemaVersion: 'mediflow.application-lock-receipt.v1', state: 'server_invalidation_confirmed',
       });
-      expect((await page.request.get('/api/patients')).status()).toBe(401);
+      expect((await documentRequests(page).get('/api/patients')).status()).toBe(401);
       await page.reload();
-      await unlock(page, pin, key, 'click');
+      key = await unlock(page, pin, 'click');
     } finally {
       await initial.close();
     }
@@ -100,7 +106,7 @@ for (const { name, pin } of [
     try {
       const page = await reopened.newPage();
       await page.goto('/');
-      await unlock(page, pin, key, 'enter');
+      await unlock(page, pin, 'enter', key);
     } finally {
       await reopened.close();
     }
@@ -140,57 +146,43 @@ async function holdRealResponse(
   }
 }
 
-test('explicit lock and PIN recovery: required/pending, short and wrong PIN, loading and focus recovery', async ({ page, browserName }) => {
+alphanumeric('explicit lock and PIN recovery: pending, short and wrong PIN, loading and focus recovery', async ({ page, browserName }) => {
   expect(browserName, 'Response-gated negative case requires Chromium/CDP; it must not silently skip').toBe('chromium');
-  const key = await openLegacyPinArchive(page, ALPHANUMERIC_PIN);
-  const context = page.context();
-  await page.close();
-  const reopened = await context.newPage();
+  await openLegacyPinArchive(page, ALPHANUMERIC_PIN);
   const loginRequests: string[] = [];
-  reopened.on('request', request => {
+  const observeLogin = (request: Request) => {
     if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/auth/login') {
       loginRequests.push(request.postDataJSON().password as string);
     }
-  });
+  };
+  page.on('request', observeLogin);
   try {
-    await reopened.goto('/');
-    const shell = reopened.getByLabel('MediFlow lock screen', { exact: true });
+    const shell = page.getByLabel('MediFlow lock screen', { exact: true });
     const form = shell.locator('form');
-    const input = reopened.getByLabel('PIN operatore', { exact: true });
-    const renew = reopened.getByRole('button', { name: 'Rinnova accesso', exact: true });
-    const lockAll = reopened.getByRole('button', { name: 'Blocca tutte le schede', exact: true });
+    const input = page.getByLabel('PIN operatore', { exact: true });
+    const renew = page.getByRole('button', { name: 'Rinnova accesso', exact: true });
+    const lock = page.getByRole('button', { name: 'Blocca', exact: true });
     const submit = shell.locator('button[type="submit"]');
-    await expect(reopened.getByText('Una sessione è già attiva. Rinnova l’accesso per usare questa scheda.', { exact: true })).toBeVisible();
-    await expect(input).toBeDisabled();
-    await expect(submit).toBeDisabled();
-    await expect(renew).toBeEnabled();
-    await form.evaluate((element: HTMLFormElement) => element.requestSubmit());
-    expect(loginRequests).toEqual([]);
-    await renew.click();
-    await expect(reopened.getByText('Apri una scheda già sbloccata oppure blocca tutte le schede per accedere di nuovo.', { exact: true })).toBeVisible();
-    await expect(input).toBeDisabled();
-
-    const receipt = await holdRealResponse(reopened, '/api/auth/lock', 200,
-      () => lockAll.click(), async () => {
+    const receipt = await holdRealResponse(page, '/api/auth/lock', 200,
+      () => lock.click(), async () => {
         await expect(form).toHaveAttribute('aria-busy', 'true');
         await expect(input).toBeDisabled();
         await expect(submit).toBeDisabled();
         await expect(renew).toBeDisabled();
-        await expect(lockAll).toBeDisabled();
-        await expect(reopened.getByText('Verifica dell’accesso…', { exact: true })).toBeVisible();
-        await reopened.keyboard.press('Enter');
+        await expect(page.getByText('Verifica dell’accesso…', { exact: true })).toBeVisible();
+        await page.keyboard.press('Enter');
         await form.evaluate((element: HTMLFormElement) => element.requestSubmit());
         expect(loginRequests).toEqual([]);
-        await expect(reopened.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toHaveCount(0);
+        await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toHaveCount(0);
       });
     expect(await receipt.json()).toEqual({
       schemaVersion: 'mediflow.application-lock-receipt.v1', state: 'server_invalidation_confirmed',
     });
-    await expectReadyLock(reopened);
+    await expectReadyLock(page);
     await expect(input).toBeFocused();
     await expect(input).toHaveValue('');
     expect(loginRequests).toEqual([]);
-    expect((await reopened.request.get('/api/patients')).status()).toBe(401);
+    expect((await documentRequests(page).get('/api/patients')).status()).toBe(401);
 
     await input.fill('abc');
     await expect(submit).toBeDisabled();
@@ -202,26 +194,26 @@ test('explicit lock and PIN recovery: required/pending, short and wrong PIN, loa
     const wrong = 'wrong086086';
     await input.fill(wrong);
     await expect(submit).toBeEnabled();
-    const denied = await holdRealResponse(reopened, '/api/auth/login', 401,
+    const denied = await holdRealResponse(page, '/api/auth/login', 401,
       () => input.press('Enter'), async () => {
         await expect(input).toBeDisabled();
         await expect(submit).toBeDisabled();
         await expect(form).toHaveAttribute('aria-busy', 'true');
-        await reopened.keyboard.press('Enter');
+        await page.keyboard.press('Enter');
         expect(loginRequests).toEqual([wrong]);
       });
     expect(denied.request().postDataJSON().password).toBe(wrong);
-    await expect(reopened.locator('#mediflow-lock-error')).toBeVisible();
+    await expect(page.locator('#mediflow-lock-error')).toBeVisible();
     await expect(input).toHaveAttribute('aria-invalid', 'true');
     await expect(input).toBeEnabled();
     await expect(input).toHaveValue('');
     await expect(input).toBeFocused();
     await expect(shell).toBeVisible();
-    expect((await reopened.request.get('/api/patients')).status()).toBe(401);
-    await unlock(reopened, ALPHANUMERIC_PIN, key, 'enter');
+    expect((await documentRequests(page).get('/api/patients')).status()).toBe(401);
+    await unlock(page, ALPHANUMERIC_PIN, 'enter');
     expect(loginRequests).toEqual([wrong, ALPHANUMERIC_PIN]);
-    await expect(reopened.locator('#mediflow-lock-error')).toHaveCount(0);
+    await expect(page.locator('#mediflow-lock-error')).toHaveCount(0);
   } finally {
-    await reopened.close();
+    page.off('request', observeLogin);
   }
 });

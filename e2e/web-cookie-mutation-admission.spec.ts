@@ -1,15 +1,19 @@
 import { expect, test } from './fixtures/isolated-runtime';
-import { trustedWebRequestHeaders } from './fixtures/trusted-web-request';
+import { retainedDocumentAuthorityHeaders, trustedWebRequestHeaders } from './fixtures/trusted-web-request';
 import { bootstrapUnlockedSession } from './utils';
+
+test.use({ existingPin: process.env.E2E_PIN || '1234' });
 
 test('standalone cookie admission rejects hostile logout before retiring the Web session', async ({ page, baseURL }) => {
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
   await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
   const request = page.context().request;
+  const authority = await retainedDocumentAuthorityHeaders(page);
   await page.close();
 
-  expect((await request.get('/api/patients')).status()).toBe(200);
-  const trusted = trustedWebRequestHeaders(baseURL);
+  expect((await request.get('/api/patients')).status()).toBe(401);
+  expect((await request.get('/api/patients', { headers: authority })).status()).toBe(200);
+  const trusted = { ...trustedWebRequestHeaders(baseURL), ...authority };
   const deniedTransports = [
     { name: 'cross-origin', headers: { ...trusted, Origin: 'https://untrusted.invalid', 'Content-Type': 'application/json' } },
     { name: 'unsupported media type', headers: { ...trusted, 'Content-Type': 'text/plain' } },
@@ -23,7 +27,7 @@ test('standalone cookie admission rejects hostile logout before retiring the Web
       error: 'Request transport unavailable',
       code: 'request_transport_invalid',
     });
-    expect((await request.get('/api/patients')).status(), `${name} must not retire the session`).toBe(200);
+    expect((await request.get('/api/patients', { headers: authority })).status(), `${name} must not retire the session`).toBe(200);
   }
 
   const accepted = await request.post('/api/auth/logout', {
@@ -32,7 +36,7 @@ test('standalone cookie admission rejects hostile logout before retiring the Web
   });
   expect(accepted.status()).toBe(204);
   expect(await accepted.text()).toBe('');
-  expect((await request.get('/api/patients')).status()).toBe(401);
+  expect((await request.get('/api/patients', { headers: authority })).status()).toBe(401);
 });
 
 test('a page mutation is admitted on the browser own Origin and Fetch Metadata', async ({ page, baseURL }) => {
