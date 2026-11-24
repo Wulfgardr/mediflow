@@ -10,14 +10,14 @@ import test from 'node:test';
 import { installPlistTestTools } from './fixtures/plist-tool-test-support.mjs';
 import { appRoot, assetParts, fixture, repositoryRoot, snapshot, syntheticFiles, write } from './fixtures/mac-packaging-test-support.mjs';
 import { localImportClosure } from './fixtures/local-import-closure.mjs';
+import { macosWebRuntimeRequiredFiles } from './macos-web-runtime-payload.mjs';
 
 function dependencies(web) {
   const arch = process.arch;
-  for (const file of ['scripts/anydoc-pdf-page-worker.mjs', 'node_modules/pdf-lib/package.json', 'node_modules/pdfjs-dist/package.json',
-    'node_modules/pdfjs-dist/legacy/build/pdf.mjs', 'node_modules/@napi-rs/canvas/package.json', `node_modules/@napi-rs/canvas-darwin-${arch}/package.json`]) write(path.join(web, file), '{}\n');
+  for (const file of macosWebRuntimeRequiredFiles(arch)) write(path.join(web, file), '{}\n');
   for (const file of [`node_modules/@firecrawl/anydoc-darwin-${arch}/anydoc.darwin-${arch}.node`,
     `node_modules/@img/sharp-darwin-${arch}/lib/sharp-darwin-${arch}-1.0.0.node`, `node_modules/@img/sharp-libvips-darwin-${arch}/lib/libvips-cpp.1.0.0.dylib`,
-    `node_modules/@napi-rs/canvas-darwin-${arch}/skia.darwin-${arch}.node`, 'node_modules/better-sqlite3/build/Release/better_sqlite3.node', 'node_modules/fsevents/fsevents.node']) {
+    `node_modules/@napi-rs/canvas-darwin-${arch}/skia.darwin-${arch}.node`, 'node_modules/better-sqlite3/build/Release/better_sqlite3.node']) {
     write(path.join(web, file), Buffer.concat([Buffer.from([0xfe, 0xed, 0xfa, 0xcf]), Buffer.from('synthetic dependency')]), 0o755);
   }
   for (const [file, code] of [
@@ -25,7 +25,6 @@ function dependencies(web) {
     ['node_modules/@napi-rs/canvas/js-binding.js', `return require('@napi-rs/canvas-darwin-${arch}');`],
     [`node_modules/@img/sharp-darwin-${arch}/index.cjs`, `require.resolve('@img/sharp-libvips-darwin-${arch}/binary');\nmodule.exports = require('./lib/sharp-darwin-${arch}-1.0.0.node');`],
     ['node_modules/better-sqlite3/lib/database.js', "addon = require('bindings')('better_sqlite3.node');"],
-    ['node_modules/fsevents/fsevents.js', 'const Native = require("./fsevents.node");'],
   ]) write(path.join(web, file), code + '\n');
   write(path.join(web, 'node_modules/sharp/node_modules/semver/bin/semver.js'), '// safe non-native link target\n');
   fs.mkdirSync(path.join(web, 'node_modules/sharp/node_modules/.bin'));
@@ -94,7 +93,7 @@ switch (command) {
     else if (base === 'mediflow-web-sharp.node') {
       emit('LC_LOAD_DYLIB', state.linked ? '@loader_path/mediflow-web-libvips.dylib' : '@rpath/libvips-cpp.1.0.0.dylib');
       if (!state.noRpath) emit('LC_RPATH', '@loader_path/../../sharp-libvips-darwin-' + process.arch + '/lib');
-    } else if (!['mediflow-web-better-sqlite3.node', 'mediflow-web-fsevents.node'].includes(base)) throw new Error('Unknown mock Mach-O target');
+    } else if (base !== 'mediflow-web-better-sqlite3.node') throw new Error('Unknown mock Mach-O target');
     emit('LC_LOAD_DYLIB', '/usr/lib/libSystem.B.dylib'); break;
   case 'install_name_tool':
     if (helper) throw new Error('Pinned helper must not be rewritten');
@@ -283,7 +282,7 @@ test('prebuilt import requires a clean checkout and fresh output', t => {
 });
 
 for (const identity of ['', '-', 'Synthetic Developer ID']) {
-  test(`mocked build/signing pipeline (${identity || 'unsigned outer app'}) preserves pins and all six dependency targets`, t => {
+  test(`mocked build/signing pipeline (${identity || 'unsigned outer app'}) preserves pins and all dependency targets`, t => {
     const input = buildFixture(t), result = input.run({ MEDIFLOW_CODESIGN_IDENTITY: identity }); pass(result);
     assert.match(result.stdout, /runtime smoke still required/);
     const helper = path.join(input.app, 'Contents/Helpers/mediflow-chatgpt-codex');
@@ -313,7 +312,7 @@ for (const identity of ['', '-', 'Synthetic Developer ID']) {
     assert.equal(preserved.status, 0, preserved.stderr);
     assert.equal(preserved.stdout.trim(), 'preserve-me');
     const targets = fs.readdirSync(path.join(input.app, 'Contents/Frameworks')).sort();
-    assert.deepEqual(targets, ['mediflow-web-anydoc.node', 'mediflow-web-better-sqlite3.node', 'mediflow-web-canvas.node', 'mediflow-web-fsevents.node', 'mediflow-web-libvips.dylib', 'mediflow-web-sharp.node']);
+    assert.deepEqual(targets, ['mediflow-web-anydoc.node', 'mediflow-web-better-sqlite3.node', 'mediflow-web-canvas.node', 'mediflow-web-libvips.dylib', 'mediflow-web-sharp.node']);
     const events = input.events();
     const helperEvents = events.filter(e => ['codesign', 'install_name_tool'].includes(e.command) && e.args.at(-1) === helper);
     assert.ok(helperEvents.length >= 2);
@@ -327,7 +326,8 @@ for (const identity of ['', '-', 'Synthetic Developer ID']) {
       assert.ok(headlessStage < seal && headlessCheck > seal);
       const innerSigns = events.flatMap((e, index) => e.command === 'codesign' && e.args[0] === '--force'
         && e.args.at(-1).includes('/Contents/Frameworks/') ? [{ index, target: e.args.at(-1) }] : []);
-      assert.equal(innerSigns.length, 12); // normalization ad-hoc + requested final identity
+      const adHocAndRequestedIdentity = 2;
+      assert.equal(innerSigns.length, adHocAndRequestedIdentity * targets.length);
       assert.deepEqual([...new Set(innerSigns.map(({ target }) => target))].sort(),
         targets.map(name => path.join(input.app, 'Contents/Frameworks', name)));
       assert.ok(innerSigns.every(({ index }) => index < headlessStage));

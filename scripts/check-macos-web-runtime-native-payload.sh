@@ -1,5 +1,4 @@
 #!/bin/bash
-# Relocate and validate the six WebRuntime Mach-O dependencies in MediFlow.app.
 set -euo pipefail
 
 fail() {
@@ -155,6 +154,14 @@ verify_windows_bootstrap_prebuilds() {
   windows_bootstrap_prebuilds=( "$bootstrap/prebuilds/win32-x64/system-directory.node" "$bootstrap/prebuilds/win32-arm64/system-directory.node" )
 }
 
+macos_web_runtime_required_files() {
+  node --input-type=module -e '
+    const { pathToFileURL } = await import("node:url");
+    const { macosWebRuntimeRequiredFiles } = await import(pathToFileURL(process.argv[1]).href);
+    process.stdout.write(macosWebRuntimeRequiredFiles(process.argv[2]).join("\n"));
+  ' "$(dirname "$script_path")/macos-web-runtime-payload.mjs" "$1"
+}
+
 is_windows_bootstrap_prebuild() {
   [[ "${#windows_bootstrap_prebuilds[@]}" != "0" ]] && is_listed_path "$1" "${windows_bootstrap_prebuilds[@]}"
 }
@@ -216,7 +223,7 @@ validate_framework_macho() {
 }
 
 package_web_runtime_machos() {
-  local node_arch resources contents expected_frameworks native source target resolved link loader
+  local node_arch resources contents expected_frameworks native source target resolved link loader required_files required_path
   local physical_count=0 framework_count=0 old_vips_ref old_vips_count=0 rpath index
   local sharp_candidates=() libvips_candidates=() sources=() targets=() loaders=() before=() after=()
   local normalize="$normalize"
@@ -251,22 +258,16 @@ package_web_runtime_machos() {
   validate_resource_symlinks "$resources"
   verify_windows_bootstrap_prebuilds
 
-  for required_path in \
-    "$web_runtime/scripts/anydoc-pdf-page-worker.mjs" "$web_runtime/node_modules/pdf-lib/package.json" \
-    "$web_runtime/node_modules/pdfjs-dist/package.json" "$web_runtime/node_modules/pdfjs-dist/legacy/build/pdf.mjs" \
-    "$web_runtime/node_modules/@napi-rs/canvas/package.json" \
-    "$web_runtime/node_modules/@napi-rs/canvas-darwin-$node_arch/package.json" \
-    "$web_runtime/node_modules/@firecrawl/anydoc/index.js" \
-    "$web_runtime/node_modules/@napi-rs/canvas/js-binding.js" \
-    "$web_runtime/node_modules/@img/sharp-darwin-$node_arch/index.cjs" \
-    "$web_runtime/node_modules/better-sqlite3/lib/database.js" \
-    "$web_runtime/node_modules/fsevents/fsevents.js"; do
-    validate_contained_file "$required_path" "$web_runtime" "isolated PDF worker dependency"
-  done
+  required_files="$(macos_web_runtime_required_files "$node_arch")" || \
+    fail "cannot read the required WebRuntime files from scripts/macos-web-runtime-payload.mjs"
+  [[ -n "$required_files" ]] || fail "scripts/macos-web-runtime-payload.mjs lists no required WebRuntime files"
+  while IFS= read -r required_path; do
+    validate_contained_file "$web_runtime/$required_path" "$web_runtime" "isolated PDF worker dependency"
+  done <<< "$required_files"
   targets=(
     "$frameworks/mediflow-web-anydoc.node" "$frameworks/mediflow-web-sharp.node"
     "$frameworks/mediflow-web-libvips.dylib" "$frameworks/mediflow-web-canvas.node"
-    "$frameworks/mediflow-web-better-sqlite3.node" "$frameworks/mediflow-web-fsevents.node"
+    "$frameworks/mediflow-web-better-sqlite3.node"
   )
   # a second normalization of a complete relocated tree is read-only.
   # A partial tree still fails the full validation below; do not delete its targets.
@@ -282,7 +283,6 @@ package_web_runtime_machos() {
     "$web_runtime/node_modules/@img/sharp-darwin-$node_arch/index.cjs"
     "$web_runtime/node_modules/@img/sharp-darwin-$node_arch/index.cjs"
     "$web_runtime/node_modules/better-sqlite3/lib/database.js"
-    "$web_runtime/node_modules/fsevents/fsevents.js"
   )
   after=(
     "require('../../../../../Frameworks/mediflow-web-anydoc.node')"
@@ -290,7 +290,6 @@ package_web_runtime_machos() {
     "require('../../../../../Frameworks/mediflow-web-sharp.node')"
     "require.resolve('../../../../../Frameworks/mediflow-web-libvips.dylib')"
     "require('../../../../../Frameworks/mediflow-web-better-sqlite3.node')"
-    'require("../../../../Frameworks/mediflow-web-fsevents.node")'
   )
 
   if [[ "$normalize" == "1" ]]; then
@@ -303,7 +302,7 @@ package_web_runtime_machos() {
     sources=(
       "$web_runtime/node_modules/@firecrawl/anydoc-darwin-$node_arch/anydoc.darwin-$node_arch.node" "${sharp_candidates[0]}"
       "${libvips_candidates[0]}" "$web_runtime/node_modules/@napi-rs/canvas-darwin-$node_arch/skia.darwin-$node_arch.node"
-      "$web_runtime/node_modules/better-sqlite3/build/Release/better_sqlite3.node" "$web_runtime/node_modules/fsevents/fsevents.node"
+      "$web_runtime/node_modules/better-sqlite3/build/Release/better_sqlite3.node"
     )
     before=(
       "require('@firecrawl/anydoc-darwin-$node_arch')"
@@ -311,7 +310,6 @@ package_web_runtime_machos() {
       "require('./lib/$(basename "${sharp_candidates[0]}")')"
       "require.resolve('@img/sharp-libvips-darwin-$node_arch/binary')"
       "require('bindings')('better_sqlite3.node')"
-      'require("./fsevents.node")'
     )
     for source in "${sources[@]}"; do
       validate_contained_file "$source" "$web_runtime" "native source"
@@ -324,27 +322,23 @@ package_web_runtime_machos() {
       is_listed_path "$native" "${sources[@]}" || fail "unexpected native artifact in WebRuntime: $native"
       physical_count=$((physical_count + 1))
     done < <(find "$web_runtime" \( -type f -o -type l \) \( -name '*.node' -o -name '*.dylib' \) -print0)
-    [[ "$physical_count" == "6" ]] || fail "expected exactly six physical WebRuntime Mach-O artifacts, found $physical_count"
-    # preflight every package loader before moving any native payload.
-    for index in 0 1 2 3 4 5; do
+    [[ "$physical_count" == "${#sources[@]}" ]] || \
+      fail "expected exactly ${#sources[@]} physical WebRuntime Mach-O artifacts, found $physical_count"
+    for index in "${!loaders[@]}"; do
       [[ "$(literal_count "${loaders[$index]}" "${before[$index]}")" == "1" ]] || \
         fail "loader pattern must occur exactly once before relocation: ${loaders[$index]}"
       [[ "$(literal_count "${loaders[$index]}" "${after[$index]}")" == "0" ]] || \
         fail "loader already contains packaged target before relocation: ${loaders[$index]}"
     done
-    # detect the original extensionless-Codex conflict BEFORE touching
-    # any of the six dependencies. Only their exact source paths are exempt.
     native="$(first_physical_macho "$resources" "${sources[@]}")"
     [[ -z "$native" ]] || fail "unexpected physical Mach-O below Contents/Resources: $native"
-    # Xcode may preserve the six owned targets in an unsigned incremental build.
-    # Delete them only after all source/loader preflights have succeeded.
     for target in "${targets[@]}"; do
       if [[ -e "$target" || -L "$target" ]]; then
         [[ -f "$target" || -L "$target" ]] || fail "owned native target is not a file or symlink: $target"
         rm -f -- "$target"
       fi
     done
-    for index in 0 1 2 3 4 5; do
+    for index in "${!sources[@]}"; do
       source="${sources[$index]}"
       target="${targets[$index]}"
       [[ -f "$source" && ! -L "$source" ]] || fail "native source is missing or is a symlink: $source"
@@ -352,7 +346,7 @@ package_web_runtime_machos() {
       mv "$source" "$target"
       codesign --remove-signature "$target"
     done
-    for index in 0 1 2 3 4 5; do
+    for index in "${!loaders[@]}"; do
       rewrite_literal_once "${loaders[$index]}" "${before[$index]}" "${after[$index]}"
     done
 
@@ -371,13 +365,13 @@ package_web_runtime_machos() {
       [[ -n "$rpath" ]] && install_name_tool -delete_rpath "$rpath" "${targets[1]}"
     done < <(macho_references "${targets[1]}" | awk -F '\t' '$1 == "LC_RPATH" { print $2 }')
     # Apple Silicon needs ad-hoc signatures here; the outer app stays unsigned unless opted in.
-    for index in 2 0 1 3 4 5; do
+    for index in 2 0 1 3 4; do
       codesign --force --sign - "${targets[$index]}"
       codesign --verify --strict "${targets[$index]}"
     done
   fi
 
-  for index in 0 1 2 3 4 5; do
+  for index in "${!targets[@]}"; do
     target="${targets[$index]}"
     [[ -f "$target" && ! -L "$target" ]] || fail "framework native target is missing or is a symlink: $target"
     validate_framework_macho "$target"
@@ -400,14 +394,15 @@ package_web_runtime_machos() {
     is_listed_path "$native" "${targets[@]}" || fail "unexpected MediFlow Web native target: $native"
     framework_count=$((framework_count + 1))
   done < <(find "$frameworks" -maxdepth 1 \( -type f -o -type l \) -name 'mediflow-web-*' -print0)
-  [[ "$framework_count" == "6" ]] || fail "expected exactly six MediFlow Web targets in Contents/Frameworks, found $framework_count"
-  echo "macOS WebRuntime native payload guard passed: six physical Frameworks targets, ${#windows_bootstrap_prebuilds[@]} verified Windows PE prebuilds and no Mach-O below Resources"
+  [[ "$framework_count" == "${#targets[@]}" ]] || \
+    fail "expected exactly ${#targets[@]} MediFlow Web targets in Contents/Frameworks, found $framework_count"
+  echo "macOS WebRuntime native payload guard passed: ${#targets[@]} physical Frameworks targets, ${#windows_bootstrap_prebuilds[@]} verified Windows PE prebuilds and no Mach-O below Resources"
 }
 
 run_self_test() {
   local temp_dir fake_bin fixture valid_web worker_path binding_path event_log state_file events
   local layout_bin layout_state layout_log layout_web layout_frameworks bad_app bad_web bad_frameworks path
-  local bad_pattern_app bad_pattern_web extensionless_app extensionless_web real_node legacy_app legacy_web idempotent_events alias_root partial_app
+  local missing_required_app bad_pattern_app bad_pattern_web extensionless_app extensionless_web real_node legacy_app legacy_web idempotent_events alias_root partial_app
   local scripts_dir pe_case pe_app pe_web pe_dir arch
   temp_dir="$(mktemp -d "${TMPDIR:-/tmp}/mediflow-macho-guard.XXXXXX")"
   temp_dir="$(real_path "$temp_dir")"
@@ -578,7 +573,7 @@ run_self_test() {
     "$layout_web/node_modules/@firecrawl/anydoc" \
     "$layout_web/node_modules/@img/sharp-darwin-arm64/lib" "$layout_web/node_modules/@img/sharp-libvips-darwin-arm64/lib" \
     "$layout_web/node_modules/better-sqlite3/build/Release" "$layout_web/node_modules/better-sqlite3/lib" \
-    "$layout_web/node_modules/fsevents" "$layout_web/node_modules/sharp/node_modules/.bin" \
+    "$layout_web/node_modules/sharp/node_modules/.bin" \
     "$layout_web/node_modules/sharp/node_modules/semver/bin"
   for path in \
     "$layout_web/scripts/anydoc-pdf-page-worker.mjs" "$layout_web/node_modules/pdf-lib/package.json" \
@@ -586,8 +581,7 @@ run_self_test() {
     "$layout_web/node_modules/@napi-rs/canvas/package.json" "$layout_web/node_modules/@napi-rs/canvas-darwin-arm64/package.json" \
     "$layout_web/node_modules/@firecrawl/anydoc-darwin-arm64/anydoc.darwin-arm64.node" "$layout_web/node_modules/@img/sharp-darwin-arm64/lib/sharp-darwin-arm64-1.0.0.node" \
     "$layout_web/node_modules/@img/sharp-libvips-darwin-arm64/lib/libvips-cpp.1.0.0.dylib" "$layout_web/node_modules/@napi-rs/canvas-darwin-arm64/skia.darwin-arm64.node" \
-    "$layout_web/node_modules/better-sqlite3/build/Release/better_sqlite3.node" \
-    "$layout_web/node_modules/fsevents/fsevents.node"; do
+    "$layout_web/node_modules/better-sqlite3/build/Release/better_sqlite3.node"; do
     : > "$path"
   done
   printf '%s\n' "const binding = require('@firecrawl/anydoc-darwin-arm64')" > \
@@ -600,11 +594,8 @@ run_self_test() {
     "$layout_web/node_modules/@img/sharp-darwin-arm64/index.cjs"
   printf '%s\n' "addon = require('bindings')('better_sqlite3.node');" > \
     "$layout_web/node_modules/better-sqlite3/lib/database.js"
-  printf '%s\n' 'const Native = require("./fsevents.node");' > \
-    "$layout_web/node_modules/fsevents/fsevents.js"
   : > "$layout_web/node_modules/sharp/node_modules/semver/bin/semver.js"
   ln -s ../semver/bin/semver.js "$layout_web/node_modules/sharp/node_modules/.bin/semver"
-  # The real, verified Windows PE pair ships next to the six Mach-O dependencies.
   scripts_dir="$(cd "$(dirname "$script_path")" && pwd -P)"
   mkdir -p "$layout_web/scripts/windows-launcher-bootstrap/prebuilds"
   for path in index.mjs build.ps1 system-directory.c; do
@@ -626,7 +617,7 @@ run_self_test() {
     '    printf "%s\n" "Load command 0" "          cmd LC_LOAD_DYLIB" "         name $ref (offset 24)"' \
     '    [[ -f "$state/sharp-rpath-removed" ]] || printf "%s\n" "Load command 1" "          cmd LC_RPATH" "         path @loader_path/../../sharp-libvips-darwin-arm64/lib (offset 12)"' \
     '    emit_system ;;' \
-    '  mediflow-web-better-sqlite3.node|mediflow-web-fsevents.node) emit_system ;;' \
+    '  mediflow-web-better-sqlite3.node) emit_system ;;' \
     '  *) exit 97 ;;' \
     'esac' > "$layout_bin/otool"
   printf '%s\n' \
@@ -703,6 +694,16 @@ run_self_test() {
       --frameworks "$bad_pattern_app/Contents/Frameworks" >/dev/null 2>&1; then
     fail "self-test accepted a loader pattern that occurred twice"
   fi
+  missing_required_app="$temp_dir/missing-required/MediFlow.app"
+  mkdir -p "$(dirname "$missing_required_app")"
+  cp -R "$temp_dir/layout/MediFlow.app" "$missing_required_app"
+  rm "$missing_required_app/Contents/Resources/WebRuntime/node_modules/pdfjs-dist/legacy/build/pdf.mjs"
+  if MEDIFLOW_LAYOUT_STATE_DIR="$layout_state" MEDIFLOW_LAYOUT_EVENT_LOG="$layout_log" \
+      PATH="$layout_bin:$PATH" "$script_path" --normalize --web-runtime "$missing_required_app/Contents/Resources/WebRuntime" \
+      --frameworks "$missing_required_app/Contents/Frameworks" >/dev/null 2>&1; then
+    fail "self-test accepted a WebRuntime without a file listed in macos-web-runtime-payload.mjs"
+  fi
+  [[ ! -s "$layout_log" ]] || fail "self-test changed native dependencies before rejecting a missing required file"
   # Reproduce the original codex-in-Resources conflict before normalizing any dependency.
   legacy_app="$temp_dir/legacy/MediFlow.app"
   mkdir -p "$(dirname "$legacy_app")"
@@ -724,7 +725,6 @@ run_self_test() {
   MEDIFLOW_LAYOUT_STATE_DIR="$layout_state" MEDIFLOW_LAYOUT_EVENT_LOG="$layout_log" \
     PATH="$layout_bin:$PATH" "$script_path" --normalize --web-runtime "$layout_web" --frameworks "$layout_frameworks" >/dev/null
   [[ "$(cat "$layout_log")" == "$idempotent_events" ]] || fail "self-test rewrote already-normalized native targets"
-  # A helper outside Resources does not relax the Resources guard or add a seventh Frameworks target.
   mkdir -p "$(dirname "$layout_frameworks")/Helpers"
   printf '\xfe\xed\xfa\xcf' > "$(dirname "$layout_frameworks")/Helpers/mediflow-chatgpt-codex"
   MEDIFLOW_LAYOUT_STATE_DIR="$layout_state" MEDIFLOW_LAYOUT_EVENT_LOG="$layout_log" \
@@ -753,9 +753,9 @@ run_self_test() {
     fail "self-test accepted a partial normalized tree"
   fi
   [[ -f "$partial_app/Contents/Frameworks/mediflow-web-anydoc.node" ]] || fail "self-test deleted a partial tree target"
-  [[ "$(grep -c '^strip ' "$layout_log")" == "6" ]] || fail "self-test did not strip exactly six copied native signatures"
-  [[ "$(grep -c '^sign ' "$layout_log")" == "6" && "$(grep -c '^verify ' "$layout_log")" == "6" ]] || \
-    fail "self-test did not ad-hoc sign and verify exactly six relocated native targets"
+  [[ "$(grep -c '^strip ' "$layout_log")" == "5" ]] || fail "self-test did not strip exactly five copied native signatures"
+  [[ "$(grep -c '^sign ' "$layout_log")" == "5" && "$(grep -c '^verify ' "$layout_log")" == "5" ]] || \
+    fail "self-test did not ad-hoc sign and verify exactly five relocated native targets"
   grep -Fq -- '-change @rpath/libvips-cpp.1.0.0.dylib @loader_path/mediflow-web-libvips.dylib' "$layout_log" || \
     fail "self-test did not normalize Sharp to its Frameworks libvips target"
   [[ -L "$layout_web/node_modules/sharp/node_modules/.bin/semver" ]] || \
@@ -799,7 +799,7 @@ run_self_test() {
   printf '\xfe\xed\xfa\xcf' > "$bad_web/node_modules/unexpected.node"
   if MEDIFLOW_LAYOUT_STATE_DIR="$layout_state" MEDIFLOW_LAYOUT_EVENT_LOG="$layout_log" \
       PATH="$layout_bin:$PATH" "$script_path" --web-runtime "$bad_web" --frameworks "$bad_frameworks" >/dev/null 2>&1; then
-    fail "self-test accepted an unexpected seventh native artifact"
+    fail "self-test accepted an unexpected extra native artifact"
   fi
   rm "$bad_web/node_modules/unexpected.node"
   ln -s ../../../Frameworks/mediflow-web-anydoc.node "$bad_web/node_modules/native-alias"
