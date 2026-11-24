@@ -64,7 +64,7 @@ async function renderStoredDocument(source: string, updateRecord: (record: Dossi
     const panelPath = '/components/dossier-import-panel.tsx';
     const stub = 'data:text/javascript,export%20default%20%7B%7D';
     const unrelated = new Set(['@/lib/db', '@/lib/document-dossier-ports', '@/components/security-provider',
-        '@/components/patient-document-create', '@/components/kree8/kree8-workspace-shell', './patient-bulk-import-panel.module.css']);
+        '@/components/patient-document-create', '@/components/dossier-backup-proposal', '@/components/kree8/kree8-workspace-shell', './patient-bulk-import-panel.module.css']);
     const hooks = registerHooks({
         resolve(specifier, context, next) {
             if (context.parentURL?.endsWith(panelPath) && unrelated.has(specifier)) return { url: stub, shortCircuit: true };

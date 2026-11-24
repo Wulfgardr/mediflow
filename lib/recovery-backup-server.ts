@@ -13,17 +13,19 @@ import { assertRecoveryDatabaseBytes, decryptRecoveryBackup, MAX_RECOVERY_DATABA
 import { hashAccessVerifier, openRecoveryWrapping } from './security/unlock-credential';
 import { validateRecoveryAuditSchema } from './sqlite-schema';
 import { TERRITORIAL_PACK_INITIALIZATION_KEY, TERRITORIAL_PACK_OWNER } from './territorial-packs';
+import { RecoverySnapshotRefusedError, type RecoveryBackupRefusal } from './recovery-backup-refusal';
 
 function fail(): never { throw new Error('RECOVERY_BACKUP_PREFLIGHT_FAILED'); }
+function refuse(reason: RecoveryBackupRefusal): never { throw new RecoverySnapshotRefusedError(reason); }
 function quote(identifier: string): string { return '"' + identifier.replaceAll('"', '""') + '"'; }
 
 /** Validate only an isolated candidate; missing tables must never be rebuilt by a migration. */
 function validateCandidate(file: string, prepareReplacement = false): Database.Database {
     const probe = new Database(file, { readonly: true, fileMustExist: true });
     try {
-        if (![3, 4, 5, 6, 9, 10, 11, 12, 13, 14, 15, 16, 17, CURRENT_SQLITE_SCHEMA_VERSION].includes(Number(probe.pragma('user_version', { simple: true })))
-            || probe.pragma('integrity_check', { simple: true }) !== 'ok'
-            || (probe.pragma('foreign_key_check') as unknown[]).length !== 0) fail();
+        if (![3, 4, 5, 6, 9, 10, 11, 12, 13, 14, 15, 16, 17, CURRENT_SQLITE_SCHEMA_VERSION].includes(Number(probe.pragma('user_version', { simple: true })))) refuse('archive_schema_unsupported');
+        if (probe.pragma('integrity_check', { simple: true }) !== 'ok'
+            || (probe.pragma('foreign_key_check') as unknown[]).length !== 0) refuse('archive_inconsistent');
         if (probe.pragma('user_version', { simple: true }) !== CURRENT_SQLITE_SCHEMA_VERSION) assertAmbulatoryCommandPredecessorRecoverySchema(probe);
     } finally { probe.close(); }
     const candidate = openVersionedSqliteDatabase(file, undefined, { prepareReplacement });
@@ -44,12 +46,12 @@ export function createRecoverySnapshot(connection: Database.Database, actorId: s
             const account = candidate.prepare(`SELECT encrypted_master_key, recovery_wrapped_master_key, recovery_salt,
                 recovery_verifier_hash FROM users WHERE id = ? AND role = 'admin'`).get(actorId) as Record<string, unknown> | undefined;
             if (!account || typeof account.encrypted_master_key !== 'string' || !account.encrypted_master_key.startsWith('v3:')
-                || !account.recovery_wrapped_master_key || !account.recovery_salt || !account.recovery_verifier_hash) fail();
+                || !account.recovery_wrapped_master_key || !account.recovery_salt || !account.recovery_verifier_hash) refuse('recovery_wrapping_missing');
             // openVersionedSqliteDatabase can switch WAL on, but performs no schema writes at this version.
             candidate.pragma('wal_checkpoint(TRUNCATE)');
             candidate.pragma('journal_mode = DELETE');
         } finally { candidate.close(); }
-        if (fs.statSync(file).size > MAX_RECOVERY_DATABASE_BYTES) fail();
+        if (fs.statSync(file).size > MAX_RECOVERY_DATABASE_BYTES) refuse('archive_too_large');
         const bytes = fs.readFileSync(file);
         assertRecoveryDatabaseBytes(bytes);
         return bytes;
