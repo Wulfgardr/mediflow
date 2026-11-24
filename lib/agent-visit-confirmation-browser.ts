@@ -50,7 +50,7 @@ export async function agentVisitPresentation(review: AgentVisitReview, plan: Age
         proposals.push({ title: agentReviewItemLabels[sourceItem.kind], fields,
             current: review.currentSummary.get(sourceItem.id) ?? 'Non presente', sourceName: source.fileName, sourceQuote: quote, sourceHash: source.sha256 });
     }
-    return { patient: review.patient.lastName + ' ' + review.patient.firstName, fiscalCode: review.visit.anchor.fiscalCode, proposals };
+    return { patient: (review.patient.lastName + ' ' + review.patient.firstName).trim() || review.patient.taxCode, fiscalCode: review.visit.anchor.fiscalCode, proposals };
 }
 
 export async function sealVisitConfirmationPresentation(reference: string, agreementPublicKey: string, presentation: VisitConfirmationPresentation) {

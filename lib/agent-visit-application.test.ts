@@ -28,7 +28,7 @@ const database = dbServer.$client;
 const key = await generateMasterKey();
 const field = async (value: unknown) => { const sealed = await encryptData(value, key); return `ENC:${sealed.iv}:${sealed.data}`; };
 const request = new Request('http://127.0.0.1/api/agent-mandates/incoming', { method: 'POST' });
-const tables = ['entries', 'attachments', 'therapies', 'service_prescriptions', 'service_prescription_items', 'observations', 'patients', 'audit_events'];
+const tables = ['entries', 'attachments', 'therapies', 'service_prescriptions', 'service_prescription_items', 'observations', 'patients', 'audit_events', 'patients_to_ambulatories'];
 const snapshot = () => tables.map(table => database.prepare(`SELECT * FROM ${table}`).all());
 const version = () => (database.prepare('SELECT version FROM patients WHERE id=?').get(fixture.patientId) as { version: number }).version;
 test.after(() => { database.close(); rmSync(directory, { recursive: true, force: true }); });
@@ -223,4 +223,39 @@ test('native approval commits and audits exactly one plan, and a valid proof can
     assert.ok(!record.redacted_metadata.includes(proof.signature));
     assert.throws(() => applyConfirmedAgentVisit(request, fixture.session, plan, grant));
     assert.deepEqual(snapshot(), after);
+});
+
+test('a new chart, its membership and all visit items commit together within the reviewed ambulatory', async () => {
+    const f = await visit();
+    const ambulatoryId = 'synthetic-visit-clinic';
+    const other = 'synthetic-other-clinic';
+    database.prepare('INSERT INTO ambulatories (id, name) VALUES (?, ?)').run(ambulatoryId, 'Ambulatorio sintetico');
+    database.prepare('INSERT INTO ambulatories (id, name) VALUES (?, ?)').run(other, 'Altro ambulatorio sintetico');
+    const newPatient = { ambulatoryId, taxCode: 'RSSMRA80A01F205X', birthDate: '1980-01-01' };
+    const plan = { ...f.whole(), patientId: f.id, expectedVersion: 1, newPatient };
+    const before = snapshot();
+    for (const [input, scope] of [[plan, other], [{ ...plan, patientId: fixture.patientId }, ambulatoryId],
+        [{ ...plan, newPatient: { ...newPatient, birthDate: '1980-02-01' } }, ambulatoryId]] as const) {
+        assert.throws(() => applyAgentVisit(request, fixture.session, input, scope), /AGENT_APPLICATION_DENIED/);
+        assert.deepEqual(snapshot(), before);
+    }
+    database.exec("CREATE TRIGGER synthetic_new_patient_audit_fault BEFORE INSERT ON audit_events WHEN NEW.event_type='agent.visit.applied' BEGIN SELECT RAISE(ABORT, 'SYNTHETIC_NEW_PATIENT_AUDIT_FAULT'); END");
+    try {
+        assert.throws(() => applyAgentVisit(request, fixture.session, plan, ambulatoryId), /SYNTHETIC_NEW_PATIENT_AUDIT_FAULT/);
+        assert.deepEqual(snapshot(), before);
+        assert.deepEqual(agentAppliedItemIds(f.id), []);
+    } finally {
+        database.exec('DROP TRIGGER synthetic_new_patient_audit_fault');
+    }
+    const receipt = applyAgentVisit(request, fixture.session, plan, ambulatoryId);
+    const updated = snapshot();
+    assert.equal(receipt.status, 'applied');
+    assert.deepEqual(added(updated, before), [2, 2, 1, 1, 2, 1]);
+    const membership = database.prepare('SELECT ambulatory_id AS id FROM patients_to_ambulatories WHERE patient_id = ?').all(f.id);
+    assert.deepEqual(membership, [{ id: ambulatoryId }]);
+    assert.equal(applyAgentVisit(request, fixture.session, plan, ambulatoryId).eventId, receipt.eventId);
+    const duplicate = await visit(), duplicatePlan = { ...duplicate.whole(), patientId: duplicate.id, expectedVersion: 1, newPatient };
+    const beforeDuplicate = snapshot();
+    assert.throws(() => applyAgentVisit(request, fixture.session, duplicatePlan, ambulatoryId), /AGENT_APPLICATION_DENIED/);
+    assert.deepEqual(snapshot(), beforeDuplicate);
 });

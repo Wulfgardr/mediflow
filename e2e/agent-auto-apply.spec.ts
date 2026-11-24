@@ -7,6 +7,7 @@ import path from 'node:path';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 import Database from 'better-sqlite3';
 import { agentVisitPassphrase, agentVisitPin, createSyntheticAgentMandate } from './agent-visit-utils';
+import { completeAgentPairing, prepareAndDepositAgentVisit, requestAgentPairing } from '../packages/agent-client/src/visit-client';
 import { agentApplicationSchema } from '../lib/agent-visit-application-contract';
 import { trustedArchiveWebRequestHeaders } from './fixtures/trusted-web-request';
 
@@ -297,7 +298,7 @@ for (const reviewed of process.env.MEDIFLOW_VISIT_MAC_TRIAL ? [false] : [false, 
         await expect(concurrentVisit.getByRole('button', { name: 'Applica la visita', exact: true })).toBeEnabled();
         const blockedApply = doubtfulVisit.getByRole('button', { name: 'Applica la visita', exact: true });
         await expect(blockedApply).toBeDisabled();
-        await expect(blockedApply).toHaveAccessibleDescription(/Nessuna scheda attiva con questo codice fiscale nell’ambulatorio selezionato/);
+        await expect(blockedApply).toHaveAccessibleDescription(/Identità da verificare nel PDF/);
         expect(await counts()).toEqual([0, 0, 0, 0]);
         expect(plainBodies).toEqual([]);
         const batchOrder: string[] = [];
@@ -345,4 +346,101 @@ for (const reviewed of process.env.MEDIFLOW_VISIT_MAC_TRIAL ? [false] : [false, 
         expect(notApplied.appliedItemIds).toEqual([]);
         await page.screenshot({ path: info.outputPath('proposte-applicate-dopo-conferma.png'), fullPage: true });
     }
+});
+
+test('a kit visit creates the missing chart at review while mismatched and mixed PDFs stay in the inbox', async ({ page, isolatedRuntime }, info) => {
+    test.setTimeout(120000);
+    await createSyntheticAgentMandate(page);
+    const credentials = info.outputPath('private-agent');
+    mkdirSync(credentials, { mode: 0o700 });
+    const pairing = await requestAgentPairing(credentials, isolatedRuntime.url, 'Kit sintetico Ambulatorio');
+    await page.getByRole('button', { name: 'Aggiorna', exact: true }).click();
+    await page.getByRole('button', { name: 'Approva ' + pairing.code, exact: true }).click();
+    const access = await completeAgentPairing(credentials, pairing.requestId);
+    if (access.status !== 'approved') throw new Error('Synthetic mandate unavailable');
+    const anotherCf = 'RSSMRA85T10A562S';
+    const note = 'S: Visita sintetica.\nO: Dati sintetici.\nA: Controllo.\nP: Prescrizioni.';
+    const therapy = 'Prescrivo Farmaco Sintetico.';
+    const service = 'Prescritta visita pneumologica di controllo.';
+    const exemption = 'Confermata esenzione codice E30.';
+    const diagnosis = 'Confermata diagnosi sintetica.';
+    const deposit = async (patientLines: string[], facts: boolean) => {
+        const visitId = randomUUID();
+        const directory = info.outputPath(visitId);
+        mkdirSync(directory, { mode: 0o700 });
+        const source = async (lines: string[], documentDate: string | null, facts: unknown[], note = false) => {
+            const pdf = await PDFDocument.create(), font = await pdf.embedFont(StandardFonts.Helvetica), sheet = pdf.addPage();
+            lines.forEach((line, index) => sheet.drawText(line, { x: 40, y: 780 - index * 24, font, size: 11 }));
+            const bytes = await pdf.save();
+            const sha256 = createHash('sha256').update(bytes).digest('hex');
+            const fileName = note ? 'nota-visita.pdf' : sha256 + '.pdf';
+            writeFileSync(path.join(directory, fileName), bytes);
+            return { sha256, fileName, patient: { taxCode: fiscalCode }, documentDate,
+                documentType: note ? 'visita_specialistica' : 'altro', facts,
+                coverage: { pages: null, unreadablePages: [], complete: false, note: 'Originale da rivedere dal medico' } };
+        };
+        const prescription = await source([...patientLines, 'Data Prescrizione: 17/11/2026', service, exemption], null, facts ? [
+            { kind: 'service_prescription', values: { serviceName: 'visita pneumologica di controllo' }, quote: service },
+            { kind: 'exemption', values: { code: 'E30' }, quote: exemption },
+        ] : []);
+        const visitNote = await source(['Codice fiscale paziente: ' + fiscalCode, 'Data visita: 2026-11-17',
+            ...note.split('\n'), therapy, diagnosis], '2026-11-17', [
+            { kind: 'document_entry', values: { text: note, date: '2026-11-17' }, quote: note },
+            ...(facts ? [
+                { kind: 'therapy', values: { drugName: 'Farmaco Sintetico' }, quote: therapy },
+                { kind: 'diagnosis', values: { description: 'diagnosi sintetica' }, quote: diagnosis },
+            ] : []),
+        ], true);
+        const extraction = path.join(directory, 'estrazione-preparata.json');
+        writeFileSync(extraction, JSON.stringify({ schema: 'mediflow.dossier_prepared_extraction.v1',
+            preparedAt: new Date().toISOString(), preparedBy: 'Ambulatorio Codex', sources: [prescription, visitNote] }));
+        const receipt = await prepareAndDepositAgentVisit(credentials, access.agentRef, extraction, fiscalCode, undefined, visitId);
+        expect(receipt.status).toBe('closed');
+        return visitId;
+    };
+    const kitExtraction = process.env.MEDIFLOW_E2E_SYNTHETIC_KIT_EXTRACTION;
+    let good: string;
+    if (kitExtraction) {
+        good = randomUUID();
+        const receipt = await prepareAndDepositAgentVisit(credentials, access.agentRef, kitExtraction, fiscalCode, undefined, good);
+        expect(receipt.status).toBe('closed');
+    } else {
+        good = await deposit(['CODICE FISCALE: ' + fiscalCode, 'Data di nascita: 01/01/1980'], true);
+    }
+    const wrong = await deposit(['Paziente CF: ' + anotherCf], false);
+    const mixed = await deposit(['Paziente CF: ' + fiscalCode, 'Paziente CF: ' + anotherCf], false);
+    await page.getByRole('complementary', { name: 'MediFlow', exact: true }).getByRole('link', { name: 'In arrivo' }).click();
+    const region = (id: string) => page.getByRole('region', { name: 'Visita ' + id });
+    const apply = (id: string) => region(id).getByRole('button', { name: 'Applica la visita', exact: true });
+    for (const id of [wrong, mixed]) {
+        await expect(region(id).getByText('Da verificare', { exact: true })).toBeVisible();
+        await expect(apply(id)).toBeDisabled();
+    }
+    const database = new Database(path.join(isolatedRuntime.dataDirectory, 'medical.db'), { readonly: true, fileMustExist: true });
+    try {
+        const charts = () => database.prepare('SELECT id, tax_code, birth_date FROM patients WHERE tax_code = ?').all(fiscalCode);
+        expect(charts()).toEqual([]);
+        await expect(apply(good)).toBeEnabled();
+        await expect(region(good).getByText('Pronta da applicare', { exact: true })).toBeVisible();
+        await page.screenshot({ path: info.outputPath('visite-sintetiche-prima.png'), fullPage: true });
+        await page.getByRole('button', { name: 'Applica tutte le visite senza dubbi', exact: true }).click();
+        await expect(region(good)).toHaveCount(0);
+        for (const id of [wrong, mixed]) await expect(apply(id)).toBeDisabled();
+        const [created] = charts() as Array<{ id: string }>;
+        expect(charts()).toEqual([{ id: created.id, tax_code: fiscalCode, birth_date: Date.UTC(1980, 0, 1) / 1000 }]);
+        const id = created.id;
+        expect(database.prepare('SELECT status, start_date, dosage FROM therapies WHERE patient_id = ?').all(id))
+            .toEqual([{ status: 'active', start_date: Date.UTC(2026, 10, 17) / 1000, dosage: 'non indicata nel documento' }]);
+        expect(database.prepare('SELECT category, prescribed_at FROM service_prescriptions WHERE patient_id = ?').all(id))
+            .toEqual([{ category: 'visit', prescribed_at: Date.UTC(2026, 10, 17) / 1000 }]);
+        expect(database.prepare('SELECT id FROM entries WHERE patient_id = ?').all(id)).toHaveLength(1);
+        expect(database.prepare('SELECT id FROM attachments WHERE patient_id = ?').all(id)).toHaveLength(2);
+        expect(database.prepare("SELECT event_type, subject_ref FROM audit_events WHERE request_id = ? AND event_type = 'patient.created'").all(good))
+            .toEqual([{ event_type: 'patient.created', subject_ref: id }]);
+        for (const visitId of [wrong, mixed]) {
+            const row = await (await page.request.get('/api/agent-mandates/incoming?visit=' + visitId)).json();
+            expect(row.appliedItemIds).toEqual([]);
+        }
+        await page.screenshot({ path: info.outputPath('visite-sintetiche-dopo.png'), fullPage: true });
+    } finally { database.close(); }
 });

@@ -31,6 +31,26 @@ export function isValidItalianTaxCode(value: string): boolean {
     }
     return cf[15] === String.fromCharCode(65 + sum % 26);
 }
+export function taxCodeBirthDetails(value: string): { yearSuffix: number; month: number; day: number; sex: 'M' | 'F' } | null {
+    if (!isValidItalianTaxCode(value)) return null;
+    const code = value.trim().toUpperCase();
+    const dayCode = Number(decodeTaxCodeDigits(code.slice(9, 11)));
+    return {
+        yearSuffix: Number(decodeTaxCodeDigits(code.slice(6, 8))),
+        month: 'ABCDEHLMPRST'.indexOf(code[8]) + 1,
+        day: dayCode > 40 ? dayCode - 40 : dayCode,
+        sex: dayCode > 40 ? 'F' : 'M',
+    };
+}
+
+export function birthDateMatchesTaxCode(value: string, date: string): boolean {
+    const cf = taxCodeBirthDetails(value);
+    const birth = new Date(date + 'T00:00:00Z');
+    return Boolean(cf && Number.isFinite(birth.getTime()) && birth.getTime() <= Date.now()
+        && birth.toISOString().slice(0, 10) === date && birth.getUTCFullYear() % 100 === cf.yearSuffix
+        && birth.getUTCMonth() + 1 === cf.month && birth.getUTCDate() === cf.day);
+}
+
 export function inferIdentifierType(value?: string | null): PatientIdentifierType {
     const normalized = value?.trim().toUpperCase() ?? '';
     return /^STP[0-9]{13}$/.test(normalized) ? 'stp' : /^ENI[0-9]{13}$/.test(normalized) ? 'eni' : normalized ? 'cf' : 'none';

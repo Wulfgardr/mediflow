@@ -77,11 +77,11 @@ test('two visits deposited at the same time are linked by their PDF tax codes, n
     }
 });
 
-test('missing, unlabelled, unregistered or duplicated patient identity prevents automatic application', async () => {
+test('missing, unregistered or duplicated patient identity prevents automatic application', async () => {
     const f = await fixture();
     try {
         for (const [patients, pdf] of [[[], 'Paziente CF ' + cfA], [[patient(cfA), { ...patient(cfA), id: 'synthetic-duplicate' }], 'Paziente CF ' + cfA],
-            [[patient(cfA)], 'Documento sintetico senza identità'], [[patient(cfA)], cfA]] as const) {
+            [[patient(cfA)], 'Documento sintetico senza identità']] as const) {
             const review = await inspectAgentVisit(f.row, [...patients], null, new AbortController().signal, pdfText(pdf));
             assert.ok(review.blockers.length);
         }
