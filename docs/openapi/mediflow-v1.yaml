@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.60.0
+  version: 1.61.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -996,6 +996,85 @@ paths:
                     message: Pairing intent has expired and must be requested again.
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /api/v1/network/pairing-offers/redeem:
+    post:
+      x-mediflow-json-max-bytes: 2048
+      tags:
+        - Network
+      operationId: redeemNetworkPairingOffer
+      summary: Redeem a single-use device pairing offer
+      description: |
+        Requires the LAN HTTPS ingress and home-base mode. The claim secret is
+        submitted in the body, and its hash is compared by the server. Unknown,
+        expired, and consumed offers and wrong secrets share one reply. A
+        successful redemption consumes the offer and mints a device token
+        without opening an operator session. Keep the response in secure storage.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [offerId, secret, deviceName, clientPlatform]
+              properties:
+                offerId:
+                  type: string
+                  format: uuid
+                secret:
+                  type: string
+                  minLength: 43
+                  maxLength: 43
+                  pattern: '^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$'
+                deviceName:
+                  type: string
+                  minLength: 1
+                  maxLength: 64
+                clientPlatform:
+                  type: string
+                  enum: [macos, ios, ipados]
+      responses:
+        '201':
+          description: Paired credentials for the device that redeemed the offer.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [clientId, pairedClientToken]
+                properties:
+                  clientId:
+                    type: string
+                    format: uuid
+                  pairedClientToken:
+                    type: string
+                    minLength: 32
+                    maxLength: 32
+        '400':
+          $ref: '#/components/responses/InvalidNetworkPairingIntent'
+        '403':
+          description: HTTPS required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkPairingOfferError'
+        '404':
+          description: The offer or secret is invalid, expired or already used.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkPairingOfferError'
+        '409':
+          $ref: '#/components/responses/NetworkModeDisabled'
+        '413':
+          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
+        '503':
+          description: Pairing service is temporarily unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkPairingOfferError'
   /api/v1/network/pairing-clients/{clientId}:
     delete:
       tags:
@@ -1007,7 +1086,9 @@ paths:
         revocation the client token no longer authenticates on discovery or
         data-plane routes; other paired clients are unaffected. The write uses
         a compare-and-swap on the persisted pairing state, so concurrent
-        revocations cannot overwrite each other.
+        revocations cannot overwrite each other. The host Web interface may
+        also revoke through an attested loopback administrator session with
+        the same-origin mutation and archive generation headers.
       security:
         - bearerAuth: []
       parameters:
@@ -6229,6 +6310,16 @@ components:
           format: date-time
         notes:
           type: string
+    NetworkPairingOfferError:
+      type: object
+      additionalProperties: false
+      required: [error, code]
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+          enum: [PAIRING_HTTPS_REQUIRED, PAIRING_OFFER_UNAVAILABLE, PAIRING_STATE_CONFLICT]
     NetworkErrorResponse:
       type: object
       additionalProperties: false
