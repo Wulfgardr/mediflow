@@ -47,7 +47,7 @@ export async function inspectAgentVisit(row: IncomingAgentCassette, patients: Pa
     const matches = isValidItalianTaxCode(cf) ? patients.filter(patient => !patient.deletedAt && !patient.isArchived && patient.taxCode === cf) : [];
     const patient = matches.length === 1 ? matches[0] : null;
     const blockers: string[] = [], proposalBlockers: string[] = [];
-    if (!patient) blockers.push(matches.length > 1 ? 'Più schede hanno questo codice fiscale.' : 'Codice fiscale non confermato in una scheda esistente.');
+    if (!patient) blockers.push(matches.length > 1 ? 'Più schede hanno questo codice fiscale.' : 'Nessuna scheda attiva con questo codice fiscale nell’ambulatorio selezionato.');
     const documents = new Map<string, AgentVisitDocument>();
     const deposited = cassetteItems(row);
     for (const item of visit.items.filter(item => item.kind === 'pdf')) {
