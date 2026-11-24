@@ -350,11 +350,13 @@ async function assertCollectionReferences(
             .map((item) => item.id)
             .filter((value): value is string => typeof value === 'string' && value.trim().length > 0),
     );
-    const patientIds = new Set(
-        (payload.patients ?? [])
-            .map((item) => item.id)
-            .filter((value): value is string => typeof value === 'string' && value.trim().length > 0),
-    );
+    const patientIds = new Set<string>();
+    for (const patient of payload.patients ?? []) {
+        if (typeof patient.id !== 'string' || patient.id.trim().length === 0 || patientIds.has(patient.id)) {
+            throw new BackupArtifactError('invalid-patient-link', 'La copia contiene schede con identificativi mancanti o non validi.');
+        }
+        patientIds.add(patient.id);
+    }
     const conversationIds = new Set(
         (payload.conversations ?? [])
             .map((item) => item.id)
@@ -367,7 +369,7 @@ async function assertCollectionReferences(
         if (typeof patient.ambulatoryId === 'string' && patient.ambulatoryId.trim().length > 0 && !ambulatoryIds.has(patient.ambulatoryId)) {
             throw new BackupArtifactError(
                 'invalid-manifest',
-                `Patient ${patient.id ?? '<unknown>'} references an unknown ambulatory.`,
+                'La copia contiene un riferimento a un ambulatorio assente.',
             );
         }
 
@@ -375,7 +377,7 @@ async function assertCollectionReferences(
             if (!ambulatoryIds.has(ambulatoryId)) {
                 throw new BackupArtifactError(
                     'invalid-manifest',
-                    `Patient ${patient.id ?? '<unknown>'} references an unknown assigned ambulatory.`,
+                    'La copia contiene un riferimento a un ambulatorio assente.',
                 );
             }
         }
@@ -384,7 +386,7 @@ async function assertCollectionReferences(
             if (!ambulatoryIds.has(membership.ambulatoryId)) {
                 throw new BackupArtifactError(
                     'invalid-manifest',
-                    `Patient ${patient.id ?? '<unknown>'} references an unknown ambulatory membership.`,
+                    'La copia contiene un riferimento a un ambulatorio assente.',
                 );
             }
             if (membership.assignedAt !== null && membership.assignedAt !== undefined) {
@@ -396,7 +398,7 @@ async function assertCollectionReferences(
                 if (Number.isNaN(assignedAt.getTime())) {
                     throw new BackupArtifactError(
                         'invalid-manifest',
-                        `Patient ${patient.id ?? '<unknown>'} has an invalid ambulatory membership timestamp.`,
+                        'La copia contiene una data di assegnazione all’ambulatorio non valida.',
                     );
                 }
             }

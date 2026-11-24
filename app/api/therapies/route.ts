@@ -7,21 +7,19 @@ import { and, asc, desc, eq, isNull, type SQL } from 'drizzle-orm';
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 import { normalizeTherapyStatus, parseTherapyStatus } from '@/lib/status-normalization';
 import { auditContextFromSession, requestIdFromRequest } from '@/lib/security/audit';
-/* STREAM B: server-side list params (whitelisted, plaintext columns only). */
-import { parseListParams } from '@/lib/list-query-params';
+import { definePlaintextSortColumns, parseListParams } from '@/lib/list-query-params';
 import { therapyCreateSchema } from '@/lib/api-schemas/clinical-writes';
 import { parseApiBody } from '@/lib/api-schemas/parse';
 import { apiInternalError } from '@/lib/api-error-response';
 import { createTherapyOperation } from '@/lib/therapy-write-operation';
 import { readTherapyJsonObject, therapyCreateId, therapyChangedFields, validateTherapyInput } from '@/lib/therapy-write-input';
 
-// motivation is ENC:, so it is not sortable. Only plaintext columns here.
-const THERAPY_SORT_COLUMNS = {
+const THERAPY_SORT_COLUMNS = definePlaintextSortColumns('therapies', {
     startDate: therapies.startDate,
     endDate: therapies.endDate,
     createdAt: therapies.createdAt,
     updatedAt: therapies.updatedAt,
-} as const;
+});
 
 export async function GET(request: Request) {
     const session = await requireSession();
@@ -30,8 +28,8 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const patientId = searchParams.get('patientId');
 
-    /* STREAM B */
     const parsed = parseListParams(searchParams, {
+        table: 'therapies',
         sortableColumns: Object.keys(THERAPY_SORT_COLUMNS),
         defaultOrderBy: 'startDate',
         defaultOrderDir: 'desc',

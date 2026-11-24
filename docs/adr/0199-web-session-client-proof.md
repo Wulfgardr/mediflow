@@ -1,4 +1,4 @@
-# ADR 0197 · Prova del client per la sessione Web
+# ADR 0199 · Prova del client per la sessione Web
 
 Stato: Accepted il 19 novembre 2026. La decisione è inclusa nel perimetro della 0.9.1.
 

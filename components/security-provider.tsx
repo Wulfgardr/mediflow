@@ -827,11 +827,11 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         finally { accessPreparePending.current = false; }
     };
 
-    const handleWizardComplete = async ({ displayName, ambulatoryName, pin, passphrase }: SecuritySetup) => {
+    const handleWizardComplete = async ({ displayName, ambulatoryName, doctorTaxCode, pin, passphrase }: SecuritySetup) => {
         const generation = ++authorityAttemptGenerationRef.current;
         const key = await generateMasterKey();
         const result = await prepareAccess(key, passphrase, 'admin', async credentials => {
-            const result = await runPreparedAccessRequest(generation, () => setupSecurityRequest({ username: 'admin', password: pin, displayName, ambulatoryName, ...credentials }));
+            const result = await runPreparedAccessRequest(generation, () => setupSecurityRequest({ username: 'admin', password: pin, displayName, ambulatoryName, ...(doctorTaxCode ? { doctorTaxCode } : {}), ...credentials }));
             if (result.response.status === 409 && result.payload?.code === 'SETUP_ALREADY_COMPLETED') {
                 ++authorityAttemptGenerationRef.current; clearClientAuthority(); setRequiresSetup(false);
                 updateAuthRecoveryState('required');

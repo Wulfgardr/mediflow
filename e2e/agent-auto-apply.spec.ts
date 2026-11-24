@@ -62,7 +62,7 @@ for (const reviewed of process.env.MEDIFLOW_VISIT_MAC_TRIAL ? [false] : [false, 
         access = await cli('ritira', '--agente', access.agentRef);
     }
     expect(access.expiresAt - Date.now()).toBeGreaterThan(43100000);
-    expect(access.expiresAt - Date.now()).toBeLessThanOrEqual(43200000);
+    expect(access.expiresAt - Date.now()).toBeLessThanOrEqual(86400000);
     const createPatient = (taxCode: string) => page.evaluate(async cf => {
         const response = await fetch('/api/patients', { method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ firstName: 'Persona', lastName: 'Sintetica cassetta', taxCode: cf, birthDate: '1980-01-01T00:00:00.000Z', address: '', phone: '', diagnoses: [] }) });

@@ -772,6 +772,22 @@ impl RuntimeClient {
                     {
                         return Err(RuntimeError::ArchiveReplaced);
                     }
+                    if archive && raw.status == 409 {
+                        let value =
+                            serde_json::from_slice::<Value>(&raw.body).unwrap_or(Value::Null);
+                        if value["code"] == "restore_blocked" {
+                            return Err(match value["reason"].as_str() {
+                                Some("legal_hold") => RuntimeError::RestoreLegalHold,
+                                Some("retention_unreadable") => {
+                                    RuntimeError::RestoreRetentionUnreadable
+                                }
+                                Some("retired_patient_material") => {
+                                    RuntimeError::RestoreRetiredPatientMaterial
+                                }
+                                _ => RuntimeError::Conflict,
+                            });
+                        }
+                    }
                     if (path == ["api", "ai", "local-provider", "onboarding"]
                         && matches!(raw.status, 409 | 503))
                         || (path == ["api", "drugs", "update"] && raw.status == 409)

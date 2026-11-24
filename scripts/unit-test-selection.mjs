@@ -42,6 +42,7 @@ export const UNIT_SCRIPT_TESTS = Object.freeze([
   'scripts/check-never-regress-ocr-retirement.test.mjs',
   'scripts/check-never-regress-tinetti-provenance.test.mjs',
   'scripts/check-never-regress-agent-channel.test.mjs',
+  'scripts/html-sink-guard.test.mjs',
   'scripts/inventory-first-party-code.test.mjs',
   'scripts/test-data-dir.test.mjs',
   'scripts/check-schema-drift.test.ts',

@@ -3,7 +3,7 @@
   "release": "0.9.1",
   "sourceRevision": "bfddf87a5334fd7d86d7c184deac77630a332042",
   "contract": "docs/releases/0.9.1-contract.md",
-  "contractSha256": "c4ce42242ce19bf309dcd4295130d245011f5304f678a30a3bf105170279a96c",
+  "contractSha256": "100ff7ce51652caa0117118990835fe34fc55feda7d6d0b9610510c660b30757",
   "purpose": "coverage_only_no_runtime_admission",
   "capabilities": [
     {
@@ -429,10 +429,13 @@
         "status": "executed_with_limits"
       },
       "blockedBy": [
-        "C-L_errors_or_incomplete_distribution",
         "gpu_memory_not_measured",
         "surfaces_not_verified",
-        "physical_revocation_not_proved"
+        "physical_revocation_not_proved",
+        "C-L_errors_or_incomplete_distribution",
+        "memory_not_recorded",
+        "G-5_surface_not_proved",
+        "C-7_surface_not_proved"
       ],
       "modelObservedInOperation": true,
       "runtimeProof": {
@@ -440,6 +443,61 @@
         "sourceRevision": "bfddf87a5334fd7d86d7c184deac77630a332042",
         "qualification": false,
         "status": "executed_with_limits"
+      },
+      "receipts": [
+        {
+          "path": "docs/quality/intelligence/2026-11-14-ollama/ricevuta-celle.json",
+          "sha256": "6808396ef9145887608a933960e593458b29a2825bbfb5270e7a5dd1abb3f746"
+        }
+      ],
+      "criteria": {
+        "I-2": {
+          "status": "met",
+          "reasons": [],
+          "receipt": "docs/quality/intelligence/2026-11-14-ollama/ricevuta-celle.json"
+        },
+        "I-2-arresto": {
+          "status": "not_met",
+          "reasons": [
+            "cancel_physical_stop_not_proved",
+            "revoke_physical_stop_not_proved"
+          ],
+          "receipt": null
+        },
+        "C-L": {
+          "status": "not_met",
+          "reasons": [
+            "fragile-realistic/cold_errors",
+            "fragile-realistic/warm_errors",
+            "function_budget_absent",
+            "load-100-30-10/cold_errors",
+            "load-100-30-10/warm_errors",
+            "verification_outside_budget"
+          ],
+          "receipt": null
+        },
+        "memoria": {
+          "status": "not_met",
+          "reasons": [
+            "model_allocation_not_recorded",
+            "rss_budget_absent"
+          ],
+          "receipt": null
+        },
+        "G-5": {
+          "status": "not_executed",
+          "reasons": [
+            "no_receipt"
+          ],
+          "receipt": null
+        },
+        "C-7": {
+          "status": "not_executed",
+          "reasons": [
+            "no_receipt"
+          ],
+          "receipt": null
+        }
       }
     },
     {
@@ -460,13 +518,39 @@
       "proof": null,
       "blockedBy": [
         "local_only_task",
-        "I-4"
+        "I-4",
+        "G-5_surface_not_proved",
+        "C-7_surface_not_proved"
       ],
       "runtimeProof": {
         "path": "docs/quality/intelligence/2026-11-14-ollama/measurements.json",
         "sourceRevision": "bfddf87a5334fd7d86d7c184deac77630a332042",
         "qualification": false,
         "status": "not_executed_requires_I4"
+      },
+      "receipts": [],
+      "criteria": {
+        "I-4": {
+          "status": "not_executed",
+          "reasons": [
+            "no_receipt"
+          ],
+          "receipt": null
+        },
+        "G-5": {
+          "status": "not_executed",
+          "reasons": [
+            "no_receipt"
+          ],
+          "receipt": null
+        },
+        "C-7": {
+          "status": "not_executed",
+          "reasons": [
+            "no_receipt"
+          ],
+          "receipt": null
+        }
       }
     },
     {
@@ -501,7 +585,10 @@
       "blockedBy": [
         "gpu_memory_not_measured",
         "surfaces_not_verified",
-        "physical_revocation_not_proved"
+        "physical_revocation_not_proved",
+        "memory_not_recorded",
+        "G-5_surface_not_proved",
+        "C-7_surface_not_proved"
       ],
       "modelObservedInOperation": true,
       "runtimeProof": {
@@ -509,6 +596,53 @@
         "sourceRevision": "bfddf87a5334fd7d86d7c184deac77630a332042",
         "qualification": false,
         "status": "executed_with_limits"
+      },
+      "receipts": [
+        {
+          "path": "docs/quality/intelligence/2026-11-14-ollama/ricevuta-celle.json",
+          "sha256": "6808396ef9145887608a933960e593458b29a2825bbfb5270e7a5dd1abb3f746"
+        }
+      ],
+      "criteria": {
+        "I-2": {
+          "status": "met",
+          "reasons": [],
+          "receipt": "docs/quality/intelligence/2026-11-14-ollama/ricevuta-celle.json"
+        },
+        "I-2-arresto": {
+          "status": "not_met",
+          "reasons": [
+            "cancel_physical_stop_not_proved",
+            "revoke_physical_stop_not_proved"
+          ],
+          "receipt": null
+        },
+        "C-L": {
+          "status": "met",
+          "reasons": [],
+          "receipt": "docs/quality/intelligence/2026-11-14-ollama/ricevuta-celle.json"
+        },
+        "memoria": {
+          "status": "not_met",
+          "reasons": [
+            "model_allocation_not_recorded"
+          ],
+          "receipt": null
+        },
+        "G-5": {
+          "status": "not_executed",
+          "reasons": [
+            "no_receipt"
+          ],
+          "receipt": null
+        },
+        "C-7": {
+          "status": "not_executed",
+          "reasons": [
+            "no_receipt"
+          ],
+          "receipt": null
+        }
       }
     },
     {
@@ -529,13 +663,39 @@
       "proof": null,
       "blockedBy": [
         "local_only_task",
-        "I-4"
+        "I-4",
+        "G-5_surface_not_proved",
+        "C-7_surface_not_proved"
       ],
       "runtimeProof": {
         "path": "docs/quality/intelligence/2026-11-14-ollama/measurements.json",
         "sourceRevision": "bfddf87a5334fd7d86d7c184deac77630a332042",
         "qualification": false,
         "status": "not_executed_requires_I4"
+      },
+      "receipts": [],
+      "criteria": {
+        "I-4": {
+          "status": "not_executed",
+          "reasons": [
+            "no_receipt"
+          ],
+          "receipt": null
+        },
+        "G-5": {
+          "status": "not_executed",
+          "reasons": [
+            "no_receipt"
+          ],
+          "receipt": null
+        },
+        "C-7": {
+          "status": "not_executed",
+          "reasons": [
+            "no_receipt"
+          ],
+          "receipt": null
+        }
       }
     },
     {
@@ -568,10 +728,13 @@
         "status": "executed_with_limits"
       },
       "blockedBy": [
-        "C-L_errors_or_incomplete_distribution",
         "gpu_memory_not_measured",
         "surfaces_not_verified",
-        "physical_revocation_not_proved"
+        "physical_revocation_not_proved",
+        "C-L_errors_or_incomplete_distribution",
+        "memory_not_recorded",
+        "G-5_surface_not_proved",
+        "C-7_surface_not_proved"
       ],
       "modelObservedInOperation": true,
       "runtimeProof": {
@@ -579,6 +742,61 @@
         "sourceRevision": "bfddf87a5334fd7d86d7c184deac77630a332042",
         "qualification": false,
         "status": "executed_with_limits"
+      },
+      "receipts": [
+        {
+          "path": "docs/quality/intelligence/2026-11-14-ollama/ricevuta-celle.json",
+          "sha256": "6808396ef9145887608a933960e593458b29a2825bbfb5270e7a5dd1abb3f746"
+        }
+      ],
+      "criteria": {
+        "I-2": {
+          "status": "met",
+          "reasons": [],
+          "receipt": "docs/quality/intelligence/2026-11-14-ollama/ricevuta-celle.json"
+        },
+        "I-2-arresto": {
+          "status": "not_met",
+          "reasons": [
+            "cancel_physical_stop_not_proved",
+            "revoke_physical_stop_not_proved"
+          ],
+          "receipt": null
+        },
+        "C-L": {
+          "status": "not_met",
+          "reasons": [
+            "function_budget_absent",
+            "pdf-scan-10p-10MiB/cold_errors",
+            "pdf-scan-10p-10MiB/warm_errors",
+            "pdf-text-10p-10MiB/cold_errors",
+            "pdf-text-10p-10MiB/warm_errors",
+            "verification_outside_budget"
+          ],
+          "receipt": null
+        },
+        "memoria": {
+          "status": "not_met",
+          "reasons": [
+            "model_allocation_not_recorded",
+            "rss_budget_absent"
+          ],
+          "receipt": null
+        },
+        "G-5": {
+          "status": "not_executed",
+          "reasons": [
+            "no_receipt"
+          ],
+          "receipt": null
+        },
+        "C-7": {
+          "status": "not_executed",
+          "reasons": [
+            "no_receipt"
+          ],
+          "receipt": null
+        }
       }
     },
     {
@@ -599,13 +817,39 @@
       "proof": null,
       "blockedBy": [
         "local_only_task",
-        "I-4"
+        "I-4",
+        "G-5_surface_not_proved",
+        "C-7_surface_not_proved"
       ],
       "runtimeProof": {
         "path": "docs/quality/intelligence/2026-11-14-ollama/measurements.json",
         "sourceRevision": "bfddf87a5334fd7d86d7c184deac77630a332042",
         "qualification": false,
         "status": "not_executed_requires_I4"
+      },
+      "receipts": [],
+      "criteria": {
+        "I-4": {
+          "status": "not_executed",
+          "reasons": [
+            "no_receipt"
+          ],
+          "receipt": null
+        },
+        "G-5": {
+          "status": "not_executed",
+          "reasons": [
+            "no_receipt"
+          ],
+          "receipt": null
+        },
+        "C-7": {
+          "status": "not_executed",
+          "reasons": [
+            "no_receipt"
+          ],
+          "receipt": null
+        }
       }
     }
   ],

@@ -95,6 +95,7 @@ export function createAgentRegistrationStore(database: Database.Database, now = 
                 if (row.revokedAt !== null) return;
                 const time = now();
                 written(database.prepare('UPDATE agent_registrations SET revoked_at=? WHERE id=?').run(time, id));
+                database.prepare('UPDATE agent_clients SET revoked_at=? WHERE id=? AND revoked_at IS NULL').run(time, id);
                 audit('agent.client.revoked', mandates.read(row.currentRef ?? row.templateRef)!, id, time);
             }).immediate();
         },

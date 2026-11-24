@@ -1,5 +1,5 @@
 {
-  "syncCommit": "b70c734fb5e8ea0d6f0e0803521c92dcbc1e94c9",
+  "syncCommit": "d7403e6918162a5f425c9e905b8f8d7ecc5e4fb5",
   "tool": {
     "release": "v1.7.4",
     "url": "https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar",
@@ -33,11 +33,11 @@
   "files": {
     "lib/therapy-status-confirmation.ts": "33eebc3197e988f3f1c134f1ac8499da1de95171e21d0ac7e3396c2a202c6486",
     "components/therapy-manager.tsx": "636419e0533f0368add66f0321d30ecfb0c99e69e02b1359d1ff1c7c513e6579",
-    "lib/db.ts": "635366dd87c81f20a3c91da42b40d20beb1a1de78bf0fef1e25a2fd686c4b8ad",
-    "lib/security/client-auth-api.ts": "bdb5f00811f03d0c694a16e95a58670d51c234b2029fd864e4f59f4647174baf",
+    "lib/db.ts": "e69414da935b885f8ee7b3065f8161e54c1a28c434ea2f78bfb67f6b64087886",
+    "lib/security/client-auth-api.ts": "e0af8ded62043522dd22567c45f2a6f46a7f691c747bad3c75f6bd0618293fb0",
     "lib/therapy-write-operation.ts": "8fa4abf13ad501bdb1d199b2abeaee5e18331f84e6dcdb19caa0b040b5c63345",
     "app/api/therapies/[id]/route.ts": "ecc8f661c1f2521e567a6666c4c9da89097ef8da2874281285066b266f6fdcc1",
-    "app/api/therapies/route.ts": "e13c48abb76cb0461eb1a9c1f23cf8724ec9cf34d32a7bd54909e58d4e251dac",
+    "app/api/therapies/route.ts": "cfb3c6a5bced36c77a73a9b9573324f803a9abcabf7c97e34e523f21d4fe185d",
     "lib/locked-field-guard.ts": "a4b64b4db1968423169937a2b491add2d2a19b6fba2489b1515e37b358a55d3a",
     "lib/therapy-status-command-service.ts": "2e27218f4d0f6f4efbf9466ed783e43852254217a0623186ade3252438c09dd3",
     "lib/therapy-status-command-confirmation.ts": "86682b47ca7eeadaa91065511e44c72951414e5bfe7a5d7b2001224bb424db1e",
@@ -47,20 +47,20 @@
     "lib/therapy-status-command-backup.ts": "da7641d2b30548b09105dcbc0e202d25d9215a3e4768dff441b81c11bb6b5384",
     "lib/therapy-status-command-schema.ts": "98c0aba0a361ef83655a632be41a257f8b9e99a950591113683a8094e26f4c87",
     "lib/therapy-status-command-recovery-schema.ts": "8231c04d505139c63f36f9657e2a2a0c964cd48b39d4ae4b2d2a0f2c552f5f4a",
-    "lib/ambulatory-destructive-command-recovery-schema.ts": "5fabd8c508f07dd7d8c537fb0d96e96cf592c0e74d758ebd23f1bc195bcf95cf",
+    "lib/ambulatory-destructive-command-recovery-schema.ts": "ed713d8bf028b3eb594302aa2d8e3c477ba0291f84774435183486bc24794ab6",
     "lib/api-table-response.ts": "5f19aab147a2d4459c1d2ec96e6c6d67bb20ad8c23b0cd9f38239771ffbb602c",
     "lib/backup-encrypted-fields.json": "8009ed55c0b9f71d5968f62ea8f15fe9bb4b911c0b70b9c7d7b101635bbd1b0d",
     "lib/backup-import-provenance.ts": "13eb1cc6083b5a07489d64cc9d195b82b6b8b660cb9874e4dc46b93fdf25999e",
     "lib/sqlite-schema.ts": "784fa488d11577d5ce493fde0ad84b3353fbd76c8bbe3f64f1f6d0d0c127e41d",
-    "lib/sqlite-schema-open.ts": "2ee4dcf641df086c7af8fc2a7c541a7ab147d111f078165c6125c4d709871d5d",
-    "lib/backup-restore-executor.ts": "2fda131ca62a4283cfa231dda9757f7dce2de9d2cd4a2e2660a0320b9ed0fabd",
+    "lib/sqlite-schema-open.ts": "ce645331a3e1bd5c13ee25e04051c90c8e8ee982e0a0e6abb90eb298e006160e",
+    "lib/backup-restore-executor.ts": "eee7696262a2b3d019d903a16c068fe5a45fd2e9454cb6e92964c50a2432a7a3",
     "lib/security/archive-maintenance-owner.ts": "57a026cca85845bf2ed3ae5b8c47dbc88caa8184b3d41639ea7ad9e90a420802",
     "lib/clinical-status-transitions.ts": "787915f339911dd4846d29d1fe3232be373242287390989d6a97d7a5dcea460f",
     "lib/status-normalization.ts": "fa2bbdeef55384ed1bf4a851f09a5d899d56e6331cde018f68f3d8a74d3a4e51",
     "docs/domain/clinical-status-transitions.json": "70233eaac55960b999f25768bb9f8897dcce27197ed99c1a692a2d98a0582f04",
-    "lib/recovery-backup-server.ts": "80357a277f7fdc5daab793b4f6d086fb1f20782b473785f7943a0439b5941dc8",
+    "lib/recovery-backup-server.ts": "71a1af2d0c4c5f24cb15d4588bb47ed411342eed6d0a2248f703c5925bf80342",
     "lib/schema.ts": "a63799addd6217f91f39794a25881376c052b8e2012a115ff129fdd0aec5394b",
-    "lib/backup-artifact.ts": "892514e9ae5f465507560e3df6bf5594d0ddc4ee65c72f14ab6213aa995a9814"
+    "lib/backup-artifact.ts": "cdbf37a1a5d9ee71c70a2a77242d7ca60afca394fd4bba3452f4482602baab76"
   },
   "verificationInputs": [
     "docs/formal/therapy-status/",
@@ -120,13 +120,14 @@
           13,
           14,
           15,
-          16
+          16,
+          17
         ],
-        "currentVersion": 17,
+        "currentVersion": 18,
         "exactPredecessorOnly": true,
         "currentPhysicalExtensions": "preserved"
       },
-      "proof": "Causal canonical and drift tests, portable clinical links and encrypted v17 recovery of diary revisions. Formal model scope is unchanged.",
+      "proof": "Causal canonical and drift tests, portable clinical links and encrypted v17/v18 recovery with 24h agent mandate ceiling. Formal model scope is unchanged.",
       "outsideTlc": "schema, migration, encryption, keys and durable receipts are not modeled by TherapyStatus.tla",
       "canonicalSchemaFingerprints": {
         "3": "f7a926813c169edfd7c75ce5e6a1d1b9f5b1e9201c7a20456dc557b943bbaac5",
@@ -140,7 +141,8 @@
         "13": "d7f4022529da290e4aa2128fba5b8a6dee38f3fdc662fa1b36ce735b16eb6789",
         "14": "c05471c3d46b79eaf06e6ffbf92596e0398cd489a35a01dc1337949c4522fe60",
         "15": "bec9309e8ae86ea150f291ec74cb58bcbb5e55ed49bab11e5fd67d7665a135cc",
-        "16": "ea327353130d278b5b335db78345238d6f46a46049f6009efd76686b364153bb"
+        "16": "ea327353130d278b5b335db78345238d6f46a46049f6009efd76686b364153bb",
+        "17": "b4725fc2c4d77c909947d8da241b94d6d5480ccc64dc274e8eaba0897f7ceece"
       },
       "unitTestCases": {
         "v4Wrapper": 8,
@@ -155,5 +157,5 @@
     }
   },
   "legacyModelSyncCommit": "64e190438da8287928f0903b9b719c18b329a7ec",
-  "filesSha256": "4289cd8340616971c31aafc2355252573b6929df0ef92b74df316bfb2f739844"
+  "filesSha256": "c0a944c2461523dac5adb81a77fdcee9d08fe327e11e9e37a8b3f825b6d581d9"
 }

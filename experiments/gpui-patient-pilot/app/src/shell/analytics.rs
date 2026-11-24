@@ -437,7 +437,7 @@ impl AnalyticsState {
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use super::*;
     use serde_json::{Value, json};
     use std::{
@@ -594,6 +594,10 @@ mod tests {
         let mut body = vec![0; length];
         stream.read_exact(&mut body).unwrap();
         headers + &String::from_utf8(body).unwrap()
+    }
+
+    pub(in crate::shell) fn empty_demographics_wire(route: &str) -> Value {
+        demographics_reply(route, RESPONSE_EMPTY).1
     }
 
     fn demographics_reply(route: &str, mode: u16) -> (u16, Value) {

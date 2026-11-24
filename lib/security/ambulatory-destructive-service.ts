@@ -51,8 +51,6 @@ export function createAmbulatoryDestructiveService(options: { now?: () => number
         const user = tx.select().from(users).where(eq(users.id, flow.native.userId)).get();
         return user?.role === 'admin' && user.username === flow.native.username && flow.native.role === 'admin' ? null : denied();
     }
-    /* A dedicated control can carry an active web session before flow.webId records it. The owner's lock fences only an idle
-       control and burns its pending logins, so an expired flow leaves only once no session born from its control can still need retire. */
     function controlIsIdle(controlId: string): boolean {
         const current = bootstrapWebAuthControl(controlId);
         if (!current) return false;
@@ -60,7 +58,6 @@ export function createAmbulatoryDestructiveService(options: { now?: () => number
         const lock = retireWebAuthControlForLock(null, Object.freeze({ controlId, ifMatch: current.etag, idempotencyKey: randomUUID() }));
         return lock?.outcome === 'completed';
     }
-    /* A full table first drops flows that can no longer authorize anything and whose dedicated control holds no session. */
     function pruneExpired(): void {
         for (const [reference, flow] of flows) {
             if (!flow.expired && now() >= flow.createdAt && now() < flow.expiresAt) continue;

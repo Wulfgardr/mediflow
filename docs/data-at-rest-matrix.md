@@ -96,7 +96,8 @@ di un allegato verificano i formati previsti per quei percorsi.
 - Altra protezione: `wrapped_private_key`, `anchor_ciphertext`, `items_ciphertext`
 - In chiaro: `id`, `mandate_ref`, `agent_ref`, `actor_ref`, `archive_generation`, `public_key`, `model_provider`, `allows_clinical_egress`, `status`, `revision`, `deposited_at`, `modified_at`
 - L'àncora CF e tutti i valori clinici sono buste ECDH/HKDF/AES-GCM legate a mandato, visita, elemento e tipo. Il JSON degli elementi lascia leggibili identificativo opaco, tipo, dimensione ed eventuale hash del PDF. Non contiene nomi di file o testo clinico aperti. La privata è avvolta dalla master key nel browser.
-- Il backup portabile e quello completo conservano cassette e private avvolte. Il controllo della chiave prima del ripristino comprende questa privata. Il ripristino cambia la generazione dell'archivio: conserva il deposito senza rendere nuovamente validi mandato o token.
+- I due formati di backup contengono le cassette e le chiavi private avvolte. Il controllo della chiave comprende anche queste ultime. La nuova generazione dell’archivio rende inutilizzabili i vecchi mandati e token.
+- Se il ripristino portabile esclude un fascicolo ritirato, ogni cassetta deve coincidere con un deposito della generazione corrente. L’audit locale deve provarne l’applicazione completa a un solo paziente non ritirato. Se manca questa attribuzione il ripristino si ferma. Quando la destinazione ha fascicoli ritirati ma la copia non ne contiene le schede, una cassetta entra solo se l’archivio la possiede già identica.
 
 ### `agent_mandates`: mandato locale e chiave avvolta
 
@@ -153,7 +154,7 @@ di un allegato verificano i formati previsti per quei percorsi.
 ### `therapy_status_commands`: terminali durevoli del cambio stato
 
 - In chiaro: `command_id`, `protocol`, `archive_generation`, `actor_ref`, `patient_id`, `therapy_id`, `expected_version`, `target`, `outcome`, `reason`, `committed_at`, `result_version`, `result_end_date`, `audit_event_id`, `audit_snapshot`
-- Leggibile senza chiave: binding originale, stato richiesto/risultato, data e audit minimizzato. Closed ha target NULL. Ledger append-only, incluso nei backup; la conservazione dopo restore non prova lo stato corrente della terapia (ADR0168).
+- Leggibile senza chiave: binding originale, stato richiesto/risultato, data e traccia di audit minimizzata. I comandi chiusi hanno target NULL. Il ledger append-only attesta il comando eseguito all’epoca (ADR 0168). Se il ripristino portabile esclude un fascicolo, un nuovo comando che ne riporta lo stato richiesto o la data di fine blocca il ripristino. Le righe già presenti restano intatte.
 
 ### `ambulatory_destructive_commands`: terminali clear/delete
 
@@ -229,6 +230,8 @@ di un allegato verificano i formati previsti per quei percorsi.
 
 - In chiaro: `id`, `retired_at`
 - Leggibile senza chiave: identificativi tecnici.
+- Il ripristino portabile esclude il grafo clinico dei fascicoli già ritirati nella destinazione. Audit e ledger restano immutabili. Il server rifiuta le copie che, durante questa esclusione, introdurrebbero contenuto clinico nello storico di attribuzione incerta (ADR 0178).
+
 
 ### `patients`: anagrafica e sintesi clinica
 

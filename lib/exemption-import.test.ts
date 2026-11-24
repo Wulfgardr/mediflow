@@ -7,6 +7,7 @@ import test from 'node:test';
 import Database from 'better-sqlite3';
 import { EXEMPTION_COLUMNS, EXEMPTION_MAX_BYTES } from './exemption-import-contract';
 import { ensureExemptionImportSchema } from './exemption-catalog-schema';
+import { initializeSqliteSchema } from './sqlite-schema';
 import { parseExemptionImport } from './exemption-import-parser';
 import { commitExemptionImport, ExemptionImportError, previewExemptionImport, readExemptionImportStatus } from './exemption-catalog-import';
 import { readExemptionImportRequest } from './exemption-import-http';
@@ -19,14 +20,12 @@ function fixture(rows = [row()], header: readonly string[] = EXEMPTION_COLUMNS, 
 }
 function database(filename = ':memory:') {
     const db = new Database(filename);
+    initializeSqliteSchema(db);
     db.pragma('foreign_keys = ON');
-    db.exec(`CREATE TABLE exemptions (code TEXT PRIMARY KEY NOT NULL, description TEXT NOT NULL, type TEXT,
-        source TEXT, start_date INTEGER, end_date INTEGER, is_pharma INTEGER, is_specialist INTEGER,
-        is_national INTEGER, updated_at INTEGER DEFAULT (unixepoch()));
+    db.exec(`
         CREATE TABLE synthetic_assignments (id TEXT PRIMARY KEY, code TEXT REFERENCES exemptions(code), opaque TEXT);
         INSERT INTO exemptions(code, description) VALUES ('ZZ_OLD', 'Codice inventato pregresso');
         INSERT INTO synthetic_assignments VALUES ('reference-test', 'ZZ_OLD', 'invented-opaque-assignment');`);
-    ensureExemptionImportSchema(db);
     return db;
 }
 function commit(db: Database.Database, bytes: Buffer, proof = previewExemptionImport(db, bytes, sourceName, actor).proof!) {

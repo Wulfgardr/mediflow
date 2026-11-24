@@ -6,20 +6,15 @@ import { attachments } from '@/lib/schema';
 import { asc, eq, desc, type SQL } from 'drizzle-orm';
 import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth';
 import { buildAttachmentPath } from '@/lib/attachment-path';
-/* STREAM B: server-side list params (whitelisted, plaintext columns only). */
-import { parseListParams } from '@/lib/list-query-params';
+import { definePlaintextSortColumns, parseListParams } from '@/lib/list-query-params';
 import { createWebAttachment } from '@/lib/attachment-web-create';
 
-// Only plaintext columns are sortable (name/path/data are ENC:). size/type are
-// plaintext metadata and safe to sort on.
-const ATTACHMENT_SORT_COLUMNS = {
+const ATTACHMENT_SORT_COLUMNS = definePlaintextSortColumns('attachments', {
     createdAt: attachments.createdAt,
     size: attachments.size,
     type: attachments.type,
-} as const;
+});
 
-// Metadata-mode column projection: every column EXCEPT the heavy base64 `data`
-// blob, so a list never ships (or decrypts) attachment payloads.
 const ATTACHMENT_METADATA_COLUMNS = {
     id: attachments.id,
     patientId: attachments.patientId,
@@ -60,8 +55,8 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const patientId = searchParams.get('patientId');
 
-    /* STREAM B */
     const parsed = parseListParams(searchParams, {
+        table: 'attachments',
         sortableColumns: Object.keys(ATTACHMENT_SORT_COLUMNS),
         defaultOrderBy: 'createdAt',
         defaultOrderDir: 'desc',
