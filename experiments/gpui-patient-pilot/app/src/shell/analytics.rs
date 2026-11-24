@@ -257,7 +257,7 @@ impl ClinicalApp {
         pane = pane
             .child(surface::island_title(
                 "clinical-analytics-range",
-                "FASCIA DI ETÀ",
+                "Fascia di età",
                 None,
                 theme,
             ))
@@ -328,7 +328,7 @@ impl ClinicalApp {
         let stats = &demographics.stats;
         let [min_age, max_age] = demographics.age_range;
         let mut population = surface::island(theme, false)
-            .child(surface::island_title("clinical-analytics-population", "POPOLAZIONE", None, theme))
+            .child(surface::island_title("clinical-analytics-population", "Popolazione", None, theme))
             .child(crate::components::number_line(
                 "clinical-analytics-population-summary", "", stats.total_in_range.to_string(),
                 &format!(" schede attive tra {min_age} e {max_age} anni"), theme,
@@ -355,7 +355,7 @@ impl ClinicalApp {
             population = population
                 .child(surface::island_title(
                     "clinical-analytics-distribution",
-                    "DISTRIBUZIONE PER ETÀ",
+                    "Distribuzione per età",
                     None,
                     theme,
                 ))

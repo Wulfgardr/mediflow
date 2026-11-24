@@ -378,7 +378,7 @@ impl ClinicalApp {
                 ))
                 .child(surface::island_title(
                     "smart-import-heading",
-                    "IMPORT ASSISTITO · PROPOSTA",
+                    "Import assistito · Proposta",
                     None,
                     theme,
                 )),

@@ -271,7 +271,7 @@ impl ClinicalApp {
         let theme = self.theme;
         let view = surface::island(theme, true).child(surface::island_title(
             "document-original-heading",
-            "ORIGINALE",
+            "Originale",
             None,
             theme,
         ));

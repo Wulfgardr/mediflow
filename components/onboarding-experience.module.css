@@ -4,9 +4,9 @@
     width: 100%;
     min-width: 0;
     padding: clamp(1rem, 3vw, 1.75rem);
-    border: 1px solid var(--lume-rule);
-    border-radius: var(--lume-radius-panel);
-    background: var(--lume-surface-focal);
+    border: 1px solid var(--lume-record-island-rule);
+    border-radius: 14px;
+    background: var(--lume-record-island);
     color: var(--lume-ink);
     font-family: var(--lume-font-sans);
     font-size: 0.875rem;
@@ -29,9 +29,6 @@
     display: grid;
     width: min(100%, 428px);
     margin-inline: auto;
-    border-color: var(--lume-record-island-rule);
-    border-radius: 14px;
-    background: var(--lume-record-island);
     gap: 0.75rem;
     max-block-size: calc(100vh - 2rem);
     max-block-size: calc(100dvh - 2rem);
@@ -57,11 +54,16 @@
     gap: 1.5rem;
 }
 
-.heading :is(h1, h2) {
-    line-height: 1.25;
-    letter-spacing: -0.02em;
+.heading h1 {
+    letter-spacing: 0;
     text-wrap: balance;
-    font: var(--type-page-title);
+    font: var(--type-record-person);
+}
+
+.heading h2 {
+    letter-spacing: 0;
+    text-wrap: balance;
+    font: var(--type-section-heading);
 }
 
 .heading p,
@@ -72,8 +74,6 @@
     font-size: 0.875rem;
     line-height: 1.55;
 }
-
-.setup .heading h1 { font: var(--type-record-person); }
 
 :global(.fixed):has(> div > .setup) { background: var(--lume-record-canvas); }
 
@@ -124,7 +124,7 @@
 }
 
 .question > legend {
-    font: var(--type-page-title);
+    font: var(--type-section-heading);
     padding: 0 0 0.75rem;
 }
 

@@ -4130,7 +4130,7 @@ impl ClinicalApp {
         );
         surface::section_tray(
             "clinical-workspace-diary-heading",
-            "DIARIO",
+            "Diario",
             actions,
             surface::island(theme, false).child(self.diary_list(None, cx)),
             theme,
@@ -4722,7 +4722,7 @@ impl ClinicalApp {
                         .on_click(cx.listener(move |this, _, _, cx| this.change_scope(&id, cx)))
                 })))
             .child(div().flex().flex_col().gap(px(12.))
-                .child(surface::island_title("clinical-workspace-date-interval-heading", "INTERVALLO DI LETTURA", None, theme))
+                .child(surface::island_title("clinical-workspace-date-interval-heading", "Intervallo di lettura", None, theme))
                 .child(div().flex().flex_wrap().items_end().gap(px(12.))
                     .when(self.effective_text_scale() >= 2.5, |el| el.flex_col().items_stretch())
                     .children(self.global_dates.iter().enumerate().map(|(index, field)| {
