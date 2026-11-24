@@ -48,7 +48,6 @@ const context = issueSyntheticWebSessionContext({ id: actor, username, role: 'ad
 let current = context.session as typeof context.session | null;
 let pinCalls = 0;
 
-let activeUnlockRef: string | null = null;
 const handlers = createAgentLocalKitHttp({
     session: async () => current,
     async verifyPin(candidateUser, candidatePin) {
@@ -57,10 +56,8 @@ const handlers = createAgentLocalKitHttp({
         return result.kind === 'verified' ? result.account.id : null;
     },
     store: () => createAgentLocalKitStore(database),
-    isUnlockActive: (ref, actorRef) => actorRef === actor && activeUnlockRef === ref,
     renew(_request, session, generation) {
-        activeUnlockRef = `synthetic-direct-renewal-${randomUUID()}`;
-        createAgentRegistrationStore(database).renew(session.userId, generation, activeUnlockRef);
+        createAgentRegistrationStore(database).renew(session.userId, generation, `synthetic-direct-renewal-${randomUUID()}`);
         return true;
     },
 });
@@ -208,9 +205,8 @@ test('connects Codex in one click, writes kit files without leaking tokens, supp
 
     const registrationStore = createAgentRegistrationStore(database);
     const generation = readSqliteArchiveGeneration(database);
-    activeUnlockRef = 'synthetic-unlock-ref';
     registrationStore.renew(actor, generation, 'synthetic-unlock-ref');
-    const renewed = registrationStore.retrieve(registration.token, ref => ref === 'synthetic-unlock-ref');
+    const renewed = registrationStore.retrieve(registration.token);
     assert.equal(renewed.agentRef, receipt.agentRef);
     assert.equal(renewed.expiresAt - renewed.issuedAt, 86400000);
     assert.match(renewed.token, /^mfa_[A-Za-z0-9_-]{43}$/u);
@@ -219,11 +215,12 @@ test('connects Codex in one click, writes kit files without leaking tokens, supp
     assert.equal(statusActive.connected, true);
     assert.equal(statusActive.active, true);
 
-    activeUnlockRef = null;
-    const statusStale = await (await fetch(origin)).json();
-    assert.equal(statusStale.connected, true);
-    assert.equal(statusStale.active, false);
-    assert.equal(statusStale.expiresAt, null);
+    const confirmingSession = current;
+    current = issueSyntheticWebSessionContext({ id: actor, username, role: 'admin' }, randomUUID()).session;
+    const statusInLaterSession = await (await fetch(origin)).json();
+    assert.equal(statusInLaterSession.active, true);
+    assert.equal(statusInLaterSession.expiresAt, renewed.expiresAt);
+    current = confirmingSession;
 
     const directRenewRes = await fetch(origin, { method: 'PATCH', headers: mutationHeaders() });
     assert.equal(directRenewRes.status, 200);
@@ -250,9 +247,9 @@ test('connects Codex in one click, writes kit files without leaking tokens, supp
 
     const principalAfter = database.transaction(() => createAgentPairingStore(database).principal(access.token)).immediate();
     assert.equal(principalAfter, null);
-    const renewedPrincipalAfter = database.transaction(() => registrationStore.principal(renewed.token, () => true)).immediate();
+    const renewedPrincipalAfter = database.transaction(() => registrationStore.principal(renewed.token)).immediate();
     assert.equal(renewedPrincipalAfter, null);
-    assert.throws(() => registrationStore.retrieve(registration.token, () => true), /AGENT_MANDATE_DENIED/);
+    assert.throws(() => registrationStore.retrieve(registration.token), /AGENT_MANDATE_DENIED/);
 
     const revocationAudits = database.prepare("SELECT event_type FROM audit_events WHERE actor_ref=?").all(actor) as { event_type: string }[];
     assert.ok(revocationAudits.some(row => row.event_type === 'agent.client.revoked'));

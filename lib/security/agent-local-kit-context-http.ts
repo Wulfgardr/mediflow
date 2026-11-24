@@ -22,7 +22,6 @@ import {
 type Sources = {
     session(): Promise<ServerSession | null>;
     store(): ReturnType<typeof createAgentLocalKitStore>;
-    isUnlockActive?: (ref: string, actorRef: string) => boolean;
 };
 
 const reply = (value: unknown, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'no-store' } });
@@ -45,7 +44,7 @@ export function createAgentLocalKitContextHttp(sources: Sources) {
             try {
                 const access = await admitted(request, false);
                 if (!access) return denied(401);
-                const status = sources.store().status(access.session.userId, sources.isUnlockActive);
+                const status = sources.store().status(access.session.userId);
                 let items: Array<{ taxCodeLast4: string; exportedAt: number; expiresAt: number }> = [];
                 try {
                     items = listLocalKitPatientContexts(status.kitPath).map(({ taxCodeLast4, exportedAt, expiresAt }) => ({
@@ -71,7 +70,7 @@ export function createAgentLocalKitContextHttp(sources: Sources) {
                 const access = await admitted(request, true, true);
                 if (!access) return denied(403);
                 const store = sources.store();
-                const status = store.status(access.session.userId, sources.isUnlockActive);
+                const status = store.status(access.session.userId);
                 if (!status.connected || !status.active) return denied(403, 'LOCAL_KIT_INACTIVE');
                 const body = await readNativeNetworkJson(request, AGENT_PATIENT_CONTEXT_MAX_BYTES + 4096, {
                     signal: request.signal,
@@ -85,7 +84,7 @@ export function createAgentLocalKitContextHttp(sources: Sources) {
                     || fresh.generation !== access.generation) {
                     return denied(403);
                 }
-                const freshStatus = store.status(access.session.userId, sources.isUnlockActive);
+                const freshStatus = store.status(access.session.userId);
                 if (!freshStatus.connected || !freshStatus.active || freshStatus.kitPath !== status.kitPath) {
                     return denied(403, 'LOCAL_KIT_INACTIVE');
                 }
@@ -97,7 +96,6 @@ export function createAgentLocalKitContextHttp(sources: Sources) {
                         access.session.userId,
                         envelope.patient.cfHash,
                         access.generation,
-                        sources.isUnlockActive,
                     );
                 } catch (auditError) {
                     try {

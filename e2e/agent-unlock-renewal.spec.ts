@@ -10,7 +10,7 @@ test.describe.configure({ retries: 0 });
 
 const pinAccount = test.extend({ existingPin: agentVisitPin });
 
-for (const credentialKind of ['passphrase', 'pin'] as const) (credentialKind === 'pin' ? pinAccount : test)(`a registered agent receives a twelve-hour mandate on ${credentialKind} unlock and tab renewal`, async ({ page, context: browserContext, isolatedRuntime, playwright }, testInfo) => {
+for (const credentialKind of ['passphrase', 'pin'] as const) (credentialKind === 'pin' ? pinAccount : test)(`a registered agent receives a 24-hour mandate on ${credentialKind} unlock that outlives the inactivity lock`, async ({ page, context: browserContext, isolatedRuntime, playwright }, testInfo) => {
     test.setTimeout(150000);
     const agent = await playwright.request.newContext({ baseURL: isolatedRuntime.url });
     const unlockLabel = credentialKind === 'pin' ? 'PIN operatore' : 'Passphrase';
@@ -111,8 +111,10 @@ for (const credentialKind of ['passphrase', 'pin'] as const) (credentialKind ===
         await page.clock.fastForward('15:01');
         expect((await idleLock).request().headers()['x-mediflow-lock-reason']).toBe('inactivity');
         await expect(page.getByLabel(unlockLabel, { exact: true })).toBeEnabled();
-        expect((await deposit(credential.token)).status()).toBe(401);
-        expect((await retrieve()).status()).toBe(401);
+        expect((await agent.get('/api/agent/v1/context', { headers: bearer(credential.token) })).status()).toBe(200);
+        const afterIdleLock = await retrieve();
+        expect(afterIdleLock.status()).toBe(200);
+        expect((await afterIdleLock.json()).receipt.mandateRef).toBe(renewed.mandateRef);
         await unlock();
         const second = await retrieve();
         expect(second.status()).toBe(200);

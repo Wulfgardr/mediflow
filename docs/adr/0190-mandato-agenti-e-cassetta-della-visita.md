@@ -27,7 +27,8 @@ Il browser genera una coppia ECDH P-256. Conserva sul server la chiave pubblica
 e la privata avvolta dalla master key. Dopo un ricaricamento, la privata si
 riapre solo nel browser sbloccato. Il server non riceve chiavi private aperte.
 Il blocco per inattività toglie le chiavi dalla scheda ma lascia attivo il
-mandato per il deposito. Revoca e blocco manuale revocano il mandato.
+mandato per il deposito, anche quello emesso dal rinnovo allo sblocco.
+Revoca e blocco manuale revocano il mandato.
 Scadenza e revoca negano ogni nuovo deposito, anche con un token già emesso.
 
 Ogni agente chiede un abbinamento con codice di otto caratteri. Solo il
@@ -66,8 +67,11 @@ attive, lo sblocco non invia la richiesta di rinnovo.
 La credenziale di registrazione consente al client di ritirare il token
 di deposito del mandato corrente sul loopback. CLI e MCP, incluso il plugin
 Ambulatorio, usano il client condiviso per il ritiro esplicito o automatico
-quando il deposito richiede un mandato corrente. Blocco della sessione,
+quando il deposito richiede un mandato corrente. Blocco manuale,
 scadenza, nuova emissione e revoca negano richieste con il token precedente.
+Il blocco per inattività, il logout, la chiusura del browser e il riavvio del
+server non toccano il mandato già emesso: l'agente deposita fino alla scadenza di 24 ore
+senza un nuovo sblocco (decisione di Leonardo del 24/11/2026).
 La revoca della registrazione in Agenti impedisce anche le emissioni
 successive. Il ripristino automatico della scheda e il recupero col kit
 non emettono mandati. Dopo il recupero, il rinnovo riparte al primo sblocco

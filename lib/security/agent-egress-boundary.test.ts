@@ -141,10 +141,9 @@ test('J3: a renewable registration with a cloud mandate without egress still ret
     const polled = pairings.poll(pairing.request.id, pairing.claim);
     assert.ok('registrationCredential' in polled && polled.registrationCredential);
     registrations.renew(actor, generation, 'synthetic-unlock');
-    const unlocked = (ref: string, owner: string) => ref === 'synthetic-unlock' && owner === actor;
-    const retrieved = registrations.retrieve(polled.registrationCredential.token, unlocked);
+    const retrieved = registrations.retrieve(polled.registrationCredential.token);
     assert.deepEqual(Object.keys(retrieved).sort(), ['agentRef', 'expiresAt', 'issuedAt', 'mandateRef', 'token']);
-    const principal = database.transaction(() => registrations.principal(retrieved.token, unlocked)).immediate();
+    const principal = database.transaction(() => registrations.principal(retrieved.token)).immediate();
     assert.equal(principal?.modelProvider, 'openai');
     assert.equal(principal?.allowsClinicalEgress, false);
 });
