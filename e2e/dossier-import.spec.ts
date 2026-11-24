@@ -20,7 +20,7 @@ isolatedTest('Dossier senza CF: crea dalla fonte e richiede la conferma al colle
     const fileName = 'referto-senza-identificativo.pdf';
     try {
         writeFileSync(path.join(root, fileName), await textPdf(['Referto sintetico', 'Cognome: Inventata', 'Nome: Lucia', 'Data di nascita: 03/02/1980']));
-        await openUnlockedDocument(page, '/patients/import/dossier');
+        await openUnlockedDocument(page, '/patients/import/dossier', pin);
         const panel = page.getByTestId('dossier-import');
         await panel.getByTestId('dossier-folder').setInputFiles(root);
         const group = panel.getByTestId('dossier-group');
@@ -51,7 +51,7 @@ isolatedTest('Dossier senza CF: crea dalla fonte e richiede la conferma al colle
         await expect(group.getByTestId('dossier-acquire-outcome')).toHaveText('Già in MediFlow: riusato, non duplicato', { timeout: 60_000 });
         expect(await attachmentCount(page, patientId)).toBe(1);
         await page.reload();
-        await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
+        await unlockIfNeeded(page, pin);
         await panel.getByTestId('dossier-folder').setInputFiles(root);
         await expect(group).toHaveAttribute('data-identity', 'no_document_cf', { timeout: 60_000 });
         await expect(destination).toHaveValue('');

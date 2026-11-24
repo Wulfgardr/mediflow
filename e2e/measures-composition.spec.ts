@@ -88,7 +88,7 @@ for (const state of ['loading', 'error', 'denied'] as const) test(`Misure: lettu
         const requested = page.waitForRequest(request => request.method() === 'GET'
             && request.url().includes(`/api/observations?patientId=${id}`));
         await page.reload();
-        await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
+        if (state !== 'denied') await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
         const readRequest = await requested;
         await test.info().attach('richiesta-lettura-osservata', { contentType: 'application/json',
             body: JSON.stringify({ method: readRequest.method(), url: readRequest.url(), state }) });
