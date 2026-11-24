@@ -12,6 +12,7 @@ import { assertStandaloneRuntimeChunks } from './standalone-runtime-chunks.mjs';
 import { formatPdfSmokeFailure } from './anydoc-pdf-smoke-diagnostics.mjs';
 import { countWindowsIcuPngInk } from './anydoc-windows-icu-png-oracle.mjs';
 import { documentChildLaunch } from './document-child-launcher.mjs';
+import { macosWebRuntimePayloadFailure } from './macos-web-runtime-payload.mjs';
 
 import http from 'node:http';
 import https from 'node:https';
@@ -1299,6 +1300,8 @@ const anyDocWorkerFailure = bundledWorkerFailure(standaloneDir);
 if (anyDocWorkerFailure) fail(anyDocWorkerFailure);
 const appleVisionScriptFailure = bundledAppleVisionScriptFailure(standaloneDir);
 if (appleVisionScriptFailure) fail(appleVisionScriptFailure);
+const macosPayloadFailure = macosWebRuntimePayloadFailure(standaloneDir);
+if (macosPayloadFailure) fail(macosPayloadFailure);
 const anyDocWorkerPath = path.join(standaloneDir, 'scripts', ANYDOC_WORKER_FILE);
 const packageScopes = fs.readdirSync(path.join(standaloneDir, 'node_modules'), { withFileTypes: true });
 const firecrawlScope = packageScopes.find((entry) => entry.isDirectory() && entry.name === '@firecrawl')?.name;
