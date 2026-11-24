@@ -133,6 +133,11 @@
 
 .transcript[open] > summary { margin-bottom: 6px; }
 
+.visitFooterBlock {
+  display: grid;
+  gap: 10px;
+}
+
 .visitFooter {
   display: flex;
   flex-wrap: wrap;

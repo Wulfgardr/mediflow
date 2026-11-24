@@ -92,7 +92,7 @@ e rilegge tramite la live query dopo il successo. Non cambia la superficie
 | TLS proxy (trasporto native) | `https://127.0.0.1:3443` | Inoltra verso :3000. |
 | Ollama (AI generativa generale) | `http://127.0.0.1:11434` | Opzionale, non esegue OCR nel percorso allegati 0.8.5. |
 | ATHENA su MLX | processo locale bounded | Opzionale, solo Treatment Reasoning. Richiede runner e modello locali configurati. |
-| AnyDoc + Apple Vision | processi locali bounded | AnyDoc esegue il primo passaggio. Apple Vision continua soltanto le pagine PDF `needsOcr`, senza rete. |
+| AnyDoc e OCR selettivo | processi figli locali con limiti | AnyDoc esegue il primo passaggio. Il riconoscimento delle sole pagine PDF `needsOcr` usa Apple Vision su Mac o Tesseract WASM sui profili previsti. Le protezioni del figlio dipendono dal [profilo di sistema](./SECURITY.md#processi-documentali). |
 | ICD-11 WHO | Loopback fisso, solo dal server | Sidecar locale opt-in. Il provisioning manuale non è attestato da questa architettura. |
 | OpenMed redaction (shadow) | `http://127.0.0.1:18080` | Opzionale, non accessibile dai client. |
 
