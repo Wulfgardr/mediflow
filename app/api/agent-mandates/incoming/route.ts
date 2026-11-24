@@ -1,3 +1,4 @@
+import { cookies } from 'next/headers';
 import { readAuthenticatedWebSession } from '@/lib/security/server-auth';
 import { createAgentIncomingReader } from '@/lib/security/agent-incoming-reader';
 import { hasAttestedLoopbackIngress } from '@/lib/security/loopback-ingress.mjs';
@@ -27,8 +28,9 @@ export async function POST(request: Request): Promise<Response> {
         const refusal = archiveWriteRequestDenial(request, session);
         if (refusal) return refusal;
         const body = await readNativeNetworkJson(request, 34 * 1024 * 1024, { signal: request.signal, deadline: performance.now() + 15000 });
+        const selectedAmbulatoryId = (await cookies()).get('ambulatory_id')?.value ?? null;
         const current = await readAuthenticatedWebSession();
         if (current?.id !== session.id || current.userId !== session.userId) return denied(403);
-        return Response.json(applyAgentVisit(request, current, body), { headers: { 'Cache-Control': 'no-store' } });
+        return Response.json(applyAgentVisit(request, current, body, selectedAmbulatoryId), { headers: { 'Cache-Control': 'no-store' } });
     } catch (error) { return denied(error instanceof AgentApplicationDenied ? error.status : 409); }
 }

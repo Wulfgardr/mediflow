@@ -68,6 +68,16 @@ che segue.
 7. Le istruzioni del plugin e le descrizioni degli strumenti MCP dicono che
    nota, trascrizione, PDF e proposte attendono la conferma del medico.
 
+8. Sul Web, se il CF valido della visita è l’unico CF paziente in ogni PDF
+   leggibile e non c’è una scheda corrispondente, il gesto crea anche la
+   scheda nell’ambulatorio mostrato in revisione. I CF di ruolo professionale
+   documentato restano esclusi. Un CF diverso o ulteriore blocca la visita.
+   Il commit ricontrolla ambulatorio e duplicati e scrive scheda, appartenenza,
+   elementi e audit nella stessa transazione. I nomi assenti restano da
+   completare. La data di nascita viene registrata quando una fonte esplicita
+   il secolo ed è coerente con il CF. Il CF arriva al server con il piano
+   approvato per creare la scheda. La conferma nativa richiede una scheda esistente.
+
 ## Alternative scartate
 
 - Riconoscere il PDF della nota dal testo e lasciare automatici trascrizione e
