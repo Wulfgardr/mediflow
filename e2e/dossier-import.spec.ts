@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 
-import { bootstrapUnlockedSession } from './utils';
+import { bootstrapUnlockedSession, openUnlockedDocument, unlockIfNeeded } from './utils';
 import { test as isolatedTest } from './fixtures/isolated-runtime';
 import { randomSyntheticTaxCode as syntheticTaxCode } from '../lib/patient-identity.test-support.ts';
 
@@ -20,7 +20,7 @@ isolatedTest('Dossier senza CF: crea dalla fonte e richiede la conferma al colle
     const fileName = 'referto-senza-identificativo.pdf';
     try {
         writeFileSync(path.join(root, fileName), await textPdf(['Referto sintetico', 'Cognome: Inventata', 'Nome: Lucia', 'Data di nascita: 03/02/1980']));
-        await page.goto('/patients/import/dossier');
+        await openUnlockedDocument(page, '/patients/import/dossier');
         const panel = page.getByTestId('dossier-import');
         await panel.getByTestId('dossier-folder').setInputFiles(root);
         const group = panel.getByTestId('dossier-group');
@@ -51,6 +51,7 @@ isolatedTest('Dossier senza CF: crea dalla fonte e richiede la conferma al colle
         await expect(group.getByTestId('dossier-acquire-outcome')).toHaveText('Già in MediFlow: riusato, non duplicato', { timeout: 60_000 });
         expect(await attachmentCount(page, patientId)).toBe(1);
         await page.reload();
+        await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
         await panel.getByTestId('dossier-folder').setInputFiles(root);
         await expect(group).toHaveAttribute('data-identity', 'no_document_cf', { timeout: 60_000 });
         await expect(destination).toHaveValue('');
@@ -155,7 +156,7 @@ test('Dossier: cartella sintetica, aggiornamento di una scheda, nuova scheda da 
         const patientB = await createPatient(page, CF_B);
 
         // Accesso dal percorso reale: Nuova scheda → Importa documenti da cartella.
-        await page.goto('/patients/new');
+        await openUnlockedDocument(page, '/patients/new');
         await page.getByRole('link', { name: 'Importa documenti da cartella' }).click();
         await expect(page).toHaveURL(/\/patients\/import\/dossier$/u);
         const panel = page.getByTestId('dossier-import');
@@ -265,7 +266,7 @@ test('Dossier: cartella sintetica, aggiornamento di una scheda, nuova scheda da 
         await expect(asthma.getByLabel('Data')).toHaveValue('2025-05-05');
 
         // Ripresa: la pagina si rilegge dalla scheda; la stessa cartella non duplica gli originali.
-        await page.goto(`/patients/import/dossier?patientId=${encodeURIComponent(patientB)}`);
+        await openUnlockedDocument(page, `/patients/import/dossier?patientId=${encodeURIComponent(patientB)}`);
         await expect(panel.getByTestId('dossier-document')).toHaveCount(5, { timeout: 30_000 });
         await expect(panel.getByTestId('dossier-summary')).toContainText('1 di 5 documenti completi');
         await panel.getByTestId('dossier-folder').setInputFiles(path.join(root, 'Dossier'));
@@ -334,7 +335,7 @@ test('Dossier: estrazione preparata su una cartella mista di più pazienti, cita
         const patientA = await createPatient(page, CF_P);
         const patientB = await createPatient(page, CF_Q);
 
-        await page.goto('/patients/import/dossier');
+        await openUnlockedDocument(page, '/patients/import/dossier');
         const panel = page.getByTestId('dossier-import');
         await panel.getByTestId('dossier-prepared').setInputFiles(preparedPath);
         await expect(panel.getByTestId('dossier-prepared-status')).toContainText('2 documenti');

@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdir } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
-import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow, assertNotClippedInViewport } from './utils';
+import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow, assertNotClippedInViewport, openUnlockedDocument, unlockIfNeeded } from './utils';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 
 test.beforeEach(({ baseURL }) => {
@@ -31,7 +31,7 @@ async function fixture(page: Page, counts = { active: 0, suspended: 0, completed
         }
         return id as string;
     }, { counts, diagnoses });
-    await page.goto(`/patients/${patientId}/modules`);
+    await openUnlockedDocument(page, `/patients/${patientId}/modules`);
     await openPatientSection(page, 'terapie');
     await expect(register(page).getByRole('status', { name: 'Caricamento terapie' })).toHaveCount(0);
     return patientId;
@@ -185,6 +185,7 @@ test('creazione e modifica usano il form esistente e persistono i dati', async (
     await section(page).getByRole('button', { name: 'Aggiorna terapia' }).click();
     await expect(created).toContainText('Dose aggiornata');
     await page.reload();
+    await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
     await openPatientSection(page, 'terapie');
     await expect(created).toContainText('Dose aggiornata');
 });

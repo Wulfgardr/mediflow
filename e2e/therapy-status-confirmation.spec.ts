@@ -1,8 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import { differenceInYears } from 'date-fns';
 import { mkdir } from 'node:fs/promises';
-import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow } from './utils';
-import { fetchInterceptedRequest, trustedWebRequestHeaders } from './fixtures/trusted-web-request';
+import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow, openUnlockedDocument, unlockIfNeeded } from './utils';
+import { documentRequests, fetchInterceptedRequest } from './fixtures/trusted-web-request';
 
 test.beforeEach(({ baseURL }) => {
   if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL || new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).port === '3000') throw new Error('Owned synthetic archive and non-3000 loopback required');
@@ -83,7 +83,7 @@ async function fixture(page: Page): Promise<Fixture> {
     }, birthDate);
 }
 async function open(page: Page, data: Fixture) {
-    await page.goto(`/patients/${data.patientId}/modules`);
+    await openUnlockedDocument(page, `/patients/${data.patientId}/modules`);
     await openPatientSection(page, 'terapie');
     await expect(row(page)).toBeVisible();
 }
@@ -103,7 +103,7 @@ function network(page: Page) {
     return { writes, commands, events };
 }
 async function stored(page: Page, data: Fixture) {
-    const response = await page.request.get(`/api/therapies?patientId=${data.patientId}`);
+    const response = await documentRequests(page).get(`/api/therapies?patientId=${data.patientId}`);
     expect(response.status()).toBe(200);
     return (await response.json() as Array<{ id: string; version: number; status: string }>).find(item => item.id === data.therapyId);
 }
@@ -199,16 +199,30 @@ for (const applied of [true, false]) {
         const data = await fixture(page);
         await open(page, data);
         const { writes } = network(page);
-        await page.route(executeRoute, async route => {
-            if (route.request().method() !== 'POST') return route.continue();
-            if (applied) expect((await fetchInterceptedRequest(route)).status()).toBe(200);
-            await route.abort('failed');
-        });
+        if (applied) {
+            await page.evaluate(() => {
+                const authenticatedFetch = window.fetch;
+                window.fetch = async (input, init) => {
+                    const url = new URL(input instanceof Request ? input.url : input, window.location.href);
+                    if (!/^\/api\/therapy-status-commands\/[^/]+\/execute$/u.test(url.pathname)
+                        || (init?.method ?? (input instanceof Request ? input.method : 'GET')) !== 'POST') {
+                        return authenticatedFetch(input, init);
+                    }
+                    window.fetch = authenticatedFetch;
+                    await authenticatedFetch(input, init);
+                    throw new TypeError('Synthetic missing response');
+                };
+            });
+        } else {
+            await page.route(executeRoute, route => route.request().method() === 'POST' ? route.abort('failed') : route.continue());
+        }
         await (await action(page, 'Sospendi')).click();
         await confirm(page).click();
         await expectUncertainOutcome(page);
         await expect(confirm(page)).toHaveCount(0);
         await expect((await action(page, 'Sospendi'))).toBeDisabled();
+        if (await page.getByRole('menu').isVisible()) await page.keyboard.press('Escape');
+        await expect(page.getByRole('menu')).toHaveCount(0);
         await expect((await action(page, 'Concludi', true))).toBeDisabled();
         // Il menu delle azioni aperto per il controllo sopra copre la soglia: lo chiude come farebbe il medico.
         await page.keyboard.press('Escape');
@@ -292,7 +306,7 @@ test('suspend, reactivate and complete each require their own confirmation and p
         await expect(threshold(page).getByText('Registrata', { exact: true })).toBeVisible();
         expect(writes).toHaveLength(index + 1);
         expect(writes[index]).toMatchObject({ id: data.therapyId, body: { version: index + 1, status: transition.status } });
-        const response = await page.request.get(`/api/therapies?patientId=${data.patientId}`);
+        const response = await documentRequests(page).get(`/api/therapies?patientId=${data.patientId}`);
         expect(response.status()).toBe(200);
         const item = (await response.json() as Array<{ id: string; endDate: string | null }>).find(item => item.id === data.therapyId)!;
         if (transition.status === 'completed') expect(Number.isFinite(Date.parse(item.endDate!))).toBe(true);
@@ -326,6 +340,7 @@ test('an ambiguous command survives reload and unrelated advancement until expli
     await open(page, data);
     await expectUncertainOutcome(page);
     await page.reload();
+    await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
     await openPatientSection(page, 'terapie');
     await expectUncertainOutcome(page);
     await expect((await action(page, 'Sospendi'))).toBeDisabled();
@@ -335,20 +350,23 @@ test('an ambiguous command survives reload and unrelated advancement until expli
     await threshold(page).getByRole('button', { name: 'Rileggi e verifica', exact: true }).click();
     await expectUncertainOutcome(page);
     expect(writes).toHaveLength(1);
-    const archive = await (await page.request.get('/api/auth/check')).json();
-    const late = await page.request.put(`/api/therapies/${data.therapyId}`, {
-        headers: { ...trustedWebRequestHeaders(page.url()), 'x-mediflow-archive-generation': archive.archiveGeneration }, data: { version: 1, status: 'suspended' },
-    });
-    expect(late.status()).toBe(200);
-    await threshold(page).getByRole('button', { name: 'Rileggi e verifica', exact: true }).click();
-    await expectUncertainOutcome(page);
-    await threshold(page).getByRole('button', { name: 'Ritira richiesta e verifica', exact: true }).click();
-    await expect(threshold(page)).toContainText('ID richiesta ritirato');
-    const original = commands[0];
-    const denied = await page.request.post(`/api/therapy-status-commands/${original.commandId}/execute`, {
-        headers: { ...trustedWebRequestHeaders(page.url()), 'x-mediflow-archive-generation': archive.archiveGeneration }, data: original,
-    });
-    expect(denied.status()).toBe(200); expect((await denied.json()).receipt.outcome).toBe('closed');
+    const otherDocument = await page.context().newPage();
+    try {
+        await openUnlockedDocument(otherDocument, page.url());
+        const requests = documentRequests(otherDocument);
+        const late = await requests.put(`/api/therapies/${data.therapyId}`, { data: { version: 1, status: 'suspended' } });
+        expect(late.status()).toBe(200);
+        await threshold(page).getByRole('button', { name: 'Rileggi e verifica', exact: true }).click();
+        await expectUncertainOutcome(page);
+        await threshold(page).getByRole('button', { name: 'Ritira richiesta e verifica', exact: true }).click();
+        await expect(threshold(page)).toContainText('ID richiesta ritirato');
+        const original = commands[0];
+        const denied = await requests.post(`/api/therapy-status-commands/${original.commandId}/execute`, { data: original });
+        expect(denied.status()).toBe(200);
+        expect((await denied.json()).receipt.outcome).toBe('closed');
+    } finally {
+        await otherDocument.close();
+    }
     expect(await stored(page, data)).toMatchObject({ version: 2, status: 'suspended' });
     await expect(threshold(page).getByText('Registrata', { exact: true })).toHaveCount(0);
     await expect(threshold(page)).toContainText('Stato attuale: Sospesa');
@@ -366,6 +384,7 @@ test('a second tab inherits the unresolved barrier and cannot confirm its older 
     const popup = page.waitForEvent('popup');
     await page.evaluate(() => { window.open(location.href); });
     const other = await popup;
+    await unlockIfNeeded(other, process.env.E2E_PIN || '1234');
     await openPatientSection(other, 'terapie');
     await (await action(other, 'Concludi')).click();
     const a = network(page);
@@ -377,6 +396,7 @@ test('a second tab inherits the unresolved barrier and cannot confirm its older 
     await expectUncertainOutcome(other);
     await expect(confirm(other)).toHaveCount(0);
     await other.reload();
+    await unlockIfNeeded(other, process.env.E2E_PIN || '1234');
     await openPatientSection(other, 'terapie');
     await expectUncertainOutcome(other);
     await threshold(other).getByRole('button', { name: 'Rileggi e verifica', exact: true }).click();
@@ -442,7 +462,7 @@ test('P2 unavailable admission is visibly unsent and checking availability does 
 for (const failure of ['corrupt', 'unreadable'] as const) {
     test(`P2 ${failure} journal has a visible recovery and never clears a previous unknown write`, async ({ page }) => {
         const data = await fixture(page);
-        const archive = await (await page.request.get('/api/auth/check')).json();
+        const archive = await (await documentRequests(page).get('/api/auth/check')).json();
         const key = `mediflow:therapy-status-write:v1:${encodeURIComponent(archive.archiveGeneration)}:${encodeURIComponent(data.patientId)}`;
         const value = JSON.stringify({ id: 'previous-synthetic-attempt', patientId: data.patientId, therapyId: data.therapyId, version: 1, outcome: 'unknown' });
         await page.evaluate(({ key, value, failure }) => {

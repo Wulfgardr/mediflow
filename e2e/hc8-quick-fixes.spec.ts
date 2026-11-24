@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { bootstrapUnlockedSession, assertNotClippedInViewport } from './utils';
+import { bootstrapUnlockedSession, assertNotClippedInViewport, openUnlockedDocument } from './utils';
 
 test.beforeEach(async ({ page }) => {
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
@@ -7,7 +7,7 @@ test.beforeEach(async ({ page }) => {
 
 test('indice desktop: destinazione corrente in vista e focus conservato al ridimensionamento', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 960 });
-    await page.goto('/settings/zona-pericolo');
+    await openUnlockedDocument(page, '/settings/zona-pericolo');
     const nav = page.getByTestId('settings-nav-sidebar');
     const current = nav.locator('a[aria-current="page"]:visible');
     await expect(current).toHaveAttribute('href', '/settings/zona-pericolo');
@@ -26,7 +26,7 @@ test('indice desktop: destinazione corrente in vista e focus conservato al ridim
 
 test('Accesso a 768: kit visibile senza una riga aggiuntiva per lo scorrimento', async ({ page }) => {
     await page.setViewportSize({ width: 768, height: 960 });
-    await page.goto('/settings/accesso');
+    await openUnlockedDocument(page, '/settings/accesso');
     const kit = page.getByRole('button', { name: 'Prepara il nuovo kit', exact: true });
     await assertNotClippedInViewport(kit, 'Prepara il nuovo kit');
     expect(await kit.evaluate(element => element.getBoundingClientRect().bottom)).toBeLessThanOrEqual(960);
@@ -58,7 +58,7 @@ test('ricerca a 390: un solo Cancella intero, attivabile e con ritorno al campo'
 
 test('Nuova scheda a 390: tab nella colonna e testo con spazio interno', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 960 });
-    await page.goto('/patients/new');
+    await openUnlockedDocument(page, '/patients/new');
     const nav = page.getByRole('navigation', { name: 'Sezioni della vista', exact: true });
     const title = await page.getByRole('heading', { name: 'Nuova scheda', exact: true }).boundingBox();
     for (const link of await nav.getByRole('link').all()) {
@@ -78,7 +78,7 @@ test('Nuova scheda a 390: tab nella colonna e testo con spazio interno', async (
 
 test('CSV: selettore italiano da tastiera, stato del file e allineamento alla colonna', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 960 });
-    await page.goto('/patients/import');
+    await openUnlockedDocument(page, '/patients/import');
     const panel = page.getByTestId('patient-bulk-import');
     const picker = page.getByRole('button', { name: 'Scegli file CSV', exact: true });
     await expect(picker).toBeEnabled();
