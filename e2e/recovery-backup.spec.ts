@@ -8,10 +8,27 @@ const phrase = 'Passphrase recupero soltanto sintetica';
 
 test('complete backup is encrypted in the browser and verification never claims a proven restore', async ({ page, baseURL }, testInfo) => {
     await page.route('**/api/siss/session-status', route => route.fulfill({ json: { status: 'unavailable', source: 'fixture', checkpoints: [] } }));
-    const pageErrors: string[] = [];
+    const pageErrors: string[] = []; const sent: string[] = [];
     page.on('pageerror', error => pageErrors.push(error.message));
+    page.on('request', request => { if (request.method() === 'POST') sent.push(request.postData() ?? ''); });
     expect((await page.request.post('/api/system/recovery-backup', { data: {}, headers: trustedWebRequestHeaders(baseURL) })).status()).toBe(401);
     await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/');
+    await page.getByLabel('Nome e cognome', { exact: true }).fill('Medico Sintetico Recupero');
+    await page.getByLabel('Nome dell’ambulatorio', { exact: true }).fill('Studio Sintetico Recupero');
+    await page.getByRole('button', { name: 'Avanti', exact: true }).click();
+    await page.getByLabel('Passphrase di accesso', { exact: true }).fill(phrase);
+    await page.getByLabel('Conferma passphrase', { exact: true }).fill(phrase);
+    await page.locator('#setup-pin').fill('recov1234');
+    await page.locator('#setup-confirm-pin').fill('recov1234');
+    await page.getByRole('button', { name: 'Prepara il kit di recupero', exact: true }).click();
+    const kit = page.getByTestId('recovery-kit');
+    const recoveryKey = await kit.getByLabel('Chiave di recupero').textContent();
+    const kitDownload = page.waitForEvent('download');
+    await kit.getByRole('button', { name: 'Scarica kit di recupero', exact: true }).click(); await kitDownload;
+    await kit.getByRole('checkbox').check();
+    await kit.getByRole('button', { name: 'Attiva la nuova passphrase', exact: true }).click();
+    await expect(page.getByLabel('Passphrase', { exact: true })).toBeEnabled();
     await bootstrapUnlockedSession(page, '1234', {
         displayName: 'Medico Sintetico Recupero', ambulatoryName: 'Studio Sintetico Recupero', passphrase: phrase,
     });
@@ -43,5 +60,11 @@ test('complete backup is encrypted in the browser and verification never claims 
     await expect(panel).toContainText('il programma non può impedire l’uso di una copia su un altro computer');
     await panel.screenshot({ path: testInfo.outputPath('recovery-backup-mobile.png') });
     expect((await requested).postData() ?? '').not.toContain(phrase);
+    const denied = await page.context().request.post('/api/system/recovery-backup', { data: {}, headers: {
+        Origin: 'https://untrusted.invalid', 'Sec-Fetch-Site': 'cross-site', 'x-mediflow-web-instance': 'ef'.repeat(32),
+    } });
+    expect(denied.status()).toBe(403);
+    expect(sent.join('\n')).not.toContain(phrase);
+    expect(recoveryKey).toBeTruthy(); expect(sent.join('\n')).not.toContain(recoveryKey!);
     expect(pageErrors).toEqual([]);
 });
