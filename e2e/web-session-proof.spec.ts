@@ -1,11 +1,10 @@
-import { existsSync } from 'node:fs';
-import { isAbsolute, join } from 'node:path';
-import { expect, test, type Page } from '@playwright/test';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { expect, type Page } from '@playwright/test';
 import { test as standalone } from './fixtures/isolated-runtime';
 import { documentRequests } from './fixtures/trusted-web-request';
 import { bootstrapUnlockedSession, onboardingPassphrase, openPatientSection, unlockIfNeeded } from './utils';
 
-test.use({ trace: 'off', video: 'off', screenshot: 'off' });
 standalone.use({ trace: 'off', video: 'off', screenshot: 'off' });
 
 async function recordNote(page: Page, note: string): Promise<string> {
@@ -174,17 +173,16 @@ pinAccount('con il PIN transitorio la ricarica di /settings/backup lascia la pag
     expect(await (await documentRequests(page).get('/api/auth/check')).json()).toMatchObject({ hasSession: false });
 });
 
-test('il client API locale autorizzato legge la lista pazienti', async ({ baseURL }) => {
-    const token = process.env.MEDIFLOW_SESSION_PROOF_SYNTHETIC_API_TOKEN;
-    const dataDirectory = process.env.MEDIFLOW_DATA_DIR;
-    if (!token || !baseURL || new URL(baseURL).hostname !== '127.0.0.1' || !dataDirectory || !isAbsolute(dataDirectory)
-        || process.env.MEDIFLOW_E2E_DISABLE_LEGACY_COPY !== '1' || !existsSync(join(dataDirectory, 'SYNTHETIC_ONLY'))) {
-        test.skip(true, 'Richiede il token generato dal runner sintetico.');
-        return;
-    }
-    const response = await fetch(new URL('/api/v1/patients', baseURL), {
-        headers: { Authorization: `Bearer ${token}` },
-        redirect: 'error',
-    });
+standalone('il client API locale legge la lista pazienti con il proprio token e senza la prova del documento', async ({ isolatedRuntime }) => {
+    const endpoint = new URL('/api/v1/patients', isolatedRuntime.url);
+    const anonymous = await fetch(endpoint, { redirect: 'error' });
+    expect(anonymous.status).toBe(401);
+    const tokenFile = join(isolatedRuntime.dataDirectory, 'local-api-token');
+    expect(existsSync(tokenFile)).toBe(true);
+    const token = readFileSync(tokenFile, 'utf8').trim();
+    expect(token).toMatch(/^[a-f0-9]{64}$/u);
+    const forged = await fetch(endpoint, { headers: { Authorization: `Bearer ${'0'.repeat(64)}` }, redirect: 'error' });
+    expect(forged.status).toBe(401);
+    const response = await fetch(endpoint, { headers: { Authorization: `Bearer ${token}` }, redirect: 'error' });
     expect(response.status).toBe(200);
 });

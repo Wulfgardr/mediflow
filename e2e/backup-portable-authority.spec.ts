@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
 import { serializeBackupArtifact } from '../lib/backup-artifact';
 import { bootstrapUnlockedSession, unlockIfNeeded } from './utils';
@@ -13,10 +14,6 @@ test('comando terapia nativo, backup e importazione portabile conservano storico
         test.skip(true, 'Richiede un server sintetico isolato.'); return;
     }
     const pin = process.env.E2E_PIN || '1234';
-    const localToken = process.env.MEDIFLOW_LOCAL_API_TOKEN;
-    if (!localToken) {
-        test.skip(true, 'Richiede il token API del runner sintetico.'); return;
-    }
     await fetch(baseURL + '/api/auth/native/therapy-status', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
     await bootstrapUnlockedSession(page, pin);
     const db = new Database(join(dir, 'medical.db'), { fileMustExist: true });
@@ -41,6 +38,11 @@ test('comando terapia nativo, backup e importazione portabile conservano storico
         db.prepare("INSERT INTO therapies(id,patient_id,drug_name,dosage,status,start_date,version) VALUES (?,?,?,?,'active',unixepoch(),1)").run(therapyId, patientId, 'Farmaco sintetico', 'Dose sintetica');
         const mode = await web.put('/api/settings/network.mode', { data: { value: 'network-home-base' } }); expect(mode.ok()).toBe(true);
         const intent = await call('/api/v1/network/pairing-intents', { deviceName: 'U2 sintetico', clientPlatform: 'macos', appVersion: '0.9.1', requestedCapabilities: ['network.replica.readonly-patients', 'network.replica.readonly-therapies', 'network.replica.write-therapies'] });
+        if (!process.env.MEDIFLOW_LOCAL_API_TOKEN && !existsSync(join(dir, 'local-api-token'))) {
+            const denied = await fetch(baseURL + `/api/v1/network/pairing-intents/${intent.intentId}/confirm`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+            expect(denied.status).toBe(401);
+        }
+        const localToken = process.env.MEDIFLOW_LOCAL_API_TOKEN || readFileSync(join(dir, 'local-api-token'), 'utf8').trim();
         const paired = await call(`/api/v1/network/pairing-intents/${intent.intentId}/confirm`, {}, { Authorization: `Bearer ${localToken}` });
         const peer = { 'x-mediflow-paired-client-id': paired.pairedClient.clientId, 'x-mediflow-paired-client-token': paired.pairedClientToken };
         const login = await call('/api/auth/native/login', { username: process.env.E2E_USERNAME || 'admin', password: pin }, peer);
@@ -94,6 +96,8 @@ test('comando terapia nativo, backup e importazione portabile conservano storico
         const imported = await (await import('../lib/backup-artifact')).parseBackupArtifact(JSON.parse(hostile));
         expect(db.prepare("SELECT subject_ref FROM audit_events WHERE event_id=? AND event_type='backup.portable.imported'").get(marker.request_id)).toEqual({ subject_ref: imported.manifest.checksum });
         expect(db.prepare('SELECT event_type,source_surface FROM audit_events WHERE event_id=?').get(forgedId)).toEqual({ event_type: 'patient.updated', source_surface: 'web' });
+        const stale = await web.post('/api/system/backup-restore', { headers: { ...renewedIntent, 'x-mediflow-restore-credential': JSON.stringify({ pin }) }, data: hostile });
+        expect([401, 409]).toContain(stale.status());
         expect((await web.get('/api/system/backup-restore')).status()).toBe(401);
         await bootstrapUnlockedSession(page, pin);
         const listed = await (await web.get('/api/system/audit?eventType=therapy.updated&limit=2')).json();
