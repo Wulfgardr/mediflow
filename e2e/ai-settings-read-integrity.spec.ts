@@ -68,6 +68,7 @@ for (const view of ['funzioni', 'modelli']) test(`AI settings ${view}: one faile
             model: settings.aiModel_clinical, state: 'missing', revision: 'a'.repeat(64), version: 0, receipt: null, canActivate: true, inference: 'not_run', qualification: 'not_assessed' } });
         if (path === '/api/system/ai-rollout-readiness') return route.fulfill({ json: { lanes: [], localControls: [] } });
         if (path === '/api/plugin-local-ui/pairing') return route.fulfill({ json: { available: false, pending: [], active: [] } });
+        if (path === '/api/device-pairing') return route.fulfill({ json: { clients: [] } });
         if (path === '/api/siss/session-status') return route.fulfill({ json: { status: 'unavailable', source: 'fixture', checkpoints: [] } });
         if (forbiddenRuntimePath(path) || /(?:ai|ollama|mlx|model|provider|download)/iu.test(path)) { blocked.push(path); return route.abort(); }
         return route.continue();

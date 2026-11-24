@@ -55,6 +55,7 @@
     "HomeBaseEntryFetchTests.swift",
     "HomeBaseOptionalServicesProbeTests.swift",
     "HomeBasePairedStoreTests.swift",
+    "HomeBasePairingLinkTests.swift",
     "HomeBasePatientCacheStoreTests.swift",
     "HomeBasePatientsClientTests.swift",
     "HomeBaseRuntimeNodeResolutionTests.swift",
