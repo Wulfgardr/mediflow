@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { assertKeyboardFocusProgresses, assertNoHorizontalOverflow, bootstrapUnlockedSession, openPatientSection } from './utils';
+import { assertKeyboardFocusProgresses, assertNoHorizontalOverflow, bootstrapUnlockedSession, openPatientSection, openUnlockedDocument } from './utils';
 
 type SyntheticDocumentInsight = {
   id: string;
@@ -82,7 +82,7 @@ async function seedSyntheticInsights(page: Page, patientId: string, insights: Sy
 }
 
 async function openDocumentSection(page: Page, patientId: string): Promise<void> {
-  await page.goto(`/patients/${patientId}/modules`);
+  await openUnlockedDocument(page, `/patients/${patientId}/modules`);
   await openPatientSection(page, 'documenti');
   await expect(page.locator('#documenti').getByRole('heading', { name: /Archivio documenti ed evidenze/ })).toBeVisible();
 }
@@ -159,7 +159,7 @@ test('Evidence Stack web: loading ed empty hanno segnali distinti', async ({ pag
     if (route.request().method() === 'GET') await patientRead;
     await route.continue();
   });
-  await page.goto(`/patients/${patientId}/modules`);
+  await openUnlockedDocument(page, `/patients/${patientId}/modules`);
   const loading = page.locator('[data-view-state=loading]').filter({ hasText: 'Caricamento scheda paziente…' });
   try {
     await expect(loading).toBeVisible();

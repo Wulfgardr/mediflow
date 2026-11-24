@@ -1,5 +1,6 @@
+import { documentRequests } from './fixtures/trusted-web-request';
 import { expect, test } from '@playwright/test';
-import { bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch } from './utils';
+import { bootstrapUnlockedSession, openPatientSection, setAiLaneKillSwitch, openUnlockedDocument } from './utils';
 
 test.describe.configure({ retries: 0 });
 test.beforeEach(async ({ baseURL }) => {
@@ -27,7 +28,7 @@ test('I-1 Web: crea e rilegge una scheda con tutte le funzioni AI spente', async
   const originalSettings: { key: string; value: string | null }[] = [];
   try {
     for (const key of ['aiPatientInsightKillSwitch', 'aiSmartImportKillSwitch', 'aiDocumentSynthesisKillSwitch'] as const) {
-      const before = await page.request.get(`/api/settings/${key}`);
+      const before = await documentRequests(page).get(`/api/settings/${key}`);
       expect(before.ok()).toBe(true);
       originalSettings.push({ key, value: (await before.json()).value });
       await setAiLaneKillSwitch(page, key, 'disabled');
@@ -40,12 +41,12 @@ test('I-1 Web: crea e rilegge una scheda con tutte le funzioni AI spente', async
       if (!response.ok) throw new Error(`Creazione: ${response.status}`);
       return (await response.json()).id as string;
     });
-    await page.goto(`/patients/${id}/modules`);
+    await openUnlockedDocument(page, `/patients/${id}/modules`);
     await openPatientSection(page, 'attenzione');
     const disclosure = page.locator('#patient-insight').locator(':scope > div > [data-disclosure-control]');
     if (await disclosure.getAttribute('aria-expanded') !== 'true') await disclosure.click();
     await expect(page.getByTestId('patient-insight-disabled-card')).toBeVisible();
-    const response = await page.request.get(`/api/patients/${id}`);
+    const response = await documentRequests(page).get(`/api/patients/${id}`);
     expect(response.ok()).toBe(true);
     expect(await response.text()).toContain(id);
     expect(unexpectedRequests).toEqual([]);

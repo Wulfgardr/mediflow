@@ -2,7 +2,7 @@ import { expect, test, type Page, type Locator, type Response } from '@playwrigh
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
-import { bootstrapUnlockedSession, assertNotClippedInViewport } from './utils';
+import { openUnlockedDocument, bootstrapUnlockedSession, assertNotClippedInViewport } from './utils';
 import { installFunctionsEgressGuard } from './fixtures/settings-functions';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 
@@ -261,7 +261,7 @@ test('Scales library: search pending, error, empty, long identity and stale-term
             for (const mode of ['error', 'ready'] as const) {
                 mock.state.list = mode;
                 await mock.observeRead('/api/patients', mode, async () => {
-                    await page.goto('/scales');
+                    await openUnlockedDocument(page, '/scales');
                     await page.locator('#catalogo').getByRole('button', { name: /ADL \(Indice di Katz\)/u }).click();
                 });
                 const section = page.locator('#paziente');
@@ -276,7 +276,7 @@ test('Scales library: search pending, error, empty, long identity and stale-term
         for (const mode of ['pending', 'error', 'empty', 'ready'] as const) {
             mock.state.list = mode;
             await mock.observeRead('/api/patients', mode, async () => {
-                await page.goto('/scales');
+                await openUnlockedDocument(page, '/scales');
                 await page.getByRole('button', { name: /ADL \(Indice di Katz\)/u }).click();
             });
             const section = page.locator('#paziente'), start = section.getByRole('button', { name: /^Avvia /u });
@@ -359,7 +359,7 @@ test('Patient scales library: pending, failed, absent and ready patient before o
         await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
         if (visualSupplement) {
             mock.state.patient = 'missing';
-            await mock.observeRead(`/api/patients/${patientId}`, 'missing', () => page.goto(`/patients/${patientId}/scales`));
+            await mock.observeRead(`/api/patients/${patientId}`, 'missing', () => openUnlockedDocument(page, `/patients/${patientId}/scales`));
             const target = baseline ? page.getByRole('heading', { name: 'Scale cliniche', exact: true }) : page.locator('#libreria').getByRole('status');
             mock.observations.push({ visualOnly: true, state: 'patient-library-missing', baselineDefect: baseline ? 'Absent patient still offers start' : null });
             await supplementFrames(zoom, target, 'patient-library-missing', mock.frames, mock.reusedFrames);
@@ -367,7 +367,7 @@ test('Patient scales library: pending, failed, absent and ready patient before o
         }
         for (const mode of ['pending', 'error', 'missing', 'ready'] as const) {
             mock.state.patient = mode;
-            await mock.observeRead(`/api/patients/${patientId}`, mode, () => page.goto(`/patients/${patientId}/scales`));
+            await mock.observeRead(`/api/patients/${patientId}`, mode, () => openUnlockedDocument(page, `/patients/${patientId}/scales`));
             const library = page.locator('#libreria'), links = library.getByRole('link');
             await expect(links).toHaveCount(baseline || mode === 'ready' ? 5 : 0);
             if (!baseline && mode !== 'ready') await expect(library.getByRole(mode === 'error' ? 'alert' : 'status')).toHaveCount(1);
@@ -397,7 +397,7 @@ test('Scale runner: patient pending, failure and absence never become a valid fo
         await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
         if (visualSupplement) {
             mock.state.patient = 'error';
-            await mock.observeRead(`/api/patients/${patientId}`, 'error', () => page.goto(`/patients/${patientId}/scales/adl`));
+            await mock.observeRead(`/api/patients/${patientId}`, 'error', () => openUnlockedDocument(page, `/patients/${patientId}/scales/adl`));
             const target = page.locator('#scala').getByRole(baseline ? 'status' : 'alert');
             mock.observations.push({ visualOnly: true, state: 'runner-error', baselineDefect: baseline ? 'Read error still shown as loading' : null });
             await supplementFrames(zoom, target, 'runner-error', mock.frames, mock.reusedFrames);
@@ -405,7 +405,7 @@ test('Scale runner: patient pending, failure and absence never become a valid fo
         }
         for (const mode of ['pending', 'error', 'missing', 'ready'] as const) {
             mock.state.patient = mode;
-            await mock.observeRead(`/api/patients/${patientId}`, mode, () => page.goto(`/patients/${patientId}/scales/adl`));
+            await mock.observeRead(`/api/patients/${patientId}`, mode, () => openUnlockedDocument(page, `/patients/${patientId}/scales/adl`));
             const form = page.locator('#scala');
             if (mode === 'ready') {
                 await expect(form.getByRole('radio')).not.toHaveCount(0);

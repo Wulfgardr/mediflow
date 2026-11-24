@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { bootstrapUnlockedSession, openPatientSection, unlockIfNeeded } from './utils';
+import { bootstrapUnlockedSession, openPatientSection, unlockIfNeeded, openUnlockedDocument } from './utils';
 import { sealDiaryEntry } from './fixtures/sealed-diary-entry';
 
 async function patient(page: Page) {
@@ -16,7 +16,7 @@ async function patient(page: Page) {
 
 test('conferma senza campi: focus sul ritorno, Escape e chiusura restituiscono il trigger', async ({ page }) => {
     const id = await patient(page);
-    await page.goto(`/patients/${id}/entries/new`);
+    await openUnlockedDocument(page, `/patients/${id}/entries/new`);
     const editor = page.getByRole('textbox', { name: 'Resoconto clinico', exact: true });
     await expect(editor.or(page.getByRole('heading', { name: 'Sblocca MediFlow', exact: true }))).toBeVisible();
     await unlockIfNeeded(page, process.env.E2E_PIN || '1234');

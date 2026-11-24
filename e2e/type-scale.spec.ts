@@ -179,6 +179,7 @@ const ROUTES = ['/', '/?area=incarico', '/?area=turno', '/?area=diario', '/?area
   '/patients/[id]/entries/new', '/patients/[id]/edit', '/patients/new', '/patients/import', ...settingsRoutes()];
 
 const typographyTest = isolatedTest.extend<{ patientFixture: { id: string; name: string } }>({
+  existingPin: process.env.E2E_PIN || '1234',
   patientFixture: async ({ page }, runTest) => {
     const fixture = await createFixture(page);
     try {

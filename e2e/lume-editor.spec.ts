@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { bootstrapUnlockedSession } from './utils';
+import { openUnlockedDocument, bootstrapUnlockedSession } from './utils';
 
 test.describe.configure({ retries: 0 });
 
@@ -215,7 +215,7 @@ test('editor Lume compone un solo lavoro focale in giorno e grafite, wide e narr
   for (const viewCase of VIEW_CASES) {
     await page.setViewportSize({ width: viewCase.width, height: viewCase.height });
     await setRegister(page, viewCase.register);
-    await page.goto(`/patients/${patient.id}/entries/new`);
+    await openUnlockedDocument(page, `/patients/${patient.id}/entries/new`);
     await expect(page.locator('html')).toHaveClass(viewCase.register === 'grafite' ? /dark/ : /light/);
     await expect(page.getByRole('heading', { name: 'Nuova voce clinica', exact: true })).toBeVisible();
     await assertEditorComposition(page, viewCase);
@@ -241,7 +241,7 @@ test('review e handoff espongono fiducia ispezionabile e una primaria per caso',
     await page.setViewportSize({ width: viewCase.width, height: viewCase.height });
 
     await setRegister(page, viewCase.register);
-    await page.goto(`/?area=revisione&paziente=${patient.id}`);
+    await openUnlockedDocument(page, `/?area=revisione&paziente=${patient.id}`);
     await expect(page.locator('html')).toHaveClass(viewCase.register === 'grafite' ? /dark/ : /light/);
     const reviewCase = page.getByTestId('lume-review-case');
     await expect(reviewCase).toContainText(patient.name);
@@ -251,7 +251,7 @@ test('review e handoff espongono fiducia ispezionabile e una primaria per caso',
     }
 
     await setRegister(page, viewCase.register);
-    await page.goto(`/?area=handoff&paziente=${patient.id}`);
+    await openUnlockedDocument(page, `/?area=handoff&paziente=${patient.id}`);
     await expect(page.locator('html')).toHaveClass(viewCase.register === 'grafite' ? /dark/ : /light/);
     const handoffCase = page.getByTestId('lume-handoff-case');
     await expect(handoffCase).toContainText(patient.name);
@@ -265,7 +265,7 @@ test('review e handoff espongono fiducia ispezionabile e una primaria per caso',
 
 test('alias di review conserva i layout dei moduli propri', async ({ page }) => {
   await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-  await page.goto('/mockups/kree8');
+  await openUnlockedDocument(page, '/mockups/kree8');
 
   await page.getByRole('button', { name: 'Apri documenti', exact: true }).click();
   await expect(page.getByRole('heading', { name: /Referto cardiologico/ })).toBeVisible();

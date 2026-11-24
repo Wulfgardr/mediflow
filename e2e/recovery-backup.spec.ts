@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import { test, expect } from './fixtures/isolated-runtime';
+import { bootstrapUnlockedSession } from './utils';
 import { trustedWebRequestHeaders } from './fixtures/trusted-web-request';
 
 test.describe.configure({ retries: 0 });
@@ -28,22 +29,18 @@ test('complete backup is encrypted in the browser and verification never claims 
     await kit.getByRole('checkbox').check();
     await kit.getByRole('button', { name: 'Attiva la nuova passphrase', exact: true }).click();
     await expect(page.getByLabel('Passphrase', { exact: true })).toBeEnabled();
-    await expect(page.getByRole('button', { name: 'Rinnova accesso', exact: true })).toHaveCount(0);
-    await page.getByLabel('Passphrase', { exact: true }).fill(phrase);
-    await page.getByRole('button', { name: 'Sblocca', exact: true }).click();
+    await bootstrapUnlockedSession(page, '1234', {
+        displayName: 'Medico Sintetico Recupero', ambulatoryName: 'Studio Sintetico Recupero', passphrase: phrase,
+    });
     const navigation = page.getByRole('navigation', { name: 'Navigazione principale', exact: true });
-    const manual = page.getByRole('link', { name: 'Apri la cartella manualmente', exact: true });
-    await expect(navigation.or(manual).first()).toBeVisible();
-    if (await manual.isVisible()) await manual.click();
+    await expect(navigation).toBeVisible();
     await navigation.locator('summary').filter({ hasText: /^Altro$/u }).click();
     await page.getByRole('link', { name: 'Impostazioni', exact: true }).click();
     await page.locator('a[href="/settings/backup"]:visible').click();
     const panel = page.getByRole('region', { name: 'Backup completo di recupero', exact: true });
     await expect(panel).toBeVisible();
-    const denied = await page.request.post('/api/system/recovery-backup', { data: {}, headers: {
-        Origin: 'https://untrusted.invalid', 'Sec-Fetch-Site': 'cross-site',
-    } });
-    expect(denied.status()).toBe(403);
+    const requested = page.waitForRequest(request =>
+        new URL(request.url()).pathname === '/api/system/recovery-backup' && request.method() === 'POST');
     const downloadEvent = page.waitForEvent('download');
     await panel.getByRole('button', { name: 'Crea backup completo cifrato', exact: true }).click();
     const download = await downloadEvent;
@@ -62,6 +59,11 @@ test('complete backup is encrypted in the browser and verification never claims 
     await panel.getByText('Recupero su un computer nuovo', { exact: true }).click();
     await expect(panel).toContainText('il programma non può impedire l’uso di una copia su un altro computer');
     await panel.screenshot({ path: testInfo.outputPath('recovery-backup-mobile.png') });
+    expect((await requested).postData() ?? '').not.toContain(phrase);
+    const denied = await page.context().request.post('/api/system/recovery-backup', { data: {}, headers: {
+        Origin: 'https://untrusted.invalid', 'Sec-Fetch-Site': 'cross-site', 'x-mediflow-web-instance': 'ef'.repeat(32),
+    } });
+    expect(denied.status()).toBe(403);
     expect(sent.join('\n')).not.toContain(phrase);
     expect(recoveryKey).toBeTruthy(); expect(sent.join('\n')).not.toContain(recoveryKey!);
     expect(pageErrors).toEqual([]);

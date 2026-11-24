@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { bootstrapUnlockedSession, openPatientSection } from './utils';
+import { bootstrapUnlockedSession, openPatientSection, openUnlockedDocument } from './utils';
 
 async function createPatient(
   page: Page,
@@ -62,7 +62,7 @@ test('Scheda paziente renders coded diagnoses and an explicit no-diagnosis state
     diagnoses: [],
   });
 
-  await page.goto(`/patients/${patientWithDiagnosisId}/modules`);
+  await openUnlockedDocument(page, `/patients/${patientWithDiagnosisId}/modules`);
   await expect(page.getByRole('heading', { name: `Header${suffix} Icd${suffix}`, exact: true })).toBeVisible();
   const summaryLink = page.getByRole('navigation', { name: 'Sezioni della vista', exact: true })
     .getByRole('link', { name: 'Riepilogo', exact: true });
@@ -109,7 +109,7 @@ test('Scheda paziente renders coded diagnoses and an explicit no-diagnosis state
   - text: BA00 · ICD-11`
   );
 
-  await page.goto(`/patients/${patientWithoutDiagnosisId}/modules`);
+  await openUnlockedDocument(page, `/patients/${patientWithoutDiagnosisId}/modules`);
   await summaryLink.click();
   await expect(summaryLink).toHaveAttribute('aria-current', 'location');
   const emptyQuadro = page.getByRole('region', {

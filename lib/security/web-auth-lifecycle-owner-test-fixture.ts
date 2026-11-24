@@ -3,12 +3,16 @@ import { join } from 'node:path';
 import { bindSessionToArchive, currentArchiveGeneration } from './archive-session-generation';
 import {
     begin,
+    mintResourcePort,
+    registerPrivateResource,
     bootstrapControl,
     issue,
     resolve,
     retire,
     retireForUser,
 } from './web-auth-lifecycle-owner-adapter';
+import { syntheticWebClientRequest } from './loopback-ingress-test-fixture';
+import { presentedWebSessionProof, webSessionProofBindings } from './web-session-proof';
 import type { ServerSession } from './server-session';
 
 type SyntheticWebUser = Readonly<{ id: string; username: string; role: string }>;
@@ -32,6 +36,14 @@ export function issueSyntheticWebSessionContext(user: SyntheticWebUser, suffix: 
     if (!issued) throw new Error('Synthetic Web issue unavailable');
     const resolution = resolve(issued.sessionId, control.controlId);
     if (resolution.status !== 'active') throw new Error('Synthetic Web projection unavailable');
+    const proof = presentedWebSessionProof(syntheticWebClientRequest('http://127.0.0.1').headers);
+    const port = mintResourcePort(resolution.projection);
+    if (!proof || !port) throw new Error('Synthetic Web proof unavailable');
+    const revoke = webSessionProofBindings.bind(control.controlId, issued.sessionId, resolution.projection.expiresAt, proof);
+    if (!registerPrivateResource(port, revoke)) {
+        revoke();
+        throw new Error('Synthetic Web proof registration unavailable');
+    }
     if (process.env.MEDIFLOW_DATA_DIR && existsSync(join(process.env.MEDIFLOW_DATA_DIR, 'medical.db')))
         bindSessionToArchive(resolution.projection, currentArchiveGeneration());
     return Object.freeze({

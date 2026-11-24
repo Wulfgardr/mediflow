@@ -6,10 +6,15 @@ async function pair() {
     const name = 'synthetic-tab-key-' + crypto.randomUUID();
     let binding: string | null = 'synthetic-session-1';
     let active = true;
-    const health = async () => active ? binding : null;
-    const current = () => binding;
-    const a = createTabKeyShare<{ id: string }>(new BroadcastChannel(name), health, current);
-    const b = createTabKeyShare<{ id: string }>(new BroadcastChannel(name), health, current);
+    const access = (recipient: string) => ({
+        currentBinding: () => binding,
+        recipient: async () => recipient,
+        offer: async () => active,
+        accept: async () => active ? binding : null,
+        reconcile() {},
+    });
+    const a = createTabKeyShare<{ id: string }>(new BroadcastChannel(name), access('a'.repeat(64)));
+    const b = createTabKeyShare<{ id: string }>(new BroadcastChannel(name), access('b'.repeat(64)));
     const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
     await a.publish({ key, user: { id: 'synthetic-doctor' }, wrapping: null });
     return { a, b, key, revoke() { active = false; }, replace() { binding = 'synthetic-session-2'; }, close() { a.dispose(); b.dispose(); } };

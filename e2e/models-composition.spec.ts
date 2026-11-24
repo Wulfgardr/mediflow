@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { buildFunctionStatus } from '../lib/function-status';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
-import { bootstrapUnlockedSession, assertNoHorizontalOverflow } from './utils';
+import { bootstrapUnlockedSession, assertNoHorizontalOverflow, openUnlockedDocument, unlockIfNeeded } from './utils';
 import { applyAiConfigurationMock } from './fixtures/ai-settings-configuration';
 
 const clinical = 'synthetic-clinical:latest', reasoning = 'synthetic-reasoning:latest';
@@ -110,7 +110,7 @@ test('Modelli: letture chiuse, scelta e bozza, gerarchia e attivazione soltanto 
     try {
         await bootstrapUnlockedSession(page, '1234');
         mock.state.holdSettings = true;
-        await page.goto('/settings/ai/modelli');
+        await openUnlockedDocument(page, '/settings/ai/modelli');
         await expect(page.getByTestId('ai-settings-controls')).toHaveAttribute('disabled', ''); await expect(save).toBeDisabled();
         await expect(page.getByRole('status').filter({ hasText: 'Caricamento delle impostazioni' })).toBeVisible();
         await capture('caricamento'); mock.state.holdSettings = false; mock.releaseSettings();
@@ -162,6 +162,7 @@ test('Modelli: letture chiuse, scelta e bozza, gerarchia e attivazione soltanto 
         expect(mock.onboarding()).toMatchObject({ inference: 'not_run', qualification: 'not_assessed' });
         expect(mock.calls.filter(call => call.path === '/api/ai/local-provider/onboarding' && call.method === 'POST')).toHaveLength(1);
         mock.state.settingsFailed = true; await page.reload();
+        await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
         await expect(page.getByTestId('ai-settings-controls')).toHaveAttribute('disabled', ''); await expect(save).toBeDisabled();
         await expect(region).toContainText('Impossibile leggere le impostazioni.');
         await expect(region).not.toContainText('Nessun modello installato');

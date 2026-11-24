@@ -40,8 +40,8 @@
     "owner": "@Wulfgardr"
   },
   {
-    "path": "e2e/fixtures/concept-patient.ts",
-    "reason": "WUL-894: prepara la cartella sintetica usata dalle prove della scheda paziente e delle proposte; i test sono registrati negli spec Playwright.",
+    "path": "e2e/fixtures/synthetic-sheet.ts",
+    "reason": "WUL-894: fixture di accesso e preparazione dei dati usata da patient-concept.spec.ts e patient-sheet-diary-reading.spec.ts; nessun test autonomo.",
     "owner": "@Wulfgardr"
   },
   {

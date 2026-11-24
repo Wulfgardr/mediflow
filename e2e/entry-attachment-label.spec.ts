@@ -2,7 +2,7 @@ import { diaryEntrySealer } from './fixtures/sealed-diary-entry';
 import { expect, test, type Locator } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
-import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow } from './utils';
+import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow, openUnlockedDocument } from './utils';
 
 test('Allegati del Diario: etichetta neutra senza dedurre generazione dalla sintesi', async ({ baseURL }) => {
     test.setTimeout(120_000);
@@ -40,7 +40,7 @@ test('Allegati del Diario: etichetta neutra senza dedurre generazione dalla sint
             const old = await post('entries', { patientId: patient.id, type: 'note', date: '2026-10-01', title: 'Allegati storici inventati', content: 'Voce storica inventata, senza nuove elaborazioni.', attachments: historicalIds });
             return { patientId: patient.id as string, historicalIds, oldEntryId: old.id as string };
         }, { sources, seal: await diaryEntrySealer(page) });
-        await page.goto(`/patients/${fixture.patientId}/entries/new`);
+        await openUnlockedDocument(page, `/patients/${fixture.patientId}/entries/new`);
         await expect(page.getByTestId('progressive-entry-composer').locator(':scope > header')).toContainText('Sintetici Allegati');
         await page.getByRole('textbox', { name: 'Resoconto clinico', exact: true }).fill('Voce manuale inventata con originale allegato.');
         await page.locator('input[type="file"]').setInputFiles({ name: sources[0].name, mimeType: 'text/plain', buffer: Buffer.from(sources[0].text) });
@@ -106,7 +106,7 @@ test('Allegati del Diario: etichetta neutra senza dedurre generazione dalla sint
         await expect(summaries).toBeFocused();
         await page.keyboard.press('Enter');
         await verifySummaries(recent, 'scheda');
-        await page.goto(`/patients/${fixture.patientId}/entries/new`);
+        await openUnlockedDocument(page, `/patients/${fixture.patientId}/entries/new`);
         await form.locator('summary').filter({ hasText: 'Consulta cartella' }).press('Enter');
         await verifySummaries(form, 'separato');
         expect(await snapshot()).toEqual(before); expect(writes).toEqual([]); expect(preparations).toEqual([]); expect(external).toEqual([]); expect(errors).toEqual([]);

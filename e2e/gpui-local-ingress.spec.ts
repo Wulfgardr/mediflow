@@ -7,6 +7,7 @@ import http from 'node:http';
 import https from 'node:https';
 import { once } from 'node:events';
 import { randomUUID } from 'node:crypto';
+import { localClientProofHeaders } from './fixtures/trusted-web-request';
 
 const base = new URL(process.env.E2E_BASE_URL || 'http://127.0.0.1:3000');
 if (base.port === '3000' || !['127.0.0.1', '[::1]'].includes(base.hostname)) {
@@ -45,15 +46,20 @@ test('server binds GPUI authority to its socket ingress across login, both write
         });
     try {
         await expect.poll(() => output, { timeout: 15_000 }).toContain('TLS proxy listening');
-        const checked = await call('/api/auth/check');
+        const withoutProof = await call('/api/auth/check');
+        expect(withoutProof.headers['set-cookie'] ?? []).not.toContainEqual(expect.stringMatching(/^mediflow_auth_control=/u));
+        const proof = localClientProofHeaders();
+        const checked = await call('/api/auth/check', 'GET', proof);
         const control = checked.headers['set-cookie']!.find(value => value.startsWith('mediflow_auth_control='))!.split(';')[0];
-        const auth = { Cookie: control, 'If-Match': String(checked.headers.etag), 'Idempotency-Key': randomUUID() };
+        const unproven = { Cookie: control, 'If-Match': String(checked.headers.etag) };
+        expect((await call('/api/auth/local-client/login', 'POST', { ...unproven, 'Idempotency-Key': randomUUID() }, {username, password}, 'ipv6', 'mediflow.local')).status).toBe(403);
+        const auth = { ...proof, ...unproven, 'Idempotency-Key': randomUUID() };
         const forged = { ...auth, 'x-mediflow-server-loopback': 'a'.repeat(64), 'x-mediflow-proxy-loopback': 'a'.repeat(64), 'x-forwarded-for': '::1' };
         expect((await call('/api/auth/local-client/login', 'POST', forged, {username, password}, 'lan')).status).toBe(403);
         const logged = await call('/api/auth/local-client/login', 'POST', auth, {username, password}, 'ipv6', 'mediflow.local');
         expect(logged.status, JSON.stringify(logged.json)).toBe(200);
         const cookie = logged.headers['set-cookie']!.find(value => value.startsWith('mediflow_session='))!.split(';')[0];
-        const session = { Cookie: `${cookie}; ${control}`, 'x-mediflow-archive-generation': logged.json.archiveGeneration };
+        const session = { ...proof, Cookie: `${cookie}; ${control}`, 'x-mediflow-archive-generation': logged.json.archiveGeneration };
         const patient = await call('/api/patients', 'POST', session, { firstName: 'Ada', lastName: 'Prova sintetica GPUI', taxCode: `SYN${randomUUID()}`, birthDate: '1980-01-01' });
         expect(patient.status).toBe(201);
         const id = randomUUID();

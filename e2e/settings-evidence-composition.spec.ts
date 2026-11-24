@@ -2,7 +2,7 @@ import { closureGallery, settingsClosure } from './fixtures/settings-closure-gal
 import { test, expect, type Locator, type Page } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
-import { bootstrapUnlockedSession, assertNoHorizontalOverflow } from './utils';
+import { openUnlockedDocument, bootstrapUnlockedSession, assertNoHorizontalOverflow } from './utils';
 import { fetchInterceptedRequest } from './fixtures/trusted-web-request';
 
 const providerSettings = Object.freeze({ aiProvider: 'ollama', aiUrl: 'http://127.0.0.1:11434', ollamaUrl: 'http://127.0.0.1:11434' });
@@ -99,7 +99,7 @@ test('Settings evidence: composition, disclosed checks and failed update reread'
     let releaseRead: (() => void) | undefined, releaseWho: (() => void) | undefined;
     try {
         await bootstrapUnlockedSession(page, '1234');
-        await page.goto('/settings/compliance');
+        await openUnlockedDocument(page, '/settings/compliance');
         const compliance = page.getByTestId('settings-compliance-section');
         await expect(compliance).toBeVisible();
         await gallery('compliance', compliance.getByRole('heading', { name: 'Evidenze e conformità', exact: true }));
@@ -118,7 +118,7 @@ test('Settings evidence: composition, disclosed checks and failed update reread'
             await control.press('Enter'); await expect(control).toHaveAttribute('aria-expanded', 'false');
             await expect(status).toBeVisible(); await expect(limitation).toBeVisible();
         }
-        await page.goto('/settings/diagnostica');
+        await openUnlockedDocument(page, '/settings/diagnostica');
         const diagnostics = page.getByTestId('settings-diagnostics-section');
         await expect(page.getByTestId('diagnostic-service-ai')).toContainText('Raggiungibile');
         await expect(page.getByTestId('diagnostic-service-icd')).toContainText('Disattivato');
@@ -240,7 +240,7 @@ test('Settings evidence: aggiornamenti non leggibili alla prima apertura', async
     const fixture = await installSettingsEvidenceMocks(page, baseURL!);
     try {
         await bootstrapUnlockedSession(page, '1234'); fixture.state.update = 'error';
-        await page.goto('/settings/diagnostica');
+        await openUnlockedDocument(page, '/settings/diagnostica');
         const updates = page.getByTestId('settings-update-awareness-panel');
         await expect(updates.getByRole('alert')).toContainText('Errore: HTTP 503');
         await expect(updates).not.toContainText('0.9.1-synthetic-next');

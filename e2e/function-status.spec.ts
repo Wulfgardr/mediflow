@@ -1,5 +1,6 @@
+import { documentRequests } from './fixtures/trusted-web-request';
 import { expect, test } from '@playwright/test';
-import { bootstrapUnlockedSession } from './utils';
+import { bootstrapUnlockedSession, openUnlockedDocument } from './utils';
 import { WHO_LOCAL_BINDING_ID } from '../lib/reference-data/icd11-who-local-contract';
 import { FUNCTION_IDS } from '../lib/function-status';
 import { readFileSync } from 'node:fs';
@@ -10,7 +11,7 @@ test('function configuration is authenticated, complete and distinguishes failed
     expect((await request.get('/api/system/function-status')).status()).toBe(401);
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
     await page.route('**/api/system/function-status', route => route.fulfill({ status: 503, json: { error: 'synthetic_unavailable' } }));
-    await page.goto('/settings/ai/fabric');
+    await openUnlockedDocument(page, '/settings/ai/fabric');
     const panel = page.getByTestId('function-status-panel');
     await expect(panel.getByRole('alert')).toContainText('non significa che le funzioni siano spente');
     await expect(panel.locator('[data-testid^="function-state-"]')).toHaveCount(0);
@@ -19,13 +20,13 @@ test('function configuration is authenticated, complete and distinguishes failed
     await expect(panel).toContainText('Configurazione letta il');
     await expect(panel.locator('[data-testid^="function-state-"]')).toHaveCount(6);
     await expect(panel.getByTestId('function-state-icd11')).toHaveCount(0);
-    const completeStatus = await page.request.get('/api/system/function-status');
+    const completeStatus = await documentRequests(page).get('/api/system/function-status');
     expect(completeStatus.status()).toBe(200);
     expect((await completeStatus.json()).functions.map((row: { id: string }) => row.id)).toEqual(FUNCTION_IDS);
     await expect(panel.getByTestId('function-state-patient_insight')).toContainText('Spenta');
     await expect(panel.getByTestId('function-state-document_ocr')).toContainText('Apple Vision');
     await expect(panel).toContainText('Questo controllo non esegue modelli');
-    const response = await page.request.get('/api/system/function-status?unexpected=1');
+    const response = await documentRequests(page).get('/api/system/function-status?unexpected=1');
     expect(response.status()).toBe(400);
 });
 
@@ -57,7 +58,7 @@ test('WHO local verification is explicit and separates direct response, cache an
                 fetchedAt: '2026-09-06T01:00:00.000Z', expiresAt: '2026-09-07T01:00:00.000Z', completedAt: '2026-09-06T01:00:00.000Z' },
         } });
     });
-    await page.goto('/settings/repertori#who-setup');
+    await openUnlockedDocument(page, '/settings/repertori#who-setup');
     const panel = page.getByTestId('who-setup-panel');
     await expect(panel).toContainText('Servizio WHO ICD-11 disattivato');
     const verify = panel.getByRole('button', { name: 'Verifica con termine di esempio', exact: true });
@@ -110,7 +111,7 @@ test('WHO selection survives real encrypted patient create/update/read and unrel
                 ...reference, deployment: 'local', source: 'live', resultCount: 1, latencyMs: 1,
                 fetchedAt: '2026-09-06T01:00:00.000Z', completedAt: '2026-09-06T01:00:00.000Z', expiresAt: '2026-09-07T01:00:00.000Z' } } });
     });
-    await page.goto('/patients/new');
+    await openUnlockedDocument(page, '/patients/new');
     await page.locator('input[name="firstName"]').fill('Sintetico');
     await page.locator('input[name="lastName"]').fill('WhoSidecar');
     await page.getByLabel('Identificativo', { exact: true }).selectOption('other');
@@ -133,7 +134,7 @@ test('WHO selection survives real encrypted patient create/update/read and unrel
     const patientId = written.id as string;
     await expect(page).toHaveURL(new URL('/?area=incarico', baseURL!).href);
     const assertReread = async () => {
-        await page.goto(`/patients/${patientId}/edit`);
+        await openUnlockedDocument(page, `/patients/${patientId}/edit`);
         await expect(page.locator('input[name="diagnoses.0.code"]')).toHaveValue(code);
         await expect(page.locator('input[name="diagnoses.0.description"]')).toHaveValue(title);
         await page.getByText('Riferimento della selezione WHO', { exact: true }).click();
@@ -159,7 +160,7 @@ test('WHO selection survives real encrypted patient create/update/read and unrel
     expect(edited.request().postDataJSON()).not.toHaveProperty('diagnoses');
     await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules$`));
     await assertReread();
-    const stored = await page.request.get(`/api/patients/${patientId}`);
+    const stored = await documentRequests(page).get(`/api/patients/${patientId}`);
     expect((await stored.json()).diagnoses).toMatch(/^ENC:/u);
     expect(searches).toBe(2);
 });
@@ -171,13 +172,13 @@ test('embedded ICD catalog searches, checks and saves a diagnosis with the real 
         || !['localhost', '127.0.0.1'].includes(new URL(baseURL!).hostname)
         || !readFileSync(path.join(dataDir, 'SYNTHETIC_ONLY'), 'utf8').includes('WHO local sidecar')) throw new Error('Marked isolated synthetic database required');
     await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
-    const readiness = await page.request.get('/api/icd/proxy');
+    const readiness = await documentRequests(page).get('/api/icd/proxy');
     expect(readiness.status()).toBe(200);
     expect((await readiness.json()).deployment).toBe('embedded');
-    const search = await page.request.get('/api/icd/proxy?q=hypert');
+    const search = await documentRequests(page).get('/api/icd/proxy?q=hypert');
     expect(search.status()).toBe(200);
     expect((await search.json()).receipt.source).toBe('embedded');
-    await page.goto('/settings/repertori#who-setup');
+    await openUnlockedDocument(page, '/settings/repertori#who-setup');
     const catalog = page.getByTestId('who-embedded-catalog');
     await expect(catalog).toContainText('Pronto');
     await expect(catalog).toContainText('Inglese');
@@ -185,7 +186,7 @@ test('embedded ICD catalog searches, checks and saves a diagnosis with the real 
     await catalog.getByRole('button', { name: 'Aggiorna dalla WHO', exact: true }).click();
     await expect(page.getByRole('dialog')).toContainText('Non invia dati clinici');
     await page.getByRole('dialog').getByRole('button', { name: 'Annulla', exact: true }).click();
-    await page.goto('/patients/new');
+    await openUnlockedDocument(page, '/patients/new');
     await page.locator('input[name="firstName"]').fill('Sintetico');
     await page.locator('input[name="lastName"]').fill('CatalogoIncorporato');
     await page.getByLabel('Identificativo', { exact: true }).selectOption('other');
@@ -205,7 +206,7 @@ test('embedded ICD catalog searches, checks and saves a diagnosis with the real 
     const written = saved.request().postDataJSON();
     expect(written.diagnoses).toMatch(/^ENC:/u);
     await expect(page).toHaveURL(new URL('/?area=incarico', baseURL!).href);
-    await page.goto(`/patients/${written.id}/edit`);
+    await openUnlockedDocument(page, `/patients/${written.id}/edit`);
     await expect(page.locator('input[name="diagnoses.0.code"]')).toHaveValue('BA00');
     await expect(page.locator('input[name="diagnoses.0.description"]')).toHaveValue('Essential hypertension');
     await page.getByText('Riferimento della selezione WHO', { exact: true }).click();

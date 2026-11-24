@@ -1,6 +1,7 @@
+import { documentRequests } from './fixtures/trusted-web-request';
 import { expect, test, type Page, type Request } from '@playwright/test';
 
-import { openDocumentActions, assertNoHorizontalOverflow, bootstrapUnlockedSession, openPatientSection } from './utils';
+import { openDocumentActions, assertNoHorizontalOverflow, bootstrapUnlockedSession, openPatientSection, openUnlockedDocument } from './utils';
 import { chooserReady, installKeyboardChooserObservation, keyboardChooserDecision, type KeyboardChooserSnapshot } from './anydoc-keyboard-chooser';
 
 const SYNTHETIC_ATTACHMENT_NAME = 'allegato-anydoc-focus-sintetico.pdf';
@@ -61,7 +62,7 @@ async function createExtractableRtf(page: Page, patientId: string): Promise<Read
   expect(uploaded.patientId).toBe(patientId);
   expect(uploaded.data).toMatch(/^ENC:/u);
   // Cold webpack compilation of the detail route reloads the in-memory grant broker.
-  const detail = await page.request.get(`/api/attachments/${uploaded.id}`);
+  const detail = await documentRequests(page).get(`/api/attachments/${uploaded.id}`);
   expect(detail.status()).toBe(200);
   expect((await detail.json() as { data: string }).data).toBe(uploaded.data);
   return { id: uploaded.id, name };
@@ -73,7 +74,7 @@ async function establishSyntheticSession(page: Page): Promise<void> {
 }
 
 async function openDocumentArchive(page: Page, patientId: string): Promise<void> {
-  await page.goto(`/patients/${patientId}/modules`);
+  await openUnlockedDocument(page, `/patients/${patientId}/modules`);
   await openPatientSection(page, 'documenti');
   await expect(page.locator('#documenti').getByRole('heading', { name: /Archivio documenti ed evidenze/ })).toBeVisible();
 }

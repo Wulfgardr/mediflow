@@ -37,8 +37,7 @@ test('home-base catalog read is paired, capability-gated and response-compatible
 
     const login = await loginWithWebAuthControl(BASE_URL, { username: USERNAME, password: PIN });
     assert.equal(login.response.status, 200);
-    const cookieHeader = login.cookieHeader;
-    assert.ok(cookieHeader);
+    assert.ok(login.webHeaders);
     await seedCatalogs(login.webHeaders);
 
     const catalogClient = await pairClient([CATALOG_READ_CAPABILITY], 'Desk iPad catalog');
@@ -54,14 +53,14 @@ test('home-base catalog read is paired, capability-gated and response-compatible
     const missingCapability = await request('GET', '/api/v1/network/drugs?q=amoxi', {
         headers: {
             ...pairedHeaders(noCatalogClient),
-            Cookie: cookieHeader,
+            ...login.webHeaders,
         },
     });
     assert.equal(missingCapability.response.status, 403);
 
     const authenticatedHeaders = {
         ...catalogHeaders,
-        Cookie: cookieHeader,
+        ...login.webHeaders,
     };
 
     const drugsHost = await request('GET', '/api/v1/drugs?q=amoxi&limit=10', {
@@ -180,17 +179,23 @@ async function enableHomeBaseMode() {
 }
 
 async function seedCatalogs(webHeaders) {
+    const writeHeaders = {
+        ...localApiHeaders(),
+        ...webHeaders,
+        Origin: new URL(BASE_URL).origin,
+        'Sec-Fetch-Site': 'same-origin',
+    };
     const legacyBody = await request('POST', '/api/v1/drugs', {
-        headers: { ...localApiHeaders(), ...webHeaders },
+        headers: writeHeaders,
         body: [TERMINOLOGY_PARITY.webDrug],
     });
     assert.equal(legacyBody.response.status, 400);
     assert.equal(legacyBody.json?.code, 'AIFA_LEGACY_REPLACE_COMMAND_REQUIRED');
 
-    const status = await request('GET', '/api/drugs?count=1', { headers: { Cookie: webHeaders.Cookie } });
+    const status = await request('GET', '/api/drugs?count=1', { headers: webHeaders });
     assert.equal(status.response.status, 200);
     const drugs = await request('POST', '/api/v1/drugs', {
-        headers: { ...localApiHeaders(), ...webHeaders },
+        headers: writeHeaders,
         body: {
             items: [TERMINOLOGY_PARITY.webDrug],
             expectedSnapshot: status.json?.snapshot,

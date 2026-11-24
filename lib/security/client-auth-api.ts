@@ -1,3 +1,4 @@
+import { WEB_CONTROL_LOCATOR_HEADER, WEB_SESSION_LOCATOR_HEADER, WEB_SESSION_PROOF_HEADER } from './web-session-proof-header';
 import type { PassphraseAdoptionPayload, PassphraseChangePayload, PassphraseRecoveryPayload } from './passphrase-adoption-validation';
 
 export type AuthHealthErrorCategory =
@@ -455,21 +456,98 @@ export function observeArchiveGeneration(value: unknown): void {
     rejectReplacedArchive();
 }
 
-/** One document-wide transport fence also reaches controllers that use plain fetch. */
+const DOCUMENT_AUTHORITY_STORAGE_KEY = 'mediflow_web_document_authority';
+const PROOF_PATTERN = /^[a-f0-9]{64}$/u;
+const CONTROL_LOCATOR_PATTERN = /^[A-Za-z0-9_-]{32,256}$/u;
+const SESSION_LOCATOR_PATTERN = /^[a-f0-9]{64}$/u;
+
+let webInstanceProof: string | undefined;
+let webControlLocator: string | null = null;
+let webSessionLocator: string | null = null;
+
+type RetainedDocumentAuthority = { proof: string; control: string; session: string };
+
+function readRetainedDocumentAuthority(): RetainedDocumentAuthority | null {
+    try {
+        const stored = JSON.parse(sessionStorage.getItem(DOCUMENT_AUTHORITY_STORAGE_KEY) ?? 'null') as Partial<RetainedDocumentAuthority> | null;
+        if (typeof stored?.proof === 'string' && PROOF_PATTERN.test(stored.proof)
+            && typeof stored.control === 'string' && CONTROL_LOCATOR_PATTERN.test(stored.control)
+            && typeof stored.session === 'string' && SESSION_LOCATOR_PATTERN.test(stored.session)) {
+            return { proof: stored.proof, control: stored.control, session: stored.session };
+        }
+    } catch { return null; }
+    return null;
+}
+
+function documentProof(): string {
+    if (webInstanceProof === undefined) {
+        const retained = readRetainedDocumentAuthority();
+        if (retained) {
+            webInstanceProof = retained.proof;
+            webControlLocator = retained.control;
+            webSessionLocator = retained.session;
+        } else {
+            webInstanceProof = Array.from(crypto.getRandomValues(new Uint8Array(32)), byte => byte.toString(16).padStart(2, '0')).join('');
+        }
+    }
+    return webInstanceProof;
+}
+
+export function retainDocumentAuthorityForReload(): boolean {
+    const proof = documentProof();
+    if (!webControlLocator || !webSessionLocator) return false;
+    sessionStorage.setItem(DOCUMENT_AUTHORITY_STORAGE_KEY, JSON.stringify({ proof, control: webControlLocator, session: webSessionLocator }));
+    return true;
+}
+
+export function releaseDocumentAuthorityForReload(): void {
+    sessionStorage.removeItem(DOCUMENT_AUTHORITY_STORAGE_KEY);
+}
+
+export async function documentProofDigest(): Promise<string> {
+    const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(documentProof()));
+    return Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+export async function requestTabAccess(body: { offer: string } | { accept: true }): Promise<boolean> {
+    const response = await fetch('/api/auth/tab-access', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    });
+    return response.status === 204;
+}
+
 export function installArchiveGenerationTransport(): () => void {
     const original = window.fetch;
     const guarded: typeof fetch = (input, init) => {
         const url = new URL(input instanceof Request ? input.url : String(input), window.location.href);
         const method = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase();
         const scopedEpochRead = method === 'GET' && url.pathname === '/api/patient-profile/selection-epoch';
-        if (url.origin !== window.location.origin || !url.pathname.startsWith('/api/')
-            || (!scopedEpochRead && !['POST', 'PUT', 'PATCH', 'DELETE'].includes(method))) return original(input, init);
+        if (url.origin !== window.location.origin || !url.pathname.startsWith('/api/')) return original(input, init);
         const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
-        // A caller cannot silently change which archive this document has displayed.
-        if (documentGeneration) headers.set('x-mediflow-archive-generation', documentGeneration);
-        else headers.delete('x-mediflow-archive-generation');
-        return original(input, { ...init, headers }).then(async response => {
-            if (response.status === 409) {
+        headers.set(WEB_SESSION_PROOF_HEADER, documentProof());
+        headers.delete(WEB_CONTROL_LOCATOR_HEADER);
+        headers.delete(WEB_SESSION_LOCATOR_HEADER);
+        if (webControlLocator) headers.set(WEB_CONTROL_LOCATOR_HEADER, webControlLocator);
+        if (webSessionLocator) headers.set(WEB_SESSION_LOCATOR_HEADER, webSessionLocator);
+        const archiveScoped = scopedEpochRead || ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
+        if (archiveScoped) {
+            if (documentGeneration) headers.set('x-mediflow-archive-generation', documentGeneration);
+            else headers.delete('x-mediflow-archive-generation');
+        }
+        return original(input, { ...init, cache: 'no-store', headers, redirect: 'error' }).then(async response => {
+            if (response.ok && ['/api/auth/check', '/api/auth/tab-access'].includes(url.pathname)) {
+                const control = response.headers.get(WEB_CONTROL_LOCATOR_HEADER);
+                if (control && CONTROL_LOCATOR_PATTERN.test(control)) webControlLocator = control;
+            }
+            if (response.ok && ['/api/auth/login', '/api/auth/setup', '/api/auth/tab-access'].includes(url.pathname)) {
+                const session = response.headers.get(WEB_SESSION_LOCATOR_HEADER);
+                if (session && SESSION_LOCATOR_PATTERN.test(session)) webSessionLocator = session;
+            }
+            if (response.ok && ['/api/auth/logout', '/api/auth/lock'].includes(url.pathname)
+                && headers.get(WEB_SESSION_LOCATOR_HEADER) === webSessionLocator) webSessionLocator = null;
+            if (archiveScoped && response.status === 409) {
                 const payload = await response.clone().json().catch(() => null);
                 if (payload?.code === 'ARCHIVE_REPLACED') rejectReplacedArchive();
             }

@@ -1,5 +1,5 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
-import { bootstrapUnlockedSession, setAiLaneKillSwitch } from './utils';
+import { openUnlockedDocument, bootstrapUnlockedSession, setAiLaneKillSwitch } from './utils';
 
 const SYNTHETIC_ENTRY = 'Controllo sintetico senza dati clinici reali. Nessun elemento richiede una decisione.';
 type SyntheticPatient = { id: string; expectedPatientName: string };
@@ -25,7 +25,7 @@ async function createSyntheticPatient(page: Page, suffix: string): Promise<Synth
 }
 
 async function openNewEntry(page: Page, patient: SyntheticPatient): Promise<void> {
-  await page.goto(`/patients/${patient.id}/entries/new`);
+  await openUnlockedDocument(page, `/patients/${patient.id}/entries/new`);
   await expect(page.getByRole('heading', { name: 'Nuova voce clinica', exact: true })).toBeVisible();
   await expect(page.getByRole('form', { name: 'Nuova voce clinica', exact: true })).toBeVisible();
   await expect(page.getByTestId('progressive-entry-composer').locator('header')
