@@ -340,6 +340,7 @@ const UNFILTERED_PATIENTS_READ_ALLOWLIST = [
     ['app/api/patients/route.ts', 'tx.select({ id: patients.id }).from(patients).where(eq(patients.id, values.id)).get()', 1],
     ['app/api/patients/route.ts', 'tx.select({ id: patients.id }).from(patients).where(eq(patients.id, normalized.values.id)).get()', 1],
     ['app/api/v1/patients/route.ts', 'tx.select({ id: patients.id }).from(patients).where(eq(patients.id, normalized.values.id)).get()', 1],
+    ['lib/agent-visit-application.ts', 'tx.select({ id: patients.id }).from(patients).where(eq(patients.id, id)).get()', 1],
     ['lib/network-patient-lifecycle.ts', 'tx.select({ id: patients.id }).from(patients).where(eq(patients.id, normalized.values.id)).get()', 1],
     ['app/api/siss-handoffs/route.ts', 'tx.select({ deletedAt: patients.deletedAt }).from(patients) .where(eq(patients.id, patientId)).get()', 1],
     ['app/api/system/backup-restore/route.ts', 'tx.select().from(patients).all()', 1],
