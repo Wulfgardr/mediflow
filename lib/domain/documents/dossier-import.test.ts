@@ -51,6 +51,10 @@ const WHITE_PRESCRIPTION_TEXT = [
     'DATA COMPILAZIONE: 23/11/2026   Rilasciata ai sensi del DM del 30 dicembre 2020   Pagina 1 di 1',
 ].join('\n');
 
+const WHITE_PRESCRIPTION_LAYOUT_TEXT = WHITE_PRESCRIPTION_TEXT.split('\n')
+    .map((line, index) => (index === 0 ? '          ' + line : line).replace('tel. 0000000000', 'tel.0000000000'))
+    .join('\n\n');
+
 function verifyPrescription(text: string) {
     const repo = fileURLToPath(new URL('../../../', import.meta.url));
     const sha256 = createHash('sha256').update(text).digest('hex');
@@ -78,6 +82,16 @@ test('WUL-950: the Dossier verifier accepts a white electronic prescription with
     const run = verifyPrescription(WHITE_PRESCRIPTION_TEXT);
     assert.equal(run.status, 0, run.stderr);
     assert.deepEqual(JSON.parse(run.stdout), { verified: 0, approximate: 0, rifiutati: 0, motivi: [] });
+});
+
+test('WUL-950: the layout text with blank lines inside the prescriber block is still accepted', () => {
+    const run = verifyPrescription(WHITE_PRESCRIPTION_LAYOUT_TEXT);
+    assert.equal(run.status, 0, run.stderr);
+    const { taxCodes } = resolveDocumentTaxCodeRoles({ text: WHITE_PRESCRIPTION_LAYOUT_TEXT });
+    assert.deepEqual(taxCodes.map(({ value, role }) => [value, role]), [
+        [PRESCRIPTION_PATIENT_CF, 'patient_cf'],
+        [PRESCRIPTION_DOCTOR_CF, 'prescriber_cf'],
+    ]);
 });
 
 test('WUL-950: the patient and prescriber have separate high-confidence CFs', () => {
