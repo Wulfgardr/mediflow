@@ -61,7 +61,7 @@ function formatDepositTime(timestamp: number): string {
 }
 
 function UnlockedIncoming() {
-    const { visits, busy, error } = useSyncExternalStore(subscribeAgentIncoming, agentIncomingSnapshot, agentIncomingServerSnapshot);
+    const { visits, busy, error, applicationError } = useSyncExternalStore(subscribeAgentIncoming, agentIncomingSnapshot, agentIncomingServerSnapshot);
     const [pdf, setPdf] = useState<{ base64: string; name: string } | null>(null);
     const [openingPdf, setOpeningPdf] = useState(false);
     const [pdfError, setPdfError] = useState<string | null>(null);
@@ -75,6 +75,8 @@ function UnlockedIncoming() {
     };
     const applicable = visits.filter(agentVisitAwaitsReview);
     const blockedCount = visits.length - applicable.length;
+    const generalApplicationError = applicationError && !visits.some(({ visit }) => visit.cassette.id === applicationError.visitId)
+        ? applicationError.message : null;
 
     return <main className="mx-auto max-w-4xl space-y-6 p-6">
         <header className="flex flex-wrap items-end justify-between gap-4 border-b border-[var(--lume-rule)] pb-4">
@@ -94,6 +96,7 @@ function UnlockedIncoming() {
             </div>
         </header>
         {error && <p role="alert" className="rounded-lg border border-[var(--lume-signal-critical)] p-3 text-[var(--lume-signal-critical)]">{error}</p>}
+        {generalApplicationError && <p role="alert" className="rounded-lg border border-[var(--lume-signal-critical)] p-3 text-[var(--lume-signal-critical)]">{generalApplicationError}</p>}
         {pdfError && <p role="alert" className="rounded-lg border border-[var(--lume-signal-critical)] p-3 text-[var(--lume-signal-critical)]">{pdfError}</p>}
         {!visits.length && !busy && !error && (
             <section className="rounded-lg border border-[var(--lume-rule)] bg-[var(--lume-surface-field)] p-6 space-y-2">
@@ -110,6 +113,8 @@ function UnlockedIncoming() {
             const transcriptions = pending.filter(item => item.kind === 'transcription');
             const proposals = pending.filter(item => item.kind !== 'pdf' && item.kind !== 'note' && item.kind !== 'transcription');
             const allBlockers = [...review.blockers, ...review.proposalBlockers];
+            const actionMessages = applicationError?.visitId === visit.cassette.id ? [...allBlockers, applicationError.message] : allBlockers;
+            const actionMessagesId = `visita-${visit.cassette.id}-esito`;
             const isApplicable = applicable.includes(review);
             const fiscalCode = typeof visit.anchor.fiscalCode === 'string' ? visit.anchor.fiscalCode : null;
             const statusText = visit.cassette.status !== 'closed'
@@ -156,12 +161,6 @@ function UnlockedIncoming() {
                         <Link href={`/patients/${review.patient.id}/modules`} className={SETTINGS_SECONDARY_BUTTON_CLASS}>Apri scheda</Link>
                     ) : null}
                 </header>
-
-                {allBlockers.length > 0 && (
-                    <div className="space-y-1.5 rounded-lg border border-[var(--lume-signal-critical)] p-3">
-                        {allBlockers.map((message, index) => <p role="alert" key={index} className="[font:var(--type-body)] text-[var(--lume-signal-critical)]">{message}</p>)}
-                    </div>
-                )}
 
                 {pdfItems.length > 0 && (
                     <div className="space-y-2">
@@ -259,13 +258,22 @@ function UnlockedIncoming() {
                     </details>;
                 })}
 
-                <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--lume-rule)] pt-4">
-                    <span className="[font:var(--type-meta)] text-[var(--lume-ink-muted)]">
-                        {pending.length === 1 ? '1 elemento in attesa di conferma' : `${pending.length} elementi in attesa di conferma`}
-                    </span>
-                    <button className={isApplicable ? SETTINGS_PRIMARY_BUTTON_CLASS : SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy || !isApplicable} onClick={() => { void applyReviewedAgentVisits([visit.cassette.id]); }}>
-                        Applica la visita
-                    </button>
+                <footer className="space-y-3 border-t border-[var(--lume-rule)] pt-4">
+                    {actionMessages.length > 0 && (
+                        <div id={actionMessagesId} className="space-y-1.5 rounded-lg border border-[var(--lume-signal-critical)] p-3">
+                            {actionMessages.map((message, index) => <p role="alert" key={index} className="[font:var(--type-body)] text-[var(--lume-signal-critical)]">{message}</p>)}
+                        </div>
+                    )}
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <span className="[font:var(--type-meta)] text-[var(--lume-ink-muted)]">
+                            {pending.length === 1 ? '1 elemento in attesa di conferma' : `${pending.length} elementi in attesa di conferma`}
+                        </span>
+                        <button className={isApplicable ? SETTINGS_PRIMARY_BUTTON_CLASS : SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy || !isApplicable}
+                            aria-describedby={actionMessages.length > 0 ? actionMessagesId : undefined}
+                            onClick={() => { void applyReviewedAgentVisits([visit.cassette.id]); }}>
+                            Applica la visita
+                        </button>
+                    </div>
                 </footer>
             </section>;
         })}

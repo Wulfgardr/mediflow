@@ -15,7 +15,7 @@
 import { clinicalFactContext, contextHeading, contextReview, isHistoricalTherapy, legacyIcdPattern, legacySectionNegation, negationCues, structuredContextApplies, suspensionHeadings } from './clinical-context-lexicon';
 import { routeDocumentClass, parseFileNameHints } from './document-class-router';
 import type { DocumentDecisionClassification } from './document-decision';
-import { isValidItalianTaxCodeChecksum, resolveDocumentTaxCodeRoles } from './document-identity-resolution';
+import { hasPhysicianTaxCodeStamp, isValidItalianTaxCodeChecksum, resolveDocumentTaxCodeRoles } from './document-identity-resolution';
 import { parseItalianLabReport } from './lab-report-parser';
 import {
     catalogObservationCode, findInvalidityMentions, findIsoCode, findPrescriptionReference, findPriority, findScaleMentions, invalidityDetails,
@@ -164,6 +164,7 @@ export function unitText(text: string, unit: DossierUnit): string { return text.
 
 export type DossierProfessionalLabelScope =
     | 'same_line'
+    | 'physician_stamp'
     | 'prescriber_block'
     | 'specialist_block'
     | 'signature_block'
@@ -177,6 +178,7 @@ export interface DossierTaxCodeEvidence {
 
 const EXCLUDED_PROFESSIONAL_SCOPES = new Set<DossierProfessionalLabelScope>([
     'same_line',
+    'physician_stamp',
     'prescriber_block',
     'specialist_block',
     'signature_block',
@@ -226,6 +228,7 @@ const SIGNATURE_HEADING = new RegExp(String.raw`^${SIGNATURE_LABEL}(?:\s*:\s*[\p
 const SIGNATURE_META_LINE = /^(?:data(?:\s+firma)?|emesso\s+da|ente\s+certificatore|certificato|qualifica|ruolo|ordine\s+dei\s+medici|n\.?\s*iscrizione)\s*[:.]?\s*.+$/iu;
 const PLAIN_NAME_LINE = /^\p{Lu}[\p{L}’'-]+(?:\s+\p{Lu}[\p{L}’'-]+){1,3}$/u;
 const LINE_TAX_CODE = /\b(?:(?:STP|ENI)\d{13}|[A-Z]{6}[0-9LMNPQRSTUV]{2}[A-Z][0-9LMNPQRSTUV]{2}[A-Z][0-9LMNPQRSTUV]{3}[A-Z])\b/giu;
+const PAPER_PRESCRIPTION_HEADING = /^ricetta[ \t\u00a0]+(?:cartacea|bianca)[ \t\u00a0]*(?:\r?\n|$)/iu;
 
 export function excludedProfessionalCode(code: DossierTaxCodeEvidence): boolean {
     return code.role === 'professional_cf'
@@ -317,11 +320,19 @@ function professionalOccurrenceScope(prefix: string, suffix = ''): DossierProfes
 
 export function collectDossierTaxCodes(text: string): DossierTaxCodeEvidence[] {
     const resolved = resolveDocumentTaxCodeRoles({ text });
+    const paperPrescription = PAPER_PRESCRIPTION_HEADING.test(text.trimStart());
     const seen = new Set<string>();
     const result: DossierTaxCodeEvidence[] = [];
     for (const code of resolved.taxCodes) {
         const occurrences = [...text.matchAll(new RegExp(`\\b${code.value}\\b`, 'giu'))];
-        const scopes = occurrences.map(match => professionalOccurrenceScope(text.slice(0, match.index!), text.slice(match.index! + match[0].length)));
+        const canReadStamp = paperPrescription && code.role === 'physician_cf' && code.confidence === 'high'
+            && resolved.taxCodes.every(other => other.value !== code.value || other.role === 'physician_cf');
+        const scopes = occurrences.map(match => {
+            const prefix = text.slice(0, match.index!);
+            const suffix = text.slice(match.index! + match[0].length);
+            return professionalOccurrenceScope(prefix, suffix)
+                ?? (canReadStamp && hasPhysicianTaxCodeStamp(prefix) ? 'physician_stamp' as const : null);
+        });
         const explicitProfessional = scopes.length > 0 && scopes.every(Boolean);
         const role = explicitProfessional ? 'professional_cf' : code.role === 'patient_cf' ? 'patient_cf' : 'unknown_cf';
         const key = `${code.value}:${role}`;

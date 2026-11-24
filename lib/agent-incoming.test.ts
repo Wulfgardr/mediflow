@@ -47,11 +47,12 @@ const posts: Record<string, unknown>[] = [];
 const published: string[] = [];
 const inbox = '/api/agent-mandates/incoming';
 let confirmationRoute: ((init?: RequestInit) => Response) | null = null;
+let patientAvailableForApplication = true;
 
 db.setKey(masterKey);
 observeArchiveGeneration(generation);
 mock.method(db.patients, 'toArray', async () => [patient()]);
-mock.method(db.patients, 'get', async () => patient());
+mock.method(db.patients, 'get', async () => patientAvailableForApplication ? patient() : undefined);
 mock.method(db.exemptions, 'toArray', async () => []);
 mock.method(db.observations, 'query', () => ({ toArray: async () => [] }));
 mock.method(globalThis, 'fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -182,6 +183,49 @@ const shownVisit = (visitId: string) => agentIncomingSnapshot().visits.find(revi
 
 const textHash = (value: string) => createHash('sha256').update(value).digest('hex');
 const pending = (review: NonNullable<ReturnType<typeof shownVisit>>) => review.visit.items.filter(item => !review.appliedItemIds.includes(item.id)).map(item => item.id).sort();
+
+test('a doctor stamp leaves a visit applicable only when the code has no other occurrence', async () => {
+    const prescriberCode = 'RSSMRA85T10A562S';
+    const indent = ' '.repeat(87);
+    const stampedText = `Ricetta cartacea\nAssistito codice fiscale ${cf}\n\n${indent}Dott. ALDO BRUNI\n${indent}CF: ${prescriberCode}`;
+    const deposit = (text: string) => depositCassette('local', false, [
+        { kind: 'pdf', value: { name: 'ricetta-sintetica.pdf' }, pdf: syntheticPdf(text) },
+    ]);
+    const ready = await deposit(stampedText);
+    const discordant = await deposit(stampedText + '\nAssistito codice fiscale ' + prescriberCode);
+    await refreshAgentIncoming(db.getSessionReadSignal(), async bytes => ({
+        text: Buffer.from(bytes).toString('utf8').replace(/^%PDF-1\.4\n/u, ''),
+        beyondText: false,
+    }));
+    assert.deepEqual(shownVisit(ready.visitId)?.blockers, []);
+    assert.equal(agentVisitAwaitsReview(shownVisit(ready.visitId)!), true);
+    assert.equal(agentVisitAwaitsReview(shownVisit(discordant.visitId)!), false);
+    const before = snapshot();
+    await applyReviewedAgentVisits([ready.visitId]);
+    assert.deepEqual(agentAppliedItemIds(ready.visitId), ready.ids);
+    assert.deepEqual(agentAppliedItemIds(discordant.visitId), []);
+    assert.deepEqual(added(snapshot(), before), [0, 1, 0]);
+});
+
+test('a chart unavailable at application leaves the visit untouched and the error survives refresh', async () => {
+    posts.length = 0;
+    const ready = await modelNoteVisit(), before = snapshot();
+    await refreshAgentIncoming(db.getSessionReadSignal(), contentReadPdf);
+    assert.equal(agentVisitAwaitsReview(shownVisit(ready.visitId)!), true);
+    patientAvailableForApplication = false;
+    try {
+        await applyReviewedAgentVisits([ready.visitId]);
+        await refreshAgentIncoming(db.getSessionReadSignal(), contentReadPdf);
+        assert.deepEqual(snapshot(), before);
+        assert.deepEqual(posts, []);
+        assert.deepEqual(agentIncomingSnapshot().applicationError, {
+            visitId: ready.visitId, message: 'La visita non è stata applicata. Rileggi la cassetta.',
+        });
+    } finally { patientAvailableForApplication = true; }
+    await applyReviewedAgentVisits([ready.visitId]);
+    assert.equal(agentIncomingSnapshot().applicationError, null);
+    assert.deepEqual(agentAppliedItemIds(ready.visitId).sort(), [...ready.ids].sort());
+});
 
 test('L1 L6: nothing the agent deposits enters before the doctor’s gesture; «Applica la visita» files note, dictation and every PDF in one review', async () => {
     posts.length = 0;
