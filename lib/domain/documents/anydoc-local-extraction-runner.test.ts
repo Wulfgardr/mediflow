@@ -200,6 +200,8 @@ test('fails closed with sanitized io_failure for missing, symlinked, and tampere
         for (const relativePath of [
             'package.json',
             'scripts/document-child-launcher.mjs',
+            'scripts/document-windows-sandbox.mjs',
+            ...(process.platform === 'win32' ? ['scripts/document-windows-sandbox/launcher-x64.exe'] : []),
             'scripts/document-child-network-guard.mjs',
             'lib/domain/documents/anydoc-local-extraction-runner.ts',
             'lib/domain/documents/anydoc-local-extraction-contract.ts',
@@ -223,7 +225,8 @@ process.stdout.write(JSON.stringify(result));
         const extractFromFixture = (attachmentId: string) => new Promise<Awaited<ReturnType<typeof extractAnyDocLocalBytes>>>((resolve, reject) => {
             const child = spawn(process.execPath, ['--experimental-strip-types', '--import', loaderPath, fixtureDriver, attachmentId], {
                 cwd: fixtureRoot,
-                env: { NODE_ENV: 'test', MEDIFLOW_DATA_DIR: process.env.MEDIFLOW_DATA_DIR ?? fixtureRoot },
+                env: { NODE_ENV: 'test', MEDIFLOW_DATA_DIR: process.env.MEDIFLOW_DATA_DIR ?? fixtureRoot,
+                    ...(process.platform === 'win32' ? { LOCALAPPDATA: process.env.LOCALAPPDATA } : {}) },
                 stdio: ['pipe', 'pipe', 'pipe'],
                 timeout: 20_000,
             });

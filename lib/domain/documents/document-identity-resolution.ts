@@ -184,15 +184,9 @@ const PHYSICIAN_STAMP_PREFIX = new RegExp(
 const PATIENT_SECTION_HEADER = /^(?:dati(?:\s+(?:anagrafici|personali))?\s+(?:dell['’]\s*|del(?:la)?\s+)?(?:assistit[oa]|paziente|cittadin[oa])|(?:assistit[oa]|paziente|cittadin[oa])\s*:)/iu;
 const NON_PATIENT_BLOCK_CUE = /\b(?:medico|prescrittore|refertante|specialista|dirigente|operatore|operatrice|compilatore|compilatrice|firmato|sottoscritto|firma|struttura|azienda|asl|ats|asst)\b/iu;
 
-function inferPhysicianStamp(
-    text: string,
-    start: number,
-    minLeft: number,
-): Pick<DocumentDecisionTaxCodeRole, 'role' | 'confidence'> | null {
-    const stamp = PHYSICIAN_STAMP_PREFIX.exec(text.slice(Math.max(0, minLeft - 1), start));
-    return stamp && !PATIENT_ROLE_CUE.test(stamp[2])
-        ? { role: 'physician_cf', confidence: 'high' }
-        : null;
+export function hasPhysicianTaxCodeStamp(prefix: string): boolean {
+    const stamp = PHYSICIAN_STAMP_PREFIX.exec(prefix);
+    return stamp !== null && !PATIENT_ROLE_CUE.test(stamp[2]);
 }
 
 function inferPatientSectionFallback(
@@ -237,10 +231,10 @@ export function resolveDocumentTaxCodeRoles(
         const context = contextAround(input.text, start, end, contextWindow, minLeft, maxRight);
         const evidenceId = `tax-code:${taxCodes.length + 1}`;
         const inferred = inferRole(context.snippet, context.taxCodeStart, context.taxCodeEnd);
-        const stamp = inferred.confidence === 'high' ? null : inferPhysicianStamp(input.text, start, minLeft);
-        const role = stamp ?? (inferred.role === 'unknown_cf'
-            ? (inferPatientSectionFallback(input.text, start, minLeft) ?? inferred)
-            : inferred);
+        const stamp = inferred.confidence !== 'high' && hasPhysicianTaxCodeStamp(input.text.slice(Math.max(0, minLeft - 1), start));
+        const role = stamp ? { role: 'physician_cf', confidence: 'high' } as const
+            : inferred.role === 'unknown_cf' ? (inferPatientSectionFallback(input.text, start, minLeft) ?? inferred)
+                : inferred;
 
         // Un CF con checksum non valido (tipico dei falsi positivi OCR O/0, I/1)
         // non puo mai essere high confidence: viene declassato a medium, cosi

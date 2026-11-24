@@ -63,7 +63,7 @@ function formatDepositTime(timestamp: number): string {
 }
 
 function UnlockedIncoming() {
-    const { visits, busy, error } = useSyncExternalStore(subscribeAgentIncoming, agentIncomingSnapshot, agentIncomingServerSnapshot);
+    const { visits, busy, error, applicationError } = useSyncExternalStore(subscribeAgentIncoming, agentIncomingSnapshot, agentIncomingServerSnapshot);
     const [pdf, setPdf] = useState<{ base64: string; name: string } | null>(null);
     const [openingPdf, setOpeningPdf] = useState(false);
     const [pdfError, setPdfError] = useState<string | null>(null);
@@ -77,6 +77,8 @@ function UnlockedIncoming() {
     };
     const applicable = visits.filter(agentVisitAwaitsReview);
     const blockedCount = visits.length - applicable.length;
+    const generalApplicationError = applicationError && !visits.some(({ visit }) => visit.cassette.id === applicationError.visitId)
+        ? applicationError.message : null;
 
     return <main className={`${surface.page} ${css.page}`} data-record-page>
         <header className={surface.pageHeader}>
@@ -98,6 +100,7 @@ function UnlockedIncoming() {
             </div>
         </header>
         {error && <p role="alert" className={css.alert}>{error}</p>}
+        {generalApplicationError && <p role="alert" className={css.alert}>{generalApplicationError}</p>}
         {pdfError && <p role="alert" className={css.alert}>{pdfError}</p>}
         {!visits.length && !busy && !error && (
             <section className={surface.tray} data-record-tray="in-arrivo" aria-labelledby="in-arrivo-vuoto">
@@ -119,6 +122,8 @@ function UnlockedIncoming() {
             const transcriptions = pending.filter(item => item.kind === 'transcription');
             const proposals = pending.filter(item => item.kind !== 'pdf' && item.kind !== 'note' && item.kind !== 'transcription');
             const allBlockers = [...review.blockers, ...review.proposalBlockers];
+            const actionMessages = applicationError?.visitId === visit.cassette.id ? [...allBlockers, applicationError.message] : allBlockers;
+            const actionMessagesId = `visita-${visit.cassette.id}-esito`;
             const isApplicable = applicable.includes(review);
             const fiscalCode = typeof visit.anchor.fiscalCode === 'string' ? visit.anchor.fiscalCode : null;
             const status = visit.cassette.status !== 'closed'
@@ -146,12 +151,6 @@ function UnlockedIncoming() {
                         <Link href={`/patients/${review.patient.id}/modules`} className={surface.islandAction}>Apri scheda</Link>
                     ) : null}
                 </div>
-
-                {allBlockers.length > 0 && (
-                    <div className={`${surface.island} ${css.blockers}`}>
-                        {allBlockers.map((message, index) => <p role="alert" key={index}>{message}</p>)}
-                    </div>
-                )}
 
                 {pdfItems.length > 0 && (
                     <section className={surface.island} aria-label="PDF della visita">
@@ -251,13 +250,22 @@ function UnlockedIncoming() {
                     </details>;
                 })}
 
-                <footer className={css.visitFooter}>
-                    <span>
-                        {pending.length === 1 ? '1 elemento in attesa di conferma' : `${pending.length} elementi in attesa di conferma`}
-                    </span>
-                    <button type="button" className="mf-button-secondary" disabled={busy || !isApplicable} onClick={() => { void applyReviewedAgentVisits([visit.cassette.id]); }}>
-                        Applica la visita
-                    </button>
+                <footer className={css.visitFooterBlock}>
+                    {actionMessages.length > 0 && (
+                        <div id={actionMessagesId} className={`${surface.island} ${css.blockers}`}>
+                            {actionMessages.map((message, index) => <p role="alert" key={index}>{message}</p>)}
+                        </div>
+                    )}
+                    <div className={css.visitFooter}>
+                        <span>
+                            {pending.length === 1 ? '1 elemento in attesa di conferma' : `${pending.length} elementi in attesa di conferma`}
+                        </span>
+                        <button type="button" className={isApplicable ? 'mf-button-primary' : 'mf-button-secondary'} disabled={busy || !isApplicable}
+                            aria-describedby={actionMessages.length > 0 ? actionMessagesId : undefined}
+                            onClick={() => { void applyReviewedAgentVisits([visit.cassette.id]); }}>
+                            Applica la visita
+                        </button>
+                    </div>
                 </footer>
             </section>;
         })}

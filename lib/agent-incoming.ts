@@ -4,13 +4,18 @@ import { clientArchiveGeneration } from './security/client-auth-api';
 import { db } from './db';
 import { notifyDbChange } from './live-query';
 import { openAgentVisit } from './agent-cassette-client';
-import { inspectAgentVisit, prepareAgentApplication, reopenReviewedAgentItems, type AgentVisitReview } from './agent-visit-review';
+import { agentVisitAwaitsReview, inspectAgentVisit, prepareAgentApplication, reopenReviewedAgentItems, type AgentVisitReview } from './agent-visit-review';
 import { agentVisitPresentation, sealVisitConfirmationPresentation } from './agent-visit-confirmation-browser';
 import type { VisitConfirmationTicket } from './agent-visit-confirmation-contract';
 import type { AgentApplicationReceipt, AgentCassetteIndexPage, IncomingAgentCassette } from './agent-visit-application-contract';
 import { publishAgentIncomingCount } from './agent-incoming-count';
 
-const empty = { visits: [] as AgentVisitReview[], busy: false, error: null as string | null };
+const empty = {
+    visits: [] as AgentVisitReview[],
+    busy: false,
+    error: null as string | null,
+    applicationError: null as { visitId: string | null; message: string } | null,
+};
 let snapshot = empty;
 const listeners = new Set<() => void>();
 let inFlight: Promise<void> | null = null;
@@ -49,7 +54,7 @@ async function reopenForApplication(review: AgentVisitReview, signal: AbortSigna
 }
 async function apply(review: AgentVisitReview, signal: AbortSignal) {
     const input = await prepareAgentApplication(review, signal);
-    if (!input) return review;
+    if (!input) throw new Error(notApplied);
     signal.throwIfAborted();
     const response = await fetch(inbox, { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input), signal });
@@ -104,7 +109,11 @@ export async function refreshAgentIncoming(signal = db.getSessionReadSignal(), r
         try {
             signal.throwIfAborted();
             let page = await fetchIncoming<AgentCassetteIndexPage>('', signal);
-            if (!page.visits.length) { signal.throwIfAborted(); publish(empty); return; }
+            if (!page.visits.length) {
+                signal.throwIfAborted();
+                publish({ ...empty, applicationError: snapshot.applicationError });
+                return;
+            }
             const [patients, profileResponse, exemptions] = await Promise.all([db.patients.toArray({ signal, rejectAuthUnavailable: true }),
                 fetch('/api/auth/profile', { cache: 'no-store', signal }), db.exemptions.toArray({ signal, rejectAuthUnavailable: true })]);
             if (!profileResponse.ok) throw new Error('Profilo medico non disponibile.');
@@ -134,7 +143,7 @@ export async function refreshAgentIncoming(signal = db.getSessionReadSignal(), r
                 page = await fetchIncoming<AgentCassetteIndexPage>('?after=' + page.next, signal);
             }
             signal.throwIfAborted();
-            publish({ visits, busy: false, error: unreadable ? 'Una visita non è leggibile. Riprova dopo lo sblocco.' : null });
+            publish({ ...snapshot, visits, busy: false, error: unreadable ? 'Una visita non è leggibile. Riprova dopo lo sblocco.' : null });
         } catch (error) {
             if (!signal.aborted) publish({ ...snapshot, busy: false, error: error instanceof Error ? error.message : 'Cassetta non disponibile. Riprova.' });
         }
@@ -159,25 +168,31 @@ export async function applyReviewedAgentVisits(ids: string[]): Promise<void> {
     while (inFlight) await inFlight;
     signal.throwIfAborted();
     const task = (async () => {
-        publish({ ...snapshot, busy: true, error: null });
+        publish({ ...snapshot, busy: true, applicationError: null });
         const versions = new Map<string, { reviewed: number; committed: number }>();
         try {
             for (const id of ids) {
                 if (signal.aborted) return;
                 const review = snapshot.visits.find(value => value.visit.cassette.id === id);
                 const patient = review?.patient;
-                if (!review || !patient?.version || review.blockers.length || review.proposalBlockers.length) continue;
-                const known = versions.get(patient.id);
-                const expectedVersion = known?.reviewed === patient.version ? known.committed : patient.version;
+                if (!review) continue;
                 try {
+                    if (!patient?.version || !agentVisitAwaitsReview(review)) throw new Error(notApplied);
+                    const known = versions.get(patient.id);
+                    const expectedVersion = known?.reviewed === patient.version ? known.committed : patient.version;
                     const reopened = await reopenForApplication(review, signal);
                     const current = expectedVersion === patient.version ? reopened : { ...reopened, patient: { ...patient, version: expectedVersion } };
                     const applied = await apply(current, signal);
-                    if (applied === current || !applied.patient?.version) continue;
+                    if (!applied.patient?.version) throw new Error(notApplied);
                     versions.set(patient.id, { reviewed: patient.version, committed: applied.patient.version });
                     publish({ ...snapshot, visits: snapshot.visits.map(value => value === review ? { ...applied, visit: review.visit } : value) });
                 } catch (error) {
-                    if (!signal.aborted && !snapshot.error) publish({ ...snapshot, error: error instanceof Error ? error.message : 'Visita non applicata.' });
+                    if (!signal.aborted && !snapshot.applicationError) {
+                        publish({ ...snapshot, applicationError: {
+                            visitId: ids.length === 1 ? id : null,
+                            message: error instanceof Error ? error.message : notApplied,
+                        } });
+                    }
                 }
             }
         } finally { if (!signal.aborted) publish({ ...snapshot, busy: false }); }
@@ -185,7 +200,5 @@ export async function applyReviewedAgentVisits(ids: string[]): Promise<void> {
     inFlight = task;
     try { await task; } finally { if (inFlight === task) inFlight = null; }
     if (signal.aborted) return;
-    const failure = snapshot.error;
     await refreshAgentIncoming(signal);
-    if (failure && !signal.aborted) publish({ ...snapshot, error: failure });
 }
