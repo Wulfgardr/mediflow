@@ -27,11 +27,8 @@ function fixture() {
     const registrations = createAgentRegistrationStore(database, now);
     const pairing = pairings.request('Synthetic agent', ['visita.apri', 'visita.chiudi']);
     const id = pairing.request.id;
-    let currentUnlock: string | null = 'unlock-a';
-    const active = (ref: string, owner: string) => ref === currentUnlock && owner === actor;
     return { database, actor, generation, template, mandates, registrations, id, now,
         advance: (ms: number) => { time += ms; },
-        setUnlock: (ref: string | null) => { currentUnlock = ref; },
         renew: (ref: string) => registrations.renew(actor, generation, ref),
         revoke: () => registrations.revoke(id, actor, generation),
         poll: () => pairings.poll(id, pairing.claim),
@@ -42,8 +39,8 @@ function fixture() {
             assert.equal(response.credential, null);
             return response.registrationCredential.token;
         },
-        retrieve: (token: string) => registrations.retrieve(token, active),
-        principal: (token: string) => database.transaction(() => registrations.principal(token, active)).immediate(),
+        retrieve: (token: string) => registrations.retrieve(token),
+        principal: (token: string) => database.transaction(() => registrations.principal(token)).immediate(),
     };
 }
 
@@ -80,23 +77,37 @@ for (const cause of ['lock', 'expiry', 'account-lockout', 'revocation', 'replace
         f.renew('unlock-a');
         const first = f.retrieve(long);
         assert.ok(f.principal(first.token));
-        if (cause === 'lock') f.setUnlock(null);
+        if (cause === 'lock') f.mandates.revokeAll(f.actor, f.generation);
         if (cause === 'expiry') f.advance(MANDATE_MAX_DURATION_MS);
         if (cause === 'account-lockout') f.database.prepare('UPDATE users SET locked_until=?').run(f.now() / 1000 + 500);
         if (cause === 'replacement') f.database.transaction(() => rotateSqliteArchiveGeneration(f.database)).immediate();
         if (cause === 'revocation') f.revoke();
         if (cause === 'renewal') {
-            f.setUnlock('unlock-b'); f.renew('unlock-b');
+            f.renew('unlock-b');
             assert.notEqual(f.retrieve(long).mandateRef, first.mandateRef);
         } else {
             assert.throws(() => f.retrieve(long), /AGENT_MANDATE_DENIED/u);
         }
         assert.equal(f.principal(first.token), null);
         if (cause === 'revocation' || cause === 'replacement') {
-            f.setUnlock('unlock-b');
             if (cause === 'revocation') f.renew('unlock-b');
             assert.throws(() => f.retrieve(long), /AGENT_MANDATE_DENIED/u);
         }
+    } finally { f.database.close(); }
+});
+
+test('deposit authority outlives the Web session that confirmed it until the mandate expires', () => {
+    const f = fixture();
+    try {
+        const long = f.register();
+        f.renew('unlock-a');
+        const first = f.retrieve(long);
+        f.advance(MANDATE_MAX_DURATION_MS - 1);
+        assert.equal(f.principal(first.token)?.mandateRef, first.mandateRef);
+        assert.deepEqual(f.retrieve(long), first);
+        f.advance(1);
+        assert.equal(f.principal(first.token), null);
+        assert.throws(() => f.retrieve(long), /AGENT_MANDATE_DENIED/u);
     } finally { f.database.close(); }
 });
 
