@@ -26,6 +26,11 @@ implica approvazione del prodotto da parte della WHO.
 [Provenienza e integrità](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/assets/reference-data/icd11/README.md),
 [attribuzione e condizioni](licenses/who-icd11/NOTICE.md).
 
+## Codici QR
+
+Il collegamento delle app Apple genera il QR nel browser con `qr` di Paul
+Miller, distribuito con licenza MIT o Apache-2.0. [Sorgente e licenze](https://github.com/paulmillr/qr).
+
 ## Ispirazione
 
 Questi riferimenti mi hanno suggerito una forma o un metodo. Non ne ho

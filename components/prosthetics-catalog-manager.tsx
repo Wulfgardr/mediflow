@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { PROSTHETICS_COLUMNS, type ProstheticsStatus, type ProstheticsPreview, type ProstheticsReceipt, type ProstheticsManifest } from '@/lib/reference-data/prosthetics-catalog-contract';
-import { ProstheticsClientError, prostheticsRequest, readProstheticsSource, type ProstheticsSource } from '@/lib/reference-data/prosthetics-catalog-client';
+import { downloadProstheticsFile, ProstheticsClientError, prostheticsRequest, readProstheticsSource, type ProstheticsSource } from '@/lib/reference-data/prosthetics-catalog-client';
 import { ProstheticsImportFields } from './prosthetics-import-fields';
 import { ProstheticsSourcesPanel } from './prosthetics-source-documents';
 import { ProstheticsCatalogLookup } from './prosthetics-catalog-manager-lookup';
@@ -79,7 +79,7 @@ export default function ProstheticsCatalogManager({ expanded, onExpandedChange }
             <p className="mt-2" style={{ overflowWrap: 'anywhere' }}>{PROSTHETICS_COLUMNS.join(',')}</p>
             <p className="mt-2">Un solo sistema di codifica, versione, fonte e ambito per file. Duplicati ed errori bloccano tutto l’import. I codici assenti restano; le prescrizioni salvate non cambiano.</p>
         </Disclosure>
-        <a className="inline-flex items-center border px-4 text-sm font-semibold" style={control} href="/api/prosthetics/catalog/template" download>Scarica template sintetico CSV</a>
+        <button type="button" className="inline-flex items-center border px-4 text-sm font-semibold" style={control} disabled={busy} onClick={() => void run(signal => downloadProstheticsFile({ kind: 'template' }, 'protesica-template-sintetico.csv', signal))}>Scarica template sintetico CSV</button>
         <label className="block space-y-2 text-sm font-normal">File repertorio protesica (.csv)
             <input type="file" accept=".csv,text/csv" disabled={busy} className="block w-full min-w-0 text-sm" style={control} onChange={event => {
                 const file = event.target.files?.[0]; event.target.value = ''; if (!file) return;

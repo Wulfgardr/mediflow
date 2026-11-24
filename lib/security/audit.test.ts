@@ -377,6 +377,7 @@ test('summarizeAuditEvents groups PHI-safe operational KPIs', () => {
         ai_review: 0,
         agent_operation: 0,
         reference_data: 0,
+        network_pairing: 0,
     });
     assert.deepEqual(summary.topEventTypes, [
         { eventType: 'patient.updated', count: 2 },

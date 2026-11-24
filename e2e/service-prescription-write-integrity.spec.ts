@@ -1,7 +1,8 @@
 import { expect, test } from '@playwright/test';
 import Database from 'better-sqlite3';
 import { isAbsolute, join } from 'node:path';
-import { bootstrapUnlockedSession, openPatientSection } from './utils';
+import { bootstrapUnlockedSession, openPatientSection, unlockIfNeeded } from './utils';
+import { documentRequests } from './fixtures/trusted-web-request';
 
 test('Web service prescriptions and items retain the draft on audit failure and persist each accepted action', async ({ page, baseURL }, testInfo) => {
     test.skip(process.env.MF085_SYNTHETIC_E2E !== '1', 'Requires an isolated synthetic server.');
@@ -28,10 +29,11 @@ test('Web service prescriptions and items retain the draft on audit failure and 
         }; } finally { db.close(); }
     };
     const http = async (kind: string) => {
-        const response = await page.request.get(`/api/${kind}?patientId=${patientId}`);
+        const response = await documentRequests(page).get(`/api/${kind}?patientId=${patientId}`);
         expect(response.status()).toBe(200); return await response.json() as Array<{ id: string; version: number; status: string }>;
     };
     await page.goto(`/patients/${patientId}/modules`);
+    await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
     await openPatientSection(page, 'prestazioni');
     const pane = page.locator('#prestazioni');
     await pane.getByRole('button', { name: 'Nuova prestazione', exact: true }).click();

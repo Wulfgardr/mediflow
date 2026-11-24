@@ -1,7 +1,7 @@
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
 import { execFileSync } from 'node:child_process';
 import { expect, test, type Page } from '@playwright/test';
-import { bootstrapUnlockedSession, assertNoHorizontalOverflow, assertNotClippedInViewport } from './utils';
+import { openUnlockedDocument, bootstrapUnlockedSession, assertNoHorizontalOverflow, assertNotClippedInViewport } from './utils';
 
 const longName = 'Modello sintetico con nome completo molto lungo per la revisione clinica e la verifica della scelta conservata';
 const optionId = `model_option_${'2'.repeat(32)}`;
@@ -28,7 +28,7 @@ async function fixture(page: Page, { enabled = true, available = true } = {}) {
             })),
         } });
     });
-    await page.goto('/mockups/choices');
+    await openUnlockedDocument(page, '/mockups/choices');
     await expect(page.getByTestId('choice-fixture')).toBeVisible();
     return () => expect(writes, 'montaggio e render non salvano preferenze').toBe(0);
 }

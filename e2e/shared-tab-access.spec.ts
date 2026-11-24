@@ -1,8 +1,21 @@
 import { expect, test } from './fixtures/isolated-runtime';
-import { bootstrapUnlockedSession, openPatientSection, unlockIfNeeded } from './utils';
+import { bootstrapUnlockedSession, openPatientSection, openUnlockedDocument, unlockIfNeeded } from './utils';
+import { documentRequests } from './fixtures/trusted-web-request';
+import type { Page } from '@playwright/test';
 import { agentVisitPassphrase, agentVisitPin } from './agent-visit-utils';
 
-test('renewing tab B preserves tab A authority and transfers the key without another passphrase', async ({ page, context, isolatedRuntime }, testInfo) => {
+const pinAccount = test.extend({ existingPin: agentVisitPin });
+
+async function saveSharedNote(page: Page, note: string) {
+    await page.getByRole('combobox', { name: 'Tipo di voce' }).selectOption('note');
+    await page.getByRole('textbox', { name: 'Resoconto clinico', exact: true }).fill(note);
+    await page.getByRole('button', { name: 'Rivedi', exact: true }).click();
+    const saved = page.waitForResponse(response => new URL(response.url()).pathname === '/api/entries' && response.request().method() === 'POST');
+    await page.getByRole('button', { name: 'Conferma e registra', exact: true }).click();
+    expect((await saved).status()).toBe(201);
+}
+
+pinAccount('renewing tab B preserves tab A authority and transfers the key without another passphrase', async ({ page, context, isolatedRuntime }, testInfo) => {
     test.setTimeout(120000);
     await bootstrapUnlockedSession(page, agentVisitPin);
     await page.getByRole('complementary', { name: 'MediFlow', exact: true }).getByRole('link', { name: 'Impostazioni', exact: true }).click();
@@ -29,11 +42,11 @@ test('renewing tab B preserves tab A authority and transfers the key without ano
         const locks: string[] = [];
         context.on('request', request => { if (request.url().endsWith('/api/auth/lock')) locks.push(request.url()); });
         await second.getByRole('button', { name: 'Rinnova accesso', exact: true }).click();
-        await page.waitForTimeout(20000);
-        const authority = await page.request.get('/api/auth/check');
+        await expect(second.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
+        const authority = await documentRequests(page).get('/api/auth/check');
+        expect(authority.status()).toBe(200);
         expect((await authority.json()).hasSession).toBe(true);
         expect(locks).toEqual([]);
-        await expect(second.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
         await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
         const patientId = await page.evaluate(async () => {
             const response = await fetch('/api/patients', { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -41,14 +54,11 @@ test('renewing tab B preserves tab A authority and transfers the key without ano
             if (!response.ok) throw new Error('SYNTHETIC_PATIENT_FAILED');
             return (await response.json()).id as string;
         });
-        await page.getByRole('complementary', { name: 'MediFlow', exact: true }).getByRole('link', { name: 'Pazienti', exact: true }).click();
-        await page.getByRole('option', { name: /SinteticaSchede/ }).click();
-        await page.keyboard.press('n');
-        await expect(page).toHaveURL(new RegExp('/patients/' + patientId + '/entries/new$'));
-        await page.getByRole('textbox', { name: 'Resoconto clinico', exact: true }).fill('SYNTHETIC_SHARED_TAB_CLINICAL_NOTE');
-        const saved = page.waitForResponse(response => response.url().endsWith('/api/entries') && response.request().method() === 'POST');
-        await page.getByRole('button', { name: 'Registra nel diario', exact: true }).click();
-        expect((await saved).status()).toBe(201);
+        await page.getByRole('navigation', { name: 'Navigazione principale', exact: true }).getByRole('link', { name: 'Pazienti', exact: true }).click();
+        await page.getByRole('option', { name: /SinteticaSchede/ }).press('Enter');
+        await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules$`));
+        await page.getByRole('link', { name: 'Nuova voce', exact: true }).click();
+        await saveSharedNote(page, 'SYNTHETIC_SHARED_TAB_CLINICAL_NOTE');
         await second.getByRole('complementary', { name: 'MediFlow', exact: true }).getByRole('link', { name: 'Pazienti', exact: true }).click();
         await second.getByRole('option', { name: /SinteticaSchede/ }).click();
         await second.getByRole('link', { name: 'Apri scheda paziente', exact: true }).click();
@@ -58,23 +68,25 @@ test('renewing tab B preserves tab A authority and transfers the key without ano
         await page.getByRole('complementary', { name: 'MediFlow', exact: true }).getByRole('link', { name: 'Impostazioni', exact: true }).click();
         await page.getByRole('link', { name: 'Agenti', exact: true }).click();
         await page.getByLabel('PIN di conferma', { exact: true }).fill(agentVisitPin);
+        await page.getByLabel('Autorizzo il passaggio di documenti e trascrizioni al fornitore scelto', { exact: true }).check();
         const creation = page.waitForResponse(response => response.url().endsWith('/api/agent-mandates') && response.request().method() === 'POST');
         await page.getByRole('button', { name: 'Crea mandato', exact: true }).click();
         expect((await creation).status()).toBe(201);
         await second.getByRole('complementary', { name: 'MediFlow', exact: true }).getByRole('link', { name: 'Impostazioni', exact: true }).click();
         await second.getByRole('link', { name: 'Agenti', exact: true }).click();
         await second.getByLabel('PIN di conferma', { exact: true }).fill(agentVisitPin);
+        await second.getByLabel('Autorizzo il passaggio di documenti e trascrizioni al fornitore scelto', { exact: true }).check();
         const secondCreation = second.waitForResponse(response => response.url().endsWith('/api/agent-mandates') && response.request().method() === 'POST');
         await second.getByRole('button', { name: 'Crea mandato', exact: true }).click();
         expect((await secondCreation).status()).toBe(201);
         await second.screenshot({ path: testInfo.outputPath('seconda-scheda-sbloccata.png'), fullPage: true });
         await page.getByRole('button', { name: /Blocca/ }).first().click();
-        await expect.poll(async () => (await (await second.request.get('/api/auth/check')).json()).hasSession).toBe(false);
+        await expect.poll(async () => (await (await documentRequests(second).get('/api/auth/check')).json()).hasSession).toBe(false);
         await expect(second.getByLabel('Passphrase', { exact: true })).toBeVisible({ timeout: 20000 });
     } finally { await second.close(); }
 });
 
-for (const donor of ['fresh', 'restored', 'legacy'] as const) test('a renewed tab can rotate the PIN and recover the same note with a ' + donor + ' donor session', async ({ page, context, isolatedRuntime }) => {
+for (const donor of ['fresh', 'restored', 'legacy'] as const) pinAccount('a renewed tab can rotate the PIN and recover the same note with a ' + donor + ' donor session', async ({ page, context, isolatedRuntime }) => {
     await bootstrapUnlockedSession(page, agentVisitPin);
     const patientId = await page.evaluate(async () => {
         const response = await fetch('/api/patients', { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -82,12 +94,10 @@ for (const donor of ['fresh', 'restored', 'legacy'] as const) test('a renewed ta
         if (!response.ok) throw new Error('SYNTHETIC_PATIENT_FAILED');
         return (await response.json()).id as string;
     });
-    await page.goto(isolatedRuntime.url + '/patients/' + patientId + '/entries/new');
+    await openUnlockedDocument(page, `/patients/${patientId}/modules`, agentVisitPin);
+    await page.getByRole('link', { name: 'Nuova voce', exact: true }).click();
     const note = 'SYNTHETIC_PIN_ROTATION_NOTE';
-    await page.getByRole('textbox', { name: 'Resoconto clinico', exact: true }).fill(note);
-    const saved = page.waitForResponse(response => response.url().endsWith('/api/entries') && response.request().method() === 'POST');
-    await page.getByRole('button', { name: 'Registra nel diario', exact: true }).click();
-    expect((await saved).status()).toBe(201);
+    await saveSharedNote(page, note);
     if (donor === 'legacy') await page.evaluate(() => {
         const stored = JSON.parse(sessionStorage.getItem('mediflow_session_key')!);
         sessionStorage.setItem('mediflow_session_key', JSON.stringify(stored.jwk ?? stored));
@@ -95,6 +105,7 @@ for (const donor of ['fresh', 'restored', 'legacy'] as const) test('a renewed ta
     if (donor !== 'fresh') {
         await page.reload();
         await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
+        await expect(page.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeHidden();
     }
     const second = await context.newPage();
     try {
@@ -133,7 +144,7 @@ for (const donor of ['fresh', 'restored', 'legacy'] as const) test('a renewed ta
         await expect.poll(() => status).toBe(200);
         await expect(second.getByLabel('PIN operatore', { exact: true })).toBeVisible();
         await unlockIfNeeded(second, replacement);
-        await second.goto(isolatedRuntime.url + '/patients/' + patientId + '/modules');
+        await openUnlockedDocument(second, `/patients/${patientId}/modules`, replacement);
         await openPatientSection(second, 'diario');
         await expect(second.getByText(note, { exact: true })).toBeVisible();
     } finally { await second.close(); }

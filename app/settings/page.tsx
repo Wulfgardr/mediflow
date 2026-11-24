@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 
+import { DevicePairingPanel, readDevicePairingList } from '@/components/settings/device-pairing-panel';
+import type { DevicePairingList } from '@/lib/network-pairing-offer-contract';
 import { Disclosure } from '@/components/disclosure';
 import { ViewState } from '@/components/ui/view-state';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -35,6 +37,7 @@ async function readNetworkOverview(): Promise<NetworkOverviewPayload> {
 /* LUME-110/68 */
 export default function SettingsPage() {
     const router = useRouter();
+    const [pairings, setPairings] = useState<DevicePairingList | null>(null);
     const [networkOverview, setNetworkOverview] = useState<NetworkOverviewPayload | null>(null);
     const [confirmedNetworkMode, setConfirmedNetworkMode] = useState<
         NetworkOverviewPayload['session']['operatingMode'] | null
@@ -56,6 +59,9 @@ export default function SettingsPage() {
 
     useEffect(() => {
         let cancelled = false;
+        void readDevicePairingList().then(list => {
+            if (!cancelled) setPairings(list);
+        }).catch(() => {});
         void readNetworkOverview()
             .then((overview) => {
                 if (!cancelled) {
@@ -172,6 +178,13 @@ export default function SettingsPage() {
                     </Link>
                 </div>
             </section>
+            {pairings && <section className={overviewStyles.section} aria-labelledby="settings-devices-title">
+                <div>
+                    <h2 id="settings-devices-title" className={overviewStyles.sectionTitle}>Dispositivi</h2>
+                    <DevicePairingPanel networkEnabled={isHomeBase} clients={pairings.clients}
+                        onClientsChange={clients => setPairings({ clients })} />
+                </div>
+            </section>}
             <section className={overviewStyles.section} aria-labelledby="settings-appearance-title"
                 data-testid="settings-preview-section" data-settings-section="appearance-preview">
                 <div>

@@ -18,6 +18,9 @@ import { parsePatientDocumentCreateJournal, type PatientDocumentCreateJournal } 
 export const AUDIT_SCHEMA_VERSION = 1 as const;
 
 export const AUDIT_EVENT_TYPES = [
+    'network.pairing.offer.created',
+    'network.pairing.offer.redeemed',
+    'network.pairing.client.revoked',
     'backup.portable.imported',
     'backup.provenance.unattested',
     'backup.audit.imported',
@@ -111,7 +114,7 @@ export const AUDIT_EVENT_TYPES = [
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number];
 export type AuditOutcome = 'success' | 'failure' | 'denied';
 export type AuditActorType = 'user' | 'system';
-export type AuditSubjectType = 'backup' | 'audit_event' | 'therapy_command' | 'session' | 'active_role_attestation' | 'patient' | 'ambulatory' | 'checkup' | 'entry' | 'therapy' | 'observation' | 'attachment' | 'prosthetic_prescription' | 'service_prescription' | 'service_prescription_item' | 'siss_handoff' | 'settings' | 'ai_review' | 'agent_operation' | 'reference_data';
+export type AuditSubjectType = 'backup' | 'audit_event' | 'therapy_command' | 'session' | 'active_role_attestation' | 'patient' | 'ambulatory' | 'checkup' | 'entry' | 'therapy' | 'observation' | 'attachment' | 'prosthetic_prescription' | 'service_prescription' | 'service_prescription_item' | 'siss_handoff' | 'settings' | 'ai_review' | 'agent_operation' | 'reference_data' | 'network_pairing';
 export type AuditSourceSurface = 'web' | 'native' | 'api' | 'job' | 'agent';
 export type AgentAuditProvenance = Readonly<{ proposerRef: string; mandateRef: string; modelProvider: 'openai' | 'anthropic' | 'local' }>;
 export type AuditAuthContext = 'session' | 'local-token' | 'anonymous';
@@ -441,7 +444,7 @@ function buildAuditEventRow(input: AuditWriteInput): typeof auditEvents.$inferIn
 
 /* mandatory clinical audit insert on the caller's authoritative SQLite transaction. */
 export function writeAuditEventInTransaction(
-    tx: Parameters<Parameters<typeof dbServer.transaction>[0]>[0],
+    tx: Pick<Parameters<Parameters<typeof dbServer.transaction>[0]>[0], 'insert' | 'get'>,
     input: AuditWriteInput,
 ): string {
     assertArchiveGeneration(tx, input.archiveGeneration);
@@ -534,6 +537,7 @@ export function summarizeAuditEvents(records: AuditRecord[], isTruncated = false
         ai_review: 0,
         agent_operation: 0,
         reference_data: 0,
+        network_pairing: 0,
     };
     const eventTypeCounts = new Map<AuditEventType, number>();
     const actors = new Set<string>();

@@ -1,3 +1,5 @@
+import { releaseDocumentAuthorityForReload, retainDocumentAuthorityForReload } from './client-auth-api';
+
 const SESSION_KEY_STORAGE_KEY = 'mediflow_session_key';
 const SESSION_USER_STORAGE_KEY = 'mediflow_user';
 
@@ -14,6 +16,7 @@ export async function persistSecuritySession<T>(key: CryptoKey, userData: T, wra
     const jwk = await window.crypto.subtle.exportKey('jwk', key);
     sessionStorage.setItem(SESSION_KEY_STORAGE_KEY, JSON.stringify({ jwk, wrapping }));
     sessionStorage.setItem(SESSION_USER_STORAGE_KEY, JSON.stringify(userData));
+    if (!retainDocumentAuthorityForReload()) clearSecuritySession();
 }
 
 export async function restoreSecuritySession<T>(): Promise<RestoredSecuritySession<T> | null> {
@@ -42,4 +45,5 @@ export async function restoreSecuritySession<T>(): Promise<RestoredSecuritySessi
 export function clearSecuritySession(): void {
     sessionStorage.removeItem(SESSION_KEY_STORAGE_KEY);
     sessionStorage.removeItem(SESSION_USER_STORAGE_KEY);
+    releaseDocumentAuthorityForReload();
 }

@@ -851,6 +851,47 @@ final class PairedPatientsWorkspaceModel: ObservableObject, ClinicalNavigationWo
     }
     #endif
 
+    var pairingReplacementID: String? {
+        pairedStore.loadSettings().pairedClientId.trimmedOrNil ?? pairedClientId.trimmedOrNil
+            ?? pairedClientToken.trimmedOrNil.map { _ in "paired" }
+    }
+
+    var canConfirmPairing: Bool { !isWorking && !hasMobileVisitBlockingComposer && pendingConflict == nil }
+
+    func acceptPairing(
+        _ link: HomeBasePairingLink, replacing previousClientID: String?,
+        redeem: @MainActor (HomeBasePairingLink) async throws -> HomeBasePairingConnection = { try await $0.redeem() }
+    ) async throws {
+        guard canConfirmPairing, pairingReplacementID == previousClientID else { throw HomeBasePairingError.contextChanged }
+        let previous = pairedStore.loadSettings()
+        let generation = loginGeneration
+        let operation = beginExclusiveOperation()
+        defer { finishExclusiveOperation(operation) }
+        let connection = try await redeem(link)
+        let credentials = connection.credentials
+        guard !Task.isCancelled, loginGeneration == generation, previous == pairedStore.loadSettings(),
+              !hasMobileVisitBlockingComposer, pendingConflict == nil else { throw HomeBasePairingError.contextChanged }
+        let settings = HomeBasePairedSettings(
+            serverURL: connection.origin.absoluteString, tlsPin: link.fingerprint, pairedClientId: credentials.clientId
+        )
+        do {
+            try pairedStore.save(settings: settings, pairedClientToken: credentials.clientToken)
+        } catch {
+            throw HomeBasePairingError.storage
+        }
+        mobileVisit?.lock()
+        clearOperatorSessionPresentation()
+        serverURL = settings.serverURL
+        tlsPin = settings.tlsPin
+        pairedClientId = settings.pairedClientId
+        pairedClientToken = credentials.clientToken
+        username = settings.username
+        ambulatoryId = settings.ambulatoryId
+        connectionState = .notLoaded
+        reconciliationLine = "Accedi per aprire l’archivio."
+        statusMessage = "Dispositivo collegato."
+    }
+
     func discoverHomeBase() async {
         await runTask {
             let candidate = try await HomeBaseBonjourDiscovery().discoverFirst()

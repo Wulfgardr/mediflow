@@ -5,6 +5,7 @@ import test from 'node:test';
 import ts from 'typescript';
 import * as values from './settings-value';
 import * as serverErrorLog from './server-error-log';
+import * as accessibilityPreferences from './ui-accessibility-preferences';
 import { sanitizeAIInsightManualConfig } from './ai-insight-settings';
 
 function route() {
@@ -12,6 +13,7 @@ function route() {
     const routeModule = { exports: {} as { PUT: (request: Request, context: unknown) => Promise<Response>; GET: (request: Request, context: unknown) => Promise<Response> } };
     const imports: Record<string, unknown> = {
         '@/lib/backup-restore-receipt-contract': { RESTORE_RECEIPT_PREFIX: 'restore.' },
+        '@/lib/network-pairing-offer-contract': { PAIRING_OFFERS_KEY: 'network.pairing.offers' },
         '@/lib/ai-providers/fabric/function-model-settings-write': { writeSettingWithFunctionModelGeneration: (...args: unknown[]) => writes.push(args) },
         '@/lib/security/archive-write-request': { archiveWriteRequestDenial: () => null },
         '@/lib/security/network-mode-write': { networkModeWriteDenial: () => null },
@@ -22,6 +24,7 @@ function route() {
         '@/lib/security/audit': { auditContextFromRequest: () => ({}), listChangedFields: () => [], requestIdFromRequest: () => 'synthetic', withAuditContextMetadata: () => ({}), writeAuditEvent: async (value: unknown) => { audits.push(value); } },
         '@/lib/settings-value': values,
         '@/lib/server-error-log': serverErrorLog,
+        '@/lib/ui-accessibility-preferences': accessibilityPreferences,
         '@/lib/security/settings-write-policy': { evaluateSettingsWrite: () => ({ allowed: true }) },
     };
     const compiled = ts.transpileModule(readFileSync('app/api/settings/[key]/route.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } });

@@ -1,6 +1,6 @@
 /* destructive auth tests own their process and initially empty data directory. */
 import { test as base, expect } from '@playwright/test';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { createHash, randomUUID, randomBytes } from 'node:crypto';
 import { createServer } from 'node:net';
 import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync, writeSync } from 'node:fs';
@@ -41,10 +41,11 @@ type IsolatedRuntime = Readonly<{ url: string; dataDirectory: string;
   cancelNavigation(): void;
 }>;
 
-export const test = base.extend<{ isolatedRuntime: IsolatedRuntime; initialRuntimeServices: boolean; pluginLocalUiRuntime: boolean }>({
+export const test = base.extend<{ isolatedRuntime: IsolatedRuntime; initialRuntimeServices: boolean; pluginLocalUiRuntime: boolean; existingPin: string | undefined }>({
   pluginLocalUiRuntime: [false, { option: true }],
   initialRuntimeServices: [false, { option: true }],
-  isolatedRuntime: async ({ initialRuntimeServices, pluginLocalUiRuntime }, provide, testInfo) => {
+  existingPin: [undefined, { option: true }],
+  isolatedRuntime: async ({ initialRuntimeServices, pluginLocalUiRuntime, existingPin }, provide, testInfo) => {
     const bundle = path.resolve(process.env.E2E_ISOLATED_STANDALONE_DIR
       || path.join(repositoryRoot, process.env.MEDIFLOW_NEXT_DIST_DIR || '.next', 'standalone'));
     const serverPath = path.join(bundle, 'server.js');
@@ -73,7 +74,6 @@ export const test = base.extend<{ isolatedRuntime: IsolatedRuntime; initialRunti
       mkdirSync(path.join(dataDirectory, 'pm2'), { mode: 0o700 });
       writeFileSync(path.join(dataDirectory, 'pm2/pm2.log'), 'synthetic runtime log', { mode: 0o600 });
     }
-    const log = openSync(path.join(directory, 'server.log'), 'wx', 0o600);
     const environment: NodeJS.ProcessEnv = { ...process.env,
       NODE_ENV: 'production', HOSTNAME: '127.0.0.1', PORT: String(port),
       MEDIFLOW_NEXT_DIST_DIR: contract.distDir,
@@ -85,6 +85,16 @@ export const test = base.extend<{ isolatedRuntime: IsolatedRuntime; initialRunti
     environment.MEDIFLOW_PLUGIN_LOCAL_UI = pluginLocalUiRuntime ? '1' : '0';
     delete environment.MEDIFLOW_RUNTIME_TWIN;
     delete environment.NEXT_PUBLIC_MEDIFLOW_RUNTIME_TWIN;
+    if (existingPin) {
+      const seed = spawnSync(process.execPath, [path.join(repositoryRoot, 'scripts/prepare-e2e-db.mjs')], {
+        cwd: repositoryRoot, env: { ...environment, E2E_PIN: existingPin }, stdio: 'ignore', timeout: 30_000,
+      });
+      if (seed.status !== 0) {
+        rmSync(directory, { recursive: true });
+        throw new Error('The isolated synthetic PIN account could not be prepared.');
+      }
+    }
+    const log = openSync(path.join(directory, 'server.log'), 'wx', 0o600);
     let args = isolatedRuntimeArguments(bundle);
     if (pluginLocalUiRuntime && args.length === 1) {
       const metadata = JSON.parse(readFileSync(path.join(bundle, 'mediflow-build-identity.json'), 'utf8'));
@@ -128,7 +138,7 @@ export const test = base.extend<{ isolatedRuntime: IsolatedRuntime; initialRunti
     let { child, closed } = launch();
     let restarts = 0;
     let sourceFingerprint: string | null = null;
-    let initialEmptyAccount = false;
+    let initialAccountVerified = false;
     try {
       await awaitReady(child);
       const revisionResponse = await fetch(`${url}/api/system/revision`);
@@ -141,8 +151,11 @@ export const test = base.extend<{ isolatedRuntime: IsolatedRuntime; initialRunti
         'HTML and runtime must share the bundle metadata; pass its supported MEDIFLOW_APP_* environment.').toBe(true);
       const initial = await fetch(`${url}/api/auth/check`);
       expect(initial.status).toBe(200);
-      expect(await initial.json()).toMatchObject({ status: 'ok', isSetup: false, hasSession: false, db: { state: 'ready' } });
-      initialEmptyAccount = true;
+      expect(await initial.json()).toMatchObject({
+        status: 'ok', isSetup: Boolean(existingPin), hasSession: false, db: { state: 'ready' },
+        ...(existingPin ? { unlock: { credential: 'pin' } } : {}),
+      });
+      initialAccountVerified = true;
       let lastNavigation: string | undefined;
       await provide({ url, dataDirectory,
         async restart() {
@@ -181,12 +194,14 @@ export const test = base.extend<{ isolatedRuntime: IsolatedRuntime; initialRunti
       // Only the child we created is terminated. No port-wide kill, account restore or DB edit.
       await stop();
       closeSync(log);
-      const keepEvidence = !initialEmptyAccount || testInfo.status !== 'passed';
+      const keepEvidence = !initialAccountVerified || testInfo.status !== 'passed';
       await testInfo.attach('isolated-runtime.json', {
         contentType: 'application/json',
         body: JSON.stringify({
           isolated: true, url, node: process.versions.node, platform: process.platform, arch: process.arch,
-          emptyDataBeforeStart: !initialRuntimeServices, initialRuntimeServices, pluginLocalUiRuntime, initialEmptyAccount, sourceFingerprint, childStopped: true, restarts,
+          emptyDataBeforeStart: !initialRuntimeServices && !existingPin, initialRuntimeServices, pluginLocalUiRuntime,
+          initialEmptyAccount: initialAccountVerified && !existingPin, initialPinAccount: initialAccountVerified && Boolean(existingPin),
+          sourceFingerprint, childStopped: true, restarts,
           serverSHA256: createHash('sha256').update(readFileSync(serverPath)).digest('hex'),
           runtimeContractSHA256: createHash('sha256').update(readFileSync(contractPath)).digest('hex'),
           sharedDatabaseUsed: false, accountOrDatabaseRestore: false,

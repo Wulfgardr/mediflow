@@ -2,7 +2,7 @@ import { expect, test, type Locator } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
 import { SISS_URLS } from '../lib/siss-urls';
 import { openBrowserZoomFixture } from './fixtures/browser-zoom';
-import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow, assertNotClippedInViewport } from './utils';
+import { bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow, assertNotClippedInViewport, openUnlockedDocument } from './utils';
 
 test('SISS: diario locale, pre-controllo ed esportazione senza servizi regionali', async ({ baseURL }) => {
     test.setTimeout(180_000);
@@ -35,7 +35,7 @@ test('SISS: diario locale, pre-controllo ed esportazione senza servizi regionali
             const response = await fetch('/api/patients', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ firstName: 'Siss', lastName: 'Sintetico', taxCode: `C14${crypto.randomUUID().replaceAll('-', '').slice(0, 13).toUpperCase()}`, birthDate: '1980-01-01T00:00:00Z', diagnoses: [] }) });
             if (!response.ok) throw new Error(`Synthetic patient ${response.status}`); return (await response.json()).id as string;
         });
-        await page.goto(`/patients/${patientId}/modules`); await openPatientSection(page, 'siss');
+        await openUnlockedDocument(page, `/patients/${patientId}/modules`); await openPatientSection(page, 'siss');
         const pane = page.locator('#siss');
         const directory = process.env.SISS_SCREENSHOTS; if (directory) await mkdir(directory, { recursive: true });
         const surfaces: unknown[] = [];

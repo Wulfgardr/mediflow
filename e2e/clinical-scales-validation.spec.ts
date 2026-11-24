@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { bootstrapUnlockedSession } from './utils';
+import { bootstrapUnlockedSession, openUnlockedDocument, unlockIfNeeded } from './utils';
 
 async function openSyntheticChart(page: Page, baseURL: string | undefined, suffixPrefix: string) {
     test.skip(process.env.E2E_SCALES_SYNTHETIC_ONLY !== '1', 'Requires an isolated synthetic database and explicit opt-in');
@@ -40,7 +40,7 @@ async function capture(testInfo: ReturnType<typeof test.info>, target: Locator, 
 
 test('Untouched/partial scales do not write; explicit zero and complete POMA-28 do', async ({ page, baseURL }, testInfo) => {
     const { patientId, writes } = await openSyntheticChart(page, baseURL, 'SCLTST');
-    await page.goto(`/patients/${patientId}/scales/adl`);
+    await openUnlockedDocument(page, `/patients/${patientId}/scales/adl`);
     const form = page.locator('#scala');
     await expect(form.getByRole('button', { name: 'Avanti', exact: true })).toBeDisabled();
     expect(writes()).toBe(0);
@@ -61,7 +61,7 @@ test('Untouched/partial scales do not write; explicit zero and complete POMA-28 
     await leaveDialog.getByRole('button', { name: 'Esci senza salvare', exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/scales$`));
     expect(writes()).toBe(0);
-    await page.goto(`/patients/${patientId}/scales/adl`);
+    await openUnlockedDocument(page, `/patients/${patientId}/scales/adl`);
     for (let index = 0; index < 6; index++) {
         await expect(form.getByText(`Domanda ${index + 1} di 6`, { exact: true })).toBeVisible();
         const next = form.getByRole('button', { name: index === 5 ? 'Completa' : 'Avanti', exact: true });
@@ -82,12 +82,12 @@ test('Untouched/partial scales do not write; explicit zero and complete POMA-28 
     await expect(history.getByRole('article').first()).toContainText('ADL (Indice di Katz)');
     await expect(history.getByRole('article').first()).toContainText('Punteggio: 0');
 
-    await page.goto(`/patients/${patientId}/scales/tinetti`);
+    await openUnlockedDocument(page, `/patients/${patientId}/scales/tinetti`);
     await expect(page.getByText(/Versione Tinetti precedente ritirata/)).toBeVisible();
     await expect(page.getByRole('button', { name: 'Completa', exact: true })).toHaveCount(0);
     expect(writes()).toBe(1);
 
-    await page.goto(`/patients/${patientId}/scales/tinetti-poma28-v1`);
+    await openUnlockedDocument(page, `/patients/${patientId}/scales/tinetti-poma28-v1`);
     const maxima = [1, 2, 2, 2, 2, 2, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1];
     for (let index = 0; index < maxima.length; index++) {
         await expect(form.getByText(`Domanda ${index + 1} di 20`, { exact: true })).toBeVisible();
@@ -100,6 +100,7 @@ test('Untouched/partial scales do not write; explicit zero and complete POMA-28 
     await expect.poll(writes).toBe(2);
     await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/modules#scale$`));
     await page.reload();
+    await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
     const records = history.getByRole('article');
     await expect(records).toHaveCount(2);
     const poma = records.filter({ has: page.getByRole('heading', { name: 'Tinetti POMA-28', exact: true }) });
@@ -119,7 +120,7 @@ for (const theme of ['light', 'dark']) test(`Tinetti POMA-28: all 20 questions a
     await page.setViewportSize({ width: 1180, height: 780 });
     await page.addInitScript(value => localStorage.setItem('mediflow-theme', value), theme);
     const { patientId, writes } = await openSyntheticChart(page, baseURL, 'SCLKBD');
-    await page.goto(`/patients/${patientId}/scales`);
+    await openUnlockedDocument(page, `/patients/${patientId}/scales`);
     const link = page.getByRole('link', { name: /^Tinetti POMA-28 / });
     await tabTo(page, link);
     await page.keyboard.press('Enter');
@@ -223,7 +224,10 @@ for (const theme of ['light', 'dark']) test(`Tinetti POMA-28: all 20 questions a
     const result = history.getByRole('article');
     await expect(result).toHaveCount(1);
     for (const reopen of [false, true]) {
-        if (reopen) await page.reload();
+        if (reopen) {
+            await page.reload();
+            await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
+        }
         await expect(result.getByRole('heading', { name: 'Tinetti POMA-28', exact: true })).toBeVisible();
         await expect(result.getByText('Punteggio 0/28', { exact: true })).toBeVisible();
         await expect(result.getByText('Il rischio di caduta richiede una valutazione clinica.', { exact: true })).toBeVisible();

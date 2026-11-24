@@ -6,7 +6,8 @@ use crate::{
     ambulatory_command_recovery::CommandRecoveryBinding,
     ambulatory_commands::{hex64, uuid},
     http::{
-        authenticate_web_p3, control_cookie, cookie_header, encode_cookie_value, sensitive_header,
+        LOCAL_CLIENT_SESSION_PROOF_HEADER, authenticate_web_p3, control_cookie, cookie_header,
+        encode_cookie_value, local_client_session_proof, sensitive_header,
     },
 };
 use reqwest::{
@@ -78,6 +79,7 @@ pub struct HostAmbulatoryCommand {
     recovery: bool,
     reference: Zeroizing<String>,
     control: Zeroizing<String>,
+    proof: Zeroizing<String>,
     cookie: Mutex<Zeroizing<String>>,
     marker: Mutex<Option<AmbulatoryCommandMarker>>,
     auth_attempted: AtomicBool,
@@ -211,6 +213,7 @@ impl HostAmbulatoryCommand {
             recovery: recovery_marker.is_some(),
             reference: Zeroizing::new(open.reference),
             control,
+            proof: local_client_session_proof()?,
             cookie: Mutex::new(Zeroizing::new(String::new())),
             marker: Mutex::new(recovery_marker),
             auth_attempted: AtomicBool::new(false),
@@ -231,6 +234,10 @@ impl HostAmbulatoryCommand {
         });
         let mut headers = HeaderMap::new();
         headers.insert(COOKIE, sensitive_header(&value)?);
+        headers.insert(
+            LOCAL_CLIENT_SESSION_PROOF_HEADER,
+            sensitive_header(&self.proof)?,
+        );
         headers.insert(
             "x-mediflow-ambulatory-command-reference",
             sensitive_header(&self.reference)?,
@@ -572,6 +579,7 @@ mod tests {
             recovery,
             reference: Zeroizing::new("f".repeat(64)),
             control: Zeroizing::new("b".repeat(64)),
+            proof: Zeroizing::new("a".repeat(64)),
             cookie: Mutex::new(Zeroizing::new("d".repeat(64))),
             marker: Mutex::new(Some(marker())),
             auth_attempted: AtomicBool::new(true),
