@@ -1261,3 +1261,14 @@ Le altre impronte coincidono con `main`. Il digest successivo comprende la
 conservazione della prova accanto alla chiave del PIN transitorio (WUL-931):
 riguarda solo intestazioni e `sessionStorage` della scheda, non il comando di
 stato terapia.
+
+### Rifiuti spiegati del backup completo, WUL-930
+
+In `lib/recovery-backup-server.ts` i rifiuti dello snapshot e del candidato
+portano un motivo (`RecoverySnapshotRefusedError`: schema non previsto,
+integrità o riferimenti, involucro di recupero assente, dimensione). Il
+messaggio dell'errore resta `RECOVERY_BACKUP_PREFLIGHT_FAILED`. Condizioni,
+ordine dei controlli, cattura e conservazione dei comandi di stato terapia,
+swap e rotazione della generazione restano identici. Aggiornati solo il digest
+del file e `syncCommit`; modello, statechart, invarianti, limiti, testimoni e
+mutanti non cambiano.

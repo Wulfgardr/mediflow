@@ -16,6 +16,8 @@ import { Kree8WorkspaceShell } from '@/components/kree8/kree8-workspace-shell';
 import PrivacyBlur from '@/components/privacy-blur';
 import { useSecurity } from '@/components/security-provider';
 import PatientDocumentCreate from '@/components/patient-document-create';
+import { DossierBackupProposal, dossierBackupProposed, dossierWritablePatientCount, type DossierBackupChoice } from '@/components/dossier-backup-proposal';
+import { dossierCreationSource } from '@/lib/dossier-backup-gate';
 import { proposeIdentityFields } from '@/lib/domain/documents/dossier-sections';
 import { db } from '@/lib/db';
 import { createDossierPorts } from '@/lib/document-dossier-ports';
@@ -170,6 +172,8 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
     const preparedInput = useRef<HTMLInputElement>(null);
     const [prepared, setPrepared] = useState<{ extraction: PreparedExtraction; warnings: string[]; fileName: string } | null>(null);
     const lastSelection = useRef<DossierInputFile[] | null>(null);
+    const [backupChoice, setBackupChoice] = useState<DossierBackupChoice>({ kind: 'pending' });
+    const backupProposed = dossierBackupProposed(groups, backupChoice);
 
     useEffect(() => () => { generation.current += 1; }, []);
     useEffect(() => {
@@ -208,6 +212,7 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
 
     const readSelection = async (list: FileList | null) => {
         if (!list?.length) return;
+        setBackupChoice({ kind: 'pending' });
         await readFiles(inputFiles(list), prepared?.extraction ?? null);
     };
 
@@ -281,7 +286,7 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
 
     const acquire = async (group: DossierDraftGroup) => {
         const patientId = links[group.key];
-        if (!patientId) return;
+        if (!patientId || backupProposed) return;
         const op = operation();
         setBusy('Salvataggio e rilettura degli originali…');
         try {
@@ -342,6 +347,8 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
                         <div className={styles.actions}>
                             <button type="button" className="mf-button-secondary" onClick={() => { void refreshPatients(); }}>Aggiorna elenco schede</button>
                         </div>
+                        {backupProposed ? <DossierBackupProposal patients={dossierWritablePatientCount(groups)} disabled={Boolean(busy)} onChoice={setBackupChoice} />
+                            : backupChoice.kind === 'made' ? <p role="status" data-testid="dossier-backup-made">Backup creato: {backupChoice.fileName}.</p> : null}
                         {groups.map((group) => {
                             const linked = links[group.key] ?? '';
                             const baseIdentity = evaluateDraftGroupIdentity(group, patients, linked || null);
@@ -424,11 +431,11 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
                                         <span>Ho controllato le fonti e confermo che appartengono alla scheda scelta.</span>
                                     </label>
                                     <div className={styles.actions}>
-                                        <button type="button" className={styles.primary} disabled={!linked || identity.blocking || !confirmations[group.key] || !acquirable || Boolean(busy)}
+                                        <button type="button" className={styles.primary} disabled={!linked || identity.blocking || !confirmations[group.key] || !acquirable || Boolean(busy) || backupProposed}
                                             onClick={() => { void acquire(effectiveGroup); }}>Salva {formatCountLabel(acquirable, 'originale', 'originali')} nella scheda</button>
                                     </div>
-                                    <NewPatientFromDocument group={group} identityBlocking={identity.blocking} busy={Boolean(busy)}
-                                        creating={creating?.groupKey === group.key ? creating.sourceKey : null}
+                                    <NewPatientFromDocument group={group} identityBlocking={identity.blocking} busy={Boolean(busy) || backupProposed}
+                                        creating={dossierCreationSource(creating, group.key, backupProposed)}
                                         onStart={(sourceKey) => setCreating({ groupKey: group.key, sourceKey })}
                                         onCancel={() => setCreating(null)}
                                         onCreated={async (patientId) => {
