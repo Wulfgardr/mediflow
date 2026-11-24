@@ -1,0 +1,5 @@
+{"op":"press","target":{"role":"tab","name":"Parametri"},"key":"Enter"}
+{"op":"expect","target":{"role":"tab","name":"Parametri"},"state":"selected"}
+{"op":"discover"}
+{"op":"click","target":{"role":"button","name":"Nuovo parametro"}}
+{"op":"expect","target":{"role":"textbox","name":"Nome del parametro"},"state":"visible"}

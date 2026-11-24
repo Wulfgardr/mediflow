@@ -2,17 +2,19 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {createHash} from 'node:crypto';
 import {test} from 'node:test';
+import {deriveCellQualification,loadReceipt,ReceiptRejectedError} from './release-register-qualification';
 
 const root=process.env.MEDIFLOW_WUL840_BIS_ROOT ? new URL('file://'+process.env.MEDIFLOW_WUL840_BIS_ROOT+'/') : new URL('../../../',import.meta.url);
 const directory='docs/quality/intelligence/2026-11-14-ollama/';
 const read=(name:string)=>JSON.parse(fs.readFileSync(new URL(name,root),'utf8'));
-const register=process.env.MEDIFLOW_WUL840_BIS_REGISTER ? JSON.parse(fs.readFileSync(process.env.MEDIFLOW_WUL840_BIS_REGISTER,'utf8')) : read('docs/quality/intelligence/registro-0.9.1.json');
+const register=process.env.MEDIFLOW_WUL840_BIS_REGISTER ? JSON.parse(fs.readFileSync(process.env.MEDIFLOW_WUL840_BIS_REGISTER,'utf8')) : read(directory+'registro-storico.json');
 const functions=['patient_insight','smart_import','document_synthesis'];
 type Sample={scenario:string;mode:string;phase:string;run:number;elapsedMs:number;outcome:string;timeout:boolean;coldModelAbsent:boolean|null;warmModelDigest?:string|null;memory:{rssSamplesBytes:number[];peakRssBytes:number|null}};
 type Group={scenario:string;mode:string;n:number;errors:number;timeouts:number;p50Ms:number;p95Ms:number;maxMs:number;latencyBudgetMs:number|null};
 
 function validateRegister(value:typeof register,m:ReturnType<typeof read>){
- assert.equal(value.contractSha256,createHash('sha256').update(fs.readFileSync(new URL(value.contract,root))).digest('hex'));
+ assert.equal(value.contract,'docs/releases/0.9.1-contract.md');
+ assert.equal(value.contractSha256,createHash('sha256').update(fs.readFileSync(new URL(directory+'contratto-0.9.1-del-registro.txt',root))).digest('hex'));
  assert.equal(value.sourceRevision,m.sourceRevision);
  assert.match(value.sourceRevision,/^[a-f0-9]{40}$/);
  assert.equal(value.purpose,'coverage_only_no_runtime_admission');
@@ -263,4 +265,48 @@ test('WUL-840 bis binds the rejection diagnosis to every recorded Patient Insigh
   }
  }
  assert.deepEqual(counts,{proposal_invalid:33,proposal_unfaithful:3});
+});
+
+test('WUL-840 bis receipt keeps the incomplete 14/11 evidence incomplete and rejects a mutated copy',()=>{
+ const m=read(directory+'measurements.json'),receiptPath=directory+'ricevuta-celle.json';
+ const bytes=fs.readFileSync(new URL(receiptPath,root));const receipt=JSON.parse(bytes.toString('utf8'));
+ assert.equal(receipt.sources[directory+'measurements.json'],createHash('sha256').update(fs.readFileSync(new URL(directory+'measurements.json',root))).digest('hex'));
+ assert.equal(receipt.sources[directory+'i2-interventions.json'],createHash('sha256').update(fs.readFileSync(new URL(directory+'i2-interventions.json',root))).digest('hex'));
+ assert.equal(receipt.sourceRevision,m.sourceRevision);assert.equal(receipt.buildId,m.buildId);assert.equal(receipt.profile.osBuild,m.machine.osBuild);
+ const matchesMeasurements=(r:typeof receipt)=>{for(const fid of functions){
+  const f=r.functions[fid],scenarios=m.frozenBaselines.functions[fid].scenarios;
+  assert.deepEqual(f.cl.groups,m.aggregates.filter((g:Group)=>scenarios.includes(g.scenario)).map((g:Group)=>({scenario:g.scenario,mode:g.mode,n:g.n,errors:g.errors,timeouts:g.timeouts,p50Ms:g.p50Ms,p95Ms:g.p95Ms,maxMs:g.maxMs})));
+  assert.equal(f.cl.functionBudget.latencyMs,m.frozenBaselines.functions[fid].latencyMs);
+  assert.equal(f.cl.functionBudget.rssBytes,m.frozenBaselines.functions[fid].rssBytes);
+  for(const scenario of ['complete','error','cancel','revoke'])assert.ok(m.i2.some((x:{functionId:string;scenario:string})=>x.functionId===fid&&x.scenario===scenario));
+  for(const scenario of ['cancel','revoke'])assert.equal(f.i2[scenario].physical,'not_proved');
+ }};
+ matchesMeasurements(receipt);
+ const historical=structuredClone(register);
+ const ref={path:receiptPath,sha256:createHash('sha256').update(bytes).digest('hex')};
+ const ids:{[id:string]:{[criterion:string]:string}}={};
+ for(const cell of historical.cells){
+  if(cell.provider==='ollama')cell.receipts=[ref];
+  const d=deriveCellQualification(historical,cell,(p:string)=>fs.readFileSync(new URL(p,root)));
+  assert.equal(d.qualification,'not_qualified',cell.id);
+  assert.equal(cell.qualification,'not_qualified',cell.id);
+  for(const blocker of cell.blockedBy)assert.ok(d.blockedBy.includes(blocker),cell.id+': '+blocker);
+  ids[cell.id]=Object.fromEntries(Object.entries(d.criteria).map(([k,v])=>[k,v.status]));
+ }
+ const local={'I-2':'met','I-2-arresto':'not_met',memoria:'not_met','G-5':'not_executed','C-7':'not_executed'};
+ const remote={'I-4':'not_executed','G-5':'not_executed','C-7':'not_executed'};
+ assert.deepEqual(ids,{
+  'patient_insight/ollama':{...local,'C-L':'not_met'},'smart_import/ollama':{...local,'C-L':'met'},'document_synthesis/ollama':{...local,'C-L':'not_met'},
+  'patient_insight/chatgpt':remote,'smart_import/chatgpt':remote,'document_synthesis/chatgpt':remote,
+ });
+ const forged=JSON.parse(bytes.toString('utf8'));
+ for(const g of forged.functions.patient_insight.cl.groups)g.errors=0;
+ forged.functions.patient_insight.cl.functionBudget={latencyMs:1,rssBytes:1,gpuBytes:null};
+ const forgedBytes=Buffer.from(JSON.stringify(forged));
+ assert.throws(()=>loadReceipt(ref,()=>forgedBytes),(e:unknown)=>e instanceof ReceiptRejectedError&&e.reason==='sha256_mismatch');
+ const rehashed=structuredClone(historical);const cell=rehashed.cells.find((c:{id:string})=>c.id==='patient_insight/ollama');
+ cell.receipts=[{path:receiptPath,sha256:createHash('sha256').update(forgedBytes).digest('hex')}];
+ const d=deriveCellQualification(rehashed,cell,()=>forgedBytes);
+ assert.equal(d.qualification,'not_qualified');
+ assert.throws(()=>matchesMeasurements(forged));
 });

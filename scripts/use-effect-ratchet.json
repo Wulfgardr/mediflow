@@ -16,7 +16,6 @@
     "components/app-startup-screen.tsx": 1,
     "components/backup-restore-ui.tsx": 1,
     "components/backup-scheduler-ui.tsx": 1,
-    "components/clinical-rich-text-editor.tsx": 2,
     "components/document-original-save.tsx": 2,
     "components/document-synthesis-fabric-review-card.tsx": 3,
     "components/document-upload.tsx": 6,

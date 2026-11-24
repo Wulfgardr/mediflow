@@ -41,7 +41,7 @@ export async function createSyntheticAgentMandate(page: Page, credential: 'passp
     const created = await creation; expect(created.status()).toBe(201);
     const mandate = created.request().postDataJSON().mandate;
     expect(mandate).toMatchObject({ provider: 'openai', allowsClinicalEgress: true });
-    expect(mandate.durationMs).toBe(43200000);
+    expect(mandate.durationMs).toBe(86400000);
     return { ...mandate, recovery };
 }
 

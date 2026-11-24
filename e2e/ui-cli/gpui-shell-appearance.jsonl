@@ -1,0 +1,17 @@
+{"op":"click","target":{"role":"button","name":"Impostazioni"}}
+{"op":"click","target":{"role":"button","name":"Aspetto"}}
+{"op":"discover"}
+{"op":"press","target":{"role":"tab","name":"Giorno"},"key":"Enter"}
+{"op":"expect","target":{"role":"tab","name":"Giorno"},"state":"selected"}
+{"op":"click","target":{"role":"button","name":"Passa al tema Grafite"}}
+{"op":"expect","target":{"role":"button","name":"Passa al tema Giorno"},"state":"visible"}
+{"op":"click","target":{"role":"button","name":"Torna alle impostazioni"}}
+{"op":"click","target":{"role":"button","name":"Aspetto"}}
+{"op":"expect","target":{"role":"tab","name":"Grafite"},"state":"selected"}
+{"op":"click","target":{"role":"tab","name":"Aspetto di sistema"}}
+{"op":"expect","target":{"role":"tab","name":"Aspetto di sistema"},"state":"selected"}
+{"op":"click","target":{"role":"tab","name":"Grafite"}}
+{"op":"expect","target":{"role":"tab","name":"Grafite"},"state":"selected"}
+{"op":"click","target":{"role":"button","name":"Passa al tema Giorno"}}
+{"op":"expect","target":{"role":"tab","name":"Giorno"},"state":"selected"}
+{"op":"discover"}

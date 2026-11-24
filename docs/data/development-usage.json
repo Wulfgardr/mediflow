@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "snapshotDate": "2026-11-06",
+  "snapshotDate": "2026-11-19",
   "scope": "mediflow",
   "attribution": {
     "method": "verified-repository-checkout",
@@ -11,28 +11,28 @@
       "environment": "codex",
       "source": "Codex local token records + historical CodexBar 0.60.3",
       "from": "2026-02-02",
-      "to": "2026-11-06",
+      "to": "2026-11-19",
       "historyCoverageEstablished": false,
-      "totalTokens": 34535287187,
-      "cacheReadTokens": 33279168239
+      "totalTokens": 38152552958,
+      "cacheReadTokens": 36840518127
     },
     {
       "environment": "claude",
       "source": "Claude Code local response records",
       "from": "2026-07-02",
-      "to": "2026-11-06",
+      "to": "2026-11-19",
       "historyCoverageEstablished": false,
-      "totalTokens": 5300005382,
-      "cacheReadTokens": 5193631015
+      "totalTokens": 8563318699,
+      "cacheReadTokens": 8402974913
     }
   ],
   "effortSource": {
     "method": "unique-codex-response-usage-with-matching-turn-context",
     "timezone": "Europe/Rome",
     "from": "2026-09-03",
-    "to": "2026-11-06",
-    "totalTokens": 9822318975,
-    "responseRecords": 67091,
+    "to": "2026-11-19",
+    "totalTokens": 13167298205,
+    "responseRecords": 83403,
     "missingFiles": 130,
     "completeHistory": false
   },
@@ -3004,6 +3004,422 @@
       "model": "gpt-6.1-sol",
       "effort": "unknown",
       "tokens": 54347541
+    },
+    {
+      "date": "2026-11-07",
+      "environment": "claude",
+      "provider": "Anthropic",
+      "model": "claude-haiku-5-5",
+      "effort": "unknown",
+      "tokens": 158506
+    },
+    {
+      "date": "2026-11-07",
+      "environment": "claude",
+      "provider": "Anthropic",
+      "model": "claude-opus-5-5",
+      "effort": "unknown",
+      "tokens": 271487745
+    },
+    {
+      "date": "2026-11-07",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.1-sol",
+      "effort": "unknown",
+      "tokens": 187719393
+    },
+    {
+      "date": "2026-11-07",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.1-terra",
+      "effort": "unknown",
+      "tokens": 13961120
+    },
+    {
+      "date": "2026-11-08",
+      "environment": "claude",
+      "provider": "Anthropic",
+      "model": "claude-haiku-5-5",
+      "effort": "unknown",
+      "tokens": 5961998
+    },
+    {
+      "date": "2026-11-08",
+      "environment": "claude",
+      "provider": "Anthropic",
+      "model": "claude-opus-5-5",
+      "effort": "unknown",
+      "tokens": 550149902
+    },
+    {
+      "date": "2026-11-09",
+      "environment": "claude",
+      "provider": "Anthropic",
+      "model": "claude-fable-5-2",
+      "effort": "unknown",
+      "tokens": 85979180
+    },
+    {
+      "date": "2026-11-09",
+      "environment": "claude",
+      "provider": "Anthropic",
+      "model": "claude-opus-5-5",
+      "effort": "unknown",
+      "tokens": 177306528
+    },
+    {
+      "date": "2026-11-09",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.1-sol",
+      "effort": "unknown",
+      "tokens": 3907222
+    },
+    {
+      "date": "2026-11-10",
+      "environment": "claude",
+      "provider": "Anthropic",
+      "model": "claude-fable-5-2",
+      "effort": "unknown",
+      "tokens": 411298847
+    },
+    {
+      "date": "2026-11-10",
+      "environment": "claude",
+      "provider": "Anthropic",
+      "model": "claude-haiku-5-5",
+      "effort": "unknown",
+      "tokens": 14423
+    },
+    {
+      "date": "2026-11-10",
+      "environment": "claude",
+      "provider": "Anthropic",
+      "model": "claude-opus-5-5",
+      "effort": "unknown",
+      "tokens": 25289880
+    },
+    {
+      "date": "2026-11-10",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6-astra",
+      "effort": "unknown",
+      "tokens": 42782699
+    },
+    {
+      "date": "2026-11-11",
+      "environment": "claude",
+      "provider": "Anthropic",
+      "model": "claude-opus-5-5",
+      "effort": "unknown",
+      "tokens": 173221540
+    },
+    {
+      "date": "2026-11-11",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6-astra",
+      "effort": "unknown",
+      "tokens": 9854268
+    },
+    {
+      "date": "2026-11-11",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.1-terra",
+      "effort": "unknown",
+      "tokens": 14061839
+    },
+    {
+      "date": "2026-11-12",
+      "environment": "claude",
+      "provider": "Anthropic",
+      "model": "claude-fable-5-2",
+      "effort": "unknown",
+      "tokens": 10524348
+    },
+    {
+      "date": "2026-11-12",
+      "environment": "claude",
+      "provider": "Anthropic",
+      "model": "claude-haiku-5-5",
+      "effort": "unknown",
+      "tokens": 14126
+    },
+    {
+      "date": "2026-11-12",
+      "environment": "claude",
+      "provider": "Anthropic",
+      "model": "claude-opus-5-5",
+      "effort": "unknown",
+      "tokens": 127719369
+    },
+    {
+      "date": "2026-11-12",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6-astra",
+      "effort": "unknown",
+      "tokens": 7804192
+    },
+    {
+      "date": "2026-11-12",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.1-sol",
+      "effort": "unknown",
+      "tokens": 219442211
+    },
+    {
+      "date": "2026-11-13",
+      "environment": "claude",
+      "provider": "Anthropic",
+      "model": "claude-fable-5-2",
+      "effort": "unknown",
+      "tokens": 230193239
+    },
+    {
+      "date": "2026-11-13",
+      "environment": "claude",
+      "provider": "Anthropic",
+      "model": "claude-haiku-5-5",
+      "effort": "unknown",
+      "tokens": 115917
+    },
+    {
+      "date": "2026-11-13",
+      "environment": "claude",
+      "provider": "Anthropic",
+      "model": "claude-opus-5-5",
+      "effort": "unknown",
+      "tokens": 50057539
+    },
+    {
+      "date": "2026-11-13",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6-astra",
+      "effort": "unknown",
+      "tokens": 25599678
+    },
+    {
+      "date": "2026-11-13",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.1-sol",
+      "effort": "unknown",
+      "tokens": 851565232
+    },
+    {
+      "date": "2026-11-13",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.1-terra",
+      "effort": "unknown",
+      "tokens": 119204767
+    },
+    {
+      "date": "2026-11-14",
+      "environment": "claude",
+      "provider": "Anthropic",
+      "model": "claude-fable-5-2",
+      "effort": "unknown",
+      "tokens": 119496928
+    },
+    {
+      "date": "2026-11-14",
+      "environment": "claude",
+      "provider": "Anthropic",
+      "model": "claude-opus-5-5",
+      "effort": "unknown",
+      "tokens": 61838742
+    },
+    {
+      "date": "2026-11-14",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.1-sol",
+      "effort": "unknown",
+      "tokens": 309678451
+    },
+    {
+      "date": "2026-11-14",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.1-terra",
+      "effort": "unknown",
+      "tokens": 382958692
+    },
+    {
+      "date": "2026-11-15",
+      "environment": "claude",
+      "provider": "Anthropic",
+      "model": "claude-opus-5-5",
+      "effort": "unknown",
+      "tokens": 48162003
+    },
+    {
+      "date": "2026-11-15",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.1-sol",
+      "effort": "unknown",
+      "tokens": 26933420
+    },
+    {
+      "date": "2026-11-16",
+      "environment": "claude",
+      "provider": "Anthropic",
+      "model": "claude-opus-5-5",
+      "effort": "unknown",
+      "tokens": 7160701
+    },
+    {
+      "date": "2026-11-17",
+      "environment": "claude",
+      "provider": "Anthropic",
+      "model": "claude-fable-5-2",
+      "effort": "unknown",
+      "tokens": 5815855
+    },
+    {
+      "date": "2026-11-17",
+      "environment": "claude",
+      "provider": "Anthropic",
+      "model": "claude-haiku-5-5",
+      "effort": "unknown",
+      "tokens": 162463
+    },
+    {
+      "date": "2026-11-17",
+      "environment": "claude",
+      "provider": "Anthropic",
+      "model": "claude-opus-5-5",
+      "effort": "unknown",
+      "tokens": 245420765
+    },
+    {
+      "date": "2026-11-17",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6-astra",
+      "effort": "unknown",
+      "tokens": 2847043
+    },
+    {
+      "date": "2026-11-17",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.1-sol",
+      "effort": "unknown",
+      "tokens": 274711419
+    },
+    {
+      "date": "2026-11-17",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.1-terra",
+      "effort": "unknown",
+      "tokens": 1021610
+    },
+    {
+      "date": "2026-11-17",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.2-astra",
+      "effort": "unknown",
+      "tokens": 5341358
+    },
+    {
+      "date": "2026-11-17",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.2-sol",
+      "effort": "unknown",
+      "tokens": 293757076
+    },
+    {
+      "date": "2026-11-18",
+      "environment": "claude",
+      "provider": "Anthropic",
+      "model": "claude-fable-5-2",
+      "effort": "unknown",
+      "tokens": 212001979
+    },
+    {
+      "date": "2026-11-18",
+      "environment": "claude",
+      "provider": "Anthropic",
+      "model": "claude-opus-5-5",
+      "effort": "unknown",
+      "tokens": 201557963
+    },
+    {
+      "date": "2026-11-18",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.2-astra",
+      "effort": "unknown",
+      "tokens": 96794584
+    },
+    {
+      "date": "2026-11-18",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.2-sol",
+      "effort": "unknown",
+      "tokens": 544828243
+    },
+    {
+      "date": "2026-11-19",
+      "environment": "claude",
+      "provider": "Anthropic",
+      "model": "claude-fable-5-2",
+      "effort": "unknown",
+      "tokens": 7301831
+    },
+    {
+      "date": "2026-11-19",
+      "environment": "claude",
+      "provider": "Anthropic",
+      "model": "claude-mythos-5-2",
+      "effort": "unknown",
+      "tokens": 75692310
+    },
+    {
+      "date": "2026-11-19",
+      "environment": "claude",
+      "provider": "Anthropic",
+      "model": "claude-opus-5-5",
+      "effort": "unknown",
+      "tokens": 159208690
+    },
+    {
+      "date": "2026-11-19",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.2-astra",
+      "effort": "unknown",
+      "tokens": 67311689
+    },
+    {
+      "date": "2026-11-19",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.2-sol",
+      "effort": "unknown",
+      "tokens": 88164605
+    },
+    {
+      "date": "2026-11-19",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-daybreak-blue-latest",
+      "effort": "unknown",
+      "tokens": 27014960
     }
   ],
   "effort": [
@@ -3886,6 +4302,294 @@
       "model": "gpt-6.1-sol",
       "effort": "xhigh",
       "tokens": 45144832
+    },
+    {
+      "date": "2026-11-12",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6-astra",
+      "effort": "xhigh",
+      "tokens": 7804192
+    },
+    {
+      "date": "2026-11-12",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "tokens": 3610326
+    },
+    {
+      "date": "2026-11-12",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.1-sol",
+      "effort": "xhigh",
+      "tokens": 215831885
+    },
+    {
+      "date": "2026-11-13",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6-astra",
+      "effort": "xhigh",
+      "tokens": 25599678
+    },
+    {
+      "date": "2026-11-13",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.1-sol",
+      "effort": "medium",
+      "tokens": 5251862
+    },
+    {
+      "date": "2026-11-13",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.1-sol",
+      "effort": "xhigh",
+      "tokens": 846313370
+    },
+    {
+      "date": "2026-11-13",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.1-terra",
+      "effort": "high",
+      "tokens": 8879619
+    },
+    {
+      "date": "2026-11-13",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.1-terra",
+      "effort": "low",
+      "tokens": 108310
+    },
+    {
+      "date": "2026-11-13",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.1-terra",
+      "effort": "max",
+      "tokens": 91968439
+    },
+    {
+      "date": "2026-11-13",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.1-terra",
+      "effort": "xhigh",
+      "tokens": 18248399
+    },
+    {
+      "date": "2026-11-14",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "tokens": 2805283
+    },
+    {
+      "date": "2026-11-14",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.1-sol",
+      "effort": "medium",
+      "tokens": 6057651
+    },
+    {
+      "date": "2026-11-14",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.1-sol",
+      "effort": "xhigh",
+      "tokens": 300815517
+    },
+    {
+      "date": "2026-11-14",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.1-terra",
+      "effort": "high",
+      "tokens": 44017305
+    },
+    {
+      "date": "2026-11-14",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.1-terra",
+      "effort": "max",
+      "tokens": 338334524
+    },
+    {
+      "date": "2026-11-14",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.1-terra",
+      "effort": "xhigh",
+      "tokens": 606863
+    },
+    {
+      "date": "2026-11-15",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.1-sol",
+      "effort": "medium",
+      "tokens": 791213
+    },
+    {
+      "date": "2026-11-15",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.1-sol",
+      "effort": "xhigh",
+      "tokens": 26142207
+    },
+    {
+      "date": "2026-11-17",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6-astra",
+      "effort": "xhigh",
+      "tokens": 2847043
+    },
+    {
+      "date": "2026-11-17",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "tokens": 49941628
+    },
+    {
+      "date": "2026-11-17",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.1-sol",
+      "effort": "xhigh",
+      "tokens": 224769791
+    },
+    {
+      "date": "2026-11-17",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.1-terra",
+      "effort": "medium",
+      "tokens": 1021610
+    },
+    {
+      "date": "2026-11-17",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.2-astra",
+      "effort": "xhigh",
+      "tokens": 5341358
+    },
+    {
+      "date": "2026-11-17",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.2-sol",
+      "effort": "high",
+      "tokens": 10326715
+    },
+    {
+      "date": "2026-11-17",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.2-sol",
+      "effort": "max",
+      "tokens": 12711610
+    },
+    {
+      "date": "2026-11-17",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.2-sol",
+      "effort": "medium",
+      "tokens": 2271608
+    },
+    {
+      "date": "2026-11-17",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.2-sol",
+      "effort": "xhigh",
+      "tokens": 268447143
+    },
+    {
+      "date": "2026-11-18",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.2-astra",
+      "effort": "medium",
+      "tokens": 148838
+    },
+    {
+      "date": "2026-11-18",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.2-astra",
+      "effort": "xhigh",
+      "tokens": 96645746
+    },
+    {
+      "date": "2026-11-18",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.2-sol",
+      "effort": "high",
+      "tokens": 48968401
+    },
+    {
+      "date": "2026-11-18",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.2-sol",
+      "effort": "medium",
+      "tokens": 1655943
+    },
+    {
+      "date": "2026-11-18",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.2-sol",
+      "effort": "xhigh",
+      "tokens": 494203899
+    },
+    {
+      "date": "2026-11-19",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.2-astra",
+      "effort": "xhigh",
+      "tokens": 67311689
+    },
+    {
+      "date": "2026-11-19",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.2-sol",
+      "effort": "high",
+      "tokens": 20997138
+    },
+    {
+      "date": "2026-11-19",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-6.2-sol",
+      "effort": "xhigh",
+      "tokens": 67167467
+    },
+    {
+      "date": "2026-11-19",
+      "environment": "codex",
+      "provider": "OpenAI",
+      "model": "gpt-daybreak-blue-latest",
+      "effort": "high",
+      "tokens": 27014960
     }
   ]
 }

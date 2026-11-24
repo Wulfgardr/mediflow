@@ -10,15 +10,13 @@ import { requireSession, unauthorizedResponse } from '@/lib/security/server-auth
 import { auditContextFromSession, requestIdFromRequest } from '@/lib/security/audit';
 import { prepareEntryCreate, readEntryJsonObject } from '@/lib/entry-write-input';
 import { createEntryOperation } from '@/lib/entry-write-operation';
-/* STREAM B: server-side list params (whitelisted, plaintext columns only). */
-import { parseListParams } from '@/lib/list-query-params';
+import { definePlaintextSortColumns, parseListParams } from '@/lib/list-query-params';
 
-// Only plaintext columns are sortable server-side (ENC: columns are opaque).
-const ENTRY_SORT_COLUMNS = {
+const ENTRY_SORT_COLUMNS = definePlaintextSortColumns('entries', {
     date: entries.date,
     createdAt: entries.createdAt,
     updatedAt: entries.updatedAt,
-} as const;
+});
 
 export async function GET(request: Request) {
     const session = await requireSession();
@@ -28,8 +26,8 @@ export async function GET(request: Request) {
     const patientId = searchParams.get('patientId');
     const includeDeleted = searchParams.get('includeDeleted') === 'true';
 
-    /* STREAM B */
     const parsed = parseListParams(searchParams, {
+        table: 'entries',
         sortableColumns: Object.keys(ENTRY_SORT_COLUMNS),
         defaultOrderBy: 'date',
         defaultOrderDir: 'desc',

@@ -7,10 +7,12 @@ read_when:
 
 # Matrice dei dati a riposo
 
-**Versione 15.** C06 / [WUL-721](https://linear.app/wulfgardr/issue/WUL-721),
-criterio 1. Aggiornata l'8 novembre 2026 per l'uscita delle tabelle di review durevole e scrittura SOAP headless (schema 11); il 7 novembre 2026 per le allergie cifrate (ADR 0182); il 3 novembre 2026 per finestre e blocchi della conservazione (ADR 0178); il 21 ottobre 2026 per il marker Web di cambio stato
-terapia (ADR 0156); il 13 ottobre 2026 per i permessi del database adottato dalla cartella
-dell’applicazione; l’11 ottobre per credenziali v3 e generazione dell’archivio, recupero cifrato completo e permessi delle copie di riparazione; la prima classificazione era su `main` `bcb7af46a`.
+**Versione 17.** C06 / [WUL-721](https://linear.app/wulfgardr/issue/WUL-721),
+criterio 1. Il 20 novembre 2026 è stato aggiunto lo storico delle rettifiche del diario. La versione precedente documenta il controllo del server sui campi del diario Web.
+La revisione dell’8 novembre segue la rimozione delle tabelle di review durevole e scrittura SOAP headless (schema 11).
+A novembre sono entrate le allergie cifrate (7 novembre, ADR 0182) e le finestre con i blocchi della conservazione (3 novembre, ADR 0178).
+In ottobre si sono aggiunti il marker Web del cambio di stato terapia (21 ottobre, ADR 0156), i permessi del database adottato dalla cartella dell’applicazione (13 ottobre), le credenziali v3, la generazione dell’archivio, il recupero cifrato completo e i permessi delle copie di riparazione (11 ottobre).
+La prima classificazione risale al commit `bcb7af46a` di `main`.
 
 MediFlow cifra alcuni campi, non il database. Questa matrice dice, per ogni
 colonna e per ogni file che il prodotto scrive, che cosa si legge senza la
@@ -64,12 +66,15 @@ l'applicazione è sbloccata restano fuori, come in
 
 ## Colonne del database
 
-Per ogni tabella: le colonne cifrate dal contratto del client, quelle protette
-in altro modo, quelle in chiaro. "Cifrate" significa che il client le cifra
-prima di inviarle; l'involucro è controllato dal server solo sulle scritture
-dei client abbinati (`lib/network-*-write.ts`) e sulla sostituzione del
-contenuto di un allegato (`lib/api-schemas/attachments.ts`). Le rotte Web
-locali salvano ciò che ricevono.
+Per ogni tabella sono indicate le colonne cifrate dal client, quelle protette
+in altro modo e quelle in chiaro. Il client cifra i valori prima dell’invio.
+Quando si crea o modifica una voce del diario dal Web, il server richiede
+l’involucro `ENC:` per ogni valore presente in `title`, `content`, `metadata`,
+`attachments` e `deletionReason`. Un valore in chiaro in uno di questi campi
+fa rifiutare la scrittura. Le API v1 applicano i controlli delle rispettive
+rotte. Le scritture dei dispositivi abbinati e la sostituzione del contenuto
+di un allegato verificano i formati previsti per quei percorsi.
+[Controllo del diario](../lib/api/v1/sealed-write.ts) · [Campi per tabella](../lib/backup-encrypted-fields.json) · [Contratto degli allegati](../lib/api-schemas/attachments.ts)
 
 ### `ambulatories`: sedi e contenitori di lavoro
 
@@ -91,7 +96,8 @@ locali salvano ciò che ricevono.
 - Altra protezione: `wrapped_private_key`, `anchor_ciphertext`, `items_ciphertext`
 - In chiaro: `id`, `mandate_ref`, `agent_ref`, `actor_ref`, `archive_generation`, `public_key`, `model_provider`, `allows_clinical_egress`, `status`, `revision`, `deposited_at`, `modified_at`
 - L'àncora CF e tutti i valori clinici sono buste ECDH/HKDF/AES-GCM legate a mandato, visita, elemento e tipo. Il JSON degli elementi lascia leggibili identificativo opaco, tipo, dimensione ed eventuale hash del PDF. Non contiene nomi di file o testo clinico aperti. La privata è avvolta dalla master key nel browser.
-- Il backup portabile e quello completo conservano cassette e private avvolte. Il controllo della chiave prima del ripristino comprende questa privata. Il ripristino cambia la generazione dell'archivio: conserva il deposito senza rendere nuovamente validi mandato o token.
+- I due formati di backup contengono le cassette e le chiavi private avvolte. Il controllo della chiave comprende anche queste ultime. La nuova generazione dell’archivio rende inutilizzabili i vecchi mandati e token.
+- Se il ripristino portabile esclude un fascicolo ritirato, ogni cassetta deve coincidere con un deposito della generazione corrente. L’audit locale deve provarne l’applicazione completa a un solo paziente non ritirato. Se manca questa attribuzione il ripristino si ferma. Quando la destinazione ha fascicoli ritirati ma la copia non ne contiene le schede, una cassetta entra solo se l’archivio la possiede già identica.
 
 ### `agent_mandates`: mandato locale e chiave avvolta
 
@@ -148,7 +154,7 @@ locali salvano ciò che ricevono.
 ### `therapy_status_commands`: terminali durevoli del cambio stato
 
 - In chiaro: `command_id`, `protocol`, `archive_generation`, `actor_ref`, `patient_id`, `therapy_id`, `expected_version`, `target`, `outcome`, `reason`, `committed_at`, `result_version`, `result_end_date`, `audit_event_id`, `audit_snapshot`
-- Leggibile senza chiave: binding originale, stato richiesto/risultato, data e audit minimizzato. Closed ha target NULL. Ledger append-only, incluso nei backup; la conservazione dopo restore non prova lo stato corrente della terapia (ADR0168).
+- Leggibile senza chiave: binding originale, stato richiesto/risultato, data e traccia di audit minimizzata. I comandi chiusi hanno target NULL. Il ledger append-only attesta il comando eseguito all’epoca (ADR 0168). Se il ripristino portabile esclude un fascicolo, un nuovo comando che ne riporta lo stato richiesto o la data di fine blocca il ripristino. Le righe già presenti restano intatte.
 
 ### `ambulatory_destructive_commands`: terminali clear/delete
 
@@ -224,12 +230,14 @@ locali salvano ciò che ricevono.
 
 - In chiaro: `id`, `retired_at`
 - Leggibile senza chiave: identificativi tecnici.
+- Il ripristino portabile esclude il grafo clinico dei fascicoli già ritirati nella destinazione. Audit e ledger restano immutabili. Il server rifiuta le copie che, durante questa esclusione, introdurrebbero contenuto clinico nello storico di attribuzione incerta (ADR 0178).
+
 
 ### `patients`: anagrafica e sintesi clinica
 
 - Cifrate: `address`, `phone`, `caregiver`, `exemptions`, `diagnoses`, `allergies`, `status_reason`, `notes`, `ai_summary`, `document_insights`, `archive_reason`, `archive_note`, `deletion_reason`
 - In chiaro: `id`, `first_name`, `last_name`, `tax_code`, `identifier_type`, `identifier_history`, `birth_date_precision`, `birth_year`, `birth_date`, `is_adi`, `is_archived`, `ambulatory_id`, `created_at`, `updated_at`, `monitoring_profile`, `version`, `deleted_at`, `ai_summary_generated_at`, `ai_summary_context_hash`
-- Leggibile senza chiave: nome, cognome, codice fiscale, data di nascita, profilo di monitoraggio, ADI e stato di archiviazione.
+- Leggibile senza chiave: nome, cognome, codice fiscale, data di nascita, profilo di monitoraggio, ADI e stato di archiviazione. Quando cambia l’identificativo del paziente, lo storico conserva in chiaro il tipo e il valore prima e dopo la modifica, la versione, la data e il riferimento all’operatore.
 
 ### `patients_to_ambulatories`: appartenenza dei pazienti alle sedi
 
@@ -420,3 +428,5 @@ cambia una classificazione.
 
 | 12 | Indice locale di provenienza: identificativi e classificazione leggibili in chiaro, esclusione dal portabile e inclusione nel recupero completo. |
 | 15 | Escono le sette tabelle di review durevole e scrittura SOAP headless, mai scritte dal prodotto: lo schema 11 le elimina, la copia originale dell'aggiornamento le conserva. |
+| 16 | Il server verifica la cifratura dei campi clinici nelle scritture del diario Web. |
+| 17 | Aggiunto lo storico delle rettifiche. Titolo e testo precedenti sono cifrati. Data, operatore, versione sostituita e collegamenti alla nota e all’audit sono leggibili senza la chiave. |

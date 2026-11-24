@@ -59,8 +59,8 @@ test('scheduled runner converts unix-seconds date fields to ISO strings', () => 
 });
 
 test('backup restore coerces unix-seconds integers from legacy scheduled artifacts', () => {
-  const executorSource = parseSource('lib/backup-restore-executor.ts', ts.ScriptKind.TS);
-  const normalizeDateValue = loadRouteFunction(executorSource, 'normalizeDateValue');
+  const restoreRowSource = parseSource('lib/backup-restore-row.ts', ts.ScriptKind.TS);
+  const normalizeDateValue = loadRouteFunction(restoreRowSource, 'normalizeDateValue');
 
   const fromSeconds = normalizeDateValue(1750000000);
   assert.ok(fromSeconds instanceof Date);

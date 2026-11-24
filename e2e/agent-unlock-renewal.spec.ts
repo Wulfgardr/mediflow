@@ -75,7 +75,7 @@ for (const credentialKind of ['passphrase', 'pin'] as const) test(`a registered 
         expect(first.status()).toBe(200);
         const { credential, receipt: renewed } = await first.json();
         expect(renewed).toMatchObject({ agentRef: receipt.id, issuedAt: expect.any(Number), expiresAt: expect.any(Number) });
-        expect(renewed.expiresAt - renewed.issuedAt).toBe(43200000);
+        expect(renewed.expiresAt - renewed.issuedAt).toBe(86400000);
         expect(renewed.mandateRef).not.toBe(template.id);
         const context = await agent.get('/api/agent/v1/context', { headers: bearer(credential.token) });
         expect(context.status()).toBe(200);
@@ -179,7 +179,7 @@ for (const credentialKind of ['passphrase', 'pin'] as const) test(`a registered 
             expect(afterShare.status()).toBe(200);
             const shared = await afterShare.json();
             expect(shared.receipt.mandateRef).not.toBe(latest.receipt.mandateRef);
-            expect(shared.receipt.expiresAt - shared.receipt.issuedAt).toBe(43200000);
+            expect(shared.receipt.expiresAt - shared.receipt.issuedAt).toBe(86400000);
             const replay = await secondTab.evaluate(async ({ body, etag }) => {
                 const confirm = (binding: string) => fetch('/api/agent-mandates/unlock', { method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'If-Match': binding }, body });
