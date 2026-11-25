@@ -616,9 +616,10 @@ Stato al 18 novembre 2026.
 | D26-D30 Zone, larghezze, fascia, fonte e bozza | In corso. La bozza a tre zone (PR 1048, chiusa) è servita da termine di confronto | In corso |
 | D31 Viste fuori dalla scheda | Per vista, nell'inventario | Per vista, nell'inventario |
 
-Aggiornamento del 24 novembre 2026 (PR 1059). Il linguaggio «Vassoio opaco»
-si estende a tutte le viste Web e GPUI; la tabella sopra resta lo stato del
-18 novembre.
+Aggiornamento del 25 novembre 2026 (PR 1094, solo Web). Il linguaggio «Vassoio opaco»
+si estende alle viste Web rimanenti; la tabella sopra resta lo stato del
+18 novembre e la vista paziente «Stabile e cambiato» (PR 1059) resta invariata.
+Le modifiche GPUI sono state rimosse dalla PR secondo la direzione del 25/11.
 
 - Web, viste del cockpit: Turno, Incarico, Diario e Repertori erano già pagine
   di cartella. Si aggiungono Revisione, Handoff SISS e Stato operativo: titolo
@@ -632,17 +633,11 @@ si estende a tutte le viste Web e GPUI; la tabella sopra resta lo stato del
   `--type-section-heading`. Nessun titolo conserva il punto finale.
 - Web, controlli: la riga compatta del Diario nel Quadro misura 48 px di
   colonna data (prima 84 px); la vista Diario completa resta a 84 px.
-- GPUI: le viste del pilota si allineano agli stessi ruoli di vassoio e isola
-  nello stesso branch, con 15 titoli residui portati in case frase e righe
-  Impostazioni a tutta larghezza.
 
 Provato in questo aggiornamento (archivio sintetico, senza dati reali): build
-standalone Web, 12 spec Playwright mirati (48/48), regressione identità UI
-(`scripts/ui-identita/prova.mjs`, 19/19), 3 copioni UI CLI Web (279 passi),
-suite Rust GPUI (`cargo fmt --check`, `clippy -Dwarnings`, 788 test), 10
-copioni UI CLI GPUI (`gpui-shell*.jsonl`) e 28 catture visive GPUI in Giorno e
-Grafite. Non provato qui: CI GitHub completa sul riallineamento finale dopo
-l'ingresso su `main` delle PR precedenti in coda.
+standalone Web, suite `repository-guards`, verifica formale `verify:therapy-status`,
+spec Playwright mirate sulle viste cambiate, contatore dei gesti WUL-860 e
+catture prima/dopo rispetto a `origin/main`.
 
 ## Prove e limiti
 
