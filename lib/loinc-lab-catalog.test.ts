@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import { LOINC_LAB_TABLE, LOINC_LAB_UNITS, LOINC_LAB_VERSION } from './generated-loinc-lab-catalog';
-import { DDIMER_UNSPECIFIED_DEFAULT_CODE, LOINC_PENDING_VALIDATION, formatMeasureValue, formatUnitForDisplay, loincObservationNames, loincReportedUnits, resolveStaticTerminology, searchStaticTerminology } from './terminology';
+import { LOINC_PENDING_VALIDATION, formatMeasureValue, formatUnitForDisplay, loincObservationNames, resolveStaticTerminology, searchStaticTerminology } from './terminology';
 import { validateObservationDocument } from './fse-validation';
 import { catalogObservationCode, reportedObservationCode } from './domain/documents/dossier-sections';
 import { observationSeriesKey } from './patient-quadro';
@@ -37,8 +37,8 @@ test('the active catalog is generated from the committed table: same codes, offi
         LOINC_LAB_TABLE.map((row) => [row.code, row.longCommonName, row.unit]));
 });
 
-test('81 active rows enter the static LOINC catalog with official name and unit; the 16 awaiting validation do not', () => {
-    assert.deepEqual([active.length, pending.length], [81, 16]);
+test('82 active rows enter the static LOINC catalog with official name and unit; the 15 awaiting validation do not', () => {
+    assert.deepEqual([active.length, pending.length], [82, 15]);
     for (const row of active) {
         assert.deepEqual(resolveStaticTerminology('LOINC', row.code), {
             system: 'LOINC', code: row.code, display: row.longCommonName, displayIt: row.nameIt,
@@ -112,7 +112,7 @@ test('counterexamples stay uncoded: unexpected unit, awaiting validation, near n
     assert.equal(catalogObservationCode('Acido urico', 'mg/dL', '5,2')?.code, loincLabTableCode(table, 'Acido urico', 'mg/dL'));
     for (const [name, unit, value] of [
         ['Acido urico', 'umol/L', '300'], ['Acido urico', '', '5,2'], ['Acido urico', 'mg/dl', '5,2'],
-        ['LDH', 'U/L', '200'], ['eGFR', 'mL/min/{1.73_m2}', '80'], ['D-dimero', 'ng{FEU}/mL', '320'], ['Troponina', 'ng/L', '12'],
+        ['LDH', 'U/L', '200'], ['eGFR', 'mL/min/{1.73_m2}', '80'], ['D-dimero', 'mg/L', '0,32'], ['Troponina', 'ng/L', '12'],
         ['Microalbuminuria', 'mg/L', '15'], ['Proteine urine', 'mg/dL', '30'],
         ['Acido urico totale', 'mg/dL', '5,2'], ['Ferritina sierica', 'ng/mL', '30'], ['Lipasi pancreatica', 'U/L', '35'],
         ['Acido urico', 'mg/dL', 'negativo'], ['Acido urico', 'mg/dL', '<5'], ['Acido urico', 'mg/dL', ''], ['Acido urico', 'mg/dL', '1e3'],
@@ -184,8 +184,6 @@ test('WUL-929 clinical choices: all 14 lab decisions produce expected series, co
     assert.deepEqual(catalogObservationCode('FT3', 'pmol/L', '4,8'), { code: '14928-6', unitCode: 'pmol/L' });
 
     assert.deepEqual(catalogObservationCode('HbA1c', '%', '6,5'), { code: '4548-4', unitCode: '%' });
-    for (const name of ['HbA1c', 'Emoglobina glicata', 'HbA1c IFCC']) assert.equal(catalogObservationCode(name, 'mmol/mol', '48'), null, name);
-    assert.equal(LOINC_LAB_TABLE.find((row) => row.code === '59261-8')?.status, 'in_attesa_di_validazione');
 
     assert.equal(catalogObservationCode('eGFR', 'mL/min/{1.73_m2}', '72'), null);
     assert.equal(catalogObservationCode('eGFR CKD-EPI', 'mL/min/{1.73_m2}', '72'), null);
@@ -223,13 +221,6 @@ test('WUL-929 clinical choices: all 14 lab decisions produce expected series, co
     assert.deepEqual(catalogObservationCode('Reticolociti', '%', '1,1'), { code: '17849-1', unitCode: '%' });
     assert.deepEqual(catalogObservationCode('Reticolociti', '10*3/uL', '55'), { code: '60474-4', unitCode: '10*3/uL' });
 
-    assert.equal(DDIMER_UNSPECIFIED_DEFAULT_CODE, null);
-    assert.deepEqual(loincObservationNames().filter((entry) => entry.name === 'D-dimero'), []);
-    assert.deepEqual(loincObservationNames({ dDimerUnspecified: '48065-7' }).filter((entry) => entry.name === 'D-dimero'),
-        [{ name: 'D-dimero', unit: 'ng{FEU}/mL', code: '48065-7', active: true }]);
-    assert.deepEqual(loincReportedUnits({ dDimerUnspecified: '48065-7' }).filter((entry) => entry.name === 'D-dimero').map((entry) => [entry.reported, entry.unit]),
-        [['ng/mL', 'ng{FEU}/mL'], ['ng/ml', 'ng{FEU}/mL'], ['ug/L', 'ng{FEU}/mL'], ['µg/L', 'ng{FEU}/mL'], ['ng{FEU}/mL', 'ng{FEU}/mL']]);
-    assert.equal(reportedObservationCode('D-dimero', 'ng/mL', '320'), null);
     assert.deepEqual(reportedObservationCode('D-dimero FEU', 'ng/mL', '320'), { code: '48065-7', unitCode: 'ng{FEU}/mL' });
     assert.deepEqual(reportedObservationCode('D-dimero DDU', 'ug/L', '180'), { code: '48066-5', unitCode: 'ug/L{DDU}' });
 
@@ -248,6 +239,34 @@ test('WUL-929 clinical choices: all 14 lab decisions produce expected series, co
         assert.equal(catalogObservationCode('PCR', 'mg/L', word), null, word);
         assert.equal(reportedObservationCode('PCR', 'mg/L', word), null, word);
     }
+});
+
+test('WUL-929, 25/11: a D-dimer without FEU or DDU reads as FEU, so every D-dimer has a series', () => {
+    for (const [name, unit] of [['D-dimero', 'ng/mL'], ['D-dimero', 'ng/ml'], ['D-dimero', 'ug/L'], ['D-dimero', 'µg/L'], ['Dimero D', 'ng/mL'], ['D-dimero', 'ng{FEU}/mL']] as const) {
+        assert.deepEqual(reportedObservationCode(name, unit, '320'), { code: '48065-7', unitCode: 'ng{FEU}/mL' }, `${name} ${unit}`);
+    }
+    assert.deepEqual(reportedObservationCode('D-dimero DDU', 'ng/mL', '180'), { code: '48066-5', unitCode: 'ug/L{DDU}' });
+    assert.equal(reportedObservationCode('D-dimero', 'mg/L', '0,32'), null);
+    const unspecified = reportedObservationCode('D-dimero', 'ng/mL', '320')!;
+    const feu = reportedObservationCode('D-dimero FEU', 'ng/mL', '480')!;
+    const ddu = reportedObservationCode('D-dimero DDU', 'ug/L', '180')!;
+    const seriesOf = (entry: { code: string; unitCode: string }) => observationSeriesKey({ codeSystem: 'LOINC', code: entry.code, unitSystem: 'UCUM', unitCode: entry.unitCode });
+    assert.equal(seriesOf(unspecified), seriesOf(feu));
+    assert.notEqual(seriesOf(unspecified), seriesOf(ddu));
+});
+
+test('WUL-929, 25/11: HbA1c in mmol/mol is its own active series (59261-8), never mixed with the % series (4548-4)', () => {
+    assert.equal(LOINC_LAB_TABLE.find((row) => row.code === '59261-8')?.status, 'attivo');
+    const percent = ['HbA1c', 'Emoglobina glicata', 'Emoglobina A1c', 'Hb glicata'].map((name) => catalogObservationCode(name, '%', '6,5'));
+    const ifcc = ['HbA1c', 'Emoglobina glicata', 'Emoglobina A1c', 'Hb glicata', 'HbA1c IFCC'].map((name) => catalogObservationCode(name, 'mmol/mol', '48'));
+    assert.deepEqual(percent, percent.map(() => ({ code: '4548-4', unitCode: '%' })));
+    assert.deepEqual(ifcc, ifcc.map(() => ({ code: '59261-8', unitCode: 'mmol/mol' })));
+    assert.equal(catalogObservationCode('HbA1c IFCC', '%', '6,5'), null);
+    assert.equal(catalogObservationCode('HbA1c NGSP', 'mmol/mol', '48'), null);
+    assert.equal(catalogObservationCode('HbA1c', 'mmol/L', '48'), null);
+    const seriesOf = (entry: { code: string; unitCode: string } | null) => observationSeriesKey({ codeSystem: 'LOINC', code: entry!.code, unitSystem: 'UCUM', unitCode: entry!.unitCode });
+    assert.notEqual(seriesOf(percent[0]), seriesOf(ifcc[0]));
+    assert.deepEqual(resolveStaticTerminology('LOINC', '59261-8')?.defaultUnit, 'mmol/mol');
 });
 
 test('printed spellings are table data: «nessuna» only for a dimensionless unit, no spaces, no repeats, none on a row without unit', () => {
