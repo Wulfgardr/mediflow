@@ -4,7 +4,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 import Database from 'better-sqlite3';
-import { createSyntheticAgentMandate } from './agent-visit-utils';
+import { agentVisitPassphrase, createSyntheticAgentMandate } from './agent-visit-utils';
 import { completeAgentPairing, prepareAndDepositAgentVisit, requestAgentPairing } from '../packages/agent-client/src/visit-client';
 import { documentRequests } from './fixtures/trusted-web-request';
 
@@ -66,6 +66,8 @@ test('the physician decides a kit visit one proposal at a time, and the visit is
     expect(receipt.status).toBe('closed');
 
     await page.goto(isolatedRuntime.url + '/in-arrivo');
+    await page.getByLabel('Passphrase', { exact: true }).fill(agentVisitPassphrase);
+    await page.getByRole('button', { name: 'Sblocca', exact: true }).click();
     await expect(page).toHaveURL(/\/da-decidere$/u);
     await expect(page.getByRole('heading', { name: 'Da decidere', exact: true, level: 1 })).toBeVisible();
     const visit = page.getByRole('region', { name: 'Visita ' + visitId });
@@ -90,7 +92,8 @@ test('the physician decides a kit visit one proposal at a time, and the visit is
         await shot('2-correggi-la-dose');
         await correction.getByRole('button', { name: 'Tieni corretta', exact: true }).click();
         const decided = visit.getByRole('region', { name: 'Voci decise' });
-        await expect(decided.getByText('In scheda', { exact: true })).toHaveCount(1);
+        await expect(decided.getByText('Corretta in scheda', { exact: true })).toHaveCount(1);
+        await expect(decided.getByText('ogni 15 giorni')).toHaveCount(0);
         expect(therapies()).toEqual([{ drug: 'colecalciferolo', dosage: '25.000 UI una fiala ogni 30 giorni' }]);
         expect(services()).toEqual([]);
         expect(entries()).toEqual([]);
@@ -104,7 +107,7 @@ test('the physician decides a kit visit one proposal at a time, and the visit is
         expect(discard?.actor).toBeTruthy();
 
         await proposal('Prestazione proposta').getByRole('button', { name: 'Tieni', exact: true }).click();
-        await expect(decided.getByText('In scheda', { exact: true })).toHaveCount(2);
+        await expect(decided.getByText('In scheda', { exact: true })).toHaveCount(1);
         expect(services()).toHaveLength(1);
         await shot('3-voci-decise');
         expect(events('agent.visit.applied')).toEqual([]);

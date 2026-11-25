@@ -7,7 +7,7 @@ import { clinicalContentAllowed } from './agent-mandate-contract';
 
 export type AgentCassetteIndexEntry = Pick<AgentCassette, 'id' | 'archiveGeneration' | 'status' | 'revision' | 'depositedAt'>;
 export type AgentCassetteIndexPage = { visits: AgentCassetteIndexEntry[]; next: string | null };
-export type IncomingAgentCassette = AgentCassette & { appliedItemIds: string[]; discardedItemIds?: string[] };
+export type IncomingAgentCassette = AgentCassette & { appliedItemIds: string[]; discardedItemIds?: string[]; correctedItemIds?: string[] };
 
 const sealed = z.string().regex(/^ENC:[A-Za-z0-9+/]+=*:[A-Za-z0-9+/]+=*$/u);
 const noteValues = z.object({ title: sealed, content: sealed, date: dateInputSchema, metadata: sealed }).strict();

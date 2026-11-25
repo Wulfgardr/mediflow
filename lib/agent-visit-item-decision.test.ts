@@ -27,7 +27,7 @@ dbServer.insert(patients).values({ id: otherPatientId, firstName: 'Altra', lastN
 const { createAgentMandateStore } = await import('./agent-mandate-store.ts');
 const { createAgentPairingStore } = await import('./agent-pairing-store.ts');
 const { createAgentCassetteStore, readAgentCassetteIndex } = await import('./agent-cassette-store.ts');
-const { applyAgentVisit, decideAgentVisitItem, agentAppliedItemIds, agentDiscardedItemIds } = await import('./agent-visit-application.ts');
+const { applyAgentVisit, decideAgentVisitItem, agentAppliedItemIds, agentDiscardedItemIds, agentCorrectedItemIds } = await import('./agent-visit-application.ts');
 const { archiveGenerationForSession } = await import('./security/archive-session-generation.ts');
 const database = dbServer.$client;
 const key = await generateMasterKey();
@@ -136,6 +136,7 @@ test('Correggi writes the physician value, not the deposited one, and marks the 
     const therapy = f.byKind('therapy');
     assert.deepEqual(database.prepare('SELECT dosage FROM therapies WHERE id=?').all(therapy.id), [{ dosage: '25.000 UI ogni 30 giorni' }]);
     assert.deepEqual(flagsOf('agent.item.applied', therapy.id), [['item', 'corrected']]);
+    assert.deepEqual(agentCorrectedItemIds(f.id), [therapy.id]);
     decideAgentVisitItem(request, fixture.session, f.keep('observation', fixture.patientId, 'correct', { value: '1.3' }));
     assert.deepEqual(database.prepare('SELECT value FROM observations WHERE id=?').all(f.byKind('observation').id), [{ value: '1.3' }]);
 });

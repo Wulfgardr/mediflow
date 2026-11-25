@@ -298,10 +298,12 @@ export function VisitQueue({ visits, busy, applicationError }: Snapshot) {
                         <p className={css.groupLabel}>Decise <span>{decided.length}</span></p>
                         <ul>
                             {decided.map(item => <li key={item.id}>
-                                <span>{agentReviewItemLabels[item.kind]} · {proposalHeadline(item)}</span>
-                                {review.discardedItemIds.includes(item.id)
-                                    ? <span className={surface.pillNeutral}>Scartata</span>
-                                    : <span className={surface.pillSuccess}>In scheda</span>}
+                                {review.correctedItemIds.includes(item.id)
+                                    ? <><span>{agentReviewItemLabels[item.kind]}</span><span className={surface.pillSuccess}>Corretta in scheda</span></>
+                                    : <><span>{agentReviewItemLabels[item.kind]} · {proposalHeadline(item)}</span>
+                                        {review.discardedItemIds.includes(item.id)
+                                            ? <span className={surface.pillNeutral}>Scartata</span>
+                                            : <span className={surface.pillSuccess}>In scheda</span>}</>}
                             </li>)}
                         </ul>
                     </section>

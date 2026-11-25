@@ -16,7 +16,7 @@ import { agentVisitPdfText, type AgentVisitPdf } from './agent-visit-pdf-text';
 
 export type AgentVisitDocument = AgentVisitPdf & { id: string; name: string; hash: string };
 export type AgentVisitReview = { visit: Omit<OpenedAgentVisit, 'cassette'> & { cassette: AgentCassetteIndexEntry }; patient: Patient | null; newPatient: NewAgentPatient | null;
-    documents: AgentVisitDocument[]; appliedItemIds: string[]; discardedItemIds: string[]; currentSummary: Map<string, string>; blockers: string[]; proposalBlockers: string[];
+    documents: AgentVisitDocument[]; appliedItemIds: string[]; discardedItemIds: string[]; correctedItemIds: string[]; currentSummary: Map<string, string>; blockers: string[]; proposalBlockers: string[];
     itemBlockers: Map<string, string[]> };
 type ReviewItem = AgentVisitReview['visit']['items'][number];
 export const agentItemDecided = (review: Pick<AgentVisitReview, 'appliedItemIds' | 'discardedItemIds'>, itemId: string) =>
@@ -123,7 +123,7 @@ export async function inspectAgentVisit(row: IncomingAgentCassette, patients: Pa
             currentSummary.set(item.id, before.join('; ') || 'Non presente');
         }
     }
-    return { visit, patient, newPatient, documents: [...documents.values()], appliedItemIds: row.appliedItemIds, discardedItemIds, currentSummary, blockers, proposalBlockers, itemBlockers };
+    return { visit, patient, newPatient, documents: [...documents.values()], appliedItemIds: row.appliedItemIds, discardedItemIds, correctedItemIds: row.correctedItemIds ?? [], currentSummary, blockers, proposalBlockers, itemBlockers };
 }
 export async function reopenReviewedAgentItems(review: AgentVisitReview, row: IncomingAgentCassette): Promise<AgentVisitReview['visit']['items'] | null> {
     const visit = await openAgentVisit(row);
