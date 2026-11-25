@@ -26,8 +26,9 @@ async function patientCount(page: Page): Promise<number> {
 
 async function stage(page: Page, lastName: string, pin = PIN) {
     await openUnlockedDocument(page, '/patients/new', pin);
-    const panel = page.getByTestId('patient-document-create');
-    await panel.locator('input[type="file"]').setInputFiles({ name: `referto-${lastName}.pdf`, mimeType: 'application/pdf', buffer: await syntheticPdf(lastName) });
+    await page.getByTestId('patient-document-create').locator('input[type="file"]').setInputFiles({ name: `referto-${lastName}.pdf`, mimeType: 'application/pdf', buffer: await syntheticPdf(lastName) });
+    const panel = page.getByTestId('dossier-new-patient').getByTestId('patient-document-create');
+    await panel.getByRole('button', { name: 'Avvia la revisione del documento' }).click({ timeout: 60_000 });
     await expect(panel.getByRole('heading', { name: 'Revisione dei dati' })).toBeFocused({ timeout: 60_000 });
     await expect(panel.getByText(`Paziente: ${lastName} Lucia`)).toBeVisible();
     for (const label of ['Nome', 'Cognome', 'Codice fiscale']) await expect(panel.getByLabel(label, { exact: true })).toHaveValue('');
@@ -234,28 +235,19 @@ test('arrivo da documento e lettura tardiva rispettano il focus già scelto', as
     test.setTimeout(90_000);
     await bootstrapUnlockedSession(page, PIN);
     const lastName = 'FocusDocumentoSintetico';
-    let releaseStage!: () => void;
-    const holdStage = new Promise<void>(resolve => { releaseStage = resolve; });
-    await page.route('**/api/patients/document-create', async route => {
-        if ((route.request().postDataJSON() as { operation?: string }).operation === 'stage') await holdStage;
-        await route.continue();
-    });
     await openUnlockedDocument(page, '/patients/new#documento', PIN);
     const panel = page.getByTestId('patient-document-create');
-    await expect(panel.getByRole('button', { name: 'Scegli un documento' })).toBeVisible();
+    await expect(panel.getByRole('button', { name: 'Scegli i documenti' })).toBeVisible();
     await expect(page.getByRole('textbox', { name: /^Nome\b/u })).not.toBeFocused();
     const picker = page.waitForEvent('filechooser');
-    await panel.getByRole('button', { name: 'Scegli un documento' }).click();
+    await panel.getByRole('button', { name: 'Scegli i documenti' }).click();
     await (await picker).setFiles({ name: 'referto-focus-sintetico.pdf', mimeType: 'application/pdf', buffer: await syntheticPdf(lastName) });
     const back = page.getByRole('link', { name: 'Torna alla lista', exact: true });
-    try {
-        await expect(panel.getByRole('heading', { name: /Lettura ed estrazione locale/ })).toBeFocused();
-        for (let press = 0; press < 12 && !await back.evaluate(element => document.activeElement === element); press++) {
-            await page.keyboard.press('Shift+Tab');
-        }
-        await expect(back).toBeFocused();
-    } finally { releaseStage(); }
-    await expect(panel.getByRole('heading', { name: 'Revisione dei dati' })).toBeVisible({ timeout: 60_000 });
+    for (let press = 0; press < 12 && !await back.evaluate(element => document.activeElement === element); press++) {
+        await page.keyboard.press('Shift+Tab');
+    }
+    await expect(back).toBeFocused();
+    await expect(page.getByTestId('dossier-new-patient').getByRole('button', { name: 'Avvia la revisione del documento' })).toBeVisible({ timeout: 60_000 });
     await expect(back).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(page).toHaveURL(/\/?\?area=incarico$/u);
