@@ -1,5 +1,6 @@
 /* First use only. Consume the existing Lume tokens; no global theme or assets. */
 .experience {
+    --lume-control-height: 2.75rem;
     box-sizing: border-box;
     width: 100%;
     min-width: 0;

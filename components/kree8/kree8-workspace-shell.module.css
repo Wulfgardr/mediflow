@@ -1038,4 +1038,5 @@
 .pageChrome { padding: 24px var(--ink-plane-inset) 20px; border-bottom: 1px solid var(--k8-line); }
 @media (min-width: 1001px) {
   .pageChrome { padding: 39px 24px 16px; }
+  .pageChrome ~ :is(.sectionRail, .workspaceBody) { --ink-plane-inset: 24px; }
 }
