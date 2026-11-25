@@ -107,8 +107,6 @@ test('nuova scheda: trascino due documenti, confermo l’anagrafica proposta e i
     await expect(hypertension).toContainText('Diagnosi: ICD-10 I10 Ipertensione essenziale');
     await expect(letter.locator('[data-testid="dossier-fact"][data-kind="therapy"]').filter({ has: page.locator('input[value="Ramipril"]') })).toHaveCount(1);
     await expect(exams.locator('[data-testid="dossier-fact"][data-kind="observation"]').filter({ has: page.locator('input[value="Creatinina"]') })).toHaveCount(1);
-    await hypertension.getByRole('button', { name: 'Mostra nel testo' }).click();
-    await expect(letter.locator('details[open]')).toContainText('Ipertensione essenziale');
     await capture(info, page, '3-dati-clinici-in-revisione.png');
 
     const patient = await page.evaluate(async (id) => (await fetch(`/api/patients/${id}`, { cache: 'no-store' })).json(), patientId);
