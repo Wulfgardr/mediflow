@@ -2,7 +2,7 @@
 
 import { formatCountLabel } from '@/lib/format-count';
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { db, Ambulatory } from '@/lib/db';
+import { db, Ambulatory, ApiConflictError } from '@/lib/db';
 import { Plus, Loader2, CornerDownRight } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { SETTINGS_INPUT_CLASS, SETTINGS_LABEL_CLASS, SETTINGS_PRIMARY_BUTTON_CLASS } from '@/components/settings/settings-ui';
@@ -103,7 +103,18 @@ export default function AmbulatoryManagerPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ambulatoryId: id, version: target.version })
             });
-            if (!res.ok) throw new Error("Failed to clear");
+            if (!res.ok) {
+                const payload = await res.json().catch(() => null) as { code?: string } | null;
+                if (res.status === 409 && payload?.code === 'VERSION_CONFLICT') {
+                    setActionError('La sede è cambiata. Aggiorna l’elenco e riprova se serve.');
+                    return;
+                }
+                if (res.status === 404) {
+                    setActionError('La sede non è più disponibile. Aggiorna l’elenco.');
+                    return;
+                }
+                throw new Error("Failed to clear");
+            }
             // preserve accepted currentness even when the following read fails.
             const accepted = await res.json() as { version?: number };
             if (!Number.isSafeInteger(accepted.version) || accepted.version! <= target.version) {
@@ -185,8 +196,12 @@ export default function AmbulatoryManagerPage() {
             await db.ambulatories.delete(id, { version: target?.version });
             setAcceptedAction('Ambulatorio eliminato.');
             await loadAmbulatories();
-        } catch {
-            setActionError("Errore durante l'eliminazione");
+        } catch (error) {
+            if (error instanceof ApiConflictError) {
+                setActionError('La sede è cambiata. Aggiorna l’elenco e riprova se serve.');
+            } else {
+                setActionError("Errore durante l'eliminazione");
+            }
         } finally { setIsUpdating(false); }
     };
 

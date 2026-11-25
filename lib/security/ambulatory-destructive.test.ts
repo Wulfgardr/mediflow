@@ -22,7 +22,7 @@ const cookieState = { cookies: new Map<string, string>() };
 const cleanup = installNetworkPatientCookieFixture(dataDir, cookieState);
 const { dbServer, openDbServer } = load('../db-server.ts') as typeof import('../db-server'); openDbServer();
 const { createAmbulatoryDestructiveService, AMBULATORY_COMMAND_REFERENCE_HEADER } = load('./ambulatory-destructive-service.ts') as typeof import('./ambulatory-destructive-service');
-const { deleteAmbulatory, createAmbulatory } = load('../ambulatory-write.ts') as typeof import('../ambulatory-write');
+const { deleteAmbulatory, createAmbulatory, clearAmbulatory } = load('../ambulatory-write.ts') as typeof import('../ambulatory-write');
 const sql = dbServer.$client;
 const origin = 'http://127.0.0.1:31998';
 type Service = ReturnType<typeof createAmbulatoryDestructiveService>;
@@ -406,4 +406,99 @@ test('raw replacement rejects a divergent terminal before target promotion and p
     assert.equal(statSync(destination).ino, beforeInode);
     const after = openVersionedSqliteDatabase(destination);
     try { assert.deepEqual(readAmbulatoryCommandRows(after), captured.rows); captureAmbulatoryCommands(after); } finally { after.close(); }
+});
+
+test('concurrent web clear of empty test ambulatory: within challenge rejects cleanly, after challenge expires requires recovery within deadlines', async () => {
+    const native = seed();
+    const webSession = { ...native.session, authChannel: 'web' as const };
+    let offset = 0;
+    const service = createAmbulatoryDestructiveService({ now: () => Date.now() + offset });
+
+    const inTime = prepare(service, native);
+    const webFirst = await clearAmbulatory({ request: request(), session: webSession }, 'target', 1);
+    assert.equal(webFirst.status, 200);
+    const beforeInTime = snapshot();
+    offset = 10_000;
+    const rejected = inTime.execute();
+    assert.equal(rejected.status, 200);
+    assert.equal(rejected.value.outcome, 'terminal');
+    assert.equal((rejected.value.receipt as Record<string, unknown>).outcome, 'rejected');
+    assert.equal((rejected.value.receipt as Record<string, unknown>).reason, 'plan_changed');
+    const afterInTime = snapshot();
+    assert.deepEqual(afterInTime.ambulatory, beforeInTime.ambulatory);
+    assert.deepEqual(afterInTime.audit, beforeInTime.audit);
+    assert.equal(afterInTime.ledger.length, beforeInTime.ledger.length + 1);
+    offset = 0;
+    assert.deepEqual(recover(service, native, inTime.marker), rejected);
+    assert.equal((await service.retire(request(inTime.headers))).status, 204);
+
+    const beforeWebStale = snapshot();
+    const webStale = await clearAmbulatory({ request: request(), session: webSession }, 'target', 1);
+    assert.equal(webStale.status, 409);
+    assert.equal(webStale.value.code, 'VERSION_CONFLICT');
+    assert.deepEqual(snapshot(), beforeWebStale);
+
+    const openV2 = () => {
+        const initial = request({ ...Object.fromEntries(native.request.headers), 'x-mediflow-expected-ambulatory-id': 'scope' });
+        const opened = service.begin(initial, native.session, native.pairedClient,
+            { purpose: 'execute', command: { operation: 'ambulatory.clear-test.v1', originalScopeId: 'scope', ambulatoryId: 'target', expectedVersion: 2 } }, 'scope');
+        assert.equal(opened.status, 200);
+        const attempt = beginWebAuthControl('login', Object.freeze({ controlId: opened.control!.controlId, ifMatch: opened.control!.etag, idempotencyKey: randomUUID() }), request());
+        assert.ok(attempt);
+        const web = issueWebAuthControl(attempt, { id: native.session.userId, username: native.session.username, role: native.session.role });
+        assert.ok(web);
+        const headers = { 'x-mediflow-archive-generation': initial.headers.get('x-mediflow-archive-generation')!, [AMBULATORY_COMMAND_REFERENCE_HEADER]: String(opened.value.reference),
+            cookie: `mediflow_session=${web.sessionId}; mediflow_auth_control=${opened.control!.controlId}` };
+        const preview = service.preview(request(headers));
+        assert.equal(preview.status, 200);
+        return { headers, marker: preview.value.marker as AmbulatoryCommandMarker };
+    };
+    const expiredExec = openV2();
+    const webSecond = await clearAmbulatory({ request: request(), session: webSession }, 'target', 2);
+    assert.equal(webSecond.status, 200);
+    const beforeExpired = snapshot();
+    offset = 30_001;
+    const deniedExec = service.execute(request(expiredExec.headers), { operation: expiredExec.marker.operation, planDigest: expiredExec.marker.planDigest, confirmation: 'SVUOTA' });
+    assert.equal(deniedExec.status, 401);
+    assert.equal(deniedExec.value.code, 'AMBULATORY_CHALLENGE_EXPIRED');
+    assert.deepEqual(snapshot(), beforeExpired);
+    assert.equal((await service.retire(request(expiredExec.headers))).status, 204);
+
+    const beforeChallengeRec = snapshot();
+    offset = 0;
+    const expiredChallengeRec = open(service, native, expiredExec.marker);
+    const expiredChallengeHeaders = expiredChallengeRec.login();
+    offset = 30_001;
+    assert.equal(service.recover(request(expiredChallengeHeaders), false).value.code, 'AMBULATORY_CHALLENGE_EXPIRED');
+    assert.equal(service.recover(request(expiredChallengeHeaders), true).value.code, 'AMBULATORY_AUTHORIZATION_EXPIRED');
+    assert.deepEqual(snapshot(), beforeChallengeRec);
+    assert.equal((await service.retire(request(expiredChallengeHeaders))).status, 204);
+
+    const beforePrepRec = snapshot();
+    offset = -300_001;
+    const expiredPrepRec = open(service, native, expiredExec.marker);
+    offset = 0;
+    const expiredPrepHeaders = expiredPrepRec.login();
+    assert.equal(service.recover(request(expiredPrepHeaders), false).value.code, 'AMBULATORY_PREPARATION_EXPIRED');
+    assert.equal(service.recover(request(expiredPrepHeaders), true).value.code, 'AMBULATORY_AUTHORIZATION_EXPIRED');
+    assert.deepEqual(snapshot(), beforePrepRec);
+    assert.equal((await service.retire(request(expiredPrepHeaders))).status, 204);
+
+    const beforeFreshRec = snapshot();
+    offset = 0;
+    const freshRec = open(service, native, expiredExec.marker);
+    const freshHeaders = freshRec.login();
+    offset = 5_000;
+    const unknownRead = service.recover(request(freshHeaders), false);
+    assert.equal(unknownRead.status, 200);
+    assert.equal(unknownRead.value.outcome, 'unknown');
+    assert.deepEqual(snapshot(), beforeFreshRec);
+    const closed = service.recover(request(freshHeaders), true);
+    assert.equal(closed.status, 200);
+    assert.equal((closed.value.receipt as Record<string, unknown>).outcome, 'closed');
+    const afterClose = snapshot();
+    assert.deepEqual(afterClose.ambulatory, beforeFreshRec.ambulatory);
+    assert.deepEqual(afterClose.audit, beforeFreshRec.audit);
+    assert.equal(afterClose.ledger.length, beforeFreshRec.ledger.length + 1);
+    assert.equal((await service.retire(request(freshHeaders))).status, 204);
 });

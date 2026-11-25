@@ -770,7 +770,9 @@ if let Some(web)=editor.web.take(){web.cancel_local();cx.background_executor().s
         enabled: bool,
     ) -> Stateful<Div> {
         let id = id.into();
-        let element = button(id.clone(), label, theme, primary, enabled);
+        let selector = id.clone();
+        let element = button(id.clone(), label, theme, primary, enabled)
+            .debug_selector(move || selector.to_string());
         if let Some(target) = self.ambulatory_management.commands.get(id.as_ref()) {
             target.attach_enabled(element, enabled)
         } else {
