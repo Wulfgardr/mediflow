@@ -40,6 +40,13 @@ export function agentConfirmationPatientState(patientId: string, expectedVersion
     return confirmationDigest(JSON.stringify([patient, rows]));
 }
 
+export function agentConfirmationFiscalCode(patientId: string): string {
+    const patient = dbServer.select({ taxCode: patients.taxCode }).from(patients).where(and(eq(patients.id, patientId), activePatients())).get();
+    const fiscalCode = patient?.taxCode.trim().toUpperCase();
+    if (!fiscalCode || !/^[A-Z0-9]{16}$/u.test(fiscalCode)) throw new AgentApplicationDenied(409);
+    return fiscalCode;
+}
+
 export class AgentApplicationDenied extends Error {
     constructor(readonly status: 403 | 404 | 409) { super('AGENT_APPLICATION_DENIED'); }
 }

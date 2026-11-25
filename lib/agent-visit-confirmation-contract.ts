@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { agentApplicationSchema } from './agent-visit-application-contract';
+import { agentApplicationSchema, type AgentApplication } from './agent-visit-application-contract';
 
-export const visitConfirmationPurpose = 'mediflow.visit-confirmation.v1';
+export const visitConfirmationPurpose = 'mediflow.visit-confirmation.v2';
 export const visitConfirmationDurationMs = 60_000;
 export const visitConfirmationPolicies = ['biometrics-or-companion', 'account-password'] as const;
 export const visitConfirmationId = z.string().uuid().toLowerCase();
@@ -22,8 +22,9 @@ export type VisitConfirmationRegistration = z.infer<typeof visitRegistrationSche
 export type VisitConfirmationProof = z.infer<typeof visitProofSchema>;
 export type VisitConfirmationReceipt = { reference: string; status: 'waiting' | 'applied' | 'not_applied' | 'unavailable' };
 export type VisitConfirmationTicket = { reference: string; visitId: string; revision: number };
+export type VisitConfirmationShownItem = { id: string; kind: AgentApplication['items'][number]['kind'] };
 export type VisitConfirmationPresentation = {
     patient: string;
     fiscalCode: string;
-    proposals: { title: string; fields: { label: string; value: string }[]; current: string; sourceName: string; sourceQuote: string; sourceHash: string }[];
+    proposals: (VisitConfirmationShownItem & { title: string; fields: { label: string; value: string }[]; current: string; sourceName: string; sourceQuote: string; sourceHash: string })[];
 };

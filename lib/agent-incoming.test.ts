@@ -23,7 +23,7 @@ fixture.seedComposition();
 const { createAgentMandateStore } = await import('./agent-mandate-store.ts');
 const { createAgentPairingStore } = await import('./agent-pairing-store.ts');
 const { createAgentCassetteStore, readAgentCassette, readAgentCassetteIndex } = await import('./agent-cassette-store.ts');
-const { applyAgentVisit, agentAppliedItemIds, AgentApplicationDenied, applyConfirmedAgentVisit, agentConfirmationPatientState } = await import('./agent-visit-application.ts');
+const { applyAgentVisit, agentAppliedItemIds, AgentApplicationDenied, applyConfirmedAgentVisit, agentConfirmationFiscalCode, agentConfirmationPatientState } = await import('./agent-visit-application.ts');
 const { startVisitConfirmation, nextVisitConfirmation } = await import('./agent-visit-confirmation.ts');
 const { createVisitConfirmationChallenge } = await import('./agent-visit-confirmation-proof.ts');
 const { createEntryOperationInTransaction } = await import('./entry-write-operation.ts');
@@ -34,6 +34,7 @@ const { refreshAgentIncoming, applyReviewedAgentVisits, agentIncomingSnapshot, s
 const { agentVisitAwaitsReview, inspectAgentVisit, prepareAgentApplication } = await import('./agent-visit-review.ts');
 
 const database = dbServer.$client, actor = fixture.session.userId, cf = 'RSSMRA80A01H501U';
+database.prepare('UPDATE patients SET tax_code=? WHERE id=?').run(cf, fixture.patientId);
 const generation = archiveGenerationForSession(fixture.session)!;
 const quote = 'LOINC 2345-7. Glucosio 100 mg/dL intervallo 70 110';
 const masterKey = await generateMasterKey();
@@ -335,7 +336,8 @@ test('L3 L4: the native confirmation shows note, dictation and the text of every
         assert.equal(await db.openLocalDraft(note.values.content), soap);
         assert.ok(soap.length > 600);
         const pdfText = (pdf: Buffer) => pdf.toString('utf8').trim();
-        assert.deepEqual((await openPresentation(reference, agreement.privateKey, presentation)).proposals, [
+        const opened = await openPresentation(reference, agreement.privateKey, presentation);
+        assert.deepEqual(opened.proposals.map(({ id: _id, kind: _kind, ...shown }: Record<string, unknown>) => shown), [
             { title: 'Nota', fields: [{ label: 'Testo', value: soap }], current: 'Non presente', sourceName: 'Cassetta della visita', sourceQuote: 'Scritta dal modello', sourceHash: textHash(soap) },
             { title: 'Trascrizione', fields: [{ label: 'Testo', value: dictation }], current: 'Non presente', sourceName: 'Cassetta della visita', sourceQuote: 'Depositata dall’agente', sourceHash: textHash(dictation) },
             { title: 'PDF', fields: [{ label: 'Testo', value: pdfText(f.original) }], current: 'Non presente', sourceName: 'referto.pdf', sourceQuote: 'Depositato dall’agente', sourceHash: pdfHash(f.original) },
@@ -348,9 +350,14 @@ test('L3 L4: the native confirmation shows note, dictation and the text of every
         const signingPublicKey = Buffer.concat([Buffer.of(4), Buffer.from(jwk.x!, 'base64url'), Buffer.from(jwk.y!, 'base64url')]).toString('base64');
         const binding = { reference, ...f.principal, sessionId: fixture.session.id, visitId: plan.visitId, revision: plan.cassetteRevision,
             patientId: plan.patientId, patientVersion: plan.expectedVersion, patientState: agentConfirmationPatientState(plan.patientId, plan.expectedVersion),
-            expiresAt: Date.now() + 60_000 };
+            fiscalCode: agentConfirmationFiscalCode(plan.patientId), expiresAt: Date.now() + 60_000 };
         const challenge = createVisitConfirmationChallenge(binding, plan, presentation, signingPublicKey);
         assert.equal(JSON.parse(challenge.bytes).presentationDigest, createHash('sha256').update(Buffer.from(presentation, 'base64')).digest('hex'));
+        const signed = JSON.parse(challenge.bytes);
+        assert.equal(signed.fiscalCode, opened.fiscalCode);
+        assert.deepEqual(signed.items, opened.proposals.map(({ id, kind }: Record<string, unknown>) => ({ id, kind })));
+        const hidden = createVisitConfirmationChallenge(binding, { ...plan, items: plan.items.filter(item => item.id !== f.originalId) }, presentation, signingPublicKey);
+        assert.notDeepEqual(JSON.parse(hidden.bytes).items, signed.items);
         const policy = 'biometrics-or-companion' as const;
         const grant = { challenge, assertLive() {}, proof: { policy, signature: sign('sha256', Buffer.from(challenge.bytes + '\n' + policy),
             { key: keys.privateKey, dsaEncoding: 'ieee-p1363' }).toString('base64') } };
