@@ -101,9 +101,6 @@ export const LOINC_PENDING_VALIDATION: (StaticCatalogItem & { note: string })[] 
     { code: '3016-3', display: 'Thyrotropin [Units/volume] in Serum or Plasma', displayIt: 'TSH', defaultUnit: 'm[IU]/L', note: 'Notazione unita internazionali (mUI/L vs uUI/mL) da validare.' },
 ];
 
-export type DDimerUnspecifiedCode = '48065-7' | null;
-export const DDIMER_UNSPECIFIED_DEFAULT_CODE: DDimerUnspecifiedCode = null;
-const DDIMER_UNSPECIFIED_NAMES = ['D-dimero', 'Dimero D'] as const;
 const WHOLE_BLOOD_GLUCOSE_SYNONYMS = ['Glicemia capillare', 'Glicemia da glucometro', 'Glicemia (sangue intero)'] as const;
 
 const LOINC_LAB_ACTIVE: StaticCatalogItem[] = LOINC_LAB_TABLE.filter((row) => row.status === 'attivo').map((row) => ({
@@ -114,22 +111,15 @@ const LOINC_CATALOG: StaticCatalogItem[] = [...LOINC_PILOT, ...LOINC_LAB_ACTIVE]
 export interface LoincObservationName { name: string; unit: string; code: string; active: boolean }
 
 const displayNames = (displayIt: string) => [displayIt.replace(/\(.*\)/u, ''), /\(([^)]+)\)/u.exec(displayIt)?.[1] ?? ''];
-export interface LoincNameOptions { dDimerUnspecified?: DDimerUnspecifiedCode }
+const tableRowNames = (row: typeof LOINC_LAB_TABLE[number]) => [row.nameIt, row.nameIt.replace(/\(.*\)/u, ''), ...row.synonyms];
 
-const tableRowNames = (row: typeof LOINC_LAB_TABLE[number], { dDimerUnspecified = DDIMER_UNSPECIFIED_DEFAULT_CODE }: LoincNameOptions) => [
-    row.nameIt,
-    row.nameIt.replace(/\(.*\)/u, ''),
-    ...row.synonyms,
-    ...(dDimerUnspecified === row.code ? DDIMER_UNSPECIFIED_NAMES : []),
-];
-
-export function loincObservationNames(options: LoincNameOptions = {}): LoincObservationName[] {
+export function loincObservationNames(): LoincObservationName[] {
     const fromDisplay = (items: StaticCatalogItem[], active: boolean) => items.flatMap((item) =>
         displayNames(item.displayIt ?? '').map((name) => ({ name, unit: item.defaultUnit ?? '', code: item.code, active })));
     const wholeBloodGlucose = WHOLE_BLOOD_GLUCOSE_SYNONYMS.map((name) => ({ name, unit: 'mg/dL', code: '2339-0', active: true }));
     const fromTable = LOINC_LAB_TABLE.flatMap((row) => {
         const units = row.unit ? [row.unit, ...row.additionalUnits] : [''];
-        return tableRowNames(row, options).flatMap((name) =>
+        return tableRowNames(row).flatMap((name) =>
             units.map((unit) => ({ name, unit, code: row.code, active: row.status === 'attivo' })));
     });
     return [...fromDisplay(LOINC_PILOT, true), ...wholeBloodGlucose, ...fromDisplay(LOINC_PENDING_VALIDATION, false), ...fromTable]
@@ -138,8 +128,8 @@ export function loincObservationNames(options: LoincNameOptions = {}): LoincObse
 
 export interface LoincReportedUnit { name: string; reported: string; unit: string }
 
-export function loincReportedUnits(options: LoincNameOptions = {}): LoincReportedUnit[] {
-    return LOINC_LAB_TABLE.filter((row) => row.status === 'attivo').flatMap((row) => tableRowNames(row, options)
+export function loincReportedUnits(): LoincReportedUnit[] {
+    return LOINC_LAB_TABLE.filter((row) => row.status === 'attivo').flatMap((row) => tableRowNames(row)
         .filter((name) => name.trim())
         .flatMap((name) => row.reportUnits.map((reported) => ({ name, reported, unit: row.unit }))));
 }

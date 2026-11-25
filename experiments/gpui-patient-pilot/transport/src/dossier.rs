@@ -1791,12 +1791,15 @@ mod tests {
         let exams = [
             ("eGFR", "72", "mL/min/{1.73_m2}"),
             ("LDH", "210", "U/L"),
-            ("D-dimero", "320", "ng/mL"),
+            ("D-dimero", "0,32", "mg/L"),
             ("Troponina", "12", "ng/L"),
         ];
         for (name, value, unit) in exams {
             assert_eq!(catalog(name, unit, value), Value::Null, "{name} {unit}");
         }
+        assert_eq!(catalog("D-dimero", "ng{FEU}/mL", "320")["code"], "48065-7");
+        assert_eq!(catalog("HbA1c", "mmol/mol", "48")["code"], "59261-8");
+        assert_eq!(catalog("HbA1c", "%", "6,5")["code"], "4548-4");
         assert_eq!(catalog("Calcio totale", "mmol/L", "2,3")["code"], "2000-8");
         assert_eq!(catalog("FT4", "pmol/L", "15")["code"], "14920-3");
         let facts: Vec<Value> = exams
