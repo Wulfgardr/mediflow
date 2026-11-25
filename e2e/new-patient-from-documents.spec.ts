@@ -51,7 +51,9 @@ async function countOf(page: Page, resource: string, patientId: string): Promise
 }
 
 async function capture(info: TestInfo, page: Page, name: string) {
-    await info.attach(name, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
+    const target = info.outputPath(name);
+    await page.screenshot({ fullPage: true, path: target });
+    await info.attach(name, { path: target, contentType: 'image/png' });
 }
 
 const dropZone = (page: Page) => page.getByTestId('patient-document-create').locator('section[aria-labelledby="patient-document-create-title"]');
