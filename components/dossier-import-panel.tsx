@@ -23,7 +23,7 @@ import { db } from '@/lib/db';
 import { createDossierPorts } from '@/lib/document-dossier-ports';
 import {
     DossierAbortedError, DossierIdentityBlocked, DossierStaleError, DossierWriteInFlight, acceptVerifiedAndApply, acquireDossierGroup, applyDossierDocument, buildDossierInventory,
-    evaluateDraftGroupIdentity, loadPatientDossier, retryDossierExtraction, saveDossierReview,
+    dossierGroupDestination, evaluateDraftGroupIdentity, loadPatientDossier, retryDossierExtraction, saveDossierReview,
     type DossierAcquireOutcome, type DossierApplyResult, type DossierBulkResult, type DossierDocumentView, type DossierDraftGroup, type DossierInputFile,
     type DossierPatient, type DossierPatientView,
 } from '@/lib/document-dossier-session';
@@ -239,12 +239,7 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
             } });
             if (!op.isCurrent()) return;
             setGroups(next);
-            const suggestions: Record<string, string> = {};
-            for (const group of next) {
-                const identity = evaluateDraftGroupIdentity(group, patients, null);
-                if (identity.status === 'suggested') suggestions[group.key] = identity.candidatePatientIds[0];
-            }
-            setLinks(suggestions);
+            setLinks({});
         } catch (error) {
             if (op.isCurrent()) setNotice(error instanceof DossierAbortedError ? error.message : 'Lettura della cartella non riuscita.');
         } finally { if (op.isCurrent()) setBusy(null); }
@@ -284,8 +279,7 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
         };
     };
 
-    const acquire = async (group: DossierDraftGroup) => {
-        const patientId = links[group.key];
+    const acquire = async (group: DossierDraftGroup, patientId: string) => {
         if (!patientId || backupProposed) return;
         const op = operation();
         setBusy('Salvataggio e rilettura degli originali…');
@@ -350,7 +344,7 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
                         {backupProposed ? <DossierBackupProposal patients={dossierWritablePatientCount(groups)} disabled={Boolean(busy)} onChoice={setBackupChoice} />
                             : backupChoice.kind === 'made' ? <p role="status" data-testid="dossier-backup-made">Backup creato: {backupChoice.fileName}.</p> : null}
                         {groups.map((group) => {
-                            const linked = links[group.key] ?? '';
+                            const linked = dossierGroupDestination(group, patients, links[group.key]);
                             const baseIdentity = evaluateDraftGroupIdentity(group, patients, linked || null);
                             const effectiveGroup = withSourceConfirmations(group);
                             const identity = evaluateDraftGroupIdentity(effectiveGroup, patients, linked || null);
@@ -427,12 +421,16 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
                                     </div>
                                     <label className={styles.consent}>
                                         <input type="checkbox" checked={confirmations[group.key] === true} disabled={!linked || identity.blocking || Boolean(busy)}
-                                            onChange={(event) => { const checked = event.currentTarget.checked; setConfirmations((current) => ({ ...current, [group.key]: checked })); }} />
+                                            onChange={(event) => {
+                                                const checked = event.currentTarget.checked;
+                                                setLinks((current) => ({ ...current, [group.key]: linked }));
+                                                setConfirmations((current) => ({ ...current, [group.key]: checked }));
+                                            }} />
                                         <span>Ho controllato le fonti e confermo che appartengono alla scheda scelta.</span>
                                     </label>
                                     <div className={styles.actions}>
                                         <button type="button" className={styles.primary} disabled={!linked || identity.blocking || !confirmations[group.key] || !acquirable || Boolean(busy) || backupProposed}
-                                            onClick={() => { void acquire(effectiveGroup); }}>Salva {formatCountLabel(acquirable, 'originale', 'originali')} nella scheda</button>
+                                            onClick={() => { void acquire(effectiveGroup, linked); }}>Salva {formatCountLabel(acquirable, 'originale', 'originali')} nella scheda</button>
                                     </div>
                                     <NewPatientFromDocument group={group} identityBlocking={identity.blocking} busy={Boolean(busy) || backupProposed}
                                         creating={dossierCreationSource(creating, group.key, backupProposed)}

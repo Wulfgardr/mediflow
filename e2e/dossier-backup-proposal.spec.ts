@@ -28,6 +28,17 @@ async function createPatient(page: Page, taxCode: string): Promise<string> {
     }, taxCode);
 }
 
+async function holdPatientList(page: Page): Promise<{ release(): Promise<void> }> {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    const isPatientList = (url: URL) => url.pathname === '/api/patients';
+    await page.route(isPatientList, async (route) => {
+        if (route.request().method() === 'GET') await held;
+        await route.fallback();
+    });
+    return { async release() { release(); await page.unroute(isPatientList); } };
+}
+
 async function attachmentCount(page: Page): Promise<number> {
     return page.evaluate(async () => {
         const response = await fetch('/api/attachments?metadata=true', { cache: 'no-store' });
@@ -50,10 +61,12 @@ test('Dossier: a batch of five patients proposes a complete backup before writin
         }
         await bootstrapUnlockedSession(page, pin);
         const patientId = await createPatient(page, first);
+        const patientList = await holdPatientList(page);
         await openUnlockedDocument(page, '/patients/import/dossier', pin);
         const panel = page.getByTestId('dossier-import');
         await panel.getByTestId('dossier-folder').setInputFiles(path.join(root, 'Lotto'));
         await expect(panel.getByTestId('dossier-group')).toHaveCount(5, { timeout: 180_000 });
+        await patientList.release();
 
         const proposal = panel.getByTestId('dossier-backup-proposal');
         await expect(proposal).toContainText('Stai per scrivere in 5 schede.');

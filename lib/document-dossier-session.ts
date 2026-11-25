@@ -244,6 +244,12 @@ export function evaluateDraftGroupIdentity(group: DossierDraftGroup, patients: r
     );
 }
 
+export function dossierGroupDestination(group: DossierDraftGroup, patients: readonly DossierPatient[], chosenPatientId: string | undefined): string {
+    if (chosenPatientId !== undefined) return chosenPatientId;
+    const identity = evaluateDraftGroupIdentity(group, patients, null);
+    return identity.status === 'suggested' ? identity.candidatePatientIds[0] : '';
+}
+
 // ---------------------------------------------------------------------------
 // Confini di scrittura: la revoca resta revoca, mai un errore di rete
 // ---------------------------------------------------------------------------
