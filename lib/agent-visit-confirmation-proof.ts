@@ -5,7 +5,7 @@ import type { AgentApplication } from './agent-visit-application-contract';
 
 export type VisitConfirmationBinding = Readonly<{
     reference: string; actorRef: string; sessionId: string; archiveGeneration: string; agentRef: string; mandateRef: string;
-    visitId: string; revision: number; patientId: string; patientVersion: number; patientState: string; expiresAt: number;
+    visitId: string; revision: number; patientId: string; patientVersion: number; patientState: string; fiscalCode: string; expiresAt: number;
 }>;
 
 export type VisitConfirmationChallenge = Readonly<{
@@ -45,6 +45,8 @@ export function createVisitConfirmationChallenge(binding: VisitConfirmationBindi
         patientId: binding.patientId,
         patientVersion: binding.patientVersion,
         patientState: binding.patientState,
+        fiscalCode: binding.fiscalCode,
+        items: input.items.map(({ id, kind }) => ({ id, kind })),
         signingPublicKey,
         deviceRef,
         applicationDigest,

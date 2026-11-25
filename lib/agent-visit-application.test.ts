@@ -189,7 +189,7 @@ test('native approval commits and audits exactly one plan, and a valid proof can
     const publicKey = Buffer.concat([Buffer.of(4), Buffer.from(jwk.x!, 'base64url'), Buffer.from(jwk.y!, 'base64url')]).toString('base64');
     const binding = { reference, ...f.principal, sessionId: fixture.session.id, visitId: plan.visitId, revision: plan.cassetteRevision,
         patientId: plan.patientId, patientVersion: plan.expectedVersion, patientState: agentConfirmationPatientState(plan.patientId, plan.expectedVersion),
-        expiresAt: Date.now() + 60_000 };
+        fiscalCode: 'SYNTHETICXX11A11', expiresAt: Date.now() + 60_000 };
     const presentation = Buffer.from('synthetic ciphertext representation').toString('base64');
     const challenge = createVisitConfirmationChallenge(binding, plan, presentation, publicKey);
     const policy = 'biometrics-or-companion' as const;
