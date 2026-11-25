@@ -489,3 +489,46 @@ Prove: `lib/web-patient-document.test.ts` attraversa la route con sessioni Web
 sintetiche reali, SQLite e AnyDoc reali, PIN verificato; `e2e/patient-document-create.spec.ts`
 prova nel browser il percorso felice, la risposta persa e l'annullamento su un
 archivio isolato vuoto.
+
+## Decisione del 25 novembre 2026: proposte d'anagrafica con un gesto unico esplicito (WUL-959)
+
+Dalla PR #1119 la pagina «Nuova scheda» accetta più documenti e propone
+l'anagrafica dal lotto Dossier. Fino a oggi ogni proposta entrava con un clic
+per campo («Usa per…»). Leonardo ha scelto fra tre opzioni:
+
+1. approvazione per campo, come prima;
+2. un pulsante «Usa tutte le proposte», poi il PIN;
+3. campi già compilati all'apertura, con il PIN come unica conferma.
+
+**Decisione: opzione 2.** Le proposte entrano nei campi per campo oppure con
+il gesto unico esplicito «Usa tutte le proposte». L'opzione 3 è scartata:
+nessun dato d'identità entra nei campi senza un gesto del medico.
+
+Regole:
+
+- Le proposte vengono da tutti i documenti leggibili del lotto, ognuna con il
+  file da cui viene; valori uguali (a meno di maiuscole e spazi) si contano una
+  volta. Il calcolo è in `lib/dossier-new-patient-entry.ts`
+  (`groupIdentityProposals`, `allIdentityProposals`).
+- Se due documenti propongono valori diversi per lo stesso campo, il gesto
+  unico non sceglie: il campo resta com'è, la pagina lo segna «Da decidere» e
+  «Prosegui alla conferma» resta bloccato finché il medico non sceglie una
+  proposta o scrive il valore.
+- Una data di nascita proposta che non corrisponde al codice fiscale proposto
+  non entra con il gesto unico: resta da decidere, con il motivo accanto al
+  campo. Serve perché le proposte vengono da più documenti, e uno può essere di
+  un familiare senza codice fiscale.
+- Limite dichiarato: senza alcun codice fiscale nel lotto non c'è nulla con cui
+  confrontare la data, e il gesto unico porta nei campi anche dati presi da
+  documenti diversi che non si contraddicono.
+- I campi restano modificabili; accanto a ogni campo che coincide con una
+  proposta resta il nome del file da cui viene.
+- PIN, controllo dei duplicati, conferma del collegamento e blocchi del lotto
+  (due codici fiscali, omocodia, codice già in archivio) restano invariati: il
+  gesto unico opera solo dentro la revisione già aperta.
+
+Prove: `lib/dossier-new-patient-entry.test.ts` (proposte dal lotto, valori
+concordi, valori discordi, documenti esclusi) ed `e2e/new-patient-from-documents.spec.ts`
+(un gesto riempie i campi, correzione di un campo, PIN e scheda creata; due
+cognomi diversi lasciano il campo da decidere; la data di nascita di un
+familiare senza codice fiscale resta da decidere; casi bloccati invariati).
