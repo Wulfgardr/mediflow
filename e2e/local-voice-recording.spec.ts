@@ -115,7 +115,7 @@ test('dalla scheda: registro una visita a due voci, pausa, ripresa, fine, rilegg
     await openUnlockedDocument(page, `/patients/${patientId}/modules`, pin);
     const command = page.getByRole('link', { name: 'Registra la visita' });
     await expect(command).toBeVisible();
-    await expect(page.locator('[data-lume-primary="true"], .mf-button-primary')).toHaveCount(1);
+    await expect(page.locator('[data-lume-primary="true"], .mf-button-primary').filter({ visible: true })).toHaveCount(1);
     await capture(info, page, '1-scheda-con-registra.png');
 
     await command.click();
