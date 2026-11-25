@@ -68,6 +68,8 @@ test('nuova scheda: trascino due documenti, confermo l’anagrafica proposta e i
     await dropFiles(dropZone(page), [{ name: 'esami.pdf', bytes: await labPdf(taxCode) }, { name: 'lettera.pdf', bytes: await letterPdf(taxCode) }]);
     const panel = page.getByTestId('dossier-import');
     const group = panel.getByTestId('dossier-group');
+    await expect(panel).toHaveCSS('border-top-left-radius', '0px');
+    await expect(page.locator('#documento [data-testid="dossier-import"]')).toHaveCount(1);
     await expect(group).toHaveAttribute('data-identity', 'unmatched_cf', { timeout: 120_000 });
     await expect(group.getByTestId('dossier-source')).toHaveCount(2);
     await expect(page.locator('#dati')).toBeHidden();

@@ -340,7 +340,7 @@ function ActiveDossierImport({ initialPatientId, entry }: { initialPatientId: st
     };
 
     const content = (
-            <div className={styles.panel} data-testid="dossier-import" aria-busy={busy ? 'true' : 'false'}>
+            <div className={newPatient ? styles.embeddedPanel : styles.panel} data-testid="dossier-import" aria-busy={busy ? 'true' : 'false'}>
                 {newPatient ? groups.length ? <div className={styles.actions}>
                     <button type="button" className="mf-button-secondary" disabled={Boolean(busy)} onClick={clearSelection}>Scegli altri documenti</button>
                 </div> : <PatientDocumentCreate onActiveChange={newPatient.onActiveChange} onDocuments={(files) => {

@@ -258,8 +258,8 @@ export default function NewPatientPage() {
                             I documenti si leggono su questo computer. Confermi i dati anagrafici proposti e il PIN; diagnosi, farmaci ed esami
                             restano da rivedere, ognuno con la sua fonte.
                         </p>
-                        <DossierNewPatientImport onActiveChange={setDocumentFlowActive} />
                     </div>
+                    <DossierNewPatientImport onActiveChange={setDocumentFlowActive} />
                 </section>
 
             {importMeta && (
