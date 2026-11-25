@@ -27,6 +27,7 @@ import {
     type DossierFactAssessment, type DossierHostExtraction, type DossierIdentityEvaluation, type DossierRecord, type DossierResidualSegment,
     type DossierSourceClassification, type DossierTaxCodeEvidence, type DossierWriteClaim,
 } from './domain/documents/dossier-import';
+import type { DocumentDecisionClassification } from './domain/documents/document-decision';
 import { preparedBulkDecisions, preparedDossierFacts, preparedPatientKey, preparedPatientLabel, type PreparedExtraction, type PreparedPatient } from './domain/documents/dossier-prepared';
 import { sameClinicalText, sameClinicalValue, sameDay, sameDosage, sameOptional, sameUnit } from './domain/documents/dossier-clinical-equality';
 
@@ -87,12 +88,19 @@ export interface DossierPorts {
 // Inventario
 // ---------------------------------------------------------------------------
 
+/** Ciò che la provenienza dichiara del file prima di leggerlo: la categoria scritta nel nome dalla fonte. */
+export interface DossierSourceHints {
+    categoryLabel: string;
+    classification?: DocumentDecisionClassification;
+}
+
 export interface DossierInputFile {
     name: string; size: number; type: string; relativePath: string; lastModified: number;
+    hints?: DossierSourceHints;
     read(): Promise<Uint8Array>;
 }
 
-export type DossierSourceStatus = 'ready' | 'duplicate_in_selection' | 'excluded' | 'unreadable' | 'unsupported_format';
+export type DossierSourceStatus = 'ready' | 'duplicate_in_selection' | 'already_imported' | 'excluded' | 'unreadable' | 'unsupported_format';
 
 export interface DossierDraftSource {
     key: string;
@@ -110,6 +118,7 @@ export interface DossierDraftSource {
     documentDate: DossierRecord['documentDate'];
     facts: DossierFact[];
     classificationResult: DossierRecord['classification'];
+    categoryLabel?: string;
     status: DossierSourceStatus;
     duplicateOf?: string;
     file: DossierInputFile;
@@ -117,7 +126,8 @@ export interface DossierDraftSource {
     prepared?: { patient: PreparedPatient | null; patientLabel: string; notes: string[]; facts: number };
 }
 
-export interface DossierDraftGroup { physicianTaxCode?: string | null; key: string; sources: DossierDraftSource[] }
+/** `declaredTaxCode`: codice fiscale dichiarato dalla provenienza della selezione; una scheda con un altro codice blocca il gruppo. */
+export interface DossierDraftGroup { physicianTaxCode?: string | null; declaredTaxCode?: string; key: string; sources: DossierDraftSource[] }
 
 export class DossierAbortedError extends Error { constructor() { super('Operazione interrotta: sessione bloccata o contesto cambiato.'); } }
 
@@ -141,12 +151,16 @@ async function extractWithRetry(ports: DossierPorts, bytes: Uint8Array, signal: 
 
 export async function buildDossierInventory(
     ports: DossierPorts, files: readonly DossierInputFile[],
-    options: { signal: AbortSignal; isCurrent: () => boolean; onProgress?: (done: number, total: number) => void; prepared?: PreparedExtraction | null },
+    options: {
+        signal: AbortSignal; isCurrent: () => boolean; onProgress?: (done: number, total: number) => void; prepared?: PreparedExtraction | null;
+        declaredTaxCode?: string; skipImportedFor?: string;
+    },
 ): Promise<DossierDraftGroup[]> {
     const { signal, isCurrent } = options;
     const preparedSources = new Map((options.prepared?.sources ?? []).map((source) => [source.sha256, source]));
     const physicianTaxCode = await ports.physicianTaxCode?.(signal) ?? null;
     const exemptionCodes = await ports.exemptionCodes(signal);
+    const imported = options.skipImportedFor ? recordsBySha(await ports.listAttachments(options.skipImportedFor, signal)) : new Map<string, DossierAttachmentMeta>();
     assertLive(signal, isCurrent);
     const sources: DossierDraftSource[] = [];
     const firstBySha = new Map<string, string>();
@@ -164,6 +178,15 @@ export async function buildDossierInventory(
         assertLive(signal, isCurrent);
         const sha256 = await ports.sha256(bytes);
         const classification = classifyDossierSource({ name: file.name, size: bytes.byteLength, declaredType: file.type, head: bytes.subarray(0, 16) });
+        const hinted = file.hints ? { categoryLabel: file.hints.categoryLabel } : {};
+        if (imported.has(sha256)) {
+            bytes.fill(0);
+            sources.push({ key, group: groupKeyOf(file.relativePath), relativePath: file.relativePath, fileName: file.name, size: file.size, sha256,
+                classification, extraction: { state: 'not_extracted', reason: classification.kind }, text: null, taxCodes: [], patientNames: [], documentDate: null,
+                facts: [], classificationResult: file.hints?.classification ?? 'unknown', ...hinted, status: 'already_imported', file });
+            options.onProgress?.(index + 1, files.length);
+            continue;
+        }
         const duplicateOf = firstBySha.get(sha256);
         const refusedText = classification.kind === 'text' && !classification.extractable;
         // Solo una fonte ammessa rappresenta i suoi byte: un TXT rifiutato non deve nascondere una copia leggibile.
@@ -195,8 +218,9 @@ export async function buildDossierInventory(
         bytes.fill(0);
         const date = text ? findExplicitDocumentDate(text, file.name) : findExplicitDocumentDate('', file.name);
         const candidates = text && extraction.state === 'extracted'
-            ? extractDossierCandidates({ fileName: file.name, text, units: extraction.units, documentDate: date?.date ?? null, exemptionCodes })
-            : { facts: [], classification: 'unknown' as const };
+            ? extractDossierCandidates({ fileName: file.name, text, units: extraction.units, documentDate: date?.date ?? null, exemptionCodes,
+                classification: file.hints?.classification })
+            : { facts: [], classification: file.hints?.classification ?? 'unknown' };
         const taxCodes = text ? collectDossierTaxCodes(text) : [];
         const patientNames = text ? collectDossierPatientNames(text) : [];
         const match = duplicateOf ? undefined : preparedSources.get(sha256);
@@ -218,16 +242,35 @@ export async function buildDossierInventory(
         const group = (match && preparedPatientKey(match.patient, text)) || groupKeyOf(file.relativePath);
         sources.push({ key, group, relativePath: file.relativePath, fileName: file.name, size: file.size, sha256,
             classification, extraction, text, taxCodes, patientNames, documentDate,
-            facts, classificationResult: candidates.classification,
+            facts, classificationResult: candidates.classification, ...hinted,
             status: duplicateOf ? 'duplicate_in_selection' : 'ready', ...(duplicateOf ? { duplicateOf } : {}), ...(prepared ? { prepared } : {}), file });
         options.onProgress?.(index + 1, files.length);
     }
     const groups = new Map<string, DossierDraftSource[]>();
     for (const source of sources) groups.set(source.group, [...(groups.get(source.group) ?? []), source]);
-    return [...groups.entries()].map(([key, items]) => ({ key, sources: items, physicianTaxCode }));
+    const declared = options.declaredTaxCode ? { declaredTaxCode: options.declaredTaxCode } : {};
+    return [...groups.entries()].map(([key, items]) => ({ key, sources: items, physicianTaxCode, ...declared }));
 }
 
 export function evaluateDraftGroupIdentity(group: DossierDraftGroup, patients: readonly DossierPatient[], linkedPatientId: string | null): DossierIdentityEvaluation {
+    const identity = documentIdentity(group, patients, linkedPatientId);
+    const declared = group.declaredTaxCode;
+    if (!declared) return identity;
+    const linked = linkedPatientId ? patients.find((patient) => patient.id === linkedPatientId) : undefined;
+    const holders = patients.filter((patient) => patient.taxCode.trim().toUpperCase() === declared).map((patient) => patient.id);
+    if (linked && linked.taxCode.trim().toUpperCase() !== declared) {
+        return { status: 'discordant', blocking: true, confirmationRequired: true, documentPatientCodes: identity.documentPatientCodes, candidatePatientIds: holders,
+            message: 'La cartella è di un altro codice fiscale. Nessuna fonte verrà salvata su questa scheda.' };
+    }
+    const documentCode = identity.documentPatientCodes.length === 1 && !identity.blocking ? identity.documentPatientCodes[0] : null;
+    if (documentCode && documentCode !== declared) {
+        return { status: 'discordant', blocking: true, confirmationRequired: true, documentPatientCodes: identity.documentPatientCodes, candidatePatientIds: [],
+            message: 'Il codice fiscale nei documenti non è quello della cartella. Nessuna fonte verrà salvata.' };
+    }
+    return identity;
+}
+
+function documentIdentity(group: DossierDraftGroup, patients: readonly DossierPatient[], linkedPatientId: string | null): DossierIdentityEvaluation {
     return evaluateDossierGroupIdentity(
         group.sources
             .filter((source) => source.status === 'ready')
@@ -277,7 +320,7 @@ async function boundary<T>(guard: Guard, operation: () => Promise<T>): Promise<T
 
 export type DossierAcquireOutcome =
     | { key: string; status: 'stored' | 'reused'; attachmentId: string; verified: boolean; measured?: { original: number; artifact: number } }
-    | { key: string; status: 'skipped'; reason: 'duplicate_in_selection' | 'excluded' | 'unreadable' | 'unsupported_format' | 'identity_unconfirmed' }
+    | { key: string; status: 'skipped'; reason: 'duplicate_in_selection' | 'already_imported' | 'excluded' | 'unreadable' | 'unsupported_format' | 'identity_unconfirmed' }
     | { key: string; status: 'failed'; reason: 'source_changed' | 'too_large' | 'readback_mismatch' | 'write_failed' | 'artifact_conflict'; attachmentId?: string };
 
 function dataEqual(left: Uint8Array, right: Uint8Array): boolean {
@@ -648,7 +691,8 @@ export async function retryDossierExtraction(
         const exemptionCodes = await ports.exemptionCodes(input.signal);
         guard();
         const date = record.documentDate ?? (() => { const found = findExplicitDocumentDate(text, record.source.fileName); return found ? { value: found.date, source: found.source } : null; })();
-        const proposed = extractDossierCandidates({ fileName: record.source.fileName, text, units, documentDate: date?.value ?? null, exemptionCodes });
+        const proposed = extractDossierCandidates({ fileName: record.source.fileName, text, units, documentDate: date?.value ?? null, exemptionCodes,
+            classification: record.classification === 'unknown' ? undefined : record.classification });
         const patient = await ports.getPatient(input.patientId, input.signal);
         guard();
         if (!patient) return 'stale';
