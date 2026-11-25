@@ -18,7 +18,7 @@ use serde::Deserialize;
 use serde_json::json;
 use std::sync::{
     Mutex,
-    atomic::{AtomicBool, Ordering},
+    atomic::{AtomicBool, AtomicU64, Ordering},
 };
 use zeroize::Zeroizing;
 
@@ -86,6 +86,8 @@ pub struct HostAmbulatoryCommand {
     authenticated: AtomicBool,
     preview_attempted: AtomicBool,
     sent: AtomicBool,
+    preparation_expires_at: u64,
+    challenge_expires_at: AtomicU64,
 }
 impl HostAmbulatoryCommand {
     pub(crate) fn prepare(
@@ -220,6 +222,8 @@ impl HostAmbulatoryCommand {
             authenticated: AtomicBool::new(false),
             preview_attempted: AtomicBool::new(false),
             sent: AtomicBool::new(false),
+            preparation_expires_at: open.expires_at,
+            challenge_expires_at: AtomicU64::new(u64::MAX),
         })
     }
     fn headers(&self) -> Result<HeaderMap> {
@@ -282,6 +286,8 @@ impl HostAmbulatoryCommand {
         let preview = AmbulatoryCommandPreview::parse(&raw.body, &self.identity)?;
         self.client.context.check()?;
         *self.marker.lock().map_err(|_| RuntimeError::Locked)? = Some(preview.marker.clone());
+        self.challenge_expires_at
+            .store(preview.challenge_expires_at, Ordering::Release);
         Ok(preview)
     }
     pub fn execute(
@@ -406,6 +412,10 @@ impl HostAmbulatoryCommand {
             .lock()
             .map_err(|_| RuntimeError::Locked)?
             .clone())
+    }
+    pub fn expired_at(&self, now_ms: u64) -> bool {
+        now_ms >= self.preparation_expires_at
+            || now_ms >= self.challenge_expires_at.load(Ordering::Acquire)
     }
     fn observe(
         &self,
@@ -586,6 +596,8 @@ mod tests {
             authenticated: AtomicBool::new(true),
             preview_attempted: AtomicBool::new(true),
             sent: AtomicBool::new(false),
+            preparation_expires_at: u64::MAX,
+            challenge_expires_at: AtomicU64::new(u64::MAX),
         }
     }
     fn store(flow: &HostAmbulatoryCommand) -> AmbulatoryCommandRecoveryStore {
@@ -971,5 +983,17 @@ mod tests {
         assert!(flow.retire().is_err());
         assert_eq!(flow.authority(), AmbulatoryCommandAuthority::LocallyRetired);
         worker.join().unwrap();
+    }
+
+    #[test]
+    fn ambulatory_command_expired_at_tracks_preparation_and_challenge_deadlines() {
+        let mut flow = ready("http://127.0.0.1:1", false);
+        flow.preparation_expires_at = 300_000;
+        flow.challenge_expires_at.store(30_000, Ordering::Release);
+        assert!(!flow.expired_at(29_999));
+        assert!(flow.expired_at(30_000));
+        flow.challenge_expires_at.store(u64::MAX, Ordering::Release);
+        assert!(!flow.expired_at(299_999));
+        assert!(flow.expired_at(300_000));
     }
 }
