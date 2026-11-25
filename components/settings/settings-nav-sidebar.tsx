@@ -105,7 +105,7 @@ export function SettingsNavSidebar({ onSearchRequest }: { onSearchRequest?: () =
                         className={navigation.searchButton}
                     >
                         <span><Search aria-hidden="true" /> Cerca impostazione</span>
-                        <kbd className={navigation.shortcut}>⌘/Ctrl+K</kbd>
+                        <kbd className={navigation.shortcut}>⌘K</kbd>
                     </button>
                 ) : null}
                 <NavGroups pathname={pathname} />
