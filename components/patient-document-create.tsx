@@ -76,7 +76,9 @@ function fieldError(fields: Fields): string | null {
 
 /** Creates a patient from one document through the shared command: local extraction, field-by-field
  * entry by the physician, explicit PIN confirmation, CAS and audit on the server, attachment readback here. */
-export default function PatientDocumentCreate({ onActiveChange, dossier }: { onActiveChange?: (active: boolean) => void; dossier?: PatientDocumentDossierSource } = {}) {
+export default function PatientDocumentCreate({ onActiveChange, dossier, onDocuments }: {
+    onActiveChange?: (active: boolean) => void; dossier?: PatientDocumentDossierSource; onDocuments?: (files: File[]) => boolean;
+} = {}) {
     const { showToast } = useToast();
     const confirm = useConfirm();
     const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
@@ -271,8 +273,14 @@ export default function PatientDocumentCreate({ onActiveChange, dossier }: { onA
         patientDocumentMarker.clear(scope.current, commandId); restart(); setPhase({ kind: 'idle' });
     }
 
+    function select(files: File[]) {
+        if (!files.length || onDocuments?.(files)) return;
+        void choose(files[0]);
+    }
+
     function drop(event: DragEvent<HTMLElement>) {
         event.preventDefault(); setDragging(false);
+        if (onDocuments) { select([...event.dataTransfer.files]); return; }
         if (event.dataTransfer.files.length !== 1) {
             setPhase({ kind: 'idle', notice: { tone: 'critical', text: 'Scegli un solo documento. Nessuna scheda creata.' } });
             return;
@@ -295,12 +303,12 @@ export default function PatientDocumentCreate({ onActiveChange, dossier }: { onA
             {phase.kind === 'idle' && (
                 <>
                     {phase.notice && <div className={`mf-alert ${phase.notice.tone === 'critical' ? 'mf-alert-critical' : 'mf-alert-info'}`} role="alert">{phase.notice.text}</div>}
-                    {dossier && (
+                    {dossier ? (
                         <div className="mf-alert mf-alert-info">
                             <p className="text-sm">Documento del lotto: {dossier.file.name}. La lettura locale avvia una lavorazione revisionabile; nessuna scheda viene creata senza PIN.</p>
                             <button type="button" className="mf-button-primary mt-3" onClick={() => { void choose(dossier.file); }}>Avvia la revisione del documento</button>
                         </div>
-                    )}
+                    ) : (
                     <section
                         aria-labelledby="patient-document-create-title"
                         onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
@@ -311,12 +319,13 @@ export default function PatientDocumentCreate({ onActiveChange, dossier }: { onA
                         <FileUp className="h-6 w-6 text-[color:var(--lume-ink-muted)]" aria-hidden="true" />
                         <h3 id="patient-document-create-title" ref={heading} tabIndex={-1} className="font-semibold text-[color:var(--lume-ink)]">Nuova scheda da documento</h3>
                         <p className="max-w-xl text-sm text-[color:var(--lume-ink-muted)]">
-                            Trascina qui un PDF o un’immagine (JPEG, PNG) fino a 10 MiB, oppure sceglilo.
+                            {onDocuments ? 'Trascina qui uno o più documenti del paziente, oppure sceglili.' : 'Trascina qui un PDF o un’immagine (JPEG, PNG) fino a 10 MiB, oppure sceglilo.'}
                         </p>
-                        <input ref={fileInput} type="file" accept={PATIENT_DOCUMENT_ACCEPT} className="sr-only" id="patient-document-create-file"
-                            onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; void choose(file); }} />
-                        <button type="button" className="mf-button-secondary" onClick={() => fileInput.current?.click()}>Scegli un documento</button>
+                        <input ref={fileInput} type="file" accept={onDocuments ? undefined : PATIENT_DOCUMENT_ACCEPT} multiple={Boolean(onDocuments)} className="sr-only" id="patient-document-create-file"
+                            onChange={(event) => { const files = [...(event.target.files ?? [])]; event.target.value = ''; select(files); }} />
+                        <button type="button" className="mf-button-secondary" onClick={() => fileInput.current?.click()}>{onDocuments ? 'Scegli i documenti' : 'Scegli un documento'}</button>
                     </section>
+                    )}
                 </>
             )}
 

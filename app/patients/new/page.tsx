@@ -16,7 +16,7 @@ import { useRouter } from 'next/navigation';
 import { AlertTriangle, CheckCircle2, FileSearch, FileSpreadsheet, FolderOpen } from 'lucide-react'; // manual CSV and folder entrypoints
 import { v4 as uuidv4 } from 'uuid';
 import PatientForm from '@/components/patient-form';
-import PatientDocumentCreate from '@/components/patient-document-create';
+import { DossierNewPatientImport } from '@/components/dossier-import-panel';
 import { focusPatientCreationTarget } from '@/lib/patient-creation-focus';
 import { useToast } from '@/components/ui/toast-provider';
 import { useConfirm } from '@/components/ui/confirm-dialog';
@@ -257,16 +257,16 @@ export default function NewPatientPage() {
                         <div className="space-y-1">
                             <p className="mf-eyebrow">Documento clinico</p>
                             <h2 className="text-lg font-semibold tracking-tight text-[color:var(--lume-ink)]">
-                                Crea la scheda da un documento
+                                Crea la scheda dai documenti
                             </h2>
                             <p className="max-w-3xl text-sm leading-relaxed text-[color:var(--lume-ink-muted)]">
-                                Il testo viene estratto su questo computer. Nome, cognome e codice fiscale li scrivi tu leggendolo, poi confermi
-                                con il PIN: la scheda nasce con il documento allegato. Diagnosi e terapie si aggiungono dopo, nella scheda.
+                                I documenti si leggono su questo computer. Confermi i dati anagrafici proposti e il PIN; diagnosi, farmaci ed esami
+                                restano da rivedere, ognuno con la sua fonte.
                             </p>
                         </div>
                     </div>
                 </div>
-                <PatientDocumentCreate onActiveChange={setDocumentFlowActive} />
+                <DossierNewPatientImport onActiveChange={setDocumentFlowActive} />
             </section>
 
             {importMeta && (
