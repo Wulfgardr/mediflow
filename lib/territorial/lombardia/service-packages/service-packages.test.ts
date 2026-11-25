@@ -254,6 +254,25 @@ test('WUL-922: recenti esclusi, scaduti con i mesi di ritardo, prescritti in att
     ]);
 });
 
+test('una prescrizione più vecchia della cadenza e mai eseguita torna proposta dicendo quando era stata prescritta', () => {
+    const history: PatientServiceHistoryEntry[] = [{ serviceCode: '90.28.1', status: 'prescribed', prescribedAt: '2026-04-01' }];
+    const hba1c = requestsByCode(generate({ patientIcd11Codes: ['5A11'], history })).get('90.28.1');
+    assert.deepEqual(hba1c?.reason, {
+        kind: 'ordered_not_performed',
+        orderedAt: '2026-04-01',
+        label: 'Prescritta o prenotata il 2026-04-01, non risulta eseguita',
+    });
+});
+
+test('una data di calendario impossibile è rifiutata come riferimento e ignorata nello storico', () => {
+    const outcome = generate({ patientIcd11Codes: ['5A11'], asOf: '2026-02-30' });
+    assert.equal(outcome.ok, false);
+    if (outcome.ok) return;
+    assert.equal(outcome.errorCode, 'INVALID_REFERENCE_DATE');
+    const history: PatientServiceHistoryEntry[] = [{ serviceCode: '90.28.1', status: 'performed', performedAt: '2026-09-31' }];
+    assert.equal(requestsByCode(generate({ patientIcd11Codes: ['5A11'], history })).get('90.28.1')?.reason.label, 'Mai eseguita');
+});
+
 test('con il modulo renale l’albuminuria di 8 mesi fa torna da richiedere', () => {
     const history: PatientServiceHistoryEntry[] = [{ serviceCode: '90.33.4', status: 'performed', performedAt: '2026-03-25' }];
     assert.equal(requestsByCode(generate({ patientIcd11Codes: ['5A11'], history })).has('90.33.4'), false);

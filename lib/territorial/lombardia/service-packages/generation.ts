@@ -55,6 +55,8 @@ export type GeneratePackageServiceRequestsInput = Readonly<{
 
 type CalendarDate = Readonly<{ year: number; month: number; day: number }>;
 
+const ISO_CALENDAR_DATE_SHAPE = /^\d{4}-\d{2}-\d{2}$/;
+
 type EffectiveItem = Readonly<{
     sourceModuleId: 'base' | string;
     item: ServicePackageItem;
@@ -71,7 +73,8 @@ function parseCalendarDate(value: string | Date | null | undefined): CalendarDat
         };
     }
     const trimmed = value.trim();
-    if (isValidIsoCalendarDate(trimmed)) {
+    if (ISO_CALENDAR_DATE_SHAPE.test(trimmed)) {
+        if (!isValidIsoCalendarDate(trimmed)) return null;
         const [year, month, day] = trimmed.split('-').map(Number);
         return { year, month, day };
     }
@@ -113,6 +116,14 @@ function wholeMonthsBetween(earlier: CalendarDate, later: CalendarDate): number 
     if (compareCalendarDates(earlier, later) >= 0) return 0;
     const raw = (later.year - earlier.year) * 12 + (later.month - earlier.month);
     return later.day < earlier.day ? Math.max(0, raw - 1) : raw;
+}
+
+function orderedNotPerformedReason(orderedAt: string) {
+    return {
+        kind: 'ordered_not_performed' as const,
+        orderedAt,
+        label: `Prescritta o prenotata il ${orderedAt}, non risulta eseguita`,
+    };
 }
 
 function formatOverdueLabel(overdueMonths: number): string {
@@ -385,7 +396,9 @@ export function generatePackageServiceRequests(
                     label: formatOverdueLabel(overdueMonths),
                 };
             })()
-            : { kind: 'never_performed' as const, label: 'Mai eseguita' as const };
+            : latestOpenOrder
+                ? orderedNotPerformedReason(formatCalendarDate(latestOpenOrder))
+                : { kind: 'never_performed' as const, label: 'Mai eseguita' as const };
 
         requests.push({
             itemId: item.id,
