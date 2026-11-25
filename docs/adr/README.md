@@ -14,6 +14,7 @@ verifica dello stato successivo.
 
 ## Decisioni richiamate
 
+- L'[ADR 0203](0203-pacchetti-prestazioni-territoriali.md) propone il confine dei pacchetti di prestazioni per diagnosi nel modulo Lombardia (`lom`), con stati di approvazione nei tipi, fonti e catalogo regionale obbligatori e generazione pura rispetto allo storico senza scritture cliniche.
 - L'[ADR 0200](0200-web-standard-launcher-e-ritiro-app-desktop.md), in stato **Proposed** (Refs WUL-880), propone l'applicazione Web locale come unica superficie desktop su macOS, Windows e Linux, affiancata da launcher sottili per sistema e dalle app iOS/iPadOS, con ritiro ordinato di GPUI e della finestra Mac Swift.
 - L'[ADR 0199](0199-web-session-client-proof.md), accettato il 19/11/2026 per la 0.9.1, lega la sessione al documento Web o al client locale autenticato e richiede di aggiornare insieme server e GPUI.
 - L'[ADR 0198](0198-document-child-platform-boundary.md) propone il confine documentale di Web e Headless. Il 19 novembre 2026 Leonardo ha approvato l’isolamento di rete imposto dal sistema come requisito di consegna su Windows 11 ARM. L’ADR registra le prove su macOS ARM64, Omarchy ARM e Windows 11 ARM. La ricetta resta proposta durante l’integrazione.
