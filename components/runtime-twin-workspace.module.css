@@ -153,8 +153,8 @@
   .workspace[data-unified-shell='true']:not([data-patient-record='true']) .workspaceBar .recordTab::before { content: '·'; margin: 0 4px 0 2px; }
   .workspace[data-unified-shell='true'] .navigation > a > small { margin-left: auto; padding: 0 6px; border-radius: 10px; background: var(--record-soft); color: var(--record-hint); font: var(--type-record-meta); }
   .workspace[data-patient-record='true'] .workspaceBar,
-  .workspace[data-unified-shell='true']:has([data-page-frame]) .workspaceBar { position: absolute; z-index: 3; top: 0; left: 0; max-width: calc(100% - 335px); width: max-content; }
-  .workspace[data-unified-shell='true']:has([data-page-frame]) .workspaceBar { z-index: 1001; }
+  .workspace[data-unified-shell='true']:has([data-page-frame], [data-runtime-settings]) .workspaceBar { position: absolute; z-index: 3; top: 0; left: 0; max-width: calc(100% - 335px); width: max-content; }
+  .workspace[data-unified-shell='true']:has([data-page-frame], [data-runtime-settings]) .workspaceBar { z-index: 1001; }
   .workspace[data-patient-record='true'] .recordTab[data-active='true'] { color: var(--record-hint); }
   .workspace[data-patient-record='true'] .directoryTab::after { content: '·'; margin-left: 4px; }
   .workspace[data-patient-record='true'] .recordWhen { display: inline; }

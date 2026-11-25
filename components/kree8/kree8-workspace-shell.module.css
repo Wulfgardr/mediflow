@@ -1158,3 +1158,6 @@
   :global(html[data-runtime-twin-design='proposal']) .workspaceBody [data-runtime-settings] > aside,
   :global(html[data-runtime-twin-design='proposal']) .workspaceBody [data-testid='settings-subroute-content'] { padding-inline: 0; }
 }
+@media (min-width: 1001px) {
+  :global(html[data-runtime-twin-design='proposal']) .canvas:has([data-runtime-settings]) .chrome { padding: 39px 24px 16px; }
+}

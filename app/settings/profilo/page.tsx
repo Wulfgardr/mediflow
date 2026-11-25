@@ -124,6 +124,8 @@ export default function SettingsProfilePage() {
                         Valori salvati: {state.current.displayName || 'Nome medico vuoto'} · {state.current.ambulatoryName || 'Nome ambulatorio vuoto'}
                     </p>}
                     <div className={styles.actions}>
+                        <button type="button" onClick={() => void editor.current?.read()} disabled={state.busy}
+                            className={SETTINGS_SECONDARY_BUTTON_CLASS}>Rileggi profilo mantenendo la bozza</button>
                         <button
                             onClick={() => void editor.current?.save()}
                             disabled={state.busy || state.requiresRead || !state.current}
@@ -133,8 +135,6 @@ export default function SettingsProfilePage() {
                             <Save className="w-4 h-4" />
                             {state.busy ? 'Attendi...' : 'Salva profilo'}
                         </button>
-                        <button type="button" onClick={() => void editor.current?.read()} disabled={state.busy}
-                            className={SETTINGS_SECONDARY_BUTTON_CLASS}>Rileggi profilo mantenendo la bozza</button>
                     </div>
                 </div>
             </section>
