@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
+import fs from 'node:fs';
 
 import {
     DossierAbortedError, DossierCollectionChanged, DossierIdentityBlocked, DossierStaleError, DossierVersionConflict, DossierWriteRejected,
-    DossierWriteInFlight, acceptVerifiedAndApply, acquireDossierGroup, applyDossierDocument, buildDossierInventory, evaluateDraftGroupIdentity, loadPatientDossier,
+    DossierWriteInFlight, acceptVerifiedAndApply, acquireDossierGroup, applyDossierDocument, buildDossierInventory, dossierGroupDestination, evaluateDraftGroupIdentity, loadPatientDossier,
     retryDossierExtraction, saveDossierReview,
     type DossierAcquireOutcome, type DossierAttachmentMeta, type DossierInputFile, type DossierPatient, type DossierPorts, type DossierRecordTable,
 } from './document-dossier-session';
@@ -155,6 +156,26 @@ test('homonymous patients: the document code selects B; linking to A is refused 
     const outcomes = await acquireDossierGroup(ports, { group, patientId: 'pb', confirmed: true, ...live });
     assert.deepEqual(outcomes.map((item) => [item.status, 'verified' in item && item.verified]), [['stored', true]]);
     assert.deepEqual([...attachments.values()].map((item) => item.meta.patientId), ['pb']);
+});
+
+test('the destination follows a schede list that arrives after the folder was read; an explicit choice wins', async () => {
+    const ciTaxCode = 'RSSMRA67A28Z410I';
+    const { files, ports } = setup([['Lotto/Scheda-1/referto.pdf', labText(ciTaxCode)]]);
+    const [group] = await buildDossierInventory(ports, files, live);
+    const holder: DossierPatient = { id: 'pc', firstName: 'Mario', lastName: 'Rossi', taxCode: ciTaxCode, version: 1, diagnoses: [], exemptions: [] };
+    assert.equal(dossierGroupDestination(group, [], undefined), '');
+    assert.equal(dossierGroupDestination(group, [...patientsFixture(), holder], undefined), 'pc');
+    assert.equal(dossierGroupDestination(group, [...patientsFixture(), holder], ''), '');
+    assert.equal(dossierGroupDestination(group, [...patientsFixture(), holder], 'pa'), 'pa');
+    assert.equal(dossierGroupDestination(group, patientsFixture(), undefined), '');
+});
+
+test('the Dossier import panel derives the destination from the current schede list and pins it on confirmation', () => {
+    const panel = fs.readFileSync(new URL('../components/dossier-import-panel.tsx', import.meta.url), 'utf8');
+    assert.match(panel, /const linked = dossierGroupDestination\(group, patients, links\[group\.key\]\);/);
+    assert.match(panel, /setLinks\(\(current\) => \(\{ \.\.\.current, \[group\.key\]: linked \}\)\);\s*setConfirmations\(\(current\) => \(\{ \.\.\.current, \[group\.key\]: checked \}\)\);/);
+    assert.match(panel, /void acquire\(effectiveGroup, linked\)/);
+    assert.doesNotMatch(panel, /setLinks\(suggestions\)/);
 });
 
 test('mixed group (two patient codes) is blocked as a whole', async () => {
