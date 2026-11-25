@@ -364,6 +364,76 @@ test('WUL-929: right name in an unexpected unit, an exam awaiting validation and
         ['Acido urico', 'Azotemia', 'LDH', 'Ferritina sierica', 'Ca', 'FT4', 'Calcio', 'Calcio totale']);
 });
 
+test('WUL-929: units as printed on Italian reports are table data; the code, value and UCUM unit come from the table, nothing is converted', () => {
+    const table = readLoincLabTable();
+    const exams = [
+        ['Vitamina D 25-OH', '45', 'nmol/L', '50-125', 'nmol/L'],
+        ['Vitamina B12', '350', 'pmol/l', '150-650', 'pmol/L'],
+        ['Folati', '20,5', 'nmol/L', '7-45', 'nmol/L'],
+        ['INR', '1,10', '', '0,80-1,20', '{INR}'],
+        ['PT INR', '2,5', 'INR', '2,0-3,0', '{INR}'],
+        ['Tempo di protrombina', '12,1', 'sec', '9,5-13,5', 's'],
+        ['aPTT', '30', 's', '25-35', 's'],
+        ['aPTT ratio', '1,05', '', '0,80-1,20', '{ratio}'],
+        ['PTT ratio', '1,1', 'ratio', '0,8-1,2', '{ratio}'],
+        ['Rapporto albumina/creatinina', '12', 'mg/g', '0-30', 'mg/g{creat}'],
+        ['Anticorpi anti-TPO', '12', 'UI/mL', '0-34', '[IU]/mL'],
+        ['pH urine', '6,0', '', '5,0-8,0', '[pH]'],
+    ] as const;
+    const text = ['Referto di laboratorio sintetico', ...exams.map(([name, value, unit, range]) => [name, value, unit, range].filter(Boolean).join(' '))].join('\n');
+    const observations = candidates(text, '2026-11-20').filter((fact) => fact.kind === 'observation');
+    assert.deepEqual(observations.map((fact) => [fact.values.display, fact.values.code, fact.values.value, fact.values.unit, fact.values.unitCode]),
+        exams.map(([name, value, unit, , ucum]) => [name, loincLabTableCode(table, name, ucum), value.replace(',', '.'), unit, ucum]));
+    assert.deepEqual(observations.map((fact) => dossierFactBlockers(fact)), exams.map(() => []));
+});
+
+test('WUL-929: a spelling the table does not list, a missing unit, a non-numeric value and a name awaiting validation stay without code', () => {
+    const lines = [
+        'Vitamina D 25-OH 45 NMOL/L 50-125',
+        'Vitamina B12 350 pmol/mL 150-650',
+        'Anticorpi anti-TPO 12 U/mL 0-34',
+        'Anticorpi anti-TPO 12 kUI/L 0-34',
+        'Tempo di protrombina 12,1 S 9,5-13,5',
+        'Tempo di protrombina 12,1 secondi 9,5-13,5',
+        'Vitamina D 25-OH 45 50-125',
+        'Tempo di protrombina 12,1 9,5-13,5',
+        'aPTT 1,05 0,80-1,20',
+        'aPTT 30 25-35',
+        'Glicemia 95 70-110',
+        'Peso specifico urine 1020 1005-1030',
+        'Peso specifico urine 1,020 1,005-1,030',
+        'ACR (mg/mmol) 2,5 mg/mmol 0-3',
+        'INR <1,0 0,8-1,2',
+        'INR 1,1,2 0,8-1,2',
+        'Calcio totale 2,3 mmol/L 2,1-2,6',
+        'FT4 15 pmol/L 10-22',
+        'FT3 5 pmol/l 3,1-6,8',
+        'eGFR 80 60-120',
+        'HbA1c 40 20-42',
+        'Nitriti 0 0-0',
+    ];
+    const observations = candidates(lines.join('\n')).filter((fact) => fact.kind === 'observation');
+    assert.deepEqual(observations.filter((fact) => fact.values.code || fact.values.unitCode).map((fact) => fact.evidence?.excerpt), []);
+    assert.deepEqual(observations.map((fact) => fact.evidence?.excerpt), [
+        'Vitamina D 25-OH 45 NMOL/L 50-125', 'Tempo di protrombina 12,1 S 9,5-13,5', 'Calcio totale 2,3 mmol/L 2,1-2,6', 'FT4 15 pmol/L 10-22', 'FT3 5 pmol/l 3,1-6,8',
+    ], 'a missing unit is read only where the table declares it, so the other rows stay in the diary as on main');
+});
+
+test('WUL-929: reported units never widen the prepared path or the pending names', async () => {
+    const { REPORT_UNITS, catalogObservationCode, reportedObservationCode } = await import('./dossier-sections');
+    const { loincObservationNames } = await import('../../terminology');
+    for (const [name, unit] of [['INR', ''], ['Anticorpi anti-TPO', 'UI/mL'], ['Tempo di protrombina', 'sec'], ['Vitamina B12', 'pmol/l'], ['pH urine', '']] as const) {
+        assert.equal(catalogObservationCode(name, unit, '1'), null, `${name} «${unit}» on the prepared path`);
+        assert.ok(reportedObservationCode(name, unit, '1'), `${name} «${unit}» on a report`);
+        for (const value of ['negativo', '<1', '1,1,2', '', 'tracce']) assert.equal(reportedObservationCode(name, unit, value), null, `${name} ${value}`);
+    }
+    const spellings = ['', ...REPORT_UNITS.spellings, ...new Set(loincObservationNames().map((entry) => entry.unit))];
+    for (const { name } of loincObservationNames().filter((entry) => !entry.active)) {
+        for (const unit of spellings) assert.equal(reportedObservationCode(name, unit, '1'), null, `${name} «${unit}»`);
+        assert.equal(REPORT_UNITS.acceptsMissingUnit(name), false, name);
+    }
+});
+
 test('residual text is everything no proposal covers, per unit', async () => {
     const { dossierResidualSegments } = await import('./dossier-import');
     const text = 'Terapia: Ramipril 5 mg\n\nNota libera senza struttura.';
