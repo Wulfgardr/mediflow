@@ -10,7 +10,7 @@ export const REPORT_WITHOUT_UNIT = 'nessuna';
 
 const COLUMNS = [
     'nome_it', 'sinonimi_it', 'loinc', 'loinc_long_name', 'componente', 'proprieta', 'sistema', 'scala', 'metodo',
-    'unita_ucum', 'unita_alternative', 'unita_referto', 'fonte_url', 'verifica', 'ambiguita', 'stato',
+    'unita_ucum', 'altre_unita_ucum', 'unita_alternative', 'unita_referto', 'fonte_url', 'verifica', 'ambiguita', 'stato',
 ] as const;
 type Column = typeof COLUMNS[number];
 const STATUSES: readonly LoincLabStatus[] = ['attivo', 'in_attesa_di_validazione'];
@@ -72,9 +72,21 @@ export function parseLoincLabTable(text: string): LoincLabRow[] {
         const longCommonName = cell('loinc_long_name');
         if (!nameIt || !longCommonName) throw new Error(`Riga ${line}: nome italiano e Long Common Name sono obbligatori`);
         const synonyms = cell('sinonimi_it').split('|').map((synonym) => synonym.trim()).filter(Boolean);
+        const additionalUnits = parseAdditionalUnits(cell('altre_unita_ucum'), unit, line);
         const reportUnits = parseReportUnits(cell('unita_referto'), unit, line);
-        return { code, longCommonName, nameIt, synonyms, unit, reportUnits, status };
+        return { code, longCommonName, nameIt, synonyms, unit, additionalUnits, reportUnits, status };
     });
+}
+
+function parseAdditionalUnits(text: string, unit: string, line: number): string[] {
+    const units = text.split('|').map((item) => item.trim()).filter(Boolean);
+    if (units.length && !unit) throw new Error(`Riga ${line}: altre unità UCUM per un esame senza unità UCUM`);
+    if (new Set(units).size !== units.length) throw new Error(`Riga ${line}: altra unità UCUM ripetuta`);
+    for (const item of units) {
+        if (/\s/u.test(item)) throw new Error(`Riga ${line}: altra unità UCUM «${item}» con spazi`);
+        if (item === unit) throw new Error(`Riga ${line}: altra unità UCUM «${item}» coincide con l'unità principale`);
+    }
+    return units;
 }
 
 function parseReportUnits(text: string, unit: string, line: number): string[] {
@@ -91,7 +103,7 @@ function parseReportUnits(text: string, unit: string, line: number): string[] {
 export function parseLoincLabUnits(text: string, rows: readonly LoincLabRow[]): LoincLabUnit[] {
     const [header, ...body] = parseCsv(text);
     if (JSON.stringify(header) !== JSON.stringify(UNIT_COLUMNS)) throw new Error(`Intestazione delle unità UCUM diversa da: ${UNIT_COLUMNS.join(',')}`);
-    const used = new Set(rows.map((row) => row.unit).filter(Boolean));
+    const used = new Set(rows.flatMap((row) => [row.unit, ...row.additionalUnits]).filter(Boolean));
     const seen = new Set<string>();
     return body.map((cells, index) => {
         const line = index + 2;
@@ -110,7 +122,7 @@ export function renderLoincLabModule(rows: readonly LoincLabRow[], units: readon
     const lines = (items: readonly object[]) => items.map((item) => `    ${JSON.stringify(item)},`);
     return [
         `export type LoincLabStatus = ${STATUSES.map((status) => `'${status}'`).join(' | ')};`,
-        'export interface LoincLabRow { code: string; longCommonName: string; nameIt: string; synonyms: string[]; unit: string; reportUnits: string[]; status: LoincLabStatus }',
+        'export interface LoincLabRow { code: string; longCommonName: string; nameIt: string; synonyms: string[]; unit: string; additionalUnits: string[]; reportUnits: string[]; status: LoincLabStatus }',
         'export interface LoincLabUnit { code: string; display: string; displayIt: string }',
         '',
         `export const LOINC_LAB_VERSION = '${LOINC_LAB_TABLE_VERSION}';`,
@@ -139,7 +151,7 @@ export function readLoincLabUnits(rows: readonly LoincLabRow[]): LoincLabUnit[] 
 }
 
 export function loincLabTableCode(rows: readonly LoincLabRow[], name: string, unit: string): string {
-    const matches = rows.filter((row) => row.unit === unit
+    const matches = rows.filter((row) => [row.unit, ...row.additionalUnits].includes(unit)
         && [row.nameIt, row.nameIt.replace(/\(.*\)/u, '').trim(), ...row.synonyms].includes(name));
     if (matches.length !== 1) throw new Error(`«${name}» in ${unit}: ${matches.length} righe nella tabella LOINC`);
     return matches[0].code;

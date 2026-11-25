@@ -163,7 +163,7 @@ test('Misure: chiusura e ripresa conservano bozza, select e data; invio usa il p
     expect(body).toMatchObject({ patientId: id, code: '2339-0', unitCode: 'mg/dL', value: 95.5, source: 'manual' });
     expect(body.id).toMatch(/^[0-9a-f-]{36}$/);
     await expect(register(page).getByRole('cell', { name: '95.5 mg/dL', exact: true })).toBeVisible();
-    await register(page).getByRole('button', { name: 'Glicemia', exact: true }).click();
+    await register(page).getByRole('button', { name: 'Glicemia su sangue intero', exact: true }).click();
     await expect(history(page)).toContainText('95.5');
     await expect(form.getByLabel('Valore', { exact: true })).toHaveValue('');
 });
