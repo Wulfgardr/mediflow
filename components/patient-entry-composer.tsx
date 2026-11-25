@@ -350,7 +350,6 @@ export function PatientEntryComposer({ embedded = false, sheetSource, focusRef }
         });
     };
 
-    /* WUL-420 */
     const insertReviewedDraft = () => {
         if (!dictatedDraft.trim() || !isDictatedDraftReviewed) return;
         appendReviewedText(dictatedDraft);
