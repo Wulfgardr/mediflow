@@ -43,7 +43,7 @@ export default function AmbulatoryManagerPage() {
     const [command, setCommand] = useState<WebAmbulatoryPlan | null>(null);
     // Keep hierarchy rendering linear even when the sede list grows.
     const ambulatoryById = useMemo(() => new Map(ambulatories.map((item) => [item.id, item])), [ambulatories]);
-    const actionsBlocked = isLoading || isCreating || isPreparing || isUpdating || Boolean(readError || actionError);
+    const actionsBlocked = isLoading || isCreating || isUpdating || Boolean(readError || actionError);
     const selectedParent = newParentId ? ambulatoryById.get(newParentId) : null;
 
     useEffect(() => {
@@ -96,6 +96,7 @@ export default function AmbulatoryManagerPage() {
     };
 
     const openCommand = async (operation: AmbulatoryDestructiveOperation, id: string) => {
+        if (isPreparing) return;
         const target = ambulatoryById.get(id);
         if (typeof target?.version !== 'number') {
             setActionError('Versione della sede non disponibile. Aggiorna la pagina e riprova.');
@@ -224,7 +225,7 @@ export default function AmbulatoryManagerPage() {
                 </div>
                 <div className={styles.actions}><button onClick={handleCreate} disabled={!newName || actionsBlocked} className={SETTINGS_PRIMARY_BUTTON_CLASS} data-settings-primary="true">{isCreating ? <Loader2 aria-hidden /> : <Plus aria-hidden />}Aggiungi</button></div>
             </section>
-            <section id="sedi" className={styles.section} aria-busy={isLoading}>
+            <section id="sedi" className={styles.section} aria-busy={isLoading || isPreparing}>
                 <h3 className={styles.heading}>Sedi configurate</h3>
                 <p className={styles.meta}>La sede predefinita viene usata per i nuovi dati quando non scegli un contesto diverso.</p>
                 {ambulatories.length > 0 ? <div role="tree" aria-label="Sedi configurate">{buildTree(ambulatories).map(root => renderAmbulatoryNode(root))}</div>

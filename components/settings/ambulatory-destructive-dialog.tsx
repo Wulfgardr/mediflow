@@ -71,7 +71,7 @@ export function AmbulatoryDestructiveDialog({ plan: initialPlan, onClose, onAppl
             {refreshed && <p role="status" className="text-sm font-semibold text-[color:var(--lume-ink)]">Controlla di nuovo i dati e conferma.</p>}
             <PlanSummary plan={plan} />
             <label className="mf-field-label grid gap-1">PIN di conferma
-                <input name="pin" type="password" autoComplete="off" required value={pin} autoFocus
+                <input name="pin" type="password" autoComplete="off" required value={pin}
                     minLength={SECURITY_CONFIG.PIN_MIN_LENGTH} maxLength={SECURITY_CONFIG.PIN_MAX_LENGTH + 1}
                     onChange={event => { setPin(event.target.value); setError(''); }} className="mf-input" aria-invalid={Boolean(error)} />
             </label>
