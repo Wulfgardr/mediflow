@@ -50,7 +50,7 @@ async function reopenForApplication(review: AgentVisitReview, signal: AbortSigna
     const items = await reopenReviewedAgentItems(review, row);
     signal.throwIfAborted();
     if (!items) throw new Error(notApplied);
-    return { ...review, appliedItemIds: row.appliedItemIds, discardedItemIds: row.discardedItemIds ?? [], visit: { ...review.visit, items } };
+    return { ...review, appliedItemIds: row.appliedItemIds, discardedItemIds: row.discardedItemIds ?? [], correctedItemIds: row.correctedItemIds ?? [], visit: { ...review.visit, items } };
 }
 async function apply(review: AgentVisitReview, signal: AbortSignal) {
     const input = await prepareAgentApplication(review, signal);
@@ -234,7 +234,8 @@ export async function decideAgentVisitItem(visitId: string, itemId: string, deci
             const patient = reopened.patient && receipt.patientVersion ? { ...reopened.patient, version: receipt.patientVersion } : reopened.patient;
             const updated: AgentVisitReview = { ...review, patient,
                 appliedItemIds: decision === 'discard' ? reopened.appliedItemIds : [...new Set([...reopened.appliedItemIds, itemId])],
-                discardedItemIds: decision === 'discard' ? [...new Set([...reopened.discardedItemIds, itemId])] : reopened.discardedItemIds };
+                discardedItemIds: decision === 'discard' ? [...new Set([...reopened.discardedItemIds, itemId])] : reopened.discardedItemIds,
+                correctedItemIds: decision === 'correct' ? [...new Set([...reopened.correctedItemIds, itemId])] : reopened.correctedItemIds };
             publish({ ...snapshot, visits: snapshot.visits.map(value => value === review ? updated : value) });
             decided = true;
         } catch (error) {

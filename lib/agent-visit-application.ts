@@ -63,6 +63,11 @@ export function agentAppliedItemIds(visitId: string): string[] {
 export function agentDiscardedItemIds(visitId: string): string[] {
     return itemEventIds('agent.item.discarded', visitId);
 }
+export function agentCorrectedItemIds(visitId: string): string[] {
+    return [...new Set(dbServer.select({ id: auditEvents.subjectRef, metadata: auditEvents.redactedMetadata }).from(auditEvents).where(and(eq(auditEvents.eventType, 'agent.item.applied'),
+        eq(auditEvents.requestId, visitId), eq(auditEvents.outcome, 'success'), eq(auditEvents.sourceSurface, 'agent'))).all()
+        .flatMap(row => row.id && row.metadata && (JSON.parse(row.metadata).flags ?? []).includes('corrected') ? [row.id] : []))];
+}
 function visitRecipients(visitId: string): string[] {
     return [...new Set(dbServer.select({ id: auditEvents.subjectRef }).from(auditEvents).where(and(eq(auditEvents.eventType, 'patient.updated'),
         eq(auditEvents.subjectType, 'patient'), eq(auditEvents.requestId, visitId), eq(auditEvents.outcome, 'success'))).all().flatMap(row => row.id ? [row.id] : []))];
