@@ -15,6 +15,7 @@ verifica dello stato successivo.
 ## Decisioni richiamate
 
 - L'[ADR 0203](0203-pacchetti-prestazioni-territoriali.md) propone il confine dei pacchetti di prestazioni per diagnosi nel modulo Lombardia (`lom`), con stati di approvazione nei tipi, fonti e catalogo regionale obbligatori e generazione pura rispetto allo storico senza scritture cliniche.
+- L'[ADR 0200](0200-web-standard-launcher-e-ritiro-app-desktop.md), in stato **Proposed** (Refs WUL-880), propone l'applicazione Web locale come unica superficie desktop su macOS, Windows e Linux, affiancata da launcher sottili per sistema e dalle app iOS/iPadOS, con ritiro ordinato di GPUI e della finestra Mac Swift.
 - L'[ADR 0199](0199-web-session-client-proof.md), accettato il 19/11/2026 per la 0.9.1, lega la sessione al documento Web o al client locale autenticato e richiede di aggiornare insieme server e GPUI.
 - L'[ADR 0198](0198-document-child-platform-boundary.md) propone il confine documentale di Web e Headless. Il 19 novembre 2026 Leonardo ha approvato l’isolamento di rete imposto dal sistema come requisito di consegna su Windows 11 ARM. L’ADR registra le prove su macOS ARM64, Omarchy ARM e Windows 11 ARM. La ricetta resta proposta durante l’integrazione.
 - L'[ADR 0195](0195-materiale-dell-agente-dopo-il-gesto-del-medico.md), accettato il 19/11/2026, fa entrare in cartella nota, trascrizione, PDF e proposte depositati da un client agente solo dopo il gesto del medico, sul Web o nella conferma nativa che li mostra per intero.
@@ -24,7 +25,7 @@ verifica dello stato successivo.
 
 - L'[ADR 0191](0191-conferma-da-chat-e-cassetta-senza-finestra.md), accettato il 18/11/2026, definisce la conferma da Codex tramite autenticazione macOS e il servizio facoltativo della cassetta con chiave in memoria fino a 8 ore.
 
-- [0190-mandato-agenti-e-cassetta-della-visita.md](./0190-mandato-agenti-e-cassetta-della-visita.md): mandato fino a 12 ore, deposito cifrato e applicazione condizionata della visita. Il runtime resta subordinato alla composizione atomica dei writer.
+- [0190-mandato-agenti-e-cassetta-della-visita.md](./0190-mandato-agenti-e-cassetta-della-visita.md): mandato fino a 24 ore, deposito cifrato e applicazione condizionata della visita. Il runtime resta subordinato alla composizione atomica dei writer.
 
 - [0183-autore-delle-voci-di-diario.md](./0183-autore-delle-voci-di-diario.md): autore assegnato dal server, schema 10 e contratto di lettura additivo.
 - [0184-prove-sul-comportamento-e-vincoli-sul-testo.md](./0184-prove-sul-comportamento-e-vincoli-sul-testo.md): prove sul comportamento e vincoli sul testo dei sorgenti ammessi solo per confini, contratti immutabili e verifica formale.
