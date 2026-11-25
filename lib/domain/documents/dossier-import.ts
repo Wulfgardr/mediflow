@@ -773,7 +773,7 @@ export function extractDossierCandidates(input: DossierCandidateInput): { facts:
             const line = lines[result.lineNumber - 1];
             const end = start + line.replace(/\r$/u, '').length;
             // Codice e unità solo da corrispondenza esatta col catalogo locale; altrimenti restano da inserire.
-            const coded = catalogObservationCode(result.analyte, result.unit);
+            const coded = catalogObservationCode(result.analyte, result.unit, result.value);
             const fromParagraph = rebuilt.has(start);
             const values: DossierFactValues = {
                 display: result.analyte, value: result.value, unit: result.unit, code: coded?.code ?? '', unitCode: coded?.unitCode ?? '',

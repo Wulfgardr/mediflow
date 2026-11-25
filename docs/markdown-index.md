@@ -191,6 +191,7 @@ contratti e nella valutazione competente del deployment.
 | --- | --- | --- |
 | [docs/COMPLIANCE.md](./COMPLIANCE.md) | Quadro compliance GDPR/FHIR e interoperabilità. | Per requisiti normativi e policy operative. |
 | [docs/MANUALE.md](./MANUALE.md) | Manuale utente medico. | Per supporto operativo lato clinico. |
+| [licenses/loinc/NOTICE.md](../licenses/loinc/NOTICE.md) | Attribuzione, versione (2.83) e provenienza della tabella LOINC degli esami di laboratorio. | Prima di aggiungere, promuovere o aggiornare righe di `assets/reference-data/loinc/esami-laboratorio-it.csv`. |
 
 ## 🧑‍💻 Evidenze tecniche e documentazione
 
