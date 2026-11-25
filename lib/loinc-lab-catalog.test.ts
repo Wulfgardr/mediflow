@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import { LOINC_LAB_TABLE, LOINC_LAB_UNITS, LOINC_LAB_VERSION } from './generated-loinc-lab-catalog';
-import { LOINC_PENDING_VALIDATION, formatMeasureValue, formatUnitForDisplay, loincObservationNames, loincReportedUnits, resolveStaticTerminology, searchStaticTerminology } from './terminology';
+import { LOINC_PENDING_VALIDATION, formatMeasureValue, formatUnitForDisplay, loincObservationNames, resolveStaticTerminology, searchStaticTerminology } from './terminology';
 import { validateObservationDocument } from './fse-validation';
 import { catalogObservationCode, reportedObservationCode } from './domain/documents/dossier-sections';
 import { observationSeriesKey } from './patient-quadro';
