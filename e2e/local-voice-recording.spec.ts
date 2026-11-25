@@ -258,12 +258,13 @@ test('il testo di un altro paziente o di un’altra prima visita non viene prepa
     await expect(page.getByTestId('local-voice-review')).toBeVisible();
 
     service().state.subjectOverride = `paziente:${second}`;
-    await page.reload();
+    await openUnlockedDocument(page, `/patients/${first}/modules?voce=nuova`, pin);
+    await expect(page.getByTestId('local-voice-foreign')).toContainText('C’è da rivedere la registrazione di un altro paziente.');
     await expect(page.getByTestId('local-voice-review')).toHaveCount(0);
     await expect(page.getByText('Buongiorno, come va la pressione')).toHaveCount(0);
     service().state.subjectOverride = null;
-    await page.getByTestId('local-voice-recorder').waitFor();
-    await page.goto(`/patients/${first}/modules?voce=nuova`);
+    await openUnlockedDocument(page, `/patients/${first}/modules?voce=nuova`, pin);
+    await expect(page.getByTestId('local-voice-review')).toBeVisible();
     await page.getByTestId('local-voice-recorder').getByRole('button', { name: 'Scarta' }).click();
     await page.getByRole('button', { name: 'Scarta', exact: true }).last().click();
     await expect.poll(() => service().state.session).toBeNull();
