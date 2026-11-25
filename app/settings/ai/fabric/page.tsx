@@ -114,7 +114,7 @@ function FabricProviderSection({ snapshot }: { snapshot: FabricStatusSnapshot })
 
 function TreatmentUnavailableSection() {
     return <section className={SETTINGS_CARD_CLASS} aria-labelledby="fabric-treatment-portable-title" data-testid="fabric-treatment-portable">
-        <h3 id="fabric-treatment-portable-title">Ragionamento terapeutico</h3>
+        <h3 id="fabric-treatment-portable-title" className="[font:var(--type-record-island)]">Ragionamento terapeutico</h3>
         <p>{TREATMENT_REASONING_UNAVAILABLE_LABEL}</p>
         <p>{TREATMENT_REASONING_UNAVAILABLE_REASON}</p>
     </section>;
@@ -154,7 +154,7 @@ export default function SettingsAiFabricPage() {
     }, []);
 
     return (
-        <section className="space-y-4" data-testid="settings-ai-fabric-section">
+        <section className="grid min-w-0 gap-[10px]" data-testid="settings-ai-fabric-section">
             <SettingsSectionIntro
                 title="Intelligence Fabric"
                 description="Distingui configurazione locale, collegamento account esterno e disponibilità delle funzioni. Collegare un account non ammette un provider."
@@ -181,17 +181,16 @@ export default function SettingsAiFabricPage() {
             {state.kind === 'unauthorized' ? <FabricErrorState unauthorized /> : null}
             {state.kind === 'error' ? <FabricErrorState /> : null}
 
-            <details className={SETTINGS_CARD_CLASS}>
-            <summary className={functionStyles.advancedSummary}>Dettagli tecnici: provider, connessioni e registro</summary>
-
-            {state.kind === 'ready' ? (
-                <div className="space-y-6">
-                    <FabricProviderSection snapshot={state.status} />
-                    <FabricVenueSection snapshot={state.observability} />
-                    <FabricEgressSection snapshot={state.status} />
-                    <FabricCapabilityRegistry snapshot={state.status} />
-                </div>
-            ) : null}
+            <details className={styles.fabricDetails}>
+                <summary className={functionStyles.advancedSummary}>Dettagli tecnici: provider, connessioni e registro</summary>
+                {state.kind === 'ready' ? (
+                    <div>
+                        <FabricProviderSection snapshot={state.status} />
+                        <FabricVenueSection snapshot={state.observability} />
+                        <FabricEgressSection snapshot={state.status} />
+                        <FabricCapabilityRegistry snapshot={state.status} />
+                    </div>
+                ) : null}
             </details>
         </section>
     );

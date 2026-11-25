@@ -1,13 +1,15 @@
 import { formatCountLabel } from '@/lib/format-count';
-import ink from '@/components/ink-secondary.module.css';
-import { useMemo } from 'react';
+import surface from '@/components/record-surface.module.css';
+import { useMemo, type ReactNode } from 'react';
 import {
+  CalendarCheck2,
+  CalendarClock,
+  CalendarX2,
   ChevronRight,
 } from 'lucide-react';
 
 import {
   ClinicalAgendaBridgePanel,
-  PillBadge,
   STATUS_FILTERS,
 } from '../cockpit-shared';
 import type {
@@ -19,10 +21,17 @@ import type {
   StatusFilter,
 } from '../cockpit-shared';
 import type { PillVariant } from '@/lib/patient-workspace';
-import { agendaFilterMatches } from '@/lib/ui-semantic-signal';
+import { agendaFilterMatches, resolveSemanticSignal, type SemanticSignal } from '@/lib/ui-semantic-signal';
 import { ViewState } from '@/components/ui/view-state';
-import styles from '../kree8-clinical-cockpit-foundation.module.css';
 import agendaStyles from './turno-area.module.css';
+
+const SIGNAL_PILL: Record<SemanticSignal, string> = {
+  neutral: surface.pillNeutral,
+  success: surface.pillSuccess,
+  warning: surface.pillWarning,
+  critical: surface.pillCritical,
+  plum: surface.pillProposal,
+};
 const AI_QUEUE: Kree8DecisionCard[] = [
   {
     title: 'Follow-up suggerito',
@@ -67,6 +76,7 @@ function TurnoArea({
   onSelectPatient,
   onOpenArea,
   onRetry,
+  commandTrigger,
 }: {
   filter: StatusFilter;
   setFilter: (filter: StatusFilter) => void;
@@ -77,6 +87,7 @@ function TurnoArea({
   onSelectPatient: (patientId: string) => void;
   onOpenArea: (area: AreaId) => void;
   onRetry: () => void;
+  commandTrigger?: ReactNode;
 }) {
   const visibleAgenda = useMemo(() => agendaState.rows.filter(
     (row) => agendaFilterMatches(filter, row.filterCategory),
@@ -135,56 +146,72 @@ function TurnoArea({
     onOpenArea(card.target);
   };
 
+  const showBridge = agendaBridge.status !== 'ready' || Boolean(agendaBridge.data?.enabled);
+
   return (
-    <div className={`${styles.areaShell} ${ink.surface} ${agendaStyles.agenda}`} data-testid="agenda-area">
-      <header className={styles.areaHeader}>
-        <div>
-          <h1 className={styles.areaTitle}>Agenda<span aria-hidden="true">.</span></h1>
-          <p className={styles.areaSubtitle}>
+    <div className={`${surface.page} ${agendaStyles.agenda}`} data-record-page data-testid="agenda-area">
+      <header className={surface.pageHeader}>
+        <div className={surface.pageHeading}>
+          <h1 className={surface.pageTitle}>Agenda</h1>
+          <p className={surface.pageMeta}>
             {hasSnapshot ? formatCountLabel(todayVisitCount, 'appuntamento oggi', 'appuntamenti oggi') : '…'}
             {patientState.status === 'ready' ? ` · ${formatCountLabel(patientState.patients.length, 'paziente in carico', 'pazienti in carico')}` : ''}
           </p>
         </div>
-      </header>
-      <div className={agendaStyles.filters} aria-label="Filtri agenda">{STATUS_FILTERS.map(item => <button key={item.id} type="button" aria-pressed={filter === item.id} onClick={() => setFilter(item.id)}>{item.label}</button>)}</div>
-      <section aria-labelledby={AGENDA_HEADING_ID} aria-busy={pending}>
-        <div className={agendaStyles.sectionHeader}>
-          <h2 id={AGENDA_HEADING_ID} tabIndex={-1} className={agendaStyles.agendaTitle}>Appuntamenti</h2>
-          {!isReview && agendaState.canRefresh && agendaState.status !== 'error' && <button type="button" className="mf-button-text" disabled={pending} onClick={onRetry}>Aggiorna</button>}
+        <div className={surface.pageActions}>
+          {!isReview && agendaState.canRefresh && agendaState.status !== 'error' && <button type="button" className="mf-button-secondary" disabled={pending} onClick={onRetry}>Aggiorna</button>}
+          {commandTrigger}
         </div>
-        {pending && <ViewState state="loading" title="Caricamento appuntamenti…"
-          detail={hasSnapshot ? 'Aggiornamento dell’agenda in corso. Sono mostrati gli ultimi appuntamenti letti.' : undefined} />}
-        {agendaState.status === 'error' && <ViewState state="error" title="Agenda non disponibile."
-          detail={[hasSnapshot ? 'Impossibile aggiornare l’agenda. Sono mostrati gli ultimi appuntamenti letti.' : '',
-            agendaState.patientsUnavailable ? 'Impossibile aggiornare i dati dei pazienti per l’agenda.' : ''].filter(Boolean).join(' ') || undefined}
-          action={{ label: 'Riprova', onClick: onRetry }} />}
-        {groups.map((group) => (
-          <section key={group.title} className={agendaStyles.group} aria-label={group.title}>
-            <h3>{group.title} <span>{group.rows.length}</span></h3>
-            <div className={agendaStyles.columns} aria-hidden="true"><span>Ora</span><span>Paziente e controllo</span><span>Stato</span></div>
-            {group.rows.map((row) => (
-              <div key={row.id} className={agendaStyles.row}>
-                <span className={agendaStyles.time}>{row.time}</span>
-                <span className={agendaStyles.subject}><strong>{row.title}</strong><span>{row.sub}</span></span>
-                <PillBadge variant={row.pill as PillVariant}>{row.pillLabel}</PillBadge>
+      </header>
+      <div className={surface.segmented} role="group" aria-label="Filtri agenda">{STATUS_FILTERS.map(item => <button key={item.id} type="button" aria-pressed={filter === item.id} onClick={() => setFilter(item.id)}>{item.label}</button>)}</div>
+      <div className={agendaStyles.trays}>
+        <section className={surface.tray} data-record-tray="appuntamenti" aria-labelledby={AGENDA_HEADING_ID} aria-busy={pending}>
+          <h2 id={AGENDA_HEADING_ID} tabIndex={-1} className={surface.zoneTitle}>Appuntamenti</h2>
+          {showBridge ? <div className={`${surface.islandProposal} ${agendaStyles.bridge}`}><ClinicalAgendaBridgePanel bridge={agendaBridge} /></div> : null}
+          {pending && <ViewState state="loading" title="Caricamento appuntamenti…"
+            detail={hasSnapshot ? 'Aggiornamento dell’agenda in corso. Sono mostrati gli ultimi appuntamenti letti.' : undefined} />}
+          {agendaState.status === 'error' && <ViewState state="error" title="Agenda non disponibile."
+            detail={[hasSnapshot ? 'Impossibile aggiornare l’agenda. Sono mostrati gli ultimi appuntamenti letti.' : '',
+              agendaState.patientsUnavailable ? 'Impossibile aggiornare i dati dei pazienti per l’agenda.' : ''].filter(Boolean).join(' ') || undefined}
+            action={{ label: 'Riprova', onClick: onRetry }} />}
+          {groups.map((group) => (
+            <section key={group.title} className={surface.island} aria-label={group.title}>
+              <div className={surface.islandHeader}>
+                <span className={surface.islandIcon} aria-hidden="true">{group.title === 'Scaduti' ? <CalendarX2 size={15} /> : group.title === 'Oggi' ? <CalendarCheck2 size={15} /> : <CalendarClock size={15} />}</span>
+                <h3>{group.title} <span>{group.rows.length}</span></h3>
               </div>
-            ))}
-          </section>
-        ))}
-        {agendaState.status === 'ready' && visibleAgenda.length === 0 && <ViewState state="empty"
-          title={filter === 'all' ? 'Nessun appuntamento in agenda.' : 'Nessun appuntamento con questo filtro.'} />}
-      </section>
-      <section className={agendaStyles.external}><ClinicalAgendaBridgePanel bridge={agendaBridge} /></section>
-      <section className={agendaStyles.actions} aria-label={isReview ? 'Documenti da revisionare' : 'Da fare oggi'}>
-        <h2>{isReview ? 'Documenti da revisionare' : 'Da fare oggi'}</h2>
-        {decisionCards.map((card) => <div key={card.title} className={agendaStyles.actionRow}>
-          <div><strong>{card.title}</strong><p>{card.body}</p></div>
-          <PillBadge variant={card.pillVariant}>{card.pill}</PillBadge>
-          <button type="button" className={styles.ghostBtnSm}
-            aria-controls={card.target === 'turno' ? AGENDA_HEADING_ID : undefined}
-            onClick={() => runDecisionAction(card)}>{card.action}<ChevronRight size={13} /></button>
-        </div>)}
-      </section>
+              <ul className={agendaStyles.rows}>
+                {group.rows.map((row) => (
+                  <li key={row.id} className={agendaStyles.row}>
+                    <span className={agendaStyles.time}>{row.time}</span>
+                    <span className={agendaStyles.subject}><strong>{row.title}</strong><span>{row.sub}</span></span>
+                    <span className={SIGNAL_PILL[resolveSemanticSignal(row.pill as PillVariant)]}>{row.pillLabel}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
+          {agendaState.status === 'ready' && visibleAgenda.length === 0 && <ViewState state="empty"
+            title={filter === 'all' ? 'Nessun appuntamento in agenda.' : 'Nessun appuntamento con questo filtro.'} />}
+        </section>
+        <section className={surface.tray} data-record-tray="da-fare" aria-labelledby="turno-da-fare-heading">
+          <h2 id="turno-da-fare-heading" className={surface.zoneTitle}>{isReview ? 'Documenti da revisionare' : 'Da fare oggi'}</h2>
+          <div className={surface.island}>
+            <ul className={agendaStyles.actions}>
+              {decisionCards.map((card) => <li key={card.title} className={agendaStyles.actionRow}>
+                <div className={agendaStyles.actionText}>
+                  <strong>{card.title}</strong>
+                  <span className={SIGNAL_PILL[resolveSemanticSignal(card.pillVariant)]}>{card.pill}</span>
+                  <p>{card.body}</p>
+                </div>
+                <button type="button" className={agendaStyles.actionLink}
+                  aria-controls={card.target === 'turno' ? AGENDA_HEADING_ID : undefined}
+                  onClick={() => runDecisionAction(card)}>{card.action}<ChevronRight size={14} aria-hidden="true" /></button>
+              </li>)}
+            </ul>
+          </div>
+        </section>
+      </div>
     </div>
   );
 }

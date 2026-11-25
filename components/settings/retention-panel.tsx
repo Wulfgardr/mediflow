@@ -129,9 +129,18 @@ export function RetentionPanel() {
 
     const fail = (code: string) => showToast({ tone: 'error', title: ERROR_COPY[code] ?? 'Operazione non riuscita.' });
 
-    if (loadFailed) return <ViewState state="error" title="Conservazione non disponibile." action={{ label: 'Riprova', onClick: () => void load() }} />;
-    if (!overview) return <ViewState state="loading" title="Caricamento della conservazione" />;
-    if (overview.status !== 'ready') return <ViewState state="error" title="Lo stato della conservazione non è leggibile: nessun fascicolo viene proposto per lo scarto." />;
+    if (loadFailed || !overview || overview.status !== 'ready') {
+        return (
+            <section className={styles.page} data-testid="settings-retention-section">
+                <header className={styles.intro}><h2>Conservazione</h2></header>
+                <div className={styles.section}>
+                    {loadFailed ? <ViewState state="error" title="Conservazione non disponibile." action={{ label: 'Riprova', onClick: () => void load() }} />
+                        : !overview ? <ViewState state="loading" title="Caricamento della conservazione" />
+                            : <ViewState state="error" title="Lo stato della conservazione non è leggibile: nessun fascicolo viene proposto per lo scarto." />}
+                </div>
+            </section>
+        );
+    }
 
     const profile = RETENTION_PROFILES[overview.profileId];
     const usedSources = [...new Set(RETENTION_CATEGORIES.map(category => profile.terms[category].sourceId).filter((id): id is RetentionSourceId => id !== null))];

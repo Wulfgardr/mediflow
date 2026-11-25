@@ -124,7 +124,7 @@ async function readGlobalWindow(page: Page): Promise<Array<{ date: string }>> {
 async function diarySignatures(entries: Locator): Promise<string[]> {
   const signatures: string[] = [];
   const sample = await entries.evaluateAll(elements => elements.map(element => ({
-    label: element.getAttribute('aria-labelledby'), title: element.querySelector('h3')?.textContent,
+    label: element.getAttribute('aria-labelledby'), title: element.querySelector('h4')?.textContent,
     active: element.getAttribute('data-active'),
   })));
   const activeIndex = sample.findIndex(row => row.active === 'true');
@@ -139,7 +139,7 @@ async function diarySignatures(entries: Locator): Promise<string[]> {
         await expect(link).toHaveAttribute('href', /\/entries\/new$/);
         signatures.push(JSON.stringify([
           await link.getAttribute('href'),
-          await entry.locator('h3').textContent(),
+          await entry.locator('h4').textContent(),
         ]));
       } finally {
         await entry.page().keyboard.press('Escape');
@@ -152,7 +152,7 @@ async function diarySignatures(entries: Locator): Promise<string[]> {
       await entries.nth(activeIndex).focus();
       await expect.poll(async () => {
         const rows = await entries.evaluateAll(elements => elements.map(element => ({
-          label: element.getAttribute('aria-labelledby'), title: element.querySelector('h3')?.textContent,
+          label: element.getAttribute('aria-labelledby'), title: element.querySelector('h4')?.textContent,
           active: element.getAttribute('data-active'), background: getComputedStyle(element).backgroundColor,
         })));
         if (!rows.length || rows.length !== sample.length

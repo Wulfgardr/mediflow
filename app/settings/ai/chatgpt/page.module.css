@@ -1,7 +1,7 @@
 /* page-local geometry; the shared shell, tokens and palette stay intact. */
 .page {
     display: grid;
-    gap: 1.5rem;
+    gap: 10px;
     min-width: 0;
     color: var(--lume-ink, CanvasText);
     font-family: var(--lume-font-sans, system-ui, sans-serif);
@@ -10,7 +10,7 @@
     overflow-wrap: anywhere;
 }
 .page p { margin: 0; }
-.header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; }
+.header { padding: 6px 6px 2px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; }
 .identity { display: flex; align-items: center; gap: .75rem; min-width: 0; }
 .identity > div { min-width: 0; }
 :global(html[data-runtime-twin-design='proposal']) .identity > div > p:first-child { display: block; }
@@ -29,3 +29,12 @@
 .page .returnLink:focus-visible { outline: 2px solid var(--lume-accent, Highlight); outline-offset: 3px; }
 @media (max-width: 560px) { .page .returnLink { width: 100%; } }
 @media (prefers-reduced-motion: reduce) { .page .returnLink { transition: none; } }
+
+.account { composes: settingSurface from "../../../../components/settings/settings-lume.module.css"; }
+.account :is(h2, h3) :global(button[data-disclosure-control]) { font: var(--type-record-island); }
+.page .accountBody > :global(section[data-testid='chatgpt-account-panel']) {
+    padding: 12px 0 0;
+    border: 0;
+    border-top: 1px solid var(--lume-record-island-rule);
+    border-radius: 0;
+}

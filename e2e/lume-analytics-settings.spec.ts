@@ -245,19 +245,27 @@ async function verifySettings(page: Page, viewCase: ViewCase): Promise<void> {
   const networkAction = page.getByTestId('settings-network-mode-action');
   expect((await networkAction.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(viewCase.viewport === 'narrow' ? 44 : 40);
   await expect(networkAction).toBeEnabled();
-  await expect(networkValue).toHaveText('Stato Locale', { useInnerText: true });
+  await expect(networkValue).toHaveText('Modalità operativa Locale', { useInnerText: true });
   await networkAction.click();
-  await expect(networkValue).toHaveText('Stato Home-base', { useInnerText: true });
+  await expect(networkValue).toHaveText('Modalità operativa Home-base', { useInnerText: true });
   await expect(networkAction).toHaveText('Disattiva home-base');
   await networkAction.click();
-  await expect(networkValue).toHaveText('Stato Locale', { useInnerText: true });
+  await expect(networkValue).toHaveText('Modalità operativa Locale', { useInnerText: true });
 
+  const resolveColor = (variable: string) => page.evaluate((name) => {
+    const probe = document.createElement('span');
+    probe.style.color = `var(${name})`;
+    document.body.appendChild(probe);
+    const value = getComputedStyle(probe).color;
+    probe.remove();
+    return value;
+  }, variable);
   const preview = page.getByTestId('settings-preview-section');
-  await expect(preview).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await expect(preview).toHaveCSS('background-color', await resolveColor('--lume-record-island'));
   const oppositeTheme = viewCase.register === 'grafite' ? 'Chiaro' : 'Scuro';
   await page.getByRole('button', { name: `Tema ${oppositeTheme}` }).click();
   await expect(page.locator('html')).toHaveClass(viewCase.register === 'grafite' ? /light/ : /dark/);
-  await expect(preview).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await expect(preview).toHaveCSS('background-color', await resolveColor('--lume-record-island'));
   const originalTheme = viewCase.register === 'grafite' ? 'Scuro' : 'Chiaro';
   await page.getByRole('button', { name: `Tema ${originalTheme}` }).click();
   await expect(page.locator('html')).toHaveClass(viewCase.register === 'grafite' ? /dark/ : /light/);

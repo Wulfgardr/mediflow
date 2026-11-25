@@ -423,7 +423,7 @@ export function Kree8WorkspaceShell({
   return (
     <RuntimeTwinFolderContext.Provider value={visibleFolder ?? null}>
     <div className={`${sectionRecipe.sections} ${folderMode ? twin.patientShell : `${styles.shell} ${isClinical ? styles.clinicalShell : ''} ${overviewMode ? styles.overviewShell : ''}`}`} ref={rootRef}>
-      <main className={`${layout.container} ${folderMode ? twin.patientCanvas : `${styles.canvas} ${isClinical ? styles.clinicalCanvas : ''}`}`} data-writing={writing} data-folder-section={visibleFolder} data-testid={isClinical ? 'lume-scheda-scroll' : undefined}>
+      <main className={`${layout.container} ${folderMode ? twin.patientCanvas : `${styles.canvas} ${isClinical ? styles.clinicalCanvas : ''}`}`} data-writing={writing} data-folder-section={visibleFolder} data-record-page={proposal ? '' : undefined} data-testid={isClinical ? 'lume-scheda-scroll' : undefined}>
         <header
           className={`${layout.plane} ${folderMode ? twin.patientHeader : `${styles.chrome} ${isClinical ? styles.clinicalChrome : ''}`}`}
           data-testid={isClinical ? 'lume-scheda-header' : undefined}
@@ -478,8 +478,8 @@ export function Kree8WorkspaceShell({
               </span>
               <div className={styles.heroText}>
                 {!proposal ? <p className={styles.eyebrow}>{eyebrow}</p> : null}
-                <h1 className={`${styles.title} type-page-title`}>
-                  <span className={styles.titleMain}>{title}</span><span aria-hidden="true">.</span>
+                <h1 className={proposal ? styles.title : `${styles.title} type-page-title`}>
+                  <span className={styles.titleMain}>{title}</span>{proposal ? null : <span aria-hidden="true">.</span>}
                 </h1>
                 {patientLabel ? (
                   <p className={styles.patientLabel} data-testid="lume-workspace-patient-label">

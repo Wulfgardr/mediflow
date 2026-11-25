@@ -446,7 +446,7 @@ test('D: due misure dello stesso codice in unità diverse restano distinte nella
     for (const reading of [grams, kilograms]) {
         const row = records.getByRole('table').first().getByRole('row').filter({ hasText: reading });
         await expect(row).toBeVisible();
-        await expect(row.getByRole('cell').last()).toHaveText('—');
+        await expect(row.getByRole('cell').last()).toHaveText('–');
     }
     await expect(records).not.toContainText(/68[.,]?600 kg|72 g\b/u);
 });

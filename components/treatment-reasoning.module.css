@@ -17,7 +17,7 @@
 .notice, .preparation { display: grid; gap: 12px; padding-block: 20px; border-block: 1px solid var(--lume-rule-strong); margin-block: 28px; }
 .notice a { color: var(--lume-ink-fresh); text-decoration: underline; text-underline-offset: 3px; }
 .field { display: grid; gap: 8px; max-width: 36rem; }
-.field select { width: 100%; min-width: 0; min-height: 44px; padding: 8px 12px; border: 1px solid var(--lume-rule-strong); border-radius: var(--lume-control-radius,10px); background: var(--lume-surface-focal); color: var(--lume-ink); font: var(--type-body); }
+.field select { width: 100%; min-width: 0; min-height: 44px; padding: 8px 12px; border: 1px solid var(--lume-ink-muted); border-radius: 10px; background: var(--lume-surface-focal); color: var(--lume-ink); font: var(--type-body); }
 .confirmation { display: flex; align-items: flex-start; gap: 12px; min-height: 44px; padding-block: 8px; max-width: 64ch; }
 .confirmation input { flex: none; margin-top: 4px; width: 16px; height: 16px; accent-color: var(--lume-ink-fresh); }
 .actionBar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 28px; padding-block: 16px; }
@@ -27,7 +27,7 @@
 .loading, .error, .signal { display: flex; align-items: flex-start; gap: 12px; }
 .loading { padding-block: 28px; color: var(--lume-ink-muted); }
 .error { color: var(--lume-signal-critical); padding-block: 16px; }
-.proposal { min-width: 0; margin-top: 28px; }
+.proposal { composes: islandProposal from './record-surface.module.css'; margin-top: 16px; }
 .proposalHeader { display: grid; gap: 8px; padding-block: 16px; border-block: 1px solid var(--lume-rule-strong); }
 .proposalHeader h5 { display: flex; align-items: center; gap: 8px; color: var(--lume-ink-pencil); }
 .recommendation { display: grid; gap: 12px; margin-top: 28px; }

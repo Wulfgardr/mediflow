@@ -3,7 +3,7 @@
 // WUL-297 Aspetto: moved from the monolithic settings page.
 
 import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
-import { ThemeToggle } from '@/components/theme-toggle';
+import { SettingsThemeControl } from '@/components/settings/settings-theme-control';
 import { useUIAccessibility } from '@/components/ui-accessibility-provider';
 import { usePrivacy } from '@/components/privacy-provider';
 import styles from '@/components/settings/account-pages.module.css';
@@ -34,7 +34,7 @@ export default function SettingsAppearancePage() {
             <div className={styles.section} data-testid="ui-accessibility-controls">
                 <h3 className={styles.heading}>Tema e movimento</h3>
                 <div className={styles.row}>
-                    <span><strong className={styles.strong}>Tema interfaccia</strong><span className={styles.copy}>Giorno, Grafite o il tema del sistema.</span></span><ThemeToggle />
+                    <strong className={styles.strong}>Tema interfaccia</strong><SettingsThemeControl />
                 </div>
                 <button type="button" onClick={() => setReduceMotion(!reduceMotion)} aria-pressed={reduceMotion} className={`${styles.row} ${styles.preference}`}>
                     <span><strong className={styles.strong}>Riduci movimento</strong><span className={styles.copy}>Riduce le transizioni durante il lavoro.</span></span>

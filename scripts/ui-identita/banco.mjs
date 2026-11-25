@@ -30,11 +30,12 @@ export async function request(route, { method = 'GET', headers = {}, body } = {}
   return { response, json };
 }
 export async function login() {
-  const bootstrap = await request('/api/auth/check');
+  const proof = { 'x-mediflow-local-client-instance': randomBytes(32).toString('hex') };
+  const bootstrap = await request('/api/auth/check', { headers: proof });
   const control = bootstrap.response.headers.getSetCookie().map(c => c.split(';')[0]).join('; ');
-  const result = await request('/api/auth/login', { method: 'POST', headers: { Cookie: control, 'If-Match': bootstrap.response.headers.get('etag'), 'Idempotency-Key': randomUUID() }, body: { username: 'performance-baseline', password: '314159' } });
+  const result = await request('/api/auth/login', { method: 'POST', headers: { ...proof, Cookie: control, 'If-Match': bootstrap.response.headers.get('etag'), 'Idempotency-Key': randomUUID() }, body: { username: 'performance-baseline', password: '314159' } });
   const session = result.response.headers.getSetCookie().map(c => c.split(';')[0]).join('; ');
-  return { ...result, cookie: `${control}; ${session}; ambulatory_id=performance-baseline-ambulatory` };
+  return { ...result, proof, cookie: `${control}; ${session}; ambulatory_id=performance-baseline-ambulatory` };
 }
 function spawnOwned(args, env, log) {
   const fd = fs.openSync(`${data}/${log}`, 'a');
@@ -108,7 +109,7 @@ async function seedReference() {
   const wrapped = Buffer.from(auth.json.encryptedMasterKey.slice(3), 'base64');
   const raw = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: wrapped.subarray(0, 12) }, kek, wrapped.subarray(12));
   const key = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt']);
-  const headers = { Cookie: auth.cookie, Origin: httpURL, 'Sec-Fetch-Site': 'same-origin', 'x-mediflow-archive-generation': auth.json.archiveGeneration };
+  const headers = { ...auth.proof, Cookie: auth.cookie, Origin: httpURL, 'Sec-Fetch-Site': 'same-origin', 'x-mediflow-archive-generation': auth.json.archiveGeneration };
   const { syntheticTaxCode } = await import('../../lib/patient-identity.test-support.ts');
   const existing = (await request('/api/patients', { headers })).json;
   const patients = [];
@@ -147,7 +148,7 @@ async function pair(platform) {
   const confirmed = (await request(`/api/v1/network/pairing-intents/${intent.intentId}/confirm`, { method: 'POST', headers })).json;
   const auth = await login();
   const reference = JSON.parse(fs.readFileSync(`${data}/reference.json`));
-  const paired = { Cookie: auth.cookie, 'x-mediflow-paired-client-id': confirmed.pairedClient.clientId, 'x-mediflow-paired-client-token': confirmed.pairedClientToken, 'x-mediflow-expected-ambulatory-id': 'performance-baseline-ambulatory' };
+  const paired = { ...auth.proof, Cookie: auth.cookie, 'x-mediflow-paired-client-id': confirmed.pairedClient.clientId, 'x-mediflow-paired-client-token': confirmed.pairedClientToken, 'x-mediflow-expected-ambulatory-id': 'performance-baseline-ambulatory' };
   const detail = await request(`/api/v1/network/patients/${reference.referenceId}`, { headers: paired });
   const identity = (await request('/api/v1/network/identity', { headers: paired })).json;
   const tlsPin = createHash('sha256').update(new X509Certificate(fs.readFileSync(`${data}/local-api.crt`)).raw).digest('hex');

@@ -20,7 +20,7 @@ function Quota({ window, title }: { window: AccountLimitWindow | null; title: st
 function ObservationTime({ value }: { value: number }) {
     return <span>Ultima lettura: <time dateTime={new Date(value).toISOString()}>{new Date(value).toLocaleTimeString('it-IT')}</time>.</span>;
 }
-export function ChatGptAccountCard({ active }: { active: boolean }) {
+export function ChatGptAccountCard({ active, primary = true }: { active: boolean; primary?: boolean }) {
     const [client] = useState(() => createAccountBrowser());
     const [view, setView] = useState<AccountBrowserView>(client.snapshot);
     const id = useId();
@@ -45,6 +45,8 @@ export function ChatGptAccountCard({ active }: { active: boolean }) {
     const locked = presentation.locked;
     const status = locked ? null : view.status;
     const busy = view.busy !== null;
+    const officialLoginUrl = status?.state === 'awaiting_login' ? view.authUrl : null;
+    const connectActionClass = primary ? SETTINGS_PRIMARY_BUTTON_CLASS : SETTINGS_SECONDARY_BUTTON_CLASS;
     const allowed = (action: AccountAction) => !locked && (!view.error || ['cancel_login', 'logout'].includes(action)) && status?.actions.includes(action);
     const run = (operation: AccountOperation | 'status') => { void client.run(operation); };
     return <section id="chatgpt-account" className={`${SETTINGS_CARD_CLASS} ${styles.card}`} aria-labelledby={`${id}-title`} data-testid="chatgpt-account-panel">
@@ -73,9 +75,9 @@ export function ChatGptAccountCard({ active }: { active: boolean }) {
             {status?.state === 'awaiting_login' && <p>Completa l’accesso ufficiale sul computer che ospita MediFlow, poi torna qui. Se il link non è più visibile, annulla e avvia un nuovo accesso.</p>}
             {status?.state === 'verifying' && <p>Accesso ricevuto. Verifica il collegamento per completare.</p>}
             <div className={styles.actions}>
-                {allowed('connect') && <button type="button" className={SETTINGS_PRIMARY_BUTTON_CLASS} disabled={busy} onClick={() => run('login/start')}>Collega ChatGPT</button>}
-                {view.authUrl && status?.state === 'awaiting_login' && <a className={SETTINGS_PRIMARY_BUTTON_CLASS} href={view.authUrl} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">Apri accesso ufficiale</a>}
-                {allowed('complete_login') && <button type="button" className={SETTINGS_PRIMARY_BUTTON_CLASS} disabled={busy} onClick={() => run('login/complete')}>Verifica accesso</button>}
+                {allowed('connect') && <button type="button" className={connectActionClass} disabled={busy} onClick={() => run('login/start')}>Collega ChatGPT</button>}
+                {officialLoginUrl && <a className={connectActionClass} href={officialLoginUrl} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer">Apri accesso ufficiale</a>}
+                {allowed('complete_login') && <button type="button" className={officialLoginUrl ? SETTINGS_SECONDARY_BUTTON_CLASS : connectActionClass} disabled={busy} onClick={() => run('login/complete')}>Verifica accesso</button>}
                 {(allowed('cancel_login') || view.busy === 'login/start') && <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={view.busy === 'login/cancel'} onClick={() => run('login/cancel')}>Annulla accesso</button>}
                 {allowed('logout') && <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={view.busy === 'logout'} onClick={() => run('logout')}>Scollega ChatGPT</button>}
                 <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy} onClick={() => run('status')}>Rileggi stato</button>
