@@ -12,7 +12,8 @@
  */
 
 import { clinicalHeadingPattern, contextReview, familyHeadings, headingQualifiers, legacySectionFamily, legacySectionNegation, suspensionHeadings } from './clinical-context-lexicon';
-import { loincObservationNames } from '../../terminology';
+import { loincObservationNames, loincReportedUnits } from '../../terminology';
+import type { LabReportUnits } from './lab-report-parser';
 
 export type DossierSectionKind =
     | 'diagnosis' | 'anamnesis' | 'anamnesis_family' | 'medication' | 'services' | 'clinical_question' | 'prosthetic'
@@ -207,6 +208,33 @@ export function catalogObservationCode(analyte: string, unit: string, value: str
     if (!name || PENDING_NAMES.has(name) || !unitCode || !NUMERIC_VALUE.test(value.trim())) return null;
     const [only, ...others] = OBSERVATION_CODES.get(observationKey(analyte, unitCode)) ?? [];
     return only && others.length === 0 ? { code: only, unitCode } : null;
+}
+
+const REPORTED_UNITS = loincReportedUnits().map((entry) => ({ ...entry, name: normalizedName(entry.name) }));
+const ACTIVE_UNITS_BY_NAME = OBSERVATION_NAMES.filter((entry) => entry.active).reduce((index, entry) => {
+    const name = normalizedName(entry.name);
+    index.set(name, new Set([...(index.get(name) ?? []), entry.unit]));
+    return index;
+}, new Map<string, Set<string>>());
+
+function declaredUnit(name: string, printedUnit: string): string | null {
+    const declared = new Set(REPORTED_UNITS.filter((entry) => entry.name === name && entry.reported === printedUnit).map((entry) => entry.unit));
+    if (declared.size !== 1) return null;
+    const [unit] = declared;
+    if (printedUnit === '' && (ACTIVE_UNITS_BY_NAME.get(name)?.size ?? 0) !== 1) return null;
+    return unit;
+}
+
+export const REPORT_UNITS: LabReportUnits = {
+    spellings: [...new Set(REPORTED_UNITS.map((entry) => entry.reported).filter(Boolean))],
+    acceptsMissingUnit: (analyte) => declaredUnit(normalizedName(analyte), '') !== null,
+};
+
+export function reportedObservationCode(analyte: string, printedUnit: string, value: string): { code: string; unitCode: string } | null {
+    const name = normalizedName(analyte);
+    const declared = declaredUnit(name, printedUnit);
+    if (declared !== null) return catalogObservationCode(analyte, declared, value);
+    return REPORTED_UNITS.some((entry) => entry.name === name && entry.reported === printedUnit) ? null : catalogObservationCode(analyte, printedUnit, value);
 }
 
 export interface DossierIdentityProposal { field: 'taxCode' | 'firstName' | 'lastName' | 'birthDate'; value: string; excerpt: string }

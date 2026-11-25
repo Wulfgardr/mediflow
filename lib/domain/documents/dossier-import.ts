@@ -18,8 +18,8 @@ import type { DocumentDecisionClassification } from './document-decision';
 import { hasPhysicianTaxCodeStamp, isValidItalianTaxCodeChecksum, resolveDocumentTaxCodeRoles, whiteElectronicPrescriberEvidence } from './document-identity-resolution';
 import { parseItalianLabReport } from './lab-report-parser';
 import {
-    catalogObservationCode, findInvalidityMentions, findIsoCode, findPrescriptionReference, findPriority, findScaleMentions, invalidityDetails,
-    legacyQualifiersOf, parseMedicationItem, prostheticStatusOf, qualifiersOf, segmentDossierSections, splitSectionItems, type DossierSection,
+    REPORT_UNITS, findInvalidityMentions, findIsoCode, findPrescriptionReference, findPriority, findScaleMentions, invalidityDetails,
+    legacyQualifiersOf, parseMedicationItem, prostheticStatusOf, qualifiersOf, reportedObservationCode, segmentDossierSections, splitSectionItems, type DossierSection,
 } from './dossier-sections';
 import { clinicalDay, identityName, sameClinicalText, sameClinicalValue, sameDay, sameDosage, sameOptional, sameUnit } from './dossier-clinical-equality';
 import {
@@ -768,12 +768,12 @@ export function extractDossierCandidates(input: DossierCandidateInput): { facts:
         const offsets: number[] = [];
         let cursor = 0;
         for (const line of lines) { offsets.push(cursor); cursor += line.length + 1; }
-        for (const result of parseItalianLabReport(plain)) {
+        for (const result of parseItalianLabReport(plain, REPORT_UNITS)) {
             const start = offsets[result.lineNumber - 1];
             const line = lines[result.lineNumber - 1];
             const end = start + line.replace(/\r$/u, '').length;
             // Codice e unità solo da corrispondenza esatta col catalogo locale; altrimenti restano da inserire.
-            const coded = catalogObservationCode(result.analyte, result.unit, result.value);
+            const coded = reportedObservationCode(result.analyte, result.unit, result.value);
             const fromParagraph = rebuilt.has(start);
             const values: DossierFactValues = {
                 display: result.analyte, value: result.value, unit: result.unit, code: coded?.code ?? '', unitCode: coded?.unitCode ?? '',
