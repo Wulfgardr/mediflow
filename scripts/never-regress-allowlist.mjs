@@ -210,6 +210,21 @@ export const NEVER_REGRESS_ALLOWLIST = {
     ],
     externalUrls: [
         {
+            path: 'lib/territorial/lombardia/service-packages/diabetes-type2.ts',
+            pattern: "^const\\ ALLEGATO_8_URL\\ =\\ 'https://www\\.regione\\.lombardia\\.it/content/dam/rl/canali\\-tematici\\-servizi/01\\-sanita/07\\-ticket\\-ed\\-esenzioni/ticket\\-esenzioni\\-prerstazioni\\-ssr/allegati/allegato\\-8\\-elenco\\-malattie\\-condizioni\\-croniche\\-ed\\-invalidanti\\-30\\-10\\-2026\\.pdf';$",
+            reason: 'WUL-921: public source cited by a service package for the physician to open; never fetched by MediFlow.',
+        },
+        {
+            path: 'lib/territorial/lombardia/service-packages/diabetes-type2.ts',
+            pattern: "^const\\ NOMENCLATORE_URL\\ =\\ 'https://www\\.regione\\.lombardia\\.it/content/dam/rl/canali\\-tematici\\-servizi/01\\-sanita/07\\-ticket\\-ed\\-esenzioni/ticket\\-esenzioni\\-prerstazioni\\-ssr/allegati/Nomenclatore\\+tariffario\\+dal\\+1\\+ottobre\\+2025\\.xlsx';$",
+            reason: 'WUL-921: public source cited by a service package for the physician to open; never fetched by MediFlow.',
+        },
+        {
+            path: 'lib/territorial/lombardia/service-packages/diabetes-type2.ts',
+            pattern: "^const\\ SID_AMD_2018_URL\\ =\\ 'https://aemmedi\\.it/wp\\-content/uploads/2009/06/AMD\\-Standard\\-unico1\\.pdf';$",
+            reason: 'WUL-921: public source cited by a service package for the physician to open; never fetched by MediFlow.',
+        },
+        {
             path: 'lib/reference-data/icd11-embedded-parser.ts',
             pattern: "^export const WHO_CATALOG_URL = 'https://icdcdn\\.who\\.int/static/releasefiles/2026-01/SimpleTabulation-ICD-11-MMS-en\\.zip';$",
             reason: 'ADR 0115: fixed public WHO archive, explicit confirmed acquisition only, no redirects, credentials or clinical payload.',
