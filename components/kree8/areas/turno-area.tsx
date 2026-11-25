@@ -1,5 +1,6 @@
 import { formatCountLabel } from '@/lib/format-count';
 import surface from '@/components/record-surface.module.css';
+import { PageHeader } from '@/components/ui/page-header';
 import { useMemo, type ReactNode } from 'react';
 import {
   CalendarCheck2,
@@ -150,19 +151,17 @@ function TurnoArea({
 
   return (
     <div className={`${surface.page} ${agendaStyles.agenda}`} data-record-page data-testid="agenda-area">
-      <header className={surface.pageHeader}>
-        <div className={surface.pageHeading}>
-          <h1 className={surface.pageTitle}>Agenda</h1>
-          <p className={surface.pageMeta}>
-            {hasSnapshot ? formatCountLabel(todayVisitCount, 'appuntamento oggi', 'appuntamenti oggi') : '…'}
-            {patientState.status === 'ready' ? ` · ${formatCountLabel(patientState.patients.length, 'paziente in carico', 'pazienti in carico')}` : ''}
-          </p>
-        </div>
-        <div className={surface.pageActions}>
+      <PageHeader
+        title="Agenda"
+        meta={<>
+          {hasSnapshot ? formatCountLabel(todayVisitCount, 'appuntamento oggi', 'appuntamenti oggi') : '…'}
+          {patientState.status === 'ready' ? ` · ${formatCountLabel(patientState.patients.length, 'paziente in carico', 'pazienti in carico')}` : ''}
+        </>}
+        actions={<>
           {!isReview && agendaState.canRefresh && agendaState.status !== 'error' && <button type="button" className="mf-button-secondary" disabled={pending} onClick={onRetry}>Aggiorna</button>}
           {commandTrigger}
-        </div>
-      </header>
+        </>}
+      />
       <div className={surface.segmented} role="group" aria-label="Filtri agenda">{STATUS_FILTERS.map(item => <button key={item.id} type="button" aria-pressed={filter === item.id} onClick={() => setFilter(item.id)}>{item.label}</button>)}</div>
       <div className={agendaStyles.trays}>
         <section className={surface.tray} data-record-tray="appuntamenti" aria-labelledby={AGENDA_HEADING_ID} aria-busy={pending}>

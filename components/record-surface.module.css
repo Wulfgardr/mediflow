@@ -45,7 +45,10 @@
   gap: 8px;
 }
 
-.pageActions > :is(a, button) { min-height: 36px; }
+@media (min-width: 1001px) {
+  .page:has(> [data-page-frame]:first-child) { padding-top: 39px; }
+  .pageHeader > .pageActions { margin-top: -20px; }
+}
 
 .segmented {
   display: inline-flex;

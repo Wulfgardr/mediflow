@@ -1,6 +1,7 @@
 import { formatCountLabel as formatCatalogCount } from '@/lib/format-count';
 import { AifaCatalogQuickUpdate } from '@/components/settings/aifa-catalog-quick-update';
 import surface from '@/components/record-surface.module.css';
+import { PageHeader } from '@/components/ui/page-header';
 import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import {
@@ -188,19 +189,17 @@ function RepertoriArea({ isReview, commandTrigger }: { isReview: boolean; comman
   const freshnessTitle = needsImport ? 'Import repertori incompleto' : 'Repertori disponibili';
   return (
     <div className={`${surface.page} ${repertoriStyles.page}`} data-record-page>
-      <header className={surface.pageHeader}>
-        <div className={surface.pageHeading}>
-          <h1 className={surface.pageTitle}>Repertori</h1>
-          <p className={surface.pageMeta}>{isLoading ? 'Lettura locale…' : isError
+      <PageHeader
+        title="Repertori"
+        meta={isLoading ? 'Lettura locale…' : isError
             ? 'Impossibile leggere i conteggi locali in questa sessione.'
             : catalogState?.indexedCount == null ? 'Totale indicizzato incompleto'
-              : `${availableCatalogs} di ${formatCatalogCount(catalogs.length, 'catalogo disponibile', 'cataloghi disponibili')} · ${formatCatalogCount(catalogState.indexedCount, 'voce indicizzata', 'voci indicizzate')}`}</p>
-        </div>
-        <div className={surface.pageActions}>
-          <Link href="/settings/repertori" className={styles.ghostBtn}><Database size={14} aria-hidden="true" />Gestisci repertori</Link>
+              : `${availableCatalogs} di ${formatCatalogCount(catalogs.length, 'catalogo disponibile', 'cataloghi disponibili')} · ${formatCatalogCount(catalogState.indexedCount, 'voce indicizzata', 'voci indicizzate')}`}
+        actions={<>
+          <Link href="/settings/repertori" className="mf-button-secondary"><Database size={14} aria-hidden="true" />Gestisci repertori</Link>
           {commandTrigger}
-        </div>
-      </header>
+        </>}
+      />
       <section className={surface.tray} data-record-tray="repertori" aria-labelledby="repertori-zona">
         <h2 id="repertori-zona" className={surface.zoneTitle}>{isReady ? freshnessTitle : 'Cataloghi locali'}</h2>
         {isLoading && <ViewState state="loading" title="Caricamento repertori locali." />}
