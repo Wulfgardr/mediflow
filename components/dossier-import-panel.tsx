@@ -243,9 +243,16 @@ function ActiveDossierImport({ initialPatientId, entry }: { initialPatientId: st
         if (lastSelection.current) await readFiles(lastSelection.current, parsed.value);
     };
 
+    const retireNewPatientDossier = () => {
+        if (!newPatient) return;
+        setView(null);
+        setDossierPatientId('');
+    };
+
     const readFiles = async (files: DossierInputFile[], extraction: PreparedExtraction | null) => {
         lastSelection.current = files;
         const op = operation();
+        retireNewPatientDossier();
         setGroups([]); setOutcomes({}); setMeasured({}); setNotice(null); setConfirmations({}); setConfirmedUncertain({});
         setBusy(`Lettura locale di ${formatCountLabel(files.length, 'file', 'file')}…`);
         try {
@@ -272,6 +279,7 @@ function ActiveDossierImport({ initialPatientId, entry }: { initialPatientId: st
         operation();
         lastSelection.current = null;
         setGroups([]); setCreating(null); setOutcomes({}); setMeasured({}); setNotice(null); setConfirmations({}); setConfirmedUncertain({}); setLinks({});
+        retireNewPatientDossier();
         newPatient?.onActiveChange(false);
     };
 
