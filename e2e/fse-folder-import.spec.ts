@@ -106,7 +106,8 @@ test('WUL-949: la cartella del Fascicolo entra nell’import dalla scheda, si fe
         await expect(visit).toContainText('Data: 2025-06-02');
         await expect(group.getByLabel('Scheda di destinazione')).toHaveValue(patientId);
         expect(await attachmentCount(page, patientId)).toBe(0);
-        await page.screenshot({ path: path.join(evidence, '2-cartella-letta.png'), fullPage: true });
+        await page.screenshot({ path: path.join(evidence, '2-cartella-letta.png') });
+        await group.screenshot({ path: path.join(evidence, '2b-inventario.png') });
 
         await group.getByLabel('Ho controllato le fonti e confermo che appartengono alla scheda scelta.').check();
         await group.getByRole('button', { name: 'Salva 2 originali nella scheda', exact: true }).click();
@@ -117,8 +118,10 @@ test('WUL-949: la cartella del Fascicolo entra nell’import dalla scheda, si fe
         await expect(documents.nth(1).getByRole('heading', { level: 3 })).toContainText('2025-06-02 · Referto specialistico');
         expect(await attachmentCount(page, patientId)).toBe(2);
         expect(await clinicalRows(page, patientId)).toBe(0);
-        await page.screenshot({ path: path.join(evidence, '3-in-revisione.png'), fullPage: true });
+        await documents.nth(0).getByRole('heading', { level: 3 }).scrollIntoViewIfNeeded();
+        await page.screenshot({ path: path.join(evidence, '3-in-revisione.png') });
 
+        rmSync(path.join(folder, 'appunti.pdf'));
         await writeFseDocument(folder, '2025-09-01_LAB_REFERTO_SPECIALISTICO_LABORATORIO_ASST_SINTETICA_2c3d4e5f.pdf', taxCode, 'Controllo sintetico');
         await openSiss(patientId);
         await page.locator('#siss').getByTestId('fse-folder').setInputFiles(folder);
@@ -127,10 +130,12 @@ test('WUL-949: la cartella del Fascicolo entra nell’import dalla scheda, si fe
         await expect(group.locator('[data-source-status="already_imported"]')).toHaveCount(2);
         await expect(group.locator('[data-source-status="already_imported"]').first()).toContainText('Già importato: saltato');
         await expect(group.locator('[data-source-status="ready"]')).toHaveCount(1);
-        await page.screenshot({ path: path.join(evidence, '4-seconda-importazione.png'), fullPage: true });
+        await group.screenshot({ path: path.join(evidence, '4-seconda-importazione.png') });
         await group.getByLabel('Ho controllato le fonti e confermo che appartengono alla scheda scelta.').check();
         await group.getByRole('button', { name: 'Salva 1 originale nella scheda', exact: true }).click();
         await expect(group.locator('[data-source-status="ready"]').getByTestId('dossier-acquire-outcome')).toHaveText('Originale salvato e riletto identico', { timeout: 60_000 });
+        await expect(group.getByTestId('fse-cleanup')).toHaveText('Tutti i documenti della cartella sono in MediFlow. Puoi cancellare la cartella dai Download.');
+        await group.screenshot({ path: path.join(evidence, '4b-proposta-di-pulizia.png') });
         expect(await attachmentCount(page, patientId)).toBe(3);
         expect(await attachmentCount(page, otherId)).toBe(0);
 

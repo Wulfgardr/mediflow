@@ -3,6 +3,7 @@
 .heading { margin: 0 0 12px; font: var(--type-section-heading); }
 .caption { margin: 6px 0 12px; color: var(--lume-ink-muted); font-size: 0.9375rem; line-height: 1.6; }
 .actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.fseEntry { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 24px; }
 .panel :global(.siss-action-btn), .panel :global(.graphite-block button) {
     display: inline-flex; align-items: center; justify-content: center; gap: 12px;
     min-height: 44px; height: auto; min-width: 0; max-width: 100%;
