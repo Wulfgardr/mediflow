@@ -119,7 +119,7 @@ test('WUL-961: a Web admin session reaches no legacy delete or clear of a sede',
         assert.notEqual(response.status, 200, 'DELETE /api/ambulatories/[id] deleted a sede with the Web session alone');
     }
     if (existsSync(legacyClearRoute)) {
-        const response = await (load(legacyClearRoute) as RoutePost).POST(routeRequest('/api/ambulatories/clear', { ambulatoryId: 'other-test', version: 1 }, admin));
+        const response = await (load('../app/api/ambulatories/clear/route.ts') as RoutePost).POST(routeRequest('/api/ambulatories/clear', { ambulatoryId: 'other-test', version: 1 }, admin));
         assert.notEqual(response.status, 200, 'POST /api/ambulatories/clear emptied a sede with the Web session alone');
     }
     assert.deepEqual(clinical(), before);
