@@ -37,9 +37,9 @@ export function DossierBackupProposal({ patients, disabled, onChoice }: {
         {!allowed && <p>{RECOVERY_BACKUP_REQUIREMENT}</p>}
         {failure && <p role="alert">{failure}</p>}
         <div className={styles.actions}>
-            <button type="button" className={styles.primary} disabled={!allowed || working || disabled} onClick={() => { void backup(); }}>
+            <button type="button" className="mf-button-primary" disabled={!allowed || working || disabled} onClick={() => { void backup(); }}>
                 {working ? 'Backup in corso…' : 'Fai un backup adesso'}</button>
-            <button type="button" className={styles.secondary} disabled={working || disabled} onClick={() => onChoice({ kind: 'skipped' })}>Continua senza backup</button>
+            <button type="button" className="mf-button-secondary" disabled={working || disabled} onClick={() => onChoice({ kind: 'skipped' })}>Continua senza backup</button>
         </div>
     </div>;
 }

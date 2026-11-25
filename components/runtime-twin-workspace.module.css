@@ -16,6 +16,7 @@
 .recordTab > a:first-child { display: inline-flex; align-items: center; min-height: var(--lume-control-height); min-width: var(--lume-control-height); font-size: 0.75rem; padding: 8px 7px 8px 12px; max-width: 190px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .recordTab > :last-child { display: grid; place-items: center; width: var(--lume-control-height); height: var(--lume-control-height); }
 .recordTab[data-active='true'] { color: var(--lume-ink); background: var(--lume-surface-field); }
+.pageCrumb { display: inline-flex; align-items: center; flex: none; min-height: var(--lume-control-height); padding: 8px 12px; font-size: 0.75rem; color: var(--lume-ink-muted); white-space: nowrap; }
 /* preserve the shared toggle's touch target inside the 48px header. */
 .privacy { width: 44px !important; height: 44px !important; min-width: 44px !important; border-radius: var(--lume-radius-control) !important; border: 0 !important; padding: 0 !important; flex: none; }
 .page { position: relative; flex: 1; min-height: 0; overflow: auto; scrollbar-width: thin; }
@@ -150,6 +151,8 @@
   .workspace[data-unified-shell='true'] .recordTab { color: var(--record-hint); background: transparent; padding: 0; }
   .workspace[data-unified-shell='true'] .recordTab[data-active='true'] { color: var(--lume-ink); }
   .workspace[data-unified-shell='true'] .workspaceBar .recordTab > :last-child { width: 22px; height: 22px; opacity: .75; }
+  .workspace[data-unified-shell='true'] .workspaceBar .pageCrumb { padding: 0; min-height: 22px; font: var(--type-record-meta); color: var(--record-hint); }
+  .workspace[data-unified-shell='true'] .workspaceBar .pageCrumb::before { content: '·'; margin: 0 4px 0 2px; }
   .workspace[data-unified-shell='true']:not([data-patient-record='true']) .workspaceBar .recordTab::before { content: '·'; margin: 0 4px 0 2px; }
   .workspace[data-unified-shell='true'] .navigation > a > small { margin-left: auto; padding: 0 6px; border-radius: 10px; background: var(--record-soft); color: var(--record-hint); font: var(--type-record-meta); }
   .workspace[data-patient-record='true'] .workspaceBar,

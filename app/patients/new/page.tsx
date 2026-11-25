@@ -216,12 +216,6 @@ export default function NewPatientPage() {
         }
     };
 
-    const statusLabel = pendingImportReview
-        ? 'Documento letto: controllo in corso.'
-        : importedData
-            ? 'Dati applicati alla scheda: controlla i campi e conferma.'
-            : 'La scheda viene creata solo quando salvi.';
-
     const navItems = [
         { href: '#documento', label: 'Da un documento', meta: 'facoltativo' },
         ...(importMeta ? [{
@@ -234,12 +228,7 @@ export default function NewPatientPage() {
 
     return (
         <Kree8WorkspaceShell
-            eyebrow="Paziente"
             title="Nuova scheda"
-            subtitle="Da documento clinico o con inserimento manuale."
-            backHref="/?area=incarico"
-            backLabel="Torna alla lista"
-            statusLabel={statusLabel}
             navItems={navItems}
             navigationClassName={styles.navigation}
             headerActions={<>

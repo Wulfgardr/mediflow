@@ -187,11 +187,7 @@ export default function EditPatientPage() {
     if (!patient || patient.id !== id) {
         return (
             <Kree8WorkspaceShell
-                eyebrow="Scheda paziente"
                 title="Modifica dati"
-                subtitle="Caricamento della scheda in corso."
-                backHref={`/patients/${id}/modules`}
-                backLabel="Torna alla scheda paziente"
                 navItems={[]}
             >
                 <div className={workspaceStyles.loadingCard}>Caricamento scheda...</div>
@@ -201,11 +197,7 @@ export default function EditPatientPage() {
 
     return (
         <Kree8WorkspaceShell
-            eyebrow="Scheda paziente"
             title="Modifica dati"
-            subtitle="Aggiorna anagrafica, contatti, diagnosi, agenda e profilo assistenziale."
-            backHref={`/patients/${id}/modules`}
-            backLabel="Torna alla scheda paziente"
             patientDetails={patientAllergiesForHeader(patient.allergies)}
             patientLabel={`${patient.lastName} ${patient.firstName}`}
             navItems={workspaceNavItems}

@@ -60,12 +60,12 @@ function ProfileEditor({ controller }: { controller: WorkProfileController }) {
                         <p>All’apertura: {workProfilePreview(state.active).areaLabel}.</p>
                     </div>
                     <div className={styles.actions}>
-                        <Link className={rollbackPreview || error ? styles.secondaryAction : styles.primaryAction}
-                            href={`/?area=${workProfilePreview(state.active).area}`}>Apri il tuo spazio di lavoro</Link>
-                        <button type="button" disabled={disabled} className={styles.secondaryAction}
+                        <button type="button" disabled={disabled} className="mf-button-secondary"
                             onClick={() => saveDraft({ ...state.active!, step: 3 })}>Cambia profilo di lavoro</button>
-                        <button type="button" disabled={disabled} className={styles.secondaryAction}
+                        <button type="button" disabled={disabled} className="mf-button-secondary"
                             onClick={() => saveDraft(newDraft())}>Ripeti le domande</button>
+                        <Link className={rollbackPreview || error ? 'mf-button-secondary' : 'mf-button-primary'}
+                            href={`/?area=${workProfilePreview(state.active).area}`}>Apri il tuo spazio di lavoro</Link>
                     </div>
                 </>
             ) : (
@@ -90,16 +90,16 @@ function ProfileEditor({ controller }: { controller: WorkProfileController }) {
                             </div>
                             <p className={styles.hint}>Ogni avanzamento salva le risposte su questa postazione.</p>
                             <div className={styles.actions}>
-                                {draft.step > 0 && <button type="button" disabled={disabled} className={styles.secondaryAction}
+                                {draft.step > 0 && <button type="button" disabled={disabled} className="mf-button-secondary"
                                     onClick={() => saveDraft({ ...draft, step: draft.step - 1 })}>Indietro</button>}
+                                <button type="button" disabled={disabled} className="mf-button-secondary" onClick={manual}>
+                                    Scegli manualmente
+                                </button>
                                 <button type="button" disabled={disabled || !draft.answers[question.key]}
-                                    className={rollbackPreview || error ? styles.secondaryAction : styles.primaryAction}
+                                    className={rollbackPreview || error ? 'mf-button-secondary' : 'mf-button-primary'}
                                     onClick={() => saveDraft({ ...draft, step: draft.step + 1,
                                         profile: draft.step === 2 ? recommendation.profile : draft.profile })}>
                                     {draft.step === 2 ? 'Mostra anteprima' : 'Salva e continua'}
-                                </button>
-                                <button type="button" disabled={disabled} className={styles.secondaryAction} onClick={manual}>
-                                    Scegli manualmente
                                 </button>
                             </div>
                         </>
@@ -139,18 +139,18 @@ function ProfileEditor({ controller }: { controller: WorkProfileController }) {
                             </ul>
                             <p className={styles.hint}>Il profilo non installa app e non attiva agenti.</p>
                             <div className={styles.actions}>
-                                <button type="button" disabled={disabled} className={rollbackPreview || error ? styles.secondaryAction : styles.primaryAction}
-                                    onClick={() => void change('confirm')}>Conferma profilo di lavoro</button>
-                                <button type="button" disabled={disabled} className={styles.secondaryAction}
+                                <button type="button" disabled={disabled} className="mf-button-secondary"
                                     onClick={() => saveDraft({ ...draft, source: 'guided', step: 0 })}>Rivedi le risposte</button>
-                                {draft.source === 'guided' && <button type="button" disabled={disabled} className={styles.secondaryAction}
+                                {draft.source === 'guided' && <button type="button" disabled={disabled} className="mf-button-secondary"
                                     onClick={manual}>Scegli manualmente</button>}
+                                <button type="button" disabled={disabled} className={rollbackPreview || error ? 'mf-button-secondary' : 'mf-button-primary'}
+                                    onClick={() => void change('confirm')}>Conferma profilo di lavoro</button>
                             </div>
                         </>
                     )}
                     {state.draft && <div className={styles.draftActions}>
                         {!busy && !error && <p className={styles.draftStatus} role="status">Bozza salvata. Puoi interrompere e riprendere da qui.</p>}
-                        <button type="button" disabled={disabled} className={styles.secondaryAction}
+                        <button type="button" disabled={disabled} className="mf-button-secondary"
                             onClick={() => void change('discard-draft')}>Scarta la bozza</button>
                     </div>}
                 </>
@@ -162,13 +162,13 @@ function ProfileEditor({ controller }: { controller: WorkProfileController }) {
                             <p>Ripristino previsto: <strong>{state.previous ? WORK_PROFILE_LABELS[state.previous.profile] : 'Nessun profilo scelto'}</strong>.
                                 La bozza corrente sarà scartata. Il setup dell’app e della sicurezza resta invariato.</p>
                             <div className={styles.actions}>
-                                <button type="button" disabled={disabled} className={error ? styles.secondaryAction : styles.primaryAction}
-                                    onClick={() => void change('rollback')}>Conferma ripristino del profilo</button>
-                                <button type="button" disabled={disabled} className={styles.secondaryAction}
+                                <button type="button" disabled={disabled} className="mf-button-secondary"
                                     onClick={() => setRollbackPreview(false)}>Annulla ripristino</button>
+                                <button type="button" disabled={disabled} className={error ? 'mf-button-secondary' : 'mf-button-primary'}
+                                    onClick={() => void change('rollback')}>Conferma ripristino del profilo</button>
                             </div>
                         </>
-                    ) : <button type="button" disabled={disabled} className={styles.secondaryAction}
+                    ) : <button type="button" disabled={disabled} className="mf-button-secondary"
                         onClick={() => setRollbackPreview(true)}>Ripristina la scelta precedente</button>}
                 </div>
             )}
@@ -214,7 +214,7 @@ export function WorkProfileOnboarding({ controller }: { controller: WorkProfileC
             </header>
             {error && <div role="alert" className={styles.alert}>
                 <p className={styles.errorText}>{error}</p>
-                <button type="button" disabled={busy} className={styles.primaryAction} onClick={() => void reload()}>Rileggi lo stato</button>
+                <button type="button" disabled={busy} className="mf-button-primary" onClick={() => void reload()}>Rileggi lo stato</button>
             </div>}
             {busy && <p className={styles.hint} role="status">Lettura o salvataggio del profilo…</p>}
             {state && <ProfileEditor key={`${state.revision}:${controller.snapshotVersion}`} controller={controller} />}
@@ -232,7 +232,7 @@ export function WorkProfileSettings({ showHeading = true }: { showHeading?: bool
     return <section className={styles.settingsProfile} aria-labelledby={showHeading ? 'work-profile-title' : undefined}
         aria-label={showHeading ? undefined : 'Il tuo modo di lavorare'} data-testid="work-profile-onboarding" aria-busy={busy}>
         {showHeading && <h2 id="work-profile-title">Il tuo modo di lavorare</h2>}
-        {error && <div role="alert"><p>{error}</p><button type="button" disabled={busy} className={styles.secondaryAction} onClick={() => void reload()}>Rileggi lo stato</button></div>}
+        {error && <div role="alert"><p>{error}</p><button type="button" disabled={busy} className="mf-button-secondary" onClick={() => void reload()}>Rileggi lo stato</button></div>}
         {busy && <p role="status">Lettura o salvataggio del profilo…</p>}
         {state && <ProfileEditor key={`${state.revision}:${controller.snapshotVersion}`} controller={controller} />}
         <nav className={styles.links} aria-label="Percorsi sempre disponibili">

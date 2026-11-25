@@ -255,3 +255,99 @@ for (const theme of ['light', 'dark'] as const) {
     });
   }
 }
+
+function secondaryPages(patientId: string) {
+  return [
+    { route: '/patients/new', back: '/?area=incarico' },
+    { route: '/patients/import', back: '/?area=incarico' },
+    { route: '/patients/import/dossier', back: '/?area=incarico' },
+    { route: `/patients/${patientId}/edit`, back: `/patients/${patientId}/modules` },
+    { route: '/scales', back: null },
+    { route: `/patients/${patientId}/scales`, back: `/patients/${patientId}/modules` },
+    { route: `/patients/${patientId}/scales/mmse`, back: `/patients/${patientId}/scales` },
+    { route: '/analytics', back: null },
+  ];
+}
+
+async function returnPaths(page: Page) {
+  return page.evaluate(() => ({
+    crumb: [...document.querySelectorAll('[class*=workspaceBar] nav a[href]')].map((link) => link.getAttribute('href')),
+    inPage: [...document.querySelectorAll('main a[href]')]
+      .filter((element) => element.checkVisibility())
+      .map((element) => (element.getAttribute('aria-label') || (element as HTMLElement).innerText).trim())
+      .filter((label) => /^Torna (a|al|ai|alla|alle|all’)\b/u.test(label)),
+  }));
+}
+
+for (const viewport of VIEWPORTS) {
+  test(`pagine secondarie: ritorno nel percorso, testata come la vista paziente, ${viewport.name}`, async ({ page }) => {
+    test.setTimeout(300_000);
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+    const patientId = await createPatient(page);
+    const canon = await settle(page, `/patients/${patientId}/modules`);
+    const commandTop = canon.header[0].y;
+    const commandHeight = canon.header[0].height;
+    const problems: string[] = [];
+    for (const { route, back } of secondaryPages(patientId)) {
+      const view = await settle(page, route);
+      const paths = await returnPaths(page);
+      if (!view.title || Math.abs(view.title.y - canon.title!.y) > 1 || Math.abs(view.title.x - canon.title!.x) > 1) {
+        problems.push(`${route}: titolo a ${JSON.stringify(view.title)}, la vista paziente a ${JSON.stringify(canon.title)}`);
+      }
+      if (!view.crumbVisible) problems.push(`${route}: il percorso in alto è coperto`);
+      if (back && !paths.crumb.includes(back)) problems.push(`${route}: il percorso non riporta a ${back} (${paths.crumb.join(', ')})`);
+      for (const label of paths.inPage) problems.push(`${route}: ritorno nella pagina «${label}»`);
+      for (const command of view.header) {
+        const where = `${route} «${command.label}»`;
+        if (Math.abs(command.y - commandTop) > 1) problems.push(`${where}: comando a y=${command.y}, la vista paziente a ${commandTop}`);
+        if (command.height !== commandHeight) problems.push(`${where}: alto ${command.height}, la vista paziente ${commandHeight}`);
+        if (command.covered) problems.push(`${where}: coperto da un altro elemento nel bordo alto`);
+        if (command.radius !== '10px') problems.push(`${where}: raggio ${command.radius}`);
+        if (command.font !== '14px/600') problems.push(`${where}: testo ${command.font}`);
+      }
+      if (view.primaries.length > 1) problems.push(`${route}: ${view.primaries.length} principali (${view.primaries.join(', ')})`);
+    }
+    expect(problems).toEqual([]);
+  });
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`nessun comando o percorso coperto nelle pagine secondarie, tema ${theme}`, async ({ page }) => {
+    test.setTimeout(400_000);
+    await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+    const patientId = await createPatient(page);
+    const problems: string[] = [];
+    for (const width of COVERAGE_WIDTHS) {
+      await page.setViewportSize({ width, height: 1000 });
+      for (const { route } of secondaryPages(patientId)) {
+        await settle(page, route);
+        await page.evaluate((selected) => {
+          localStorage.setItem('mediflow-theme', selected);
+          document.documentElement.classList.remove('light', 'dark');
+          document.documentElement.classList.add(selected);
+        }, theme);
+        for (const problem of await coveredControls(page)) problems.push(`${width} ${route}: ${problem}`);
+      }
+    }
+    expect(problems).toEqual([]);
+  });
+}
+
+test('il ritorno nel percorso si raggiunge e si usa da tastiera', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+  const patientId = await createPatient(page);
+  await settle(page, `/patients/${patientId}/scales/mmse`);
+  const crumb = page.getByRole('navigation', { name: 'Cartelle aperte' }).getByRole('link', { name: 'Scale cliniche', exact: true });
+  await expect(crumb).toBeVisible();
+  await page.locator('body').focus();
+  for (let press = 0; press < 40 && !await crumb.evaluate((element) => element === document.activeElement); press++) {
+    await page.keyboard.press('Tab');
+  }
+  await expect(crumb).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(new RegExp(`/patients/${patientId}/scales$`, 'u'));
+  await expect(page.locator('main h1').first()).toHaveText('Scale cliniche');
+});

@@ -19,12 +19,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
 
     return (
         <Kree8WorkspaceShell
-            eyebrow="Sistema"
             title="Impostazioni"
-            subtitle="Configurazione della postazione che ospita MediFlow."
-            backHref="/?area=incarico"
-            backLabel="Torna ai pazienti"
-            statusLabel="I dati clinici e i servizi restano locali."
         >
             <div data-runtime-settings className={navigation.workspace}>
                 <aside className={navigation.indexPane}>

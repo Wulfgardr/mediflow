@@ -201,7 +201,6 @@ for (const width of [390, 1023, 1024, 1280]) {
             await expect(back).toHaveCount(0);
             await expect(page.getByTestId('settings-nav-ai-fabric')).toBeVisible();
         }
-        await expect(page.getByRole('link', { name: 'Torna ai pazienti', exact: true })).toHaveAttribute('href', '/?area=incarico');
         await page.getByRole('textbox', { name: 'Campo locale fixture' }).fill('Bozza locale');
         await sidebar.getByRole('button', { name: /Cerca impostazione/ }).click();
         await expect(page.getByRole('textbox', { name: 'Campo locale fixture' })).toHaveValue('Bozza locale');

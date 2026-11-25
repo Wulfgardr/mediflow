@@ -25,8 +25,8 @@ export function usePathname() { return window.location.pathname; }
 export function useParams() { return { id: 'ui06-patient' }; }
 export function useSearchParams() { return new URLSearchParams(window.location.search); }
 export function useRouter() { return { push: (href: string) => window.location.assign(href) }; }
-export function Kree8WorkspaceShell({ children, title, backHref, backLabel }: { children: ReactNode; title: string; backHref: string; backLabel: string }) {
-    return <main><header><a href={backHref}>{backLabel}</a><h1>{title}</h1></header>{children}</main>;
+export function Kree8WorkspaceShell({ children, title, parent }: { children: ReactNode; title: string; parent?: { href: string; label: string } }) {
+    return <main><header>{parent ? <a href={parent.href}>{parent.label}</a> : null}<h1>{title}</h1></header>{children}</main>;
 }
 export function SettingsSearchOverlay({ open, onClose }: { open: boolean; onClose: () => void }) { return open ? <div role="dialog" aria-label="Ricerca fixture"><button onClick={onClose}>Chiudi ricerca</button></div> : null; }
 export function useSettingsSearch() { const [isSearchOpen, setOpen] = useState(false); return { isSearchOpen, openSearch: () => setOpen(true), closeSearch: () => setOpen(false) }; }

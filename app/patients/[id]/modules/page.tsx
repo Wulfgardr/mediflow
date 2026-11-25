@@ -387,13 +387,7 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
 
     if (!patient) {
         return (
-            <Kree8WorkspaceShell
-                eyebrow="Scheda clinica"
-                title="Scheda paziente"
-                subtitle=""
-                backHref="/?area=incarico"
-                backLabel="Pazienti"
-            >
+            <Kree8WorkspaceShell title="Scheda paziente">
                 <ViewState state={patientError ? 'error' : 'loading'} title={patientError ? 'Impossibile leggere la scheda paziente.' : 'Caricamento scheda paziente…'} action={patientError ? { label: 'Riprova', onClick: refreshPatient } : undefined} />
             </Kree8WorkspaceShell>
         );
@@ -700,9 +694,7 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
             writing={writing}
             eyebrow="Scheda clinica"
             title={`${patient.lastName} ${patient.firstName}`.trim() || patient.taxCode}
-            subtitle=""
-            backHref="/?area=incarico"
-            backLabel="Pazienti"
+            parent={{ href: '/?area=incarico', label: 'Pazienti' }}
             patientAtoms={[
                 patient.taxCode ? `Codice ${patient.taxCode}` : 'Codice non disponibile',
                 ageLabel,

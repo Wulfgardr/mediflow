@@ -72,13 +72,8 @@ export default function ScalesPage() {
 
     return (
         <div className={styles.screen}><Kree8WorkspaceShell
-            eyebrow="Valutazioni"
             title="Scale cliniche"
-            subtitle="Scegli una scala per avviare una valutazione."
-            backHref={`/patients/${id}/modules#scale`}
-            backLabel="Torna alla scheda paziente"
             patientLabel={patient ? `${patient.lastName} ${patient.firstName}` : undefined}
-            statusLabel={`${formatCountLabel(scales.length, 'scala disponibile', 'scale disponibili')} dalla libreria locale.`}
             navItems={[]}
         >
             {/* WUL-678: each instrument is one complete, keyboard-accessible target. */}

@@ -23,26 +23,10 @@
 :is(.panel, .embeddedPanel) p { line-height: 1.55; margin: 0; }
 .muted { color: var(--lume-ink-muted); font-size: 0.875rem; }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
-.primary, .secondary, .fileLabel, .consent, .disclosure summary {
+.fileLabel, .consent, .disclosure summary {
     min-height: 44px;
     font: inherit;
 }
-.primary, .secondary {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 10px 16px;
-    border: 1px solid var(--lume-rule);
-    border-radius: var(--lume-radius-control);
-    line-height: 1.4;
-    text-align: center;
-    text-decoration: none;
-    cursor: pointer;
-    max-width: 100%;
-}
-.primary { background: var(--lume-ink-fresh); color: var(--lume-surface-focal); }
-.secondary { background: var(--lume-surface-field); color: var(--lume-ink); }
 :is(.panel, .embeddedPanel) :is(button, input):disabled { opacity: 0.55; cursor: not-allowed; }
 :is(.panel, .embeddedPanel) :is(button, a, input, summary):focus-visible, :is(.panel, .embeddedPanel) h2:focus {
     outline: 2px solid var(--lume-ink-fresh);
@@ -80,7 +64,7 @@
     .table td::before { content: attr(data-label); display: block; font-weight: 600; color: var(--lume-ink-muted); margin-bottom: 4px; }
 }
 @media (prefers-reduced-motion: reduce) { :is(.panel, .embeddedPanel) :is(*, *::before, *::after) { transition: none; animation: none; } }
-@media (forced-colors: active) { .primary, .secondary, .notice { border: 1px solid ButtonText; } }
+@media (forced-colors: active) { .notice { border: 1px solid ButtonText; } }
 
 .panel, .embeddedPanel { font: 0.875rem/1.5 var(--lume-font-sans); }
 .preview tbody td { color: var(--lume-ink-pencil); }

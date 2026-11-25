@@ -129,13 +129,9 @@ function ScaleRunner({ patientId, scaleId }: { patientId: string; scaleId: strin
     if (!scaleDef) {
         return (
             <div className={styles.screen}><Kree8WorkspaceShell
-                eyebrow="Valutazioni"
+                parent={{ href: `/patients/${patientId}/scales`, label: 'Scale cliniche' }}
                 title="Scala non disponibile"
-                subtitle="Scegli una scala dalla libreria del paziente."
-                backHref={`/patients/${patientId}/scales`}
-                backLabel="Torna alle scale"
                 patientLabel={patient ? `${patient.lastName} ${patient.firstName}` : undefined}
-                statusLabel="Nessun dato è stato modificato."
                 navItems={[]}
             >
                 {/* a retirement notice is clinical content, not optional header copy. */}
@@ -152,11 +148,8 @@ function ScaleRunner({ patientId, scaleId }: { patientId: string; scaleId: strin
 
     return (
         <div className={styles.screen}><Kree8WorkspaceShell
-            eyebrow="Valutazione"
+            parent={{ href: `/patients/${patientId}/scales`, label: 'Scale cliniche' }}
             title={scaleDisplayTitle(scaleDef)}
-            subtitle="Risposte e punteggio vengono registrati nello storico delle scale."
-            backHref={`/patients/${patientId}/scales`}
-            backLabel="Torna alle scale"
             patientLabel={patientLabel}
             navItems={[]}
         >
