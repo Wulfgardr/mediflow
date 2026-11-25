@@ -4,17 +4,17 @@ import { clientArchiveGeneration } from './security/client-auth-api';
 import { db } from './db';
 import { notifyDbChange } from './live-query';
 import { openAgentVisit } from './agent-cassette-client';
-import { agentVisitAwaitsReview, inspectAgentVisit, prepareAgentApplication, reopenReviewedAgentItems, type AgentVisitReview } from './agent-visit-review';
+import { agentItemDecided, agentVisitAwaitsReview, inspectAgentVisit, prepareAgentApplication, prepareAgentItemDecision, reopenReviewedAgentItems, type AgentVisitReview } from './agent-visit-review';
 import { agentVisitPresentation, sealVisitConfirmationPresentation } from './agent-visit-confirmation-browser';
 import type { VisitConfirmationTicket } from './agent-visit-confirmation-contract';
-import type { AgentApplicationReceipt, AgentCassetteIndexPage, IncomingAgentCassette } from './agent-visit-application-contract';
+import type { AgentApplicationReceipt, AgentCassetteIndexPage, AgentItemDecision, AgentItemDecisionReceipt, IncomingAgentCassette } from './agent-visit-application-contract';
 import { publishAgentIncomingCount } from './agent-incoming-count';
 
 const empty = {
     visits: [] as AgentVisitReview[],
     busy: false,
     error: null as string | null,
-    applicationError: null as { visitId: string | null; message: string } | null,
+    applicationError: null as { visitId: string | null; itemId?: string; message: string } | null,
 };
 let snapshot = empty;
 const listeners = new Set<() => void>();
@@ -50,7 +50,7 @@ async function reopenForApplication(review: AgentVisitReview, signal: AbortSigna
     const items = await reopenReviewedAgentItems(review, row);
     signal.throwIfAborted();
     if (!items) throw new Error(notApplied);
-    return { ...review, appliedItemIds: row.appliedItemIds, visit: { ...review.visit, items } };
+    return { ...review, appliedItemIds: row.appliedItemIds, discardedItemIds: row.discardedItemIds ?? [], visit: { ...review.visit, items } };
 }
 async function apply(review: AgentVisitReview, signal: AbortSignal) {
     const input = await prepareAgentApplication(review, signal);
@@ -74,7 +74,8 @@ export async function attemptNativeConfirmation(signal: AbortSignal, readPdf?: P
     const ticket: VisitConfirmationTicket | null = await offer.json();
     if (!ticket) return;
     const existing = snapshot.visits.find(review => review.visit.cassette.id === ticket.visitId && review.visit.cassette.revision === ticket.revision);
-    if (!existing?.patient?.version || existing.blockers.length || existing.proposalBlockers.length) return;
+    if (!existing?.patient?.version || existing.blockers.length || existing.proposalBlockers.length
+        || existing.visit.items.some(item => agentItemDecided(existing, item.id))) return;
     const send = (input: unknown) => fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' },
         signal, body: JSON.stringify(input) });
     const reference = ticket.reference;
@@ -137,7 +138,7 @@ export async function refreshAgentIncoming(signal = db.getSessionReadSignal(), r
                     }
                     const { id, archiveGeneration, status, revision, depositedAt } = review.visit.cassette;
                     if (archiveGeneration !== clientArchiveGeneration()) review = { ...review, blockers: [...review.blockers, 'Visita da un archivio precedente. Apri i PDF per recuperarla nella scheda.'] };
-                    if (review.visit.items.every(item => review.appliedItemIds.includes(item.id))) continue;
+                    if (review.visit.items.every(item => agentItemDecided(review, item.id))) continue;
                     visits.push({ ...review, documents: [], visit: { ...review.visit, cassette: { id, archiveGeneration, status, revision, depositedAt },
                         items: review.visit.items.map(item => item.kind === 'pdf' ? { ...item, value: { name: item.value.name } } : item) } });
                 }
@@ -209,4 +210,39 @@ export async function applyReviewedAgentVisits(ids: string[]): Promise<void> {
     try { await task; } finally { if (inFlight === task) inFlight = null; }
     if (signal.aborted) return;
     await refreshAgentIncoming(signal);
+}
+const notDecided = 'La voce non è stata decisa. Rileggi la visita.';
+export async function decideAgentVisitItem(visitId: string, itemId: string, decision: AgentItemDecision, correction?: Record<string, string>): Promise<boolean> {
+    const signal = db.getSessionReadSignal();
+    while (inFlight) await inFlight;
+    signal.throwIfAborted();
+    let decided = false;
+    const task = (async () => {
+        publish({ ...snapshot, busy: true, applicationError: null });
+        try {
+            const review = snapshot.visits.find(value => value.visit.cassette.id === visitId);
+            if (!review) throw new Error(notDecided);
+            const reopened = await reopenForApplication(review, signal);
+            const input = await prepareAgentItemDecision(reopened, itemId, decision, signal, correction);
+            if (!input) throw new Error(notDecided);
+            const response = await fetch(inbox + '/items', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input), signal });
+            if (!response.ok) throw new Error(notDecided);
+            const receipt: AgentItemDecisionReceipt = await response.json();
+            signal.throwIfAborted();
+            if (receipt.status !== 'decided' || receipt.visitId !== visitId || receipt.itemId !== itemId || receipt.decision !== decision) throw new Error('Ricevuta non verificabile. Rileggi la visita.');
+            if (decision !== 'discard') notifyDbChange();
+            const patient = reopened.patient && receipt.patientVersion ? { ...reopened.patient, version: receipt.patientVersion } : reopened.patient;
+            const updated: AgentVisitReview = { ...review, patient,
+                appliedItemIds: decision === 'discard' ? reopened.appliedItemIds : [...new Set([...reopened.appliedItemIds, itemId])],
+                discardedItemIds: decision === 'discard' ? [...new Set([...reopened.discardedItemIds, itemId])] : reopened.discardedItemIds };
+            publish({ ...snapshot, visits: snapshot.visits.map(value => value === review ? updated : value) });
+            decided = true;
+        } catch (error) {
+            if (!signal.aborted) publish({ ...snapshot, applicationError: { visitId, itemId, message: error instanceof Error ? error.message : notDecided } });
+        } finally { if (!signal.aborted) publish({ ...snapshot, busy: false }); }
+    })();
+    inFlight = task;
+    try { await task; } finally { if (inFlight === task) inFlight = null; }
+    if (!signal.aborted) await refreshAgentIncoming(signal);
+    return decided;
 }

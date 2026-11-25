@@ -97,7 +97,7 @@
   cursor: pointer;
 }
 
-.sourceName { margin-inline-start: auto; color: var(--lume-ink-muted); font: var(--type-meta); overflow-wrap: anywhere; }
+.sourceName { color: var(--lume-ink-muted); font: var(--type-meta); overflow-wrap: anywhere; }
 
 .headline { margin: 0; color: var(--lume-ink); font: var(--type-record-row); overflow-wrap: anywhere; }
 
@@ -147,6 +147,85 @@
   padding: 2px 6px;
   color: var(--lume-ink-muted);
   font: var(--type-record-data);
+}
+
+.proposals:has(.proposalBody) { grid-template-columns: minmax(0, 1fr); }
+
+.proposal { gap: 10px; }
+
+.proposalBody {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 12px 20px;
+  align-items: start;
+}
+
+.proposalFacts { display: grid; gap: 8px; min-width: 0; }
+
+.proposalSource {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding-left: 14px;
+  border-left: 1px solid var(--lume-record-island-rule);
+}
+
+.proposalSource > .sourceLink.sourceLink { text-align: start; justify-self: start; }
+.proposalSource > .quote { padding-left: 0; border-left: 0; color: var(--lume-ink); }
+
+.itemActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.itemAlert,
+.itemBlocker {
+  margin: 0;
+  color: var(--lume-signal-critical);
+  font: var(--type-meta);
+}
+
+.pdfDecision {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--lume-record-island-rule);
+  color: var(--lume-ink);
+  font: var(--type-record-data);
+}
+
+.correction { display: grid; gap: 10px; }
+
+.correctionField {
+  display: grid;
+  gap: 4px;
+  color: var(--lume-ink-muted);
+  font: var(--type-record-label);
+}
+
+.decided > ul { display: grid; margin: 0; padding: 0; list-style: none; }
+
+.decided li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+  padding-block: 8px;
+  color: var(--lume-ink);
+  font: var(--type-record-data);
+}
+
+.decided li + li { border-top: 1px solid var(--lume-record-island-rule); }
+
+@media (max-width: 899px) {
+  .proposalBody { grid-template-columns: minmax(0, 1fr); }
+  .proposalSource { padding-left: 0; border-left: 0; }
 }
 
 @media (max-width: 699px) {

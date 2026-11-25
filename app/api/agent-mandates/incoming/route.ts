@@ -3,7 +3,7 @@ import { readAuthenticatedWebSession } from '@/lib/security/server-auth';
 import { createAgentIncomingReader } from '@/lib/security/agent-incoming-reader';
 import { hasAttestedLoopbackIngress } from '@/lib/security/loopback-ingress.mjs';
 import { readAgentCassette, readAgentCassetteIndex } from '@/lib/agent-cassette-store';
-import { applyAgentVisit, agentAppliedItemIds, AgentApplicationDenied } from '@/lib/agent-visit-application';
+import { applyAgentVisit, agentAppliedItemIds, agentDiscardedItemIds, AgentApplicationDenied } from '@/lib/agent-visit-application';
 import { isTrustedWebMutationRequest } from '@/lib/security/request-transport';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { readNativeNetworkJson } from '@/lib/native-network-json-body';
@@ -15,7 +15,7 @@ export const GET = createAgentIncomingReader({
     index: (actorRef, after) => readAgentCassetteIndex(openDbServer(), actorRef, after),
     cassette: (actorRef, id) => {
         const row = readAgentCassette(openDbServer(), id, actorRef);
-        return row && { ...row, appliedItemIds: agentAppliedItemIds(id) };
+        return row && { ...row, appliedItemIds: agentAppliedItemIds(id), discardedItemIds: agentDiscardedItemIds(id) };
     },
 });
 
