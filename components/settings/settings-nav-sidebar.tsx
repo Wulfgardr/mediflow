@@ -96,17 +96,21 @@ export function SettingsNavSidebar({ onSearchRequest }: { onSearchRequest?: () =
             </div>
 
             <div ref={desktopRef} className={navigation.desktopSidebar}>
-                {desktopOverflows && <span data-index-hint className={navigation.desktopScrollHint}>Scorri l’indice <span aria-hidden="true">↕</span></span>}
-                {onSearchRequest ? (
-                    <button
-                        type="button"
-                        onClick={onSearchRequest}
-                        data-testid="settings-search-trigger"
-                        className={navigation.searchButton}
-                    >
-                        <span><Search aria-hidden="true" /> Cerca impostazione</span>
-                        <kbd className={navigation.shortcut}>⌘K</kbd>
-                    </button>
+                {desktopOverflows || onSearchRequest ? (
+                    <div data-index-hint className={navigation.desktopHead}>
+                        {desktopOverflows && <span className={navigation.desktopScrollHint}>Scorri l’indice <span aria-hidden="true">↕</span></span>}
+                        {onSearchRequest ? (
+                            <button
+                                type="button"
+                                onClick={onSearchRequest}
+                                data-testid="settings-search-trigger"
+                                className={navigation.searchButton}
+                            >
+                                <span><Search aria-hidden="true" /> Cerca impostazione</span>
+                                <kbd className={navigation.shortcut}>⌘K</kbd>
+                            </button>
+                        ) : null}
+                    </div>
                 ) : null}
                 <NavGroups pathname={pathname} />
             </div>

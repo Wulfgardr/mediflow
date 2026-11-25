@@ -128,7 +128,7 @@ async function coveredControls(page: Page): Promise<string[]> {
     };
     return controls.flatMap((element) => {
       if (!element.checkVisibility({ opacityProperty: true, visibilityProperty: true })) return [];
-      const box = element.getBoundingClientRect();
+      const box = element.getClientRects()[0] ?? element.getBoundingClientRect();
       if (box.width <= 2 || box.height <= 2 || box.top < 0 || box.left < 0 || box.bottom > innerHeight || box.right > innerWidth) return [];
       const label = (element.getAttribute('aria-label') || (element as HTMLElement).innerText || element.getAttribute('placeholder') || element.tagName).trim().slice(0, 40);
       return [[box.x + box.width / 2, box.y + box.height / 2], [box.x + box.width / 2, box.y + Math.min(3, box.height / 2)]]

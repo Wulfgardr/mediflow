@@ -65,12 +65,19 @@
     font: var(--type-meta);
 }
 
-.desktopScrollHint {
+.desktopHead {
     position: sticky;
     top: 0;
     z-index: 2;
-    padding: 12px 2px 6px;
+    display: grid;
+    gap: 12px;
+    margin-bottom: -6px;
+    padding-bottom: 6px;
     background: var(--lume-record-rail);
+}
+
+.desktopScrollHint {
+    padding: 12px 2px 6px;
 }
 
 .searchButton, .mobileStripSearch {
