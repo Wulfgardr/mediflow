@@ -114,6 +114,10 @@ test('nuova scheda: trascino due documenti, confermo l’anagrafica proposta e i
     const patient = await page.evaluate(async (id) => (await fetch(`/api/patients/${id}`, { cache: 'no-store' })).json(), patientId);
     expect(patient).toMatchObject({ firstName: 'Elena Maria', lastName: 'Sintetica', taxCode, birthDate: '1950-02-03T00:00:00.000Z' });
     for (const resource of ['therapies', 'observations']) expect(await countOf(page, resource, patientId)).toBe(0);
+
+    await panel.getByRole('button', { name: 'Scegli altri documenti' }).click();
+    await expect(panel.getByRole('heading', { name: 'Rivedi e applica i dati clinici' })).toHaveCount(0);
+    await expect(panel.getByTestId('dossier-document')).toHaveCount(0);
 });
 
 test('nuova scheda: documenti di due pazienti, omocodia o scheda già esistente non avviano la creazione', async ({ page }, info) => {
