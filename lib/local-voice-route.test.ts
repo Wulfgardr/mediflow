@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import test, { after } from 'node:test';
 import { bindSyntheticArchiveSessions } from './security/web-auth-lifecycle-owner-test-fixture';
-import { startFakeLocalVoice } from './local-voice/fake-service.test-support.mjs';
+import { startFakeLocalVoice } from './local-voice/fake-service.test-support.ts';
 import { createLocalVoiceBridge } from './local-voice/web-bridge';
 
 const load = createRequire(import.meta.url);
