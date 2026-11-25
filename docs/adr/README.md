@@ -15,7 +15,7 @@ verifica dello stato successivo.
 ## Decisioni richiamate
 
 - L'[ADR 0203](0203-pacchetti-prestazioni-territoriali.md) propone il confine dei pacchetti di prestazioni per diagnosi nel modulo Lombardia (`lom`), con stati di approvazione nei tipi, fonti e catalogo regionale obbligatori e generazione pura rispetto allo storico senza scritture cliniche.
-- L'[ADR 0200](0200-web-standard-launcher-e-ritiro-app-desktop.md), in stato **Proposed** (Refs WUL-880), propone l'applicazione Web locale come unica superficie desktop su macOS, Windows e Linux, affiancata da launcher sottili per sistema e dalle app iOS/iPadOS, con ritiro ordinato di GPUI e della finestra Mac Swift.
+- L'[ADR 0200](0200-web-standard-launcher-e-ritiro-app-desktop.md), accettato il 25/11/2026 (WUL-880), fa del Web locale l'unica applicazione desktop su macOS, Windows e Linux, con un launcher piccolo per sistema e le app iPhone e iPad. GPUI e la finestra Mac Swift si ritirano in PR ordinate, dopo che la voce locale è diventata un servizio con la sua interfaccia di registrazione Web. La cassetta a finestra chiusa dell'ADR 0191 resta un modulo facoltativo del launcher del Mac, spento in partenza.
 - L'[ADR 0199](0199-web-session-client-proof.md), accettato il 19/11/2026 per la 0.9.1, lega la sessione al documento Web o al client locale autenticato e richiede di aggiornare insieme server e GPUI.
 - L'[ADR 0198](0198-document-child-platform-boundary.md) propone il confine documentale di Web e Headless. Il 19 novembre 2026 Leonardo ha approvato l’isolamento di rete imposto dal sistema come requisito di consegna su Windows 11 ARM. L’ADR registra le prove su macOS ARM64, Omarchy ARM e Windows 11 ARM. La ricetta resta proposta durante l’integrazione.
 - L'[ADR 0195](0195-materiale-dell-agente-dopo-il-gesto-del-medico.md), accettato il 19/11/2026, fa entrare in cartella nota, trascrizione, PDF e proposte depositati da un client agente solo dopo il gesto del medico, sul Web o nella conferma nativa che li mostra per intero.
@@ -23,7 +23,7 @@ verifica dello stato successivo.
 - L'[ADR 0193](0193-egress-clinico-controllato-dal-server.md), accettato il 19/11/2026, fa rifiutare dal server le operazioni cliniche dei mandati cloud senza egress dichiarato e toglie dall'applicazione automatica le cassette già depositate così.
 - L'[ADR 0192](0192-segnaposto-con-ruolo-e-date-relative.md), accettato il 19/11/2026, dà un ruolo ai segnaposto verso i modelli cloud, lega i ruoli ai campi dell'output ed esprime le date cliniche come scostamenti in giorni. La data di nascita non esce mai come scostamento.
 
-- L'[ADR 0191](0191-conferma-da-chat-e-cassetta-senza-finestra.md), accettato il 18/11/2026, definisce la conferma da Codex tramite autenticazione macOS e il servizio facoltativo della cassetta con chiave in memoria fino a 8 ore.
+- L'[ADR 0191](0191-conferma-da-chat-e-cassetta-senza-finestra.md), accettato il 18/11/2026, definisce la conferma da Codex tramite autenticazione macOS e il servizio facoltativo della cassetta con chiave in memoria fino a 8 ore; dal 25/11/2026 il servizio è un modulo del launcher macOS, assente su Windows e Linux.
 
 - [0190-mandato-agenti-e-cassetta-della-visita.md](./0190-mandato-agenti-e-cassetta-della-visita.md): mandato fino a 24 ore, deposito cifrato e applicazione condizionata della visita. Il runtime resta subordinato alla composizione atomica dei writer.
 

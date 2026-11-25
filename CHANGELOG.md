@@ -75,6 +75,26 @@ release](https://github.com/Wulfgardr/mediflow/releases) raccoglie i pacchetti p
   attribuire con certezza. Resta disponibile il recupero completo cifrato
   ([sicurezza](./SECURITY.md#cancellazione-del-paziente-ed-eliminazione-dei-dati)).
 
+### Limiti dichiarati
+
+- Quando un modello esterno riceve il profilo con i segnaposto al posto dei
+  nomi, MediFlow controlla che ogni segnaposto della risposta appartenga alla
+  richiesta. Non controlla se il modello ha scambiato due persone con lo stesso
+  ruolo. La risposta resta una proposta che il medico rilegge prima che entri
+  in cartella ([ADR 0192](./docs/adr/0192-segnaposto-con-ruolo-e-date-relative.md)).
+- Il programma locale che cerca i nomi nei testi prima dell’invio a un modello
+  esterno non può usare la rete, ma può leggere i file dell’utente del computer.
+- Il processo che gestisce l’accesso all’account ChatGPT usa una cartella e un
+  ambiente propri, senza la gabbia del sistema operativo che isola gli altri
+  processi. Si occupa solo di accesso, catalogo dei modelli e quote e non genera
+  risposte. I primi due limiti si riprendono nel giro successivo
+  ([WUL-905](https://linear.app/wulfgardr/issue/WUL-905)).
+- Da questa versione la glicemia letta da un referto si registra su siero o
+  plasma. Le glicemie dei referti già in archivio restano nella serie «sangue
+  intero», anche nei grafici: MediFlow non riscrive i valori già salvati.
+- Nella nuova scheda dai documenti una foto singola segue ancora il percorso
+  precedente e non porta dati clinici; i dati arrivano dai PDF.
+
 ### Profilo paziente
 
 - Nel Quadro una diagnosi o una sintesi di documento senza data resta
@@ -126,7 +146,9 @@ release](https://github.com/Wulfgardr/mediflow/releases) raccoglie i pacchetti p
 ### Client Apple
 
 Le modifiche qui elencate riguardano il sorgente dei client Swift e la
-compatibilità con le app esistenti. Il pacchetto nativo per Mac della 0.9.1 è il client GPUI.
+compatibilità con le app esistenti. Su Mac, Windows e Linux la 0.9.1 si usa
+nel browser, avviata dal launcher; i client Swift restano per iPhone e iPad
+([ADR 0200](./docs/adr/0200-web-standard-launcher-e-ritiro-app-desktop.md)).
 
 - Accesso con passphrase v3 nei client abbinati, con derivazione locale e
   verifica della generazione dell'archivio. Il preflight corrente ammette
