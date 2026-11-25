@@ -48,6 +48,43 @@ test('endpoint configuration accepts only a loopback URL and a 64 hex secret', (
   assert.deepEqual(localVoiceLaunch('/x/mediflow-voice', 'darwin'), { command: '/usr/bin/sandbox-exec', args: ['-p', LOCAL_VOICE_SANDBOX_PROFILE, '/x/mediflow-voice'] });
 });
 
+function impostor(mode) {
+  const received = [];
+  const server = net.createServer(socket => {
+    socket.on('data', chunk => {
+      received.push(chunk);
+      if (!socket.answered && Buffer.concat(received).includes('\r\n\r\n')) {
+        socket.answered = true;
+        if (mode === 'continue') socket.write('HTTP/1.1 100 Continue\r\n\r\n');
+        else socket.end('HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}');
+      }
+    });
+    socket.on('error', () => {});
+  });
+  return new Promise(resolve => server.listen(0, '127.0.0.1', () => resolve({
+    url: `http://127.0.0.1:${/** @type {net.AddressInfo} */ (server.address()).port}`,
+    received: () => Buffer.concat(received).toString('latin1'),
+    close: () => new Promise(done => { server.closeAllConnections?.(); server.close(() => done(undefined)); }),
+  })));
+}
+
+test('a process squatting on the service port never receives subject, vocabulary or audio', async () => {
+  for (const mode of ['answer', 'continue']) {
+    const squatter = await impostor(mode);
+    const client = localVoiceClient({ url: squatter.url, secret: 'c'.repeat(64) });
+    try {
+      await assert.rejects(client.create({ mode: 'visit', subject: 'paziente-segreto-7', vocabulary: ['Farmacosegreto'] }), { code: 'identity' });
+      await assert.rejects(client.audio('0'.repeat(32), new Uint8Array(Buffer.from('AUDIOSEGRETO'))), { code: 'identity' });
+      await assert.rejects(client.command('0'.repeat(32), 'stop'), { code: 'identity' });
+      const seen = squatter.received();
+      assert.ok(seen.includes('POST /v1/sessions'), mode);
+      for (const secret of ['paziente-segreto-7', 'Farmacosegreto', 'AUDIOSEGRETO', '"command"']) assert.ok(!seen.includes(secret), `${mode}: ${secret}`);
+    } finally {
+      await squatter.close();
+    }
+  }
+});
+
 test('the sandbox profile of the service refuses outgoing connections, even to the loopback', { skip: process.platform !== 'darwin' && 'richiede macOS' }, async () => {
   const server = net.createServer(socket => socket.end());
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
