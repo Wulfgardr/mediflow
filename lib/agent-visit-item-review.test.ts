@@ -14,7 +14,8 @@ const pdfText = (text: string) => async () => ({ text, beyondText: false });
 const patient = (): Patient => ({ id: 'synthetic-' + cf, taxCode: cf, firstName: 'Persona', lastName: 'Sintetica',
     address: '', phone: '', updatedAt: new Date(), createdAt: new Date(), version: 1 });
 
-async function fixture() {
+type Proposal = { kind: 'observation' | 'therapy' | 'diagnosis'; values: Record<string, string>; quote: string };
+async function fixture(proposalInput: Proposal = { kind: 'observation', values: observation, quote }) {
     const f = await agentCassetteFixture(undefined, 'local', false);
     db.setKey(f.masterKey);
     const visitId = randomUUID();
@@ -27,8 +28,8 @@ async function fixture() {
     const pdfId = randomUUID(), pdf = seal(pdfId, 'pdf', { name: 'synthetic.pdf', base64: bytes.toString('base64') });
     const documentHash = createHash('sha256').update(bytes).digest('hex');
     receipt = f.run(() => f.store.add(f.principal, visitId, receipt.revision, { id: pdfId, kind: 'pdf', envelope: pdf.envelope, byteLength: pdf.bytes.length, documentHash }));
-    const proposalId = randomUUID(), proposal = seal(proposalId, 'observation', { values: observation, quote, source: { sha256: documentHash, fileName: 'synthetic.pdf' } });
-    receipt = f.run(() => f.store.add(f.principal, visitId, receipt.revision, { id: proposalId, kind: 'observation', envelope: proposal.envelope,
+    const proposalId = randomUUID(), proposal = seal(proposalId, proposalInput.kind, { values: proposalInput.values, quote: proposalInput.quote, source: { sha256: documentHash, fileName: 'synthetic.pdf' } });
+    receipt = f.run(() => f.store.add(f.principal, visitId, receipt.revision, { id: proposalId, kind: proposalInput.kind, envelope: proposal.envelope,
         byteLength: proposal.bytes.length, documentHash: null }));
     f.run(() => f.store.close(f.principal, visitId, receipt.revision));
     const row = (discardedItemIds: string[] = []) => ({ ...f.rows()[0], appliedItemIds: [], discardedItemIds });
@@ -77,4 +78,47 @@ test('a proposal without a verified source cannot be kept as is, but can be corr
         assert.equal(agentVisitAwaitsReview(afterDiscard), true);
         assert.deepEqual((await prepareAgentApplication(afterDiscard, signal))?.items.map(item => item.id), [f.pdfId]);
     } finally { get.mock.restore(); query.mock.restore(); f.close(); }
+});
+
+const therapyQuote = 'Prescrivo Eutirox levotiroxina 50 mcg una compressa al mattino, AIC 023935010, ATC H03AA01.';
+const therapy = { drugName: 'Eutirox', activePrinciple: 'levotiroxina', dosage: '50 mcg una compressa al mattino', status: 'active', startDate: '2026-11-17', aic: '023935010', atc: 'H03AA01' };
+
+test('a correction that changes the drug drops the deposited AIC and ATC codes; a dose correction keeps them', async () => {
+    const f = await fixture({ kind: 'therapy', values: therapy, quote: therapyQuote });
+    const query = mock.method(db.therapies, 'query', () => ({ toArray: async () => [] }));
+    const get = mock.method(db.patients, 'get', async () => patient());
+    try {
+        const signal = new AbortController().signal;
+        const review = await inspectAgentVisit(f.row(), [patient()], null, signal, pdfText('Paziente CF ' + cf + '\nData Prescrizione: 17/11/2026\n' + therapyQuote));
+        const codes = (input: Awaited<ReturnType<typeof prepareAgentItemDecision>>) => {
+            assert.ok(input && input.decision !== 'discard' && input.item.kind === 'therapy');
+            return { aic: input.item.values.aic ?? null, atc: input.item.values.atc ?? null };
+        };
+        assert.deepEqual(codes(await prepareAgentItemDecision(review, f.proposalId, 'keep', signal)), { aic: '023935010', atc: 'H03AA01' });
+        assert.deepEqual(codes(await prepareAgentItemDecision(review, f.proposalId, 'correct', signal, { dosage: '75 mcg una compressa al mattino' })), { aic: '023935010', atc: 'H03AA01' });
+        assert.deepEqual(codes(await prepareAgentItemDecision(review, f.proposalId, 'correct', signal, { drugName: 'Tirosint' })), { aic: null, atc: null });
+        assert.deepEqual(codes(await prepareAgentItemDecision(review, f.proposalId, 'correct', signal, { activePrinciple: 'liotironina' })), { aic: null, atc: null });
+        assert.deepEqual(codes(await prepareAgentItemDecision(review, f.proposalId, 'correct', signal, { drugName: ' eutirox ' })), { aic: '023935010', atc: 'H03AA01' });
+    } finally { get.mock.restore(); query.mock.restore(); f.close(); }
+});
+
+const diagnosisQuote = 'Diagnosi: diabete mellito tipo 2 E11.9 ICD-10 confermata.';
+const diagnosis = { description: 'diabete mellito tipo 2', code: 'E11.9', system: 'ICD-10', date: '2026-11-17' };
+const withDiagnosis = (): Patient => ({ ...patient(), diagnoses: [{ code: 'E11.9', system: 'ICD-10', description: 'Diabete tipo 2', date: new Date('2020-01-01') }] });
+
+test('a diagnosis already in the chart is neither kept nor corrected in silence; the whole visit still shows it in the chart', async () => {
+    const f = await fixture({ kind: 'diagnosis', values: diagnosis, quote: diagnosisQuote });
+    const get = mock.method(db.patients, 'get', async () => withDiagnosis());
+    try {
+        const signal = new AbortController().signal;
+        const review = await inspectAgentVisit(f.row(), [withDiagnosis()], null, signal, pdfText('Paziente CF ' + cf + '\n' + diagnosisQuote));
+        assert.match(review.currentSummary.get(f.proposalId) ?? '', /E11\.9/);
+        await assert.rejects(prepareAgentItemDecision(review, f.proposalId, 'keep', signal), /già in scheda/);
+        await assert.rejects(prepareAgentItemDecision(review, f.proposalId, 'correct', signal, { description: 'diabete mellito tipo 2 in compenso' }), /già in scheda/);
+        assert.deepEqual(review.inRecordItemIds, [f.proposalId]);
+        const recoded = await prepareAgentItemDecision(review, f.proposalId, 'correct', signal, { code: 'E11.65' });
+        assert.ok(recoded && recoded.decision === 'correct' && recoded.item.kind === 'diagnosis');
+        assert.ok(await prepareAgentItemDecision(review, f.proposalId, 'discard', signal));
+        assert.equal(agentVisitAwaitsReview(review), true);
+    } finally { get.mock.restore(); f.close(); }
 });

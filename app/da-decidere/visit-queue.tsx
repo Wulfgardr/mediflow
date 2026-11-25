@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { CircleDashed, FileText, Inbox, NotebookPen } from 'lucide-react';
 import { taxCodeBirthDetails } from '@/lib/patient-identity';
 import { applyReviewedAgentVisits, decideAgentVisitItem, readIncomingAgentPdf } from '@/lib/agent-incoming';
-import { AGENT_CORRECTABLE_FIELDS, agentItemAwaitsDecision, agentItemCorrectable, agentVisitAwaitsReview, type AgentVisitReview } from '@/lib/agent-visit-review';
+import { AGENT_CORRECTABLE_FIELDS, agentCorrectionDropsDrugCodes, agentItemAwaitsDecision, agentItemCorrectable, agentVisitAwaitsReview, type AgentVisitReview } from '@/lib/agent-visit-review';
 import type { AgentItemDecision } from '@/lib/agent-visit-application-contract';
 import { agentReviewFieldLabels as fieldLabels, agentReviewFieldValues as fieldValues, agentReviewItemLabels } from '@/lib/agent-visit-review-labels';
 import surface from '@/components/record-surface.module.css';
@@ -65,12 +65,17 @@ function sourceFileName(item: VisitItem): string | null {
 function CorrectionForm({ item, busy, onCancel, onSave }: { item: VisitItem; busy: boolean; onCancel: () => void; onSave: (values: Record<string, string>) => void }) {
     const fields = agentItemCorrectable(item.kind) ? AGENT_CORRECTABLE_FIELDS[item.kind] : [];
     const values = itemValues(item);
+    const [dropsCodes, setDropsCodes] = useState(false);
+    const read = (form: HTMLFormElement) => {
+        const data = new FormData(form);
+        return Object.fromEntries(fields.map(field => [field, String(data.get(field) ?? '')]));
+    };
     const submit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-        const data = new FormData(event.currentTarget);
-        onSave(Object.fromEntries(fields.map(field => [field, String(data.get(field) ?? '')])));
+        onSave(read(event.currentTarget));
     };
-    return <form className={css.correction} onSubmit={submit} aria-label={'Correggi ' + agentReviewItemLabels[item.kind].toLowerCase()}>
+    return <form className={css.correction} onSubmit={submit} onChange={event => setDropsCodes(agentCorrectionDropsDrugCodes(item, read(event.currentTarget)))}
+        aria-label={'Correggi ' + agentReviewItemLabels[item.kind].toLowerCase()}>
         {fields.map(field => <label key={field} className={css.correctionField}>
             <span>{fieldLabels[field] ?? field}</span>
             {field === 'status' && item.kind === 'therapy'
@@ -80,6 +85,7 @@ function CorrectionForm({ item, busy, onCancel, onSave }: { item: VisitItem; bus
                 : <input name={field} type={DATE_FIELDS.has(field) ? 'date' : 'text'} className="mf-input"
                     defaultValue={DATE_FIELDS.has(field) ? (values[field] ?? '').slice(0, 10) : values[field] ?? ''} />}
         </label>)}
+        {dropsCodes ? <p className={css.correctionNote}>Senza codice AIC e ATC: valevano per il farmaco depositato.</p> : null}
         <div className={css.itemActions}>
             <Button variant="text" onClick={onCancel} disabled={busy}>Annulla</Button>
             <Button variant="secondary" type="submit" disabled={busy}>Tieni corretta</Button>
@@ -90,7 +96,7 @@ function CorrectionForm({ item, busy, onCancel, onSave }: { item: VisitItem; bus
 function ItemGestures({ review, item, busy, onDecide, onCorrect }: { review: AgentVisitReview; item: VisitItem; busy: boolean;
     onDecide: (decision: AgentItemDecision) => void; onCorrect: () => void }) {
     if (!agentItemAwaitsDecision(review, item.id)) return null;
-    const blocked = Boolean(review.itemBlockers.get(item.id)?.length);
+    const blocked = Boolean(review.itemBlockers.get(item.id)?.length) || review.inRecordItemIds.includes(item.id);
     return <div className={css.itemActions} role="group" aria-label={'Decidi ' + proposalHeadline(item)}>
         <Button variant="text" disabled={busy} onClick={() => onDecide('discard')}>Scarta</Button>
         {agentItemCorrectable(item.kind) ? <Button variant="secondary" disabled={busy} onClick={onCorrect}>Correggi</Button> : null}
@@ -274,6 +280,7 @@ export function VisitQueue({ visits, busy, applicationError }: Snapshot) {
                                         </aside>
                                     </div>
                                     {itemBlockers.map(message => <p key={message} className={css.itemBlocker}>{message}</p>)}
+                                    {review.inRecordItemIds.includes(item.id) ? <p className={css.itemInRecord}>Già in scheda.</p> : null}
                                     {correcting === item.id ? null : gestures(item)}
                                 </article>;
                             })}
