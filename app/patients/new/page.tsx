@@ -16,7 +16,7 @@ import { useRouter } from 'next/navigation';
 import { AlertTriangle, CheckCircle2, FileSearch, FileSpreadsheet, FolderOpen } from 'lucide-react'; // manual CSV and folder entrypoints
 import { v4 as uuidv4 } from 'uuid';
 import PatientForm from '@/components/patient-form';
-import PatientDocumentCreate from '@/components/patient-document-create';
+import { DossierNewPatientImport } from '@/components/dossier-import-panel';
 import { focusPatientCreationTarget } from '@/lib/patient-creation-focus';
 import { useToast } from '@/components/ui/toast-provider';
 import { useConfirm } from '@/components/ui/confirm-dialog';
@@ -252,13 +252,14 @@ export default function NewPatientPage() {
                     <div className={surface.island}>
                         <div className={surface.islandHeader}>
                             <span className={surface.islandIcon} aria-hidden="true"><FileSearch size={16} /></span>
-                            <h2>Documento clinico</h2>
+                            <h2>Crea la scheda dai documenti</h2>
                         </div>
                         <p className={surface.pageMeta}>
-                            Il testo viene estratto su questo computer. Trascrivi i dati anagrafici e conferma con il PIN. Il documento resta allegato alla scheda.
+                            I documenti si leggono su questo computer. Confermi i dati anagrafici proposti e il PIN; diagnosi, farmaci ed esami
+                            restano da rivedere, ognuno con la sua fonte.
                         </p>
-                        <PatientDocumentCreate onActiveChange={setDocumentFlowActive} />
                     </div>
+                    <DossierNewPatientImport onActiveChange={setDocumentFlowActive} />
                 </section>
 
             {importMeta && (
