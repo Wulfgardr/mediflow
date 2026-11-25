@@ -244,12 +244,21 @@ const NAME_TOKEN = String.raw`(?!${LABEL_WORD})[A-ZÀ-Ý][A-Za-zÀ-ÿ'’]+(?:\s
 const SURNAME = new RegExp(String.raw`\b[Cc]ognome\s*[:.]\s*(${NAME_TOKEN})`, 'u');
 const GIVEN = new RegExp(String.raw`(?<![Cc]og)\b[Nn]ome\s*[:.]\s*(${NAME_TOKEN})`, 'u');
 const BIRTH = /\b(?:nat[oa]\s+il|data\s+di\s+nascita\s*[:.]?)\s*(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})/iu;
+const MONTHS = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
+const SPOKEN_BIRTH = new RegExp(String.raw`\b(?:nat[oa]\s+il|data\s+di\s+nascita\s*[:.]?)\s*(\d{1,2})°?\s+(${MONTHS.join('|')})\s+(\d{4})`, 'iu');
+
+function birthMatch(text: string): [string, string, string, string] | null {
+    const numeric = BIRTH.exec(text);
+    if (numeric) return [numeric[0], numeric[1], numeric[2], numeric[3]];
+    const spoken = SPOKEN_BIRTH.exec(text);
+    return spoken ? [spoken[0], spoken[1], String(MONTHS.indexOf(spoken[2].toLowerCase()) + 1), spoken[3]] : null;
+}
 
 /** Proposte d'anagrafica da etichette esplicite: il medico le inserisce solo con un gesto. */
 export function proposeIdentityFields(text: string, patientTaxCode: string | null): DossierIdentityProposal[] {
     const proposals: DossierIdentityProposal[] = [];
     if (patientTaxCode) proposals.push({ field: 'taxCode', value: patientTaxCode, excerpt: `Codice fiscale paziente nel documento: ${patientTaxCode}` });
-    const surname = SURNAME.exec(text); const given = GIVEN.exec(text); const birth = BIRTH.exec(text);
+    const surname = SURNAME.exec(text); const given = GIVEN.exec(text); const birth = birthMatch(text);
     if (surname) proposals.push({ field: 'lastName', value: surname[1].trim(), excerpt: surname[0].trim() });
     if (given) proposals.push({ field: 'firstName', value: given[1].trim(), excerpt: given[0].trim() });
     if (birth) {
