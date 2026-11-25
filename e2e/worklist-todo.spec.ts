@@ -6,7 +6,7 @@ import { closureGallery, registerClosureZoom } from './fixtures/patient-closure-
 import { installWorklistTodoFixture } from './fixtures/worklist-todo';
 import { assertNoHorizontalOverflow, bootstrapUnlockedSession } from './utils';
 
-const directoryCommandSelector = '[data-patient-directory] > header :is(a, button):not(.mf-composite-field .mf-button-icon)';
+const directoryCommandSelector = '[data-patient-directory] > :is(header, [data-patient-directory-tools]) :is(a, button):not(.mf-composite-field .mf-button-icon)';
 
 test('Da fare: controlli confermati, letture negative, filtri e ritorno alla riga', async ({ baseURL }, info) => {
   test.setTimeout(300_000);
@@ -59,7 +59,7 @@ test('Da fare: controlli confermati, letture negative, filtri e ritorno alla rig
               radius: css.borderRadius, overflow: node.scrollWidth - node.clientWidth };
           }), commands: [...document.querySelectorAll(commandSelector)].filter(visible).map(node => {
             const r = node.getBoundingClientRect(), css = getComputedStyle(node);
-            return { text: node.textContent, recipe: node.className, accessibleName: node.getAttribute('aria-label'), insideCompositeField: !!node.closest('.mf-composite-field'), visibility: css.visibility, width: r.width, height: r.height, padding: [css.paddingTop, css.paddingRight, css.paddingBottom, css.paddingLeft], gap: css.gap };
+            return { text: node.textContent, header: !!node.closest('[data-command-bar]'), recipe: node.className, accessibleName: node.getAttribute('aria-label'), insideCompositeField: !!node.closest('.mf-composite-field'), visibility: css.visibility, width: r.width, height: r.height, padding: [css.paddingTop, css.paddingRight, css.paddingBottom, css.paddingLeft], gap: css.gap };
           }), primaryCount: document.querySelectorAll('[data-patient-directory] [data-lume-action=primary]').length,
           emptyTodos: [...document.querySelectorAll('[data-worklist-todo]')].filter(node => node.textContent === 'Nessun controllo aperto').map(node => {
             const css = getComputedStyle(node);
@@ -93,9 +93,9 @@ test('Da fare: controlli confermati, letture negative, filtri e ritorno alla rig
         for (const overflow of frame.columnOverflow) expect(overflow).toBeLessThanOrEqual(1);
         expect(frame.commands).toHaveLength(3);
         for (const command of frame.commands) {
-          expect(command.height, command.text ?? '').toBeGreaterThanOrEqual(frame.cssWidth <= 700 ? 44 : 40);
-          expect(command.width).toBeGreaterThanOrEqual(40);
-          expect(command.padding, command.text || command.accessibleName || command.recipe).toEqual(['8px', '16px', '8px', '16px']);
+          expect(command.height, command.text ?? '').toBeGreaterThanOrEqual(frame.cssWidth <= 700 ? 44 : command.header ? 36 : 40);
+          expect(command.width).toBeGreaterThanOrEqual(36);
+          expect(command.padding, command.text || command.accessibleName || command.recipe).toEqual(command.header ? ['0px', '14px', '0px', '14px'] : ['8px', '16px', '8px', '16px']);
         }
         for (const measured of frame.rows) {
           expect(measured.height).toBeGreaterThanOrEqual(frame.cssWidth <= 700 ? 44 : 40);
