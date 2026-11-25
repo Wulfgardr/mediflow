@@ -37,7 +37,7 @@ test('the physician decides a kit visit one proposal at a time, and the visit is
     const directory = info.outputPath(visitId);
     mkdirSync(directory, { mode: 0o700 });
     const note = 'S: Controllo sintetico.\nO: Dati sintetici.\nA: Stabile.\nP: Vitamina D e visita pneumologica.';
-    const therapy = 'Prescrivo colecalciferolo 25.000 UI una fiala ogni 15 giorni.';
+    const therapy = 'Prescrivo Dibase colecalciferolo 25.000 UI una fiala ogni 15 giorni, AIC 036588019, ATC A11CC05.';
     const service = 'Prescritta visita pneumologica di controllo.';
     const exemption = 'Confermata esenzione codice E30.';
     const source = async (lines: string[], documentDate: string | null, facts: unknown[], isNote = false) => {
@@ -52,7 +52,7 @@ test('the physician decides a kit visit one proposal at a time, and the visit is
             coverage: { pages: null, unreadablePages: [], complete: false, note: 'Originale da rivedere dal medico' } };
     };
     const prescription = await source(['Paziente CF ' + fiscalCode, 'Data Prescrizione: 17/11/2026', therapy, service, exemption], null, [
-        { kind: 'therapy', values: { drugName: 'colecalciferolo', dosage: '25.000 UI una fiala ogni 15 giorni' }, quote: therapy },
+        { kind: 'therapy', values: { drugName: 'Dibase', activePrinciple: 'colecalciferolo', dosage: '25.000 UI una fiala ogni 15 giorni', aic: '036588019', atc: 'A11CC05' }, quote: therapy },
         { kind: 'service_prescription', values: { serviceName: 'visita pneumologica di controllo' }, quote: service },
         { kind: 'exemption', values: { code: 'E30' }, quote: exemption },
     ]);
@@ -79,7 +79,7 @@ test('the physician decides a kit visit one proposal at a time, and the visit is
 
     const database = new Database(path.join(isolatedRuntime.dataDirectory, 'medical.db'), { readonly: true, fileMustExist: true });
     try {
-        const therapies = () => database.prepare('SELECT drug_name AS drug, dosage FROM therapies WHERE patient_id = ?').all(patient.id);
+        const therapies = () => database.prepare('SELECT drug_name AS drug, dosage, aic, atc FROM therapies WHERE patient_id = ?').all(patient.id);
         const services = () => database.prepare('SELECT id FROM service_prescriptions WHERE patient_id = ?').all(patient.id);
         const entries = () => database.prepare('SELECT id FROM entries WHERE patient_id = ?').all(patient.id);
         const events = (type: string) => database.prepare('SELECT actor_ref AS actor, occurred_at AS at, redacted_metadata AS metadata FROM audit_events WHERE event_type = ? AND (request_id = ? OR subject_ref = ?)')
@@ -88,13 +88,17 @@ test('the physician decides a kit visit one proposal at a time, and the visit is
 
         await proposal('Terapia proposta').getByRole('button', { name: 'Correggi', exact: true }).click();
         const correction = visit.getByRole('form', { name: 'Correggi terapia proposta' });
+        const withoutCodes = correction.getByText('Senza codice AIC e ATC: valevano per il farmaco depositato.', { exact: true });
         await correction.getByLabel('Posologia', { exact: true }).fill('25.000 UI una fiala ogni 30 giorni');
-        await shot('2-correggi-la-dose');
+        await expect(withoutCodes).toHaveCount(0);
+        await correction.getByLabel('Farmaco', { exact: true }).fill('Colecalciferolo Sintetico');
+        await expect(withoutCodes).toBeVisible();
+        await shot('2-correggi-farmaco-e-dose');
         await correction.getByRole('button', { name: 'Tieni corretta', exact: true }).click();
         const decided = visit.getByRole('region', { name: 'Voci decise' });
         await expect(decided.getByText('Corretta in scheda', { exact: true })).toHaveCount(1);
         await expect(decided.getByText('ogni 15 giorni')).toHaveCount(0);
-        expect(therapies()).toEqual([{ drug: 'colecalciferolo', dosage: '25.000 UI una fiala ogni 30 giorni' }]);
+        expect(therapies()).toEqual([{ drug: 'Colecalciferolo Sintetico', dosage: '25.000 UI una fiala ogni 30 giorni', aic: null, atc: null }]);
         expect(services()).toEqual([]);
         expect(entries()).toEqual([]);
         await expect(visit.getByText('Decisa in parte', { exact: true })).toBeVisible();
