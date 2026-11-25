@@ -38,7 +38,8 @@ const icd11CodeSchema = z.string().trim().regex(ICD11_CODE_PATTERN, {
     message: 'Codice ICD-11 non valido',
 });
 
-export const servicePackageSourceSchema = z.object({
+export const documentSourceSchema = z.object({
+    kind: z.literal('documento'),
     document: nonEmptyText,
     sectionOrTable: nonEmptyText,
     publishedAt: isoCalendarDateSchema,
@@ -46,6 +47,25 @@ export const servicePackageSourceSchema = z.object({
     url: z.string().url(),
     status: z.enum(SERVICE_PACKAGE_SOURCE_STATUSES),
 }).strict();
+
+export const physicianDecisionSourceSchema = z.object({
+    kind: z.literal('decisione_del_medico'),
+    decidedBy: nonEmptyText,
+    decidedAt: isoCalendarDateSchema,
+    decision: nonEmptyText,
+}).strict();
+
+export const servicePackageSourceSchema = z.discriminatedUnion('kind', [
+    documentSourceSchema,
+    physicianDecisionSourceSchema,
+]);
+
+const itemSourcesSchema = z.array(servicePackageSourceSchema)
+    .min(1)
+    .refine((sources) => sources.some((source) => source.kind === 'documento'), {
+        message: 'Ogni voce cita almeno un documento',
+    })
+    .readonly();
 
 export const draftApprovalSchema = z.object({
     status: z.literal('draft_pending_approval'),
@@ -72,7 +92,7 @@ export const servicePackageItemSchema = z.object({
     priority: z.enum(SERVICE_PACKAGE_PRIORITIES),
     exemptionCode: nonEmptyText.nullable(),
     appropriatenessConditions: z.array(nonEmptyText).readonly(),
-    sources: z.array(servicePackageSourceSchema).min(1).readonly(),
+    sources: itemSourcesSchema,
 }).strict();
 
 export const complicationModuleSchema = z.object({
@@ -118,6 +138,8 @@ export const servicePackageSchema = z.union([
     approvedServicePackageSchema,
 ]);
 
+export type DocumentSource = z.infer<typeof documentSourceSchema>;
+export type PhysicianDecisionSource = z.infer<typeof physicianDecisionSourceSchema>;
 export type ServicePackageSource = z.infer<typeof servicePackageSourceSchema>;
 export type DraftServicePackageApproval = z.infer<typeof draftApprovalSchema>;
 export type ApprovedServicePackageApproval = z.infer<typeof approvedApprovalSchema>;
@@ -196,6 +218,12 @@ export type SkippedServiceItem = Readonly<{
     periodicityMonths: number;
     reason: SkippedServiceReason;
 }>;
+
+export function servicePackageSourceKey(source: ServicePackageSource): string {
+    return source.kind === 'documento'
+        ? [source.kind, source.document, source.sectionOrTable, source.publishedAt].join('\u0000')
+        : [source.kind, source.decidedBy, source.decidedAt, source.decision].join('\u0000');
+}
 
 export function formatServicePackageApproval(approval: ServicePackageApproval): string {
     if (approval.status === 'draft_pending_approval') {

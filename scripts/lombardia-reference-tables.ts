@@ -13,6 +13,8 @@ export const EXEMPTION_COVERAGE_TABLE_PATH = 'assets/reference-data/lombardia/es
 
 const NOMENCLATORE_COLUMNS = ['codice', 'descrizione', 'nota', 'nota_regionale', 'branca'] as const;
 const EXEMPTION_COLUMNS = ['esenzione', 'malattia', 'codice_prestazione', 'condizione', 'pagine_allegato_8'] as const;
+export const ALLEGATO_8_CONTROL_VISIT = 'VISITA DI CONTROLLO';
+const CONTROL_VISIT_DESCRIPTION = /^VISITA\b[^.]*\bDI CONTROLLO\b/u;
 
 export type NomenclatoreRow = Readonly<{
     code: string;
@@ -71,9 +73,28 @@ export function readNomenclatoreTable(path = NOMENCLATORE_TABLE_PATH): Nomenclat
     return parseNomenclatoreTable(readFileSync(path, 'utf8'));
 }
 
+export function controlVisitCodes(rows: readonly NomenclatoreRow[]): string[] {
+    return rows.filter((row) => CONTROL_VISIT_DESCRIPTION.test(row.description)).map((row) => row.code);
+}
+
+export function expandControlVisitCoverage(
+    entries: readonly RegionalExemptionCoverageEntry[],
+    nomenclatore: readonly NomenclatoreRow[],
+): RegionalExemptionCoverageEntry[] {
+    const visits = controlVisitCodes(nomenclatore);
+    return entries.flatMap((entry) => (entry.serviceCode === ALLEGATO_8_CONTROL_VISIT
+        ? visits.map((serviceCode) => ({ ...entry, serviceCode }))
+        : [entry]));
+}
+
+export function readExemptionCoverageTable(path = EXEMPTION_COVERAGE_TABLE_PATH): RegionalExemptionCoverageEntry[] {
+    return parseExemptionCoverageTable(readFileSync(path, 'utf8'));
+}
+
 export function readLombardiaReferenceCatalog(): LombardiaReferenceCatalog {
+    const nomenclatore = readNomenclatoreTable();
     return {
-        services: nomenclatoreCatalogEntries(readNomenclatoreTable()),
-        exemptions: parseExemptionCoverageTable(readFileSync(EXEMPTION_COVERAGE_TABLE_PATH, 'utf8')),
+        services: nomenclatoreCatalogEntries(nomenclatore),
+        exemptions: expandControlVisitCoverage(readExemptionCoverageTable(), nomenclatore),
     };
 }
