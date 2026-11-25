@@ -26,10 +26,11 @@ createRoot(document.getElementById('root')!).render(<Fixture/>);
 `);
 await build({ entryPoints: [entry], bundle: true, outfile: join(output, 'fixture.js'), jsx: 'automatic', platform: 'browser',
     nodePaths: [join(root, 'node_modules')], tsconfig: join(root, 'tsconfig.json'), loader: { '.module.css': 'local-css' }, define: { 'process.env.NODE_ENV': '"test"', 'process.env': '{}' } });
-const utilities = await postcss([tailwind({ base: root })]).process(`@import "tailwindcss" source(none); @source "${root}/components/settings/settings-ui.tsx"; @source "${root}/components/settings/chatgpt-account-card.tsx";`, { from: join(root, 'app/account-fixture.css') });
+const globals = join(root, 'app/globals.css');
+const utilities = await postcss([tailwind({ base: root })]).process(await readFile(globals, 'utf8'), { from: globals });
 const tokens = (await Promise.all(['lume-tokens.css','lume-motion.css','runtime-twin.css'].map(file => readFile(join(root, 'app', file), 'utf8')))).join('\n');
 await writeFile(join(output, 'base.css'), utilities.css + '\n' + tokens + '\nbody{margin:0;background:var(--lume-surface-canvas);color:var(--lume-ink);font-family:system-ui}main{width:calc(100% - 32px);max-width:1080px;margin:32px auto}h1{font-size:20px;margin-bottom:24px}#lock-fixture{margin-top:32px}');
-await writeFile(join(output, 'index.html'), '<!doctype html><html lang="it" data-runtime-twin-design="proposal" data-ui-style="redesign" data-twin-composition="stream"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>ChatGPT account — fixture sintetica</title><link rel="stylesheet" href="/base.css"><link rel="stylesheet" href="/fixture.css"><div id="root"></div><script src="/fixture.js"></script></html>');
+await writeFile(join(output, 'index.html'), '<!doctype html><html lang="it" data-lume="true" data-runtime-twin-design="proposal" data-ui-style="redesign" data-twin-composition="stream"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>ChatGPT account — fixture sintetica</title><link rel="stylesheet" href="/base.css"><link rel="stylesheet" href="/fixture.css"><div id="root"></div><script src="/fixture.js"></script></html>');
 const files = new Set(['index.html','base.css','fixture.css','fixture.js']);
 const server = createServer(async (req,res) => {
     if (req.url === '/brand/openai/chatgpt-mark.png') { res.setHeader('Content-Type', 'image/png'); res.end(await readFile(markPath)); return; }
@@ -77,6 +78,7 @@ try {
     const syntheticModel = panel.getByRole('listitem').filter({ hasText: /^synthetic-model · predefinito dell’account, non di MediFlow$/ });
     async function geometry(width, name) {
         await page.setViewportSize({ width, height: 1000 });
+        await page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))));
         const metrics = await panel.evaluate(element => {
             const controls = [...element.querySelectorAll('button,a,summary')].filter(node => node.checkVisibility());
             const rectangles = controls.map(node => { const r=node.getBoundingClientRect(); return { text: node.textContent, x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height }; });
