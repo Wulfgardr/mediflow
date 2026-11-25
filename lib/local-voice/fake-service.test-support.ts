@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { localVoiceResponseProof, signLocalVoiceRequest } from './client.mjs';
+import { localVoiceContinueProof, localVoiceResponseProof, signLocalVoiceRequest } from './client.mjs';
 
 type Line = { speaker: 'doctor' | 'patient'; text: string };
 type Suggestion = { original: string; replacement: string };
@@ -39,7 +39,7 @@ export async function startFakeLocalVoice({ secret, port = 0, model = 'ready', l
             } : null,
         };
     };
-    const server = http.createServer((request, response) => {
+    const handle = (request: http.IncomingMessage, response: http.ServerResponse) => {
         const chunks: Buffer[] = [];
         request.on('data', (chunk) => chunks.push(chunk));
         request.on('end', () => {
@@ -79,12 +79,18 @@ export async function startFakeLocalVoice({ secret, port = 0, model = 'ready', l
             if (request.method === 'POST' && match[2] === '/commands') {
                 const { command } = JSON.parse(body.toString('utf8'));
                 if (!(ALLOWED[session.state] ?? []).includes(command)) return reply(409, { error: 'not-allowed' });
-                if (command === 'stop' && state.stopFailures > 0) { state.stopFailures -= 1; return reply(409, { error: 'audio-pending' }); }
+                if ((command === 'stop' || command === 'pause') && state.stopFailures > 0) { state.stopFailures -= 1; return reply(503, { error: 'draining' }); }
                 session.state = command === 'start' ? 'preparing' : command === 'pause' ? 'paused' : command === 'resume' ? 'recording' : 'review';
                 return reply(202, snapshot());
             }
             return reply(404, { error: 'not-found' });
         });
+    };
+    const server = http.createServer(handle);
+    server.on('checkContinue', (request: http.IncomingMessage, response: http.ServerResponse) => {
+        const nonce = String(request.headers['x-mediflow-voice-auth'] ?? '').split('.')[1] ?? '';
+        request.socket.write(`HTTP/1.1 100 Continue\r\nX-MediFlow-Voice-Proof: ${localVoiceContinueProof(secret, nonce)}\r\n\r\n`);
+        handle(request, response);
     });
     await new Promise<void>((resolve) => server.listen(port, '127.0.0.1', resolve));
     const address = server.address() as AddressInfo;
