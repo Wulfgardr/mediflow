@@ -128,7 +128,10 @@ test('WUL-949: la cartella del Fascicolo entra nell’import dalla scheda, si fe
         await expect(page).toHaveURL(new RegExp(`/patients/import/dossier\\?patientId=${patientId}`));
         await expect(sources).toHaveCount(3, { timeout: 60_000 });
         await expect(group.locator('[data-source-status="already_imported"]')).toHaveCount(2);
-        await expect(group.locator('[data-source-status="already_imported"]').first()).toContainText('Già importato: saltato');
+        const skipped = group.locator('[data-source-status="already_imported"]').filter({ hasText: '2025-03-14_LAB_' });
+        await expect(skipped).toContainText('Già importato: saltato');
+        await expect(skipped).toContainText('Data: 2025-03-14');
+        await expect(skipped).not.toContainText('Nessun CF leggibile');
         await expect(group.locator('[data-source-status="ready"]')).toHaveCount(1);
         await group.screenshot({ path: path.join(evidence, '4-seconda-importazione.png') });
         await group.getByLabel('Ho controllato le fonti e confermo che appartengono alla scheda scelta.').check();

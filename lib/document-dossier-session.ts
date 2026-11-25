@@ -181,8 +181,10 @@ export async function buildDossierInventory(
         const hinted = file.hints ? { categoryLabel: file.hints.categoryLabel } : {};
         if (imported.has(sha256)) {
             bytes.fill(0);
+            const named = findExplicitDocumentDate('', file.name);
             sources.push({ key, group: groupKeyOf(file.relativePath), relativePath: file.relativePath, fileName: file.name, size: file.size, sha256,
-                classification, extraction: { state: 'not_extracted', reason: classification.kind }, text: null, taxCodes: [], patientNames: [], documentDate: null,
+                classification, extraction: { state: 'not_extracted', reason: classification.kind }, text: null, taxCodes: [], patientNames: [],
+                documentDate: named ? { value: named.date, source: named.source } : null,
                 facts: [], classificationResult: file.hints?.classification ?? 'unknown', ...hinted, status: 'already_imported', file });
             options.onProgress?.(index + 1, files.length);
             continue;

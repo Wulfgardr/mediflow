@@ -452,11 +452,13 @@ function ActiveDossierImport({ initialPatientId, entry }: { initialPatientId: st
                                                 <td role="cell" data-label="N.">{index + 1}</td>
                                                 <td role="cell" data-label="File"><PrivacyBlur>{source.relativePath}</PrivacyBlur>
                                                     <small className={styles.muted}>{source.classification.reason}</small></td>
-                                                <td role="cell" data-label="Lettura">{describeExtraction(source)}
+                                                <td role="cell" data-label="Lettura">{source.status === 'already_imported' ? null : describeExtraction(source)}
                                                     {source.categoryLabel ? <small data-testid="dossier-source-category">Categoria: {source.categoryLabel}</small> : null}
                                                     <small>{source.documentDate ? `Data: ${source.documentDate.value}` : 'Nessuna data esplicita'}</small>
-                                                    <small>{taxCodes.length ? <>CF letti: <PrivacyBlur>{taxCodes.join(', ')}</PrivacyBlur></> : 'Nessun CF leggibile'}</small>
-                                                    <small>{formatCountLabel(source.facts.length, 'proposta', 'proposte')}</small>
+                                                    {source.status === 'already_imported' ? null : <>
+                                                        <small>{taxCodes.length ? <>CF letti: <PrivacyBlur>{taxCodes.join(', ')}</PrivacyBlur></> : 'Nessun CF leggibile'}</small>
+                                                        <small>{formatCountLabel(source.facts.length, 'proposta', 'proposte')}</small>
+                                                    </>}
                                                     {source.prepared ? <small data-testid="dossier-source-prepared">Estrazione preparata: {formatCountLabel(source.prepared.facts, 'proposta', 'proposte')}{source.prepared.patientLabel ? <>, paziente <PrivacyBlur>{source.prepared.patientLabel}</PrivacyBlur></> : ''}{source.prepared.notes.length ? `. ${source.prepared.notes.join(' ')}` : ''}</small>
                                                         : prepared && source.status === 'ready' ? <small className={styles.notice} data-testid="dossier-source-prepared">Assente dall’estrazione preparata: solo proposte del parser locale.</small> : null}</td>
                                                 <td role="cell" data-label="Esito">

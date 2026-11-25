@@ -1076,6 +1076,7 @@ test('WUL-949 alla seconda importazione i documenti già nel dossier della sched
     const [second] = await buildDossierInventory(ports, files, { ...live, declaredTaxCode: CF_A, skipImportedFor: 'pa' });
     assert.deepEqual(second.sources.map((item) => item.status), ['already_imported']);
     assert.equal(second.sources[0].extraction.state, 'not_extracted');
+    assert.deepEqual(second.sources[0].documentDate, { value: '2025-01-10', source: 'file_name' });
     const outcomes = await acquireDossierGroup(ports, { group: second, patientId: 'pa', confirmed: true, ...live });
     assert.deepEqual(outcomes, [{ key: 's1', status: 'skipped', reason: 'already_imported' }]);
     assert.equal(attachments.size, 1);
