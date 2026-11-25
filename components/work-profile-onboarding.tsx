@@ -204,9 +204,9 @@ function ProfileEditor({ controller }: { controller: WorkProfileController }) {
 export function WorkProfileOnboarding({ controller }: { controller: WorkProfileController }) {
     const { state, busy, error, reload } = controller;
     return (
-        <section className={`${styles.experience} ${styles.profile}`} aria-labelledby="work-profile-title" data-testid="work-profile-onboarding" aria-busy={busy}>
+        <section className={`${styles.experience} ${styles.profile}`} aria-labelledby="work-profile-title" data-testid="work-profile-onboarding" data-record-page="true" aria-busy={busy}>
             <header className={styles.heading}>
-                <h1 id="work-profile-title" className="type-page-title">Il tuo modo di lavorare<span aria-hidden="true">.</span></h1>
+                <h1 id="work-profile-title">Il tuo modo di lavorare</h1>
                 <p>Scegli da dove iniziare. Puoi usare la cartella senza IA.</p>
                 <nav className={styles.links} aria-label="Percorsi sempre disponibili">
                     <Link className={styles.textAction} href="/?area=incarico">Apri la cartella manualmente</Link>

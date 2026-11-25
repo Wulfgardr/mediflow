@@ -20,7 +20,7 @@ export default function SettingsCompliancePage() {
                 <p>Lo stato legale non è valutato. Le evidenze tecniche possono supportare una verifica,
                     ma non determinano applicabilità, ruoli, adempimenti o certificazioni.</p>
             </section>
-            <div>
+            <div className={styles.evidenceList}>
                 {COMPLIANCE_EVIDENCE_INVENTORY.records.map(record => (
                     <article key={record.id} className={styles.section} data-testid={`compliance-evidence-${record.id}`}>
                         <h3 className={styles.heading}>{record.label}</h3>

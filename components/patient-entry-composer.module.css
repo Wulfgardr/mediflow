@@ -29,7 +29,7 @@
     gap: 6px 20px;
     margin-top: 8px;
 }
-.titleRow h1 { margin: 0; letter-spacing: 0; font: var(--type-page-title); }
+.titleRow h1 { margin: 0; letter-spacing: 0; font: var(--type-record-person); }
 .titleRow p { margin: 0; color: var(--lume-ink-muted); font-size: 0.875rem; overflow-wrap: anywhere; }
 
 .sheet {
@@ -243,3 +243,38 @@
 .steps [aria-current='step'] { color: var(--lume-ink); font-weight: 600; }
 .receipt { padding: 14px; background: var(--lume-surface-field); border-radius: var(--lume-radius-control); }
 .receipt > p { margin-block: 10px; }
+
+.entryRoute .titleRow h1, .notesReview h1 { font: var(--type-record-person); letter-spacing: 0; }
+.entryRoute .titleRow h1 > span[aria-hidden='true'] { display: none; }
+.entryRoute .writingColumn {
+    padding: 10px;
+    border-radius: 24px;
+    background: var(--lume-record-tray);
+    box-shadow: inset 0 0 0 1px var(--lume-record-tray-rule),
+        inset 0 1px 0 var(--lume-record-tray-light),
+        inset 0 -12px 18px -18px var(--lume-record-tray-shadow);
+}
+.entryRoute .writingColumn .columnHeading { margin: 4px 6px 10px; }
+.entryRoute .writingColumn .sheet,
+.notesReview > section {
+    padding: 14px 16px;
+    border: 1px solid var(--lume-record-island-rule);
+    border-radius: 14px;
+    background: var(--lume-record-island);
+}
+.entryRoute .writingColumn .form { padding: 0; }
+.entryRoute .writingColumn .actions { margin-inline: 0; background: var(--lume-record-island); }
+.entryRoute :is(.metadataField select, .metadataField input, .editor),
+.notesReview :global(.mf-input):not([aria-invalid='true']) { border-color: var(--lume-ink-muted); border-radius: 10px; }
+.notesReview { width: min(100%, 48rem); margin-inline: auto; }
+.notesReview > section { margin: 0; max-width: none; }
+.notesReview h2 { font: var(--type-record-island); }
+
+@media (max-width: 699px) {
+    .entryRoute .page { padding-top: 10px; }
+    .entryRoute .header { margin-bottom: 10px; }
+    .entryRoute .writingColumn { padding: 6px; border-radius: 16px; }
+    .entryRoute .writingColumn .columnHeading { margin: 2px 6px 6px; }
+    .entryRoute .writingColumn .sheet, .notesReview > section { padding: 10px 14px; }
+    .entryRoute .metadata { gap: 8px 12px; padding-bottom: 12px; }
+}

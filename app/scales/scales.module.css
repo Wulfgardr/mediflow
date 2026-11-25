@@ -1,40 +1,15 @@
-/* WUL-676: section titles and explanatory text use the shared proposal scale. */
-:global(html[data-runtime-twin-design='proposal']) .sectionHeading h2 {
-    margin: 0;
-    font-size: var(--twin-type-section);
-    font-weight: var(--twin-heading-weight);
-    line-height: var(--twin-heading-leading);
-    letter-spacing: -0.02em;
-}
-:global(html[data-runtime-twin-design='proposal']) .sectionHeading p {
-    margin: 6px 0 0;
-    color: var(--lume-ink-muted);
-    font-size: var(--twin-type-body);
-    line-height: var(--twin-body-leading);
-}
-:global(html[data-runtime-twin-design='proposal']) .categoryTitle {
-    padding: 0;
-    color: var(--lume-ink);
-    font-size: var(--twin-type-subsection);
-    font-weight: var(--twin-heading-weight);
-    line-height: var(--twin-heading-leading);
-    letter-spacing: -0.01em;
-    text-transform: none;
-}
-.catalogCount {
-    padding-top: 4px;
-    color: var(--lume-ink-muted);
-    font-size: var(--twin-type-caption);
-    line-height: var(--twin-body-leading);
-    font-variant-numeric: tabular-nums;
-}
-
-/* WUL-678: catalogue and patient choice share the workspace plane. */
-.catalogSection, .patientSection { display: grid; gap: 24px; scroll-margin-top: 10rem; }
-.patientSection { padding-top: 24px; border-top: 1px solid color-mix(in srgb, var(--lume-ink) 16%, transparent); }
-
-.patientSearch { display: flex; align-items: center; gap: 12px; }
+.catalogSection, .patientSection { scroll-margin-top: 10rem; }
+.patientSection { margin-top: 16px; }
+.changeScale { gap: 6px; }
+.patientSearch { display: flex; align-items: center; gap: 8px; }
 .patientSearch > svg { flex: 0 0 16px; width: 16px; height: 16px; }
-.patientSearch > input { min-width: 0; }
-.patientName { display: block; font-size: 0.875rem; font-weight: 600; white-space: normal; overflow-wrap: anywhere; }
-.patientIdentity { display: block; margin-top: 4px; white-space: normal; overflow-wrap: anywhere; }
+.patientSearch > input { flex: 1; min-width: 0; }
+.patientName, .patientIdentity { display: block; white-space: normal; overflow-wrap: anywhere; }
+.patientName { font: var(--type-record-row); }
+.patientIdentity { margin-top: 4px; }
+.instrumentRow[aria-pressed='true'] {
+    padding-inline: 8px;
+    border-radius: 8px;
+    background: var(--lume-record-change);
+}
+:global(:root) .catalogSection[data-record-tray] > h2 { font: var(--type-record-zone); }

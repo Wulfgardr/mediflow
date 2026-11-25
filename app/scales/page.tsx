@@ -16,13 +16,13 @@ import {
 import { useRouter } from 'next/navigation';
 
 import { Kree8WorkspaceShell } from '@/components/kree8/kree8-workspace-shell';
-import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import { useLiveQueryState } from '@/lib/live-query';
 import { readCockpitRows } from '@/components/kree8/cockpit-read-snapshot';
 import { subscribeClientAccountAuthority } from '@/lib/security/client-auth-api';
 import { db } from '@/lib/db';
 import { SCALES } from '@/lib/scale-definitions';
 import { scaleDisplayTitle } from '@/lib/scale-history';
+import surface from '@/components/record-surface.module.css';
 import styles from './scales.module.css';
 import scaleStyles from '@/components/scales/scale-workspace.module.css';
 
@@ -40,7 +40,7 @@ const SCALE_CATALOG: ScaleCatalogItem[] = [
     { id: 'iadl', category: 'Autonomia e mobilità', icon: ClipboardList },
 ].filter((item) => Boolean(SCALES[item.id]));
 
-const SCALE_NAV_BASE: { href: string; label: string; meta?: string }[] = [];
+const SCALE_NAV_BASE = [{ href: '#catalogo', label: 'Catalogo' }];
 const GROUPED_SCALE_CATALOG = Array.from(
     SCALE_CATALOG.reduce((groups, item) => {
         const current = groups.get(item.category) ?? [];
@@ -52,7 +52,6 @@ const GROUPED_SCALE_CATALOG = Array.from(
 
 export default function ScalesLibraryPage() {
     const router = useRouter();
-    const { proposal } = useRuntimeTwinDesign();
     const [selectedScale, setSelectedScale] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const catalogSectionRef = useRef<HTMLElement | null>(null);
@@ -61,10 +60,9 @@ export default function ScalesLibraryPage() {
 
     const normalizedSearchTerm = searchTerm.trim().toLowerCase();
     const selectedScaleDefinition = selectedScale ? SCALES[selectedScale] : null;
-    const originalNavItems = selectedScaleDefinition
-        ? [...SCALE_NAV_BASE, { href: '#paziente', label: 'Paziente', meta: 'avvio scala' }]
+    const navItems = selectedScaleDefinition
+        ? [...SCALE_NAV_BASE, { href: '#paziente', label: 'Paziente' }]
         : SCALE_NAV_BASE;
-    const navItems = proposal ? originalNavItems.map(({ href, label }) => ({ href, label })) : originalNavItems;
 
     const snapshotVisibility = useRef({ valid: true });
     const [, invalidateSnapshot] = useState(0);
@@ -133,137 +131,118 @@ export default function ScalesLibraryPage() {
             subtitle="Il punteggio viene registrato nella cartella del paziente."
             backHref="/?area=incarico"
             backLabel="Torna ai pazienti"
-            statusLabel={selectedScaleDefinition
-                ? `${scaleDisplayTitle(selectedScaleDefinition)}: manca la scheda paziente.`
-                : 'Sono elencate solo le scale già digitalizzate.'}
             navItems={navItems}
         >
-            <section id="catalogo" ref={catalogSectionRef} className={`${scaleStyles.workspace} ${styles.catalogSection}`}>
-                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                    <div className={`space-y-1 ${styles.sectionHeading}`}>
-                        {!proposal && <p className="mf-eyebrow">Catalogo scale</p>}
-                        <h2 className="text-lg font-semibold tracking-tight" style={{ color: 'var(--lume-ink)' }}>
-                            {proposal ? 'Scegli una scala' : 'Scale pronte alla somministrazione'}
-                        </h2>
-                        {proposal && <p>Il punteggio verrà registrato nella cartella del paziente.</p>}
-                    </div>
-                    <span className={proposal ? styles.catalogCount : 'lume-registro mf-btn-secondary w-fit'}>{formatCountLabel(SCALE_CATALOG.length, proposal ? 'scala disponibile' : 'scala attiva', proposal ? 'scale disponibili' : 'scale attive')}</span>
-                </div>
-
-                <div className="space-y-6">
-                    {GROUPED_SCALE_CATALOG.map(([category, items]) => (
-                        <div key={category} className="space-y-3">
-                            <h3 className={proposal ? styles.categoryTitle : 'section-kicker px-1'}>{category}</h3>
-                            <div className={scaleStyles.catalog}>
-                                {items.map((item) => {
-                                    const scale = SCALES[item.id];
-                                    const Icon = item.icon;
-                                    const isSelected = selectedScale === item.id;
-
-                                    return (
-                                        <button
-                                            key={item.id}
-                                            type="button"
-                                            onClick={() => handleScaleChoice(item.id)}
-                                            aria-pressed={isSelected}
-                                            className={scaleStyles.catalogLink}
-                                        >
-                                            <Icon size={20} aria-hidden="true" />
-                                            <span>
-                                                <strong className={scaleStyles.catalogTitle}>{scaleDisplayTitle(scale)}</strong>
-                                                <span className={scaleStyles.catalogDescription}>{scale.description}</span>
-                                            </span>
-                                            <ArrowRight size={18} aria-hidden="true" />
-                                        </button>
-                                    );
-                                })}
-                            </div>
+            <section id="catalogo" ref={catalogSectionRef} className={`${surface.tray} ${styles.catalogSection}`} data-record-tray="catalogo">
+                <h2 className={surface.zoneTitle}>Scegli una scala</h2>
+                {GROUPED_SCALE_CATALOG.map(([category, items]) => {
+                    const CategoryIcon = category === 'Cognitivo e umore' ? Brain : Activity;
+                    return <section key={category} className={surface.island}>
+                        <div className={surface.islandHeader}>
+                            <span className={surface.islandIcon} aria-hidden="true"><CategoryIcon size={16} /></span>
+                            <h3>{category} <span>{formatCountLabel(items.length, 'scala', 'scale')}</span></h3>
                         </div>
-                    ))}
-                </div>
+                        <div className={scaleStyles.catalog}>
+                            {items.map((item) => {
+                                const scale = SCALES[item.id];
+                                const Icon = item.icon;
+                                const isSelected = selectedScale === item.id;
+
+                                return (
+                                    <button
+                                        key={item.id}
+                                        type="button"
+                                        onClick={() => handleScaleChoice(item.id)}
+                                        aria-pressed={isSelected}
+                                        className={`${scaleStyles.catalogLink} ${styles.instrumentRow}`}
+                                    >
+                                        <span className={surface.islandIcon} aria-hidden="true"><Icon size={16} /></span>
+                                        <span>
+                                            <strong className={scaleStyles.catalogTitle}>{scaleDisplayTitle(scale)}</strong>
+                                            <span className={scaleStyles.catalogDescription}>{scale.description}</span>
+                                        </span>
+                                        <ArrowRight size={18} aria-hidden="true" />
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        </section>;
+                    })}
             </section>
 
             {selectedScaleDefinition && (
-                <section id="paziente" ref={patientSectionRef} className={`${scaleStyles.workspace} ${styles.patientSection}`}>
-                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                        <div className={`space-y-1 ${styles.sectionHeading}`}>
-                            {!proposal && <p className="mf-eyebrow">Avvio scala</p>}
-                            <h2 className="text-lg font-semibold tracking-tight" style={{ color: 'var(--lume-ink)' }}>
-                                Scegli il paziente
-                            </h2>
-                            <p className="max-w-3xl text-sm leading-relaxed" style={{ color: 'var(--lume-ink-muted)' }}>
-                                Hai scelto <strong className="font-semibold" style={{ color: 'var(--lume-ink)' }}>{scaleDisplayTitle(selectedScaleDefinition)}</strong>.
-                            </p>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={handleClearScale}
-                            className={scaleStyles.control}
-                        >
-                            <ArrowLeft className="h-4 w-4" />
-                            Cambia scala
-                        </button>
-                    </div>
-
-                    <div className={styles.patientSearch}>
-                        <Search aria-hidden="true" style={{ color: 'var(--lume-ink-muted)' }} />
-                        <input
-                            ref={patientSearchRef}
-                            value={searchTerm}
-                            onChange={(event) => setSearchTerm(event.target.value)}
-                            aria-label="Cerca paziente per nome o codice fiscale"
-                            placeholder="Cerca per nome o codice fiscale"
-                            className="mf-input"
-                        />
-                    </div>
-
-                    <div className="grid gap-3" aria-busy={patientRead.loading}>
-                        {patientRead.loading && <p role="status">Lettura delle schede in corso…</p>}
-                        {readFailed && <div><p role="alert">Impossibile leggere le schede. Riprova.</p>
-                            <button type="button" onClick={refresh} className={scaleStyles.control}>Riprova</button></div>}
-                        {patients?.map((patient) => (
-                            <button
-                                key={patient.id}
-                                type="button"
-                                onClick={() => handleSelectPatient(patient.id)}
-                                aria-label={`Avvia ${scaleDisplayTitle(selectedScaleDefinition)} per ${patient.lastName} ${patient.firstName}`}
-                                className={scaleStyles.catalogLink}
-                            >
-                                <span className="min-w-0">
-                                    <strong className={styles.patientName} style={{ color: 'var(--lume-ink)' }}>
-                                        {patient.lastName} {patient.firstName}
-                                    </strong>
-                                    <span className={`lume-code ${styles.patientIdentity}`} style={{ color: 'var(--lume-ink-muted)' }}>{patient.taxCode}</span>
-                                </span>
-                                <span className="inline-flex shrink-0 items-center gap-2 text-xs font-semibold" style={{ color: 'var(--lume-ink-muted)' }}>
-                                    Avvia
-                                    <ArrowRight className="h-4 w-4" />
-                                </span>
+                <section id="paziente" ref={patientSectionRef} className={`${surface.tray} ${styles.patientSection}`} data-record-tray="paziente">
+                    <div className={surface.island}>
+                        <div className={surface.islandHeader}>
+                            <span className={surface.islandIcon} aria-hidden="true"><Search size={16} /></span>
+                            <h2>Scegli il paziente</h2>
+                            <button type="button" onClick={handleClearScale} className={`${surface.islandAction} ${styles.changeScale}`}>
+                                <ArrowLeft size={16} aria-hidden="true" />
+                                Cambia scala
                             </button>
-                        ))}
+                        </div>
+                        <p className={surface.pageMeta}>{scaleDisplayTitle(selectedScaleDefinition)}</p>
 
-                        {patients?.length === 0 && (
-                            <div className="text-sm" role="status" style={{ color: 'var(--lume-ink-muted)' }}>
-                                Nessuna scheda corrisponde alla ricerca.
-                            </div>
-                        )}
+                        <div className={styles.patientSearch}>
+                            <Search aria-hidden="true" style={{ color: 'var(--lume-ink-muted)' }} />
+                            <input
+                                ref={patientSearchRef}
+                                value={searchTerm}
+                                onChange={(event) => setSearchTerm(event.target.value)}
+                                aria-label="Cerca paziente per nome o codice fiscale"
+                                placeholder="Cerca per nome o codice fiscale"
+                                className={surface.field}
+                            />
+                        </div>
 
-                        {patients && patients.length >= 8 && (
-                            <div className="text-sm" style={{ color: 'var(--lume-ink-muted)' }}>
-                                Affina la ricerca per vedere altre schede.
-                            </div>
-                        )}
-                    </div>
+                        <div className={scaleStyles.catalog} aria-busy={patientRead.loading}>
+                            {patientRead.loading && <p role="status">Lettura delle schede in corso…</p>}
+                            {readFailed && <div><p role="alert">Impossibile leggere le schede. Riprova.</p>
+                                <button type="button" onClick={refresh} className={scaleStyles.control}>Riprova</button></div>}
+                            {patients?.map((patient) => (
+                                <button
+                                    key={patient.id}
+                                    type="button"
+                                    onClick={() => handleSelectPatient(patient.id)}
+                                    aria-label={`Avvia ${scaleDisplayTitle(selectedScaleDefinition)} per ${patient.lastName} ${patient.firstName}`}
+                                    className={scaleStyles.catalogLink}
+                                >
+                                    <span className="min-w-0">
+                                        <strong className={styles.patientName} style={{ color: 'var(--lume-ink)' }}>
+                                            {patient.lastName} {patient.firstName}
+                                        </strong>
+                                        <span className={`lume-code ${styles.patientIdentity}`} style={{ color: 'var(--lume-ink-muted)' }}>{patient.taxCode}</span>
+                                    </span>
+                                    <span className="inline-flex shrink-0 items-center gap-2 text-xs font-semibold" style={{ color: 'var(--lume-ink-muted)' }}>
+                                        Avvia
+                                        <ArrowRight className="h-4 w-4" />
+                                    </span>
+                                </button>
+                            ))}
 
-                    <div className="flex justify-end border-t pt-5" style={{ borderColor: 'color-mix(in srgb, var(--lume-ink) 10%, transparent)' }}>
-                        <button
-                            type="button"
-                            onClick={() => router.push('/patients/new')}
-                            className={scaleStyles.control}
-                        >
-                            <UserPlus className="h-4 w-4" />
-                            Crea nuova scheda
-                        </button>
+                            {patients?.length === 0 && (
+                                <div className="text-sm" role="status" style={{ color: 'var(--lume-ink-muted)' }}>
+                                    Nessuna scheda corrisponde alla ricerca.
+                                </div>
+                            )}
+
+                            {patients && patients.length >= 8 && (
+                                <div className="text-sm" style={{ color: 'var(--lume-ink-muted)' }}>
+                                    Affina la ricerca per vedere altre schede.
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex justify-end border-t pt-5" style={{ borderColor: 'color-mix(in srgb, var(--lume-ink) 10%, transparent)' }}>
+                            <button
+                                type="button"
+                                onClick={() => router.push('/patients/new')}
+                                className={scaleStyles.control}
+                            >
+                                <UserPlus className="h-4 w-4" />
+                                Crea nuova scheda
+                            </button>
+                        </div>
                     </div>
                 </section>
             )}

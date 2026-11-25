@@ -17,7 +17,7 @@ export default function SettingsDiagnosticsPage() {
                 <h2>Diagnostica</h2>
                 <p>Stato dei servizi, architettura della postazione e aggiornamenti software.</p>
             </header>
-            <ServiceArchitecturePanel />
+            <div className={styles.services}><ServiceArchitecturePanel /></div>
             <Disclosure title="Diagnostica di Sistema" headingLevel={3} className={styles.section}>
                 <DiagnosticHub />
             </Disclosure>

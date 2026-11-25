@@ -1,354 +1,172 @@
-/* WUL-678: recent work sits on the substrate; the Filo keeps one shared axis. */
-.timelineSection {
-  min-width: 0;
-  padding: 0;
-  background: transparent;
-  color: var(--lume-ink);
-}
+.page { gap: 16px; }
 
-.sectionHeader {
+.tools {
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 0 2px 13px;
-  border-bottom: 1px solid var(--lume-rule);
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  min-width: 0;
 }
 
-.sectionTitle {
-  margin: 0;
-  font-size: 0.9375rem;
-  font-weight: 600;
-}
-/* a section heading stays distinct from each entry title. */
-:global(html[data-runtime-twin-design='proposal']) .sectionTitle {
-  font-size: var(--twin-type-section);
-  font-weight: var(--twin-heading-weight);
-  line-height: var(--twin-heading-leading);
-  letter-spacing: -0.02em;
-}
-:global(html[data-runtime-twin-design='proposal']) .sectionSubtitle { font-size: var(--twin-type-body); line-height: var(--twin-body-leading); }
-:global(html[data-runtime-twin-design='proposal']) .count { font-size: 0.9375rem; color: var(--lume-ink); }
-/* dates orient the chronology; actions stay with their patient entry. */
-:global(html[data-runtime-twin-design='proposal']) .date {
-  font-size: var(--twin-type-body);
-  font-weight: 600;
-  line-height: var(--twin-body-leading);
-  color: var(--lume-ink);
-}
-:global(html[data-runtime-twin-design='proposal']) .sectionHeader { align-items: baseline; }
-
-.sectionSubtitle {
-  max-width: 68ch;
-  margin: 4px 0 0;
-  color: var(--lume-ink-muted);
-  font-size: 0.75rem;
-  line-height: 1.5;
-}
-
-.count {
-  flex: none;
-  color: var(--lume-ink-muted);
-  font-size: 0.9375rem;
-  font-variant-numeric: tabular-nums;
-}
-
-.feedViewport {
-  max-block-size: none;
-  overflow: visible;
-  scrollbar-gutter: stable;
-}
+.tools > input { flex: 1 1 260px; min-width: 0; min-height: 40px; }
+.tools > input::-webkit-search-cancel-button { appearance: none; }
+.tools > [role='group'] { max-width: 100%; }
 
 .feed {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  /* The Filo inset belongs inside the feed width: content-box padding
-     otherwise pushes active entries past the reflow viewport. */
-  box-sizing: border-box;
-  width: 100%;
+  display: grid;
+  gap: var(--surface-tray-inset, 10px);
   min-width: 0;
-  padding: 0;
 }
 
-.filo {
-  position: absolute;
-  z-index: 0;
-  left: 17px;
-  width: 1px;
-  overflow: visible;
-}
+.month.month { gap: 0; padding-bottom: 4px; }
+.month > :first-child { padding-bottom: 6px; }
+.month > :first-child > h3::first-letter { text-transform: uppercase; }
 
 .entry {
   position: relative;
-  z-index: 1;
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  gap: 0 16px;
   min-width: 0;
-  padding: 13px 14px 12px;
-  border: 0;
-  border-radius: 0;
-  border-bottom: 1px solid var(--lume-rule);
+  margin-inline: -8px;
+  padding: 12px 8px;
+  border-radius: 10px;
   outline: 0;
   background: transparent;
   color: var(--lume-ink);
-  transition:
-    background-color var(--lume-dur-fuoco) var(--lume-ease),
-    color var(--lume-dur-firma) var(--lume-ease);
+  transition: background-color var(--lume-dur-fuoco) var(--lume-ease);
 }
 
-.entry[data-active='true'] {
-  background: color-mix(in srgb, var(--lume-ink) 3%, transparent);
-  box-shadow: none;
+.entry + .entry::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 8px;
+  left: 8px;
+  height: 1px;
+  background: var(--lume-record-island-rule);
 }
 
-.entry:focus-visible {
-  box-shadow: var(--lume-focus-ring);
-}
-
+.entry[data-active='true'] { background: var(--lume-surface-selected); }
+.entry[data-active='true']::before,
+.entry[data-active='true'] + .entry::before,
+.entry[data-lume-entry-state='draft']::before,
+.entry[data-lume-entry-state='draft'] + .entry::before { display: none; }
+.entry[data-lume-entry-state='draft'] { background: var(--lume-surface-draft); }
+.entry:focus-visible { box-shadow: var(--lume-focus-ring); }
 .entry:focus-within { z-index: 2; }
 
-.node {
-  position: absolute;
-  top: 18px;
-  left: -22px; /* center matches .filo left: 17px */
-  width: 10px;
-  height: 10px;
-  overflow: visible;
+.date {
+  grid-column: 1;
+  grid-row: 1 / span 4;
+  color: var(--lume-ink-muted);
+  font: var(--type-record-data);
+  font-variant-numeric: tabular-nums;
+  white-space: pre-line;
 }
 
-.entryTop {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: baseline;
-  gap: 10px;
-}
+.titleGroup,
+.preview,
+.provenance,
+.entryFooter { grid-column: 2; min-width: 0; }
 
 .titleGroup {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
-  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
 }
 
 .entryTitle {
   min-width: 0;
   margin: 0;
-  overflow-wrap: anywhere;
   color: var(--lume-ink);
-  font-size: 0.875rem;
-  font-weight: 600;
-  line-height: 1.35;
-  transition: color var(--lume-dur-firma) var(--lume-ease);
-}
-
-.stateLabel {
-  flex: none;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  color: var(--lume-ink-muted);
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-}
-
-.date {
-  color: var(--lume-ink-muted);
-  font-size: 0.75rem;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+  font: var(--type-record-row);
+  overflow-wrap: anywhere;
 }
 
 .preview {
-  max-width: 64ch;
-  margin: 5px 0 0;
+  max-width: 68ch;
+  margin: 6px 0 0;
   color: var(--lume-ink);
-  font: var(--type-prose);
+  font: var(--type-record-text);
   overflow-wrap: anywhere;
-  transition: color var(--lume-dur-firma) var(--lume-ease);
 }
 
 .entry[data-lume-entry-state='draft'] .entryTitle,
-.entry[data-lume-entry-state='draft'] .preview {
-  color: var(--lume-ink-fresh);
-}
-
-.entry[data-lume-entry-state='deleted'] .stateLabel {
-  border-color: var(--lume-signal-critical);
-  color: var(--lume-signal-critical);
-}
+.entry[data-lume-entry-state='draft'] .preview { color: var(--lume-ink-fresh); }
 
 .provenance {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 4px 12px;
-  margin-top: 8px;
+  margin-top: 6px;
   color: var(--lume-ink-muted);
-  font-size: 0.75rem;
+  font: var(--type-record-meta);
   font-variant-numeric: tabular-nums;
 }
 
 .entryFooter {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px 12px;
-  margin-top: 10px;
-  padding-top: 9px;
-  border-top: 1px solid var(--lume-rule);
+  gap: 6px 12px;
+  margin-top: 8px;
   color: var(--lume-ink-muted);
-  font-size: 0.75rem;
+  font: var(--type-record-data);
 }
 
 .patientIdentity {
   display: inline-flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 5px 8px;
+  gap: 4px 8px;
   min-width: 0;
 }
 
-.patientIdentity strong {
-  color: var(--lume-ink);
-  font: var(--type-person-preview);
-}
+.patientIdentity strong { color: var(--lume-ink); font: var(--type-record-row); }
 
-.attachmentCount {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
+.attachmentCount { display: inline-flex; align-items: center; gap: 4px; }
 
 .entryActions {
   display: inline-flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 7px;
+  gap: 2px;
   margin-left: auto;
 }
 
-.emptyState {
-  margin: 0;
-  padding: 28px 8px 18px;
+.quietAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
   color: var(--lume-ink-muted);
-  font-size: 0.8125rem;
-  text-align: center;
+  font: var(--type-strong);
+  cursor: pointer;
 }
 
-@media (max-width: 640px) {
-  .feedViewport {
-    max-block-size: none;
-    overflow: visible;
-  }
+.quietAction:hover { border-color: var(--lume-record-island-rule); background: var(--lume-record-compact-island); color: var(--lume-ink); }
+.quietAction:focus-visible { outline: 2px solid var(--lume-accent); outline-offset: 2px; }
 
-  .timelineSection {
-    padding: 0;
-  }
+@media (max-width: 700px) {
+  .entry { grid-template-columns: minmax(0, 1fr); }
+  .date { grid-row: auto; margin-bottom: 4px; white-space: normal; }
+  .titleGroup, .preview, .provenance, .entryFooter { grid-column: 1; }
+  .entryActions { margin-left: 0; }
+}
 
-  .sectionHeader {
-    display: block;
-  }
-
-  .count {
-    display: block;
-    margin-top: 7px;
-  }
-
-  .feed {
-    padding-left: 0;
-  }
-
-  .filo {
-    left: 14px;
-  }
-
-  .node {
-    left: -20px;
-  }
-
-  .entry {
-    padding: 12px 10px;
-  }
-
-  .entryTop {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 4px;
-  }
-
-  .titleGroup {
-    align-items: flex-start;
-  }
-
-  .date {
-    white-space: normal;
-  }
-
-  .entryFooter {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .entryActions {
-    margin-left: 0;
-  }
+@media (pointer: coarse) {
+  .quietAction { min-width: 44px; min-height: 44px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .entry,
-  .entryTitle,
-  .preview {
-    transition: none;
-  }
+  .entry { transition: none; }
 }
 
-:global(:root[data-ui-reduce-motion='true']) .entry,
-:global(:root[data-ui-reduce-motion='true']) .entryTitle,
-:global(:root[data-ui-reduce-motion='true']) .preview {
-  transition: none;
-}
-
-.entry[data-active='true'] { background: var(--lume-surface-selected); }
-.entryTop .entryTitle { font: 600 0.875rem/1.5 var(--lume-font-sans); }
-.date, .provenance, .entryFooter, .stateLabel { font-size: 0.8125rem; letter-spacing: 0; text-transform: none; }
-.patientIdentity strong {
-  font: var(--type-person-preview); }
-.entry[data-lume-entry-state='draft'] { background: var(--lume-surface-draft); }
-
-.entry { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 0 16px; padding: 16px 0; }
-.entryTop { display: contents; }
-.titleGroup, .preview, .provenance, .entryFooter { grid-column: 2; }
-.date { grid-column: 1; grid-row: 1 / span 3; white-space: pre-line; }
-@media (max-width: 700px) {
-  .entry { grid-template-columns: minmax(0, 1fr); }
-  .titleGroup, .preview, .provenance, .entryFooter { grid-column: 1; }
-  .date { grid-row: 1; margin-bottom: 8px; }
-}
-
-.tools { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
-.tools input { min-width: 0; flex: 1 1 240px; padding: 10px 12px; }
-.types { display: flex; gap: 4px; overflow-x: auto; max-width: 100%; }
-.types button { flex-shrink: 0; min-height: 44px; padding: 8px 12px; border: 0; border-radius: 0; background: transparent; color: var(--lume-ink-muted); }
-.types button[aria-pressed='true'] { color: var(--lume-ink); box-shadow: inset 0 -2px var(--lume-ink-fresh); }
-.month { padding: 20px 0 12px; margin: 0; border-bottom: 1px solid var(--lume-rule-strong); color: var(--lume-ink-muted); text-transform: capitalize; }
-.entryFooter { border: 0; padding: 0; }
-.patientIdentity strong {
-  font: var(--type-person-preview); }
-
-/* Azioni di riga quiete: si ripetono su ogni voce, quindi niente cornice. */
-:global(html[data-runtime-twin-design='proposal']) .entryActions > :is(a, button) {
-  border-color: transparent;
-  background: transparent;
-  box-shadow: none;
-  color: var(--lume-ink-muted);
-}
-:global(html[data-runtime-twin-design='proposal']) .entryActions > :is(a, button):hover {
-  background: var(--lume-surface-selected);
-  color: var(--lume-ink);
-  transform: none;
-}
-
-.timelineSection.timelineSection .sectionTitle, .timelineSection.timelineSection .month {
-  font: var(--type-section-heading);
-  font-variant-caps: normal;
-}
-.timelineSection .month { text-transform: none; }
+:global(:root[data-ui-reduce-motion='true']) .entry { transition: none; }

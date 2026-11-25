@@ -2,7 +2,7 @@
 
 import { formatCountLabel } from '@/lib/format-count';
 import { differenceInYears } from 'date-fns';
-import { AlertTriangle, ShieldCheck } from 'lucide-react';
+import { Activity, AlertTriangle, BarChart3, Filter, ListChecks, ShieldCheck, Users, type LucideIcon } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { Kree8WorkspaceShell } from '@/components/kree8/kree8-workspace-shell';
@@ -15,6 +15,7 @@ import { subscribeClientAccountAuthority } from '@/lib/security/client-auth-api'
 import { readCockpitRows } from '@/components/kree8/cockpit-read-snapshot';
 import { ViewState } from '@/components/ui/view-state';
 
+import surface from '@/components/record-surface.module.css';
 import styles from './analytics.module.css';
 
 /* LUME-110/68 */
@@ -57,18 +58,11 @@ function ProgressLine({ label, value, total }: { label: string; value: number; t
     );
 }
 
-function SectionHeading({ label, title, description }: { label: string; title: string; description: string }) {
-    /* the title carries the meaning; presentation labels belong only to the comparison. */
-    const { proposal } = useRuntimeTwinDesign();
-    return (
-        <div className={styles.sectionHeading}>
-            {!proposal && <p className={styles.sectionLabel}>{label}</p>}
-            <div>
-                <h2>{title}</h2>
-                <p>{description}</p>
-            </div>
-        </div>
-    );
+function SectionHeading({ icon: Icon, title }: { icon: LucideIcon; title: string }) {
+    return <div className={surface.islandHeader}>
+        <span className={surface.islandIcon} aria-hidden="true"><Icon size={16} /></span>
+        <h2>{title}</h2>
+    </div>;
 }
 
 export default function AnalyticsPage() {
@@ -179,217 +173,207 @@ export default function AnalyticsPage() {
             variant="overview"
             eyebrow="Analisi"
             title="Analisi"
-            subtitle="Una domanda alla volta sui dati già registrati in questa postazione."
+            subtitle=""
             backHref="/?area=incarico"
             backLabel="Torna ai pazienti"
             statusLabel={populationSummary}
             navItems={navItems}
         >
-            {patients.length === 0 && <ViewState state="empty" title="Nessuna scheda attiva disponibile per l’analisi." />}
-            <section
-                id="domanda"
-                className={styles.focusSurface}
-                data-testid="analytics-focus-surface"
-                data-lume-analytics-focus="true"
-            >
-                <div className={styles.answer}>
-                    {!proposal && <p className={styles.sectionLabel}>Domanda operativa</p>}
-                    <h2>{proposal ? 'Schede attive nel filtro' : 'Quante schede attive rientrano nella fascia d’età scelta?'}</h2>
-                    <p
-                        className={`${styles.primaryValue} lume-registro`}
-                        data-testid="analytics-primary-value"
-                        data-lume-register-value="true"
-                    >
-                        {populationSummary}
-                    </p>
-                    <p className={styles.mutedNote}>
-                        {stats.totalInRange > 0
-                            ? `${percent(stats.totalInRange, stats.withBirthDate)}% delle schede con età nota.`
-                            : 'Nessuna scheda attiva con età nota rientra nel filtro corrente.'}
-                    </p>
-                </div>
-
-                <div className={styles.filterField} data-testid="analytics-filter-field">
-                    {proposal ? <h2>Fascia d’età</h2> : <p className={styles.sectionLabel}>Filtro quieto</p>}
-                    <label>
-                        <span>Età minima</span>
-                        <strong className="lume-registro">{formatCountLabel(ageRange[0], 'anno', 'anni')}</strong>
-                        <RangeInput
-                            min={0}
-                            max={120}
-                            aria-label="Età minima"
-                            aria-valuetext={formatCountLabel(ageRange[0], 'anno', 'anni')}
-                            value={ageRange[0]}
-                            onChange={(event) => setAgeRange([Number(event.target.value), ageRange[1]])}
-                        />
-                    </label>
-                    <label>
-                        <span>Età massima</span>
-                        <strong className="lume-registro">{formatCountLabel(ageRange[1], 'anno', 'anni')}</strong>
-                        <RangeInput
-                            min={0}
-                            max={120}
-                            aria-label="Età massima"
-                            aria-valuetext={formatCountLabel(ageRange[1], 'anno', 'anni')}
-                            value={ageRange[1]}
-                            onChange={(event) => setAgeRange([ageRange[0], Number(event.target.value)])}
-                        />
-                    </label>
-                </div>
-            </section>
-
-            <div className={styles.analysisGrid}>
-            <section id="indicatori" className={styles.layerSection} data-testid="analytics-layer-section">
-                <SectionHeading
-                    label="Indicatori"
-                    title={proposal ? 'Profilo della popolazione' : 'Lettura della popolazione filtrata'}
-                    description={proposal ? 'Assistenza e diagnosi nelle schede selezionate.' : 'Valori di contesto, subordinati alla risposta principale.'}
-                />
-                <dl className={styles.factList}>
-                    <div className={styles.factRow}>
-                        <dt>Assistenza domiciliare integrata</dt>
-                        <dd><span className="lume-registro" data-lume-register-value="true">{stats.adiCount}</span> {stats.adiCount === 1 ? 'scheda' : 'schede'}</dd>
-                    </div>
-                    <div className={styles.factRow}>
-                        <dt>Con almeno una diagnosi registrata</dt>
-                        <dd><span className="lume-registro" data-lume-register-value="true">{stats.withDiagnoses}</span> {proposal && stats.withDiagnoses === 1 ? 'scheda' : 'schede'}</dd>
-                    </div>
-                    <div className={styles.factRow}>
-                        <dt>Senza data di nascita, escluse dal filtro</dt>
-                        <dd><span className="lume-registro" data-lume-register-value="true">{stats.withoutBirthDate}</span> {proposal && stats.withoutBirthDate === 1 ? 'scheda' : 'schede'}</dd>
-                    </div>
-                </dl>
-            </section>
-
-            <section id="eta" className={styles.layerSection}>
-                <SectionHeading
-                    label="Grafico"
-                    title="Distribuzione per fascia d’età"
-                    description={proposal ? 'Numero di schede attive per fascia d’età, nel filtro corrente.' : 'Ogni barra usa come base le schede comprese nel filtro.'}
-                />
-                <div className={styles.chart} aria-label="Distribuzione delle schede per fascia d’età">
-                    {Object.entries(stats.ageDist).map(([range, count]) => (
-                        <div className={styles.chartRow} key={range}>
-                            <div className={styles.chartDatum}>
-                                <span>{range} anni</span>
-                                <strong className="lume-registro" data-lume-register-value="true">{count}</strong>
-                            </div>
-                            <ProgressLine label={`${range} anni`} value={count} total={stats.totalInRange} />
-                        </div>
-                    ))}
-                </div>
-            </section>
-
-            <section id="diagnosi" className={styles.layerSection}>
-                <SectionHeading
-                    label="Tabella"
-                    title="Diagnosi più ricorrenti"
-                    description={proposal ? 'Le diagnosi presenti nelle schede selezionate.' : 'Descrizione, sistema di codifica e numero di schede nel filtro corrente.'}
-                />
-                <div
-                    className={styles.tableScroller}
-                    data-testid="analytics-table-overflow"
-                    data-horizontal-overflow="declared"
-                    tabIndex={0}
-                    aria-label="Tabella diagnosi, scorrimento orizzontale disponibile se necessario"
+            <div className={styles.content}>
+                {patients.length === 0 && <ViewState state="empty" title="Nessuna scheda attiva disponibile per l’analisi." />}
+                <section
+                    id="domanda"
+                    className={`${surface.tray} ${styles.columns}`}
+                    data-record-tray="popolazione"
+                    data-testid="analytics-focus-surface"
+                    data-lume-analytics-focus="true"
                 >
-                    <table className={styles.dataTable}>
-                        <thead>
-                            <tr>
-                                <th scope="col">Diagnosi</th>
-                                <th scope="col">Codice</th>
-                                <th scope="col">Schede</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {stats.topDiagnoses.map((diagnosis) => (
-                                <tr key={diagnosis.key}>
-                                    <td>{diagnosis.description}</td>
-                                    <td className="lume-code" data-lume-register-value="true">{diagnosis.system} {diagnosis.code}</td>
-                                    <td className="lume-registro" data-lume-register-value="true">{diagnosis.count}</td>
-                                </tr>
-                            ))}
-                            {stats.topDiagnoses.length === 0 ? (
-                                <tr>
-                                    <td colSpan={3} className={styles.emptyState}>
-                                        Nessuna diagnosi codificata nel filtro corrente.
-                                    </td>
-                                </tr>
-                            ) : null}
-                        </tbody>
-                    </table>
-                </div>
-            </section>
+                    <div className={surface.island}>
+                        <SectionHeading icon={Users} title="Schede attive nel filtro" />
+                        <p
+                            className={`${styles.primaryValue} lume-registro`}
+                            data-testid="analytics-primary-value"
+                            data-lume-register-value="true"
+                        >
+                            {populationSummary}
+                        </p>
+                        <p className={styles.mutedNote}>
+                            {stats.totalInRange > 0
+                                ? `${percent(stats.totalInRange, stats.withBirthDate)}% delle schede con età nota.`
+                                : 'Nessuna scheda attiva con età nota rientra nel filtro corrente.'}
+                        </p>
+                    </div>
 
-            </div>
-            <section id="audit" className={styles.layerSection}>
-                <div className={styles.auditHeading}>
-                    <SectionHeading
-                        label="Audit locale"
-                        title="Attività della postazione"
-                        description="Eventi prodotti localmente, senza contenuti clinici. Lo storico importato è escluso dai conteggi."
-                    />
-                    <label className={styles.compactField}>
-                        <span>{proposal ? 'Periodo' : 'Finestra audit'}</span>
-                        <select aria-label={proposal ? 'Periodo audit' : 'Finestra audit'} value={auditDays} onChange={(event) => setAuditDays(Number(event.target.value))}>
-                            <option value={7}>Ultimi 7 giorni</option>
-                            <option value={30}>Ultimi 30 giorni</option>
-                            <option value={90}>Ultimi 90 giorni</option>
-                        </select>
-                    </label>
-                </div>
+                    <div className={`${surface.island} ${styles.filterField}`} data-testid="analytics-filter-field">
+                        <SectionHeading icon={Filter} title="Fascia d’età" />
+                        <label>
+                            <span>Età minima</span>
+                            <strong className="lume-registro">{formatCountLabel(ageRange[0], 'anno', 'anni')}</strong>
+                            <RangeInput
+                                min={0}
+                                max={120}
+                                aria-label="Età minima"
+                                aria-valuetext={formatCountLabel(ageRange[0], 'anno', 'anni')}
+                                value={ageRange[0]}
+                                onChange={(event) => setAgeRange([Number(event.target.value), ageRange[1]])}
+                            />
+                        </label>
+                        <label>
+                            <span>Età massima</span>
+                            <strong className="lume-registro">{formatCountLabel(ageRange[1], 'anno', 'anni')}</strong>
+                            <RangeInput
+                                min={0}
+                                max={120}
+                                aria-label="Età massima"
+                                aria-valuetext={formatCountLabel(ageRange[1], 'anno', 'anni')}
+                                value={ageRange[1]}
+                                onChange={(event) => setAgeRange([ageRange[0], Number(event.target.value)])}
+                            />
+                        </label>
+                    </div>
+                </section>
 
-                {auditLoading ? (
-                    <p className={styles.emptyState} role="status">Sto leggendo il tracciato locale.</p>
-                ) : auditError ? (
-                    <p className={styles.warningState} role="status">
-                        <AlertTriangle aria-hidden="true" />
-                        {auditError}
-                    </p>
-                ) : auditSummary ? (
-                    <div className={styles.auditResult}>
-                        <ShieldCheck aria-hidden="true" />
+                <div className={`${surface.tray} ${styles.columns}`} data-record-tray="distribuzione">
+                    <section id="indicatori" className={`${surface.island} ${styles.layerSection}`} data-testid="analytics-layer-section">
+                        <SectionHeading icon={Activity} title="Profilo della popolazione" />
                         <dl className={styles.factList}>
                             <div className={styles.factRow}>
-                                <dt>Eventi locali registrati</dt>
-                                <dd className="lume-registro" data-lume-register-value="true">{auditSummary.totalEvents}</dd>
+                                <dt>Assistenza domiciliare integrata</dt>
+                                <dd><span className="lume-registro" data-lume-register-value="true">{stats.adiCount}</span> {stats.adiCount === 1 ? 'scheda' : 'schede'}</dd>
                             </div>
                             <div className={styles.factRow}>
-                                <dt>Completati, errori, negati</dt>
-                                <dd className="lume-registro" data-lume-register-value="true">
-                                    {auditSummary.outcomes.success} / {auditSummary.outcomes.failure} / {auditSummary.outcomes.denied}
-                                </dd>
+                                <dt>Con almeno una diagnosi registrata</dt>
+                                <dd><span className="lume-registro" data-lume-register-value="true">{stats.withDiagnoses}</span> {stats.withDiagnoses === 1 ? 'scheda' : 'schede'}</dd>
                             </div>
                             <div className={styles.factRow}>
-                                <dt>Eventi importati, esaminati separatamente</dt>
-                                <dd>{auditSummary.importedEvents}{auditSummary.importedIsTruncated ? ' o più' : ''}</dd>
-                            </div>
-                            <div className={styles.factRow}>
-                                <dt>Origine non attestata, esaminati separatamente</dt>
-                                <dd>{auditSummary.unattestedEvents}{auditSummary.unattestedIsTruncated ? ' o più' : ''}</dd>
-                            </div>
-                            <div className={styles.factRow}>
-                                <dt>Attori distinti</dt>
-                                <dd className="lume-registro" data-lume-register-value="true">{auditSummary.distinctActors}</dd>
-                            </div>
-                            <div className={styles.factRow}>
-                                <dt>Evento più frequente</dt>
-                                <dd>
-                                    <span className="lume-registro" data-lume-register-value="true">
-                                        {auditSummary.topEventTypes[0]?.eventType ?? 'Nessun evento'}
-                                    </span>
-                                    {auditSummary.topEventTypes[0] ? `, ${formatCountLabel(auditSummary.topEventTypes[0].count, 'occorrenza', 'occorrenze')}` : ''}
-                                </dd>
+                                <dt>Senza data di nascita, escluse dal filtro</dt>
+                                <dd><span className="lume-registro" data-lume-register-value="true">{stats.withoutBirthDate}</span> {stats.withoutBirthDate === 1 ? 'scheda' : 'schede'}</dd>
                             </div>
                         </dl>
-                        {auditSummary.isTruncated ? (
-                            <p className={styles.mutedNote}>Riepilogo calcolato sui primi 200 eventi locali nel filtro.</p>
-                        ) : null}
-                    </div>
-                ) : (
-                    <p className={styles.emptyState}>Nessun riepilogo audit disponibile.</p>
-                )}
-            </section>
+                    </section>
+
+                    <section id="eta" className={`${surface.island} ${styles.layerSection}`}>
+                        <SectionHeading icon={BarChart3} title="Distribuzione per fascia d’età" />
+                        <div className={styles.chart} aria-label="Distribuzione delle schede per fascia d’età">
+                            {Object.entries(stats.ageDist).map(([range, count]) => (
+                                <div key={range}>
+                                    <div className={styles.chartDatum}>
+                                        <span>{range} anni</span>
+                                        <strong className="lume-registro" data-lume-register-value="true">{count}</strong>
+                                    </div>
+                                    <ProgressLine label={`${range} anni`} value={count} total={stats.totalInRange} />
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+                </div>
+                <div className={surface.tray} data-record-tray="diagnosi">
+                    <section id="diagnosi" className={`${surface.island} ${styles.layerSection}`}>
+                        <SectionHeading icon={ListChecks} title="Diagnosi più ricorrenti" />
+                        <div
+                            className={styles.tableScroller}
+                            data-testid="analytics-table-overflow"
+                            data-horizontal-overflow="declared"
+                            tabIndex={0}
+                            aria-label="Tabella diagnosi"
+                        >
+                            <table className={styles.dataTable}>
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Diagnosi</th>
+                                        <th scope="col">Codice</th>
+                                        <th scope="col">Schede</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {stats.topDiagnoses.map((diagnosis) => (
+                                        <tr key={diagnosis.key}>
+                                            <td>{diagnosis.description}</td>
+                                            <td className="lume-code" data-lume-register-value="true">{diagnosis.system} {diagnosis.code}</td>
+                                            <td className="lume-registro" data-lume-register-value="true">{diagnosis.count}</td>
+                                        </tr>
+                                    ))}
+                                    {stats.topDiagnoses.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={3} className={styles.emptyState}>
+                                                Nessuna diagnosi codificata nel filtro corrente.
+                                            </td>
+                                        </tr>
+                                    ) : null}
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                </div>
+                <div className={surface.tray} data-record-tray="audit">
+                    <section id="audit" className={`${surface.island} ${styles.layerSection}`}>
+                        <div className={styles.auditHeading}>
+                            <div className={styles.auditContext}>
+                                <SectionHeading icon={ShieldCheck} title="Attività della postazione" />
+                                <p className={styles.mutedNote}>Lo storico importato è escluso dai conteggi degli eventi locali.</p>
+                            </div>
+                            <label className={styles.compactField}>
+                                <span>{proposal ? 'Periodo' : 'Finestra audit'}</span>
+                                <select className={surface.field} aria-label={proposal ? 'Periodo audit' : 'Finestra audit'} value={auditDays} onChange={(event) => setAuditDays(Number(event.target.value))}>
+                                    <option value={7}>Ultimi 7 giorni</option>
+                                    <option value={30}>Ultimi 30 giorni</option>
+                                    <option value={90}>Ultimi 90 giorni</option>
+                                </select>
+                            </label>
+                        </div>
+
+                        {auditLoading ? (
+                            <p className={styles.emptyState} role="status">Sto leggendo il tracciato locale.</p>
+                        ) : auditError ? (
+                            <p className={styles.warningState} role="status">
+                                <AlertTriangle aria-hidden="true" />
+                                {auditError}
+                            </p>
+                        ) : auditSummary ? (
+                            <div className={styles.auditResult}>
+                                <dl className={styles.factList}>
+                                    <div className={styles.factRow}>
+                                        <dt>Eventi locali registrati</dt>
+                                        <dd className="lume-registro" data-lume-register-value="true">{auditSummary.totalEvents}</dd>
+                                    </div>
+                                    <div className={styles.factRow}>
+                                        <dt>Completati, errori, negati</dt>
+                                        <dd className="lume-registro" data-lume-register-value="true">
+                                            {auditSummary.outcomes.success} / {auditSummary.outcomes.failure} / {auditSummary.outcomes.denied}
+                                        </dd>
+                                    </div>
+                                    <div className={styles.factRow}>
+                                        <dt>Eventi importati, esaminati separatamente</dt>
+                                        <dd>{auditSummary.importedEvents}{auditSummary.importedIsTruncated ? ' o più' : ''}</dd>
+                                    </div>
+                                    <div className={styles.factRow}>
+                                        <dt>Origine non attestata, esaminati separatamente</dt>
+                                        <dd>{auditSummary.unattestedEvents}{auditSummary.unattestedIsTruncated ? ' o più' : ''}</dd>
+                                    </div>
+                                    <div className={styles.factRow}>
+                                        <dt>Attori distinti</dt>
+                                        <dd className="lume-registro" data-lume-register-value="true">{auditSummary.distinctActors}</dd>
+                                    </div>
+                                    <div className={styles.factRow}>
+                                        <dt>Evento più frequente</dt>
+                                        <dd>
+                                            <span className="lume-registro" data-lume-register-value="true">
+                                                {auditSummary.topEventTypes[0]?.eventType ?? 'Nessun evento'}
+                                            </span>
+                                            {auditSummary.topEventTypes[0] ? `, ${formatCountLabel(auditSummary.topEventTypes[0].count, 'occorrenza', 'occorrenze')}` : ''}
+                                        </dd>
+                                    </div>
+                                </dl>
+                                {auditSummary.isTruncated ? (
+                                    <p className={styles.mutedNote}>Riepilogo calcolato sui primi 200 eventi locali nel filtro.</p>
+                                ) : null}
+                            </div>
+                        ) : (
+                            <p className={styles.emptyState}>Nessun riepilogo audit disponibile.</p>
+                        )}
+                    </section>
+                </div>
+            </div>
         </Kree8WorkspaceShell>
     );
 }

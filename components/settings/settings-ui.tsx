@@ -1,5 +1,4 @@
 import styles from './settings-lume.module.css';
-import navigation from './settings-navigation.module.css';
 import proposalStyles from './settings-proposal.module.css';
 
 /* LUME-110/68 */
@@ -40,7 +39,7 @@ export function SettingsSectionIntro({
     const proposalDescription = PROPOSAL_INTRO_COPY[title] ?? description;
 
     return (
-        <div className={`${styles.sectionIntro} ${navigation.sectionIntro}`}>
+        <div className={styles.sectionIntro}>
             <h2>{title}</h2>
             <div className={proposalStyles.proposalDescription}>
                 <p>{proposalDescription}</p>

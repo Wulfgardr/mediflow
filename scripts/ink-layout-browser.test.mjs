@@ -21,10 +21,14 @@ test('le ricette del piano e delle sezioni funzionano senza il foglio globale', 
             globalThis.recipes = {layout, section, workspace, secondary, foundation, models};`, resolveDir: root },
         bundle: true, write: false, outfile: '/fixture.js', format: 'iife', logLevel: 'silent',
     });
+    const globalStyles = postcss.parse(await readFile(path.join(root, 'app/globals.css'), 'utf8'));
+    let recordIslandType = '';
+    globalStyles.walkDecls('--type-record-island', declaration => { recordIslandType = declaration.value; });
+    assert.ok(recordIslandType);
     const browser = await chromium.launch(secureLaunch({ headless: true }));
     try {
         const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
-        await page.setContent('<html data-runtime-twin-design="proposal"><head></head><body></body></html>');
+        await page.setContent(`<html data-runtime-twin-design="proposal"><head><style>:root { --lume-font-sans: system-ui, sans-serif; --type-record-island: ${recordIslandType}; }</style></head><body></body></html>`);
         await page.addStyleTag({ content: bundle.outputFiles.find(file => file.path.endsWith('.css')).text });
         await page.addScriptTag({ content: bundle.outputFiles.find(file => file.path.endsWith('.js')).text });
         await page.evaluate(() => {
@@ -53,7 +57,10 @@ test('le ricette del piano e delle sezioni funzionano senza il foglio globale', 
             const style = getComputedStyle(element);
             return [style.fontSize, style.fontWeight, style.lineHeight, style.letterSpacing, style.textTransform];
         }));
-        assert.deepEqual(metrics, Array.from({length: 4}, () => ['15px', '600', '22.5px', 'normal', 'none']));
+        assert.deepEqual(metrics, [
+            ...Array.from({length: 3}, () => ['15px', '600', '22.5px', 'normal', 'none']),
+            ['17px', '600', '22px', 'normal', 'none'],
+        ]);
         assert.equal(await page.getByText('Archivio documenti', {exact: true}).evaluate(element => getComputedStyle(element).fontSize), '15px');
         assert.equal(await page.getByText('3 file', {exact: true}).evaluate(element => getComputedStyle(element).textTransform), 'none');
         const recordFont = await page.locator('article h3').evaluate(element => getComputedStyle(element).fontSize);

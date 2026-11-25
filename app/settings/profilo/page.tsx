@@ -73,7 +73,7 @@ export default function SettingsProfilePage() {
             <section className={styles.section} aria-labelledby="settings-account-profile-title" aria-busy={state.busy}>
                 <h3 id="settings-account-profile-title" className={styles.heading}>Nome medico e ambulatorio</h3>
                 <div className={styles.form}>
-                    <div>
+                    <div className={styles.fieldRow}>
                         <label htmlFor="doctor-name" className={SETTINGS_LABEL_CLASS}>
                             Nome medico
                         </label>
@@ -91,7 +91,7 @@ export default function SettingsProfilePage() {
                         />
                     </div>
 
-                    <div>
+                    <div className={styles.fieldRow}>
                         <label htmlFor="clinic-name" className={SETTINGS_LABEL_CLASS}>
                             Nome ambulatorio
                         </label>
@@ -109,7 +109,7 @@ export default function SettingsProfilePage() {
                         />
                     </div>
 
-                    <div>
+                    <div className={styles.fieldRow}>
                         <label htmlFor="doctor-tax-code" className={SETTINGS_LABEL_CLASS}>Codice fiscale</label>
                         <input id="doctor-tax-code" name="doctorTaxCode" type="text"
                             value={profile.doctorTaxCode ?? ''}

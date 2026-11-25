@@ -842,6 +842,14 @@
 :global(html[data-runtime-twin-design='proposal']) .panelSubtitle { font-size: var(--twin-type-body); line-height: var(--twin-body-leading); }
 :global(html[data-runtime-twin-design='proposal']) .statLabel { font-size: var(--twin-type-caption); text-transform: none; letter-spacing: 0; }
 :global(html[data-runtime-twin-design='proposal']) .panelHeader { flex-wrap: wrap; }
+:global(html[data-runtime-twin-design='proposal']) .areaShell[data-record-page] { gap: 18px; padding: 24px; }
+:global(html[data-runtime-twin-design='proposal']) .areaShell[data-record-page] .areaHeader { align-items: flex-start; justify-content: space-between; gap: 12px 20px; padding: 0; }
+:global(html[data-runtime-twin-design='proposal']) .areaShell[data-record-page] .areaTitle { letter-spacing: 0; font: var(--type-record-person); }
+:global(html[data-runtime-twin-design='proposal']) .areaShell[data-record-page] .panel { padding: 18px 20px; border: 1px solid var(--lume-record-island-rule); border-radius: 14px; background: var(--lume-record-island); }
+@media (max-width: 699px) {
+  :global(html[data-runtime-twin-design='proposal']) .areaShell[data-record-page] { gap: 14px; padding: 16px; }
+  :global(html[data-runtime-twin-design='proposal']) .areaShell[data-record-page] .panel { padding: 12px 14px; }
+}
 
 .pill.pill { border: 0; border-radius: 0; padding: 0; background: transparent; font-size: 0.8125rem; letter-spacing: 0; }
 .pillWarning::before, .pillCritical::before { flex-shrink: 0; font-size: 0.75rem; }
