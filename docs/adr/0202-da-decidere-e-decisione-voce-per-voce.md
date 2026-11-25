@@ -45,10 +45,20 @@ per voce anche per le visite.
 5. **Correggi è Tieni con il valore del medico.** I campi corretti passano
    dallo stesso scrittore; l'audit porta il segno `corrected` e la provenienza
    sigillata porta passaggio e file della fonte con `corrected: true`.
-6. **Solo su una scheda esistente.** La decisione voce per voce vale quando la
+6. **Una correzione non perde nulla in silenzio.** Se Correggi cambia il
+   farmaco o il principio attivo di una terapia, i codici AIC e ATC depositati
+   non entrano in scheda: valevano per il farmaco proposto. Il modulo lo dice
+   solo in quel caso. Se cambia solo dose, posologia, stato o date, i codici
+   restano. Una diagnosi o un'esenzione già in scheda (stesso codice e
+   sistema, oppure stessa descrizione senza codice) non si tiene e non si
+   corregge restando uguale: la decisione viene rifiutata, la voce mostra «Già
+   in scheda» e il medico la scarta o modifica la voce dalla scheda. Una
+   correzione che cambia il codice entra come diagnosi nuova. La visita
+   intera non cambia: la voce mostra già «In scheda: …» prima di applicare.
+7. **Solo su una scheda esistente.** La decisione voce per voce vale quando la
    visita ha una scheda attiva riconosciuta. Una visita che crea la scheda
    (prima visita) si applica ancora per intero.
-7. **La conferma con Touch ID non parte** su una visita già decisa in parte:
+8. **La conferma con Touch ID non parte** su una visita già decisa in parte:
    la si finisce dal Web. Il percorso nativo (`lib/agent-visit-confirmation*`,
    `native/AgentVisitConfirmation/`) non cambia.
 
@@ -109,6 +119,10 @@ corrispondente. Le prove sul codice stanno in
 `lib/agent-visit-item-decision.test.ts`.
 
 ## Limiti
+
+- I due controlli del punto 6 stanno nel browser che prepara la scrittura, come
+  la verifica dell'identità: il server riceve valori cifrati. Le prove sono in
+  `lib/agent-visit-item-review.test.ts` e nella spec `e2e/da-decidere.spec.ts`.
 
 - La prima scrittura di una visita va alla scheda che il medico ha davanti. Il
   server non legge il codice fiscale cifrato della cassetta: l'identità resta
