@@ -111,3 +111,56 @@ for (const viewport of VIEWPORTS) {
     expect(problems).toEqual([]);
   });
 }
+
+const COVERAGE_WIDTHS = [390, 768, 1024, 1280, 1440] as const;
+
+async function coveredControls(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const selector = 'a[href], button, input:not([type=hidden]), select, textarea, summary, [role=button], [role=tab]';
+    const controls = [...document.querySelectorAll(`main :is(${selector}), [class*=workspaceBar] :is(${selector})`)];
+    const clipped = (element: Element, x: number, y: number) => {
+      for (let node = element.parentElement; node; node = node.parentElement) {
+        if (getComputedStyle(node).overflow === 'visible') continue;
+        const box = node.getBoundingClientRect();
+        if (x < box.left || x > box.right || y < box.top || y > box.bottom) return true;
+      }
+      return false;
+    };
+    return controls.flatMap((element) => {
+      if (!element.checkVisibility({ opacityProperty: true, visibilityProperty: true })) return [];
+      const box = element.getBoundingClientRect();
+      if (box.width <= 2 || box.height <= 2 || box.top < 0 || box.left < 0 || box.bottom > innerHeight || box.right > innerWidth) return [];
+      const label = (element.getAttribute('aria-label') || (element as HTMLElement).innerText || element.getAttribute('placeholder') || element.tagName).trim().slice(0, 40);
+      return [[box.x + box.width / 2, box.y + box.height / 2], [box.x + box.width / 2, box.y + Math.min(3, box.height / 2)]]
+        .filter(([x, y]) => !clipped(element, x, y))
+        .flatMap(([x, y]) => {
+          const hit = document.elementFromPoint(x, y);
+          if (hit && (element.contains(hit) || (element as HTMLInputElement).labels?.[0]?.contains(hit))) return [];
+          const by = hit ? `${hit.tagName.toLowerCase()}.${String(hit.className).split(' ')[0]}` : 'nulla';
+          return [`«${label}» coperto da ${by} a ${Math.round(x)},${Math.round(y)}`];
+        })
+        .slice(0, 1);
+    });
+  });
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`nessun comando o percorso coperto nelle viste di lavoro, tema ${theme}`, async ({ page }) => {
+    test.setTimeout(300_000);
+    await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+    const problems: string[] = [];
+    for (const width of COVERAGE_WIDTHS) {
+      await page.setViewportSize({ width, height: 1000 });
+      for (const route of HEADER_PAGES) {
+        await settle(page, route);
+        await page.evaluate((selected) => {
+          localStorage.setItem('mediflow-theme', selected);
+          document.documentElement.classList.remove('light', 'dark');
+          document.documentElement.classList.add(selected);
+        }, theme);
+        for (const problem of await coveredControls(page)) problems.push(`${width} ${route}: ${problem}`);
+      }
+    }
+    expect(problems).toEqual([]);
+  });
+}

@@ -29,24 +29,30 @@ for (const width of [768, 1024, 1440, 390]) {
         canvas.font = style.font;
         return {
           input: rect(input), field: rect(field), toolbar: rect(toolbar),
-          title: rect(toolbar.querySelector('h1')!),
+          title: rect(document.querySelector('main h1')!),
           filter: rect(toolbar.querySelector('[aria-label="Stato elenco"]')!),
-          create: rect(toolbar.querySelector('a[href="/patients/new"]')!),
+          create: rect(document.querySelector('main [data-page-frame] a[href="/patients/new"]')!),
           textWidth: canvas.measureText((input as HTMLInputElement).value).width,
           overflow: document.documentElement.scrollWidth > innerWidth,
         };
       });
       expect(geometry.input.width).toBeGreaterThanOrEqual(geometry.textWidth + 2);
       expect(geometry.overflow).toBe(false);
+      const boxes = { title: geometry.title, create: geometry.create, field: geometry.field, filter: geometry.filter };
+      const overlaps = Object.entries(boxes).flatMap(([a, first], index) => Object.entries(boxes).slice(index + 1)
+        .filter(([, second]) => Math.min(first.right, second.right) - Math.max(first.x, second.x) > 1
+          && Math.min(first.bottom, second.bottom) - Math.max(first.y, second.y) > 1)
+        .map(([b]) => `${a}/${b}`));
+      expect(overlaps).toEqual([]);
+      expect(geometry.field.y).toBeGreaterThanOrEqual(geometry.title.bottom);
+      expect(geometry.field.y).toBeGreaterThanOrEqual(geometry.create.bottom);
+      expect(geometry.create.x).toBeGreaterThanOrEqual(geometry.title.right);
+      expect(geometry.create.right).toBeLessThanOrEqual(width);
       if (width === 1440) {
         expect(Math.abs(geometry.field.y - geometry.filter.y)).toBeLessThan(8);
-        expect(geometry.field.x).toBeGreaterThan(geometry.title.right);
       } else {
-        expect(geometry.field.y).toBeGreaterThanOrEqual(geometry.title.bottom);
         expect(geometry.filter.y).toBeGreaterThanOrEqual(geometry.field.bottom);
         expect(Math.abs(geometry.field.width - geometry.toolbar.width)).toBeLessThan(2);
-        expect(Math.abs(geometry.filter.y - geometry.create.y)).toBeLessThan(2);
-        expect(geometry.create.x).toBeGreaterThanOrEqual(geometry.filter.right);
         if (width !== 390) expect(geometry.input.width).toBeGreaterThanOrEqual(320);
       }
       await expect(clear).toBeVisible();
