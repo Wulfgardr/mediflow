@@ -94,6 +94,18 @@ test('ADR 0201: only the two confirmed commands reach the ambulatory delete and 
     assert.equal(/export (?:async )?function (?:deleteAmbulatory|clearAmbulatory)\b/u.test(core), false);
 });
 
+export function ambulatoryTableDestructiveCalls(files, readSource = file => fs.readFileSync(file, 'utf8')) {
+    return files.filter(file => /\bambulatories\s*\.\s*(?:delete|bulkDelete|clear)\s*\(/u.test(readSource(file)));
+}
+
+test('ADR 0201: product code never deletes or clears sedi through the generic db table', () => {
+    const files = [...productSources('app'), ...productSources('lib'), ...productSources('components'), ...productSources('hooks')];
+    assert.deepEqual(ambulatoryTableDestructiveCalls(files), []);
+    assert.deepEqual(ambulatoryTableDestructiveCalls(['app/settings/ambulatories/page.tsx'],
+        () => 'await db.ambulatories.delete(id, { version });'), ['app/settings/ambulatories/page.tsx']);
+    assert.deepEqual(ambulatoryTableDestructiveCalls(['lib/x.ts'], () => 'await db.ambulatories.update(id, body);'), []);
+});
+
 test('ADR 0201: no host route deletes or clears a sede outside the confirmed command', () => {
     assert.equal(/export (?:async )?function DELETE\b/u.test(fs.readFileSync('app/api/ambulatories/[id]/route.ts', 'utf8')), false);
     assert.equal(fs.existsSync('app/api/ambulatories/clear/route.ts'), false);
