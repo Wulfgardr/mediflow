@@ -75,7 +75,7 @@ function codeFiles(directory: string, found: string[] = []): string[] {
 test('no Apple speech engine is left in the code: dictation is whisper only', () => {
     const self = resolve(import.meta.filename);
     const files = codeRoots.flatMap(directory => codeFiles(join(root, directory)));
-    assert.ok(files.some(file => file.endsWith('local_voice/whisper.rs')), 'whisper engine not scanned');
+    assert.ok(files.some(file => file.endsWith('local-voice/engine/src/whisper.rs')), 'whisper engine not scanned');
     assert.ok(files.some(file => file.endsWith('PairedPatientsWorkspaceView.swift')), 'Apple client not scanned');
     const hits = files
         .filter(file => file !== self)

@@ -1,0 +1,20 @@
+[package]
+name = "mediflow-voice"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "mediflow-voice"
+path = "src/main.rs"
+
+[dependencies]
+mediflow-local-voice = { path = "../engine" }
+serde_json = "1.0"
+zeroize = "1.8"
+sha2 = "0.10"
+
+[dev-dependencies]
+mediflow-local-voice = { path = "../engine", features = ["test-support"] }

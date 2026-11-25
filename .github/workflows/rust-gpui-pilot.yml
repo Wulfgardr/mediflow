@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'experiments/gpui-patient-pilot/**'
+      - 'native/local-voice/**'
       - 'app/fonts/**'
       - 'native/MediFlowMac/Sources/MediFlowAppleShared/Resources/Fonts/**'
       - 'docs/design/punto-inchiostro/tokens/punto-inchiostro.tokens.json'
@@ -32,6 +33,7 @@ on:
     branches: [main]
     paths:
       - 'experiments/gpui-patient-pilot/**'
+      - 'native/local-voice/**'
       - 'app/fonts/**'
       - 'native/MediFlowMac/Sources/MediFlowAppleShared/Resources/Fonts/**'
       - 'docs/design/punto-inchiostro/tokens/punto-inchiostro.tokens.json'
