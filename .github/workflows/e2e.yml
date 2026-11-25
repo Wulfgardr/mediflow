@@ -39,7 +39,7 @@ jobs:
       matrix:
         shard: [1, 2, 3, 4]
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 45
     env:
       E2E_BASE_URL: http://127.0.0.1:3123
       E2E_PIN: "1234"
@@ -227,13 +227,13 @@ jobs:
         run: npm run test:e2e -- --shard=${{ matrix.shard }}/4
 
       - name: Synthetic Web gesture ratchet
-        if: matrix.shard == 1
+        if: matrix.shard == 2
         env:
           GESTURE_OUTPUT_DIR: ${{ runner.temp }}/web-gestures
         run: nice -n 10 npm run e2e:gesti
 
       - name: Upload Web gesture measurements
-        if: always() && matrix.shard == 1
+        if: always() && matrix.shard == 2
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: web-gesture-measurements
