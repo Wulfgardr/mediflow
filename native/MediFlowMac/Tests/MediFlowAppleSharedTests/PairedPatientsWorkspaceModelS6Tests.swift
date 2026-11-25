@@ -450,21 +450,6 @@ actor S6MockDataSource: HomeBasePatientsDataSource {
         return HomeBaseAmbulatoryMutationResponse(success: true, version: payload.expectedVersion + 1)
     }
 
-    func deleteAmbulatory(
-        id: String, expectedVersion: Int,
-        credentials: HomeBasePairedCredentials, sessionCookie: String
-    ) async throws -> HomeBaseAmbulatoryMutationResponse {
-        if let ambulatoryMutationError { throw ambulatoryMutationError }
-        return HomeBaseAmbulatoryMutationResponse(success: true)
-    }
-
-    func clearAmbulatory(
-        id: String, expectedVersion: Int,
-        credentials: HomeBasePairedCredentials, sessionCookie: String
-    ) async throws -> HomeBaseAmbulatoryMutationResponse {
-        if let ambulatoryMutationError { throw ambulatoryMutationError }
-        return HomeBaseAmbulatoryMutationResponse(success: true, version: expectedVersion + 1)
-    }
 
     func fetchPatients(
         credentials: HomeBasePairedCredentials,

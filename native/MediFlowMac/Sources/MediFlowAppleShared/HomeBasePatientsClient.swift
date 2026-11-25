@@ -409,44 +409,6 @@ public actor HomeBasePatientsClient {
         return try decode(HomeBaseAmbulatoryMutationResponse.self, from: data)
     }
 
-    public func deleteAmbulatory(
-        id: String,
-        expectedVersion: Int,
-        credentials: HomeBasePairedCredentials,
-        sessionCookie: String
-    ) async throws -> HomeBaseAmbulatoryMutationResponse {
-        let url = try configuration.apiBaseURL()
-            .appendingPathComponent("network")
-            .appendingPathComponent("ambulatories")
-            .appendingPathComponent(id)
-        let (data, _) = try await send(
-            to: url,
-            method: "DELETE",
-            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: nil),
-            body: encode(AmbulatoryVersionRequest(version: expectedVersion))
-        )
-        return try decode(HomeBaseAmbulatoryMutationResponse.self, from: data)
-    }
-
-    public func clearAmbulatory(
-        id: String,
-        expectedVersion: Int,
-        credentials: HomeBasePairedCredentials,
-        sessionCookie: String
-    ) async throws -> HomeBaseAmbulatoryMutationResponse {
-        let url = try configuration.apiBaseURL()
-            .appendingPathComponent("network")
-            .appendingPathComponent("ambulatories")
-            .appendingPathComponent("clear")
-        let (data, _) = try await send(
-            to: url,
-            method: "POST",
-            headers: pairedHeaders(credentials: credentials, sessionCookie: sessionCookie, ambulatoryId: nil),
-            body: encode(AmbulatoryClearRequest(ambulatoryId: id, version: expectedVersion))
-        )
-        return try decode(HomeBaseAmbulatoryMutationResponse.self, from: data)
-    }
-
     public func searchDrugs(
         query: String,
         limit: Int = HomeBaseCatalogSearchLimit.defaultMaximum,
@@ -1899,15 +1861,6 @@ private struct AuthProfileUpdateRequest: Encodable {
         try container.encode(displayName, forKey: .displayName)
         try container.encode(ambulatoryName, forKey: .ambulatoryName)
     }
-}
-
-private struct AmbulatoryVersionRequest: Encodable {
-    let version: Int
-}
-
-private struct AmbulatoryClearRequest: Encodable {
-    let ambulatoryId: String
-    let version: Int
 }
 
 public enum HomeBaseScaleWriteError: String, Error, LocalizedError {

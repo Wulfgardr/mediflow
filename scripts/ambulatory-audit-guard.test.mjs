@@ -13,8 +13,6 @@ const cases = [
     ['POST', 'host', 'clear', 'app/api/ambulatories/clear/route.ts'],
     ['POST', 'network', 'create', 'app/api/v1/network/ambulatories/route.ts'],
     ['PUT', 'network', 'update', 'app/api/v1/network/ambulatories/[id]/route.ts'],
-    ['DELETE', 'network', 'delete', 'app/api/v1/network/ambulatories/[id]/route.ts'],
-    ['POST', 'network', 'clear', 'app/api/v1/network/ambulatories/clear/route.ts'],
 ];
 for (const [handler, mode, operation, route] of cases) {
     const spec = ambulatoryAuditContract(handler, mode, operation);

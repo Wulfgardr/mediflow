@@ -68,48 +68,48 @@ function update(surface: Surface, authority: ReturnType<typeof seed>, id: string
 function create(surface: Surface, authority: ReturnType<typeof seed>, body: Record<string, unknown>) {
     return surface === 'host' ? host.createAmbulatory(context, body) : paired.createNetworkAmbulatory(authority, body);
 }
-function remove(surface: Surface, authority: ReturnType<typeof seed>, id: string, version: number) {
-    return surface === 'host' ? host.deleteAmbulatory(context, id, version)
-        : paired.deleteNetworkAmbulatory(authority, id, { version });
+function remove(id: string, version: number) {
+    return host.deleteAmbulatory(context, id, version);
 }
 
-for (const surface of ['host', 'paired'] as const) {
-    for (const defaultParent of [false, true]) {
-        test(`${surface}: deleting a ${defaultParent ? 'default' : 'nondefault'} parent with children preserves every row and audit`, async () => {
-            const authority = seed({ a: null, b: 'a', c: 'b' });
-            if (defaultParent) assert.equal((await update(surface, authority, 'a', { isDefault: true, version: 1 })).status, 200);
-            const before = snapshot();
-            const denied = await remove(surface, authority, 'a', row('a').version);
-            observations.push({ surface, case: 'delete-parent', defaultParent, before, denied, after: snapshot() });
-            assert.equal(denied.status, 409);
-            assert.equal(denied.value.error, 'Ambulatory still has child ambulatories. Move them before deletion.');
-            assert.deepEqual(snapshot(), before);
-        });
-    }
-    test(`${surface}: leaf deletion and explicit child detach retain the ordinary delete receipt`, async () => {
-        const authority = seed({ a: null, b: 'a', c: null });
-        assert.deepEqual(await remove(surface, authority, 'c', 1), { status: 200, value: { success: true, affectedAmbulatories: [] } });
-        assert.equal((await update(surface, authority, 'b', { parentId: null, version: 1 })).status, 200);
+for (const defaultParent of [false, true]) {
+    test(`host: deleting a ${defaultParent ? 'default' : 'nondefault'} parent with children preserves every row and audit`, async () => {
+        const authority = seed({ a: null, b: 'a', c: 'b' });
+        if (defaultParent) assert.equal((await update('host', authority, 'a', { isDefault: true, version: 1 })).status, 200);
         const before = snapshot();
-        assert.deepEqual(await remove(surface, authority, 'a', 1), { status: 200, value: { success: true, affectedAmbulatories: [] } });
-        assert.equal(row('a'), undefined);
-        assert.deepEqual(row('b'), { id: 'b', parent_id: null, version: 2, is_default: 0 });
-        const events = (snapshot().audit as Array<Record<string, unknown>>).slice(before.audit.length);
-        assert.equal(events.length, 1);
-        assert.equal(events[0].event_type, 'ambulatory.deleted');
-        assert.equal(events[0].subject_ref, 'a');
-        assert.equal(events[0].source_surface, surface === 'host' ? 'web' : 'native');
-        assert.equal(JSON.parse(String(events[0].redacted_metadata)).resourceVersion, 1);
-    });
-    test(`${surface}: stale parent deletion keeps the existing CAS conflict`, async () => {
-        const authority = seed({ a: null, b: 'a' });
-        const before = snapshot();
-        const denied = await remove(surface, authority, 'a', 9);
+        const denied = remove('a', row('a').version);
+        observations.push({ surface: 'host', case: 'delete-parent', defaultParent, before, denied, after: snapshot() });
         assert.equal(denied.status, 409);
-        assert.equal(denied.value.code, 'VERSION_CONFLICT');
-        assert.equal(denied.value.currentVersion, 1);
+        assert.equal(denied.value.error, 'Ambulatory still has child ambulatories. Move them before deletion.');
         assert.deepEqual(snapshot(), before);
     });
+}
+test('host: leaf deletion and explicit child detach retain the ordinary delete receipt', async () => {
+    const authority = seed({ a: null, b: 'a', c: null });
+    assert.deepEqual(remove('c', 1), { status: 200, value: { success: true, affectedAmbulatories: [] } });
+    assert.equal((await update('host', authority, 'b', { parentId: null, version: 1 })).status, 200);
+    const before = snapshot();
+    assert.deepEqual(remove('a', 1), { status: 200, value: { success: true, affectedAmbulatories: [] } });
+    assert.equal(row('a'), undefined);
+    assert.deepEqual(row('b'), { id: 'b', parent_id: null, version: 2, is_default: 0 });
+    const events = (snapshot().audit as Array<Record<string, unknown>>).slice(before.audit.length);
+    assert.equal(events.length, 1);
+    assert.equal(events[0].event_type, 'ambulatory.deleted');
+    assert.equal(events[0].subject_ref, 'a');
+    assert.equal(events[0].source_surface, 'web');
+    assert.equal(JSON.parse(String(events[0].redacted_metadata)).resourceVersion, 1);
+});
+test('host: stale parent deletion keeps the existing CAS conflict', async () => {
+    seed({ a: null, b: 'a' });
+    const before = snapshot();
+    const denied = remove('a', 9);
+    assert.equal(denied.status, 409);
+    assert.equal(denied.value.code, 'VERSION_CONFLICT');
+    assert.equal(denied.value.currentVersion, 1);
+    assert.deepEqual(snapshot(), before);
+});
+
+for (const surface of ['host', 'paired'] as const) {
     for (const [first, second] of [['a', 'b'], ['b', 'a']]) {
         test(`${surface}: stale drafts ${first}→${second}/${second}→${first} cannot commit a cycle`, async () => {
             const authority = seed();
@@ -254,12 +254,12 @@ function contender(surface: Surface, operation: 'create' | 'delete', gate = '') 
 
 for (const surface of ['host', 'paired'] as const) {
     for (const first of ['create', 'delete'] as const) {
-        test(`${surface}: two SQLite processes ${first}-first never leave an orphan`, { timeout: 25_000 }, async () => {
+        test(`${surface} create and host delete: two SQLite processes ${first}-first never leave an orphan`, { timeout: 25_000 }, async () => {
             seed({ a: null });
             const before = snapshot();
             const gate = join(dataDir, `${surface}-${first}-release`);
             const second = first === 'create' ? 'delete' : 'create';
-            const racers = [contender(surface, first, gate), contender(surface, second)];
+            const racers = [contender(first === 'create' ? surface : 'host', first, gate), contender(second === 'create' ? surface : 'host', second)];
             try {
                 await Promise.all(racers.map(racer => racer.ready));
                 racers[0].release();
