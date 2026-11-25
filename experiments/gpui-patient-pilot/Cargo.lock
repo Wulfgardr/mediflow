@@ -3215,6 +3215,7 @@ dependencies = [
  "iana-time-zone",
  "image",
  "mediflow-local-state",
+ "mediflow-local-voice",
  "mediflow-patient-client",
  "mediflow-runtime-client",
  "raw-window-handle",
@@ -3222,7 +3223,6 @@ dependencies = [
  "sha2",
  "unicode-normalization",
  "unicode-segmentation",
- "whisper-rs",
  "windows-sys 0.61.2",
  "zeroize",
 ]
@@ -3232,6 +3232,17 @@ name = "mediflow-local-state"
 version = "0.9.1"
 dependencies = [
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "mediflow-local-voice"
+version = "0.9.1"
+dependencies = [
+ "sha2",
+ "unicode-normalization",
+ "unicode-segmentation",
+ "whisper-rs",
+ "zeroize",
 ]
 
 [[package]]
