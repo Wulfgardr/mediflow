@@ -355,7 +355,7 @@ test('WUL-929: right name in an unexpected unit, an exam awaiting validation and
         'Ca 2,3 mmol/L 2,1-2,6',
         'Microalbuminuria 15 mg/L 0-20',
         'Proteine urine 30 mg/dL 0-10',
-        'D-dimero 320 ng/mL 0-500',
+        'D-dimero 0,32 mg/L 0-0,5',
         'Troponina 12 ng/L 0-14',
     ].join('\n');
     const observations = candidates(text).filter((fact) => fact.kind === 'observation');
@@ -478,6 +478,7 @@ test('WUL-929: synthetic Italian report covering all 14 clinical choices keeps e
             ['FT3', '3.2', '3051-0', 'pg/mL'],
             ['FT3', '4.9', '14928-6', 'pmol/L'],
             ['HbA1c', '6.5', '4548-4', '%'],
+            ['HbA1c', '48', '59261-8', 'mmol/mol'],
             ['eGFR', '72', '', ''],
             ['eGFR CKD-EPI 2021', '72', '98979-8', 'mL/min/{1.73_m2}'],
             ['eGFR CKD-EPI 2009', '70', '62238-1', 'mL/min/{1.73_m2}'],
@@ -495,7 +496,7 @@ test('WUL-929: synthetic Italian report covering all 14 clinical choices keeps e
             ['VES Westergren', '14', '4537-7', 'mm/h'],
             ['Neutrofili', '60', '770-8', '%'],
             ['Reticolociti', '1.1', '17849-1', '%'],
-            ['D-dimero', '320', '', ''],
+            ['D-dimero', '320', '48065-7', 'ng{FEU}/mL'],
             ['D-dimero FEU', '320', '48065-7', 'ng{FEU}/mL'],
             ['D-dimero DDU', '180', '48066-5', 'ug/L{DDU}'],
             ['Troponina', '12', '', ''],
