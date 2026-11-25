@@ -1,6 +1,6 @@
 import 'server-only';
 import { randomUUID } from 'node:crypto';
-import { agentAppliedItemIds, agentConfirmationPatientState, applyConfirmedAgentVisit, hasAgentVisitConfirmationReceipt, recordDeniedAgentVisitConfirmation } from './agent-visit-application';
+import { agentAppliedItemIds, agentConfirmationFiscalCode, agentConfirmationPatientState, applyConfirmedAgentVisit, hasAgentVisitConfirmationReceipt, recordDeniedAgentVisitConfirmation } from './agent-visit-application';
 import { readAgentCassette } from './agent-cassette-store';
 import { cassetteItems } from './agent-cassette-contract';
 import { openDbServer } from './db-server';
@@ -16,7 +16,7 @@ import { isCurrentServerSession } from './security/current-session-authority';
 
 type NativePeer = Awaited<ReturnType<typeof launchNativeVisitConfirmation>>;
 type AgentIdentity = Pick<AgentPrincipal, 'agentRef' | 'actorRef' | 'archiveGeneration' | 'mandateRef'>;
-type SessionPreparation = Readonly<{ sessionId: string; patientId: string; patientVersion: number; patientState: string }>;
+type SessionPreparation = Readonly<{ sessionId: string; patientId: string; patientVersion: number; patientState: string; fiscalCode: string }>;
 type Confirmation = VisitConfirmationTicket & {
     identity: AgentIdentity;
     modelProvider: AgentPrincipal['modelProvider'];
@@ -122,7 +122,7 @@ export async function prepareVisitConfirmation(session: ServerSession, reference
     const pending = requests.get(reference);
     if (!pending || !waiting(pending) || pending.state.kind !== 'waiting' || !matchesSession(pending, session) || !fromCassette(pending, true)) throw denied();
     const patientState = agentConfirmationPatientState(patientId, patientVersion);
-    const prepared = Object.freeze({ sessionId: session.id, patientId, patientVersion, patientState });
+    const prepared = Object.freeze({ sessionId: session.id, patientId, patientVersion, patientState, fiscalCode: agentConfirmationFiscalCode(patientId) });
     const port = mintResourcePort(session);
     if (!port) throw denied();
     const registration = registerPrivateResource(port, () => retire(pending, 'denied', 'session_retired'));

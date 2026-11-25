@@ -9,6 +9,8 @@ struct VisitConfirmationPresentation: Decodable {
     }
 
     struct Proposal: Decodable {
+        let id: String
+        let kind: String
         let title: String
         let fields: [Field]
         let current: String
@@ -45,6 +47,11 @@ struct VisitConfirmationPresentation: Decodable {
     }
 }
 
+struct VisitConfirmationShownItem: Decodable, Equatable {
+    let id: String
+    let kind: String
+}
+
 struct VisitConfirmationChallenge: Decodable {
     let purpose: String
     let requestId: String
@@ -52,6 +59,13 @@ struct VisitConfirmationChallenge: Decodable {
     let expiresAt: Int
     let presentationDigest: String
     let signingPublicKey: Data
+    let fiscalCode: String
+    let items: [VisitConfirmationShownItem]
+
+    func describes(_ presentation: VisitConfirmationPresentation) -> Bool {
+        presentation.fiscalCode == fiscalCode
+            && presentation.proposals.map { VisitConfirmationShownItem(id: $0.id, kind: $0.kind) } == items
+    }
 }
 
 struct VisitConfirmationFrame: Decodable {
@@ -74,7 +88,7 @@ struct OpenVisitConfirmation {
         let decoder = JSONDecoder()
         let challenge = try decoder.decode(VisitConfirmationChallenge.self, from: frame.challenge)
         let digest = SHA256.hash(data: frame.presentation).map { String(format: "%02x", $0) }.joined()
-        guard challenge.purpose == "mediflow.visit-confirmation.v1",
+        guard challenge.purpose == "mediflow.visit-confirmation.v2",
               let ref = UUID(uuidString: challenge.requestId), ref.uuidString.lowercased() == challenge.requestId,
               let nonce = Data(base64Encoded: challenge.nonce), nonce.count == 32,
               challenge.expiresAt > now, challenge.expiresAt - now <= 60_000,
@@ -90,7 +104,7 @@ struct OpenVisitConfirmation {
                                        ciphertext: sealed.ciphertext.dropLast(16), tag: sealed.ciphertext.suffix(16))
         let bytes = try AES.GCM.open(box, using: key, authenticating: aad)
         let presentation = try decoder.decode(VisitConfirmationPresentation.self, from: bytes)
-        guard presentation.valid else { throw VisitConfirmationFailure.denied }
+        guard presentation.valid, challenge.describes(presentation) else { throw VisitConfirmationFailure.denied }
         self.challenge = challenge
         self.challengeBytes = frame.challenge
         self.presentation = presentation
