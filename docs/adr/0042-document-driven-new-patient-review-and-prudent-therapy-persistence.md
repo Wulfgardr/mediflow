@@ -514,6 +514,13 @@ Regole:
   unico non sceglie: il campo resta com'è, la pagina lo segna «Da decidere» e
   «Prosegui alla conferma» resta bloccato finché il medico non sceglie una
   proposta o scrive il valore.
+- Una data di nascita proposta che non corrisponde al codice fiscale proposto
+  non entra con il gesto unico: resta da decidere, con il motivo accanto al
+  campo. Serve perché le proposte vengono da più documenti, e uno può essere di
+  un familiare senza codice fiscale.
+- Limite dichiarato: senza alcun codice fiscale nel lotto non c'è nulla con cui
+  confrontare la data, e il gesto unico porta nei campi anche dati presi da
+  documenti diversi che non si contraddicono.
 - I campi restano modificabili; accanto a ogni campo che coincide con una
   proposta resta il nome del file da cui viene.
 - PIN, controllo dei duplicati, conferma del collegamento e blocchi del lotto
@@ -523,4 +530,5 @@ Regole:
 Prove: `lib/dossier-new-patient-entry.test.ts` (proposte dal lotto, valori
 concordi, valori discordi, documenti esclusi) ed `e2e/new-patient-from-documents.spec.ts`
 (un gesto riempie i campi, correzione di un campo, PIN e scheda creata; due
-cognomi diversi lasciano il campo da decidere; casi bloccati invariati).
+cognomi diversi lasciano il campo da decidere; la data di nascita di un
+familiare senza codice fiscale resta da decidere; casi bloccati invariati).
