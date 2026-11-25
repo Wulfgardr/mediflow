@@ -178,6 +178,7 @@ impl ClinicalApp {
         let area = &self.local_host.archives;
         let available = self.archive_available();
         let mut pane = div().min_w_0().flex().flex_col().gap(px(16.))
+            .child(heading("archive-heading", "Archivi e backup", theme))
             .child(self.local_host_panel(cx))
             .child(section("archive-recovery-heading", "Backup completo di recupero", theme))
             .child(text!("Copia cifrata di archivio, account, chiavi protette e storico. Richiede un kit di recupero già salvato e la sua chiave cartacea separata. Limite: 512 MiB. La verifica non prova un ripristino."))

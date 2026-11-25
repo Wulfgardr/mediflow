@@ -2,7 +2,6 @@ import 'server-only';
 import type Database from 'better-sqlite3';
 import { hasAttestedLoopbackIngress } from './loopback-ingress.mjs';
 import { createAgentPairingStore, type AgentPrincipal } from '../agent-pairing-store';
-import { isAgentUnlockActive } from './agent-unlock-session';
 import { createAgentRegistrationStore } from '../agent-registration-store';
 import { clinicalContentAllowed, type AgentOperation } from '../agent-mandate-contract';
 
@@ -19,7 +18,7 @@ export function withAuthenticatedAgentTransaction<T>(database: Database.Database
     if (!match) throw new AgentChannelDenied(401);
     return database.transaction(() => {
         const principal = createAgentPairingStore(database).principal(match[1]!)
-            ?? createAgentRegistrationStore(database).principal(match[1]!, isAgentUnlockActive);
+            ?? createAgentRegistrationStore(database).principal(match[1]!);
         if (!principal) throw new AgentChannelDenied(401);
         if (operation && (!principal.operations.includes(operation)
             || !clinicalContentAllowed(principal.modelProvider, principal.allowsClinicalEgress))) throw new AgentChannelDenied(403);

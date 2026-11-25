@@ -1,5 +1,7 @@
 'use client';
 
+import { taxCodeBirthDetails } from '@/lib/patient-identity';
+
 import { ViewState } from '@/components/ui/view-state';
 import { formatCountLabel } from '@/lib/format-count';
 import type { ReactNode } from 'react';
@@ -52,6 +54,7 @@ export function PatientIdentityLens({
     actions,
     exemptionDetails = [],
 }: PatientIdentityLensProps) {
+    const birth = (patient.identifierType ?? 'cf') === 'cf' ? taxCodeBirthDetails(patient.taxCode) : null;
     /* WUL-678: normalize both lookup sides, preserving the original exemption contract. */
     const detailByCode = new Map(exemptionDetails.map((item) => [item.code.trim().toUpperCase(), item.description?.trim()]));
     /* WUL-678: only the requested domain is rendered in each destination. */
@@ -60,8 +63,9 @@ export function PatientIdentityLens({
             <div className={disclosure.identity}>
                 {domain === 'anagrafica' ? <section aria-label="Dati anagrafici">
                     <dl className={disclosure.facts}>
-                        <div><dt>Nome e cognome</dt><dd><PrivacyBlur>{patient.firstName} {patient.lastName}</PrivacyBlur></dd></div>
+                        <div><dt>Nome e cognome</dt><dd><PrivacyBlur>{`${patient.firstName} ${patient.lastName}`.trim() || 'Da completare'}</PrivacyBlur></dd></div>
                         <div><dt>Codice fiscale</dt><dd><PrivacyBlur intensity="sm">{patient.taxCode || 'Non registrato'}</PrivacyBlur></dd></div>
+                        {birth && <div><dt>Sesso nel codice fiscale</dt><dd>{birth.sex}</dd></div>}
                         <div><dt>Data di nascita</dt><dd>{birthDateLabel} · {ageLabel}</dd></div>
                         <div><dt>Telefono</dt><dd><PrivacyBlur intensity="sm">{patient.phone || 'Non registrato'}</PrivacyBlur></dd></div>
                         <div><dt>Indirizzo</dt><dd><PrivacyBlur intensity="sm">{patient.address || 'Non registrato'}</PrivacyBlur></dd></div>

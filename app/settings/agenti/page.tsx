@@ -380,7 +380,7 @@ export default function AgentSettingsPage() {
                         }} />Rinnova allo sblocco
                     </label>
                     {renewOnUnlock && <>
-                        <p>Dal prossimo sblocco il client riceve un mandato di 24 ore con queste operazioni, finché l’accesso resta attivo.</p>
+                        <p>Dal prossimo sblocco il client riceve un mandato di 24 ore con queste operazioni. Il blocco per inattività non lo ferma; «Blocca» lo revoca.</p>
                         <label className="block">PIN per {pairing.name}<input className={SETTINGS_INPUT_CLASS} type="password"
                             inputMode="numeric" autoComplete="off" aria-invalid={Boolean(approvalPinError)} value={approvalPin} onChange={event => {
                                 setApprovalPin(event.target.value); setApprovalPinSubmitError(null);

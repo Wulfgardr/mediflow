@@ -1,0 +1,94 @@
+[
+  {
+    "code": "mmol/mol",
+    "displayIt": "mmol/mol"
+  },
+  {
+    "code": "mL/min/{1.73_m2}",
+    "displayIt": "mL/min/1,73 m²"
+  },
+  {
+    "code": "mg/L",
+    "displayIt": "mg/L"
+  },
+  {
+    "code": "mm/h",
+    "displayIt": "mm/h"
+  },
+  {
+    "code": "ng/mL",
+    "displayIt": "ng/mL"
+  },
+  {
+    "code": "ug/dL",
+    "displayIt": "µg/dL"
+  },
+  {
+    "code": "pg/mL",
+    "displayIt": "pg/mL"
+  },
+  {
+    "code": "pmol/L",
+    "displayIt": "pmol/L"
+  },
+  {
+    "code": "nmol/L",
+    "displayIt": "nmol/L"
+  },
+  {
+    "code": "[IU]/mL",
+    "displayIt": "UI/mL"
+  },
+  {
+    "code": "{INR}",
+    "displayIt": ""
+  },
+  {
+    "code": "s",
+    "displayIt": "s"
+  },
+  {
+    "code": "{ratio}",
+    "displayIt": ""
+  },
+  {
+    "code": "ng{FEU}/mL",
+    "displayIt": "ng/mL FEU"
+  },
+  {
+    "code": "ug/L{DDU}",
+    "displayIt": "µg/L DDU"
+  },
+  {
+    "code": "ng/L",
+    "displayIt": "ng/L"
+  },
+  {
+    "code": "mg/(24.h)",
+    "displayIt": "mg/24 h"
+  },
+  {
+    "code": "mg/g{creat}",
+    "displayIt": "mg/g creatinina"
+  },
+  {
+    "code": "mmol/mol{creat}",
+    "displayIt": "mmol/mol creatinina"
+  },
+  {
+    "code": "[pH]",
+    "displayIt": ""
+  },
+  {
+    "code": "{Spec_grav}",
+    "displayIt": ""
+  },
+  {
+    "code": "/[HPF]",
+    "displayIt": "/campo"
+  },
+  {
+    "code": "/uL",
+    "displayIt": "/µL"
+  }
+]

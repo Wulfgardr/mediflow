@@ -18,8 +18,8 @@ import type { DocumentDecisionClassification } from './document-decision';
 import { hasPhysicianTaxCodeStamp, isValidItalianTaxCodeChecksum, resolveDocumentTaxCodeRoles, whiteElectronicPrescriberEvidence } from './document-identity-resolution';
 import { parseItalianLabReport } from './lab-report-parser';
 import {
-    catalogObservationCode, findInvalidityMentions, findIsoCode, findPrescriptionReference, findPriority, findScaleMentions, invalidityDetails,
-    legacyQualifiersOf, parseMedicationItem, prostheticStatusOf, qualifiersOf, segmentDossierSections, splitSectionItems, type DossierSection,
+    REPORT_UNITS, findInvalidityMentions, findIsoCode, findPrescriptionReference, findPriority, findScaleMentions, invalidityDetails,
+    legacyQualifiersOf, parseMedicationItem, prostheticStatusOf, qualifiersOf, reportedObservationCode, segmentDossierSections, splitSectionItems, type DossierSection,
 } from './dossier-sections';
 import { clinicalDay, identityName, sameClinicalText, sameClinicalValue, sameDay, sameDosage, sameOptional, sameUnit } from './dossier-clinical-equality';
 import {
@@ -603,6 +603,7 @@ export const DOSSIER_FACT_TARGET: Record<DossierFactKind, 'patient_diagnoses' | 
 
 export type DossierFactValues = Record<string, string>;
 export type DossierFactDecision = 'pending' | 'accepted' | 'rejected' | 'already_present';
+export type DossierFactDecider = 'accept_verified';
 
 export interface DossierEvidence { unit: number; start: number; end: number; excerpt: string }
 
@@ -617,10 +618,21 @@ export interface DossierFact {
     values: DossierFactValues;
     decision: DossierFactDecision;
     note?: string;
+    /** Decisione presa da «Accetta il verificato» e non ancora rivista dal medico; assente per le decisioni del medico. */
+    decidedBy?: DossierFactDecider;
     /** Identità opaca del record, persistita nell'artefatto prima della scrittura. */
     recordId?: string;
 }
 
+
+/** Decisione del medico su una voce: se era del gesto unico, motivo e provenienza del gesto non valgono più. */
+export function decideByPhysician(fact: DossierFact, decision: DossierFactDecision): DossierFact {
+    const physician: DossierFact = { ...fact, decision };
+    if (!fact.decidedBy) return physician;
+    delete physician.decidedBy;
+    delete physician.note;
+    return physician;
+}
 
 function hashText(value: string): string {
     let hash = 0x811c9dc5;
@@ -756,12 +768,12 @@ export function extractDossierCandidates(input: DossierCandidateInput): { facts:
         const offsets: number[] = [];
         let cursor = 0;
         for (const line of lines) { offsets.push(cursor); cursor += line.length + 1; }
-        for (const result of parseItalianLabReport(plain)) {
+        for (const result of parseItalianLabReport(plain, REPORT_UNITS)) {
             const start = offsets[result.lineNumber - 1];
             const line = lines[result.lineNumber - 1];
             const end = start + line.replace(/\r$/u, '').length;
             // Codice e unità solo da corrispondenza esatta col catalogo locale; altrimenti restano da inserire.
-            const coded = catalogObservationCode(result.analyte, result.unit);
+            const coded = reportedObservationCode(result.analyte, result.unit, result.value);
             const fromParagraph = rebuilt.has(start);
             const values: DossierFactValues = {
                 display: result.analyte, value: result.value, unit: result.unit, code: coded?.code ?? '', unitCode: coded?.unitCode ?? '',
@@ -1275,7 +1287,8 @@ function validFact(value: unknown): value is DossierFact {
         || typeof value.negated !== 'boolean' || !isRecord(value.values) || typeof value.decision !== 'string') return false;
     return Object.values(value.values).every((entry) => typeof entry === 'string')
         && ['pending', 'accepted', 'rejected', 'already_present'].includes(value.decision)
-        && (value.recordId === undefined || typeof value.recordId === 'string');
+        && (value.recordId === undefined || typeof value.recordId === 'string')
+        && (value.decidedBy === undefined || value.decidedBy === 'accept_verified');
 }
 
 /** Legge la chiave `dossier` dall'artefatto. Un record malformato vale come assente-ma-presente: `invalid`. */

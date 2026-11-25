@@ -12,6 +12,12 @@ export type IncomingAgentCassette = AgentCassette & { appliedItemIds: string[] }
 const sealed = z.string().regex(/^ENC:[A-Za-z0-9+/]+=*:[A-Za-z0-9+/]+=*$/u);
 const noteValues = z.object({ title: sealed, content: sealed, date: dateInputSchema, metadata: sealed }).strict();
 const id = z.string().uuid();
+export const newAgentPatientSchema = z.object({
+    ambulatoryId: z.string().min(1).max(256),
+    taxCode: z.string().regex(/^[A-Z0-9]{16}$/u),
+    birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u).nullable(),
+}).strict();
+export type NewAgentPatient = z.output<typeof newAgentPatientSchema>;
 export const agentApplicationItemSchema = z.discriminatedUnion('kind', [
     z.object({ id, kind: z.literal('note'), values: noteValues }).strict(),
     z.object({ id, kind: z.literal('transcription'), values: noteValues }).strict(),
@@ -28,10 +34,14 @@ export const agentApplicationItemSchema = z.discriminatedUnion('kind', [
         value: z.string().min(1).max(4096), observedAt: dateInputSchema,
         refLow: z.string().max(4096).nullable().optional(), refHigh: z.string().max(4096).nullable().optional(), refText: z.string().max(4096).nullable().optional(), notes: sealed }).strict() }).strict(),
 ]);
-export const agentApplicationSchema = z.object({ visitId: id, phase: z.literal('review'), patientId: z.string().min(1).max(256),
+const applicationFields = z.object({ visitId: id, phase: z.literal('review'), patientId: z.string().min(1).max(256),
     expectedVersion: z.number().int().positive().max(Number.MAX_SAFE_INTEGER - 129), cassetteRevision: z.number().int().positive(),
     items: z.array(agentApplicationItemSchema).min(1).max(128),
-}).strict().refine(value => new Set(value.items.map(item => item.id)).size === value.items.length);
+}).strict();
+const uniqueItems = (value: { items: Array<{ id: string }> }) => new Set(value.items.map(item => item.id)).size === value.items.length;
+export const agentApplicationSchema = applicationFields.refine(uniqueItems);
+export const reviewedAgentApplicationSchema = applicationFields.extend({ newPatient: newAgentPatientSchema.optional() }).refine(uniqueItems);
+export type ReviewedAgentApplicationInput = z.input<typeof reviewedAgentApplicationSchema>;
 export type AgentApplicationInput = z.input<typeof agentApplicationSchema>;
 export type AgentApplication = z.output<typeof agentApplicationSchema>;
 export const agentStructuredKind = (kind: string) => !['note', 'transcription', 'pdf'].includes(kind);

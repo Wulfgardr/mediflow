@@ -424,7 +424,7 @@ if let Some(web)=editor.web.take(){web.cancel_local();cx.background_executor().s
                 )
             })
             .unwrap_or_default();
-        div().flex().flex_col().gap(px(12.)).child(surface::island_title("bootstrap-title", "Prima sede", None, theme)).child(text!(identity).with_id("bootstrap-identity"))
+        div().flex().flex_col().gap(px(12.)).child(heading("bootstrap-title","Prima sede",theme)).child(text!(identity).with_id("bootstrap-identity"))
             .child(text!("Questa operazione richiede un accesso amministrativo dedicato. L’indirizzo locale non attesta dove termini un eventuale proxy.").with_id("bootstrap-boundary"))
             .children(editor.fields.iter().enumerate().map(|(index,field)|div().flex().flex_col().gap(px(4.)).child(text!(field.label).with_id(("bootstrap-field-label",index))).child(field.editor.clone())))
             .when_some(editor.payload.as_ref(),|el,payload|el.child(text!(format!("ID conservato: {}",payload.id)).with_id("bootstrap-id")))
@@ -770,7 +770,9 @@ if let Some(web)=editor.web.take(){web.cancel_local();cx.background_executor().s
         enabled: bool,
     ) -> Stateful<Div> {
         let id = id.into();
-        let element = button(id.clone(), label, theme, primary, enabled);
+        let selector = id.clone();
+        let element = button(id.clone(), label, theme, primary, enabled)
+            .debug_selector(move || selector.to_string());
         if let Some(target) = self.ambulatory_management.commands.get(id.as_ref()) {
             target.attach_enabled(element, enabled)
         } else {
@@ -783,54 +785,16 @@ if let Some(web)=editor.web.take(){web.cancel_local();cx.background_executor().s
         let management = &self.ambulatory_management;
         let busy = management.is_saving();
         let loaded = matches!(self.ambulatories, Load::Ready(_));
-        let actions = div()
-            .flex()
-            .flex_wrap()
-            .gap(px(12.))
-            .child(
-                self.ambulatory_button(
-                    "clinical-workspace-ambulatories-back",
-                    "Torna alle Impostazioni",
-                    theme,
-                    false,
-                    !busy,
-                )
-                .on_click(cx.listener(|this, _, window, cx| {
-                    if this.ambulatory_management.is_saving() {
-                        return;
-                    }
-                    this.withdraw_ambulatory_command_view(cx);
-                    this.select_settings_page(SettingsPage::Overview, window, cx);
-                })),
-            )
-            .child(
-                self.ambulatory_button(
-                    "clinical-workspace-ambulatories-reread",
-                    "Rileggi le sedi",
-                    theme,
-                    false,
-                    !busy && !matches!(self.ambulatories, Load::Loading),
-                )
-                .on_click(cx.listener(|this, _, _, cx| {
-                    if this.ambulatory_management.is_saving()
-                        || matches!(this.ambulatories, Load::Loading)
-                    {
-                        return;
-                    }
-                    this.ambulatory_management.rebase = true;
-                    this.load_ambulatories(cx);
-                })),
-            );
-        let header = surface::page(theme)
-            .max_w(px(760.))
-            .child(surface::page_header(
-                "clinical-workspace-ambulatories-heading",
-                "Ambulatori",
-                None,
-                actions,
-                theme,
-            ));
-        let mut view = surface::island(theme, false)
+        let mut view = div().w_full().min_w_0().max_w(px(760.)).flex().flex_col().gap(px(24.))
+            .child(heading("clinical-workspace-ambulatories-heading", "Ambulatori", theme))
+            .child(div().flex().flex_wrap().gap(px(12.))
+                .child(self.ambulatory_button("clinical-workspace-ambulatories-back", "Torna alle Impostazioni", theme, false, !busy)
+                    .on_click(cx.listener(|this, _, window, cx| { if this.ambulatory_management.is_saving() { return; } this.withdraw_ambulatory_command_view(cx); this.select_settings_page(SettingsPage::Overview, window, cx); })))
+                .child(self.ambulatory_button("clinical-workspace-ambulatories-reread", "Rileggi le sedi", theme, false, !busy && !matches!(self.ambulatories, Load::Loading))
+                    .on_click(cx.listener(|this, _, _, cx| {
+                            if this.ambulatory_management.is_saving() || matches!(this.ambulatories,Load::Loading) { return; }
+                            this.ambulatory_management.rebase=true; this.load_ambulatories(cx);
+                        }))))
             .child(div().text_color(theme.secondary).child(text!("La sede corrente limita le cartelle visualizzate. La sede predefinita viene proposta al nuovo accesso; cambiarla non sposta la selezione di questa sessione.")));
         if let Some((message, failed)) = &management.message {
             view = view.child(notice(
@@ -1111,7 +1075,7 @@ if let Some(web)=editor.web.take(){web.cancel_local();cx.background_executor().s
             "Sedi registrate",
             theme,
         ));
-        let content = match &self.ambulatories {
+        match &self.ambulatories {
             Load::Loading => view.child(notice(
                 "clinical-workspace-ambulatories-loading",
                 "Lettura delle sedi in corso…",
@@ -1160,8 +1124,7 @@ if let Some(web)=editor.web.take(){web.cancel_local();cx.background_executor().s
                                 .child(self.ambulatory_button(format!("clinical-workspace-ambulatory-delete-{delete_id}"),Self::ambulatory_command_row_label(false),theme,false,loaded && self.can_open_ambulatory_command()).on_click(cx.listener(move|this,_,_,cx|this.open_ambulatory_command(&delete_id,mediflow_runtime_client::AmbulatoryCommandOperation::Delete,cx))))))
                 }))
             }
-        };
-        header.child(surface::tray(theme).child(content))
+        }
     }
 }
 

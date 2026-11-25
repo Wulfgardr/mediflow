@@ -174,9 +174,9 @@ function inferRole(context: string, taxCodeStart: number, taxCodeEnd: number): P
 const HORIZONTAL_SPACE = String.raw`[ \t\u00a0]`;
 const WHITE_ELECTRONIC_PRESCRIPTION_HEADER = /^(?:prescrizione di farmaci non a carico del SSN[ \t]+[-–][ \t]+)?ricetta bianca elettronica(?:[ \t]+[-–][ \t]+promemoria per il paziente)?[ \t]*(?:\r?\n|$)/iu;
 const WHITE_ELECTRONIC_PRESCRIBER_BLOCK = new RegExp(
-    String.raw`^[ \t]*cognome e nome del medico:[ \t]+[\p{L} .'’-]{1,120}?[ \t]{2,}codice fiscale[ \t]*:?\r?\n`
-    + String.raw`[ \t]*indirizzo dello studio e numero di telefono:[^\r\n]*\r?\n`
-    + String.raw`(?:[^\r\n:]+[ \t]+tel\.[^\r\n]*\r?\n)?`
+    String.raw`^[ \t]*cognome e nome del medico:[ \t]+[\p{L} .'’-]{1,120}?[ \t]{2,}codice fiscale[ \t]*:?\r?\n(?:[ \t]*\r?\n){0,3}`
+    + String.raw`[ \t]*indirizzo dello studio e numero di telefono:[^\r\n]*\r?\n(?:[ \t]*\r?\n){0,3}`
+    + String.raw`(?:[^\r\n:]+[ \t]+tel\.[^\r\n]*\r?\n(?:[ \t]*\r?\n){0,3})?`
     + String.raw`[ \t]*specializzazione:[^:\r\n]{0,120}?[ \t]{2,}(${ITALIAN_TAX_CODE_REGEX.source})[ \t]*$`,
     'gimu',
 );

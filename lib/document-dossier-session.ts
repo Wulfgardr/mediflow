@@ -244,6 +244,12 @@ export function evaluateDraftGroupIdentity(group: DossierDraftGroup, patients: r
     );
 }
 
+export function dossierGroupDestination(group: DossierDraftGroup, patients: readonly DossierPatient[], chosenPatientId: string | undefined): string {
+    if (chosenPatientId !== undefined) return chosenPatientId;
+    const identity = evaluateDraftGroupIdentity(group, patients, null);
+    return identity.status === 'suggested' ? identity.candidatePatientIds[0] : '';
+}
+
 // ---------------------------------------------------------------------------
 // Confini di scrittura: la revoca resta revoca, mai un errore di rete
 // ---------------------------------------------------------------------------
@@ -1020,39 +1026,40 @@ export interface DossierBulkResult {
     accepted: number;
     alreadyPresent: number;
     superseded: number;
+    setAside: number;
     leftPending: number;
     residualAcknowledged: number;
     applied: DossierApplyResult[];
     skipped: number;
 }
 
-/**
- * Un solo gesto del medico per scheda: accetta le proposte verificate sulla fonte, nuove e
- * senza blocchi, segna come già presenti quelle in scheda o accettate in un'altra fonte,
- * rifiuta le proposte per sezione sostituite dall'estrazione preparata, conferma il residuo
- * solo dove l'estrazione dichiara coperte tutte le pagine; poi applica con i writer ordinari.
- * Conflitti, incertezze, negazioni e citazioni non trovate restano da decidere.
- */
+function bulkContext(view: DossierPatientView) {
+    const conflicted = new Set([...view.assessments].flatMap(([ref, assessment]) => assessment.status === 'conflict' ? [ref, ...assessment.relatedFactRefs] : []));
+    const documentNames = Object.fromEntries(view.documents.map((document) => [document.attachment.id, document.record.source.fileName]));
+    return { conflicted, documentNames, exemptionCodes: view.exemptionCodes, assessment: (ref: string) => view.assessments.get(ref) };
+}
+
 export async function acceptVerifiedAndApply(
     ports: DossierPorts, input: { patientId: string; signal: AbortSignal; isCurrent: () => boolean; includeSummaries?: boolean },
 ): Promise<DossierBulkResult> {
     const { patientId, signal, isCurrent } = input;
     const includeSummaries = input.includeSummaries === true;
     const guard = guardOf(signal, isCurrent);
-    const result: DossierBulkResult = { documents: 0, accepted: 0, alreadyPresent: 0, superseded: 0, leftPending: 0, residualAcknowledged: 0, applied: [], skipped: 0 };
+    const result: DossierBulkResult = { documents: 0, accepted: 0, alreadyPresent: 0, superseded: 0, setAside: 0, leftPending: 0, residualAcknowledged: 0, applied: [], skipped: 0 };
     const view = await loadPatientDossier(ports, patientId, signal);
     guard();
     if (!view) return result;
+    const context = bulkContext(view);
     const acceptedElsewhere = new Set(view.documents.flatMap((document) => document.record.facts
         .filter((fact) => fact.decision === 'accepted' || fact.decision === 'already_present').map((fact) => dossierFactRef(document.attachment.id, fact.factId))));
+    const setAsideElsewhere = new Set<string>();
     for (const document of view.documents) {
         if (document.coverage.gaps.includes('identity_conflict') || !document.preservationCurrent || !document.attachment.currentness) { result.skipped += 1; continue; }
-        const decide = (record: DossierRecord) => preparedBulkDecisions({ record, documentKey: document.attachment.id,
-            assessment: (ref) => view.assessments.get(ref), exemptionCodes: view.exemptionCodes, acceptedElsewhere, includeSummaries });
+        const decide = (record: DossierRecord) => preparedBulkDecisions({ ...context, record, documentKey: document.attachment.id, acceptedElsewhere, setAsideElsewhere, includeSummaries });
         const preview = decide(document.record);
         const acknowledge = preview.acknowledgeResidual && document.record.residualReview.state !== 'acknowledged';
         result.documents += 1;
-        if (!preview.counts.accepted && !preview.counts.alreadyPresent && !preview.counts.superseded && !acknowledge) {
+        if (!preview.counts.accepted && !preview.counts.alreadyPresent && !preview.counts.superseded && !preview.counts.setAside && !acknowledge) {
             result.leftPending += preview.counts.leftPending;
             continue;
         }
@@ -1066,40 +1073,43 @@ export async function acceptVerifiedAndApply(
                         : fresh.residualReview };
                 } });
         } catch (error) {
-            // Un documento cambiato o con scritture in volo si salta; gli altri proseguono.
             if (error instanceof DossierStaleError || error instanceof DossierWriteInFlight) { result.skipped += 1; continue; }
             throw error;
         }
         guard();
         for (const ref of decided.accepted) acceptedElsewhere.add(ref);
+        for (const ref of decided.setAside) setAsideElsewhere.add(ref);
         result.accepted += decided.counts.accepted; result.alreadyPresent += decided.counts.alreadyPresent;
-        result.superseded += decided.counts.superseded; result.leftPending += decided.counts.leftPending;
+        result.superseded += decided.counts.superseded; result.setAside += decided.counts.setAside; result.leftPending += decided.counts.leftPending;
     }
     const hasPrepared = (record: DossierRecord) => record.facts.some((fact) => fact.origin === 'prepared');
     const fresh = await loadPatientDossier(ports, patientId, signal);
     guard();
     for (const document of fresh?.documents ?? []) {
-        // Solo i documenti con estrazione preparata: gli altri restano al pulsante «Applica» del documento.
         if (!hasPrepared(document.record) || !document.attachment.currentness || document.coverage.gaps.includes('identity_conflict')) continue;
         const ready = document.record.facts.some((fact) => eligible(document.record, fact, fresh!.exemptionCodes));
         if (!ready) continue;
         result.applied.push(await applyDossierDocument(ports, { patientId, attachmentId: document.attachment.id, expected: document.attachment.currentness, signal, isCurrent }));
         guard();
     }
-    // Dopo la scrittura: dove la sintesi è scritta e riletta, la voce col testo intero lascia il posto e il residuo si conferma.
     const after = await loadPatientDossier(ports, patientId, signal);
     guard();
-    for (const document of after?.documents ?? []) {
+    if (!after) return result;
+    const afterContext = bulkContext(after);
+    const supersededAfterWrite = (record: DossierRecord, attachmentId: string) => {
+        const decided = preparedBulkDecisions({ ...afterContext, record, documentKey: attachmentId, acceptedElsewhere, setAsideElsewhere, includeSummaries });
+        const facts = record.facts.map((fact, index) => fact.origin === 'parser:document' && fact.decision === 'pending' && decided.facts[index].decision === 'rejected' ? decided.facts[index] : fact);
+        return { facts, superseded: facts.filter((fact, index) => fact !== record.facts[index]).length, acknowledgeResidual: decided.acknowledgeResidual };
+    };
+    for (const document of after.documents) {
         if (!hasPrepared(document.record) || !document.attachment.currentness) continue;
-        const final = preparedBulkDecisions({ record: document.record, documentKey: document.attachment.id, assessment: (ref) => after!.assessments.get(ref),
-            exemptionCodes: after!.exemptionCodes, acceptedElsewhere, includeSummaries: false });
+        const final = supersededAfterWrite(document.record, document.attachment.id);
         const acknowledge = final.acknowledgeResidual && document.record.residualReview.state !== 'acknowledged';
-        if (!final.counts.superseded && !acknowledge) continue;
+        if (!final.superseded && !acknowledge) continue;
         try {
             await saveDossierReview(ports, { patientId, attachmentId: document.attachment.id, expected: document.attachment.currentness, signal, isCurrent,
                 change: (record) => {
-                    const decided = preparedBulkDecisions({ record, documentKey: document.attachment.id, assessment: (ref) => after!.assessments.get(ref),
-                        exemptionCodes: after!.exemptionCodes, acceptedElsewhere, includeSummaries: false });
+                    const decided = supersededAfterWrite(record, document.attachment.id);
                     return { ...record, facts: decided.facts, residualReview: decided.acknowledgeResidual && record.residualReview.state !== 'acknowledged'
                         ? { state: 'acknowledged', at: ports.now().toISOString(), note: 'Sintesi scritta e riletta; pagine dichiarate lette coerenti con il testo conservato.' }
                         : record.residualReview };
@@ -1109,9 +1119,8 @@ export async function acceptVerifiedAndApply(
             throw error;
         }
         guard();
-        // Ciò che la seconda fase sostituisce era «da decidere» nella prima.
-        result.superseded += final.counts.superseded;
-        result.leftPending = Math.max(0, result.leftPending - final.counts.superseded);
+        result.superseded += final.superseded;
+        result.leftPending = Math.max(0, result.leftPending - final.superseded);
         if (acknowledge) result.residualAcknowledged += 1;
     }
     return result;

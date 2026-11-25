@@ -5,30 +5,21 @@ import { isClinicalRichTextHtml, sanitizeClinicalRichTextHtml } from './clinical
 import { cassetteItems } from './agent-cassette-contract';
 import { agentBytes } from './agent-cassette-crypto';
 import { openAgentVisit, type OpenedAgentVisit } from './agent-cassette-client';
-import { agentApplicationSchema, agentStructuredKind, type AgentApplicationInput, type AgentCassetteIndexEntry, type IncomingAgentCassette } from './agent-visit-application-contract';
-import { collectDossierTaxCodes, evaluateDossierGroupIdentity, excludedProfessionalCode, dossierFactBlockers } from './domain/documents/dossier-import';
-import { verifyPreparedFields, preparedTokens } from './domain/documents/dossier-prepared';
-import { clinicalFactContext, contextReview, isHistoricalTherapy } from './domain/documents/clinical-context-lexicon';
+import { reviewedAgentApplicationSchema, agentStructuredKind, type ReviewedAgentApplicationInput, type AgentCassetteIndexEntry, type IncomingAgentCassette, type NewAgentPatient } from './agent-visit-application-contract';
+import { collectDossierTaxCodes, excludedProfessionalCode } from './domain/documents/dossier-import';
+import { reviewAgentFact } from './agent-visit-facts';
 import { servicePrescriptionCreateSchema } from './api-schemas/prescriptions';
-import { isValidItalianTaxCode } from './patient-identity';
+import { birthDateMatchesTaxCode, isValidItalianTaxCode } from './patient-identity';
+import { PreviewError } from '../components/document-viewer-policy';
 import { agentVisitPdfText, type AgentVisitPdf } from './agent-visit-pdf-text';
 
 export type AgentVisitDocument = AgentVisitPdf & { id: string; name: string; hash: string };
-export type AgentVisitReview = { visit: Omit<OpenedAgentVisit, 'cassette'> & { cassette: AgentCassetteIndexEntry }; patient: Patient | null;
+export type AgentVisitReview = { visit: Omit<OpenedAgentVisit, 'cassette'> & { cassette: AgentCassetteIndexEntry }; patient: Patient | null; newPatient: NewAgentPatient | null;
     documents: AgentVisitDocument[]; appliedItemIds: string[]; currentSummary: Map<string, string>; blockers: string[]; proposalBlockers: string[] };
 const proposalLabels: Record<string, string> = { therapy: 'la terapia', service: 'la prestazione', diagnosis: 'la diagnosi', exemption: 'l’esenzione', observation: 'l’osservazione' };
 const hex = (value: ArrayBuffer) => [...new Uint8Array(value)].map(byte => byte.toString(16).padStart(2, '0')).join('');
 const text = (value: unknown) => typeof value === 'string' ? value.trim() : '';
 const normalized = (value: string) => value.replace(/\s+/gu, ' ').trim().toLocaleLowerCase('it-IT');
-function locateQuote(source: string, quote: string): RegExpExecArray | null {
-    if (quote.length < 12 || quote.length > 600) return null;
-    const pattern = quote.split(/\s+/u).map(part => part.replace(/[.*+?^$(){}|[\]\\]/gu, '\\$&')).join('\\s+');
-    const start = /^[\p{L}\p{N}]/u.test(quote) ? '(?<![\\p{L}\\p{N}])' : '';
-    const end = /[\p{L}\p{N}]$/u.test(quote) ? '(?![\\p{L}\\p{N}])' : '';
-    const literal = new RegExp(start + pattern + end, 'giu');
-    const match = literal.exec(source);
-    return match && !literal.test(source) ? match : null;
-}
 function sourceHash(item: OpenedAgentVisit['items'][number]): string {
     const source = item.value.source;
     return source && typeof source === 'object' && !Array.isArray(source) ? text((source as Record<string, unknown>).sha256) : '';
@@ -39,59 +30,73 @@ function values(item: OpenedAgentVisit['items'][number]): Record<string, string>
     return value as Record<string, string>;
 }
 
+function documentedBirthDates(text: string): string[] {
+    return [...text.matchAll(/\bdata\s+(?:di\s+)?nascita\s*[:.]?\s*(\d{1,2})[./-](\d{1,2})[./-](\d{4})\b/giu)]
+        .map(([, day, month, year]) => year + '-' + month.padStart(2, '0') + '-' + day.padStart(2, '0'));
+}
+
 export async function inspectAgentVisit(row: IncomingAgentCassette, patients: Patient[], physicianTaxCode: string | null, signal: AbortSignal,
-    readPdf = agentVisitPdfText, exemptionCodes: ReadonlySet<string> = new Set()): Promise<AgentVisitReview> {
+    readPdf = agentVisitPdfText, ambulatoryId?: string): Promise<AgentVisitReview> {
     const visit = await openAgentVisit(row);
     signal.throwIfAborted();
     const cf = text(visit.anchor.fiscalCode);
-    const matches = isValidItalianTaxCode(cf) ? patients.filter(patient => !patient.deletedAt && !patient.isArchived && patient.taxCode === cf) : [];
-    const patient = matches.length === 1 ? matches[0] : null;
+    const physician = physicianTaxCode?.trim().toUpperCase();
     const blockers: string[] = [], proposalBlockers: string[] = [];
-    if (!patient) blockers.push(matches.length > 1 ? 'Più schede hanno questo codice fiscale.' : 'Nessuna scheda attiva con questo codice fiscale nell’ambulatorio selezionato.');
+    const validCf = cf === cf.toUpperCase() && cf !== physician && isValidItalianTaxCode(cf);
+    const matches = validCf ? patients.filter(patient => !patient.deletedAt && (patient.identifierType ?? 'cf') === 'cf'
+        && patient.taxCode.trim().toUpperCase() === cf) : [];
+    const patient = matches.length === 1 && !matches[0].isArchived ? matches[0] : null;
+    if (!validCf) blockers.push('Controlla il codice fiscale della visita.');
+    else if (matches.length > 1) blockers.push('Più schede hanno questo codice fiscale.');
+    else if (matches[0]?.isArchived) blockers.push('La scheda con questo codice fiscale è archiviata.');
+    else if (!patient && !ambulatoryId) blockers.push('Nessuna scheda attiva con questo codice fiscale nell’ambulatorio selezionato.');
+    else if (patient && !patient.version) blockers.push('Aggiorna la scheda prima di applicare la visita.');
     const documents = new Map<string, AgentVisitDocument>();
     const deposited = cassetteItems(row);
     for (const item of visit.items.filter(item => item.kind === 'pdf')) {
         const bytes = agentBytes(text(item.value.base64));
+        const name = text(item.value.name);
         try {
             const hash = hex(await crypto.subtle.digest('SHA-256', bytes));
-            if (hash !== deposited.find(value => value.id === item.id)?.documentHash) throw new Error('Hash del PDF discordante.');
-            const read = await readPdf(bytes, signal), codes = collectDossierTaxCodes(read.text);
+            if (hash !== deposited.find(value => value.id === item.id)?.documentHash) throw new Error('AGENT_PDF_HASH_MISMATCH');
+            const read = await readPdf(bytes, signal);
             signal.throwIfAborted();
-            documents.set(hash, { ...read, id: item.id, name: text(item.value.name), hash });
-            const identity = evaluateDossierGroupIdentity([{ taxCodes: codes }], patient ? [patient] : [], patient?.id, physicianTaxCode);
-            const foreign = codes.filter(code => code.checksumValid && code.value !== physicianTaxCode
-                && !excludedProfessionalCode(code));
-            if (identity.status !== 'matched' || identity.blocking || foreign.length === 0
-                || foreign.some(code => code.value !== cf || code.role !== 'patient_cf')) {
-                blockers.push(identity.missingPhysicianTaxCode ? identity.message + ' PDF: ' + text(item.value.name) : 'Identità da verificare nel PDF ' + text(item.value.name) + ': ' + identity.documentPatientCodes.join(', '));
+            documents.set(hash, { ...read, id: item.id, name, hash });
+            const codes = collectDossierTaxCodes(read.text);
+            const patientCodes = [...new Set(codes.filter(code => code.checksumValid && !excludedProfessionalCode(code)
+                && (code.value !== physician || code.role === 'patient_cf')).map(code => code.value))];
+            if (patientCodes.length !== 1 || patientCodes[0] !== cf) {
+                blockers.push('Identità da verificare nel PDF ' + name + (patientCodes.length ? ': ' + patientCodes.join(', ') : '.'));
             }
         } catch (error) {
             if (signal.aborted) throw error;
-            blockers.push('PDF non verificabile: ' + text(item.value.name));
+            const reason = error instanceof PreviewError ? error.message : error instanceof Error ? ({
+                AGENT_PDF_HASH_MISMATCH: 'Il file è cambiato.',
+                AGENT_PDF_NO_TEXT: 'Una pagina è disponibile solo come immagine.',
+                AGENT_PDF_LIMIT: 'Il file supera i limiti di lettura.',
+                AGENT_PDF_PASSWORD: 'Il file è protetto da password.',
+            }[error.message]) : undefined;
+            blockers.push('PDF non verificabile: ' + name + (reason ? '. ' + reason : ''));
         } finally { bytes.fill(0); }
     }
-    if (documents.size === 0) blockers.push('Manca un PDF con il codice fiscale del paziente.');
-    for (const item of visit.items.filter(item => agentStructuredKind(item.kind))) {
+    if (documents.size === 0 && !visit.items.some(item => item.kind === 'pdf')) blockers.push('Manca un PDF con il codice fiscale del paziente.');
+    let newPatient: NewAgentPatient | null = null;
+    if (!patient && ambulatoryId && !blockers.length) {
+        const dates = [...new Set([...documents.values()].flatMap(doc => documentedBirthDates(doc.text)))];
+        if (dates.length > 1 || dates[0] && !birthDateMatchesTaxCode(cf, dates[0])) blockers.push('Controlla la data di nascita nei PDF.');
+        else newPatient = { ambulatoryId, taxCode: cf, birthDate: dates[0] ?? null };
+    }
+    for (const item of visit.items) {
+        if (item.kind === 'note' || item.kind === 'transcription' || item.kind === 'pdf') continue;
         const source = documents.get(sourceHash(item));
-        const quote = text(item.value.quote);
-        const match = source ? locateQuote(source.text, quote) : null;
-        if (!source || !match) {
-            proposalBlockers.push('Fonte da verificare per ' + (proposalLabels[item.kind] ?? 'questa proposta') + '.'); continue;
-        }
-        const fields = values(item);
         const kind = item.kind === 'service' ? 'service_prescription' : item.kind;
-        if (kind !== 'note' && kind !== 'transcription' && kind !== 'pdf') {
-            const verified = verifyPreparedFields(kind, fields, preparedTokens(match[0]).map(token => token.text));
-            const context = clinicalFactContext(kind, fields, source.text, match.index, match.index + match[0].length);
-            const contextualFields = { ...fields, contextReview: contextReview(context, kind === 'therapy' && isHistoricalTherapy(fields.status)) };
-            proposalBlockers.push(...dossierFactBlockers({ factId: item.id, kind, values: contextualFields, negated: context.negated, origin: 'prepared', evidence: null, decision: 'pending' }, { exemptionCodes }));
-            if (verified.check !== 'ok' || verified.drop.length || fields.subject && fields.subject !== 'paziente') proposalBlockers.push('Valori o soggetto della proposta da verificare sulla fonte.');
+        const fact = source && reviewAgentFact(kind, values(item), source.text, text(item.value.quote));
+        if (!fact) {
+            proposalBlockers.push('Fonte da verificare per ' + (proposalLabels[item.kind] ?? 'questa proposta') + '.');
+            continue;
         }
-        if (item.kind === 'service' && (fields.items ?? '').split('\n').map(line => line.trim()).filter(Boolean).some(line => !normalized(quote).includes(normalized(line)))) proposalBlockers.push('Voci della prestazione da verificare sulla fonte.');
-        if (item.kind === 'observation' && [fields.refLow, fields.refHigh, fields.refText].some(value => value && !normalized(quote).includes(normalized(value)))) proposalBlockers.push('Intervallo di riferimento da verificare sulla fonte.');
-        if (item.kind === 'diagnosis' && (!fields.code || !fields.system || !normalized(quote).includes(normalized(fields.code)))) proposalBlockers.push('Codice della diagnosi da verificare sulla fonte.');
-        if (item.kind === 'observation' && (!fields.code || !normalized(quote).includes(normalized(fields.code)))) proposalBlockers.push('Codice dell’osservazione da verificare sulla fonte.');
-        if (item.kind === 'exemption' && (!fields.code || !normalized(quote).includes(normalized(fields.code)))) proposalBlockers.push('Codice di esenzione da verificare sulla fonte.');
+        item.value.values = fact.values;
+        proposalBlockers.push(...fact.blockers);
     }
     const currentSummary = new Map<string, string>();
     if (patient) {
@@ -112,7 +117,7 @@ export async function inspectAgentVisit(row: IncomingAgentCassette, patients: Pa
             currentSummary.set(item.id, before.join('; ') || 'Non presente');
         }
     }
-    return { visit, patient, documents: [...documents.values()], appliedItemIds: row.appliedItemIds, currentSummary, blockers, proposalBlockers };
+    return { visit, patient, newPatient, documents: [...documents.values()], appliedItemIds: row.appliedItemIds, currentSummary, blockers, proposalBlockers };
 }
 export async function reopenReviewedAgentItems(review: AgentVisitReview, row: IncomingAgentCassette): Promise<AgentVisitReview['visit']['items'] | null> {
     const visit = await openAgentVisit(row);
@@ -125,25 +130,29 @@ export async function reopenReviewedAgentItems(review: AgentVisitReview, row: In
             if (hex(await crypto.subtle.digest('SHA-256', bytes)) !== deposited.find(value => value.id === item.id)?.documentHash) return null;
         } finally { bytes.fill(0); }
     }
-    return visit.items;
+    return visit.items.map((item, index) => item.kind === 'pdf' ? item : review.visit.items[index]!);
 }
 export function agentVisitAwaitsReview(review: AgentVisitReview): boolean {
-    return review.visit.cassette.status === 'closed' && !review.blockers.length && !review.proposalBlockers.length
+    return review.visit.cassette.status === 'closed' && Boolean(review.patient?.version || review.newPatient) && !review.blockers.length && !review.proposalBlockers.length
         && review.visit.items.some(item => !review.appliedItemIds.includes(item.id));
 }
 
-export async function prepareAgentApplication(review: AgentVisitReview, signal: AbortSignal): Promise<AgentApplicationInput | null> {
-    if (!review.patient || review.blockers.length || review.proposalBlockers.length || review.visit.cassette.status !== 'closed') return null;
-    const patient = await db.patients.get(review.patient.id, { signal });
-    if (!patient || patient.deletedAt || patient.isArchived || patient.taxCode !== review.visit.anchor.fiscalCode || !patient.version) return null;
-    if (patient.version !== review.patient.version) throw new Error('La scheda è cambiata. Rileggi le differenze prima di applicare la visita.');
+export async function prepareAgentApplication(review: AgentVisitReview, signal: AbortSignal): Promise<ReviewedAgentApplicationInput | null> {
+    if (!agentVisitAwaitsReview(review)) return null;
+    const patient = review.patient ? await db.patients.get(review.patient.id, { signal }) : null;
+    if (review.patient && (!patient || patient.deletedAt || patient.isArchived
+        || patient.taxCode.trim().toUpperCase() !== review.visit.anchor.fiscalCode || !patient.version)) return null;
+    if (patient && patient.version !== review.patient?.version) throw new Error('La scheda è cambiata. Rileggi le differenze prima di applicare la visita.');
     const selected = review.visit.items.filter(item => !review.appliedItemIds.includes(item.id));
-    if (!selected.length) return null;
-    const diagnoses = [...(patient.diagnoses ?? [])], exemptions = [...(patient.exemptions ?? [])];
+    const diagnoses = [...(patient?.diagnoses ?? [])], exemptions = [...(patient?.exemptions ?? [])];
     for (const item of selected) {
         if (item.kind === 'diagnosis') {
             const value = values(item);
-            if (!diagnoses.some(stored => stored.code === value.code && stored.system === value.system)) diagnoses.push({ code: value.code, system: value.system, description: value.description, date: new Date(value.date || review.visit.cassette.depositedAt) });
+            const code = value.code ?? '', system = value.system ?? '';
+            if (!diagnoses.some(stored => code ? stored.code === code && stored.system === system
+                : !stored.code && normalized(stored.description) === normalized(value.description))) {
+                diagnoses.push({ code, system, description: value.description, date: new Date(value.date) });
+            }
         }
         if (item.kind === 'exemption') { const value = values(item); if (!exemptions.includes(value.code)) exemptions.push(value.code); }
     }
@@ -202,6 +211,8 @@ export async function prepareAgentApplication(review: AgentVisitReview, signal: 
         }
     }
     signal.throwIfAborted();
-    return agentApplicationSchema.parse({ visitId: review.visit.cassette.id, phase: 'review', patientId: patient.id, expectedVersion: patient.version,
+    return reviewedAgentApplicationSchema.parse({ visitId: review.visit.cassette.id, phase: 'review',
+        patientId: patient?.id ?? review.visit.cassette.id, expectedVersion: patient?.version ?? 1,
+        ...(review.newPatient ? { newPatient: review.newPatient } : {}),
         cassetteRevision: review.visit.cassette.revision, items: prepared });
 }

@@ -133,12 +133,9 @@ impl ClinicalApp {
             }))
             .on_action(cx.listener(|this, _: &Privacy, _, cx| this.change_local_preference(PreferenceChange::Privacy(false), cx)))
             .on_action(cx.listener(|this, _: &Lock, _, cx| this.request_discard(Discard::Lock, cx)))
-            .size_full().overflow_y_scroll().track_scroll(&self.privacy_scroll).bg(theme.sheet).text_color(theme.ink)
+            .size_full().overflow_y_scroll().track_scroll(&self.privacy_scroll).bg(theme.paper).text_color(theme.ink)
             .type_role(theme, crate::theme::TextRole::Body).p(px(24.)).flex().flex_col().gap(px(16.))
-            .child(surface::page_header(
-                "clinical-workspace-privacy-heading", "Contenuti oscurati", None, div(), theme,
-            ))
-            .child(surface::tray(theme).max_w(px(640.)).child(surface::island(theme, false)
+            .child(heading("clinical-workspace-privacy-heading", "Contenuti oscurati", theme))
             .child(div().max_w(px(640.)).child(text!(if self.session.is_some() {
                 "La finestra è coperta e la bozza è conservata. L’accesso resta aperto: scegli Blocca per chiuderlo."
             } else {
@@ -154,7 +151,7 @@ impl ClinicalApp {
                     button("clinical-workspace-privacy-lock", "Blocca l’accesso", theme, false, true)
                         .map(|el| self.privacy_commands[2].attach(el))
                         .on_click(cx.listener(|this, _, _, cx| this.request_discard(Discard::Lock, cx)))
-                )))))
+                )))
     }
 }
 

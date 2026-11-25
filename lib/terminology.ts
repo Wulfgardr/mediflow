@@ -1,3 +1,5 @@
+import { LOINC_LAB_TABLE, LOINC_LAB_UNITS, LOINC_LAB_VERSION } from './generated-loinc-lab-catalog';
+
 export type TerminologySystemCode = 'AIC' | 'ATC' | 'ICD-11' | 'LOINC' | 'UCUM' | 'SNOMED-CT' | 'CND';
 
 export type TerminologySystemDescriptor = {
@@ -108,6 +110,32 @@ export const LOINC_PENDING_VALIDATION: (StaticCatalogItem & { note: string })[] 
     { code: '1988-5', display: 'C reactive protein [Mass/volume] in Serum or Plasma', displayIt: 'Proteina C reattiva (PCR)', defaultUnit: 'mg/L', note: 'mg/L vs mg/dL (fattore 10); hs-CRP e voce distinta (30522-7).' },
 ];
 
+const LOINC_LAB_ACTIVE: StaticCatalogItem[] = LOINC_LAB_TABLE.filter((row) => row.status === 'attivo').map((row) => ({
+    code: row.code, display: row.longCommonName, displayIt: row.nameIt, ...(row.unit ? { defaultUnit: row.unit } : {}), version: LOINC_LAB_VERSION,
+}));
+const LOINC_CATALOG: StaticCatalogItem[] = [...LOINC_PILOT, ...LOINC_LAB_ACTIVE];
+
+export interface LoincObservationName { name: string; unit: string; code: string; active: boolean }
+
+const displayNames = (displayIt: string) => [displayIt.replace(/\(.*\)/u, ''), /\(([^)]+)\)/u.exec(displayIt)?.[1] ?? ''];
+
+export function loincObservationNames(): LoincObservationName[] {
+    const fromDisplay = (items: StaticCatalogItem[], active: boolean) => items.flatMap((item) =>
+        displayNames(item.displayIt ?? '').map((name) => ({ name, unit: item.defaultUnit ?? '', code: item.code, active })));
+    const fromTable = LOINC_LAB_TABLE.flatMap((row) => [row.nameIt, row.nameIt.replace(/\(.*\)/u, ''), ...row.synonyms]
+        .map((name) => ({ name, unit: row.unit, code: row.code, active: row.status === 'attivo' })));
+    return [...fromDisplay(LOINC_PILOT, true), ...fromDisplay(LOINC_PENDING_VALIDATION, false), ...fromTable]
+        .filter((entry) => entry.name.trim());
+}
+
+export interface LoincReportedUnit { name: string; reported: string; unit: string }
+
+export function loincReportedUnits(): LoincReportedUnit[] {
+    return LOINC_LAB_TABLE.filter((row) => row.status === 'attivo').flatMap((row) => [row.nameIt, row.nameIt.replace(/\(.*\)/u, ''), ...row.synonyms]
+        .filter((name) => name.trim())
+        .flatMap((name) => row.reportUnits.map((reported) => ({ name, reported, unit: row.unit }))));
+}
+
 const UCUM_PILOT: StaticCatalogItem[] = [
     { code: 'mm[Hg]', display: 'millimeter of mercury', displayIt: 'mmHg', version: '2.1' },
     { code: '/min', display: 'per minute', displayIt: '/min', version: '2.1' },
@@ -125,6 +153,7 @@ const UCUM_PILOT: StaticCatalogItem[] = [
     { code: '10*3/uL', display: 'thousands per microliter', displayIt: '×10³/µL', version: '2.1' },
     { code: '10*6/uL', display: 'millions per microliter', displayIt: '×10⁶/µL', version: '2.1' },
 ];
+const UCUM_CATALOG: StaticCatalogItem[] = [...UCUM_PILOT, ...LOINC_LAB_UNITS.map((unit) => ({ ...unit, version: '2.1' }))];
 
 const SUPERSCRIPT: Record<string, string> = { '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹', '-': '⁻' };
 
@@ -134,8 +163,8 @@ const SUPERSCRIPT: Record<string, string> = { '0': '⁰', '1': '¹', '2': '²', 
 export function formatUnitForDisplay(unitCode: string | null | undefined): string {
     const code = (unitCode ?? '').trim();
     if (!code) return '';
-    const known = UCUM_PILOT.find(item => item.code === code);
-    if (known?.displayIt) return known.displayIt;
+    const known = UCUM_CATALOG.find(item => item.code === code);
+    if (known) return known.displayIt ?? '';
     return code
         .replace(/\{([^}]*)\}/g, (_, annotation: string) => annotation.replace(/_/g, ' ').replace(/(\d)\.(\d)/g, '$1,$2'))
         .replace(/\[([^\]]*)\]/g, '$1')
@@ -176,8 +205,8 @@ export function normalizeTerminologySystem(value: unknown): TerminologySystemCod
 }
 
 function staticCatalogFor(system: TerminologySystemCode): StaticCatalogItem[] | null {
-    if (system === 'LOINC') return LOINC_PILOT;
-    if (system === 'UCUM') return UCUM_PILOT;
+    if (system === 'LOINC') return LOINC_CATALOG;
+    if (system === 'UCUM') return UCUM_CATALOG;
     return null;
 }
 

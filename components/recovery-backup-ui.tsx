@@ -4,28 +4,24 @@ import { useSecurity } from './security-provider';
 import { Disclosure } from './disclosure';
 import composition from './settings/backup-composition.module.css';
 import { MAX_RECOVERY_BACKUP_BYTES, MAX_RECOVERY_DATABASE_BYTES } from '@/lib/recovery-backup';
+import { createRecoveryBackupFile, RECOVERY_BACKUP_REQUIREMENT, recoveryBackupAllowed, recoveryBackupFailure } from './recovery-backup-download';
 
 export function RecoveryBackupUI({ primary = true }: { primary?: boolean }) {
     const { recoveryBackup, unlockCredential, user } = useSecurity();
     const [busy, setBusy] = useState(false);
     const [message, setMessage] = useState('');
-    const allowed = unlockCredential === 'passphrase' && user?.role === 'admin';
+    const allowed = recoveryBackupAllowed(unlockCredential, user?.role);
     return <section className={composition.section} aria-labelledby="recovery-backup-heading">
         <h3 id="recovery-backup-heading" className={composition.sectionTitle}>Backup completo di recupero</h3>
         <p>Copia cifrata dell’intero archivio, compresi account, chiavi protette e storico. Per recuperarla servono il kit corrispondente a questo backup e la sua chiave su carta, conservata separatamente. Limite: {MAX_RECOVERY_DATABASE_BYTES / (1024 * 1024)} MiB.</p>
-        {!allowed && <p>Prima passa alla passphrase e salva il kit nelle impostazioni di sicurezza, usando l’account amministratore.</p>}
+        {!allowed && <p>{RECOVERY_BACKUP_REQUIREMENT}</p>}
         <div className={composition.actions}>
             <button className={primary ? 'ui-btn-primary' : 'mf-btn-secondary'} data-backup-primary={primary || undefined} disabled={!allowed || busy} onClick={async () => {
                 setBusy(true); setMessage('Creazione in corso…');
                 try {
-                    const bytes = await recoveryBackup();
-                    if (!bytes) throw new Error();
-                    const url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: 'application/octet-stream' }));
-                    const link = document.createElement('a'); link.href = url;
-                    link.download = `mediflow-recovery-${new Date().toISOString().slice(0, 10)}.mediflow-recovery`; link.click();
-                    URL.revokeObjectURL(url);
+                    await createRecoveryBackupFile(recoveryBackup);
                     setMessage('Backup creato. Seleziona il file per verificarne la cifratura e conserva una copia fuori da questo computer, con il kit corrispondente. Non è ancora stato provato un ripristino.');
-                } catch { setMessage('Backup non creato. Rinnova l’accesso e verifica che archivio e kit siano disponibili.'); }
+                } catch (error) { setMessage(recoveryBackupFailure(error)); }
                 finally { setBusy(false); }
             }}>{busy ? 'Attendi…' : 'Crea backup completo cifrato'}</button>
             <label className={`mf-btn-secondary ${composition.fileControl}`}>Verifica il file cifrato

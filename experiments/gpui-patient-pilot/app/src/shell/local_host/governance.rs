@@ -247,6 +247,7 @@ impl ClinicalApp {
         let theme = self.theme;
         let area = &self.local_host.governance;
         let mut pane = div().min_w_0().flex().flex_col().gap(px(16.))
+            .child(heading("governance-heading", "Governo Fabric", theme))
             .child(text!("Registro e verifiche salvate sulla postazione. Rileggere non avvia prove, non attiva funzioni e non autorizza invii o uso clinico."))
             .child(self.local_host_panel(cx));
         if self.local_host.access().is_none() {

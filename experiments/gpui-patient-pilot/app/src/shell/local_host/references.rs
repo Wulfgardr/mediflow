@@ -655,6 +655,7 @@ impl ClinicalApp {
             .flex()
             .flex_col()
             .gap(px(16.))
+            .child(heading("references-heading", "Repertori", theme))
             .child(self.local_host_panel(cx));
         if self.local_host.access().is_none() {
             return pane;

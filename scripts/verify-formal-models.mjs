@@ -194,10 +194,10 @@ async function main() {
     const unlockDir = path.join(ROOT, 'docs/formal/agent-unlock');
     const unlockCfg = fs.readFileSync(path.join(unlockDir, 'MC.cfg'), 'utf8');
     runTlc(jar, outputDir, 'agent-unlock-current', { modelDir: unlockDir, tlaFile: 'AgentUnlock.tla', configText: unlockCfg, deadlock: false });
-    runTlc(jar, outputDir, 'agent-unlock-mutant-ignore-lock', {
+    runTlc(jar, outputDir, 'agent-unlock-mutant-ignore-manual-lock', {
         modelDir: unlockDir,
         tlaFile: 'AgentUnlock.tla',
-        configText: unlockCfg.replace('IgnoreLock = FALSE', 'IgnoreLock = TRUE'),
+        configText: unlockCfg.replace('IgnoreManualLock = FALSE', 'IgnoreManualLock = TRUE'),
         deadlock: false,
         expectViolation: 'NoUnauthorizedDeposit',
     });
@@ -207,6 +207,13 @@ async function main() {
         configText: unlockCfg.replace(/INVARIANTS[\s\S]*/, 'INVARIANT NoSharedWitness\n'),
         deadlock: false,
         expectViolation: 'NoSharedWitness',
+    });
+    runTlc(jar, outputDir, 'agent-unlock-reach-NoIdleDepositWitness', {
+        modelDir: unlockDir,
+        tlaFile: 'AgentUnlock.tla',
+        configText: unlockCfg.replace(/INVARIANTS[\s\S]*/, 'INVARIANT NoIdleDepositWitness\n'),
+        deadlock: false,
+        expectViolation: 'NoIdleDepositWitness',
     });
     const unlockData = path.join(dataDir, 'unlock');
     fs.mkdirSync(unlockData, { recursive: true });

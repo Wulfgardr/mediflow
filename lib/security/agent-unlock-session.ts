@@ -60,8 +60,3 @@ export function confirmSharedAgentUnlock(gesture: string, sessionId: string, con
 export function confirmDirectAgentRenewal(sessionId: string, controlId: string, actorRef: string, issue: (unlockRef: string) => void): boolean {
     return confirmSharedAgentUnlock(randomUUID(), sessionId, controlId, actorRef, issue);
 }
-
-export function isAgentUnlockActive(ref: string, actorRef: string): boolean {
-    const unlock = unlocks.get(ref.split(':', 1)[0]);
-    return Boolean(unlock?.confirmed && currentAdmin(unlock, actorRef));
-}

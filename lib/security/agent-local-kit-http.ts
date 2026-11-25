@@ -21,7 +21,6 @@ type Sources = {
     session(): Promise<ServerSession | null>;
     verifyPin(username: string, pin: string): Promise<string | null>;
     store(): ReturnType<typeof createAgentLocalKitStore>;
-    isUnlockActive?: (ref: string, actorRef: string) => boolean;
     renew?: (request: Request, session: ServerSession, generation: string) => boolean;
 };
 
@@ -54,7 +53,7 @@ export function createAgentLocalKitHttp(sources: Sources) {
         GET: async (request: Request): Promise<Response> => {
             try {
                 const access = await admitted(request, false);
-                return access ? reply(sources.store().status(access.session.userId, sources.isUnlockActive)) : denied(401);
+                return access ? reply(sources.store().status(access.session.userId)) : denied(401);
             } catch {
                 return denied(503);
             }
@@ -64,10 +63,10 @@ export function createAgentLocalKitHttp(sources: Sources) {
                 const access = await admitted(request, true);
                 if (!access || !sources.renew) return denied(403);
                 const store = sources.store();
-                const current = store.status(access.session.userId, sources.isUnlockActive);
+                const current = store.status(access.session.userId);
                 if (!current.connected) return denied(409, 'LOCAL_KIT_NOT_CONNECTED');
                 if (!sources.renew(request, access.session, access.generation)) return denied(403);
-                return reply(store.status(access.session.userId, sources.isUnlockActive));
+                return reply(store.status(access.session.userId));
             } catch (error) {
                 return denied(error instanceof AgentMandateDenied ? 403 : 503);
             }

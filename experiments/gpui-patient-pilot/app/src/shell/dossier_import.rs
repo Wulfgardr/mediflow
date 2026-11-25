@@ -217,20 +217,15 @@ impl ClinicalApp {
         let theme = self.theme;
         let state = &self.patient.dossier;
         let open = self.local_host.access().is_some();
-        let mut pane = surface::island(theme, false).child(
-            div()
-                .min_w_0()
-                .flex()
-                .items_center()
-                .gap(px(10.))
-                .child(surface::glyph(Icon::Diary, None, theme))
-                .child(surface::island_title(
-                    "dossier-import-heading",
-                    "Importa dossier",
-                    None,
-                    theme,
-                )),
-        );
+        let mut pane = div()
+            .min_w_0()
+            .flex()
+            .flex_col()
+            .gap(px(12.))
+            .border_b_1()
+            .border_color(theme.rule)
+            .pb(px(24.))
+            .child(section("dossier-import-heading", "Importa dossier", theme));
         if !open {
             return pane.child(notice("dossier-host-closed","Accesso locale chiuso. Per rivedere e applicare il dossier apri Gestione locale in Impostazioni e conferma l’accesso su questo Mac.",theme,false));
         }
@@ -308,10 +303,9 @@ impl ClinicalApp {
                 .flex_col()
                 .gap(px(10.))
                 .py(px(12.))
-                .child(surface::island_title(
+                .child(heading(
                     "dossier-group",
                     format!("Scheda {}", index + 1),
-                    None,
                     theme,
                 ))
                 .child(notice(

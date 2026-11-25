@@ -234,16 +234,17 @@ impl ClinicalApp {
 
     pub(super) fn analytics_view(&self, cx: &Context<Self>) -> Div {
         let theme = self.theme;
-        let header = surface::page(theme)
+        let mut pane = div().reading_surface(theme)
+            .min_w_0()
+            .max_w_full()
             .max_w(px(760.))
-            .child(surface::page_header(
-                "clinical-analytics-heading",
-                "Analisi",
-                None,
-                div(),
-                theme,
-            ));
-        let mut pane = surface::island(theme, false);
+            .flex()
+            .flex_col()
+            .gap(px(24.))
+            .child(heading("clinical-analytics-heading", "Analisi", theme))
+            .child(div().text_color(theme.secondary).child(text!(
+                "L’archivio calcola i conteggi della popolazione attiva per la fascia scelta. Questa finestra non calcola età, fasce o indicatori clinici: mostra i valori restituiti dall’archivio, con barre proporzionali e gli stessi conteggi in testo."
+            )));
         if let Some(session) = &self.session
             && !session.can_write(POPULATION_DEMOGRAPHICS_CAPABILITY)
         {
@@ -255,12 +256,7 @@ impl ClinicalApp {
             ));
         }
         pane = pane
-            .child(surface::island_title(
-                "clinical-analytics-range",
-                "Fascia di età",
-                None,
-                theme,
-            ))
+            .child(section("clinical-analytics-range", "FASCIA DI ETÀ", theme))
             .child(
                 div()
                     .flex()
@@ -323,12 +319,12 @@ impl ClinicalApp {
             pane = pane.child(notice("clinical-analytics-state", message, theme, error));
         }
         let Some(demographics) = self.analytics.state.ready() else {
-            return header.child(surface::tray(theme).child(pane));
+            return pane;
         };
         let stats = &demographics.stats;
         let [min_age, max_age] = demographics.age_range;
-        let mut population = surface::island(theme, false)
-            .child(surface::island_title("clinical-analytics-population", "Popolazione", None, theme))
+        pane = pane
+            .child(section("clinical-analytics-population", "POPOLAZIONE", theme))
             .child(crate::components::number_line(
                 "clinical-analytics-population-summary", "", stats.total_in_range.to_string(),
                 &format!(" schede attive tra {min_age} e {max_age} anni"), theme,
@@ -343,7 +339,7 @@ impl ClinicalApp {
                 schede(stats.adi_count)
             ))));
         if stats.total_in_range == 0 {
-            population = population.child(notice(
+            pane = pane.child(notice(
                 "clinical-analytics-empty",
                 "Nessuna scheda attiva con età nota rientra nella fascia scelta.",
                 theme,
@@ -352,11 +348,10 @@ impl ClinicalApp {
         } else {
             let rows = stats.age_dist.rows();
             let total = stats.total_in_range;
-            population = population
-                .child(surface::island_title(
+            pane = pane
+                .child(section(
                     "clinical-analytics-distribution",
-                    "Distribuzione per età",
-                    None,
+                    "DISTRIBUZIONE PER ETÀ",
                     theme,
                 ))
                 .children(
@@ -369,15 +364,14 @@ impl ClinicalApp {
                         .child(text!(format!("Distribuzione: {}.", rows_text(rows)))),
                 );
         }
-        let population = population.child(
+        pane.child(
             div()
                 .text_color(theme.secondary)
                 .child(text!(format!(
                     "Dati osservati dall’archivio il {}. La lettura non include diagnosi né conteggi diagnostici.",
                     observed_label(&demographics.observed_at)
                 ))),
-        );
-        header.child(surface::tray(theme).child(pane).child(population))
+        )
     }
 }
 

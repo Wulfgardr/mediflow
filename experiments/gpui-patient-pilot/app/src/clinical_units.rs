@@ -19,6 +19,22 @@ const CATALOG: &[(&str, &str)] = &[
     ("10*6/uL", "×10⁶/µL"),
 ];
 
+fn laboratory_units() -> &'static [(String, String)] {
+    static UNITS: std::sync::OnceLock<Vec<(String, String)>> = std::sync::OnceLock::new();
+    UNITS.get_or_init(|| {
+        let rows: Vec<serde_json::Value> = serde_json::from_str(include_str!(
+            "../../../../native/contracts/ucum/unita-laboratorio.json"
+        ))
+        .expect("native/contracts/ucum/unita-laboratorio.json: npm run generate:loinc-lab-catalog");
+        rows.iter()
+            .map(|row| {
+                let field = |name: &str| row[name].as_str().unwrap_or_default().to_owned();
+                (field("code"), field("displayIt"))
+            })
+            .collect()
+    })
+}
+
 fn superscript(ch: char) -> char {
     match ch {
         '0' => '⁰',
@@ -43,6 +59,9 @@ pub fn unit(code: &str) -> String {
     }
     if let Some((_, display)) = CATALOG.iter().find(|(known, _)| *known == code) {
         return (*display).to_string();
+    }
+    if let Some((_, display)) = laboratory_units().iter().find(|(known, _)| known == code) {
+        return display.clone();
     }
     // primo passo: annotazioni {…} (graffe tolte, «_» come spazio, virgola
     // decimale) e parentesi quadre tolte; secondo passo: potenze, esponenti, micro.
@@ -156,6 +175,22 @@ mod tests {
     fn unknown_units_are_rendered_prudently() {
         assert_eq!(unit("mL/min/{1.73_m2}"), "mL/min/1,73 m²");
         assert_eq!(unit("ug/L"), "µg/L");
+    }
+
+    #[test]
+    fn laboratory_units_come_from_the_table_with_the_web_reading() {
+        assert_eq!(laboratory_units().len(), 23);
+        assert_eq!(unit("[IU]/mL"), "UI/mL");
+        assert_eq!(unit("pmol/L"), "pmol/L");
+        assert_eq!(unit("ug/L{DDU}"), "µg/L DDU");
+        assert_eq!(unit("mg/g{creat}"), "mg/g creatinina");
+        assert_eq!(unit("mL/min/{1.73_m2}"), "mL/min/1,73 m²");
+        assert_eq!(unit("s"), "s");
+        for dimensionless in ["{INR}", "[pH]", "{Spec_grav}", "{ratio}"] {
+            assert_eq!(unit(dimensionless), "", "{dimensionless}");
+        }
+        assert_eq!(value("1.1", "{INR}"), "1,1");
+        assert_eq!(value("12", "[IU]/mL"), "12 UI/mL");
     }
 
     #[test]

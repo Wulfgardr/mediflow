@@ -2,6 +2,7 @@
 
 import { useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
+import { taxCodeBirthDetails } from '@/lib/patient-identity';
 import { useSecurity } from '@/components/security-provider';
 import { agentIncomingSnapshot, agentIncomingServerSnapshot, subscribeAgentIncoming, refreshAgentIncoming, applyReviewedAgentVisits, readIncomingAgentPdf } from '@/lib/agent-incoming';
 import { agentVisitAwaitsReview, type AgentVisitReview } from '@/lib/agent-visit-review';
@@ -126,11 +127,13 @@ function UnlockedIncoming() {
             const actionMessagesId = `visita-${visit.cassette.id}-esito`;
             const isApplicable = applicable.includes(review);
             const fiscalCode = typeof visit.anchor.fiscalCode === 'string' ? visit.anchor.fiscalCode : null;
+            const birth = review.newPatient && taxCodeBirthDetails(review.newPatient.taxCode);
+            const hasPatientName = Boolean(review.patient && (review.patient.firstName || review.patient.lastName));
             const status = visit.cassette.status !== 'closed'
                 ? { label: 'Deposito in corso', pill: surface.pillNeutral }
-                : allBlockers.length > 0
-                ? { label: 'Da verificare', pill: surface.pillWarning }
-                : { label: 'Pronta da applicare', pill: surface.pillSuccess };
+                : isApplicable
+                ? { label: 'Pronta da applicare', pill: surface.pillSuccess }
+                : { label: 'Da verificare', pill: surface.pillWarning };
             const contents = [
                 notes.length > 0 ? 'Nota' : null,
                 transcriptions.length > 0 ? 'Trascrizione' : null,
@@ -140,11 +143,11 @@ function UnlockedIncoming() {
 
             return <section key={visit.cassette.id} className={surface.tray} data-record-tray="in-arrivo" aria-label={'Visita ' + visit.cassette.id}>
                 <h2 className={surface.zoneTitle}>
-                    {review.patient ? `${review.patient.lastName} ${review.patient.firstName}` : fiscalCode ?? 'Identità da confermare'}
+                    {hasPatientName && review.patient ? `${review.patient.lastName} ${review.patient.firstName}` : fiscalCode ?? 'Identità da confermare'}
                 </h2>
                 <div className={css.visitMeta}>
                     <span className={status.pill}>{status.label}</span>
-                    {review.patient && fiscalCode ? <span className="lume-code">{fiscalCode}</span> : null}
+                    {hasPatientName && fiscalCode ? <span className="lume-code">{fiscalCode}</span> : null}
                     <span>Depositata {formatDepositTime(visit.cassette.depositedAt)}</span>
                     {contents ? <span>{contents}</span> : null}
                     {review.patient ? (
@@ -251,6 +254,10 @@ function UnlockedIncoming() {
                 })}
 
                 <footer className={css.visitFooterBlock}>
+                    {isApplicable && review.newPatient && <p className="[font:var(--type-meta)]">
+                        Applicando questa visita crei anche la scheda del paziente.
+                        {birth && ` Sesso nel CF: ${birth.sex}.`}
+                    </p>}
                     {actionMessages.length > 0 && (
                         <div id={actionMessagesId} className={`${surface.island} ${css.blockers}`}>
                             {actionMessages.map((message, index) => <p role="alert" key={index}>{message}</p>)}

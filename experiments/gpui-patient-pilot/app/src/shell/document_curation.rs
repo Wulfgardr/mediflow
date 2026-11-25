@@ -321,8 +321,8 @@ impl ClinicalApp {
             && self.form.is_none()
             && self.document_operation == DocumentOperation::Idle
             && !matches!(area.archive, ReadLoad::Loading { .. });
-        let mut view = surface::island(theme, false)
-            .child(surface::island_title("document-curation-heading", "Sintesi archiviate", None, theme))
+        let mut view = div().min_w_0().max_w_full().flex().flex_col().gap(px(12.))
+            .child(heading("document-curation-heading", "Sintesi archiviate", theme))
             .child(text!("Sintesi salvate in precedenza. Il testo sorgente archiviato può differire dall’originale disponibile oggi. Il modello usato per ciascuna sintesi non è registrato nell’archivio."))
             .child(button("document-curation-read", "Leggi l’archivio delle sintesi", theme, false, can_read)
                 .when(can_read, |el| el.on_click(cx.listener(|this,_,_,cx|this.read_document_archive(cx)))))
@@ -487,7 +487,7 @@ impl ClinicalApp {
         }
         match &area.operation {
             Operation::Review(command) => {
-                view=view.child(surface::island_title("document-curation-confirm-heading", "Rimuovere le sintesi selezionate?", None, theme))
+                view=view.child(heading("document-curation-confirm-heading","Rimuovere le sintesi selezionate?",theme))
                     .when_some(self.patient.detail.ready(),|el,patient|el.child(text!(format!("Scheda: {}",crate::title::TitleText::name(patient.display_name()).text()))))
                     .children(command.with_removed(|rows| rows.iter().map(|row|text!(gpui::SharedString::new(row["fileName"].as_str().unwrap_or("Documento")))).collect::<Vec<_>>()))
                     .child(text!("Le sintesi selezionate saranno rimosse dall’archivio. Gli allegati della cartella restano disponibili."))

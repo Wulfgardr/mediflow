@@ -1,5 +1,5 @@
 {
-  "syncCommit": "d7403e6918162a5f425c9e905b8f8d7ecc5e4fb5",
+  "syncCommit": "97db41ae624e069e029800e806b8946f2789bfbb",
   "tool": {
     "release": "v1.7.4",
     "url": "https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar",
@@ -58,7 +58,7 @@
     "lib/clinical-status-transitions.ts": "787915f339911dd4846d29d1fe3232be373242287390989d6a97d7a5dcea460f",
     "lib/status-normalization.ts": "fa2bbdeef55384ed1bf4a851f09a5d899d56e6331cde018f68f3d8a74d3a4e51",
     "docs/domain/clinical-status-transitions.json": "70233eaac55960b999f25768bb9f8897dcce27197ed99c1a692a2d98a0582f04",
-    "lib/recovery-backup-server.ts": "71a1af2d0c4c5f24cb15d4588bb47ed411342eed6d0a2248f703c5925bf80342",
+    "lib/recovery-backup-server.ts": "586b10f747c888e07c74c51508c2b65536e7ee3c5ab38d2eb3d4f71402375f17",
     "lib/schema.ts": "a63799addd6217f91f39794a25881376c052b8e2012a115ff129fdd0aec5394b",
     "lib/backup-artifact.ts": "cdbf37a1a5d9ee71c70a2a77242d7ca60afca394fd4bba3452f4482602baab76"
   },
@@ -157,5 +157,5 @@
     }
   },
   "legacyModelSyncCommit": "64e190438da8287928f0903b9b719c18b329a7ec",
-  "filesSha256": "254d4050f31fea379bcdb46bcc34365308c3b225924ede047c38ea56b03d705e"
+  "filesSha256": "3e6d1ce1c62cc0290e52ec0180a1cc2086e6a85ef109fda99e29fad8fa9a7cfa"
 }

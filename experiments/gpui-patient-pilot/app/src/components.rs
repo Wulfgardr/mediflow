@@ -354,7 +354,6 @@ pub(crate) fn observe_control(element: Stateful<Div>) -> impl IntoElement {
     element
 }
 
-#[cfg(test)]
 pub fn heading(
     id: &'static str,
     label: impl Into<crate::title::TitleText>,
