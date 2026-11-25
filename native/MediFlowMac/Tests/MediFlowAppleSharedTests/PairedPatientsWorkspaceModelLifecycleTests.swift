@@ -2027,19 +2027,6 @@ private actor LifecycleMockDataSource: HomeBasePatientsDataSource {
         HomeBaseAmbulatoryMutationResponse(success: true, version: payload.expectedVersion + 1)
     }
 
-    func deleteAmbulatory(
-        id: String, expectedVersion: Int,
-        credentials: HomeBasePairedCredentials, sessionCookie: String
-    ) async throws -> HomeBaseAmbulatoryMutationResponse {
-        HomeBaseAmbulatoryMutationResponse(success: true)
-    }
-
-    func clearAmbulatory(
-        id: String, expectedVersion: Int,
-        credentials: HomeBasePairedCredentials, sessionCookie: String
-    ) async throws -> HomeBaseAmbulatoryMutationResponse {
-        HomeBaseAmbulatoryMutationResponse(success: true, version: expectedVersion + 1)
-    }
 
     func fetchPatients(
         credentials: HomeBasePairedCredentials,

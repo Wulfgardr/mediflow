@@ -8,13 +8,14 @@ final class ObservationTrendTests: XCTestCase {
         _ id: String,
         code: String = "29463-7",
         system: String = "http://loinc.org",
+        unit: String = "kg",
         value: String,
         minutesAgo: Double = 0,
         deleted: Bool = false
     ) -> HomeBaseObservationSummary {
         HomeBaseObservationSummary(
             id: id, patientId: "p1", codeSystem: system, code: code, display: "Test",
-            unitSystem: "http://unitsofmeasure.org", unitCode: "kg", value: value, notes: nil,
+            unitSystem: "http://unitsofmeasure.org", unitCode: unit, value: value, notes: nil,
             observedAt: epoch.addingTimeInterval(-minutesAgo * 60), source: "manual", version: 1,
             createdAt: nil, updatedAt: nil,
             deletedAt: deleted ? epoch : nil, deletionReason: deleted ? "test" : nil
@@ -140,6 +141,18 @@ final class ObservationTrendTests: XCTestCase {
         ])
         XCTAssertNil(trends["a"])
         XCTAssertNil(trends["b"], "same code under a different system is a different series")
+    }
+
+    func testSameCodeInAnotherUnitIsAnotherSeries() {
+        let trends = ObservationTrendComputer.compute([
+            obs("l0", code: "1988-5", unit: "mg/L", value: "12", minutesAgo: 30),
+            obs("d0", code: "1988-5", unit: "mg/dL", value: "1,5", minutesAgo: 20),
+            obs("l1", code: "1988-5", unit: "mg/L", value: "8", minutesAgo: 10),
+            obs("d1", code: "1988-5", unit: "mg/dL", value: "2", minutesAgo: 0)
+        ])
+        XCTAssertNil(trends["d0"], "1,5 mg/dL is not compared with 12 mg/L")
+        XCTAssertEqual(trends["l1"], .falling)
+        XCTAssertEqual(trends["d1"], .rising)
     }
 
     func testDeletedObservationsAreExcludedFromTheSeries() {

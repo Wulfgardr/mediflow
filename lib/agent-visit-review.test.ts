@@ -238,8 +238,8 @@ test('a reviewed observation preserves the reference range present in its source
 
 
 test('an observation code absent from its cited source remains a proposal with a coding doubt', async () => {
-    const quote = 'Glucosio 100 mg/dL osservato il 2026-11-17';
-    const f = await fixture(cfA, false, { kind: 'observation', values: { code: '2345-7', display: 'Glucosio', value: '100', unit: 'mg/dL', unitCode: 'mg/dL', observedAt: '2026-11-17' }, quote });
+    const quote = 'Ceruloplasmina 30 mg/dL osservato il 2026-11-17';
+    const f = await fixture(cfA, false, { kind: 'observation', values: { code: '2064-4', display: 'Ceruloplasmina', value: '30', unit: 'mg/dL', unitCode: 'mg/dL', observedAt: '2026-11-17' }, quote });
     const query = mock.method(db.observations, 'query', () => ({ toArray: async () => [] }));
     try {
         const review = await inspectAgentVisit(f.row, [patient(cfA)], null, new AbortController().signal, pdfText('Paziente CF ' + cfA + '\n' + quote));

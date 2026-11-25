@@ -62,10 +62,8 @@ if (String(input).trim() !== 'GO') throw new Error('Synthetic barrier denied');
 process.stdout.write('ATTEMPT\n');
 const body = { id: 'race-child', name: 'Synthetic child', parentId: 'a' };
 try {
-    const result = surface === 'paired'
-        ? operation === 'create' ? host.createAmbulatory(networkContext, body, 'network')
-            : host.deleteAmbulatory(networkContext, 'a', 1, 'network')
-        : operation === 'create' ? host.createAmbulatory(context, body) : host.deleteAmbulatory(context, 'a', 1);
+    const result = operation === 'delete' ? host.deleteAmbulatory(context, 'a', 1)
+        : surface === 'paired' ? host.createAmbulatory(networkContext, body, 'network') : host.createAmbulatory(context, body);
     clearAllSessions(); cleanup(); dbServer.$client.close();
     process.stdout.write(`RESULT ${JSON.stringify({ ...result, pid: process.pid, writerHeld })}\n`);
 } catch (error) {
