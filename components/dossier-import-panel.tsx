@@ -18,8 +18,7 @@ import { useSecurity } from '@/components/security-provider';
 import PatientDocumentCreate from '@/components/patient-document-create';
 import { DossierBackupProposal, dossierBackupProposed, dossierWritablePatientCount, type DossierBackupChoice } from '@/components/dossier-backup-proposal';
 import { dossierCreationSource } from '@/lib/dossier-backup-gate';
-import { dossierCreationCandidates, dossierPatientCode, loneDocumentImage, newPatientDossierStart } from '@/lib/dossier-new-patient-entry';
-import { proposeIdentityFields } from '@/lib/domain/documents/dossier-sections';
+import { dossierCreationCandidates, groupIdentityProposals, loneDocumentImage, newPatientDossierStart } from '@/lib/dossier-new-patient-entry';
 import { db } from '@/lib/db';
 import { createDossierPorts } from '@/lib/document-dossier-ports';
 import {
@@ -796,7 +795,6 @@ function NewPatientFromDocument({ group, identityBlocking, busy, creating, onSta
         return () => { live = false; };
     }, [source]);
     if (identityBlocking || !candidates.length) return null;
-    const patientCode = source ? dossierPatientCode(source) : null;
     if (!creating) {
         return <div className={styles.actions} data-testid="dossier-new-patient">
             <label htmlFor={`${ids}-source`}>Nessuna scheda adatta? Crea la scheda da</label>
@@ -807,21 +805,10 @@ function NewPatientFromDocument({ group, identityBlocking, busy, creating, onSta
         </div>;
     }
     return <div className={styles.section} data-testid="dossier-new-patient">
-        {file && source ? <PatientDocumentCreate dossier={{ file, proposals: withPreparedIdentity(proposeIdentityFields(source.text ?? '', patientCode), source),
+        {file && source ? <PatientDocumentCreate dossier={{ file, proposals: groupIdentityProposals(group, source.key),
             onCreated: ({ patientId }) => { void onCreated(patientId); } }} /> : <p role="status">Preparazione del documento…</p>}
         <div className={styles.actions}><button type="button" className={styles.secondary} onClick={onCancel}>Chiudi la creazione</button></div>
     </div>;
-}
-
-/** Campi d'anagrafica dell'estrazione preparata dove il testo non ne propone: restano proposte, inserite solo con un gesto. */
-function withPreparedIdentity(proposals: ReturnType<typeof proposeIdentityFields>, source: DossierDraftGroup['sources'][number]): ReturnType<typeof proposeIdentityFields> {
-    const patient = source.prepared?.patient;
-    if (!patient) return proposals;
-    const have = new Set(proposals.map((proposal) => proposal.field));
-    const extra = (['taxCode', 'lastName', 'firstName', 'birthDate'] as const)
-        .filter((field) => !have.has(field) && patient[field])
-        .map((field) => ({ field, value: patient[field]!, excerpt: `Dall’estrazione preparata: ${patient[field]}` }));
-    return [...proposals, ...extra];
 }
 
 function FactField({ spec, value, disabled, id, onChange }: { spec: FieldSpec; value: string; disabled: boolean; id: string; onChange: (value: string) => void }) {
