@@ -41,9 +41,9 @@ test('paired ambulatory write preserves capability, concurrency, default, delete
         linkedPatientId = await createLocalPatient(linked.json.id);
         const free = await create(writer, sessionHeaders, { name: 'S3 Free', type: 'live' }); createdIds.push(free.json.id);
         const rejectedDelete = await mutate('DELETE', `/api/v1/network/ambulatories/${free.json.id}`, writer, sessionHeaders, { version: 1 }); assert.equal(rejectedDelete.response.status, 405);
-        const rejectedClearTest = await mutate('POST', '/api/v1/network/ambulatories/clear', writer, sessionHeaders, { ambulatoryId: first.json.id, version: 2 }); assert.equal(rejectedClearTest.response.status, 404);
+        const rejectedClearTest = await mutate('POST', '/api/v1/network/ambulatories/clear', writer, sessionHeaders, { ambulatoryId: first.json.id, version: 2 }); assert.equal(rejectedClearTest.response.status, 405);
         const live = await create(writer, sessionHeaders, { name: 'S3 Live', type: 'live' }); createdIds.push(live.json.id);
-        const rejectedClearLive = await mutate('POST', '/api/v1/network/ambulatories/clear', writer, sessionHeaders, { ambulatoryId: live.json.id, version: 1 }); assert.equal(rejectedClearLive.response.status, 404);
+        const rejectedClearLive = await mutate('POST', '/api/v1/network/ambulatories/clear', writer, sessionHeaders, { ambulatoryId: live.json.id, version: 1 }); assert.equal(rejectedClearLive.response.status, 405);
         scenarioResults.push({ name: 'paired ambulatory write', deniedStatus: denied.response.status, missingSessionStatus: missingSession.response.status, staleStatus: stale.response.status, unsetDefaultStatus: unsetDefault.response.status, rejectedDeleteStatus: rejectedDelete.response.status, rejectedClearTestStatus: rejectedClearTest.response.status, rejectedClearLiveStatus: rejectedClearLive.response.status });
     } finally { if (linkedPatientId) await cleanupPatient(linkedPatientId); for (const id of createdIds.reverse()) await cleanupAmbulatory(id, writer, sessionHeaders, intentionallyGuardedIds); }
 });
@@ -83,7 +83,7 @@ test('paired ambulatory audit failures roll back indirect defaults and patient c
         const secondPatient = await createLocalPatient(id);
         const beforeClear = snapshot();
         const rejectedClear = await mutate('POST', '/api/v1/network/ambulatories/clear', writer, cookie, { ambulatoryId: id, version: 1 });
-        assert.equal(rejectedClear.response.status, 404); assert.deepEqual(snapshot(), beforeClear);
+        assert.equal(rejectedClear.response.status, 405); assert.deepEqual(snapshot(), beforeClear);
         const reread = await list(writer, cookie); assert.equal(reread.response.status, 200);
         assert.equal(reread.json.find(row => row.id === id).version, 1);
         scenarioResults.push({ name: 'paired atomic default and rejected legacy clear', createFailure: rejected.response.status, rejectedClear: rejectedClear.response.status, createEvents });
