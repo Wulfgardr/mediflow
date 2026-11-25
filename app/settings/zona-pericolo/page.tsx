@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
+import surface from '@/components/record-surface.module.css';
 import styles from '@/components/settings/maintenance-pages.module.css';
 import { ViewState } from '@/components/ui/view-state';
 import { SETTINGS_INPUT_CLASS, SETTINGS_SECONDARY_BUTTON_CLASS } from '@/components/settings/settings-ui';
@@ -114,9 +115,12 @@ export default function SettingsDangerZonePage() {
 
     return (
         <section className={styles.page} data-testid="settings-danger-zone-section">
-            <header className={styles.intro}><h2>Zona pericolo</h2><p>Operazioni che riportano la postazione a uno stato precedente. Richiedono riconfigurazione.</p></header>
-            <section className={styles.section}>
-                <h3 className={styles.heading}><AlertTriangle aria-hidden />Ripristina configurazione iniziale</h3>
+            <header className={styles.intro}><h2>Zona pericolo</h2></header>
+            <section className={styles.section} aria-labelledby="danger-reset-title">
+                <div className={surface.islandHeader}>
+                    <h3 id="danger-reset-title">Ripristina configurazione iniziale</h3>
+                    <span className={surface.pillCritical} aria-hidden="true"><AlertTriangle size={14} /></span>
+                </div>
                 <p>Elimina gli account e richiede una nuova configurazione iniziale. Una copia dell’archivio precedente resta conservata finché non ne confermi l’eliminazione.</p>
                 <label className={styles.fieldLabel}><span>Scrivi <strong>{RESET_CONFIRM_KEYWORD}</strong> per abilitare il reset.</span>
                     <input type="text" value={confirmText} onChange={e => setConfirmText(e.target.value)} placeholder="Digita qui la parola richiesta"

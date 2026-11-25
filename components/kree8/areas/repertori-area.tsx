@@ -1,32 +1,38 @@
 import { formatCountLabel as formatCatalogCount } from '@/lib/format-count';
 import { AifaCatalogQuickUpdate } from '@/components/settings/aifa-catalog-quick-update';
-import ink from '@/components/ink-secondary.module.css';
-import { useState } from 'react';
+import surface from '@/components/record-surface.module.css';
+import { PageHeader } from '@/components/ui/page-header';
+import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import {
   ArrowUpRight,
+  BookOpen,
   ChevronRight,
   Database,
 } from 'lucide-react';
 
 import { useLiveQueryState } from '@/lib/live-query';
 import { ViewState } from '@/components/ui/view-state';
-import {
-  PillBadge,
-} from '../cockpit-shared';
 import type {
   Kree8CatalogClientState,
   Kree8CatalogFreshness,
   Kree8CatalogRow,
 } from '../cockpit-shared';
-import type { PillVariant } from '@/lib/patient-workspace';
-import { catalogFreshnessSignal } from '@/lib/ui-semantic-signal';
+import { catalogFreshnessSignal, type SemanticSignal } from '@/lib/ui-semantic-signal';
 import type { WhoCatalogStatus } from '@/lib/reference-data/icd11-embedded-store';
 import { getICDCatalogStatus, getICDReadiness, icdReadinessMessage } from '@/lib/icd-service';
 import type { ICDReadiness } from '@/lib/icd-service';
 import styles from '../kree8-clinical-cockpit-foundation.module.css';
 import repertoriStyles from '../kree8-clinical-cockpit-repertori.module.css';
 
+
+const SIGNAL_PILL: Record<SemanticSignal, string> = {
+  neutral: surface.pillNeutral,
+  success: surface.pillSuccess,
+  warning: surface.pillWarning,
+  critical: surface.pillCritical,
+  plum: surface.pillProposal,
+};
 
 type CatalogRow = Omit<Kree8CatalogRow, 'freshness'> & { freshness: Kree8CatalogFreshness | 'unreadable' };
 type CatalogState = Omit<Kree8CatalogClientState, 'rows' | 'indexedCount'> & { rows: CatalogRow[]; indexedCount: number | null };
@@ -153,9 +159,7 @@ function buildLiveCatalogState(
   };
 }
 
-/* ───────────────────────── Repertori ───────────────────────── */
-
-function RepertoriArea({ isReview }: { isReview: boolean }) {
+function RepertoriArea({ isReview, commandTrigger }: { isReview: boolean; commandTrigger?: ReactNode }) {
   const [selectedCatalogId, setSelectedCatalogId] = useState(REVIEW_CATALOGS[0]?.id ?? '');
   const query = useLiveQueryState<CatalogState>(
     async () => {
@@ -184,43 +188,50 @@ function RepertoriArea({ isReview }: { isReview: boolean }) {
   const needsImport = catalogs.some((catalog) => catalog.freshness === 'broken');
   const freshnessTitle = needsImport ? 'Import repertori incompleto' : 'Repertori disponibili';
   return (
-    <div className={`${styles.areaShell} ${ink.surface}`}>
-      <header className={styles.areaHeader}>
-        <div>
-          <h1 className={styles.areaTitle}>Repertori<span aria-hidden="true">.</span></h1>
-          <p className={styles.areaSubtitle}>{isLoading ? 'Lettura locale…' : isError
+    <div className={`${surface.page} ${repertoriStyles.page}`} data-record-page>
+      <PageHeader
+        title="Repertori"
+        meta={isLoading ? 'Lettura locale…' : isError
             ? 'Impossibile leggere i conteggi locali in questa sessione.'
             : catalogState?.indexedCount == null ? 'Totale indicizzato incompleto'
-              : `${availableCatalogs} di ${formatCatalogCount(catalogs.length, 'catalogo disponibile', 'cataloghi disponibili')} · ${formatCatalogCount(catalogState.indexedCount, 'voce indicizzata', 'voci indicizzate')}`}</p>
-        </div>
-        <div className={styles.headerActions}><Link href="/settings/repertori" className={styles.ghostBtn}><Database size={14} />Gestisci repertori</Link></div>
-      </header>
-      <section aria-label="Repertori rapidi">
+              : `${availableCatalogs} di ${formatCatalogCount(catalogs.length, 'catalogo disponibile', 'cataloghi disponibili')} · ${formatCatalogCount(catalogState.indexedCount, 'voce indicizzata', 'voci indicizzate')}`}
+        actions={<>
+          <Link href="/settings/repertori" className="mf-button-secondary"><Database size={14} aria-hidden="true" />Gestisci repertori</Link>
+          {commandTrigger}
+        </>}
+      />
+      <section className={surface.tray} data-record-tray="repertori" aria-labelledby="repertori-zona">
+        <h2 id="repertori-zona" className={surface.zoneTitle}>{isReady ? freshnessTitle : 'Cataloghi locali'}</h2>
         {isLoading && <ViewState state="loading" title="Caricamento repertori locali." />}
         {isError && <ViewState state="error" title="Repertori non leggibili" action={{ label: 'Riprova', onClick: query.refresh }} />}
-        <div hidden={!isReady}>
-          <h2 className={styles.panelTitle}>{freshnessTitle}</h2>
-          {isReady && catalogState?.indexedCount == null && <button type="button" className={styles.ghostBtnSm} onClick={query.refresh}>Riprova</button>}
-          <div className={repertoriStyles.catalogHeader} aria-hidden="true"><span>Catalogo</span><span>Contenuto locale</span><span>Stato</span><span /></div>
-          {catalogs.map((c) => {
-            const labelText = { fresh: 'Disponibile', ok: 'Da verificare', stale: 'Da aggiornare', broken: 'Import richiesto', off: 'Disattivato', unreadable: 'Stato non leggibile' }[c.freshness];
-            return <div key={c.id} className={repertoriStyles.catalogRow} data-selected={c.id === selectedCatalog?.id}>
-              <strong className={repertoriStyles.catalogName}>{c.name}</strong>
-              <span className={repertoriStyles.catalogSub}>{c.age}</span>
-              <PillBadge variant={(c.freshness === 'unreadable' ? 'critical' : catalogFreshnessSignal(c.freshness)) as PillVariant}>{labelText}</PillBadge>
-              <button type="button" className={styles.ghostBtnSm} aria-label={`Mostra dettaglio repertorio ${c.name}`} aria-pressed={c.id === selectedCatalog?.id} onClick={() => setSelectedCatalogId(c.id)}>Dettagli<ChevronRight size={13} /></button>
-              {c.id === 'aic' && !isReview && <AifaCatalogQuickUpdate />}
-            </div>;
-          })}
-          {isReady && !catalogs.length && <p className={styles.emptyState}>Nessun repertorio disponibile.</p>}
+        <div className={repertoriStyles.layout} hidden={!isReady}>
+          <section className={surface.island} aria-label="Repertori rapidi">
+            {isReady && catalogState?.indexedCount == null && <button type="button" className={`${styles.ghostBtnSm} ${repertoriStyles.retry}`} onClick={query.refresh}>Riprova</button>}
+            <div className={repertoriStyles.catalogHeader} aria-hidden="true"><span>Catalogo</span><span>Contenuto locale</span><span>Stato</span><span /></div>
+            {catalogs.map((c) => {
+              const labelText = { fresh: 'Disponibile', ok: 'Da verificare', stale: 'Da aggiornare', broken: 'Import richiesto', off: 'Disattivato', unreadable: 'Stato non leggibile' }[c.freshness];
+              const signal = c.freshness === 'unreadable' ? 'critical' : catalogFreshnessSignal(c.freshness);
+              return <div key={c.id} className={repertoriStyles.catalogRow} data-selected={c.id === selectedCatalog?.id}>
+                <strong className={repertoriStyles.catalogName}>{c.name}</strong>
+                <span className={repertoriStyles.catalogSub}>{c.age}</span>
+                <span className={`${SIGNAL_PILL[signal]} ${repertoriStyles.status}`}>{labelText}</span>
+                <button type="button" className={styles.ghostBtnSm} aria-label={`Mostra dettaglio repertorio ${c.name}`} aria-pressed={c.id === selectedCatalog?.id} onClick={() => setSelectedCatalogId(c.id)}>Dettagli<ChevronRight size={14} aria-hidden="true" /></button>
+                {c.id === 'aic' && !isReview && <div className={repertoriStyles.rowExtra}><AifaCatalogQuickUpdate /></div>}
+              </div>;
+            })}
+            {isReady && !catalogs.length && <p className={repertoriStyles.empty}>Nessun repertorio disponibile.</p>}
+          </section>
+          {selectedCatalog && <section className={`${surface.island} ${repertoriStyles.detail}`} aria-label={`Dettaglio ${selectedCatalog.name}`}>
+            <div className={surface.islandHeader}>
+              <span className={surface.islandIcon} aria-hidden="true"><BookOpen size={15} /></span>
+              <h3>{selectedCatalog.name}</h3>
+            </div>
+            <p>{selectedCatalog.sub}</p>
+            <span className={repertoriStyles.detailMeta}>Contenuto locale: {selectedCatalog.age}</span>
+            {selectedCatalog.href && <Link href={selectedCatalog.href} className={styles.ghostBtnSm}>{selectedCatalog.actionLabel ?? 'Apri'}<ArrowUpRight size={14} aria-hidden="true" /></Link>}
+          </section>}
         </div>
       </section>
-      <div hidden={!isReady}>{selectedCatalog && <section className={repertoriStyles.detail} aria-label={`Dettaglio ${selectedCatalog.name}`}>
-        <h2 className={styles.panelTitle}>{selectedCatalog.name}</h2>
-        <p>{selectedCatalog.sub}</p>
-        <span className={styles.rowSub}>Contenuto locale: {selectedCatalog.age}</span>
-        {selectedCatalog.href && <Link href={selectedCatalog.href} className={styles.ghostBtnSm}>{selectedCatalog.actionLabel ?? 'Apri'}<ArrowUpRight size={13} /></Link>}
-      </section>}</div>
     </div>
   );
 }

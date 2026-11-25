@@ -1,5 +1,6 @@
 import { formatCountLabel } from '@/lib/format-count';
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import {
   ArrowUpRight,
   Database,
@@ -18,10 +19,12 @@ function LiveDocumentReviewArea({
   patient,
   workspace,
   onOpenArea,
+  commandTrigger,
 }: {
   patient?: Kree8Patient | null;
   workspace?: Kree8PatientWorkspace | null;
   onOpenArea: (area: AreaId) => void;
+  commandTrigger?: ReactNode;
 }) {
   const isWorkspaceLoading = workspace === undefined;
   const codingHints = workspace?.codingHints ?? [];
@@ -35,17 +38,18 @@ function LiveDocumentReviewArea({
       : 'Non risultano evidenze recenti o codifiche aperte per questo caso.';
 
   return (
-    <div className={styles.area} data-testid="lume-review-area">
+    <div className={styles.area} data-record-page data-testid="lume-review-area">
       <header className={styles.header}>
         <div>
           <p className={styles.caption}>Revisione documentale</p>
-          <h1 className={styles.title}>Evidenza, decisione e prossimo passo<span aria-hidden="true">.</span></h1>
+          <h1 className={styles.title}>Evidenza, decisione e prossimo passo</h1>
           <p className={styles.subtitle}>
             {patient
               ? `Un solo flusso di revisione per ${patient.name}, con provenienza e responsabilità leggibili.`
               : 'Seleziona un paziente per aprire il suo flusso di revisione documentale.'}
           </p>
         </div>
+        {commandTrigger}
       </header>
 
       <section

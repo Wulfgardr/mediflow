@@ -57,7 +57,7 @@ async function captureTarget(page: Page, target: Locator, name: string, frames: 
     expect(probe.scrollOwners.length, `${name}: real scroll container`).toBeGreaterThan(0);
     if (visualRole) {
         await expect(target).toBeEnabled();
-        await expect(target).toHaveClass(visualRole === 'primary' ? /primaryAction/u : /secondaryAction/u);
+        await expect(target).toHaveClass(visualRole === 'primary' ? /mf-button-primary/u : /mf-button-secondary/u);
     }
 }
 
@@ -175,8 +175,8 @@ test('Funzioni: anteprima, applicazione e salvataggio avanzato restano distinti;
         await toggle.click();
         await toggle.locator('..').getByRole('button', { name: 'Anteprima modifica', exact: true }).click();
         await expect(preferences.getByRole('region', { name: 'Anteprima impostazioni' })).toBeVisible();
-        if (!baseline) await expect(region(page).locator('button[class*="primaryAction"]:visible')).toHaveCount(1);
-        if (!baseline) await expect(save).toHaveClass(/secondaryAction/u);
+        if (!baseline) await expect(region(page).locator('button.mf-button-primary:visible')).toHaveCount(1);
+        if (!baseline) await expect(save).toHaveClass(/mf-button-secondary/u);
         await expect(draft).toHaveValue('9');
         if (targeted) {
             const frames: unknown[] = [];
@@ -189,7 +189,7 @@ test('Funzioni: anteprima, applicazione e salvataggio avanzato restano distinti;
         expect(mock.preferenceWrites).toEqual([]); expect(mock.settingsWrites).toEqual([]);
         await preferences.getByRole('button', { name: 'Annulla proposta', exact: true }).click();
         await expect(preferences.getByRole('heading', { name: 'Preferenze per esperienza', exact: true })).toBeFocused();
-        if (!baseline) await expect(save).toHaveClass(/primaryAction/u);
+        if (!baseline) await expect(save).toHaveClass(/mf-button-primary/u);
         await expect(draft).toHaveValue('9');
         expect(mock.preferenceWrites).toEqual([]);
         await toggle.locator('..').getByRole('button', { name: 'Anteprima modifica', exact: true }).click();

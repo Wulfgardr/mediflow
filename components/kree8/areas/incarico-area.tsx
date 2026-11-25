@@ -4,11 +4,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import {
+  CalendarClock,
   Ellipsis,
   FileSearch,
   FileText,
   Plus,
   Search,
+  Stethoscope,
   UserSquare2,
   Workflow,
   X,
@@ -33,6 +35,17 @@ import styles from '../kree8-clinical-cockpit-foundation.module.css';
 import patientStyles from '../kree8-clinical-cockpit-patient-inbox.module.css';
 import { useDirectoryReturn } from '@/components/runtime-twin-workspace';
 import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
+import surface from '@/components/record-surface.module.css';
+import { PageHeader } from '@/components/ui/page-header';
+import type { SemanticSignal } from '@/lib/ui-semantic-signal';
+
+const STATUS_PILL: Record<SemanticSignal, string> = {
+  neutral: surface.pillNeutral,
+  success: surface.pillSuccess,
+  warning: surface.pillWarning,
+  critical: surface.pillCritical,
+  plum: surface.pillProposal,
+};
 
 
 /* ───────────────────────── Pazienti in carico ───────────────────────── */
@@ -60,6 +73,7 @@ function IncaricoArea({
   territorialHandoff = true,
   onRetryPatients,
   isReview,
+  commandTrigger,
 }: {
   patients: Kree8Patient[];
   patientStatus: Kree8PatientStatus;
@@ -74,6 +88,7 @@ function IncaricoArea({
   territorialHandoff?: boolean;
   onRetryPatients?: () => void;
   isReview: boolean;
+  commandTrigger?: ReactNode;
 }) {
   const router = useRouter();
   const { proposal } = useRuntimeTwinDesign();
@@ -217,7 +232,7 @@ function IncaricoArea({
   const patientRowVirtualizer = useVirtualizer({
     count: visible.length,
     getScrollElement: () => patientListParentRef.current,
-    estimateSize: () => 44,
+    estimateSize: () => 40,
     overscan: 8,
   });
   useEffect(() => { patientRowVirtualizer.measure(); }, [proposal, patientRowVirtualizer]);
@@ -287,7 +302,7 @@ function IncaricoArea({
       key,
       currentIndex: currentRowIndex(target),
       rowCount: visible.length,
-      pageSize: Math.max(1, Math.floor(viewportHeight / 44)),
+      pageSize: Math.max(1, Math.floor(viewportHeight / 40)),
     });
     if (index !== null) focusRowAtIndex(index);
   }, [currentRowIndex, focusRowAtIndex, proposal, visible.length]);
@@ -339,58 +354,58 @@ function IncaricoArea({
   }, [currentRowIndex, navigateRows, router, visible]);
 
   return (
-    <div className={styles.areaShell} onClickCapture={event => {
+    <div className={classNames(surface.page, patientStyles.directory)} data-record-page onClickCapture={event => {
       const anchor = event.target instanceof Element ? event.target.closest('a') : null;
       if (selected && anchor?.getAttribute('href')?.startsWith(`/patients/${selected.id}/`)) rememberRow(selected.id);
     }} data-patient-directory={proposal ? 'proposal' : undefined}>
-      <header className={patientStyles.directoryToolbar}>
-        <h1 className="lume-voice">Pazienti<span aria-hidden="true">.</span></h1>
-        <label className={classNames("mf-composite-field", patientStyles.patientSearchField)}>
+      <PageHeader title="Pazienti" actions={<Link href="/patients/new" className="mf-button-primary" data-lume-action="primary"><Plus size={16} aria-hidden />Nuova scheda</Link>} />
+      <div className={patientStyles.directoryToolbar} data-patient-directory-tools>
+        <label className={classNames('mf-composite-field', patientStyles.patientSearchField)}>
           <Search size={16} aria-hidden="true" />
           <input id="ricerca-pazienti" ref={attachSearchInput} type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Nome, codice o diagnosi" aria-label="Cerca nella lista pazienti" />
           <button type="button" className={classNames('mf-button-icon h-[44px]! min-h-[44px]! min-w-[44px]!', !query && 'invisible')} aria-label="Cancella la ricerca" title="Cancella la ricerca" aria-hidden={!query || undefined} tabIndex={query ? 0 : -1} onClick={() => { setQuery(''); searchInputRef.current?.focus(); }}><X size={16} aria-hidden="true" /></button>
         </label>
-        <div className={patientStyles.inboxScope} aria-label="Stato elenco">
-          <button type="button" className={classNames(patientStyles.scopeChip, list === 'attivi' && patientStyles.scopeChipActive)} aria-pressed={list === 'attivi'} onClick={() => setList('attivi')}>Attivi</button>
-          <button type="button" className={classNames(patientStyles.scopeChip, list === 'archivio' && patientStyles.scopeChipActive)} aria-pressed={list === 'archivio'} onClick={() => setList('archivio')}>Archivio</button>
+        <div className={classNames(surface.segmented, patientStyles.inboxScope)} role="group" aria-label="Stato elenco">
+          <button type="button" aria-pressed={list === 'attivi'} onClick={() => setList('attivi')}>Attivi</button>
+          <button type="button" aria-pressed={list === 'archivio'} onClick={() => setList('archivio')}>Archivio</button>
         </div>
-        {isReview ? <select aria-label="Ambito pazienti" value={scope} onChange={event => setScope(event.target.value as InboxScope)}><option value="ambulatorio">Ambulatorio locale</option><option value="network">Rete locale</option><option value="tutti">Tutti gli ambulatori</option></select> : null}
-        <Link href="/patients/new" className={classNames(styles.primaryBtn, patientStyles.directoryAction)} data-lume-action="primary"><Plus size={16} aria-hidden />Nuova scheda</Link>
-      </header>
+        {isReview ? <select className={patientStyles.scopeSelect} aria-label="Ambito pazienti" value={scope} onChange={event => setScope(event.target.value as InboxScope)}><option value="ambulatorio">Ambulatorio locale</option><option value="network">Rete locale</option><option value="tutti">Tutti gli ambulatori</option></select> : null}
+      </div>
       <div className={patientStyles.inboxLayout}>
-        <section className={patientStyles.worklistPanel} aria-label={list === 'attivi' ? 'Pazienti in carico' : 'Archivio pazienti'} data-testid="lume-worklist">
+        <section className={classNames(surface.tray, patientStyles.worklistPanel)} data-record-tray="elenco" aria-label={list === 'attivi' ? 'Pazienti in carico' : 'Archivio pazienti'} data-testid="lume-worklist">
           <header className={patientStyles.worklistPanelHeader}>
             {patientStatus === 'ready' ? <span className={patientStyles.resultCount}>{visible.length} {visible.length === 1 ? 'risultato' : 'risultati'}</span> : null}
-            <span className={patientStyles.keyboardHint}>↑ ↓ per scorrere · Invio per aprire</span>
+            <span className={patientStyles.listTools}>
+              <span className={patientStyles.keyboardHint}>↑ ↓ per scorrere · Invio per aprire</span>
+              {commandTrigger}
+            </span>
           </header>
-          <div className={patientStyles.columnHeadings} aria-hidden="true"><span data-worklist-column>Paziente</span><span data-worklist-column>Età</span><span data-worklist-column>Problema principale</span><span data-worklist-column>Aggiornato</span><span data-worklist-column>Da fare</span></div>
-          {patientStatus === 'ready' && todos.status !== 'ready' ? (
-            <div className={patientStyles.todoReadState} role={todos.status === 'loading' ? 'status' : 'alert'}>
-              <span>{todos.status === 'loading' ? 'Lettura dei controlli in corso…' : todos.status === 'error' ? '◆ Impossibile leggere i controlli.' : '▲ La lettura dei controlli non è disponibile.'}</span>
-              {todos.status === 'error' && onRetryTodos ? <button type="button" className={patientStyles.directoryAction} onClick={onRetryTodos}>Riprova controlli</button> : null}
-            </div>
-          ) : null}
-          <div style={{ marginTop: 8 }}>
+          <div className={classNames(surface.island, patientStyles.listIsland)}>
+            <div className={patientStyles.columnHeadings} aria-hidden="true"><span data-worklist-column>Paziente</span><span data-worklist-column>Età</span><span data-worklist-column>Problema principale</span><span data-worklist-column>Aggiornato</span><span data-worklist-column>Da fare</span></div>
+            {patientStatus === 'ready' && todos.status !== 'ready' ? (
+              <div className={patientStyles.todoReadState} role={todos.status === 'loading' ? 'status' : 'alert'}>
+                <span>{todos.status === 'loading' ? 'Lettura dei controlli in corso…' : todos.status === 'error' ? '◆ Impossibile leggere i controlli.' : '▲ La lettura dei controlli non è disponibile.'}</span>
+                {todos.status === 'error' && onRetryTodos ? <button type="button" className={patientStyles.directoryAction} onClick={onRetryTodos}>Riprova controlli</button> : null}
+              </div>
+            ) : null}
             {patientStatus === 'idle' || patientStatus === 'loading' ? (
-              <div className={styles.emptyState} role="status" aria-live="polite" aria-label="Caricamento pazienti">
+              <div className={patientStyles.listState} role="status" aria-live="polite" aria-label="Caricamento pazienti">
                 <p>Caricamento pazienti</p>
-                <div className="mf-skeleton h-12" />
-                <div className="mf-skeleton h-12 mt-2" />
-                <div className="mf-skeleton h-12 mt-2" />
+                <div className="mf-skeleton h-10" />
+                <div className="mf-skeleton h-10" />
+                <div className="mf-skeleton h-10" />
               </div>
             ) : patientStatus === 'error' ? (
-              <div className={styles.emptyState} role="alert">
-                {/* WUL-UIUX: l'errore dichiara cosa è successo e offre
-                    l'azione di recupero, come chiede il contratto PRODUCT.md. */}
+              <div className={patientStyles.listState} role="alert">
                 <p>Lista pazienti non disponibile. Verifica sessione e servizi locali.</p>
                 {onRetryPatients ? (
-                  <button type="button" className={styles.ghostBtnSm} onClick={onRetryPatients}>
+                  <button type="button" className={patientStyles.directoryAction} onClick={onRetryPatients}>
                     Riprova
                   </button>
                 ) : null}
               </div>
             ) : visible.length === 0 ? (
-              <p className={styles.emptyState} role="status">
+              <p className={patientStyles.listState} role="status">
                 {normalizedQuery
                   ? `Nessun risultato per “${query.trim()}”. Modifica la ricerca o cambia ambito.`
                   : 'Nessun paziente nell’ambito selezionato.'}
@@ -464,45 +479,23 @@ function IncaricoArea({
 
         {patientStatus === 'ready' && selected ? (
           <aside
-            className={patientStyles.caseLens}
+            className={classNames(surface.tray, patientStyles.caseLens)}
             key={selected.id}
+            data-record-tray="anteprima"
             aria-label={`Lente paziente: ${selected.name}`}
             data-testid="lume-patient-lens"
           >
-            <header className={patientStyles.caseLensHeader}>
-
-              <h2 className={patientStyles.caseLensName}>{selected.name}</h2>
-              <p className={classNames(patientStyles.caseLensAtoms, 'lume-registro')} data-testid="lume-patient-atoms">
-                <span>{selected.ageLabel}</span>
-                <span aria-hidden="true">·</span>
-                <span>aggiornato {selected.lastTouch}</span>
-                <span aria-hidden="true">·</span>
-                <span>{selected.pathway}</span>
-              </p>
-            </header>
-            {/* codice e descrizione restano contenuto naturale delle voci. */}
-            <ul
-              className={patientStyles.caseLensDiagnoses}
-              aria-label={`Diagnosi codificate di ${selected.name}`}
-              data-lume-diagnosis-list="true"
-            >
-              {selected.diagnoses.map((d) => (
-                <li key={d} className={patientStyles.patientDiagnosisPill}>
-                  <DiagnosisPill diagnosis={d} />
-                </li>
-              ))}
-            </ul>
-            <p className={patientStyles.caseLensStatus}>
-              {selected.statusLabel}
-            </p>
-            <div className={patientStyles.lensTodo}><h3>Da fare</h3><WorklistTodo todos={todos} patientId={selected.id} /></div>
-            <p className="lume-code" data-testid="lume-patient-code">{selected.code}</p>
-            <p className={patientStyles.caseLensSummary}>
-              {selected.summary}
+            <h2 className={classNames(surface.zoneTitle, patientStyles.caseLensName)}>{selected.name}</h2>
+            <p className={patientStyles.caseLensAtoms} data-testid="lume-patient-atoms">
+              <span>{selected.ageLabel}</span>
+              <span aria-hidden="true">·</span>
+              <span>aggiornato {selected.lastTouch}</span>
+              <span aria-hidden="true">·</span>
+              <span>{selected.pathway}</span>
             </p>
             <div className={classNames(patientStyles.caseLensActions, patientStyles.worklistLensActions)}>
               <Link href={selected.modulesHref} className={classNames(styles.ghostBtn, patientStyles.directoryAction)} data-lume-action="secondary">
-                <UserSquare2 size={13} />
+                <UserSquare2 size={14} aria-hidden="true" />
                 Apri scheda paziente
               </Link>
               <div ref={actionsRef} className={patientStyles.caseLensActionOverflow}>
@@ -549,6 +542,33 @@ function IncaricoArea({
                 ) : null}
               </div>
             </div>
+            <section className={surface.island} aria-labelledby="lente-quadro">
+              <div className={surface.islandHeader}>
+                <span className={surface.islandIcon} aria-hidden="true"><Stethoscope size={15} /></span>
+                <h3 id="lente-quadro">Quadro</h3>
+                <span className={STATUS_PILL[selected.status]}>{selected.statusLabel}</span>
+              </div>
+              <ul
+                className={patientStyles.caseLensDiagnoses}
+                aria-label={`Diagnosi codificate di ${selected.name}`}
+                data-lume-diagnosis-list="true"
+              >
+                {selected.diagnoses.map((d) => (
+                  <li key={d} className={patientStyles.patientDiagnosisPill}>
+                    <DiagnosisPill diagnosis={d} />
+                  </li>
+                ))}
+              </ul>
+              {selected.summary ? <p className={patientStyles.caseLensSummary}>{selected.summary}</p> : null}
+              <p className={classNames('lume-code', patientStyles.caseLensCode)} data-testid="lume-patient-code">{selected.code}</p>
+            </section>
+            <section className={surface.island} aria-labelledby="lente-da-fare">
+              <div className={surface.islandHeader}>
+                <span className={surface.islandIcon} aria-hidden="true"><CalendarClock size={15} /></span>
+                <h3 id="lente-da-fare">Da fare</h3>
+              </div>
+              <WorklistTodo todos={todos} patientId={selected.id} />
+            </section>
           </aside>
         ) : null}
       </div>

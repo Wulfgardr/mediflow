@@ -80,7 +80,7 @@ test('voce con data ora tipo luogo e autore conserva provenienza e stato', async
   await navigate(page, `/patients/${id}/modules`);
   const overviewRow = page.locator('#diario article').filter({ hasText: 'Pressione 132/78' });
   await expect(overviewRow).toBeVisible();
-  if (test.info().project.name.endsWith('1440')) await expect(overviewRow).toHaveCSS('grid-template-columns', /^84px /);
+  if (test.info().project.name.endsWith('1440')) await expect(overviewRow).toHaveCSS('grid-template-columns', /^48px /);
   await openPatientSection(page, 'diario');
   const row = page.locator('#diario article').filter({ hasText: 'Pressione 132/78' });
   await expect(row).toBeVisible();

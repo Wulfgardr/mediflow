@@ -1,6 +1,5 @@
 'use client';
 
-import ink from '@/components/ink-secondary.module.css';
 
 import { ApiConflictError, db } from '@/lib/db';
 import { useRouter, useParams } from 'next/navigation';
@@ -13,6 +12,7 @@ import { useToast } from '@/components/ui/toast-provider';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { patientAllergiesForHeader } from '@/lib/patient-allergies';
 import { Kree8WorkspaceShell, type Kree8WorkspaceNavItem } from '@/components/kree8/kree8-workspace-shell';
+import surface from '@/components/record-surface.module.css';
 import workspaceStyles from '@/components/kree8/kree8-workspace-shell.module.css';
 import { buildValidationMessage, type ValidatePatientExportResponse } from '@/lib/fse-validate-patient-contract';
 import { FhirExportPrecheckError } from '@/lib/fhir/export-precheck';
@@ -210,9 +210,9 @@ export default function EditPatientPage() {
             patientLabel={`${patient.lastName} ${patient.firstName}`}
             navItems={workspaceNavItems}
         >
-            <div className={ink.surface + " mx-auto flex w-full max-w-5xl flex-col gap-6 pb-8"}>
+            <div className="mx-auto grid w-full max-w-5xl min-w-0 gap-4 pb-8">
                 {patient.isArchived && (
-                    <div className="mf-alert mf-alert-warning !flex items-start gap-4 !p-6 animate-in fade-in slide-in-from-top-4 duration-500">
+                    <div className={surface.island} data-record-island>
                         <div className="mf-icon-disc h-12 w-12 shrink-0 !text-[color:var(--lume-signal-warning)]">
                             <Archive className="w-6 h-6 shrink-0" />
                         </div>
@@ -242,7 +242,7 @@ export default function EditPatientPage() {
                     </div>
                 )}
 
-                <div id="dati" className={workspaceStyles.anchorStack}>
+                <div id="dati" className={`${workspaceStyles.anchorStack} ${surface.tray}`} data-record-tray="dati">
                     {/* one snapshot per mounted patient, not per live-query revision. */}
                     <PatientEditForm
                         key={id}
@@ -253,63 +253,59 @@ export default function EditPatientPage() {
                     />
                 </div>
 
-                <div id="azioni" className="border-t border-[color:rgba(112,106,100,0.12)] pt-6">
-                    <div className="flex items-center gap-3 mb-8">
-                        <div className="mf-icon-disc h-10 w-10 !text-[color:var(--lume-signal-critical)]">
-                            <ShieldAlert className="w-5 h-5" />
+                <div id="azioni" className={surface.tray} data-record-tray="azioni">
+                    <section className={surface.island} data-record-island>
+                        <div className={surface.islandHeader}>
+                            <span className={surface.islandIcon} aria-hidden="true"><ShieldAlert size={16} /></span>
+                            <h3>Stato scheda ed export</h3>
                         </div>
-                        <div>
-                            <p className="mf-eyebrow !text-[color:var(--lume-signal-critical)]">Azioni sensibili</p>
-                            <h3 className="text-lg font-semibold tracking-tight" style={{ color: 'var(--lume-ink)' }}>Stato scheda ed export</h3>
-                        </div>
-                    </div>
-
-                    <div className="mf-section flex flex-col items-center justify-between gap-8 border-[color:rgba(163,58,47,0.22)] p-8 lg:flex-row">
-                        <div className="flex flex-wrap gap-3 w-full lg:w-auto">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setActionType('export');
-                                    setIsActionModalOpen(true);
-                                }}
-                                className="mf-btn-secondary flex-1 lg:flex-none"
-                            >
-                                <Download className="w-4 h-4" />
-                                Esporta FHIR
-                            </button>
-
-                            {!patient.isArchived ? (
+                        <div className="border-t border-[color:rgba(112,106,100,0.12)] pt-3">
+                            <div className="flex w-full flex-wrap gap-3 border-b border-[color:rgba(163,58,47,0.22)] pb-3">
                                 <button
+                                    type="button"
                                     onClick={() => {
-                                        setActionType('archive');
+                                        setActionType('export');
                                         setIsActionModalOpen(true);
                                     }}
-                                    className="mf-btn-secondary flex-1 !text-[color:var(--lume-signal-warning)] lg:flex-none"
+                                    className="mf-btn-secondary flex-1 lg:flex-none"
                                 >
-                                    <Archive className="w-4 h-4" />
-                                    Archivia
+                                    <Download className="w-4 h-4" />
+                                    Esporta FHIR
                                 </button>
-                            ) : (
+
+                                {!patient.isArchived ? (
+                                    <button
+                                        onClick={() => {
+                                            setActionType('archive');
+                                            setIsActionModalOpen(true);
+                                        }}
+                                        className="mf-btn-secondary flex-1 !text-[color:var(--lume-signal-warning)] lg:flex-none"
+                                    >
+                                        <Archive className="w-4 h-4" />
+                                        Archivia
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={handleRestore}
+                                        className="mf-btn-secondary flex-1 !text-[color:var(--lume-signal-success)] lg:flex-none"
+                                    >
+                                        <RotateCcw className="w-4 h-4" />
+                                        Riattiva
+                                    </button>
+                                )}
                                 <button
-                                    onClick={handleRestore}
-                                    className="mf-btn-secondary flex-1 !text-[color:var(--lume-signal-success)] lg:flex-none"
+                                    onClick={() => {
+                                        setActionType('delete');
+                                        setIsActionModalOpen(true);
+                                    }}
+                                    className="mf-button-destructive flex-1 lg:flex-none"
                                 >
-                                    <RotateCcw className="w-4 h-4" />
-                                    Riattiva
+                                    <Trash2 className="w-4 h-4" />
+                                    Elimina
                                 </button>
-                            )}
-                            <button
-                                onClick={() => {
-                                    setActionType('delete');
-                                    setIsActionModalOpen(true);
-                                }}
-                                className="mf-button-destructive flex-1 lg:flex-none"
-                            >
-                                <Trash2 className="w-4 h-4" />
-                                Elimina
-                            </button>
+                            </div>
                         </div>
-                    </div>
+                    </section>
                 </div>
 
                 <PatientActionModal

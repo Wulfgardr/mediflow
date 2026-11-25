@@ -77,7 +77,7 @@ for (const failure of ['counts', 'prosthetics'] as const) test(`Repertori: ${fai
     await target.scrollIntoViewIfNeeded();
     const probe = await target.evaluate(element => {
       const rect = element.getBoundingClientRect(), style = getComputedStyle(element);
-      const x = rect.x + Math.min(rect.width / 2, 50), y = rect.y + Math.min(rect.height / 2, 15);
+      const top = rect.y + parseFloat(style.paddingTop), x = rect.x + Math.min(rect.width / 2, 50), y = top + Math.min((rect.bottom - top) / 2, 15);
       const hit = document.elementFromPoint(x, y);
       return { text: element.textContent, hit: element === hit || element.contains(hit), point: { x, y }, rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
         viewport: { width: innerWidth, height: innerHeight }, color: style.color,

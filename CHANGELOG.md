@@ -48,6 +48,11 @@ release](https://github.com/Wulfgardr/mediflow/releases) raccoglie i pacchetti p
   pseudonimizzato nei limiti del mandato. Le note, le trascrizioni e i PDF forniti dall’agente
   attendono il medico in **In arrivo**. Il medico esamina i contenuti prima
   che entrino nella cartella. [Profilo](https://github.com/Wulfgardr/mediflow/pull/1055) · [Revisione](https://github.com/Wulfgardr/mediflow/pull/1056)
+- Il mandato di un agente dura fino a 24 ore. Lo interrompono «Blocca»,
+  la revoca in Impostazioni → Agenti o la scadenza. «Esci», il blocco per
+  inattività, la chiusura del browser e il riavvio non lo interrompono: l’agente
+  continua a depositare in **In arrivo** fino alla scadenza
+  ([ADR 0190](./docs/adr/0190-mandato-agenti-e-cassetta-della-visita.md)).
 - Mini offre l'anteprima del cambio di stato di un controllo tramite lo
   stesso servizio di MCP. La conferma resta nel Web e l'agente non acquisisce
   permessi di scrittura
@@ -58,6 +63,17 @@ release](https://github.com/Wulfgardr/mediflow/releases) raccoglie i pacchetti p
   smoke Windows conserva anche gli errori di avvio e pulizia
   ([#550](https://github.com/Wulfgardr/mediflow/pull/550),
   [#546](https://github.com/Wulfgardr/mediflow/pull/546)).
+
+### Comportamenti dichiarati
+
+- Sbloccata con la passphrase, la pagina ricaricata chiede di nuovo la
+  passphrase: la chiave resta solo nella pagina aperta. Sbloccata con il PIN,
+  la pagina ricaricata resta aperta finché la sessione è valida
+  ([sicurezza](./SECURITY.md#chiavi-passphrase-e-recupero)).
+- Dopo la cancellazione di un paziente, il ripristino di un backup portabile
+  più vecchio si ferma se il backup contiene visite in arrivo che non si possono
+  attribuire con certezza. Resta disponibile il recupero completo cifrato
+  ([sicurezza](./SECURITY.md#cancellazione-del-paziente-ed-eliminazione-dei-dati)).
 
 ### Profilo paziente
 

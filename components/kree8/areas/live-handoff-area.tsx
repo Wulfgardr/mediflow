@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import {
   Database,
@@ -35,9 +35,11 @@ function isSissPatientContextHandoffResult(
 function LiveHandoffArea({
   patient,
   onOpenArea,
+  commandTrigger,
 }: {
   patient?: Kree8Patient | null;
   onOpenArea: (area: AreaId) => void;
+  commandTrigger?: ReactNode;
 }) {
   const [activeAction, setActiveAction] = useState<SissPatientContextAction | null>(null);
   const [feedback, setFeedback] = useState<HandoffFeedback | null>(null);
@@ -153,15 +155,18 @@ function LiveHandoffArea({
     : 'Nessun paziente è selezionato nel cockpit.';
 
   return (
-    <div className={styles.area} data-testid="lume-handoff-area">
+    <div className={styles.area} data-record-page data-testid="lume-handoff-area">
       <header className={styles.header}>
-        <p className={styles.caption}>Handoff regionale</p>
-        <h1 className={styles.title}>Preparazione SISS con responsabilità esplicita<span aria-hidden="true">.</span></h1>
-        <p className={styles.subtitle}>
-          {patient
-            ? `Un solo passaggio assistito per ${patient.name}, senza invio o writeback automatico.`
-            : 'Seleziona un paziente prima di preparare il passaggio verso i portali regionali.'}
-        </p>
+        <div>
+          <p className={styles.caption}>Handoff regionale</p>
+          <h1 className={styles.title}>Preparazione SISS con responsabilità esplicita</h1>
+          <p className={styles.subtitle}>
+            {patient
+              ? `Un solo passaggio assistito per ${patient.name}, senza invio o writeback automatico.`
+              : 'Seleziona un paziente prima di preparare il passaggio verso i portali regionali.'}
+          </p>
+        </div>
+        {commandTrigger}
       </header>
 
       <section
