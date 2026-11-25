@@ -230,7 +230,21 @@ impl Service {
         let Some(command) = command else {
             return error(400, "command");
         };
-        let feed = {
+        if command.drains() {
+            let Some(feed) = self
+                .active
+                .lock()
+                .ok()
+                .and_then(|active| active.as_ref().filter(|a| a.id == id).map(Active::feed))
+            else {
+                return error(404, "session-not-found");
+            };
+            let until = Instant::now() + sessions::DRAIN_LIMIT;
+            while Instant::now() < until && (feed.pending() > 0 || self.starting(id)) {
+                std::thread::sleep(Duration::from_millis(20));
+            }
+        }
+        {
             let Ok(active) = self.active.lock() else {
                 return error(503, "unavailable");
             };
@@ -243,23 +257,25 @@ impl Service {
                     &json!({ "error": "not-allowed", "state": sessions::state_key(a.state()) }),
                 );
             }
-            let feed = a.feed();
             match command {
-                Command::Stop => feed.close(),
-                Command::Pause => feed.hold(),
+                Command::Stop => a.feed().close(),
+                Command::Pause => a.feed().hold(),
                 Command::Start | Command::Resume => {}
-            }
-            feed
-        };
-        if command.drains() {
-            let until = Instant::now() + sessions::DRAIN_LIMIT;
-            while feed.pending() > 0 && Instant::now() < until {
-                std::thread::sleep(Duration::from_millis(20));
             }
         }
         self.with(id, |a| {
             a.send(command);
             Response::json(202, &a.snapshot())
+        })
+    }
+
+    fn starting(&self, id: &str) -> bool {
+        self.active.lock().ok().is_some_and(|active| {
+            active.as_ref().is_some_and(|a| {
+                a.id == id
+                    && a.state() == mediflow_local_voice::State::Preparing
+                    && a.feed().accepted() > 0
+            })
         })
     }
 
@@ -421,6 +437,39 @@ mod tests {
         )
     }
 
+    struct SlowStart {
+        inner: Box<dyn mediflow_local_voice::whisper::AudioSource>,
+        started: Option<Instant>,
+    }
+
+    impl mediflow_local_voice::whisper::AudioSource for SlowStart {
+        fn start(&mut self) {
+            self.started = Some(Instant::now());
+            self.inner.start();
+        }
+        fn phase(&mut self) -> mediflow_local_voice::whisper::SourcePhase {
+            if self
+                .started
+                .is_none_or(|s| s.elapsed() < Duration::from_millis(600))
+            {
+                return mediflow_local_voice::whisper::SourcePhase::Starting;
+            }
+            self.inner.phase()
+        }
+        fn read(&mut self, out: &mut Vec<f32>) {
+            self.inner.read(out);
+        }
+        fn pause(&mut self) {
+            self.inner.pause();
+        }
+        fn resume(&mut self) {
+            self.inner.resume();
+        }
+        fn stop(&mut self) {
+            self.inner.stop();
+        }
+    }
+
     fn signed(method: &str, path: &str, body: &[u8]) -> (Request, String) {
         let secret = Secret::from_hex(KEY).unwrap();
         let nonce = random_id();
@@ -550,6 +599,62 @@ mod tests {
     }
 
     #[test]
+    fn stop_sent_while_the_engine_is_still_starting_waits_and_keeps_all_audio() {
+        let factory: Factory = Box::new(|source, _prompt| {
+            let slow = SlowStart {
+                inner: source,
+                started: None,
+            };
+            WhisperSession::with_parts(LoudnessDetector, CountingDecoder::default(), Box::new(slow))
+        });
+        let service = Service::new(
+            PORT,
+            Secret::from_hex(KEY).unwrap(),
+            factory,
+            Box::new(|| ModelState::Ready),
+        );
+        let (_, created) = call(
+            &service,
+            "POST",
+            "/v1/sessions",
+            br#"{"mode":"dictation","subject":"s"}"#,
+        );
+        let id = created["id"].as_str().unwrap().to_owned();
+        call(
+            &service,
+            "POST",
+            &format!("/v1/sessions/{id}/commands"),
+            br#"{"command":"start"}"#,
+        );
+        let mut audio = tone(2.0);
+        audio.extend(silence(1.0));
+        let (status, _) = call(
+            &service,
+            "POST",
+            &format!("/v1/sessions/{id}/audio"),
+            &pcm(&audio),
+        );
+        assert_eq!(status, 202);
+        let (_, early) = call(&service, "GET", &format!("/v1/sessions/{id}"), b"");
+        assert_eq!(early["state"], "preparing");
+        let (status, stopped) = call(
+            &service,
+            "POST",
+            &format!("/v1/sessions/{id}/commands"),
+            br#"{"command":"stop"}"#,
+        );
+        assert_eq!(status, 202, "{stopped}");
+        let review = wait_state(&service, &id, "review");
+        assert!(
+            review["review"]["text"]
+                .as_str()
+                .unwrap()
+                .contains("parola")
+        );
+        assert_eq!(review["acceptedSamples"], audio.len());
+    }
+
+    #[test]
     fn audio_that_stops_arriving_keeps_the_text_for_review() {
         let service = service(ModelState::Ready);
         let (_, created) = call(
@@ -573,7 +678,15 @@ mod tests {
             &format!("/v1/sessions/{id}/audio"),
             &pcm(&audio),
         );
-        let lost = wait_state(&service, &id, "error");
+        wait_state(&service, &id, "error");
+        let mut lost = Value::Null;
+        for _ in 0..2_000 {
+            lost = call(&service, "GET", &format!("/v1/sessions/{id}"), b"").1;
+            if !lost["review"].is_null() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
         assert_eq!(lost["fault"], "audio-lost");
         assert!(lost["review"]["text"].as_str().unwrap().contains("parola"));
         assert_eq!(

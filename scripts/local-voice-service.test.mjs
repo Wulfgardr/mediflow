@@ -70,7 +70,15 @@ test('the service listens only on the loopback, opens no connection and answers 
   try {
     assert.deepEqual(sockets(service.pid), [`127.0.0.1:${port} (LISTEN)`]);
     const external = externalAddress();
-    if (external) await assert.rejects(rawRequest(port, { host: external }), { code: 'ECONNREFUSED' });
+    if (external) {
+      const reached = await new Promise(resolve => {
+        const socket = net.connect({ host: external, port, timeout: 2000 });
+        socket.once('connect', () => { socket.destroy(); resolve(true); });
+        socket.once('timeout', () => { socket.destroy(); resolve(false); });
+        socket.once('error', () => resolve(false));
+      });
+      assert.equal(reached, false);
+    }
     const client = localVoiceClient(service);
     const status = await client.status();
     assert.equal(status.service, 'mediflow-voice');

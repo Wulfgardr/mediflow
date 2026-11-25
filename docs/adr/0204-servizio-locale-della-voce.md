@@ -49,9 +49,9 @@ La fotografia contiene `state`, `fault`, `visible`, `elapsedMs`, `limitReached`,
 
 La macchina è quella di GPUI (PR #964-#968, `engine/src/recording.rs`), invariata: `ready` (Disclosure), `preparing`, `recording`, `paused`, `finalizing`, `review`, `cancelled`, `error`. Il servizio aggiunge tre regole sul confine:
 
-1. **Nessun audio perso.** Il servizio non scarta mai audio arrivato: oltre 120 secondi in attesa risponde `429` e il client ritenta gli stessi byte. `pause` e `stop` aspettano che l'audio già arrivato sia trascritto (al massimo 120 secondi) prima di arrivare alla macchina, che alla pausa e alla fine legge un solo blocco.
+1. **Nessun audio perso.** Il servizio non scarta mai audio arrivato: oltre 120 secondi in attesa risponde `429` e il client ritenta gli stessi byte. `pause` e `stop` aspettano (al massimo 120 secondi) che il motore sia partito e che l'audio già arrivato sia trascritto, poi controllano se la macchina li ammette: la macchina alla pausa e alla fine legge un solo blocco, e un `stop` arrivato mentre il modello si carica sarebbe rifiutato.
 2. **Nessuna bozza sul paziente sbagliato.** Una sessione con testo da rivedere (`review`, oppure `error` con `audio-lost` o `permission-denied`) blocca la creazione di un'altra finché il Web non la scarta con `DELETE`. Il Web confronta `subject` con il paziente o la prima visita aperta prima di preparare una bozza.
-3. **Audio che smette di arrivare** (pagina chiusa, rete del browser ferma): dopo 2 secondi senza audio in registrazione la sessione va in `error` con `audio-lost` e il testo fin lì resta da rivedere; senza alcun audio entro 15 secondi dall'avvio va in `error` con `audio-missing`.
+3. **Audio che smette di arrivare** (pagina chiusa, rete del browser ferma): dopo 2 secondi senza audio in registrazione la sessione va in `error` con `audio-lost` e il testo fin lì resta da rivedere (`review` compare poco dopo lo stato, quando il motore ha chiuso l'ultima frase); senza alcun audio entro 15 secondi dall'avvio va in `error` con `audio-missing`.
 
 ### Errori
 
