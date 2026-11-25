@@ -39,13 +39,12 @@ test('paired ambulatory write preserves capability, concurrency, default, delete
         const unsetDefault = await mutate('PUT', `/api/v1/network/ambulatories/${second.json.id}`, writer, sessionHeaders, { version: 2, isDefault: false }); assert.equal(unsetDefault.response.status, 409);
         const linked = await create(writer, sessionHeaders, { name: 'S3 Linked', type: 'live' }); createdIds.push(linked.json.id); intentionallyGuardedIds.add(linked.json.id);
         linkedPatientId = await createLocalPatient(linked.json.id);
-        const linkedDelete = await mutate('DELETE', `/api/v1/network/ambulatories/${linked.json.id}`, writer, sessionHeaders, { version: 1 }); assert.equal(linkedDelete.response.status, 409);
         const free = await create(writer, sessionHeaders, { name: 'S3 Free', type: 'live' }); createdIds.push(free.json.id);
-        const freeDelete = await mutate('DELETE', `/api/v1/network/ambulatories/${free.json.id}`, writer, sessionHeaders, { version: 1 }); assert.equal(freeDelete.response.status, 200); createdIds.splice(createdIds.indexOf(free.json.id), 1);
-        const clearTest = await mutate('POST', '/api/v1/network/ambulatories/clear', writer, sessionHeaders, { ambulatoryId: first.json.id, version: 2 }); assert.equal(clearTest.response.status, 200); assert.equal(clearTest.json.version, 3);
+        const rejectedDelete = await mutate('DELETE', `/api/v1/network/ambulatories/${free.json.id}`, writer, sessionHeaders, { version: 1 }); assert.equal(rejectedDelete.response.status, 405);
+        const rejectedClearTest = await mutate('POST', '/api/v1/network/ambulatories/clear', writer, sessionHeaders, { ambulatoryId: first.json.id, version: 2 }); assert.equal(rejectedClearTest.response.status, 405);
         const live = await create(writer, sessionHeaders, { name: 'S3 Live', type: 'live' }); createdIds.push(live.json.id);
-        const clearLive = await mutate('POST', '/api/v1/network/ambulatories/clear', writer, sessionHeaders, { ambulatoryId: live.json.id, version: 1 }); assert.equal(clearLive.response.status, 403);
-        scenarioResults.push({ name: 'paired ambulatory write', deniedStatus: denied.response.status, missingSessionStatus: missingSession.response.status, staleStatus: stale.response.status, unsetDefaultStatus: unsetDefault.response.status, linkedDeleteStatus: linkedDelete.response.status, freeDeleteStatus: freeDelete.response.status, clearTestStatus: clearTest.response.status, clearLiveStatus: clearLive.response.status });
+        const rejectedClearLive = await mutate('POST', '/api/v1/network/ambulatories/clear', writer, sessionHeaders, { ambulatoryId: live.json.id, version: 1 }); assert.equal(rejectedClearLive.response.status, 405);
+        scenarioResults.push({ name: 'paired ambulatory write', deniedStatus: denied.response.status, missingSessionStatus: missingSession.response.status, staleStatus: stale.response.status, unsetDefaultStatus: unsetDefault.response.status, rejectedDeleteStatus: rejectedDelete.response.status, rejectedClearTestStatus: rejectedClearTest.response.status, rejectedClearLiveStatus: rejectedClearLive.response.status });
     } finally { if (linkedPatientId) await cleanupPatient(linkedPatientId); for (const id of createdIds.reverse()) await cleanupAmbulatory(id, writer, sessionHeaders, intentionallyGuardedIds); }
 });
 
@@ -83,26 +82,11 @@ test('paired ambulatory audit failures roll back indirect defaults and patient c
         const firstPatient = await createLocalPatient(id);
         const secondPatient = await createLocalPatient(id);
         const beforeClear = snapshot();
-        sql.exec("CREATE TRIGGER synthetic_paired_ambulatory_audit BEFORE INSERT ON audit_events WHEN NEW.event_type='ambulatory.cleared' BEGIN SELECT RAISE(FAIL, 'synthetic final audit failure'); END");
-        const failedClear = await mutate('POST', '/api/v1/network/ambulatories/clear', writer, cookie, { ambulatoryId: id, version: 1 });
-        assert.equal(failedClear.response.status, 500); assert.deepEqual(snapshot(), beforeClear);
-        sql.exec('DROP TRIGGER synthetic_paired_ambulatory_audit');
-        const acceptedClear = await mutate('POST', '/api/v1/network/ambulatories/clear', writer, cookie, { ambulatoryId: id, version: 1 });
-        assert.equal(acceptedClear.response.status, 200); assert.equal(acceptedClear.json.version, 2);
-        const afterClear = snapshot();
-        for (const patientId of [firstPatient, secondPatient]) {
-            const row = afterClear.patients.find(patient => patient.id === patientId);
-            assert.ok(row.deleted_at); assert.equal(row.version, 2);
-        }
-        assert.equal(afterClear.memberships.some(row => row.ambulatory_id === id), false);
-        const clearEvents = afterClear.events.slice(beforeClear.events.length);
-        assert.deepEqual(clearEvents.map(event => event.event_type).sort(), ['ambulatory.cleared', 'patient.deleted', 'patient.deleted']);
-        assert.ok([...createEvents, ...clearEvents].every(event => event.source_surface === 'native'));
-        const stale = await mutate('POST', '/api/v1/network/ambulatories/clear', writer, cookie, { ambulatoryId: id, version: 1 });
-        assert.equal(stale.response.status, 409); assert.deepEqual(snapshot(), afterClear);
+        const rejectedClear = await mutate('POST', '/api/v1/network/ambulatories/clear', writer, cookie, { ambulatoryId: id, version: 1 });
+        assert.equal(rejectedClear.response.status, 405); assert.deepEqual(snapshot(), beforeClear);
         const reread = await list(writer, cookie); assert.equal(reread.response.status, 200);
-        assert.equal(reread.json.find(row => row.id === id).version, 2);
-        scenarioResults.push({ name: 'paired atomic default and clear', createFailure: rejected.response.status, clearFailure: failedClear.response.status, retry: acceptedClear.response.status, stale: stale.response.status, createEvents, clearEvents });
+        assert.equal(reread.json.find(row => row.id === id).version, 1);
+        scenarioResults.push({ name: 'paired atomic default and rejected legacy clear', createFailure: rejected.response.status, rejectedClear: rejectedClear.response.status, createEvents });
     } finally { sql.exec('DROP TRIGGER IF EXISTS synthetic_paired_ambulatory_audit'); sql.close(); }
 });
 
@@ -114,7 +98,7 @@ async function list(client, sessionHeaders) { return request('GET', '/api/v1/net
 async function mutate(method, pathname, client, sessionHeaders, body) { return request(method, pathname, { headers: { ...pairedHeaders(client), ...sessionHeaders }, body }); }
 async function createLocalPatient(ambulatoryId) { const id = crypto.randomUUID(); const suffix = id.replace(/-/g, '').slice(0, 13).toUpperCase(); const created = await request('POST', '/api/v1/patients', { headers: localApiHeaders(), body: { id, firstName: 'Ambulatory', lastName: 'Membership', taxCode: `AMB${suffix}`, ambulatoryId, isAdi: false } }); assert.equal(created.response.status, 201); return id; }
 async function cleanupPatient(id) { const detail = await request('GET', `/api/v1/patients/${id}`, { headers: localApiHeaders() }); if (detail.response.status === 200) { const deleted = await request('DELETE', `/api/v1/patients/${id}`, { headers: localApiHeaders(), body: { version: detail.json.version } }); assert.equal(deleted.response.status, 200); } }
-async function cleanupAmbulatory(id, client, sessionHeaders, intentionallyGuardedIds) { if (intentionallyGuardedIds.has(id)) return; const rows = await list(client, sessionHeaders); const row = rows.json?.find((item) => item.id === id); if (!row || row.isDefault) return; const deleted = await mutate('DELETE', `/api/v1/network/ambulatories/${id}`, client, sessionHeaders, { version: row.version }); assert.equal(deleted.response.status, 200); }
+async function cleanupAmbulatory(id, client, sessionHeaders, intentionallyGuardedIds) { if (intentionallyGuardedIds.has(id)) return; const rows = await list(client, sessionHeaders); const row = rows.json?.find((item) => item.id === id); if (!row || row.isDefault) return; const deleted = await request('DELETE', `/api/ambulatories/${id}`, { headers: sessionHeaders, body: { version: row.version } }); assert.equal(deleted.response.status, 200); }
 function localApiHeaders() { return { Authorization: `Bearer ${LOCAL_API_TOKEN}`, 'Cache-Control': 'no-store' }; }
 function pairedHeaders(client) { return { 'x-mediflow-paired-client-id': client.pairedClientId, 'x-mediflow-paired-client-token': client.pairedClientToken }; }
 async function request(method, pathname, { headers = {}, body } = {}) { const finalHeaders = { ...headers }; if (body !== undefined) finalHeaders['Content-Type'] = 'application/json'; const response = await fetch(new URL(pathname, BASE_URL), { method, headers: finalHeaders, body: body === undefined ? undefined : JSON.stringify(body) }); const text = await response.text(); let json = null; try { json = text ? JSON.parse(text) : null; } catch { json = text; } return { response, json, text }; }
