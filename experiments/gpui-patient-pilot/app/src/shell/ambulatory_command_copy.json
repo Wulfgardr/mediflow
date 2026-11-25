@@ -27,8 +27,11 @@
     "anteprima": "Preparazione dell’anteprima…",
     "invio": "Operazione in corso…",
     "ignoto": "Esito non disponibile. Autorizza di nuovo l’accesso, poi verifica l’esito o chiudi l’operazione.",
+    "non_registrato": "Nessuna esecuzione registrata. Puoi verificare di nuovo o chiudere l’operazione.",
     "applied": "Operazione completata.",
     "rejected": "Operazione non eseguita.",
+    "rejected_piano_cambiato": "La sede è cambiata dopo l’anteprima. Aggiorna l’elenco e riprova se serve.",
+    "rejected_non_ammesso": "L’operazione non è più ammessa nello stato attuale. Aggiorna l’elenco.",
     "closed": "Operazione chiusa senza esecuzione registrata.",
     "ritiro_confermato": "Sessione dedicata chiusa.",
     "ritiro_non_confermato": "Non è stato possibile confermare la chiusura della sessione dedicata. Riprova; le informazioni per il recupero saranno conservate."
@@ -43,12 +46,14 @@
     "chiudi_attesa": "Puoi uscire: le informazioni per recuperare l’esito saranno conservate finché non sarà confermata anche la chiusura della sessione.",
     "rileggi": "Aggiorna elenco",
     "annulla": "Annulla",
-    "autorizza": "Autorizza"
+    "autorizza": "Autorizza",
+    "autorizza_di_nuovo": "Autorizza di nuovo"
   },
   "errori": {
     "storage": "Impossibile preparare il recupero. L’operazione non è stata inviata.",
     "piano_cambiato": "La situazione è cambiata. Aggiorna l’elenco e prepara una nuova anteprima.",
     "accesso_scaduto": "L’autorizzazione è scaduta o revocata. Autorizza di nuovo l’accesso.",
+    "accesso_scaduto_prima_invio": "L’autorizzazione è scaduta prima della conferma. Nessuna modifica è stata eseguita. Chiudi e prepara di nuovo l’operazione se serve.",
     "risposta_persa": "La risposta non è arrivata. Non ripetere l’operazione: verifica l’esito.",
     "autorizzazione": "Autorizzazione non riuscita. Verifica l’accesso e riprova.",
     "ack_locale": "L’esito è noto e la sessione dedicata è chiusa, ma non è stato possibile completare la chiusura del recupero. Le informazioni sono conservate; riprova a chiudere.",

@@ -22,6 +22,7 @@
 import { clinicalFactContext, clinicalSentence, clinicalTokens, contextReview, isHistoricalTherapy, legacyPreparedFamily, legacyPreparedNegation, structuredContextApplies, type ClinicalContext } from './clinical-context-lexicon';
 import { isValidItalianTaxCodeChecksum } from './document-identity-resolution';
 import { catalogObservationCode } from './dossier-sections';
+import { anchorTabularQuote } from './dossier-tabular-quote';
 import {
     DOSSIER_FACT_TARGET, dossierFactBlockers, dossierFactId, latestAppliedOutcome, unitText,
     type DossierEvidence, type DossierFact, type DossierFactAssessment, type DossierFactKind, type DossierRecord, type DossierUnit,
@@ -242,10 +243,18 @@ export function anchorPreparedQuote(text: string, units: readonly DossierUnit[],
         }
         if (best?.differences === 0) break;
     }
+    if (best?.differences === 0) {
+        const body = unitText(text, best.unit);
+        const first = best.tokens[best.from]; const last = best.tokens[best.from + wanted.length - 1];
+        return { match: 'exact', words: best.tokens.slice(best.from, best.from + wanted.length).map((token) => token.text),
+            evidence: { unit: best.unit.index, start: first.start, end: last.end, excerpt: body.slice(first.start, last.end).replace(/\s+/gu, ' ').trim() } };
+    }
+    const tabular = anchorTabularQuote(text, units, quote);
+    if (tabular) return { match: tabular.match, words: tabular.words, evidence: tabular.evidence };
     if (!best) return null;
     const body = unitText(text, best.unit);
     const first = best.tokens[best.from]; const last = best.tokens[best.from + wanted.length - 1];
-    return { match: best.differences === 0 ? 'exact' : 'approximate', words: best.tokens.slice(best.from, best.from + wanted.length).map((token) => token.text),
+    return { match: 'approximate', words: best.tokens.slice(best.from, best.from + wanted.length).map((token) => token.text),
         evidence: { unit: best.unit.index, start: first.start, end: last.end, excerpt: body.slice(first.start, last.end).replace(/\s+/gu, ' ').trim() } };
 }
 
@@ -479,7 +488,7 @@ export function preparedDossierFacts(input: PreparedFactsInput): PreparedFactsRe
                 values.observedAt ||= date;
                 // Codice e unità solo dal catalogo locale, qualunque cosa proponga il file.
                 delete values.code; delete values.unitCode;
-                const coded = catalogObservationCode(values.display ?? '', values.unit ?? '');
+                const coded = catalogObservationCode(values.display ?? '', values.unit ?? '', values.value ?? '');
                 if (!coded) {
                     uncoded.add(values.display?.trim() || 'Esame senza nome');
                     continue;
@@ -500,7 +509,8 @@ export function preparedDossierFacts(input: PreparedFactsInput): PreparedFactsRe
         else if (NARRATIVE.has(item.kind)) {
             // Un testo descrittivo è verificato solo se è esso stesso un passo del documento; il titolo è quello del tipo.
             values.title = NARRATIVE_TITLES[item.kind] ?? values.title ?? '';
-            const passage = values.text ? anchorPreparedQuote(text, units, values.text) : null;
+            const textAnchor = values.text ? anchorPreparedQuote(text, units, values.text) : null;
+            const passage = textAnchor && textAnchor.words.length === preparedTokens(values.text).length ? textAnchor : null;
             const quoted = item.quote ? anchorPreparedQuote(text, units, item.quote) : null;
             evidence = passage?.evidence ?? quoted?.evidence ?? null;
             check = passage ? (passage.match === 'exact' ? 'verified' : 'approximate') : 'paraphrase';
@@ -591,7 +601,13 @@ export interface PreparedBulkInput {
     exemptionCodes: ReadonlySet<string>;
     /** Riferimenti di fatti che la stessa operazione accetta in altri documenti. */
     acceptedElsewhere: ReadonlySet<string>;
-    /** Il medico ha letto le sintesi e chiede di accettarle: testo non verificabile. */
+    /** Riferimenti di fatti che la stessa operazione mette da parte in altri documenti. */
+    setAsideElsewhere: ReadonlySet<string>;
+    /** Riferimenti di fatti in conflitto o confrontati con un conflitto, in qualunque documento. */
+    conflicted: ReadonlySet<string>;
+    /** Nome della fonte per chiave di documento, per il motivo dei doppioni. */
+    documentNames: Readonly<Record<string, string>>;
+    /** Il medico ha letto le sintesi e chiede di accettarle; la stessa dichiarazione conferma il residuo. */
     includeSummaries: boolean;
 }
 
@@ -599,12 +615,20 @@ export interface PreparedBulkResult {
     facts: DossierFact[];
     acknowledgeResidual: boolean;
     accepted: string[];
-    counts: { accepted: number; alreadyPresent: number; superseded: number; leftPending: number };
+    setAside: string[];
+    counts: { accepted: number; alreadyPresent: number; superseded: number; setAside: number; leftPending: number };
 }
 
 const PARSER_ELIGIBLE = new Set<DossierFact['origin']>(['parser:lab', 'parser:icd', 'parser:exemption']);
 const PARSER_ELIGIBLE_KINDS = new Set<DossierFactKind>(['diagnosis', 'exemption', 'observation']);
 const SUPERSEDABLE = new Set<DossierFact['origin']>(['parser:section', 'parser:scale']);
+const AUTOMATIC_READING = new Set<DossierFact['origin']>(['parser:lab', 'parser:icd', 'parser:exemption', 'parser:section', 'parser:scale']);
+
+export const BULK_NOTE = {
+    automaticReading: 'Lettura automatica non verificata.',
+    supersededByPrepared: 'Sostituita dall’estrazione preparata verificata dello stesso tipo.',
+    supersededBySummary: 'Sostituita dalla sintesi accettata; il testo completo resta nell’allegato.',
+} as const;
 
 export function isPreparedSummary(fact: DossierFact): boolean {
     return fact.origin === 'prepared' && fact.values.preparedCheck === 'summary';
@@ -625,60 +649,79 @@ function appPageCount(record: DossierRecord): number | null {
     return record.extraction.state === 'extracted' && record.extraction.unitBasis === 'pages' ? record.extraction.units.length : null;
 }
 
+/**
+ * La regola di «Accetta il verificato» (WUL-927), solo per i documenti con estrazione preparata.
+ * Accetta i fatti preparati con citazione ritrovata, le proposte codificate trovate nel testo e la voce
+ * di diario col documento intero; mette da parte doppioni e altre letture automatiche, con il motivo;
+ * lascia al medico sintesi, conflitti, negazioni e tutto ciò che non rientra con certezza in una classe.
+ * Il residuo si conferma solo con la dichiarazione del medico sulle sintesi.
+ */
 export function preparedBulkDecisions(input: PreparedBulkInput): PreparedBulkResult {
     const { record, documentKey } = input;
-    const counts = { accepted: 0, alreadyPresent: 0, superseded: 0, leftPending: 0 };
+    const counts = { accepted: 0, alreadyPresent: 0, superseded: 0, setAside: 0, leftPending: 0 };
     const accepted: string[] = [];
-    // Solo i documenti con un'estrazione preparata: senza, nulla cambia rispetto ad ADR 0175.
+    const setAside: string[] = [];
     if (!record.facts.some((fact) => fact.origin === 'prepared')) {
-        return { facts: record.facts, acknowledgeResidual: false, accepted, counts: { ...counts, leftPending: record.facts.filter((fact) => fact.decision === 'pending').length } };
+        return { facts: record.facts, acknowledgeResidual: false, accepted, setAside, counts: { ...counts, leftPending: record.facts.filter((fact) => fact.decision === 'pending').length } };
     }
+    const refOf = (fact: DossierFact) => `${documentKey}#${fact.factId}`;
     const acceptedNow = new Set(input.acceptedElsewhere);
-    const supersedableHere = new Set(record.facts.filter((fact) => SUPERSEDABLE.has(fact.origin) && fact.decision === 'pending').map((fact) => `${documentKey}#${fact.factId}`));
-    // 1. Proposte preparate e proposte codificate del parser.
+    const setAsideNow = new Set(input.setAsideElsewhere);
+    const supersedableHere = new Set(record.facts.filter((fact) => SUPERSEDABLE.has(fact.origin) && fact.decision === 'pending').map(refOf));
+    const heldForPhysician = (fact: DossierFact) => fact.negated || input.conflicted.has(refOf(fact)) || input.assessment(refOf(fact))?.status === 'conflict';
+    const decide = (fact: DossierFact, decision: DossierFact['decision'], note?: string): DossierFact =>
+        ({ ...fact, decision, decidedBy: 'accept_verified', ...(note ? { note } : {}) });
+    const accept = (fact: DossierFact) => { counts.accepted += 1; accepted.push(refOf(fact)); acceptedNow.add(refOf(fact)); return decide(fact, 'accepted'); };
+    const reject = (fact: DossierFact, note: string) => { setAside.push(refOf(fact)); setAsideNow.add(refOf(fact)); return decide(fact, 'rejected', note); };
+    const putAside = (fact: DossierFact, note: string) => { counts.setAside += 1; return reject(fact, note); };
+    const supersede = (fact: DossierFact, note: string) => { counts.superseded += 1; return reject(fact, note); };
+    const sourceOf = (ref: string) => {
+        const key = ref.slice(0, ref.indexOf('#'));
+        return key === documentKey ? null : input.documentNames[key] ?? '';
+    };
+    const duplicateNote = (ref: string, acceptedTwin: boolean) => {
+        const source = sourceOf(ref);
+        const voice = acceptedTwin ? 'una voce accettata' : 'una voce';
+        return source === null ? `Doppione di ${voice} di questo documento.` : source ? `Doppione di ${voice} di «${source}».` : `Doppione di ${voice} di un altro documento.`;
+    };
     const first = record.facts.map((fact) => {
-        if (fact.decision !== 'pending' || SUPERSEDABLE.has(fact.origin) || fact.origin === 'parser:document') return fact;
-        const ref = `${documentKey}#${fact.factId}`;
-        let assessment = input.assessment(ref);
-        // Un fatto preparato «doppio» di una proposta per sezione dello stesso documento non è un doppione:
-        // è la stessa informazione, verificata; la proposta per sezione verrà sostituita.
-        if (fact.origin === 'prepared' && assessment?.status === 'duplicate_in_dossier') {
-            const others = assessment.relatedFactRefs.filter((related) => !supersedableHere.has(related));
-            if (!others.length) assessment = { status: 'new', detail: assessment.detail, relatedFactRefs: [] };
-            else assessment = { ...assessment, relatedFactRefs: others };
+        if (fact.decision !== 'pending' || fact.origin === 'parser:document' || fact.origin === 'manual' || heldForPhysician(fact)) return fact;
+        const assessment = input.assessment(refOf(fact));
+        if (assessment?.status === 'already_present') { counts.alreadyPresent += 1; return decide(fact, 'already_present'); }
+        if (assessment?.status === 'duplicate_in_dossier') {
+            const twins = assessment.relatedFactRefs.filter((related) => !setAsideNow.has(related) && !(fact.origin === 'prepared' && supersedableHere.has(related)));
+            if (twins.length && twins.every((related) => acceptedNow.has(related))) {
+                counts.alreadyPresent += 1;
+                return decide(fact, 'already_present', duplicateNote(twins[0], true));
+            }
+            if (twins.length) return putAside(fact, duplicateNote(twins[0], false));
         }
-        if (assessment?.status === 'already_present') { counts.alreadyPresent += 1; return { ...fact, decision: 'already_present' as const }; }
-        if (assessment?.status === 'duplicate_in_dossier' && assessment.relatedFactRefs.length
-            && assessment.relatedFactRefs.every((related) => acceptedNow.has(related))) {
-            counts.alreadyPresent += 1;
-            return { ...fact, decision: 'already_present' as const, note: 'Stesso contenuto di un’altra fonte accettata.' };
-        }
-        if ((!assessment || assessment.status === 'new') && preparedFactEligible(fact, input.exemptionCodes, input.includeSummaries)) {
-            counts.accepted += 1; accepted.push(ref); acceptedNow.add(ref);
-            return { ...fact, decision: 'accepted' as const };
-        }
-        return fact;
+        if (SUPERSEDABLE.has(fact.origin)) return fact;
+        return preparedFactEligible(fact, input.exemptionCodes, input.includeSummaries) ? accept(fact) : fact;
     });
-    // 2. Sostituzioni: la voce col testo intero solo quando la sintesi è già scritta e riletta;
-    //    una proposta per sezione solo se un fatto preparato accettato riguarda lo stesso soggetto.
     const written = (fact: DossierFact) => { const outcome = latestAppliedOutcome(record, fact.factId)?.outcome; return outcome === 'applied' || outcome === 'already_present'; };
+    const summaryAccepted = first.some((fact) => isPreparedSummary(fact) && fact.decision === 'accepted');
     const summaryWritten = first.some((fact) => isPreparedSummary(fact) && fact.decision === 'accepted' && written(fact));
-    const acceptedPrepared = first.filter((fact) => fact.origin === 'prepared' && fact.decision === 'accepted' && !isPreparedSummary(fact));
+    const keptPrepared = first.filter((fact) => fact.origin === 'prepared' && (fact.decision === 'accepted' || fact.decision === 'already_present') && !isPreparedSummary(fact));
     const facts = first.map((fact) => {
         if (fact.decision !== 'pending') return fact;
-        if ((fact.origin === 'parser:document' && summaryWritten)
-            || (SUPERSEDABLE.has(fact.origin) && acceptedPrepared.some((other) => other.kind === fact.kind && sameSubject(other, fact)))) {
-            counts.superseded += 1;
-            return { ...fact, decision: 'rejected' as const, note: fact.origin === 'parser:document' ? 'Sostituita dalla sintesi accettata; il testo completo resta nell’allegato.'
-                : 'Sostituita dall’estrazione preparata verificata dello stesso tipo.' };
+        if (fact.origin === 'parser:document') {
+            if (summaryWritten) return supersede(fact, BULK_NOTE.supersededBySummary);
+            if (!summaryAccepted && !dossierFactBlockers(fact, { exemptionCodes: input.exemptionCodes }).length) {
+                if (input.assessment(refOf(fact))?.status === 'already_present') { counts.alreadyPresent += 1; return decide(fact, 'already_present'); }
+                return accept(fact);
+            }
+        } else if (SUPERSEDABLE.has(fact.origin) && keptPrepared.some((other) => other.kind === fact.kind && sameSubject(other, fact))) {
+            return supersede(fact, BULK_NOTE.supersededByPrepared);
+        } else if (!heldForPhysician(fact) && AUTOMATIC_READING.has(fact.origin)) {
+            return putAside(fact, BULK_NOTE.automaticReading);
         }
         counts.leftPending += 1;
         return fact;
     });
-    // 3. Il residuo si conferma solo con la sintesi accettata e la copertura dichiarata coerente con MediFlow.
     const summary = facts.find(isPreparedSummary);
     const pages = appPageCount(record);
-    const acknowledgeResidual = Boolean(summary && summary.decision === 'accepted' && written(summary) && summary.values.preparedCoverage === 'complete'
+    const acknowledgeResidual = Boolean(input.includeSummaries && summary && summary.decision === 'accepted' && written(summary) && summary.values.preparedCoverage === 'complete'
         && (pages === null || summary.values.preparedPages === String(pages)));
-    return { facts, acknowledgeResidual, accepted, counts };
+    return { facts, acknowledgeResidual, accepted, setAside, counts };
 }

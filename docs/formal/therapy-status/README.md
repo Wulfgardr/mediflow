@@ -1262,10 +1262,21 @@ conservazione della prova accanto alla chiave del PIN transitorio (WUL-931):
 riguarda solo intestazioni e `sessionStorage` della scheda, non il comando di
 stato terapia.
 
+### Rifiuti spiegati del backup completo, WUL-930
+
+In `lib/recovery-backup-server.ts` i rifiuti dello snapshot e del candidato
+portano un motivo (`RecoverySnapshotRefusedError`: schema non previsto,
+integrità o riferimenti, involucro di recupero assente, dimensione). Il
+messaggio dell'errore resta `RECOVERY_BACKUP_PREFLIGHT_FAILED`. Condizioni,
+ordine dei controlli, cattura e conservazione dei comandi di stato terapia,
+swap e rotazione della generazione restano identici. Aggiornati solo il digest
+del file e `syncCommit`; modello, statechart, invarianti, limiti, testimoni e
+mutanti non cambiano.
+
 ### Unificazione grafica Vassoio opaco su TherapyManager, WUL-894
 
 Confrontato `components/therapy-manager.tsx` rispetto a `origin/main`
-(`3ef0eac1d`): il diff tocca soltanto markup e presentazione (import di
+(`a6f6221fa`): il diff tocca soltanto markup e presentazione (import di
 `record-surface.module.css` e icona decorativa `Pill` con `aria-hidden="true"`
 nella testata non incorporata e come prop `icon` su `CollapsibleSection`,
 conteggio `formatCountLabel` nella testata dei gruppi Attive/Sospese/Concluse,
@@ -1274,7 +1285,8 @@ Periodo).
 
 Nessuna transizione di stato, condizione, guardia `disabled`, chiamata ai
 controller ADR0168 o ADR0156, confine di `await`, CAS, audit, ricevuta o ordine
-degli effetti cambia. Dopo l'unione con `origin/main` (`3ef0eac1d`), il manifest
-combina i digest di `lib/security/client-auth-api.ts` (WUL-898/WUL-931) e
+degli effetti cambia. Dopo l'unione con `origin/main` (`a6f6221fa`), il manifest
+combina i digest di `lib/recovery-backup-server.ts` (WUL-930),
+`lib/security/client-auth-api.ts` (WUL-898/WUL-931) e
 `components/therapy-manager.tsx` (WUL-894), con esecuzione completa di
 `npm run verify:therapy-status`.

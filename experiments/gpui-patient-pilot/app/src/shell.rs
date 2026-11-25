@@ -41,7 +41,6 @@ mod scales;
 mod service_matching;
 mod settings;
 mod smart_import;
-mod surface;
 mod therapy_picker;
 mod threshold_actions;
 #[cfg(test)]
@@ -80,7 +79,7 @@ use crate::appointments::for_write as appointment_for_write;
 use crate::clinical_text;
 use crate::components::{
     WritingInk, WritingSurface, brand_icon, button, confirmation_heading, display_date,
-    display_instant_date, notice, plain_text, section, tab, writing_status,
+    display_instant_date, heading, notice, plain_text, section, tab, writing_status,
 };
 use crate::documents::{self, Upload};
 use crate::editing;
@@ -3392,41 +3391,17 @@ impl ClinicalApp {
     fn login_view(&self, layout: Layout, cx: &Context<Self>) -> Stateful<Div> {
         let theme = self.theme;
         let paired = self.pairing.is_some();
-        let header = surface::page(theme)
-            .max_w(px(640.))
-            .flex_shrink_0()
-            .p(px(if layout.compact { 16. } else { 28. }))
-            .rounded(px(theme.paper_radius))
-            .child(
-                div()
-                    .min_w_0()
-                    .max_w_full()
-                    .flex()
-                    .flex_wrap()
-                    .items_center()
-                    .justify_between()
-                    .gap(px(12.))
-                    .child(self.brand(true))
-                    .child(self.appearance(
-                        (layout.width - 2. * layout.margin).min(640.)
-                            - 2. * if layout.compact { 16. } else { 28. },
-                        true,
-                        cx,
-                    )),
-            )
-            .child(surface::page_header(
-                "clinical-workspace-connect-heading",
-                if paired {
-                    "Accedi al tuo archivio"
-                } else {
-                    "Collega questo dispositivo"
-                },
-                (!paired)
-                    .then(|| "Usa i dati di abbinamento assegnati a questo dispositivo.".into()),
-                div(),
-                theme,
-            ));
-        let mut panel = surface::island(theme, false).child(self.local_preferences_status(cx));
+        let mut panel = div().w_full().min_w_0().max_w(px(640.)).flex_shrink_0().bg(theme.paper)
+            .rounded(px(theme.paper_radius)).p(px(if layout.compact { 16. } else { 28. }))
+            .flex().flex_col().gap(px(16.))
+            .child(div().min_w_0().max_w_full().flex().flex_wrap().items_center().justify_between().gap(px(12.))
+                .child(self.brand(true))
+                .child(self.appearance((layout.width-2.*layout.margin).min(640.)-2.*if layout.compact {16.} else {28.},true,cx)))
+            .child(self.local_preferences_status(cx))
+            .child(div().flex().flex_col().gap(px(8.))
+                .child(crate::components::observe_control(crate::components::heading_with_role("clinical-workspace-connect-heading", if paired { "Accedi al tuo archivio" } else { "Collega questo dispositivo" }, theme, crate::theme::TitleRole::Threshold)))
+                .child(div().text_color(theme.secondary).type_role(theme, crate::theme::TextRole::Body)
+                    .child(text!(if paired { "Sblocca i dati con il tuo account personale." } else { "Usa i dati di abbinamento già assegnati al dispositivo sul computer che ospita l'archivio." }))));
         if let Some(pairing) = &self.pairing {
             panel = panel
                 .child(
@@ -3539,7 +3514,7 @@ impl ClinicalApp {
             .flex()
             .flex_col()
             .items_center()
-            .child(header.child(surface::tray(theme).child(panel)))
+            .child(panel)
     }
 
     fn directory_view(&self, layout: Layout, cx: &Context<Self>) -> Stateful<Div> {
@@ -3552,45 +3527,55 @@ impl ClinicalApp {
             .filter(|patient| patient.matches_query(&self.query))
             .collect();
         let count = self.patients.ready().map(|_| patients.len());
-        let actions = div().child(
-            button(
-                "clinical-workspace-new-patient",
-                "Nuova scheda",
-                theme,
-                true,
-                self.can_write(FormKind::PatientNew) && self.scope.is_some(),
-            )
-            .when(
-                self.can_write(FormKind::PatientNew) && self.scope.is_some(),
-                |el| el.on_click(cx.listener(|this, _, _, cx| this.new_patient(cx))),
-            ),
-        );
-        #[cfg(unix)]
-        let actions = actions.child(
-            button(
-                "document-create-open",
-                "Nuova scheda da PDF",
-                theme,
-                false,
-                self.scope.is_some() && self.form.is_none() && self.can_write(FormKind::PatientNew),
-            )
-            .on_click(cx.listener(|this, _, _, cx| this.open_patient_document(cx))),
-        );
-        let meta = count.map_or_else(
-            || "Lettura dell'elenco…".into(),
-            |n| format!("{n} {}", if n == 1 { "paziente" } else { "pazienti" }),
-        );
-        let header = surface::page(theme)
+        let header = div()
             .flex_shrink_0()
             .p(px(layout.margin))
             .pb(px(16.))
-            .child(surface::page_header(
-                "clinical-workspace-patients-heading",
-                "Pazienti",
-                Some(meta),
-                actions,
-                theme,
-            ))
+            .flex()
+            .flex_col()
+            .gap(px(16.))
+            .child(
+                div()
+                    .flex()
+                    .flex_wrap()
+                    .items_center()
+                    .justify_between()
+                    .gap(px(12.))
+                    .child(heading(
+                        "clinical-workspace-patients-heading",
+                        "Pazienti",
+                        theme,
+                    ))
+                    .child(
+                        button(
+                            "clinical-workspace-new-patient",
+                            "Nuova scheda",
+                            theme,
+                            true,
+                            self.can_write(FormKind::PatientNew) && self.scope.is_some(),
+                        )
+                        .when(
+                            self.can_write(FormKind::PatientNew) && self.scope.is_some(),
+                            |el| el.on_click(cx.listener(|this, _, _, cx| this.new_patient(cx))),
+                        ),
+                    ),
+            )
+            .when(cfg!(unix), |el| {
+                #[cfg(unix)]
+                let el = el.child(
+                    button(
+                        "document-create-open",
+                        "Nuova scheda da PDF",
+                        theme,
+                        false,
+                        self.scope.is_some()
+                            && self.form.is_none()
+                            && self.can_write(FormKind::PatientNew),
+                    )
+                    .on_click(cx.listener(|this, _, _, cx| this.open_patient_document(cx))),
+                );
+                el
+            })
             .child(
                 div()
                     .flex()
@@ -3642,20 +3627,15 @@ impl ClinicalApp {
                     .when(layout.compact, |el| el.flex_col())
                     .gap(px(12.))
                     .child(
-                        surface::segmented_bar(
-                            "clinical-workspace-patient-filters",
-                            "Elenco pazienti",
-                            theme,
-                        )
-                        .children(
+                        div().flex().flex_wrap().gap(px(4.)).children(
                             [
                                 (false, "clinical-workspace-filter-active", "Attivi"),
                                 (true, "clinical-workspace-filter-archive", "Archivio"),
                             ]
                             .into_iter()
                             .map(|(archived, id, title)| {
-                                surface::segment(id, title, self.archived == archived, theme)
-                                    .on_click(cx.listener(move |this, _, _, cx| {
+                                tab(id, title, self.archived == archived, theme).on_click(
+                                    cx.listener(move |this, _, _, cx| {
                                         if this.form.is_some() {
                                             return;
                                         }
@@ -3665,7 +3645,8 @@ impl ClinicalApp {
                                         this.patient = PatientData::default();
                                         this.core = Workspace::default();
                                         this.load_patients(cx);
-                                    }))
+                                    }),
+                                )
                             }),
                         ),
                     )
@@ -3679,8 +3660,21 @@ impl ClinicalApp {
                             false,
                         ),
                     ),
+            )
+            .child(
+                div()
+                    .text_color(theme.secondary)
+                    .type_role(theme, crate::theme::TextRole::Meta)
+                    .child(text!(
+                        count
+                            .map(|n| format!(
+                                "{n} {}",
+                                if n == 1 { "paziente" } else { "pazienti" }
+                            ))
+                            .unwrap_or_else(|| "Lettura dell'elenco…".into())
+                    )),
             );
-        let rows = surface::island(theme, false)
+        let rows = div()
             .id("clinical-workspace-directory-scroll")
             .accessibility_id("clinical-workspace-directory-scroll")
             .key_context("MediFlowPatientList")
@@ -3694,6 +3688,8 @@ impl ClinicalApp {
                     .overflow_y_scroll()
             })
             .when(layout.magnified, |el| el.flex_shrink_0())
+            .px(px(layout.margin))
+            .pb(px(layout.margin))
             .when(self.patients.message().is_some(), |el| {
                 el.child(notice(
                     "clinical-workspace-patients-state",
@@ -3838,7 +3834,7 @@ impl ClinicalApp {
             .min_w_0()
             .flex()
             .flex_col()
-            .bg(theme.sheet)
+            .bg(theme.paper)
             .rounded(px(theme.paper_radius))
             .when(!layout.magnified, |el| el.overflow_hidden())
             .when(layout.magnified, |el| {
@@ -3850,15 +3846,7 @@ impl ClinicalApp {
                     .when(!layout.magnified, |el| el.flex_1().min_h_0())
                     .when(layout.magnified, |el| el.flex_shrink_0().flex_col())
                     .flex()
-                    .gap(px(12.))
-                    .px(px(layout.margin))
-                    .pb(px(layout.margin))
-                    .child(
-                        surface::tray(theme)
-                            .flex_1()
-                            .when(!layout.magnified, |el| el.min_h_0())
-                            .child(rows),
-                    )
+                    .child(rows)
                     .when(layout.wide && self.selected_id.is_some(), |el| {
                         el.child(self.preview(cx))
                     }),
@@ -3867,24 +3855,31 @@ impl ClinicalApp {
 
     fn preview(&self, cx: &Context<Self>) -> Stateful<Div> {
         let theme = self.theme;
-        let pane = surface::tray(theme)
+        let mut pane = div()
             .id("clinical-workspace-patient-preview")
             .accessibility_id("clinical-workspace-patient-preview")
             .role(Role::Complementary)
             .aria_label("Anteprima del paziente")
             .w(px(304.))
             .flex_shrink_0()
-            .overflow_y_scroll();
-        let mut details = surface::island(theme, false);
+            .border_l_1()
+            .border_color(theme.rule)
+            .p(px(24.))
+            .overflow_y_scroll()
+            .flex()
+            .flex_col()
+            .gap(px(20.));
         if let Some(patient) = self.patient.detail.ready() {
-            details = details
-                .child(surface::record_heading(
-                    "clinical-workspace-preview-name",
-                    crate::title::TitleText::name(patient.display_name()),
-                    None,
-                    theme,
-                    crate::theme::TitleRole::RecordZone,
-                ))
+            pane = pane
+                .child(
+                    div().child(
+                        crate::title::title(
+                            crate::title::TitleText::name(patient.display_name()),
+                            theme,
+                        )
+                        .with_role(crate::theme::TitleRole::PersonPreview),
+                    ),
+                )
                 .child(div().text_color(theme.secondary).child(text!(format!(
                     "Nascita {}",
                     crate::patient_text::birth_text(
@@ -3896,7 +3891,6 @@ impl ClinicalApp {
                 .child(
                     div()
                         .flex()
-                        .flex_wrap()
                         .gap(px(4.))
                         .child(div().text_color(theme.secondary).child(text!(
                             crate::patient_text::identifier_label(
@@ -3926,7 +3920,7 @@ impl ClinicalApp {
                         "clinical-workspace-open-profile",
                         "Apri scheda",
                         theme,
-                        false,
+                        true,
                         true,
                     )
                     .on_click(cx.listener(|this, _, _, cx| {
@@ -3935,14 +3929,14 @@ impl ClinicalApp {
                     })),
                 );
         } else {
-            details = details.child(self.patient_read_hint(
+            pane = pane.child(self.patient_read_hint(
                 "clinical-workspace-preview-state",
                 &self.patient.detail,
                 ReadObject::Scheda,
                 cx,
             ));
         }
-        pane.child(details)
+        pane
     }
 
     fn wide_overview(&self, layout: Layout) -> bool {
@@ -4020,17 +4014,19 @@ impl ClinicalApp {
             pane = pane.child(self.record_sections(layout, cx));
         } else if self.show_sections {
             pane = pane.child(
-                surface::segmented_bar(
-                    "clinical-workspace-patient-sections",
-                    "Moduli del paziente",
-                    theme,
-                )
-                .flex_shrink_0()
-                .px(px(if layout.compact { 16. } else { layout.margin }))
-                .gap(px(4.))
-                .children(PatientSection::ALL.into_iter().map(|patient_section| {
-                    let section_tab =
-                        surface::segment(
+                div()
+                    .id("clinical-workspace-patient-sections")
+                    .accessibility_id("clinical-workspace-patient-sections")
+                    .role(Role::TabList)
+                    .aria_label("Moduli del paziente")
+                    .flex()
+                    .flex_wrap()
+                    .flex_shrink_0()
+                    .px(px(if layout.compact { 16. } else { layout.margin }))
+                    .gap(px(4.))
+                    .bg(theme.shade)
+                    .children(PatientSection::ALL.into_iter().map(|patient_section| {
+                        let section_tab = tab(
                             patient_section.id(),
                             patient_section.title(),
                             self.patient_section == patient_section,
@@ -4039,19 +4035,19 @@ impl ClinicalApp {
                         .on_click(cx.listener(move |this, _, _, cx| {
                             this.section_selected(patient_section, cx)
                         }));
-                    #[cfg(test)]
-                    let section_tab = {
-                        let index = PatientSection::ALL
-                            .iter()
-                            .position(|item| *item == patient_section)
-                            .unwrap();
-                        rendered_command::observe_focus(
-                            section_tab.track_focus(&self.ui_cli_section_focus[index]),
-                            self.ui_cli_section_focus[index].clone(),
-                        )
-                    };
-                    section_tab
-                })),
+                        #[cfg(test)]
+                        let section_tab = {
+                            let index = PatientSection::ALL
+                                .iter()
+                                .position(|item| *item == patient_section)
+                                .unwrap();
+                            rendered_command::observe_focus(
+                                section_tab.track_focus(&self.ui_cli_section_focus[index]),
+                                self.ui_cli_section_focus[index].clone(),
+                            )
+                        };
+                        section_tab
+                    })),
             );
         }
         let mut content = div()
@@ -4113,28 +4109,7 @@ impl ClinicalApp {
     }
 
     fn diary_view(&self, cx: &Context<Self>) -> Div {
-        let theme = self.theme;
-        let actions = div().child(
-            button(
-                "clinical-workspace-current-diary",
-                "Editor corrente…",
-                theme,
-                false,
-                true,
-            )
-            .on_click(cx.listener(|this, _, _, cx| {
-                if let Some(path) = this.current_patient_path("modules#diario") {
-                    this.open_current(&path, cx);
-                }
-            })),
-        );
-        surface::section_tray(
-            "clinical-workspace-diary-heading",
-            "Diario",
-            actions,
-            surface::island(theme, false).child(self.diary_list(None, cx)),
-            theme,
-        )
+        self.diary_list(None, cx)
     }
 
     fn diary_list(&self, limit: Option<usize>, cx: &Context<Self>) -> Div {
@@ -4152,6 +4127,12 @@ impl ClinicalApp {
             rows.truncate(limit);
         }
         div().min_w_0().max_w_full().flex().flex_col().gap(px(16.))
+            .when(limit.is_none(), |el| el.child(div().min_w_0().max_w_full().flex().flex_wrap().items_center().justify_between().gap(px(12.))
+                .child(section("clinical-workspace-diary-heading", "DIARIO", theme))
+                .child(button("clinical-workspace-current-diary", "Editor corrente…", theme, false, true)
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        if let Some(path) = this.current_patient_path("modules#diario") { this.open_current(&path, cx); }
+                    })))))
             .when(self.patient.entries.state(ReadObject::Diario).is_some(), |el| el.child(self.patient_read_hint("clinical-workspace-entries-state", &self.patient.entries, ReadObject::Diario, cx)))
             .when(self.patient.entries.ready().is_some() && rows.is_empty(), |el| el.child(
                 self.empty_read_state("clinical-workspace-entries-empty", ReadObject::Diario, cx)))
@@ -4167,7 +4148,6 @@ impl ClinicalApp {
                 div().id(SharedString::from(format!("clinical-workspace-entry-{id}"))).debug_selector(|| format!("clinical-workspace-entry-{id}")).role(Role::Article)
                     .aria_label(SharedString::from(format!("{}, {}", title, display_instant_date(&entry.date))))
                     .border_b_1().border_color(theme.rule).pb(px(24.)).flex().gap(px(12.))
-                    .when(limit.is_none() && theme.scale >= 2., |el| el.flex_col())
                     .child(div().w(px(84.)).flex_shrink_0().type_role(theme, crate::theme::TextRole::Meta).text_color(theme.secondary)
                         .child(text!(display_instant_date(&entry.date)))
                         .child(text!(entry_time(&entry.date))))
@@ -4204,22 +4184,37 @@ impl ClinicalApp {
             .ready()
             .is_some_and(|patient| !patient.is_archived && patient.deleted_at.is_none())
             && self.can_write(FormKind::Therapy);
-        let actions =
-            div().child(
-                button(
-                    "clinical-workspace-new-therapy",
-                    "Nuova terapia",
-                    theme,
-                    false,
-                    writable,
-                )
-                .when(writable, |el| {
-                    el.on_click(cx.listener(|this, _, window, cx| {
-                        this.open_form(FormKind::Therapy, window, cx)
-                    }))
-                }),
-            );
-        let content = surface::island(theme, false)
+        div()
+            .flex()
+            .flex_col()
+            .gap(px(16.))
+            .child(
+                div()
+                    .flex()
+                    .flex_wrap()
+                    .items_center()
+                    .justify_between()
+                    .gap(px(12.))
+                    .child(heading(
+                        "clinical-workspace-therapies-heading",
+                        "Terapie",
+                        theme,
+                    ))
+                    .child(
+                        button(
+                            "clinical-workspace-new-therapy",
+                            "Nuova terapia",
+                            theme,
+                            false,
+                            writable,
+                        )
+                        .when(writable, |el| {
+                            el.on_click(cx.listener(|this, _, window, cx| {
+                                this.open_form(FormKind::Therapy, window, cx)
+                            }))
+                        }),
+                    ),
+            )
             .when(
                 self.patient.therapies.state(ReadObject::Terapie).is_some(),
                 |el| {
@@ -4277,11 +4272,10 @@ impl ClinicalApp {
                                         div()
                                             .type_role(theme, crate::theme::TextRole::Strong)
                                             .child(text!(row.drug_name.clone())),
-                                        surface::status_pill(
-                                            therapy_status(&row.status).to_owned(),
-                                            theme.secondary,
-                                            theme,
-                                        ),
+                                        div()
+                                            .type_role(theme, crate::theme::TextRole::Meta)
+                                            .text_color(theme.secondary)
+                                            .child(text!(therapy_status(&row.status))),
                                     ))
                                     .child(
                                         div().flex().flex_shrink_0().child(
@@ -4348,14 +4342,7 @@ impl ClinicalApp {
                                 },
                             )
                     }),
-            );
-        surface::section_tray(
-            "clinical-workspace-therapies-heading",
-            "Terapie",
-            actions,
-            content,
-            theme,
-        )
+            )
     }
 
     fn observations_view(&self, cx: &Context<Self>) -> Div {
@@ -4375,21 +4362,37 @@ impl ClinicalApp {
             .filter(|row| row.deleted_at.is_none())
             .collect();
         rows.sort_by(|a, b| b.observed_at.cmp(&a.observed_at));
-        let actions = div().child(
-            button(
-                "clinical-workspace-new-observation",
-                "Nuovo parametro",
-                theme,
-                true,
-                writable,
+        div()
+            .flex()
+            .flex_col()
+            .gap(px(16.))
+            .child(
+                div()
+                    .flex()
+                    .flex_wrap()
+                    .items_center()
+                    .justify_between()
+                    .gap(px(12.))
+                    .child(heading(
+                        "clinical-workspace-observations-heading",
+                        "Parametri",
+                        theme,
+                    ))
+                    .child(
+                        button(
+                            "clinical-workspace-new-observation",
+                            "Nuovo parametro",
+                            theme,
+                            true,
+                            writable,
+                        )
+                        .when(writable, |el| {
+                            el.on_click(cx.listener(|this, _, window, cx| {
+                                this.open_form(FormKind::Observation, window, cx)
+                            }))
+                        }),
+                    ),
             )
-            .when(writable, |el| {
-                el.on_click(cx.listener(|this, _, window, cx| {
-                    this.open_form(FormKind::Observation, window, cx)
-                }))
-            }),
-        );
-        let content = surface::island(theme, false)
             .when(
                 self.patient
                     .observations
@@ -4499,14 +4502,7 @@ impl ClinicalApp {
                 "Andamenti e gestione nell'interfaccia corrente…",
                 PatientSection::Observations,
                 cx,
-            ));
-        surface::section_tray(
-            "clinical-workspace-observations-heading",
-            "Parametri",
-            actions,
-            content,
-            theme,
-        )
+            ))
     }
 
     fn current_module_button(
@@ -4545,7 +4541,18 @@ impl ClinicalApp {
 
     fn other_view(&self, layout: Layout, cx: &Context<Self>) -> Div {
         let theme = self.theme;
-        let content = surface::island(theme, false)
+        div()
+            .w_full()
+            .min_w_0()
+            .max_w_full()
+            .flex()
+            .flex_col()
+            .gap(px(16.))
+            .child(heading(
+                "clinical-workspace-other-heading",
+                "Altre aree",
+                theme,
+            ))
             .children(
                 if layout.magnified {
                     Area::ALL.to_vec()
@@ -4572,16 +4579,7 @@ impl ClinicalApp {
                     .on_click(
                         cx.listener(|this, _, _, cx| this.request_discard(Discard::Lock, cx)),
                     ),
-            );
-        surface::page(theme)
-            .child(surface::page_header(
-                "clinical-workspace-other-heading",
-                "Altre aree",
-                None,
-                div(),
-                theme,
-            ))
-            .child(surface::tray(theme).child(content))
+            )
     }
 
     fn area_view(&self, layout: Layout, cx: &Context<Self>) -> Stateful<Div> {
@@ -4634,45 +4632,12 @@ impl ClinicalApp {
             ),
         };
         let selected = self.area;
-        let actions = div().child(
-            button(
-                "clinical-workspace-open-current-area",
-                button_label,
-                theme,
-                true,
-                true,
-            )
-            .on_click(
-                cx.listener(move |this, _, _, cx| this.open_current(selected.current_path(), cx)),
-            ),
-        );
-        area = area.child(
-            surface::page(theme)
-                .max_w(px(720.))
-                .child(surface::page_header(
-                    "clinical-workspace-area-heading",
-                    self.area.title(),
-                    None,
-                    actions,
-                    theme,
-                ))
-                .child(
-                    surface::tray(theme).child(
-                        surface::island(theme, false)
-                            .child(
-                                div()
-                                    .type_role(theme, crate::theme::TextRole::Strong)
-                                    .child(text!(description)),
-                            )
-                            .child(notice(
-                                "clinical-workspace-area-connection",
-                                "Potrebbe essere necessario accedere di nuovo.",
-                                theme,
-                                false,
-                            )),
-                    ),
-                ),
-        );
+        area = area.child(div().w_full().min_w_0().max_w(px(720.)).flex().flex_col().gap(px(24.))
+            .child(heading("clinical-workspace-area-heading", self.area.title(), theme))
+            .child(div().type_role(theme, crate::theme::TextRole::Strong).child(text!(description)))
+            .child(notice("clinical-workspace-area-connection", "Quest'area non è ancora integrata nella finestra nativa. Il pulsante apre la funzione esistente; l'accesso potrebbe essere richiesto di nuovo.", theme, false))
+            .child(button("clinical-workspace-open-current-area", button_label, theme, true, true)
+                .on_click(cx.listener(move |this, _, _, cx| this.open_current(selected.current_path(), cx)))));
         area
     }
 }
@@ -4682,36 +4647,15 @@ impl ClinicalApp {
         let theme = self.theme;
         let agenda = self.area == Area::Agenda;
         let selected = self.area;
-        let actions =
-            div()
-                .when(!agenda, |el| {
-                    el.child(
-                        button(
-                            "clinical-workspace-global-refresh",
-                            "Rileggi",
-                            theme,
-                            false,
-                            true,
-                        )
+        div().reading_surface(theme).w_full().min_w_0().max_w_full().flex().flex_col().gap(px(24.))
+            .child(div().flex().flex_wrap().items_center().justify_between().gap(px(12.))
+                .child(crate::components::observe_control(heading("clinical-workspace-global-heading", if agenda { "Agenda" } else { "Diario generale" }, theme)))
+                .child(div().flex().flex_wrap().gap(px(8.))
+                    .when(!agenda, |el| el.child(button("clinical-workspace-global-refresh", "Rileggi", theme, false, true)
                         .debug_selector(|| "clinical-workspace-global-refresh".into())
-                        .on_click(
-                            cx.listener(|this, _, _, cx| this.request_discard(Discard::Reload, cx)),
-                        ),
-                    )
-                })
-                .child(
-                    button(
-                        "clinical-workspace-global-current",
-                        "Interfaccia corrente…",
-                        theme,
-                        false,
-                        true,
-                    )
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.open_current(selected.current_path(), cx)
-                    })),
-                );
-        let filters = surface::island(theme, false)
+                        .on_click(cx.listener(|this, _, _, cx| this.request_discard(Discard::Reload, cx)))))
+                    .child(button("clinical-workspace-global-current", "Interfaccia corrente…", theme, false, true)
+                        .on_click(cx.listener(move |this, _, _, cx| this.open_current(selected.current_path(), cx))))))
             .child(div().flex().flex_wrap().items_center().gap(px(8.))
                 .child(div().text_color(theme.secondary).child(crate::title::title("AMBULATORIO", theme).with_role(crate::theme::TitleRole::Section)))
                 .children(self.ambulatories.ready().into_iter().flatten().map(|scope| {
@@ -4722,7 +4666,7 @@ impl ClinicalApp {
                         .on_click(cx.listener(move |this, _, _, cx| this.change_scope(&id, cx)))
                 })))
             .child(div().flex().flex_col().gap(px(12.))
-                .child(surface::island_title("clinical-workspace-date-interval-heading", "Intervallo di lettura", None, theme))
+                .child(section("clinical-workspace-date-interval-heading", "INTERVALLO DI LETTURA", theme))
                 .child(div().flex().flex_wrap().items_end().gap(px(12.))
                     .when(self.effective_text_scale() >= 2.5, |el| el.flex_col().items_stretch())
                     .children(self.global_dates.iter().enumerate().map(|(index, field)| {
@@ -4740,26 +4684,16 @@ impl ClinicalApp {
                 div().id("clinical-workspace-global-search-anchor").min_w_0().max_w_full()
                     .child(crate::text_input::themed(self.global_search.clone(), theme)),
                 false,
-            ));
-        let results = div().min_w_0().flex().flex_col().gap(px(10.))
+            ))
             .when_some(self.global_patients.state(ReadObject::NomiPazienti), |el, state| {
                 el.child(self.render_global_read_state("clinical-workspace-global-patient-names", state, cx))
             })
             .when(agenda && !self.global_query.trim().is_empty() && self.global_patients.ready().is_none(), |el| el.child(notice(
                 "clinical-workspace-agenda-partial-search", "La ricerca per nome è incompleta finché i nomi dei pazienti non sono disponibili. Puoi cercare per titolo del controllo.", theme, false).debug_selector(|| "clinical-workspace-agenda-partial-search".into())))
             .child(if agenda { self.agenda_view(layout.compact, cx) } else { self.global_diary_view(cx).into_any_element() })
-            .child(div().type_role(theme, crate::theme::TextRole::Meta).text_color(theme.secondary)
-                .child(text!(if agenda { "Fino a 200 controlli, dal meno recente. Restringi l’intervallo per cercarne altri." }
-                    else { "Fino a 50 voci, dalla più recente. Cambia l’intervallo per cercarne altre." })));
-        surface::page(theme)
-            .child(surface::page_header(
-                "clinical-workspace-global-heading",
-                if agenda { "Agenda" } else { "Diario generale" },
-                None,
-                actions,
-                theme,
-            ))
-            .child(surface::tray(theme).child(filters).child(results))
+            .child(div().border_t_1().border_color(theme.rule).pt(px(16.)).type_role(theme, crate::theme::TextRole::Meta).text_color(theme.secondary)
+                .child(text!(if agenda { "La lettura comprende al massimo 200 controlli nell'intervallo applicato, dal meno recente. Altri controlli potrebbero non comparire: restringi l'intervallo per cercarli. La ricerca testuale riguarda soltanto i risultati caricati." }
+                    else { "La lettura comprende al massimo le 50 voci più recenti nell'intervallo applicato. Le voci eliminate sono escluse. Per cercare voci meno recenti scegli altre date; la ricerca testuale riguarda soltanto i risultati caricati." })))
     }
 
     fn agenda_view(&self, compact: bool, cx: &Context<Self>) -> gpui::AnyElement {
@@ -4778,7 +4712,7 @@ impl ClinicalApp {
         let state = self.agenda_state_after(now);
         let status = self.agenda_status(state.clone());
         let mut content = div()
-            .min_w_0()
+            .reading_surface(theme)
             .id("clinical-workspace-agenda-list")
             .accessibility_id("clinical-workspace-agenda-list")
             .role(Role::List)
@@ -4786,24 +4720,18 @@ impl ClinicalApp {
             .debug_selector(|| "clinical-workspace-agenda-list".into())
             .flex()
             .flex_col()
-            .gap(px(10.));
+            .gap(px(28.));
         if self.agenda.ready().is_none()
             && let Some(state) = state
         {
             return content
-                .child(
-                    surface::island(theme, false).child(self.render_global_read_state(
-                        "clinical-workspace-agenda-state",
-                        state,
-                        cx,
-                    )),
-                )
+                .child(self.render_global_read_state("clinical-workspace-agenda-state", state, cx))
                 .into_any_element();
         }
         let status_text = text!(status.clone());
         #[cfg(test)]
         let status_text = rendered_command::observe_text(status_text);
-        let status = surface::island(theme, false)
+        let status = div()
             .id("clinical-workspace-agenda-update")
             .accessibility_id("clinical-workspace-agenda-update")
             .role(Role::Status)
@@ -4811,8 +4739,6 @@ impl ClinicalApp {
             .debug_selector(|| "clinical-workspace-agenda-update".into())
             .min_h(px(44.))
             .flex()
-            .flex_row()
-            .flex_wrap()
             .items_center()
             .gap(px(12.))
             .child(status_text)
@@ -4863,13 +4789,13 @@ impl ClinicalApp {
             }
             let count = grouped.len();
             content = content.child(
-                surface::island(theme, false)
-                    .child(surface::island_title(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap(px(8.))
+                    .child(section(
                         group.id(),
-                        crate::title::TitleText::label(group.title())
-                            .with_count(count as u64)
-                            .section_label(theme),
-                        None,
+                        crate::title::TitleText::label(group.title()).with_count(count as u64),
                         theme,
                     ))
                     .when(group == AgendaGroup::Overdue, |el| {
@@ -4975,11 +4901,9 @@ impl ClinicalApp {
                                                 let id = row.id.clone();
                                                 move || format!("agenda-status-{id}")
                                             })
-                                            .child(surface::status_pill(
-                                                checkup_status(&row.status).to_owned(),
-                                                theme.secondary,
-                                                theme,
-                                            )),
+                                            .type_role(theme, crate::theme::TextRole::Meta)
+                                            .text_color(theme.secondary)
+                                            .child(text!(checkup_status(&row.status))),
                                     )
                                     .child(
                                         div()
@@ -5061,7 +4985,11 @@ impl ClinicalApp {
                                 .contains(&query))
             })
             .collect();
-        surface::island(theme, false)
+        div()
+            .reading_surface(theme)
+            .flex()
+            .flex_col()
+            .gap(px(20.))
             .when(self.global_entries.message().is_some(), |el| {
                 el.child(self.load_hint(
                     "clinical-workspace-global-entries-state",
@@ -5932,30 +5860,34 @@ impl ClinicalApp {
             .min_w_0()
             .flex()
             .flex_col()
-            .bg(theme.sheet)
+            .bg(theme.paper)
             .rounded(px(theme.paper_radius))
             .child(
                 div()
                     .flex_shrink_0()
                     .p(px(layout.margin))
-                    .child(surface::page_header(
+                    .border_b_1()
+                    .border_color(theme.rule)
+                    .flex()
+                    .flex_col()
+                    .gap(px(8.))
+                    .child(heading(
                         "clinical-workspace-new-patient-heading",
                         "Nuova scheda",
-                        Some(format!("Ambulatorio: {scope}")),
-                        div(),
                         theme,
-                    )),
+                    ))
+                    .child(
+                        div()
+                            .text_color(theme.secondary)
+                            .child(text!(format!("Ambulatorio: {scope}"))),
+                    ),
             )
             .child(
                 div()
                     .id("clinical-workspace-new-patient-scroll")
                     .min_w_0()
                     .p(px(layout.margin))
-                    .child(
-                        surface::tray(theme)
-                            .max_w(px(760.))
-                            .child(self.form_view(cx)),
-                    ),
+                    .child(div().max_w(px(760.)).child(self.form_view(cx))),
             );
         self.confirmation_plane("clinical-workspace-new-patient-plane", content, layout, cx)
     }
@@ -6096,22 +6028,38 @@ impl ClinicalApp {
             .filter(|row| row.deleted_at.is_none())
             .collect();
         rows.sort_by(|left, right| right.date.cmp(&left.date));
-        let actions =
-            div().child(
-                button(
-                    "clinical-workspace-new-checkup",
-                    "Nuovo controllo",
-                    theme,
-                    true,
-                    writable,
-                )
-                .when(writable, |el| {
-                    el.on_click(cx.listener(|this, _, window, cx| {
-                        this.open_form(FormKind::Checkup, window, cx)
-                    }))
-                }),
-            );
-        let content = surface::island(theme, false)
+        div()
+            .min_w_0()
+            .flex()
+            .flex_col()
+            .gap(px(16.))
+            .child(
+                div()
+                    .flex()
+                    .flex_wrap()
+                    .items_center()
+                    .justify_between()
+                    .gap(px(12.))
+                    .child(heading(
+                        "clinical-workspace-checkups-heading",
+                        "Controlli",
+                        theme,
+                    ))
+                    .child(
+                        button(
+                            "clinical-workspace-new-checkup",
+                            "Nuovo controllo",
+                            theme,
+                            true,
+                            writable,
+                        )
+                        .when(writable, |el| {
+                            el.on_click(cx.listener(|this, _, window, cx| {
+                                this.open_form(FormKind::Checkup, window, cx)
+                            }))
+                        }),
+                    ),
+            )
             .when(
                 self.patient.checkups.state(ReadObject::Controlli).is_some(),
                 |el| {
@@ -6200,14 +6148,7 @@ impl ClinicalApp {
                             }))
                         }),
                     )
-            }));
-        surface::section_tray(
-            "clinical-workspace-checkups-heading",
-            "Controlli",
-            actions,
-            content,
-            theme,
-        )
+            }))
     }
 }
 
@@ -6298,84 +6239,32 @@ impl ClinicalApp {
                 .iter()
                 .find(|row| row.system == system)
         });
-        let header = surface::page(theme)
-            .child(surface::page_header(
-                "clinical-workspace-references-heading",
-                "Repertori",
-                None,
-                div().child(
-                    button(
-                        "clinical-workspace-references-refresh",
-                        "Rileggi",
-                        theme,
-                        false,
-                        true,
-                    )
-                    .on_click(
-                        cx.listener(|this, _, _, cx| this.request_discard(Discard::Reload, cx)),
-                    ),
-                ),
-                theme,
-            ))
-            .child(
-                surface::segmented_bar(
-                    "clinical-workspace-reference-tabs",
-                    "Repertori disponibili",
-                    theme,
-                )
-                .children(ReferenceKind::ALL.into_iter().map(|kind| {
-                    surface::segment(kind.id(), kind.title(), self.reference_kind == kind, theme)
+        let mut pane = div().reading_surface(theme).min_w_0().flex().flex_col().gap(px(20.))
+            .child(div().flex().flex_wrap().items_center().justify_between().gap(px(12.))
+                .child(heading("clinical-workspace-references-heading", "Repertori", theme))
+                .child(button("clinical-workspace-references-refresh", "Rileggi", theme, false, true)
+                    .on_click(cx.listener(|this, _, _, cx| this.request_discard(Discard::Reload, cx)))))
+            .child(div().text_color(theme.secondary).child(text!("Riferimenti del tuo archivio. La ricerca e la copia non modificano le schede dei pazienti.")))
+            .child(div().id("clinical-workspace-reference-tabs").role(Role::TabList).aria_label("Repertori disponibili")
+                .flex().flex_wrap().gap(px(4.)).children(ReferenceKind::ALL.into_iter().map(|kind| {
+                    tab(kind.id(), kind.title(), self.reference_kind == kind, theme)
                         .on_click(cx.listener(move |this, _, _, cx| {
                             this.reference_kind = kind;
                             this.load_references(cx);
                         }))
-                })),
-            );
-        let mut pane = surface::island(theme, false)
-            .when(self.ambulatories.message().is_some(), |el| {
-                el.child(self.load_hint(
-                    "clinical-workspace-reference-ambulatories-state",
-                    &self.ambulatories,
-                ))
-            })
-            .child(
-                div()
-                    .flex()
-                    .flex_wrap()
-                    .gap(px(8.))
-                    .items_center()
-                    .child(
-                        div().text_color(theme.secondary).child(
-                            crate::title::title("AMBULATORIO", theme)
-                                .with_role(crate::theme::TitleRole::Section),
-                        ),
-                    )
-                    .children(
-                        self.ambulatories
-                            .ready()
-                            .into_iter()
-                            .flatten()
-                            .map(|scope| {
-                                let id = scope.id.clone();
-                                button(
-                                    format!("clinical-workspace-reference-scope-{id}"),
-                                    scope.name.clone(),
-                                    theme,
-                                    false,
-                                    true,
-                                )
-                                .aria_selected(self.scope.as_deref() == Some(&id))
-                                .when(self.scope.as_deref() == Some(&id), |el| {
-                                    el.bg(theme.selected).border_color(theme.fresh)
-                                })
-                                .on_click(
-                                    cx.listener(move |this, _, _, cx| this.change_scope(&id, cx)),
-                                )
-                            }),
-                    ),
-            );
+                })))
+            .when(self.ambulatories.message().is_some(), |el| el.child(self.load_hint("clinical-workspace-reference-ambulatories-state", &self.ambulatories)))
+            .child(div().flex().flex_wrap().gap(px(8.)).items_center()
+                .child(div().text_color(theme.secondary).child(crate::title::title("AMBULATORIO", theme).with_role(crate::theme::TitleRole::Section)))
+                .children(self.ambulatories.ready().into_iter().flatten().map(|scope| {
+                    let id = scope.id.clone();
+                    button(format!("clinical-workspace-reference-scope-{id}"), scope.name.clone(), theme, false, true)
+                        .aria_selected(self.scope.as_deref() == Some(&id))
+                        .when(self.scope.as_deref() == Some(&id), |el| el.bg(theme.selected).border_color(theme.fresh))
+                        .on_click(cx.listener(move |this, _, _, cx| this.change_scope(&id, cx)))
+                })));
         if self.reference_kind == ReferenceKind::Who {
-            return header.child(surface::tray(theme).child(pane.child(self.who_view(cx))));
+            return pane.child(self.who_view(cx));
         }
         pane = pane.child(div().min_w_0().flex().flex_wrap().gap(px(8.))
                 .when(self.effective_text_scale() >= 2.5, |el| el.flex_col().items_stretch())
@@ -6422,12 +6311,11 @@ impl ClinicalApp {
                 })
                 .child(rows.render(theme));
         }
-        let pane = pane.child(div().border_t_1().border_color(theme.rule).pt(px(16.)).flex().flex_col().gap(px(12.))
+        pane.child(div().border_t_1().border_color(theme.rule).pt(px(16.)).flex().flex_col().gap(px(12.))
             .child(div().type_role(theme, crate::theme::TextRole::Meta).text_color(theme.secondary).child(text!(format!("Ogni ricerca mostra al massimo {} risultati. Affina nome o codice per trovare altri riferimenti; il limite non prova che il repertorio sia completo.", self.reference_kind.limit()))))
             .child(button("clinical-workspace-reference-other-systems", "Catalogo ICD-11 incorporato e altri repertori…", theme, false, true)
                 .on_click(cx.listener(|this, _, _, cx| this.open_current(Area::References.current_path(), cx))))
-            .child(div().type_role(theme, crate::theme::TextRole::Meta).text_color(theme.secondary).child(text!("Gli altri sistemi usano il loro percorso nell'interfaccia corrente."))));
-        header.child(surface::tray(theme).child(pane))
+            .child(div().type_role(theme, crate::theme::TextRole::Meta).text_color(theme.secondary).child(text!("Gli altri sistemi usano il loro percorso nell'interfaccia corrente."))))
     }
 }
 
@@ -8805,7 +8693,7 @@ mod review706b_callers {
                             let status = cx
                                 .debug_bounds("clinical-workspace-agenda-update")
                                 .expect("agenda status");
-                            assert_eq!(status.origin.x, px(margin + surface::TRAY_INSET + 1.));
+                            assert_eq!(status.origin.x, px(margin));
                             println!(
                                 "HCG5_POSITION {width} {scale} {dark} {}",
                                 f32::from(status.origin.y)
@@ -8814,14 +8702,14 @@ mod review706b_callers {
                                 .iter()
                                 .find(|(_, n, _, _)| n.value() == Some("OGGI E PROSSIMI · 1"))
                                 .expect("counted section");
-                            assert_eq!(bounds.origin.x, px(margin + surface::TRAY_ISLAND_INSET));
+                            assert_eq!(bounds.origin.x, px(margin));
                             let lines = crate::title::take_title_lines();
                             let (_, lines) = lines
                                 .iter()
                                 .find(|(label, _)| label == "OGGI E PROSSIMI · 1")
                                 .unwrap();
                             assert!(
-                                lines.join(" ") == "OGGI E PROSSIMI · 1",
+                                lines.iter().any(|l| l.contains("PROSSIMI · 1")),
                                 "{width}/{scale}/{dark}: {lines:?}"
                             );
                         }

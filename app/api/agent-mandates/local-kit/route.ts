@@ -3,7 +3,7 @@ import { readAuthenticatedWebSession } from '@/lib/security/server-auth';
 import { verifyHostCredentials } from '@/lib/security/host-credential-verification';
 import { createAgentLocalKitStore } from '@/lib/agent-local-kit-store';
 import { createAgentRegistrationStore } from '@/lib/agent-registration-store';
-import { confirmDirectAgentRenewal, isAgentUnlockActive } from '@/lib/security/agent-unlock-session';
+import { confirmDirectAgentRenewal } from '@/lib/security/agent-unlock-session';
 import { webAuthControlIdFromRequest } from '@/lib/security/web-auth-control-transport';
 import { openDbServer } from '@/lib/db-server';
 
@@ -15,7 +15,6 @@ const handlers = createAgentLocalKitHttp({
         return result.kind === 'verified' ? result.account.id : null;
     },
     store: () => createAgentLocalKitStore(openDbServer()),
-    isUnlockActive: isAgentUnlockActive,
     renew(request, session, generation) {
         const controlId = webAuthControlIdFromRequest(request);
         if (!controlId) return false;

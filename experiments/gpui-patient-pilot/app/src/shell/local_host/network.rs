@@ -152,6 +152,7 @@ impl ClinicalApp {
     pub(in crate::shell) fn network_mode_view(&self, cx: &Context<Self>) -> Div {
         let theme = self.theme;
         let mut pane = div().min_w_0().flex().flex_col().gap(px(16.))
+            .child(heading("network-mode-heading", "Modo home-base", theme))
             .child(text!("Solo locale limita i servizi di rete. Nodo della rete fidata abilita le capacità previste per i dispositivi abbinati. La scelta non modifica da sola firewall, porte o abbinamenti."))
             .child(self.local_host_panel(cx));
         if self.local_host.access().is_none() {

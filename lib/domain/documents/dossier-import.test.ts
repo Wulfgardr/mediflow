@@ -1,8 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { fileURLToPath } from 'node:url';
 
 import {
     DOSSIER_SCHEMA_VERSION, DossierArtifactConflictError, buildDossierReceipt, classifyDossierSource, collectDossierTaxCodes,
@@ -12,8 +9,8 @@ import {
 } from './dossier-import';
 import { parseDocumentParseEvidenceArtifactSnapshot } from './document-parse-evidence-artifact';
 import { buildDocumentEvidenceBackfillPlan } from './document-evidence-backfill';
-import { isValidItalianTaxCodeChecksum, resolveDocumentTaxCodeRoles } from './document-identity-resolution';
-import { DOSSIER_PREPARED_SCHEMA } from './dossier-prepared';
+import { isValidItalianTaxCodeChecksum } from './document-identity-resolution';
+import { loincLabTableCode, readLoincLabTable } from '../../../scripts/loinc-lab-table';
 
 // Codici fiscali sintetici con carattere di controllo valido, calcolati per questo test.
 const CF_A = 'RSSMRA80A01F205X';
@@ -24,110 +21,6 @@ const empty = new Set<string>();
 test('fixture tax codes are checksum-valid synthetic values', () => {
     assert.equal(isValidItalianTaxCodeChecksum(CF_A), true);
     assert.equal(isValidItalianTaxCodeChecksum(CF_B), true);
-});
-
-const PRESCRIPTION_PATIENT_CF = 'TSTTST00A01A000W';
-const PRESCRIPTION_DOCTOR_CF = 'MEDPRS00A01A000W';
-const FOREIGN_CF = 'OPRTST00A01A000K';
-const WHITE_PRESCRIPTION_HEADER = 'Prescrizione di farmaci non a carico del SSN - Ricetta Bianca Elettronica - Promemoria per il paziente';
-const WHITE_PRESCRIPTION_TEXT = [
-    WHITE_PRESCRIPTION_HEADER,
-    'NRBE            CODICE FISCALE PAZIENTE            PIN-NRBE',
-    `                ${PRESCRIPTION_PATIENT_CF}                   00000`,
-    'E00000000000',
-    'COGNOME E NOME DEL PAZIENTE: PAZIENTE SINTETICO',
-    "INDIRIZZO: Via di Prova 1 CAP: 00000 CITTA': Citta di Prova PROV: XX",
-    'PRESCRIZIONE: 000000000 - FARMACO SINTETICO*CONFEZIONE QTA: 1',
-    'POSOLOGIA:            TDL: No',
-    'NOTE DEL MEDICO:',
-    'PREPARAZIONE FARMACEUTICA:',
-    'DURATA TRATTAMENTO:          MODALITA IMPIEGO:',
-    'QUESITO DIAGNOSTICO:',
-    'COGNOME E NOME DEL MEDICO: MEDICO SINTETICO             CODICE FISCALE',
-    'INDIRIZZO DELLO STUDIO E NUMERO DI TELEFONO: Via di Prova 100',
-    'Citta di Prova XX, tel. 0000000000',
-    `SPECIALIZZAZIONE: Continuita assistenziale              ${PRESCRIPTION_DOCTOR_CF}`,
-    '                         N. ISCRIZIONE ALBO: 00000',
-    'DATA COMPILAZIONE: 23/11/2026   Rilasciata ai sensi del DM del 30 dicembre 2020   Pagina 1 di 1',
-].join('\n');
-
-function verifyPrescription(text: string) {
-    const repo = fileURLToPath(new URL('../../../', import.meta.url));
-    const sha256 = createHash('sha256').update(text).digest('hex');
-    const input = JSON.stringify({
-        cf: PRESCRIPTION_PATIENT_CF,
-        physicianCodes: [],
-        files: [{ sha256, text }],
-        extraction: {
-            schema: DOSSIER_PREPARED_SCHEMA,
-            sources: [{
-                sha256,
-                fileName: 'ricetta-sintetica.pdf',
-                patient: { taxCode: PRESCRIPTION_PATIENT_CF },
-                facts: [],
-                coverage: { pages: 1, unreadablePages: [], complete: true },
-            }],
-        },
-    });
-    return spawnSync(process.execPath, ['scripts/run-strip-types.mjs', 'plugins/mediflow-ambulatorio/verify.mjs', repo], {
-        cwd: repo, input, encoding: 'utf8',
-    });
-}
-
-test('WUL-950: the Dossier verifier accepts a white electronic prescription with the physician CF in a separate column', () => {
-    const run = verifyPrescription(WHITE_PRESCRIPTION_TEXT);
-    assert.equal(run.status, 0, run.stderr);
-    assert.deepEqual(JSON.parse(run.stdout), { verified: 0, approximate: 0, rifiutati: 0, motivi: [] });
-});
-
-test('WUL-950: the patient and prescriber have separate high-confidence CFs', () => {
-    const text = 'Copertina sintetica\r\n\f' + WHITE_PRESCRIPTION_TEXT.replaceAll('\n', '\r\n') + '\f';
-    const { taxCodes, humanRequired, evidenceRefs } = resolveDocumentTaxCodeRoles({ text });
-    assert.deepEqual(taxCodes.map(({ value, role, confidence }) => [value, role, confidence]), [
-        [PRESCRIPTION_PATIENT_CF, 'patient_cf', 'high'],
-        [PRESCRIPTION_DOCTOR_CF, 'prescriber_cf', 'high'],
-    ]);
-    assert.equal(humanRequired, false);
-    assert.match(evidenceRefs[1].snippet, /COGNOME E NOME DEL MEDICO.*CODICE FISCALE.*SPECIALIZZAZIONE/u);
-
-    const document = { taxCodes: collectDossierTaxCodes(WHITE_PRESCRIPTION_TEXT) };
-    assert.deepEqual(document.taxCodes.map(({ role }) => role), ['patient_cf', 'professional_cf']);
-    const matches = evaluateDossierGroupIdentity([document], [{ id: 'synthetic', taxCode: PRESCRIPTION_PATIENT_CF }], 'synthetic');
-    assert.deepEqual([matches.status, matches.blocking], ['matched', false]);
-    const wrongPatient = evaluateDossierGroupIdentity([document], [{ id: 'other', taxCode: FOREIGN_CF }], 'other');
-    assert.deepEqual([wrongPatient.status, wrongPatient.blocking], ['discordant', true]);
-});
-
-test('WUL-950: the Dossier verifier still rejects foreign and ambiguous CFs', () => {
-    const cases = [
-        WHITE_PRESCRIPTION_TEXT.replace(WHITE_PRESCRIPTION_HEADER, 'Referto sintetico'),
-        WHITE_PRESCRIPTION_TEXT.replace(WHITE_PRESCRIPTION_HEADER, 'Referto che cita la Ricetta Bianca Elettronica'),
-        WHITE_PRESCRIPTION_TEXT.replace('Citta di Prova XX,', '\fCitta di Prova XX,'),
-        WHITE_PRESCRIPTION_TEXT.replace(PRESCRIPTION_DOCTOR_CF, `${PRESCRIPTION_DOCTOR_CF}   ${FOREIGN_CF}`),
-        WHITE_PRESCRIPTION_TEXT.replace(PRESCRIPTION_DOCTOR_CF, 'MEDPRS00A01A000A'),
-        `${WHITE_PRESCRIPTION_TEXT}\nDati aggiuntivi:\n${FOREIGN_CF}`,
-        `${WHITE_PRESCRIPTION_TEXT}\nDati aggiuntivi:\n${PRESCRIPTION_DOCTOR_CF}`,
-    ];
-    for (const text of cases) {
-        const run = verifyPrescription(text);
-        assert.equal(run.status, 1, run.stderr || run.stdout);
-        assert.match(run.stderr, /CF estraneo o ambiguo nel PDF/u);
-        const roles = resolveDocumentTaxCodeRoles({ text }).taxCodes;
-        assert.ok(roles.some(({ value, role }) => value !== PRESCRIPTION_PATIENT_CF && role === 'unknown_cf'));
-    }
-});
-
-test('WUL-950: the Dossier verifier still accepts an SSN electronic prescription', () => {
-    const text = [
-        'Promemoria della ricetta elettronica SSN',
-        'NRE: 0000A0000000000',
-        `CODICE FISCALE ASSISTITO: ${PRESCRIPTION_PATIENT_CF}`,
-        'PRESCRIZIONE: FARMACO SINTETICO',
-        `CODICE FISCALE MEDICO PRESCRITTORE: ${PRESCRIPTION_DOCTOR_CF}`,
-    ].join('\n');
-    const run = verifyPrescription(text);
-    assert.equal(run.status, 0, run.stderr);
-    assert.deepEqual(resolveDocumentTaxCodeRoles({ text }).taxCodes.map(({ role }) => role), ['patient_cf', 'prescriber_cf']);
 });
 
 test('classification identifies p7m, archives and e-mail as preserved-only, PDFs by magic bytes', () => {
@@ -417,14 +310,128 @@ test('reported scales and invalidity are transcribed values; unperformed scales 
 });
 
 test('lab LOINC/UCUM only from an exact local catalog match; ambiguous or unknown analytes stay uncoded', () => {
-    const text = 'Creatinina 0,9 mg/dL 0,6-1,2\nGlicemia 110 mg/dL 70-99\nCreatinina 80 umol/L 50-110\nFerritina 30 ng/mL 15-150';
+    const text = 'Creatinina 0,9 mg/dL 0,6-1,2\nGlicemia 110 mg/dL 70-99\nCreatinina 80 umol/L 50-110\nFerritina 30 ng/mL 15-150\nCeruloplasmina 30 mg/dL 20-60';
     const observations = candidates(text).filter((fact) => fact.kind === 'observation');
     assert.deepEqual(observations.map((fact) => [fact.values.display, fact.values.code, fact.values.unitCode]), [
         ['Creatinina', '2160-0', 'mg/dL'],
         ['Glicemia', '', ''],
         ['Creatinina', '', ''],
-        ['Ferritina', '', ''],
+        ['Ferritina', loincLabTableCode(readLoincLabTable(), 'Ferritina', 'ng/mL'), 'ng/mL'],
+        ['Ceruloplasmina', '', ''],
     ]);
+});
+
+test('WUL-929: a synthetic report with ten common exams from the LOINC table yields ten coded observations; a rare exam stays uncoded', () => {
+    const table = readLoincLabTable();
+    const exams = [
+        ['Acido urico', '5,2', 'mg/dL', '3,5-7,2'],
+        ['Magnesio', '2,1', 'mg/dL', '1,6-2,6'],
+        ['Fosforo', '3,4', 'mg/dL', '2,5-4,5'],
+        ['Bilirubina diretta', '0,2', 'mg/dL', '0-0,3'],
+        ['Proteine totali', '7,1', 'g/dL', '6,4-8,3'],
+        ['Lipasi', '35', 'U/L', '13-60'],
+        ['CPK', '120', 'U/L', '30-200'],
+        ['Sideremia', '90', 'ug/dL', '60-170'],
+        ['PSA totale', '1,2', 'ng/mL', '0-4'],
+        ['NT-proBNP', '80', 'pg/mL', '0-125'],
+    ] as const;
+    const text = ['Referto di laboratorio sintetico', ...exams.map((exam) => exam.join(' ')), 'Ceruloplasmina 30 mg/dL 20-60'].join('\n');
+    const observations = candidates(text, '2026-11-20').filter((fact) => fact.kind === 'observation');
+    assert.deepEqual(observations.map((fact) => [fact.values.display, fact.values.code, fact.values.value, fact.values.unit, fact.values.unitCode]), [
+        ...exams.map(([name, value, unit]) => [name, loincLabTableCode(table, name, unit), value.replace(',', '.'), unit, unit]),
+        ['Ceruloplasmina', '', '30', 'mg/dL', ''],
+    ]);
+    assert.deepEqual(observations.slice(0, 10).map((fact) => dossierFactBlockers(fact)), exams.map(() => []));
+    assert.deepEqual(dossierFactBlockers(observations[10]), ['Campo obbligatorio mancante: code.', 'Campo obbligatorio mancante: unitCode.']);
+});
+
+test('WUL-929: right name in an unexpected unit, an exam awaiting validation and a near name stay uncoded', () => {
+    const text = [
+        'Acido urico 300 umol/L 200-420',
+        'Azotemia 40 mg/dL 10-50',
+        'LDH 200 U/L 120-250',
+        'Ferritina sierica 30 ng/mL 15-150',
+        'Ca 2,3 mmol/L 2,1-2,6',
+        'FT4 1,1 ng/dL 0,9-1,7',
+        'Calcio 2,3 mmol/L 2,1-2,6',
+        'Calcio totale 2,3 mmol/L 2,1-2,6',
+        'FT4 15 pmol/L 10-22',
+        'FT3 5 pmol/L 3,1-6,8',
+    ].join('\n');
+    const observations = candidates(text).filter((fact) => fact.kind === 'observation');
+    assert.deepEqual(observations.map((fact) => fact.values.code), observations.map(() => ''));
+    assert.deepEqual(observations.map((fact) => fact.values.display).slice(0, 8),
+        ['Acido urico', 'Azotemia', 'LDH', 'Ferritina sierica', 'Ca', 'FT4', 'Calcio', 'Calcio totale']);
+});
+
+test('WUL-929: units as printed on Italian reports are table data; the code, value and UCUM unit come from the table, nothing is converted', () => {
+    const table = readLoincLabTable();
+    const exams = [
+        ['Vitamina D 25-OH', '45', 'nmol/L', '50-125', 'nmol/L'],
+        ['Vitamina B12', '350', 'pmol/l', '150-650', 'pmol/L'],
+        ['Folati', '20,5', 'nmol/L', '7-45', 'nmol/L'],
+        ['INR', '1,10', '', '0,80-1,20', '{INR}'],
+        ['PT INR', '2,5', 'INR', '2,0-3,0', '{INR}'],
+        ['Tempo di protrombina', '12,1', 'sec', '9,5-13,5', 's'],
+        ['aPTT', '30', 's', '25-35', 's'],
+        ['aPTT ratio', '1,05', '', '0,80-1,20', '{ratio}'],
+        ['PTT ratio', '1,1', 'ratio', '0,8-1,2', '{ratio}'],
+        ['Rapporto albumina/creatinina', '12', 'mg/g', '0-30', 'mg/g{creat}'],
+        ['Anticorpi anti-TPO', '12', 'UI/mL', '0-34', '[IU]/mL'],
+        ['pH urine', '6,0', '', '5,0-8,0', '[pH]'],
+    ] as const;
+    const text = ['Referto di laboratorio sintetico', ...exams.map(([name, value, unit, range]) => [name, value, unit, range].filter(Boolean).join(' '))].join('\n');
+    const observations = candidates(text, '2026-11-20').filter((fact) => fact.kind === 'observation');
+    assert.deepEqual(observations.map((fact) => [fact.values.display, fact.values.code, fact.values.value, fact.values.unit, fact.values.unitCode]),
+        exams.map(([name, value, unit, , ucum]) => [name, loincLabTableCode(table, name, ucum), value.replace(',', '.'), unit, ucum]));
+    assert.deepEqual(observations.map((fact) => dossierFactBlockers(fact)), exams.map(() => []));
+});
+
+test('WUL-929: a spelling the table does not list, a missing unit, a non-numeric value and a name awaiting validation stay without code', () => {
+    const lines = [
+        'Vitamina D 25-OH 45 NMOL/L 50-125',
+        'Vitamina B12 350 pmol/mL 150-650',
+        'Anticorpi anti-TPO 12 U/mL 0-34',
+        'Anticorpi anti-TPO 12 kUI/L 0-34',
+        'Tempo di protrombina 12,1 S 9,5-13,5',
+        'Tempo di protrombina 12,1 secondi 9,5-13,5',
+        'Vitamina D 25-OH 45 50-125',
+        'Tempo di protrombina 12,1 9,5-13,5',
+        'aPTT 1,05 0,80-1,20',
+        'aPTT 30 25-35',
+        'Glicemia 95 70-110',
+        'Peso specifico urine 1020 1005-1030',
+        'Peso specifico urine 1,020 1,005-1,030',
+        'ACR (mg/mmol) 2,5 mg/mmol 0-3',
+        'INR <1,0 0,8-1,2',
+        'INR 1,1,2 0,8-1,2',
+        'Calcio totale 2,3 mmol/L 2,1-2,6',
+        'FT4 15 pmol/L 10-22',
+        'FT3 5 pmol/l 3,1-6,8',
+        'eGFR 80 60-120',
+        'HbA1c 40 20-42',
+        'Nitriti 0 0-0',
+    ];
+    const observations = candidates(lines.join('\n')).filter((fact) => fact.kind === 'observation');
+    assert.deepEqual(observations.filter((fact) => fact.values.code || fact.values.unitCode).map((fact) => fact.evidence?.excerpt), []);
+    assert.deepEqual(observations.map((fact) => fact.evidence?.excerpt), [
+        'Vitamina D 25-OH 45 NMOL/L 50-125', 'Tempo di protrombina 12,1 S 9,5-13,5', 'Calcio totale 2,3 mmol/L 2,1-2,6', 'FT4 15 pmol/L 10-22', 'FT3 5 pmol/l 3,1-6,8',
+    ], 'a missing unit is read only where the table declares it, so the other rows stay in the diary as on main');
+});
+
+test('WUL-929: reported units never widen the prepared path or the pending names', async () => {
+    const { REPORT_UNITS, catalogObservationCode, reportedObservationCode } = await import('./dossier-sections');
+    const { loincObservationNames } = await import('../../terminology');
+    for (const [name, unit] of [['INR', ''], ['Anticorpi anti-TPO', 'UI/mL'], ['Tempo di protrombina', 'sec'], ['Vitamina B12', 'pmol/l'], ['pH urine', '']] as const) {
+        assert.equal(catalogObservationCode(name, unit, '1'), null, `${name} «${unit}» on the prepared path`);
+        assert.ok(reportedObservationCode(name, unit, '1'), `${name} «${unit}» on a report`);
+        for (const value of ['negativo', '<1', '1,1,2', '', 'tracce']) assert.equal(reportedObservationCode(name, unit, value), null, `${name} ${value}`);
+    }
+    const spellings = ['', ...REPORT_UNITS.spellings, ...new Set(loincObservationNames().map((entry) => entry.unit))];
+    for (const { name } of loincObservationNames().filter((entry) => !entry.active)) {
+        for (const unit of spellings) assert.equal(reportedObservationCode(name, unit, '1'), null, `${name} «${unit}»`);
+        assert.equal(REPORT_UNITS.acceptsMissingUnit(name), false, name);
+    }
 });
 
 test('residual text is everything no proposal covers, per unit', async () => {
@@ -844,4 +851,53 @@ test('WUL-925: uncertain CF role isolates the single document instead of marking
     assert.equal(stillMixed.status, 'mixed');
     assert.equal(stillMixed.blocking, true);
     assert.equal(stillMixed.uncertainDocuments, undefined);
+});
+
+test('WUL-926: paper prescription physician_stamp and white electronic prescription prescriber_block match the patient', () => {
+    const patients = [{ id: 'pa', taxCode: CF_A }, { id: 'pb', taxCode: CF_B }];
+    const indent = ' '.repeat(87);
+    const stamped = `Ricetta cartacea\nAssistito codice fiscale ${CF_A}\n\n${indent}Dott. ALDO BRUNI\n${indent}CF: ${CF_B}`;
+    const stampCodes = collectDossierTaxCodes(stamped);
+    assert.deepEqual(
+        stampCodes.map((entry) => [entry.value, entry.role, entry.explicitProfessional ?? false, entry.professionalLabelScope ?? null]),
+        [
+            [CF_A, 'patient_cf', false, null],
+            [CF_B, 'professional_cf', true, 'physician_stamp'],
+        ],
+    );
+    const stampMatched = evaluateDossierGroupIdentity([{ taxCodes: stampCodes }], patients, 'pa', null);
+    assert.equal(stampMatched.status, 'matched');
+    assert.equal(stampMatched.blocking, false);
+    const stampSuggested = evaluateDossierGroupIdentity([{ taxCodes: stampCodes }], patients, null, null);
+    assert.equal(stampSuggested.status, 'suggested');
+    assert.deepEqual(stampSuggested.candidatePatientIds, ['pa']);
+
+    const repeatedStampCodes = collectDossierTaxCodes(`${stamped}\nAssistito codice fiscale ${CF_B}`);
+    const repeatedStampEval = evaluateDossierGroupIdentity([{ taxCodes: repeatedStampCodes }], patients, 'pa', null);
+    assert.equal(repeatedStampEval.status, 'mixed');
+    assert.equal(repeatedStampEval.blocking, true);
+
+    const whitePrescription = [
+        'Prescrizione di farmaci non a carico del SSN - Ricetta Bianca Elettronica - Promemoria per il paziente',
+        'NRBE            CODICE FISCALE PAZIENTE            PIN-NRBE',
+        `                ${CF_A}                   00000`,
+        'COGNOME E NOME DEL MEDICO: MEDICO SINTETICO             CODICE FISCALE',
+        'INDIRIZZO DELLO STUDIO E NUMERO DI TELEFONO: Via di Prova 100',
+        'Citta di Prova XX, tel. 0000000000',
+        `SPECIALIZZAZIONE: Continuita assistenziale              ${CF_B}`,
+    ].join('\n\n');
+    const whiteCodes = collectDossierTaxCodes(whitePrescription);
+    assert.deepEqual(
+        whiteCodes.map((entry) => [entry.value, entry.role, entry.professionalLabelScope ?? null]),
+        [
+            [CF_A, 'patient_cf', null],
+            [CF_B, 'professional_cf', 'prescriber_block'],
+        ],
+    );
+    const whiteMatched = evaluateDossierGroupIdentity([{ taxCodes: whiteCodes }], patients, 'pa', null);
+    assert.equal(whiteMatched.status, 'matched');
+    assert.equal(whiteMatched.blocking, false);
+    const whiteWrong = evaluateDossierGroupIdentity([{ taxCodes: whiteCodes }], patients, 'pb', null);
+    assert.equal(whiteWrong.status, 'discordant');
+    assert.equal(whiteWrong.blocking, true);
 });

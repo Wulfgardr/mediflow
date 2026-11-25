@@ -23,9 +23,8 @@ const registrations = `FROM agent_registrations AS registration
 const grants = `FROM agent_unlock_grants AS grant
     JOIN agent_registrations AS registration ON registration.id=grant.agent_ref
     JOIN agent_pairing_requests AS pairing ON pairing.id=registration.id`;
-const grantProjection = `grant.agent_ref AS agentRef, grant.mandate_ref AS mandateRef, grant.unlock_ref AS unlockRef,
-    pairing.name, pairing.operations`;
-type Grant = { agentRef: string; mandateRef: string; unlockRef: string; name: string; operations: string };
+const grantProjection = `grant.agent_ref AS agentRef, grant.mandate_ref AS mandateRef, pairing.name, pairing.operations`;
+type Grant = { agentRef: string; mandateRef: string; name: string; operations: string };
 
 export function createAgentRegistrationStore(database: Database.Database, now = Date.now) {
     const mandates = createAgentMandateStore(database, now);
@@ -47,11 +46,11 @@ export function createAgentRegistrationStore(database: Database.Database, now = 
             .run(randomUUID(), event, time, mandate.actorRef, agentRef, agentRef, mandate.id, mandate.provider, Math.floor(time / 1000)));
     }
 
-    function activePrincipal(grant: Grant, isUnlockActive: (ref: string, actorRef: string) => boolean): AgentPrincipal | null {
+    function activePrincipal(grant: Grant): AgentPrincipal | null {
         const operations = JSON.parse(grant.operations) as AgentOperation[];
         const mandate = mandates.admit(grant.mandateRef, operations[0]!);
         if (!operations.every(operation => mandate.operations.includes(operation))
-            || !actorUnlocked(mandate.actorRef) || !isUnlockActive(grant.unlockRef, mandate.actorRef)) return null;
+            || !actorUnlocked(mandate.actorRef)) return null;
         return { agentRef: grant.agentRef, mandateRef: mandate.id, actorRef: mandate.actorRef, name: grant.name, operations,
             expiresAt: mandate.expiresAt, modelProvider: mandate.provider, allowsClinicalEgress: mandate.allowsClinicalEgress,
             publicKey: mandate.publicKey, archiveGeneration: mandate.archiveGeneration };
@@ -117,25 +116,25 @@ export function createAgentRegistrationStore(database: Database.Database, now = 
                 }
             }).immediate();
         },
-        retrieve(token: string, isUnlockActive: (ref: string, actorRef: string) => boolean) {
+        retrieve(token: string) {
             if (!AGENT_REGISTRATION_TOKEN.test(token)) throw new AgentMandateDenied();
             return database.transaction(() => {
                 const grant = database.prepare(`SELECT ${grantProjection} ${grants}
                     WHERE registration.token_hash=? AND registration.revoked_at IS NULL AND registration.current_mandate_ref=grant.mandate_ref`)
                     .get(storedToken(token)) as Grant | undefined;
-                const principal = grant && activePrincipal(grant, isUnlockActive);
+                const principal = grant && activePrincipal(grant);
                 if (!principal) throw new AgentMandateDenied();
                 const bearer = grantToken(token, principal.mandateRef);
                 written(database.prepare('UPDATE agent_unlock_grants SET token_hash=? WHERE mandate_ref=?').run(storedToken(bearer), principal.mandateRef));
                 return { agentRef: principal.agentRef, mandateRef: principal.mandateRef, issuedAt: mandates.read(principal.mandateRef)!.createdAt, expiresAt: principal.expiresAt, token: bearer };
             }).immediate();
         },
-        principal(token: string, isUnlockActive: (ref: string, actorRef: string) => boolean): AgentPrincipal | null {
+        principal(token: string): AgentPrincipal | null {
             if (!database.inTransaction) return null;
             const grant = database.prepare(`SELECT ${grantProjection} ${grants}
                 WHERE grant.token_hash=? AND registration.revoked_at IS NULL AND registration.current_mandate_ref=grant.mandate_ref`)
                 .get(storedToken(token)) as Grant | undefined;
-            try { return grant ? activePrincipal(grant, isUnlockActive) : null; }
+            try { return grant ? activePrincipal(grant) : null; }
             catch (error) { if (error instanceof AgentMandateDenied) return null; throw error; }
         },
         operationsForCassette(agentRef: string, mandateRef: string): string | undefined {

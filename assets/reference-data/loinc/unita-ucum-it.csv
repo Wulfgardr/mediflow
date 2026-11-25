@@ -1,0 +1,24 @@
+ucum,descrizione_ucum,lettura_it
+mmol/mol,millimole per mole,mmol/mol
+mL/min/{1.73_m2},milliliter per minute per 1.73 square meter,"mL/min/1,73 m²"
+mg/L,milligram per liter,mg/L
+mm/h,millimeter per hour,mm/h
+ng/mL,nanogram per milliliter,ng/mL
+ug/dL,microgram per deciliter,µg/dL
+pg/mL,picogram per milliliter,pg/mL
+pmol/L,picomole per liter,pmol/L
+nmol/L,nanomole per liter,nmol/L
+[IU]/mL,international unit per milliliter,UI/mL
+{INR},international normalized ratio,
+s,second,s
+{ratio},ratio,
+ng{FEU}/mL,nanogram fibrinogen equivalent unit per milliliter,ng/mL FEU
+ug/L{DDU},microgram per liter D-dimer unit,µg/L DDU
+ng/L,nanogram per liter,ng/L
+mg/(24.h),milligram per 24 hours,mg/24 h
+mg/g{creat},milligram per gram creatinine,mg/g creatinina
+mmol/mol{creat},millimole per mole creatinine,mmol/mol creatinina
+[pH],pH,
+{Spec_grav},specific gravity,
+/[HPF],per high power field,/campo
+/uL,per microliter,/µL

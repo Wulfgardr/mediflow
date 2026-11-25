@@ -346,20 +346,22 @@ impl ClinicalApp {
         let work = self.chat_access.voice.work.as_ref()?;
         let patient = self.patient.detail.ready()?;
         Some(
-            surface::island(self.theme, false)
+            div()
                 .id("chat-local-voice")
                 .flex_1()
                 .min_h_0()
                 .overflow_y_scroll()
-                .child(surface::page_header(
+                .p(px(20.))
+                .flex()
+                .flex_col()
+                .gap(px(12.))
+                .child(heading(
                     "chat-local-voice-title",
                     if work.session.two_voices() {
                         "Ascolto della visita"
                     } else {
                         "Dettatura locale"
                     },
-                    None,
-                    div(),
                     self.theme,
                 ))
                 .child(crate::title::title(

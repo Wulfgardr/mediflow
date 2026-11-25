@@ -630,7 +630,7 @@ fn matrix_frame(cx: &mut gpui::VisualTestContext) -> MatrixFrame {
     .collect();
     if texts
         .iter()
-        .any(|text| text == "Import assistito · Proposta")
+        .any(|text| text == "IMPORT ASSISTITO · PROPOSTA")
     {
         functions.push(Function::Import);
     }

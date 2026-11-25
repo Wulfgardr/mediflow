@@ -1,10 +1,12 @@
 'use client';
 
-import { ArrowRight, ArrowUpRight, BrainCircuit, Database, LifeBuoy, Monitor, Palette } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, BrainCircuit, Database, LifeBuoy, Monitor, Palette, Smartphone } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 
+import { DevicePairingPanel, readDevicePairingList } from '@/components/settings/device-pairing-panel';
+import type { DevicePairingList } from '@/lib/network-pairing-offer-contract';
 import { Disclosure } from '@/components/disclosure';
 import { ViewState } from '@/components/ui/view-state';
 import { SettingsThemeControl } from '@/components/settings/settings-theme-control';
@@ -43,6 +45,7 @@ async function readNetworkOverview(): Promise<NetworkOverviewPayload> {
 /* LUME-110/68 */
 export default function SettingsPage() {
     const router = useRouter();
+    const [pairings, setPairings] = useState<DevicePairingList | null>(null);
     const [networkOverview, setNetworkOverview] = useState<NetworkOverviewPayload | null>(null);
     const [confirmedNetworkMode, setConfirmedNetworkMode] = useState<
         NetworkOverviewPayload['session']['operatingMode'] | null
@@ -64,6 +67,9 @@ export default function SettingsPage() {
 
     useEffect(() => {
         let cancelled = false;
+        void readDevicePairingList().then(list => {
+            if (!cancelled) setPairings(list);
+        }).catch(() => {});
         void readNetworkOverview()
             .then((overview) => {
                 if (!cancelled) {
@@ -184,6 +190,16 @@ export default function SettingsPage() {
                         </div>
                     </div>
                 </section>
+                {pairings && (
+                    <section className={surface.island} aria-labelledby="settings-devices-title">
+                        <div className={surface.islandHeader}>
+                            <span className={surface.islandIcon}><Smartphone size={16} aria-hidden="true" /></span>
+                            <h2 id="settings-devices-title">Dispositivi</h2>
+                        </div>
+                        <DevicePairingPanel networkEnabled={isHomeBase} clients={pairings.clients}
+                            onClientsChange={clients => setPairings({ clients })} />
+                    </section>
+                )}
                 <section className={`${surface.island} ${overviewStyles.appearance}`} aria-labelledby="settings-appearance-title"
                     data-testid="settings-preview-section" data-settings-section="appearance-preview">
                     <div className={surface.islandHeader}>

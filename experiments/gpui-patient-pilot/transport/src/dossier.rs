@@ -7,11 +7,13 @@ use std::{collections::BTreeSet, ops::Range, sync::LazyLock};
 use unicode_normalization::{UnicodeNormalization, char::is_combining_mark};
 
 mod clinical_context;
+mod tabular_quote;
 
 use clinical_context::{
     ClinicalContext, clinical_fact_context, historical_therapy, legacy_family, legacy_negation,
     sentence_after, structured,
 };
+use tabular_quote::anchor_tabular;
 
 fn re(pattern: &str) -> Regex {
     Regex::new(pattern).expect("static dossier expression")
@@ -205,6 +207,12 @@ pub fn anchor(text: &str, units: &[Value], quote: &str) -> Value {
         if best.as_ref().is_some_and(|(diff, _)| *diff == 0) {
             break;
         }
+    }
+    if let Some((0, value)) = best {
+        return value;
+    }
+    if let Some(tabular) = anchor_tabular(text, units, quote) {
+        return tabular;
     }
     best.map(|(_, v)| v).unwrap_or(Value::Null)
 }
@@ -418,15 +426,19 @@ fn set_default(values: &mut Value, key: &str, value: &str) {
         values[key] = json!(value);
     }
 }
-fn catalog(analyte: &str, unit: &str) -> Value {
+fn catalog(analyte: &str, unit: &str, value: &str) -> Value {
+    if !re(r"^-?[0-9]+(?:[.,][0-9]+)?$").is_match(value.trim_matches(crate::js_whitespace)) {
+        return Value::Null;
+    }
     let entries: Value = serde_json::from_str(include_str!(
         "../../../../native/contracts/dossier-conformance/catalog.json"
     ))
     .unwrap();
     let wanted = normalized_name(analyte);
+    let unit = unit.trim_matches(crate::js_whitespace);
     array(&entries)
         .iter()
-        .find(|e| string(&e["name"]) == wanted && string(&e["unit"]) == unit.trim())
+        .find(|e| string(&e["name"]) == wanted && string(&e["unit"]) == unit)
         .map(|e| json!({"code":e["code"],"unitCode":e["unit"]}))
         .unwrap_or(Value::Null)
 }
@@ -534,7 +546,7 @@ pub fn prepared_facts(input: &Value) -> Value {
                 v.as_object_mut().unwrap().remove("code");
                 v.as_object_mut().unwrap().remove("unitCode");
                 let display = string(&item["values"]["display"]);
-                let coded = catalog(display, string(&v["unit"]));
+                let coded = catalog(display, string(&v["unit"]), string(&v["value"]));
                 if coded.is_null() {
                     let name = display.trim_matches(crate::js_whitespace);
                     let name = if name.is_empty() {
@@ -587,7 +599,14 @@ pub fn prepared_facts(input: &Value) -> Value {
                     "invalidity" => "Invalidità da documento",
                     _ => "Passo del documento",
                 });
-                let passage = anchor(text, units, string(&v["text"]));
+                let text_anchor = anchor(text, units, string(&v["text"]));
+                let passage = if !text_anchor.is_null()
+                    && array(&text_anchor["words"]).len() == words(string(&v["text"])).len()
+                {
+                    text_anchor
+                } else {
+                    Value::Null
+                };
                 let quoted = anchor(text, units, string(&item["quote"]));
                 evidence = if !passage.is_null() {
                     passage["evidence"].clone()
@@ -792,6 +811,7 @@ fn professional(code: &Value) -> bool {
             code["professionalLabelScope"].as_str(),
             Some(
                 "same_line"
+                    | "physician_stamp"
                     | "prescriber_block"
                     | "specialist_block"
                     | "signature_block"
@@ -1490,104 +1510,202 @@ fn same_subject(a: &Value, b: &Value) -> bool {
         && !b.is_empty()
         && (a.iter().all(|w| b.contains(w)) || b.iter().all(|w| a.contains(w)))
 }
+fn automatic_reading(f: &Value) -> bool {
+    [
+        "parser:lab",
+        "parser:icd",
+        "parser:exemption",
+        "parser:section",
+        "parser:scale",
+    ]
+    .contains(&string(&f["origin"]))
+}
+fn set_of(value: &Value) -> BTreeSet<String> {
+    array(value).iter().map(|v| string(v).to_owned()).collect()
+}
+fn decide(fact: &mut Value, decision: &str, note: Option<String>) {
+    fact["decision"] = json!(decision);
+    fact["decidedBy"] = json!("accept_verified");
+    if let Some(note) = note {
+        fact["note"] = json!(note);
+    }
+}
 pub fn bulk(input: &Value) -> Value {
     let record = &input["record"];
     let key = string(&input["documentKey"]);
     let mut facts = array(&record["facts"]).to_vec();
-    let mut accepted = vec![];
-    let mut counts = json!({"accepted":0,"alreadyPresent":0,"superseded":0,"leftPending":0});
+    let mut accepted: Vec<String> = vec![];
+    let mut set_aside: Vec<String> = vec![];
+    let mut counts =
+        json!({"accepted":0,"alreadyPresent":0,"superseded":0,"setAside":0,"leftPending":0});
     let inc = |counts: &mut Value, key: &str| {
         counts[key] = json!(counts[key].as_u64().unwrap() + 1);
     };
     if !facts.iter().any(|f| f["origin"] == "prepared") {
         counts["leftPending"] = json!(facts.iter().filter(|f| f["decision"] == "pending").count());
-        return json!({"facts":facts,"acknowledgeResidual":false,"accepted":accepted,"counts":counts});
+        return json!({"facts":facts,"acknowledgeResidual":false,"accepted":accepted,"setAside":set_aside,"counts":counts});
     }
-    let mut accepted_now: BTreeSet<_> = array(&input["acceptedElsewhere"])
-        .iter()
-        .map(|v| string(v).to_owned())
-        .collect();
+    let reference = |f: &Value| format!("{key}#{}", string(&f["factId"]));
+    let mut accepted_now = set_of(&input["acceptedElsewhere"]);
+    let mut set_aside_now = set_of(&input["setAsideElsewhere"]);
+    let conflicted = set_of(&input["conflicted"]);
+    let held = |f: &Value| {
+        let r = reference(f);
+        f["negated"] == true
+            || conflicted.contains(&r)
+            || input["assessments"][&r]["status"] == "conflict"
+    };
+    let duplicate_note = |related: &str, accepted_twin: bool| {
+        let document = related.split_once('#').map_or("", |(d, _)| d);
+        let voice = if accepted_twin {
+            "una voce accettata"
+        } else {
+            "una voce"
+        };
+        if document == key {
+            return format!("Doppione di {voice} di questo documento.");
+        }
+        let source = string(&input["documentNames"][document]);
+        if source.is_empty() {
+            format!("Doppione di {voice} di un altro documento.")
+        } else {
+            format!("Doppione di {voice} di «{source}».")
+        }
+    };
     let supersedable_here: BTreeSet<_> = facts
         .iter()
         .filter(|f| supersedable(f) && f["decision"] == "pending")
-        .map(|f| format!("{key}#{}", string(&f["factId"])))
+        .map(reference)
         .collect();
     for fact in &mut facts {
         if fact["decision"] != "pending"
-            || supersedable(fact)
             || fact["origin"] == "parser:document"
+            || fact["origin"] == "manual"
+            || held(fact)
         {
             continue;
         }
-        let reference = format!("{key}#{}", string(&fact["factId"]));
-        let mut assessment = input["assessments"][&reference].clone();
-        if fact["origin"] == "prepared" && assessment["status"] == "duplicate_in_dossier" {
-            let others: Vec<_> = array(&assessment["relatedFactRefs"])
-                .iter()
-                .filter(|v| !supersedable_here.contains(string(v)))
-                .cloned()
-                .collect();
-            assessment["relatedFactRefs"] = json!(others);
-            if others.is_empty() {
-                assessment["status"] = json!("new");
-            }
-        }
+        let r = reference(fact);
+        let assessment = &input["assessments"][&r];
         if assessment["status"] == "already_present" {
             inc(&mut counts, "alreadyPresent");
-            fact["decision"] = json!("already_present");
+            decide(fact, "already_present", None);
             continue;
         }
-        let related = array(&assessment["relatedFactRefs"]);
-        if assessment["status"] == "duplicate_in_dossier"
-            && !related.is_empty()
-            && related.iter().all(|v| accepted_now.contains(string(v)))
-        {
-            inc(&mut counts, "alreadyPresent");
-            fact["decision"] = json!("already_present");
-            fact["note"] = json!("Stesso contenuto di un’altra fonte accettata.");
+        if assessment["status"] == "duplicate_in_dossier" {
+            let prepared = fact["origin"] == "prepared";
+            let twins: Vec<String> = array(&assessment["relatedFactRefs"])
+                .iter()
+                .map(|v| string(v).to_owned())
+                .filter(|v| {
+                    !set_aside_now.contains(v) && !(prepared && supersedable_here.contains(v))
+                })
+                .collect();
+            if !twins.is_empty() && twins.iter().all(|v| accepted_now.contains(v)) {
+                inc(&mut counts, "alreadyPresent");
+                decide(
+                    fact,
+                    "already_present",
+                    Some(duplicate_note(&twins[0], true)),
+                );
+                continue;
+            }
+            if !twins.is_empty() {
+                inc(&mut counts, "setAside");
+                decide(fact, "rejected", Some(duplicate_note(&twins[0], false)));
+                set_aside.push(r.clone());
+                set_aside_now.insert(r);
+                continue;
+            }
+        }
+        if supersedable(fact) {
             continue;
         }
-        if (assessment.is_null() || assessment["status"] == "new")
-            && eligible(
-                fact,
-                array(&input["exemptionCodes"]),
-                input["includeSummaries"] == true,
-            )
-        {
+        if eligible(
+            fact,
+            array(&input["exemptionCodes"]),
+            input["includeSummaries"] == true,
+        ) {
             inc(&mut counts, "accepted");
-            accepted.push(reference.clone());
-            accepted_now.insert(reference);
-            fact["decision"] = json!("accepted");
+            decide(fact, "accepted", None);
+            accepted.push(r.clone());
+            accepted_now.insert(r);
         }
     }
+    let summary_accepted = facts
+        .iter()
+        .any(|f| summary(f) && f["decision"] == "accepted");
     let summary_written = facts
         .iter()
         .any(|f| summary(f) && f["decision"] == "accepted" && written(record, f));
-    let accepted_prepared: Vec<_> = facts
+    let kept_prepared: Vec<_> = facts
         .iter()
-        .filter(|f| f["origin"] == "prepared" && f["decision"] == "accepted" && !summary(f))
+        .filter(|f| {
+            f["origin"] == "prepared"
+                && (f["decision"] == "accepted" || f["decision"] == "already_present")
+                && !summary(f)
+        })
         .cloned()
         .collect();
     for fact in &mut facts {
         if fact["decision"] != "pending" {
             continue;
         }
-        if (fact["origin"] == "parser:document" && summary_written)
-            || (supersedable(fact)
-                && accepted_prepared
-                    .iter()
-                    .any(|o| o["kind"] == fact["kind"] && same_subject(o, fact)))
+        let r = reference(fact);
+        if fact["origin"] == "parser:document" {
+            if summary_written {
+                inc(&mut counts, "superseded");
+                set_aside.push(r.clone());
+                set_aside_now.insert(r);
+                decide(
+                    fact,
+                    "rejected",
+                    Some("Sostituita dalla sintesi accettata; il testo completo resta nell’allegato.".to_owned()),
+                );
+                continue;
+            }
+            if !summary_accepted
+                && array(&blockers(fact, Some(array(&input["exemptionCodes"])))).is_empty()
+            {
+                if input["assessments"][&r]["status"] == "already_present" {
+                    inc(&mut counts, "alreadyPresent");
+                    decide(fact, "already_present", None);
+                } else {
+                    inc(&mut counts, "accepted");
+                    decide(fact, "accepted", None);
+                    accepted.push(r.clone());
+                    accepted_now.insert(r);
+                }
+                continue;
+            }
+        } else if supersedable(fact)
+            && kept_prepared
+                .iter()
+                .any(|o| o["kind"] == fact["kind"] && same_subject(o, fact))
         {
             inc(&mut counts, "superseded");
-            fact["decision"] = json!("rejected");
-            fact["note"] = json!(if fact["origin"] == "parser:document" {
-                "Sostituita dalla sintesi accettata; il testo completo resta nell’allegato."
-            } else {
-                "Sostituita dall’estrazione preparata verificata dello stesso tipo."
-            });
-        } else {
-            inc(&mut counts, "leftPending");
+            set_aside.push(r.clone());
+            set_aside_now.insert(r);
+            decide(
+                fact,
+                "rejected",
+                Some(
+                    "Sostituita dall’estrazione preparata verificata dello stesso tipo.".to_owned(),
+                ),
+            );
+            continue;
+        } else if !held(fact) && automatic_reading(fact) {
+            inc(&mut counts, "setAside");
+            decide(
+                fact,
+                "rejected",
+                Some("Lettura automatica non verificata.".to_owned()),
+            );
+            set_aside.push(r.clone());
+            set_aside_now.insert(r);
+            continue;
         }
+        inc(&mut counts, "leftPending");
     }
     let pages = if record["extraction"]["state"] == "extracted"
         && record["extraction"]["unitBasis"] == "pages"
@@ -1596,19 +1714,20 @@ pub fn bulk(input: &Value) -> Value {
     } else {
         None
     };
-    let acknowledged = facts.iter().find(|f| summary(f)).is_some_and(|f| {
-        f["decision"] == "accepted"
-            && written(record, f)
-            && f["values"]["preparedCoverage"] == "complete"
-            && pages.is_none_or(|p| f["values"]["preparedPages"] == p)
-    });
-    json!({"facts":facts,"acknowledgeResidual":acknowledged,"accepted":accepted,"counts":counts})
+    let acknowledged = input["includeSummaries"] == true
+        && facts.iter().find(|f| summary(f)).is_some_and(|f| {
+            f["decision"] == "accepted"
+                && written(record, f)
+                && f["values"]["preparedCoverage"] == "complete"
+                && pages.is_none_or(|p| f["values"]["preparedPages"] == p)
+        });
+    json!({"facts":facts,"acknowledgeResidual":acknowledged,"accepted":accepted,"setAside":set_aside,"counts":counts})
 }
 /// Entry point usato dalla conformità; nessun campo del risultato viene escluso.
 pub fn verify_call(call: &Value) -> Value {
     let a = array(&call["args"]);
     match string(&call["op"]) {
-        "catalog" => catalog(string(&a[0]), string(&a[1])),
+        "catalog" => catalog(string(&a[0]), string(&a[1]), string(&a[2])),
         "preparedTokens" => json!(tokens(string(&a[0]))),
         "anchorPreparedQuote" => anchor(string(&a[0]), array(&a[1]), string(&a[2])),
         "verifyPreparedFields" => verify_fields(
@@ -1668,6 +1787,38 @@ mod tests {
     }
 
     #[test]
+    fn molar_calcium_ft4_and_ft3_stay_uncoded_until_the_clinical_choice() {
+        let exams = [
+            ("Calcio", "2,3", "mmol/L"),
+            ("Calcio totale", "2,3", "mmol/L"),
+            ("FT4", "15", "pmol/L"),
+            ("FT3", "5", "pmol/L"),
+        ];
+        for (name, value, unit) in exams {
+            assert_eq!(catalog(name, unit, value), Value::Null, "{name} {unit}");
+        }
+        assert!(!catalog("Calcio ionizzato", "mmol/L", "1,2").is_null());
+        let facts: Vec<Value> = exams
+            .iter()
+            .map(|(name, value, unit)| {
+                json!({"kind": "observation", "values": {"display": name, "value": value, "unit": unit}})
+            })
+            .collect();
+        let result = prepared_facts(&json!({
+            "source": {
+                "sha256": "b".repeat(64),
+                "facts": facts,
+                "summary": {"title": "Referto sintetico", "text": "Risultati di laboratorio"}
+            },
+            "now": "2026-11-25T12:00:00Z"
+        }));
+        assert_eq!(
+            result["notes"],
+            json!(["Esami senza codice LOINC: Calcio, Calcio totale, FT4, FT3."])
+        );
+    }
+
+    #[test]
     fn physician_code_is_never_a_patient_candidate() {
         let patients = vec![
             json!({"id":"p","taxCode":"RSSMRA80A01F205X"}),
@@ -1701,7 +1852,12 @@ mod tests {
             json!({"id":"pa","taxCode":"RSSMRA80A01F205X"}),
             json!({"id":"pb","taxCode":"RSSMRA85T10A562S"}),
         ];
-        for scope in ["specialist_block", "signature_block", "header_block"] {
+        for scope in [
+            "physician_stamp",
+            "specialist_block",
+            "signature_block",
+            "header_block",
+        ] {
             let docs = vec![json!({
                 "taxCodes": [
                     {"value":"RSSMRA80A01F205X","checksumValid":true,"role":"patient_cf"},

@@ -145,6 +145,7 @@ impl ClinicalApp {
             .flex()
             .flex_col()
             .gap(px(16.))
+            .child(heading("settings-access-heading", "Accesso", theme))
             .child(section(
                 "settings-current-session",
                 "Sessione corrente",
@@ -181,6 +182,7 @@ impl ClinicalApp {
         let theme = self.theme;
         let area = &self.local_host.security;
         let mut pane = div().min_w_0().flex().flex_col().gap(px(16.))
+            .child(heading("settings-danger-heading", "Zona pericolo", theme))
             .child(self.local_host_panel(cx))
             .child(section("settings-passphrase-heading", "Cambia passphrase e kit", theme))
             .child(text!("Richiede la passphrase attuale e la conservazione del nuovo kit e della chiave separata. Il PIN di conferma rimane invariato."))

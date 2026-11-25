@@ -698,7 +698,7 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
             variant="clinical"
             writing={writing}
             eyebrow="Scheda clinica"
-            title={`${patient.lastName} ${patient.firstName}`}
+            title={`${patient.lastName} ${patient.firstName}`.trim() || patient.taxCode}
             subtitle=""
             backHref="/?area=incarico"
             backLabel="Pazienti"

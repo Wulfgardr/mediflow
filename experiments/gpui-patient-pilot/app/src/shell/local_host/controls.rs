@@ -243,6 +243,7 @@ impl ClinicalApp {
             .flex()
             .flex_col()
             .gap(px(16.))
+            .child(heading("controls-heading", "Controlli", theme))
             .child(compliance(theme))
             .child(self.local_host_panel(cx));
         if self.local_host.access().is_none() {

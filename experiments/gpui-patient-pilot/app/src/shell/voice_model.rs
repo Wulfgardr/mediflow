@@ -251,7 +251,16 @@ impl ClinicalApp {
     pub(super) fn voice_model_view(&self, cx: &Context<Self>) -> Div {
         let theme = self.theme;
         let area = &self.voice_model;
-        let mut pane = div().min_w_0().flex().flex_col().gap(px(16.));
+        let mut pane = div()
+            .min_w_0()
+            .flex()
+            .flex_col()
+            .gap(px(16.))
+            .child(heading(
+                "clinical-workspace-settings-heading",
+                "Voce locale",
+                theme,
+            ));
         let Some(catalog) = &area.catalog else {
             return pane.child(notice(
                 "voice-model-status",

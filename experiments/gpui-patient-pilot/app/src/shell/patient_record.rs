@@ -4,16 +4,13 @@ use gpui::{AnyElement, Hsla};
 macro_rules! text {
     ($($args:tt)*) => { crate::shell::rendered_command::observe_ink(gpui::text!($($args)*)) };
 }
-pub(super) use super::surface::TRAY_INSET;
-use super::surface::{
-    glyph, island, island_highlight, island_proposal, island_title, record_heading, segmented_bar,
-    status_pill, tray,
-};
 use super::*;
 
 pub(super) const READING_INSET: f32 = 12.;
 const QUIET_CHROME: f32 = 221.;
 const WRITING_CHROME: f32 = 286.;
+pub(super) const TRAY_INSET: f32 = 10.;
+const ISLAND_RADIUS: f32 = 14.;
 const ZONE_GAP: f32 = 12.;
 
 #[derive(Clone, Default)]
@@ -218,6 +215,42 @@ pub(super) fn record_title(
     )
 }
 
+fn record_heading(
+    id: impl Into<SharedString>,
+    label: &str,
+    count: Option<String>,
+    theme: Theme,
+    role: crate::theme::TitleRole,
+) -> Stateful<Div> {
+    let id = id.into();
+    div()
+        .id(SharedString::from(format!("{id}-row")))
+        .min_w_0()
+        .flex()
+        .flex_wrap()
+        .items_baseline()
+        .justify_between()
+        .gap(px(8.))
+        .child(
+            div()
+                .id(id.clone())
+                .accessibility_id(id)
+                .role(Role::Heading)
+                .aria_label(SharedString::from(label.to_owned()))
+                .min_w_0()
+                .text_color(theme.ink)
+                .child(crate::title::title(label.to_owned(), theme).with_role(role)),
+        )
+        .when_some(count, |el, count| {
+            el.child(
+                div()
+                    .type_role(theme, crate::theme::TextRole::Meta)
+                    .text_color(theme.secondary)
+                    .child(text!(count)),
+            )
+        })
+}
+
 fn zone_label(id: &'static str, label: &'static str, changed: bool, theme: Theme) -> Stateful<Div> {
     let color = if changed {
         theme.fresh
@@ -265,6 +298,66 @@ fn zone_title(id: &'static str, label: &'static str, changed: bool, theme: Theme
                     .bg(theme.fresh),
             )
         })
+}
+
+fn tray(theme: Theme) -> Div {
+    block(theme)
+        .gap(px(TRAY_INSET))
+        .p(px(TRAY_INSET))
+        .bg(theme.record.tray)
+        .border_1()
+        .border_color(theme.record.tray_rule)
+        .rounded_t(px(ISLAND_RADIUS + TRAY_INSET))
+        .rounded_b(px(ISLAND_RADIUS - 4.))
+        .shadow(vec![
+            gpui::BoxShadow::new(px(0.), px(1.), theme.record.tray_light).inset(),
+            gpui::BoxShadow::new(px(0.), px(-1.), theme.record.tray_shadow)
+                .blur_radius(px(2.))
+                .inset(),
+        ])
+}
+
+fn island(theme: Theme, compact: bool) -> Div {
+    block(theme)
+        .gap(px(10.))
+        .p(px(16.))
+        .bg(if compact {
+            theme.record.compact_island
+        } else {
+            theme.record.island
+        })
+        .border_1()
+        .border_color(theme.record.island_rule)
+        .rounded(px(ISLAND_RADIUS))
+}
+
+fn island_title(
+    id: &'static str,
+    label: &str,
+    count: Option<String>,
+    theme: Theme,
+) -> Stateful<Div> {
+    record_heading(
+        id,
+        label,
+        count,
+        theme,
+        crate::theme::TitleRole::RecordIsland,
+    )
+}
+
+fn glyph(kind: Icon, tint: Option<Hsla>, theme: Theme) -> Div {
+    div()
+        .size(px(28.))
+        .flex_none()
+        .flex()
+        .items_center()
+        .justify_center()
+        .rounded(px(8.))
+        .bg(tint.map_or(theme.paper, |color| Theme::tint(color, 0.12)))
+        .border_1()
+        .border_color(tint.map_or(theme.rule, |color| Theme::tint(color, 0.35)))
+        .child(icon(kind, tint.unwrap_or(theme.secondary), 15.))
 }
 
 fn card_title(
@@ -322,6 +415,19 @@ fn link_enabled(
         })
         .type_role(theme, crate::theme::TextRole::Meta)
         .font_weight(gpui::FontWeight::SEMIBOLD)
+}
+
+fn tag(text: impl Into<SharedString>, color: Hsla, theme: Theme) -> Div {
+    div()
+        .flex_none()
+        .px(px(8.))
+        .py(px(1.))
+        .rounded(px(6.))
+        .bg(theme.sheet.blend(Theme::tint(color, 0.14)))
+        .text_color(color)
+        .type_role(theme, crate::theme::TextRole::Meta)
+        .font_weight(gpui::FontWeight::MEDIUM)
+        .child(text!(text.into()))
 }
 
 pub(super) fn proposal_receipt(
@@ -646,14 +752,10 @@ impl ClinicalApp {
                                             .child(allergy_label(None, theme)),
                                     )
                                     .when(adi, |el| {
-                                        el.child(status_pill("ADI attiva", theme.success, theme))
+                                        el.child(tag("ADI attiva", theme.success, theme))
                                     })
                                     .when(archived, |el| {
-                                        el.child(status_pill(
-                                            "Scheda archiviata",
-                                            theme.secondary,
-                                            theme,
-                                        ))
+                                        el.child(tag("Scheda archiviata", theme.secondary, theme))
                                     }),
                             ),
                     )
@@ -874,76 +976,88 @@ impl ClinicalApp {
             .justify_between()
             .gap(px(12.))
             .child(
-                segmented_bar(
-                    "clinical-workspace-patient-sections",
-                    "Moduli del paziente",
-                    theme,
-                )
-                .children(PatientSection::ALL.into_iter().map(|section| {
-                    let selected = self.patient_section == section;
-                    let section_tab = div()
-                        .id(section.id())
-                        .accessibility_id(section.id())
-                        .role(Role::Tab)
-                        .aria_label(section.title())
-                        .aria_selected(selected)
-                        .focusable()
-                        .tab_stop(true)
-                        .cursor_pointer()
-                        .min_h(px(34.))
-                        .px(px(14.))
-                        .flex()
-                        .items_center()
-                        .gap(px(6.))
-                        .rounded(px(10.))
-                        .border_1()
-                        .border_color(if selected {
-                            theme.rule
-                        } else {
-                            gpui::transparent_black()
-                        })
-                        .when(selected, |el| {
-                            el.bg(theme.paper).shadow(vec![
-                                gpui::BoxShadow::new(px(0.), px(1.), Theme::tint(theme.ink, 0.08))
-                                    .blur_radius(px(2.)),
-                            ])
-                        })
-                        .type_role(
-                            theme,
-                            if selected {
-                                crate::theme::TextRole::Strong
+                div()
+                    .id("clinical-workspace-patient-sections")
+                    .accessibility_id("clinical-workspace-patient-sections")
+                    .role(Role::TabList)
+                    .aria_label("Moduli del paziente")
+                    .flex()
+                    .flex_wrap()
+                    .p(px(4.))
+                    .gap(px(2.))
+                    .bg(theme.record.compact_island)
+                    .border_1()
+                    .border_color(theme.record.island_rule)
+                    .rounded(px(14.))
+                    .children(PatientSection::ALL.into_iter().map(|section| {
+                        let selected = self.patient_section == section;
+                        let section_tab = div()
+                            .id(section.id())
+                            .accessibility_id(section.id())
+                            .role(Role::Tab)
+                            .aria_label(section.title())
+                            .aria_selected(selected)
+                            .focusable()
+                            .tab_stop(true)
+                            .cursor_pointer()
+                            .min_h(px(34.))
+                            .px(px(14.))
+                            .flex()
+                            .items_center()
+                            .gap(px(6.))
+                            .rounded(px(10.))
+                            .border_1()
+                            .border_color(if selected {
+                                theme.rule
                             } else {
-                                crate::theme::TextRole::Body
-                            },
-                        )
-                        .text_color(if selected { theme.ink } else { theme.secondary })
-                        .when(!selected, move |el| {
-                            el.hover(move |style| style.bg(theme.hover).text_color(theme.ink))
-                        })
-                        .focus(move |style| style.shadow(vec![theme.focus_ring(false)]))
-                        .child(text!(section.title()))
-                        .children(count(section).filter(|count| *count > 0).map(|count| {
-                            div()
-                                .type_role(theme, crate::theme::TextRole::Meta)
-                                .text_color(theme.secondary)
-                                .child(text!(count.to_string()))
-                        }))
-                        .on_click(
-                            cx.listener(move |this, _, _, cx| this.section_selected(section, cx)),
-                        );
-                    #[cfg(test)]
-                    let section_tab = {
-                        let index = PatientSection::ALL
-                            .iter()
-                            .position(|item| *item == section)
-                            .unwrap();
-                        super::rendered_command::observe_focus(
-                            section_tab.track_focus(&self.ui_cli_section_focus[index]),
-                            self.ui_cli_section_focus[index].clone(),
-                        )
-                    };
-                    section_tab
-                })),
+                                gpui::transparent_black()
+                            })
+                            .when(selected, |el| {
+                                el.bg(theme.paper).shadow(vec![
+                                    gpui::BoxShadow::new(
+                                        px(0.),
+                                        px(1.),
+                                        Theme::tint(theme.ink, 0.08),
+                                    )
+                                    .blur_radius(px(2.)),
+                                ])
+                            })
+                            .type_role(
+                                theme,
+                                if selected {
+                                    crate::theme::TextRole::Strong
+                                } else {
+                                    crate::theme::TextRole::Body
+                                },
+                            )
+                            .text_color(if selected { theme.ink } else { theme.secondary })
+                            .when(!selected, move |el| {
+                                el.hover(move |style| style.bg(theme.hover).text_color(theme.ink))
+                            })
+                            .focus(move |style| style.shadow(vec![theme.focus_ring(false)]))
+                            .child(text!(section.title()))
+                            .children(count(section).filter(|count| *count > 0).map(|count| {
+                                div()
+                                    .type_role(theme, crate::theme::TextRole::Meta)
+                                    .text_color(theme.secondary)
+                                    .child(text!(count.to_string()))
+                            }))
+                            .on_click(cx.listener(move |this, _, _, cx| {
+                                this.section_selected(section, cx)
+                            }));
+                        #[cfg(test)]
+                        let section_tab = {
+                            let index = PatientSection::ALL
+                                .iter()
+                                .position(|item| *item == section)
+                                .unwrap();
+                            super::rendered_command::observe_focus(
+                                section_tab.track_focus(&self.ui_cli_section_focus[index]),
+                                self.ui_cli_section_focus[index].clone(),
+                            )
+                        };
+                        section_tab
+                    })),
             )
             .children(last_visit.map(|line| {
                 div()
@@ -1009,7 +1123,12 @@ impl ClinicalApp {
                         theme,
                     ))
                 })
-                .child(island_highlight(theme, compact).child(self.record_band(cx)))
+                .child(
+                    island(theme, compact)
+                        .bg(theme.record.change)
+                        .border_color(theme.record.change_rule)
+                        .child(self.record_band(cx)),
+                )
         };
         let work = (reading.is_some() || writing.is_some() || done.is_some()).then(|| {
             block(theme)
@@ -1080,7 +1199,12 @@ impl ClinicalApp {
                     }
                 })
         };
-        let band = || island_highlight(theme, false).child(self.record_band(cx));
+        let band = || {
+            island(theme, false)
+                .bg(theme.record.change)
+                .border_color(theme.record.change_rule)
+                .child(self.record_band(cx))
+        };
         let changed_title =
             || zone_title("clinical-record-zone-changed", "Cambiato", changed, theme);
         let body = || block(theme).gap(px(TRAY_INSET));
@@ -1389,9 +1513,7 @@ impl ClinicalApp {
                             .justify_between()
                             .gap(px(8.))
                             .child(named_with_dose(&therapy.drug_name, theme).flex_1())
-                            .children(
-                                change.map(|kind| status_pill(kind.label(), theme.warning, theme)),
-                            ),
+                            .children(change.map(|kind| tag(kind.label(), theme.warning, theme))),
                     )
                     .child(
                         div()
@@ -1686,14 +1808,14 @@ impl ClinicalApp {
                     .items_center()
                     .gap(px(6.))
                     .when(therapy_changes > 0, |el| {
-                        el.child(status_pill(
+                        el.child(tag(
                             plural(therapy_changes, "terapia", "terapie"),
                             theme.warning,
                             theme,
                         ))
                     })
                     .when(out_of_range > 0, |el| {
-                        el.child(status_pill(
+                        el.child(tag(
                             plural(
                                 out_of_range,
                                 "valore fuori intervallo",
@@ -1803,7 +1925,7 @@ impl ClinicalApp {
                                     .child(text!(value))
                             })),
                     )
-                    .child(status_pill(change.kind.label(), color, theme))
+                    .child(tag(change.kind.label(), color, theme))
                     .child(icon(
                         if open {
                             Icon::ChevronDown
@@ -2917,7 +3039,13 @@ impl ClinicalApp {
             patient_insight::InsightPhase::Proposal { .. }
         );
         let inline = (!open).then(|| self.current_insight()).flatten();
-        island_proposal(theme)
+        block(theme)
+            .gap(px(10.))
+            .p(px(16.))
+            .border_1()
+            .border_dashed()
+            .border_color(theme.record.proposal_rule)
+            .rounded(px(ISLAND_RADIUS))
             .child(
                 div()
                     .min_w_0()

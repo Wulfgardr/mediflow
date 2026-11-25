@@ -1591,40 +1591,19 @@ impl ClinicalApp {
 
     pub(super) fn scales_view(&self, cx: &Context<Self>) -> Div {
         let theme = self.theme;
-        let actions = div().child(
-            button(
-                "clinical-scales-reload",
-                "Rileggi catalogo e persone",
-                theme,
-                false,
-                !matches!(self.scales.catalog, Load::Loading),
-            )
-            .when(!matches!(self.scales.catalog, Load::Loading), |el| {
-                el.on_click(cx.listener(|this, _, _, cx| this.load_scales(cx)))
-            }),
-        );
-        let header = surface::page(theme).child(surface::page_header(
-            "clinical-scales-heading",
-            "Scale",
-            None,
-            actions,
-            theme,
-        ));
-        let mut pane = surface::island(theme, false).when(self.verified.is_some(), |el| {
-            el.child(notice(
-                "clinical-scales-verified",
-                self.verified.clone().unwrap_or_default(),
-                theme,
-                false,
-            ))
-        });
+        let mut pane = div().min_w_0().max_w_full().flex().flex_col().gap(px(24.))
+            .child(heading("clinical-scales-heading", "Scale", theme))
+            .child(div().text_color(theme.secondary).child(text!("Scegli una persona e uno strumento. Il risultato resta una bozza finché non lo rivedi e confermi nel Diario.")))
+            .child(button("clinical-scales-reload", "Rileggi catalogo e persone", theme, false, !matches!(self.scales.catalog, Load::Loading))
+                .when(!matches!(self.scales.catalog, Load::Loading), |el| el.on_click(cx.listener(|this, _, _, cx| this.load_scales(cx)))))
+            .when(self.verified.is_some(), |el| el.child(notice("clinical-scales-verified", self.verified.clone().unwrap_or_default(), theme, false)));
         if let Some(message) = self.scales.catalog.message() {
-            return header.child(surface::tray(theme).child(pane.child(notice(
+            return pane.child(notice(
                 "clinical-scales-state",
                 message.to_owned(),
                 theme,
                 matches!(self.scales.catalog, Load::Failed(_)),
-            ))));
+            ));
         }
         if let Some(patient) = self.patient.detail.ready() {
             pane = pane.child(
@@ -1757,83 +1736,80 @@ impl ClinicalApp {
             .detail
             .ready()
             .is_some_and(|patient| !patient.is_archived && patient.deleted_at.is_none());
-        let catalog = surface::island(theme, false)
-            .child(surface::island_title(
-                "clinical-scales-catalog-label",
-                "Strumenti dell’archivio",
-                None,
-                theme,
-            ))
-            .children(
-                self.scales
-                    .catalog
-                    .ready()
-                    .into_iter()
-                    .flat_map(|catalog| &catalog.scales)
-                    .map(|scale| {
-                        let id = scale.id;
-                        div()
-                            .id(SharedString::from(format!(
-                                "clinical-scale-catalog-row-{}",
-                                id.as_str()
-                            )))
-                            .min_w_0()
-                            .max_w_full()
-                            .border_t_1()
-                            .border_color(theme.rule)
-                            .pt(px(20.))
-                            .flex()
-                            .flex_col()
-                            .gap(px(12.))
-                            .child(
-                                div()
-                                    .type_role(theme, crate::theme::TextRole::Strong)
-                                    .child({
-                                        let text = text!(scale.title.clone());
-                                        #[cfg(test)]
-                                        let text = rendered_command::observe_text(text);
-                                        text
-                                    }),
-                            )
-                            .child(div().text_color(theme.secondary).child({
-                                let text = text!(scale.description.clone());
-                                #[cfg(test)]
-                                let text = rendered_command::observe_text(text);
-                                text
-                            }))
-                            .child({
-                                let text = text!(format!(
-                                    "{} domande · tutte le risposte sono richieste",
-                                    scale.questions.len()
-                                ));
-                                #[cfg(test)]
-                                let text = rendered_command::observe_text(text);
-                                text
-                            })
-                            .child(
-                                self.scales
-                                    .targets
-                                    .get(&format!("scale-{}", id.as_str()))
-                                    .expect("catalog target")
-                                    .attach_enabled(
-                                        button(
-                                            format!("clinical-scale-open-{}", id.as_str()),
-                                            "Compila la valutazione",
-                                            theme,
-                                            true,
-                                            selected,
-                                        ),
+        pane.child(section(
+            "clinical-scales-catalog-label",
+            "STRUMENTI DELL’ARCHIVIO",
+            theme,
+        ))
+        .children(
+            self.scales
+                .catalog
+                .ready()
+                .into_iter()
+                .flat_map(|catalog| &catalog.scales)
+                .map(|scale| {
+                    let id = scale.id;
+                    div()
+                        .id(SharedString::from(format!(
+                            "clinical-scale-catalog-row-{}",
+                            id.as_str()
+                        )))
+                        .min_w_0()
+                        .max_w_full()
+                        .border_t_1()
+                        .border_color(theme.rule)
+                        .pt(px(20.))
+                        .flex()
+                        .flex_col()
+                        .gap(px(12.))
+                        .child(
+                            div()
+                                .type_role(theme, crate::theme::TextRole::Strong)
+                                .child({
+                                    let text = text!(scale.title.clone());
+                                    #[cfg(test)]
+                                    let text = rendered_command::observe_text(text);
+                                    text
+                                }),
+                        )
+                        .child(div().text_color(theme.secondary).child({
+                            let text = text!(scale.description.clone());
+                            #[cfg(test)]
+                            let text = rendered_command::observe_text(text);
+                            text
+                        }))
+                        .child({
+                            let text = text!(format!(
+                                "{} domande · tutte le risposte sono richieste",
+                                scale.questions.len()
+                            ));
+                            #[cfg(test)]
+                            let text = rendered_command::observe_text(text);
+                            text
+                        })
+                        .child(
+                            self.scales
+                                .targets
+                                .get(&format!("scale-{}", id.as_str()))
+                                .expect("catalog target")
+                                .attach_enabled(
+                                    button(
+                                        format!("clinical-scale-open-{}", id.as_str()),
+                                        "Compila la valutazione",
+                                        theme,
+                                        true,
                                         selected,
-                                    )
-                                    .when(selected, |el| {
-                                        el.on_click(cx.listener(move |this, _, _, cx| {
-                                            this.open_scale_form(id, cx)
-                                        }))
-                                    }),
-                            )
-                    }),
-            );
-        header.child(surface::tray(theme).child(pane).child(catalog))
+                                    ),
+                                    selected,
+                                )
+                                .when(selected, |el| {
+                                    el.on_click(cx.listener(move |this, _, _, cx| {
+                                        this.open_scale_form(id, cx)
+                                    }))
+                                }),
+                        )
+                }),
+        )
     }
 
     pub(super) fn scale_workspace_view(&self, layout: Layout, cx: &Context<Self>) -> Stateful<Div> {
@@ -1880,11 +1856,9 @@ impl ClinicalApp {
                 },
                 theme,
             ))
-            .child(surface::page_header(
+            .child(heading(
                 "clinical-scale-title",
                 scale.descriptor.title.clone(),
-                None,
-                div(),
                 theme,
             ))
             .child(
@@ -1894,7 +1868,7 @@ impl ClinicalApp {
             );
         let question = &scale.descriptor.questions[scale.question];
         let question_index = scale.question;
-        let mut questions = surface::island(theme, false).flex_1();
+        let mut questions = div().min_w_0().flex_1().flex().flex_col().gap(px(16.));
         if scale.prepared.is_none() && !scale.has_attempt() {
             questions = questions.child(div().type_role(theme, crate::theme::TextRole::Meta).text_color(theme.secondary)
                 .child(text!(format!("Domanda {} di {} · {} risposte inserite", scale.question + 1, scale.descriptor.questions.len(), scale.answers.len()))))
@@ -1975,11 +1949,17 @@ impl ClinicalApp {
                         "La voce viene registrata nel contesto ambulatoriale selezionato."
                     )),
             );
-        let mut result = surface::island(theme, false).flex_1().child(section(
-            "clinical-scale-result-heading",
-            "RISULTATO E LIMITI",
-            theme,
-        ));
+        let mut result = div()
+            .min_w_0()
+            .flex_1()
+            .flex()
+            .flex_col()
+            .gap(px(16.))
+            .child(section(
+                "clinical-scale-result-heading",
+                "RISULTATO E LIMITI",
+                theme,
+            ));
         if let Some(prepared) = &scale.prepared {
             let metadata = &prepared.submission().metadata;
             result = result
@@ -2039,7 +2019,7 @@ impl ClinicalApp {
             .min_w_0()
             .flex()
             .flex_col()
-            .bg(theme.sheet)
+            .bg(theme.paper)
             .when(layout.magnified && self.message.is_some(), |el| {
                 let (message, error) = self.message.clone().unwrap_or_default();
                 el.child(
@@ -2059,8 +2039,11 @@ impl ClinicalApp {
                             .gap(px(24.))
                             .child(header)
                             .child(
-                                surface::tray(theme)
-                                    .when(!layout.compact && !layout.magnified, |el| el.flex_row())
+                                div()
+                                    .min_w_0()
+                                    .flex()
+                                    .gap(px(layout.gap))
+                                    .when(layout.compact || layout.magnified, |el| el.flex_col())
                                     .child(questions)
                                     .child(result),
                             ),
