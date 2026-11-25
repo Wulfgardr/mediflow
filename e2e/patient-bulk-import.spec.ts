@@ -20,6 +20,30 @@ const body = [header,
 const file = (text: string) => ({ name: 'pazienti-SOLO-SINTETICI.csv', mimeType: 'text/csv', buffer: Buffer.from(`\uFEFF${text}`, 'utf8') });
 const isPatientCreate = (request: Request) => request.method() === 'POST' && new URL(request.url()).pathname === '/api/patients';
 
+const preloadNotYetApplied = /^The resource (\S+) was preloaded using link preload but not used within a few seconds from the window's load event\./u;
+function collectConsoleProblems(page: Page) {
+    const problems: string[] = [];
+    let preloadedBehindAccessGate: string[] = [];
+    page.on('pageerror', error => problems.push(error.message));
+    page.on('console', message => {
+        if (message.type() !== 'error' && message.type() !== 'warning') return;
+        const preload = message.type() === 'warning' ? preloadNotYetApplied.exec(message.text()) : null;
+        if (preload) preloadedBehindAccessGate.push(new URL(preload[1]).pathname);
+        else problems.push(message.text());
+    });
+    return {
+        problems,
+        async requireGatedPreloadsApplied(): Promise<void> {
+            const applied = await page.evaluate(() => Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]'),
+                link => new URL(link.href).pathname));
+            for (const stylesheet of preloadedBehindAccessGate) {
+                if (!applied.includes(stylesheet)) problems.push(`Preloaded stylesheet never applied: ${stylesheet}`);
+            }
+            preloadedBehindAccessGate = [];
+        },
+    };
+}
+
 type WirePatient = { id: string; firstName: string; lastName: string; taxCode: string; birthDate?: string | null; address?: string | null; phone?: string | null; ambulatoryId?: string | null };
 async function list(page: Page): Promise<WirePatient[]> {
     const response = await documentRequests(page).get('/api/patients', { headers: { 'Cache-Control': 'no-store' } });
@@ -127,9 +151,7 @@ async function present(page: Page, width: number, theme: 'light' | 'dark'): Prom
 
 for (const width of [390, 1440]) for (const theme of ['light', 'dark'] as const) {
     test(`CSV reviewed creation and reload, ${width}px ${theme}, real synthetic runtime`, async ({ page, baseURL }, testInfo) => {
-        const errors: string[] = [];
-        page.on('pageerror', error => errors.push(error.message));
-        page.on('console', message => { if (message.type() === 'error' || message.type() === 'warning') errors.push(message.text()); });
+        const consoleProblems = collectConsoleProblems(page);
         await setup(page);
         const before = await createExistingFromUi(page);
         const creates: WirePatient[] = [];
@@ -206,6 +228,7 @@ for (const width of [390, 1440]) for (const theme of ['light', 'dark'] as const)
         expect(JSON.stringify(creates)).not.toContain('+390000001');
         for (const field of ['birthDate', 'address', 'phone']) expect(Object.hasOwn(sentSecond, field)).toBe(false);
         expect(new Set(creates.map(item => item.id)).size).toBe(2);
+        await consoleProblems.requireGatedPreloadsApplied();
         await page.reload(); await unlockAfterReload(page);
         const after = await list(page); expect(after).toHaveLength(3);
         expect(after.find(item => item.id === before.id)).toEqual(before);
@@ -221,7 +244,8 @@ for (const width of [390, 1440]) for (const theme of ['light', 'dark'] as const)
         await present(page, width, theme);
         await page.screenshot({ path: testInfo.outputPath(`reloaded-${width}-${theme}.png`), fullPage: true });
         expect(creates).toHaveLength(2); expect(otherDownloads).toEqual([]); expect(disallowed).toEqual([]);
-        expect(external).toEqual([]); expect(errors).toEqual([]);
+        await consoleProblems.requireGatedPreloadsApplied();
+        expect(external).toEqual([]); expect(consoleProblems.problems).toEqual([]);
         await testInfo.attach('observed-batch.json', { contentType: 'application/json', body: JSON.stringify({
             synthetic: true, viewport: width, theme, themeFixtureOnly: true, initialPatients: 1, finalPatients: after.length,
             creates: creates.length, previewCreates: 0, preexistingUnchanged: true, directAuthSubstitution: false,
@@ -245,9 +269,7 @@ test('cancelled preview sends zero patient POSTs and preserves the real preexist
 });
 
 test('React lifecycle: mount, template, preview, cleanup and remount never auto-create', async ({ page }, testInfo) => {
-    const errors: string[] = [];
-    page.on('pageerror', error => errors.push(error.message));
-    page.on('console', message => { if (message.type() === 'error' || message.type() === 'warning') errors.push(message.text()); });
+    const consoleProblems = collectConsoleProblems(page);
     await setup(page); const before = await createExistingFromUi(page);
     let creates = 0;
     page.on('request', request => { if (isPatientCreate(request)) creates += 1; });
@@ -272,12 +294,13 @@ test('React lifecycle: mount, template, preview, cleanup and remount never auto-
     await page.getByTestId('patient-bulk-file').setInputFiles(file(body));
     await expect(page.getByTestId('patient-bulk-preview-count')).toHaveText('2 da aggiungere · 2 escluse · 4 righe totali');
     await page.getByRole('button', { name: 'Annulla anteprima', exact: true }).click();
-    expect(await list(page)).toEqual([before]); expect(creates).toBe(0); expect(errors).toEqual([]);
+    await consoleProblems.requireGatedPreloadsApplied();
+    expect(await list(page)).toEqual([before]); expect(creates).toBe(0); expect(consoleProblems.problems).toEqual([]);
     expect(await page.title()).not.toBe(''); await expect(page.locator('nextjs-portal')).toHaveCount(0);
     await page.screenshot({ path: testInfo.outputPath('react-remount.png'), fullPage: true });
     await testInfo.attach('react-lifecycle.json', { contentType: 'application/json', body: JSON.stringify({
         synthetic: true, actualAppAndReact: true, unmountRemountCycles: 2, automaticPatientCreates: creates,
         template: 'constant-header-only-data-url-no-object-url-lifecycle',
-        consoleOrPageWarnings: errors.length, authProviderSubstituted: false,
+        consoleOrPageWarnings: consoleProblems.problems.length, authProviderSubstituted: false,
     }) });
 });
