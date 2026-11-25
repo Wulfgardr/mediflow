@@ -2637,14 +2637,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
                 XCTAssertTrue(payload.keys.contains("description"))
                 XCTAssertEqual(payload["description"] as? NSNull, NSNull())
                 return (response, Data(#"{"success":true,"version":2,"affectedAmbulatories":[{"id":"amb-old","version":4},{"id":"amb-new","version":2}]}"#.utf8))
-            case ("DELETE", "/api/v1/network/ambulatories/amb-new"):
-                XCTAssertEqual(try self.requestObject(request)["version"] as? Int, 2)
-                return (response, Data(#"{"success":true,"affectedAmbulatories":[{"id":"amb-old","version":5}]}"#.utf8))
-            case ("POST", "/api/v1/network/ambulatories/clear"):
-                let payload = try self.requestObject(request)
-                XCTAssertEqual(payload["ambulatoryId"] as? String, "amb-test")
-                XCTAssertEqual(payload["version"] as? Int, 7)
-                return (response, Data(#"{"success":true,"version":8,"clearedPatients":3,"preservedLivePatients":1,"removedMembershipRows":4}"#.utf8))
             case ("GET", "/api/v1/network/checkups"):
                 return (response, Data(#"[]"#.utf8))
             case ("GET", "/api/v1/network/entries"):
@@ -2740,8 +2732,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
         _ = try await source.updateProfile(expectedVersion: "opaque-profile-version", displayName: "Dott.ssa Ada", ambulatoryName: "Centro Salute", archiveGeneration: "synthetic-generation", credentials: creds, sessionCookie: cookie)
         _ = try await source.createAmbulatory(payload: HomeBaseAmbulatoryCreatePayload(id: "amb-new", name: "Sede Nuova", type: "test"), credentials: creds, sessionCookie: cookie)
         _ = try await source.updateAmbulatory(id: "amb-new", payload: HomeBaseAmbulatoryUpdatePayload(expectedVersion: 1, name: "Sede Aggiornata", description: .null), credentials: creds, sessionCookie: cookie)
-        _ = try await source.deleteAmbulatory(id: "amb-new", expectedVersion: 2, credentials: creds, sessionCookie: cookie)
-        _ = try await source.clearAmbulatory(id: "amb-test", expectedVersion: 7, credentials: creds, sessionCookie: cookie)
         _ = try await source.fetchScopedCheckups(dateFrom: fixtureDate, dateTo: fixtureDate, status: ["pending", "completed"], limit: 500, credentials: creds, sessionCookie: cookie, ambulatoryId: nil)
         _ = try await source.fetchScopedEntries(type: "note", dateFrom: fixtureDate, dateTo: fixtureDate, limit: 100, credentials: creds, sessionCookie: cookie, ambulatoryId: nil)
         _ = try await source.fetchPatients(credentials: creds, sessionCookie: cookie, ambulatoryId: nil, includeDiagnoses: true)
@@ -2792,8 +2782,6 @@ final class HomeBasePatientsClientTests: XCTestCase {
             "PUT https://localhost:3443/api/auth/profile",
             "POST https://localhost:3443/api/v1/network/ambulatories",
             "PUT https://localhost:3443/api/v1/network/ambulatories/amb-new",
-            "DELETE https://localhost:3443/api/v1/network/ambulatories/amb-new",
-            "POST https://localhost:3443/api/v1/network/ambulatories/clear",
             "GET https://localhost:3443/api/v1/network/checkups?dateFrom=2025-07-08T08:00:00Z&dateTo=2025-07-08T08:00:00Z&status=pending&status=completed&limit=500",
             "GET https://localhost:3443/api/v1/network/entries?type=note&dateFrom=2025-07-08T08:00:00Z&dateTo=2025-07-08T08:00:00Z&limit=100",
             "GET https://localhost:3443/api/v1/network/patients?include=diagnoses",

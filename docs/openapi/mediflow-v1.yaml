@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MediFlow Local API v1
-  version: 1.61.0
+  version: 1.62.0
   summary: Stable patient contract plus executable home-base network slice with explicit pairing review, paired-client auth boundary, ambulatory scope options, scoped remote patient, cross-patient agenda and diary reads, therapy, checkup, observation, and catalog read boundaries, replica planning state, explicit identity summary, and declarative AI runtime summary for the local `/api/v1` surface.
   description: |
     OpenAPI contract for the client-facing local API defined by ADR 0010.
@@ -1223,95 +1223,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/AmbulatoryUpdateRequest'
-      responses:
-        '200':
-          $ref: '#/components/responses/AmbulatoryMutationSuccess'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/VersionConflict'
-        '413':
-          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-    delete:
-      x-mediflow-json-max-bytes: 4194304
-      tags:
-        - Network
-      operationId: deleteNetworkAmbulatory
-      summary: Delete an unlinked ambulatory through the paired data plane
-      description: Requires `network.ambulatories.write` and the current ambulatory version. Active primary patients, any membership, and deletion of the last ambulatory are rejected.
-      security:
-        - pairedClientId: []
-          pairedClientToken: []
-          sessionCookieAuth: []
-      parameters:
-        - $ref: '#/components/parameters/AmbulatoryId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: false
-              required: [version]
-              properties:
-                version:
-                  type: integer
-                  minimum: 1
-                  maximum: 9007199254740991
-      responses:
-        '200':
-          $ref: '#/components/responses/AmbulatoryMutationSuccess'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/NetworkDataPlaneUnauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/VersionConflict'
-        '413':
-          $ref: '#/components/responses/NetworkJsonBodyTooLarge'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-  /api/v1/network/ambulatories/clear:
-    parameters:
-      - $ref: '#/components/parameters/ExpectedAmbulatoryScope'
-    post:
-      x-mediflow-json-max-bytes: 4194304
-      tags:
-        - Network
-      operationId: clearNetworkTestAmbulatory
-      summary: Tombstone test-container members through the paired data plane
-      description: Requires `network.ambulatories.write`, an admin session, and the current version of a `test` ambulatory. Live ambulatory clear is forbidden.
-      security:
-        - pairedClientId: []
-          pairedClientToken: []
-          sessionCookieAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: false
-              required: [ambulatoryId, version]
-              properties:
-                ambulatoryId:
-                  type: string
-                version:
-                  type: integer
-                  minimum: 1
-                  maximum: 9007199254740991
       responses:
         '200':
           $ref: '#/components/responses/AmbulatoryMutationSuccess'

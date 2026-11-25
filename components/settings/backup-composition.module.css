@@ -1,8 +1,14 @@
 .page, .workspace { min-width: 0; color: var(--lume-ink); }
-.page.page .sectionTitle, .schedule.schedule > :first-child :global([data-disclosure-control]) { margin: 0; font: var(--type-section); font-variant-caps: all-small-caps; letter-spacing: .05em; color: var(--lume-ink-muted); }
-.introduction { max-width: 70ch; margin: .75rem 0 1.25rem; font: var(--type-body); color: var(--lume-ink-muted); }
-.workspace { display: grid; gap: 1.25rem; }
-.section, .schedule { min-width: 0; padding: 1.25rem 0; border-bottom: 1px solid var(--lume-rule); }
+.page .sectionTitle, .schedule.schedule :is(h2, h3) :global(button[data-disclosure-control]) {
+    margin: 0;
+    color: var(--lume-ink);
+    font: var(--type-record-island);
+}
+.page > .sectionTitle { padding-inline: 6px; }
+.introduction { max-width: 70ch; margin: 4px 6px 10px; font: var(--type-meta); color: var(--lume-ink-muted); }
+.workspace { display: grid; gap: 10px; }
+.section { composes: settingSurface from "./settings-lume.module.css"; }
+.schedule { composes: settingSurface from "./settings-lume.module.css"; }
 .section > p { max-width: 70ch; margin-top: .75rem; font: var(--type-body); overflow-wrap: anywhere; }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }
 .workspace :global(.mf-section) { min-width: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }

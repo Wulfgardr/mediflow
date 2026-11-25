@@ -101,3 +101,17 @@
     0 0 0 1px color-mix(in srgb, var(--lume-ink) 14%, transparent),
     var(--lume-focus-ring);
 }
+
+:global(html[data-runtime-twin-design='proposal']) .area[data-record-page] { gap: 18px; padding: 24px; }
+:global(html[data-runtime-twin-design='proposal']) .area[data-record-page] .header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px 20px; padding: 0; }
+:global(html[data-runtime-twin-design='proposal']) .area[data-record-page] .title { margin: 0; letter-spacing: 0; font: var(--type-record-person); }
+:global(html[data-runtime-twin-design='proposal']) .area[data-record-page] .caseFlow { gap: 12px; padding: 14px; border: 1px solid var(--lume-record-tray-rule); border-radius: 16px; background: var(--lume-record-tray); }
+:global(html[data-runtime-twin-design='proposal']) .area[data-record-page] .section,
+:global(html[data-runtime-twin-design='proposal']) .area[data-record-page] .section:first-child { padding: 18px 20px; border: 1px solid var(--lume-record-island-rule); border-radius: 14px; background: var(--lume-record-island); }
+
+@media (max-width: 699px) {
+  :global(html[data-runtime-twin-design='proposal']) .area[data-record-page] { gap: 14px; padding: 16px; }
+  :global(html[data-runtime-twin-design='proposal']) .area[data-record-page] .caseFlow { padding: 8px; }
+  :global(html[data-runtime-twin-design='proposal']) .area[data-record-page] .section,
+  :global(html[data-runtime-twin-design='proposal']) .area[data-record-page] .section:first-child { padding: 12px 14px; }
+}

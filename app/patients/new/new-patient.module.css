@@ -8,4 +8,12 @@
 .navigation.navigation > a small { color: var(--lume-ink-muted); font-weight: 400; }
 @media (max-width: 1023px) { .navigation.navigation { padding-inline: 20px; } }
 @media (max-width: 700px), (pointer: coarse) { .navigation.navigation > a { min-height: 44px; } }
-.documentSection.documentSection.documentSection { --lume-focal-shadow-opacity: 0; padding: 0; border: 0; border-radius: 0 !important; background: transparent !important; box-shadow: none; }
+.content { display: grid; gap: 16px; min-width: 0; }
+.manualSection[hidden] { display: none; }
+.documentSection :global(section[aria-labelledby='patient-document-create-title']) {
+    border: 1px dashed var(--lume-record-proposal-rule);
+    border-radius: 14px;
+    background: transparent;
+    box-shadow: none;
+}
+.documentSection :global(.mf-input) { border-color: var(--lume-ink-muted); border-radius: 10px; }

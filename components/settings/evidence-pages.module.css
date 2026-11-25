@@ -1,16 +1,17 @@
-.page { display: grid; gap: 24px; min-width: 0; color: var(--lume-ink); }
-.page.page .intro h2,
-.page.page .heading,
-.page.page .section:global([data-disclosure]) > div:first-child h3,
-.page.page .section:global([data-disclosure]) > div:first-child :global([data-disclosure-control]) {
+.page { display: grid; gap: 10px; min-width: 0; color: var(--lume-ink); }
+.intro { padding: 6px 6px 2px; }
+.page.page .intro h2, .page.page .section .heading,
+.section :is(h2, h3),
+.section :is(h2, h3) :global(button[data-disclosure-control]) {
     margin: 0;
-    color: var(--lume-ink-muted);
-    font: var(--type-section-heading);
+    color: var(--lume-ink);
+    font: var(--type-record-island);
 }
 .page p { margin: 0; }
 .intro p, .section > p, .definition, .updateValues { font-size: 0.875rem; line-height: 1.6; max-width: 64ch; }
 .intro p { margin-top: 8px; color: var(--lume-ink-muted); }
-.section { min-width: 0; border-top: 1px solid var(--lume-rule); padding: 24px 0; display: grid; gap: 16px; }
+.section { composes: settingSurface from "./settings-lume.module.css"; min-width: 0; display: grid; gap: 12px; }
+.evidenceList { display: grid; gap: 10px; min-width: 0; }
 .detailLabel { margin: 0; font: var(--type-section); font-variant-caps: all-small-caps; letter-spacing: 0.05em; }
 .recordStatus { font-size: 0.8125rem; line-height: 1.5; font-weight: 600; }
 .definition { margin: 0; }
@@ -30,7 +31,7 @@
 .checks { min-width: 0; padding-top: 16px; }
 .checkHeader p { font-size: 0.875rem; line-height: 1.5; color: var(--lume-ink-muted); }
 .checkList { list-style: none; margin: 20px 0 0; padding: 0; }
-.checkRow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; border-top: 1px solid var(--lume-rule); padding: 20px 0; align-items: start; }
+.checkRow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; border-top: 1px solid var(--lume-record-island-rule); padding: 20px 0; align-items: start; }
 .checkRow > * { min-width: 0; }
 .checkIdentity { display: flex; gap: 12px; min-width: 0; }
 .checkIdentity > div { min-width: 0; }
@@ -50,3 +51,7 @@
     .checkResult { grid-column: 2; grid-row: 1; }
     .checkAction { grid-column: 3; grid-row: 1; }
 }
+
+.services { composes: settingSurface from "./settings-lume.module.css"; }
+.services > section:global([data-testid='service-architecture-panel']) { padding: 0; border: 0; }
+.services.services > section :global(#service-architecture-title) { color: var(--lume-ink); font: var(--type-record-island); }

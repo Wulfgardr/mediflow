@@ -46,3 +46,10 @@
     font: var(--type-section-heading); text-transform: none; letter-spacing: normal;
 }
 .section > h3 > div > :global(.apple-chip) { font: var(--type-meta); text-transform: none; letter-spacing: 0; }
+
+:global([data-record-tray='siss']) .workspace { gap: 14px; }
+:global([data-record-tray='siss']) .heading { font: var(--type-record-island); }
+:global([data-record-tray='siss']) .diary {
+    padding-top: 14px;
+    border-top: 1px solid var(--lume-record-island-rule);
+}

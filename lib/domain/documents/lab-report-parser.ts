@@ -132,7 +132,7 @@ function parseLabRow(sourceLine: string, lineNumber: number, units: LabReportUni
     const match = withUnit ?? (withoutUnit?.groups && units.acceptsMissingUnit(withoutUnit.groups.analyte.trim()) ? withoutUnit : null);
     if (!match?.groups) return undefined;
     const analyte = match.groups.analyte.trim();
-    if (analyte.length < 2 || /\d{4,}/.test(analyte)) return undefined;
+    if (analyte.length < 2 || /\d{4,}/.test(analyte.replace(/\bCKD-EPI\s*(?:2009|2021)\b/giu, ''))) return undefined;
 
     const parsedReferenceRange = parseReferenceRange(match.groups.range);
     if (!parsedReferenceRange) return undefined;

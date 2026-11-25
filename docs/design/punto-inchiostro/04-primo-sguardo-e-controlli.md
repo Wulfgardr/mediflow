@@ -616,6 +616,29 @@ Stato al 18 novembre 2026.
 | D26-D30 Zone, larghezze, fascia, fonte e bozza | In corso. La bozza a tre zone (PR 1048, chiusa) è servita da termine di confronto | In corso |
 | D31 Viste fuori dalla scheda | Per vista, nell'inventario | Per vista, nell'inventario |
 
+Aggiornamento del 25 novembre 2026 (PR 1094, solo Web). Il linguaggio «Vassoio opaco»
+si estende alle viste Web rimanenti; la tabella sopra resta lo stato del
+18 novembre e la vista paziente «Stabile e cambiato» (PR 1059) resta invariata.
+Le modifiche GPUI sono state rimosse dalla PR secondo la direzione del 25/11.
+
+- Web, viste del cockpit: Turno, Incarico, Diario e Repertori erano già pagine
+  di cartella. Si aggiungono Revisione, Handoff SISS e Stato operativo: titolo
+  con il ruolo `--type-record-person`, flusso del caso in un vassoio
+  (`--lume-record-tray`, raggio 16 px) e sezioni come isole
+  (`--lume-record-island`, raggio 14 px). La superficie di review
+  (`/mockups/kree8`) non cambia.
+- Web, viste fuori dal cockpit: nuova voce clinica, revisione delle note e
+  «Il tuo modo di lavorare» usano lo stesso titolo; il profilo di lavoro e il
+  primo avvio condividono l'isola. Le domande del profilo usano
+  `--type-section-heading`. Nessun titolo conserva il punto finale.
+- Web, controlli: la riga compatta del Diario nel Quadro misura 48 px di
+  colonna data (prima 84 px); la vista Diario completa resta a 84 px.
+
+Provato in questo aggiornamento (archivio sintetico, senza dati reali): build
+standalone Web, suite `repository-guards`, verifica formale `verify:therapy-status`,
+spec Playwright mirate sulle viste cambiate, contatore dei gesti WUL-860 e
+catture prima/dopo rispetto a `origin/main`.
+
 ## Prove e limiti
 
 Provato il 18 novembre, con dati sintetici:

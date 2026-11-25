@@ -62,3 +62,7 @@
 .fullDiaryLink:hover { text-decoration: underline; }
 @media (pointer: coarse) { .fullDiaryLink { min-height: 44px; } }
 .readingDiary .margin { flex-direction: column; align-content: flex-start; justify-content: flex-start; gap: 2px; }
+
+:global([data-record-tray='diario']) .diary { padding-bottom: 0; }
+:global([data-record-tray='diario']) .diary > .entry { padding-block: 12px; border-color: var(--lume-record-island-rule); }
+:global([data-record-tray='diario']) .diary > .entry:last-child { border-bottom: 0; }

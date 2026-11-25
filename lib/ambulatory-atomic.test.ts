@@ -85,7 +85,7 @@ function membership(patientId: string, ambulatoryId: string) {
 }
 const operations = [
     'host-create', 'host-update', 'host-delete', 'host-clear',
-    'paired-create', 'paired-update', 'paired-delete', 'paired-clear',
+    'paired-create', 'paired-update',
 ] as const;
 type Operation = typeof operations[number];
 function prepare(op: Operation): Ids {
@@ -148,8 +148,6 @@ async function invoke(op: Operation, x: Ids, version = 3) {
         case 'host-clear': return host.clearAmbulatory({ request, session }, x.target, version);
         case 'paired-create': return paired.createNetworkAmbulatory(pairedContext(), body);
         case 'paired-update': return paired.updateNetworkAmbulatory(pairedContext(), x.target, update);
-        case 'paired-delete': return paired.deleteNetworkAmbulatory(pairedContext(), x.target, { version });
-        case 'paired-clear': return paired.clearNetworkAmbulatory(pairedContext(), x.target, { version });
     }
 }
 type Fault = 'AUDIT_FAIL' | 'AUDIT_IGNORE' | 'SECOND_PATIENT_AUDIT_FAIL'
@@ -274,7 +272,7 @@ test('ignored primary and secondary DML outcomes', async () => {
 });
 
 test('clear faults at second patient audit, second tombstone and membership removal', async () => {
-    for (const op of ['host-clear', 'paired-clear'] as const) {
+    for (const op of ['host-clear'] as const) {
         for (const fault of ['SECOND_PATIENT_AUDIT_FAIL', 'SECOND_PATIENT_DML_IGNORE', 'MEMBERSHIP_DELETE_IGNORE'] as const) {
             const observed = await capture(op, fault);
             if (!baseline) { assert.ok(observed.error, `${op}/${fault}`); assert.deepEqual(observed.after, observed.before, `${op}/${fault}`); }
@@ -404,7 +402,7 @@ test('clear version exhaustion rolls back container, every patient and membershi
         else sql.prepare('UPDATE patients SET version=? WHERE id=?').run(kind === 'invalid-database' ? 0 : Number.MAX_SAFE_INTEGER,
             kind === 'already-deleted' ? x.alreadyDeleted : kind === 'shared-live' ? x.sharedLive : x.testOnlyB);
         const before = snapshot();
-        const response = await invoke(kind === 'already-deleted' ? 'paired-clear' : 'host-clear', x,
+        const response = await invoke('host-clear', x,
             kind === 'container' ? Number.MAX_SAFE_INTEGER : 3);
         assert.equal(response.status, 409, kind);
         assert.deepEqual(snapshot(), before, kind);

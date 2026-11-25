@@ -88,13 +88,15 @@ test('document date: only labeled text dates or file-name hint, never a birth da
 test('candidates: lab rows with evidence, explicit ICD with negation, catalog-only exemptions, full text kept', () => {
     const text = [
         'Referto di laboratorio', 'Glucosio 110 mg/dL 70-99 H', 'Creatinina 0,9 mg/dL 0,6-1,2',
+        'Ceruloplasmina 30 mg/dL 20-60',
         'Diagnosi: ICD-10 I10 Ipertensione essenziale', 'Nega diabete ICD-10 E11.9 diabete mellito tipo 2',
         'Esenzione 031 per ipertensione', 'Esenzione 999 inesistente', 'Note libere non strutturabili.',
     ].join('\n');
     const { units } = splitDossierUnits(text, null);
     const { facts } = extractDossierCandidates({ fileName: 'esami.pdf', text, units, documentDate: null, exemptionCodes: new Set(['031']) });
     const observations = facts.filter((fact) => fact.kind === 'observation');
-    assert.deepEqual(observations.map((fact) => fact.values.display), ['Glucosio', 'Creatinina']);
+    assert.deepEqual(observations.map((fact) => fact.values.display), ['Glucosio', 'Creatinina', 'Ceruloplasmina']);
+    assert.equal(observations[0].values.code, '2345-7');
     assert.equal(observations[0].values.observedAt, '', 'missing date stays missing');
     assert.equal(text.slice(observations[0].evidence!.start, observations[0].evidence!.end), 'Glucosio 110 mg/dL 70-99 H');
     const diagnoses = facts.filter((fact) => fact.kind === 'diagnosis');
@@ -103,7 +105,7 @@ test('candidates: lab rows with evidence, explicit ICD with negation, catalog-on
     const entry = facts.find((fact) => fact.origin === 'parser:document')!;
     assert.deepEqual([entry.values.textSource, entry.values.text], ['document', ''], 'the document entry refers to the single stored full text');
     assert.ok(dossierFactBlockers(observations[0]).some((item) => item.includes('Data mancante')));
-    assert.ok(dossierFactBlockers(observations[0]).some((item) => item.includes('code')), 'LOINC code is never invented');
+    assert.ok(dossierFactBlockers(observations[2]).some((item) => item.includes('code')), 'LOINC code is never invented');
     assert.ok(dossierFactBlockers(diagnoses[1]).some((item) => item.includes('nega')));
 });
 
@@ -314,7 +316,7 @@ test('lab LOINC/UCUM only from an exact local catalog match; ambiguous or unknow
     const observations = candidates(text).filter((fact) => fact.kind === 'observation');
     assert.deepEqual(observations.map((fact) => [fact.values.display, fact.values.code, fact.values.unitCode]), [
         ['Creatinina', '2160-0', 'mg/dL'],
-        ['Glicemia', '', ''],
+        ['Glicemia', '2345-7', 'mg/dL'],
         ['Creatinina', '', ''],
         ['Ferritina', loincLabTableCode(readLoincLabTable(), 'Ferritina', 'ng/mL'), 'ng/mL'],
         ['Ceruloplasmina', '', ''],
@@ -348,20 +350,18 @@ test('WUL-929: a synthetic report with ten common exams from the LOINC table yie
 test('WUL-929: right name in an unexpected unit, an exam awaiting validation and a near name stay uncoded', () => {
     const text = [
         'Acido urico 300 umol/L 200-420',
-        'Azotemia 40 mg/dL 10-50',
         'LDH 200 U/L 120-250',
         'Ferritina sierica 30 ng/mL 15-150',
         'Ca 2,3 mmol/L 2,1-2,6',
-        'FT4 1,1 ng/dL 0,9-1,7',
-        'Calcio 2,3 mmol/L 2,1-2,6',
-        'Calcio totale 2,3 mmol/L 2,1-2,6',
-        'FT4 15 pmol/L 10-22',
-        'FT3 5 pmol/L 3,1-6,8',
+        'Microalbuminuria 15 mg/L 0-20',
+        'Proteine urine 30 mg/dL 0-10',
+        'D-dimero 320 ng/mL 0-500',
+        'Troponina 12 ng/L 0-14',
     ].join('\n');
     const observations = candidates(text).filter((fact) => fact.kind === 'observation');
     assert.deepEqual(observations.map((fact) => fact.values.code), observations.map(() => ''));
-    assert.deepEqual(observations.map((fact) => fact.values.display).slice(0, 8),
-        ['Acido urico', 'Azotemia', 'LDH', 'Ferritina sierica', 'Ca', 'FT4', 'Calcio', 'Calcio totale']);
+    assert.deepEqual(observations.map((fact) => fact.values.display),
+        ['Acido urico', 'LDH', 'Ferritina sierica', 'Ca', 'Microalbuminuria', 'Proteine urine', 'D-dimero', 'Troponina']);
 });
 
 test('WUL-929: units as printed on Italian reports are table data; the code, value and UCUM unit come from the table, nothing is converted', () => {
@@ -405,9 +405,8 @@ test('WUL-929: a spelling the table does not list, a missing unit, a non-numeric
         'ACR (mg/mmol) 2,5 mg/mmol 0-3',
         'INR <1,0 0,8-1,2',
         'INR 1,1,2 0,8-1,2',
-        'Calcio totale 2,3 mmol/L 2,1-2,6',
-        'FT4 15 pmol/L 10-22',
-        'FT3 5 pmol/l 3,1-6,8',
+        'Microalbuminuria 15 mg/L 0-20',
+        'Proteine urine 30 mg/dL 0-10',
         'eGFR 80 60-120',
         'HbA1c 40 20-42',
         'Nitriti 0 0-0',
@@ -415,8 +414,99 @@ test('WUL-929: a spelling the table does not list, a missing unit, a non-numeric
     const observations = candidates(lines.join('\n')).filter((fact) => fact.kind === 'observation');
     assert.deepEqual(observations.filter((fact) => fact.values.code || fact.values.unitCode).map((fact) => fact.evidence?.excerpt), []);
     assert.deepEqual(observations.map((fact) => fact.evidence?.excerpt), [
-        'Vitamina D 25-OH 45 NMOL/L 50-125', 'Tempo di protrombina 12,1 S 9,5-13,5', 'Calcio totale 2,3 mmol/L 2,1-2,6', 'FT4 15 pmol/L 10-22', 'FT3 5 pmol/l 3,1-6,8',
+        'Vitamina D 25-OH 45 NMOL/L 50-125', 'Tempo di protrombina 12,1 S 9,5-13,5', 'Microalbuminuria 15 mg/L 0-20', 'Proteine urine 30 mg/dL 0-10',
     ], 'a missing unit is read only where the table declares it, so the other rows stay in the diary as on main');
+});
+
+test('WUL-929: synthetic Italian report covering all 14 clinical choices keeps every number as read', () => {
+    const lines = [
+        'Glicemia 104 mg/dL 70-99',
+        'Glicemia capillare 92 mg/dL 70-99',
+        'Azotemia 42 mg/dL 10-50',
+        'Urea 6,4 mmol/L 2,5-7,5',
+        'BUN 18 mg/dL 7-20',
+        'Calcio totale 9,3 mg/dL 8,5-10,5',
+        'Calcio totale 2,32 mmol/L 2,1-2,6',
+        'FT4 1,15 ng/dL 0,9-1,7',
+        'FT4 15,2 pmol/l 10-22',
+        'FT3 3,2 pg/mL 2,0-4,4',
+        'FT3 4,9 pmol/L 3,1-6,8',
+        'HbA1c 6,5 % 4,0-6,0',
+        'HbA1c 48 mmol/mol 20-42',
+        'eGFR 72 mL/min/1,73m2 60-120',
+        'eGFR CKD-EPI 2021 72 mL/min/1,73m2 60-120',
+        'eGFR CKD-EPI 2009 70 mL/min/1.73m2 60-120',
+        'eGFR MDRD 68 mL/min/1.73m2 60-120',
+        'Colesterolo LDL 115 mg/dL 0-100',
+        'Colesterolo LDL calcolato 112 mg/dL 0-100',
+        'Colesterolo LDL diretto 118 mg/dL 0-100',
+        'PCR 12,4 mg/L 0-5',
+        'PCR 1,24 mg/dL 0-0,5',
+        'hs-CRP 2,4 mg/L 0-3',
+        'hs-CRP 0,24 mg/dL 0-0,3',
+        'LDH 210 U/L 120-250',
+        'LDH IFCC 210 U/L 120-250',
+        'VES 14 mm/h 0-20',
+        'VES Westergren 14 mm/h 0-20',
+        'Neutrofili 4,2 10^9/L 1,8-7,0',
+        'Neutrofili 60 % 40-75',
+        'Reticolociti 1,1 % 0,5-2,0',
+        'D-dimero 320 ng/mL 0-500',
+        'D-dimero FEU 320 ng/mL 0-500',
+        'D-dimero DDU 180 ug/L 0-250',
+        'Troponina 12 ng/L 0-14',
+        'Troponina I hs 12 ng/L 0-14',
+        'Troponina T hs 14 ng/L 0-14',
+        'Troponina I 0,03 ng/mL 0-0,04',
+        'Troponina T 0,02 ng/mL 0-0,03',
+        'pH urine 6,0 5,0-8,0',
+        'Proteine urine 30 mg/dL 0-10',
+    ].join('\n');
+    const observations = candidates(lines, '2026-11-25').filter((fact) => fact.kind === 'observation');
+    assert.deepEqual(
+        observations.map((fact) => [fact.values.display, fact.values.value, fact.values.code, fact.values.unitCode]),
+        [
+            ['Glicemia', '104', '2345-7', 'mg/dL'],
+            ['Glicemia capillare', '92', '2339-0', 'mg/dL'],
+            ['Azotemia', '42', '3091-6', 'mg/dL'],
+            ['Urea', '6.4', '22664-7', 'mmol/L'],
+            ['BUN', '18', '3094-0', 'mg/dL'],
+            ['Calcio totale', '9.3', '17861-6', 'mg/dL'],
+            ['Calcio totale', '2.32', '2000-8', 'mmol/L'],
+            ['FT4', '1.15', '3024-7', 'ng/dL'],
+            ['FT4', '15.2', '14920-3', 'pmol/L'],
+            ['FT3', '3.2', '3051-0', 'pg/mL'],
+            ['FT3', '4.9', '14928-6', 'pmol/L'],
+            ['HbA1c', '6.5', '4548-4', '%'],
+            ['eGFR', '72', '', ''],
+            ['eGFR CKD-EPI 2021', '72', '98979-8', 'mL/min/{1.73_m2}'],
+            ['eGFR CKD-EPI 2009', '70', '62238-1', 'mL/min/{1.73_m2}'],
+            ['eGFR MDRD', '68', '77147-7', 'mL/min/{1.73_m2}'],
+            ['Colesterolo LDL', '115', '2089-1', 'mg/dL'],
+            ['Colesterolo LDL calcolato', '112', '13457-7', 'mg/dL'],
+            ['Colesterolo LDL diretto', '118', '18262-6', 'mg/dL'],
+            ['PCR', '12.4', '1988-5', 'mg/L'],
+            ['PCR', '1.24', '1988-5', 'mg/dL'],
+            ['hs-CRP', '2.4', '30522-7', 'mg/L'],
+            ['hs-CRP', '0.24', '30522-7', 'mg/dL'],
+            ['LDH', '210', '', ''],
+            ['LDH IFCC', '210', '14804-9', 'U/L'],
+            ['VES', '14', '30341-2', 'mm/h'],
+            ['VES Westergren', '14', '4537-7', 'mm/h'],
+            ['Neutrofili', '60', '770-8', '%'],
+            ['Reticolociti', '1.1', '17849-1', '%'],
+            ['D-dimero', '320', '', ''],
+            ['D-dimero FEU', '320', '48065-7', 'ng{FEU}/mL'],
+            ['D-dimero DDU', '180', '48066-5', 'ug/L{DDU}'],
+            ['Troponina', '12', '', ''],
+            ['Troponina I hs', '12', '89579-7', 'ng/L'],
+            ['Troponina T hs', '14', '67151-1', 'ng/L'],
+            ['Troponina I', '0.03', '10839-9', 'ng/mL'],
+            ['Troponina T', '0.02', '6598-7', 'ng/mL'],
+            ['pH urine', '6.0', '5803-2', '[pH]'],
+            ['Proteine urine', '30', '', ''],
+        ],
+    );
 });
 
 test('WUL-929: reported units never widen the prepared path or the pending names', async () => {

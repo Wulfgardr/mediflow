@@ -6,16 +6,14 @@ import { SettingsSectionIntro } from '@/components/settings/settings-ui';
 
 export default function SettingsAiGovernancePage() {
     return (
-        <section className="space-y-4" data-testid="settings-ai-governance-section">
+        <section className="grid min-w-0 gap-[10px]" data-testid="settings-ai-governance-section">
             <SettingsSectionIntro
                 title="Governance e rollout"
                 description="Parliament dei modelli e prontezza al rilascio."
             />
 
-            <div className="space-y-6">
-                <AiModelParliamentPanel />
-                <AiRolloutReadinessPanel />
-            </div>
+            <AiModelParliamentPanel />
+            <AiRolloutReadinessPanel />
         </section>
     );
 }

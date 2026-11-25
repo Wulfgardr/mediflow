@@ -94,20 +94,20 @@ export default function SettingsAccessPage() {
                 open={openForm === 'pin'} onOpenChange={open => setOpenForm(open ? 'pin' : null)}>
                 <div className={styles.form} aria-busy={isChangingPin}>
                     <p className={styles.copy}>Cambia il PIN mantenendo accessibili i dati clinici.</p>
-                    <div>
+                    <div className={styles.fieldRow}>
                         <label htmlFor="current-pin" className={SETTINGS_LABEL_CLASS}>PIN attuale</label>
                         <input id="current-pin" name="currentPin" type="password" inputMode="text"
                             value={pinForm.currentPin} onChange={e => updatePinField('currentPin', e.target.value)}
                             placeholder="Inserisci il PIN attuale" autoComplete="current-password" spellCheck={false} className={SETTINGS_INPUT_CLASS} />
                     </div>
-                    <div>
+                    <div className={styles.fieldRow}>
                         <label htmlFor="new-pin" className={SETTINGS_LABEL_CLASS}>Nuovo PIN</label>
                         <input id="new-pin" name="newPin" type="password" inputMode="text"
                             aria-invalid={Boolean(newPinError)}
                             value={pinForm.newPin} onChange={e => updatePinField('newPin', e.target.value)}
                             placeholder="4-8 caratteri" autoComplete="new-password" spellCheck={false} className={SETTINGS_INPUT_CLASS} />
                     </div>
-                    <div>
+                    <div className={styles.fieldRow}>
                         <label htmlFor="confirm-pin" className={SETTINGS_LABEL_CLASS}>Conferma nuovo PIN</label>
                         <input id="confirm-pin" name="confirmPin" type="password" inputMode="text"
                             aria-invalid={Boolean(confirmPinError)}

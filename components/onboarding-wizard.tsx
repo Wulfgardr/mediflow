@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { identifierError } from '@/lib/patient-identity';
 import { checkPassphrase } from '@/lib/security/unlock-credential';
+import access from '@/components/auth-health-screen.module.css';
+import surface from '@/components/record-surface.module.css';
 import styles from './onboarding-experience.module.css';
 
 export type SecuritySetup = { displayName: string; ambulatoryName: string; doctorTaxCode?: string; pin: string; passphrase: string };
@@ -63,8 +65,8 @@ export function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     };
 
     return (
-        <div className={`${styles.experience} ${styles.setup}`} data-testid="onboarding-setup" aria-busy={isSubmitting}>
-            <p className={styles.brandLine}><span className={styles.brand}>MediFlow<b>.</b></span><span className={styles.progress} aria-label="Avanzamento della configurazione">Passo {step} di 2</span></p>
+        <div className={`${styles.experience} ${styles.setup}`} data-testid="onboarding-setup" data-record-page data-record-island aria-busy={isSubmitting}>
+            <p className={styles.brandLine}><span className={access.brand} data-record-brand><span className={access.brandGlyph} data-brand-glyph aria-hidden="true"><i /><i /><i /></span>MediFlow</span><span className={surface.pillNeutral} aria-label="Avanzamento della configurazione">Passo {step} di 2</span></p>
             {step === 1 && (
                 <div className={styles.stack}>
                     <header className={styles.heading}>
