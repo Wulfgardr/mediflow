@@ -8,7 +8,7 @@ import { usePathname } from 'next/navigation';
 import { Fragment, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Activity, BookOpen, CalendarDays, CircleDashed, ChevronDown, CircleHelp, ClipboardList, FolderOpen, Inbox, LockKeyhole, Moon, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Settings2, Search, Sun, Users, X } from 'lucide-react';
 import { db } from '@/lib/db';
-import { currentWorkspaceDestination } from '@/lib/workspace-destination';
+import { currentWorkspaceDestination, openPatientRecordId } from '@/lib/workspace-destination';
 import { useLiveQuery } from '@/lib/live-query';
 import { agentIncomingCountServerSnapshot, agentIncomingCountSnapshot, subscribeAgentIncomingCount } from '@/lib/agent-incoming-count';
 import { useSecurity } from '@/components/security-provider';
@@ -64,6 +64,13 @@ export function useRecordCrumb(id: string | undefined, label: string, proposals?
   useWorkspaceRegistration(useContext(RecordCrumbContext), crumb);
 }
 
+type WorkspaceCrumb = { href: string; label: string };
+const WorkspaceCrumbContext = createContext<((value: WorkspaceCrumb | null) => void) | null>(null);
+export function useWorkspaceCrumb(href: string | undefined, label: string | undefined) {
+  const crumb = useMemo(() => href && label ? { href, label } : null, [href, label]);
+  useWorkspaceRegistration(useContext(WorkspaceCrumbContext), crumb);
+}
+
 export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
   const { enabled, proposal, composition, pendingForms, discardPendingForms } = useRuntimeTwinDesign();
   const confirm = useConfirm();
@@ -73,7 +80,7 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
   const desktop = useSyncExternalStore(watchRecordWidth, desktopRecord, serverRecordWidth);
   const incomingCount = useSyncExternalStore(subscribeAgentIncomingCount, agentIncomingCountSnapshot, agentIncomingCountServerSnapshot);
   const pathname = usePathname();
-  const patientId = pathname.match(/^\/patients\/([^/]+)\//)?.[1] ?? null;
+  const patientId = openPatientRecordId(pathname);
   const unifiedShell = proposal && desktop;
   const wideRecord = !!patientId && unifiedShell;
   const [opened, setOpened] = useState<string[]>([]);
@@ -87,6 +94,7 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
       : destinations[0]);
   const recordSearch = useRef<HTMLAnchorElement>(null);
   const [recordLabel, setRecordLabel] = useState<RecordCrumb | null>(null);
+  const [pageCrumb, setPageCrumb] = useState<WorkspaceCrumb | null>(null);
   const [scrolledRecord, setScrolledRecord] = useState<string | null>(null);
   const currentRecord = recordLabel?.id === patientId ? recordLabel : null;
   const operator = user?.displayName?.trim() || user?.username || '';
@@ -153,6 +161,7 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
             {railOpen ? <PanelLeftClose size={18} aria-hidden /> : <PanelLeftOpen size={18} aria-hidden />}
           </button>
   );
+  const pageCrumbLink = pageCrumb ? <Link className={styles.pageCrumb} href={pageCrumb.href}>{pageCrumb.label}</Link> : null;
   const workspaceBar = (
     <header className={styles.workspaceBar}>
           {!unifiedShell ? railToggle : null}
@@ -160,9 +169,11 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
             <Link className={styles.directoryTab} href={activeDestination.href} aria-label={activeDestination.label} aria-current={!patientId && currentDestinationHref !== null ? 'page' : undefined}>{activeDestination.label}</Link>
             {records.map((patient, index) => <span className={styles.recordTab} key={patient.id} data-active={patient.id === patientId}>
               <Link href={`/patients/${patient.id}/modules`} aria-current={patient.id === patientId ? 'page' : undefined}><span className={currentRecord && patient.id === patientId ? styles.recordName : undefined}><PrivacyBlur>{patient.lastName} {patient.firstName}</PrivacyBlur></span>{currentRecord && patient.id === patientId ? <span className={styles.recordWhen} aria-hidden="true">{currentRecord.label}</span> : null}<DraftMarker patientId={patient.id} /></Link>
+              {patient.id === patientId ? pageCrumbLink : null}
               {patient.id === patientId ? <Link href="/?area=incarico" aria-label={`Chiudi cartella ${index + 1}`} onClick={() => setOpened(value => value.filter(id => id !== patient.id))}><X size={13} aria-hidden /></Link>
                 : <button type="button" aria-label={`Chiudi cartella ${index + 1}`} onClick={() => setOpened(value => value.filter(id => id !== patient.id))}><X size={13} aria-hidden /></button>}
             </span>)}
+            {records.some(patient => patient.id === patientId) ? null : pageCrumbLink}
           </nav>
           {!unifiedShell ? <PrivacyModeToggle className={styles.privacy} /> : null}
         </header>
@@ -170,6 +181,7 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
 
   return (
     <RecordCrumbContext.Provider value={setRecordLabel}>
+    <WorkspaceCrumbContext.Provider value={setPageCrumb}>
     <WorkspaceAreaContext.Provider value={setArea}>
     <WorkspaceCommandContext.Provider value={proposal ? registerCommand : null}>
     <DirectoryReturnContext.Provider value={directoryReturn}>
@@ -232,6 +244,7 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
     </DirectoryReturnContext.Provider>
     </WorkspaceCommandContext.Provider>
     </WorkspaceAreaContext.Provider>
+    </WorkspaceCrumbContext.Provider>
     </RecordCrumbContext.Provider>
   );
 }

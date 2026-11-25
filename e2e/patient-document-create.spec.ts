@@ -228,7 +228,7 @@ test('annullamento: la lavorazione si ritira e nessuna scheda viene creata', asy
     expect(await patientCount(page)).toBe(before);
     await page.reload();
     await unlockIfNeeded(page, PIN);
-    await expect(page.getByTestId('patient-document-create').getByRole('heading', { name: 'Nuova scheda da documento' })).toBeVisible();
+    await expect(page.getByTestId('patient-document-create').getByRole('heading', { name: 'Trascina qui uno o più documenti del paziente, oppure sceglili.' })).toBeVisible();
 });
 
 test('arrivo da documento e lettura tardiva rispettano il focus già scelto', async ({ page }) => {
@@ -242,7 +242,7 @@ test('arrivo da documento e lettura tardiva rispettano il focus già scelto', as
     const picker = page.waitForEvent('filechooser');
     await panel.getByRole('button', { name: 'Scegli i documenti' }).click();
     await (await picker).setFiles({ name: 'referto-focus-sintetico.pdf', mimeType: 'application/pdf', buffer: await syntheticPdf(lastName) });
-    const back = page.getByRole('link', { name: 'Torna alla lista', exact: true });
+    const back = page.getByRole('navigation', { name: 'Cartelle aperte' }).getByRole('link', { name: 'Pazienti', exact: true });
     for (let press = 0; press < 12 && !await back.evaluate(element => document.activeElement === element); press++) {
         await page.keyboard.press('Shift+Tab');
     }

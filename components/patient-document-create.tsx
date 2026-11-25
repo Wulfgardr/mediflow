@@ -362,10 +362,9 @@ export default function PatientDocumentCreate({ onActiveChange, dossier, onDocum
                         className={`mf-section mf-section-tight flex flex-col items-center justify-center gap-3 border-dashed px-6 py-8 text-center ${dragging ? 'ring-2 ring-[color:var(--lume-ink-fresh)]' : ''}`}
                     >
                         <FileUp className="h-6 w-6 text-[color:var(--lume-ink-muted)]" aria-hidden="true" />
-                        <h3 id="patient-document-create-title" ref={heading} tabIndex={-1} className="font-semibold text-[color:var(--lume-ink)]">Nuova scheda da documento</h3>
-                        <p className="max-w-xl text-sm text-[color:var(--lume-ink-muted)]">
+                        <h3 id="patient-document-create-title" ref={heading} tabIndex={-1} className="max-w-xl text-sm font-normal text-[color:var(--lume-ink-muted)]">
                             {onDocuments ? 'Trascina qui uno o più documenti del paziente, oppure sceglili.' : 'Trascina qui un PDF o un’immagine (JPEG, PNG) fino a 10 MiB, oppure sceglilo.'}
-                        </p>
+                        </h3>
                         <input ref={fileInput} type="file" accept={onDocuments ? undefined : PATIENT_DOCUMENT_ACCEPT} multiple={Boolean(onDocuments)} className="sr-only" id="patient-document-create-file"
                             onChange={(event) => { const files = [...(event.target.files ?? [])]; event.target.value = ''; select(files); }} />
                         <button type="button" className="mf-button-secondary" onClick={() => fileInput.current?.click()}>{onDocuments ? 'Scegli i documenti' : 'Scegli un documento'}</button>
@@ -522,7 +521,7 @@ export default function PatientDocumentCreate({ onActiveChange, dossier, onDocum
                                 : 'La creazione risulta registrata, ma l’allegato non si apre o non corrisponde al documento scelto. Non ripetere la creazione; il riferimento resta conservato.'}
                     </p>
                     <div className="mt-3 flex flex-wrap gap-3">
-                        <Link href={`/patients/${phase.patientId}`} className="mf-button-primary">Apri la scheda</Link>
+                        <Link href={`/patients/${phase.patientId}`} className="mf-button-secondary">Apri la scheda</Link>
                         {phase.verified === 'failed' && <button type="button" className="mf-button-secondary" onClick={() => void readReceipt(phase.commandId, work.current)}>Rileggi esito e allegato</button>}
                         {phase.verified !== 'failed' && <button type="button" className="mf-button-secondary" onClick={() => { restart(); setPhase({ kind: 'idle' }); }}>Nuova scheda da documento</button>}
                     </div>

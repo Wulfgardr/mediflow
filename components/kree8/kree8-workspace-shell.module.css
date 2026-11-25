@@ -115,79 +115,13 @@
 .headerActionButton:focus-visible { outline: 2px solid var(--k8-focus); outline-offset: 2px; }
 .headerActionsPopover { position: absolute; top: calc(100% + 6px); right: 0; z-index: 40; min-width: 190px; }
 
-.hero {
-  min-width: 0;
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-}
 
-.brandMark {
-  flex: 0 0 auto;
-  width: 24px;
-  height: 24px;
-  border-radius: 8px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--k8-accent-soft);
-  border: 1px solid var(--k8-accent-line);
-  color: var(--k8-accent);
-  box-shadow: none;
-}
 
-.heroText { min-width: 0; flex: 1 1 auto; }
-.eyebrow {
-  margin: 0;
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--k8-subtle);
-}
 
-.title {
-  margin: 2px 0 0;
-  display: flex;
-  align-items: baseline;
-  gap: 0;
-  line-height: 1.2;
-  letter-spacing: 0;
-  font: var(--type-page-title);
-}
 
-.titleMain {
-  display: inline-block;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
-.patientLabel {
-  margin: 2px 0 0;
-  font-size: 0.75rem;
-  font-weight: 600;
-  line-height: 1.35;
-  color: var(--k8-ink);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 
-.subtitle,
-.statusLine {
-  margin: 4px 0 0;
-  max-width: 760px;
-  font-size: 0.75rem;
-  line-height: 1.5;
-  color: var(--k8-muted);
-}
 
-.statusLine {
-  color: var(--k8-subtle);
-  font-size: 0.75rem;
-}
 
 /* LUME-104/68: testata sticky e una sola elevazione clinica. */
 .clinicalShell { --lume-scheda-registro-family: var(--lume-font-sans); padding: 10px; }
@@ -494,16 +428,6 @@
     overflow: hidden;
     border-radius: 20px;
   }
-  :global(html[data-runtime-twin-design='proposal']) .canvas:has([data-runtime-settings]) .chrome {
-    position: relative;
-    top: auto;
-    flex: 0 0 auto;
-    border: 0;
-    border-bottom: 1px solid var(--k8-line);
-    border-radius: 0;
-    padding: 0 4px 18px;
-    background: transparent;
-  }
   :global(html[data-runtime-twin-design='proposal']) .workspaceBody:has([data-runtime-settings]) {
     flex: 1 1 0;
     min-height: 0;
@@ -753,9 +677,6 @@
   .workspaceBody :global(section[id]) { scroll-margin-top: 196px; }
   /* WUL-297: keep room for the privacy toggle on the same row. */
   .backButton { max-width: 100%; flex: 1 1 auto; justify-content: center; }
-  .title {
-    font: var(--type-page-title); }
-  .patientLabel { font-size: 0.75rem; }
   .clinicalShell { padding: 0; }
   .clinicalCanvas { --k8-canvas-pad: 8px; border: 0; border-radius: 0; }
   .clinicalChrome { border-radius: 10px; }
@@ -885,7 +806,6 @@
 :global(html[data-runtime-twin-design='proposal']) .clinicalAtoms { font-family: var(--lume-font-sans); font-size: 0.75rem; margin-top: 9px; }
 :global(html[data-runtime-twin-design='proposal']) .clinicalLabel,
 :global(html[data-runtime-twin-design='proposal']) .sectionLabel,
-:global(html[data-runtime-twin-design='proposal']) .eyebrow,
 :global(html[data-runtime-twin-design='proposal']) .clinicalSection > h3 :global(.section-kicker) { display: none; }
 :global(html[data-runtime-twin-design='proposal']) .headerPrimaryAction,
 :global(html[data-runtime-twin-design='proposal']) .headerActionButton { box-sizing: border-box; min-height: var(--lume-control-height); padding: 8px 14px; font-size: 0.875rem; line-height: 1.5; gap: 8px; border-radius: var(--lume-control-radius); }
@@ -970,25 +890,6 @@
   border-radius: 0;
   background: var(--lume-surface-focal);
 }
-:global(html[data-runtime-twin-design='proposal']) .canvas:has([data-runtime-settings]) .chrome {
-  position: relative;
-  top: auto;
-  display: grid;
-  grid-template-columns: 200px minmax(0, 1fr);
-  align-items: center;
-  gap: 24px;
-  padding: 22px 28px;
-  border: 0;
-  border-bottom: 1px solid var(--k8-line-strong);
-  border-radius: 0;
-  background: var(--lume-surface-focal);
-}
-:global(html[data-runtime-twin-design='proposal']) .canvas:has([data-runtime-settings]) .hero { gap: 0; }
-:global(html[data-runtime-twin-design='proposal']) .canvas:has([data-runtime-settings]) .brandMark,
-:global(html[data-runtime-twin-design='proposal']) .canvas:has([data-runtime-settings]) .statusLine { display: none; }
-:global(html[data-runtime-twin-design='proposal']) .canvas:has([data-runtime-settings]) .title { margin: 0; font: var(--type-record-person); }
-:global(html[data-runtime-twin-design='proposal']) .canvas:has([data-runtime-settings]) .titleMain { font-size: inherit; letter-spacing: 0; }
-:global(html[data-runtime-twin-design='proposal']) .canvas:has([data-runtime-settings]) .subtitle { margin: 4px 0 0; font-size: 0.75rem; }
 :global(html[data-runtime-twin-design='proposal']) .workspaceBody [data-runtime-settings] { grid-template-columns: 252px minmax(0, 1fr); row-gap: 0; }
 :global(html[data-runtime-twin-design='proposal']) .workspaceBody [data-runtime-settings] > aside { padding: 22px 14px; background: var(--lume-surface-field); border-right: 1px solid var(--k8-line-strong); }
 :global(html[data-runtime-twin-design='proposal']) .workspaceBody [data-testid='settings-subroute-content'] { padding: 36px clamp(24px, 4vw, 64px) 64px; }
@@ -1020,7 +921,6 @@
   :global(html[data-runtime-twin-design='proposal']) .clinicalBody { flex: none; overflow: visible; padding: 26px 20px 48px; border: 0; }
   :global(html[data-runtime-twin-design='proposal']) .clinicalStack { gap: 28px; }
   :global(html[data-runtime-twin-design='proposal']) .synopticTherapy { grid-template-columns: minmax(0, 1fr); gap: 3px; }
-  :global(html[data-runtime-twin-design='proposal']) .canvas:has([data-runtime-settings]) .chrome { grid-template-columns: minmax(0, 1fr); padding: 18px 20px; gap: 18px; }
 }
 @media (prefers-reduced-motion: reduce) {
   :global(html[data-runtime-twin-design='proposal']) .clinicalBody { scroll-behavior: auto; }
@@ -1048,35 +948,13 @@
 :global(html[data-runtime-twin-design='proposal']) .canvas { border: 0; border-radius: 0; padding: 0; gap: 0; background: var(--lume-surface-focal); }
 :global(html[data-runtime-twin-design='proposal']) .chrome { position: relative; top: 0; border-radius: 0; padding: 24px var(--ink-plane-inset) 20px; border: 0; border-bottom: 1px solid var(--k8-line); background: transparent; }
 :global(html[data-runtime-twin-design='proposal']) .chromeTopRow { min-height: var(--lume-control-height); }
-:global(html[data-runtime-twin-design='proposal']) .hero { padding: 8px 0 0; }
-:global(html[data-runtime-twin-design='proposal']) .title { font: var(--type-record-person); letter-spacing: 0; }
-:global(html[data-runtime-twin-design='proposal']) .brandMark { display: none; }
 :global(html[data-runtime-twin-design='proposal']) .workspaceBody { padding: 26px var(--ink-plane-inset) 50px; }
 /* secondary navigation is a compact link, never a full-width pill. */
 :global(html[data-runtime-twin-design='proposal']) .backButton { flex: 0 0 auto; width: fit-content; min-height: var(--lume-control-height); border: 0; border-radius: 5px; background: transparent; padding: 6px 0; justify-content: flex-start; }
-/* the workspace already supplies Pazienti and Privacy once. */
-:global(html[data-runtime-twin-design='proposal']) .canvas:has([data-runtime-settings]) .chromeTopRow { display: none; }
-:global(html[data-runtime-twin-design='proposal']) .canvas:has([data-runtime-settings]) .chrome { grid-template-columns: minmax(0, 1fr); padding-block: 20px; }
-:global(html[data-runtime-twin-design='proposal']) .canvas:has([data-runtime-settings]) .hero { padding: 0; }
 @media (max-width: 700px) { :global(html[data-runtime-twin-design='proposal']) .chrome { padding: 20px var(--ink-plane-inset); } :global(html[data-runtime-twin-design='proposal']) .workspaceBody { padding: 22px var(--ink-plane-inset); } }
 
 /* WUL-676: area headings and anchor navigation share one alignment.
    Only the navigation marks scroll position; data surfaces retain their shape. */
-:global(html[data-runtime-twin-design='proposal']) .overviewShell .chrome {
-  padding: 28px var(--ink-plane-inset) 20px;
-  border: 0;
-}
-:global(html[data-runtime-twin-design='proposal']) .overviewShell .hero { padding: 0; }
-:global(html[data-runtime-twin-design='proposal']) .overviewShell .title {
-  margin: 0;
-  letter-spacing: 0;
-  font: var(--type-record-person);
-}
-:global(html[data-runtime-twin-design='proposal']) .overviewShell .titleMain {
-  white-space: normal;
-  font-size: inherit;
-  letter-spacing: inherit;
-}
 :global(html[data-runtime-twin-design='proposal']) .overviewShell .sectionRail {
   position: sticky;
   top: 0;
@@ -1154,10 +1032,10 @@
 }
 
 @media (max-width: 700px) {
-  :global(html[data-runtime-twin-design='proposal']) .canvas:has([data-runtime-settings]) .chrome { padding-inline: var(--ink-plane-inset); }
   :global(html[data-runtime-twin-design='proposal']) .workspaceBody [data-runtime-settings] > aside,
   :global(html[data-runtime-twin-design='proposal']) .workspaceBody [data-testid='settings-subroute-content'] { padding-inline: 0; }
 }
+.pageChrome { padding: 24px var(--ink-plane-inset) 20px; border-bottom: 1px solid var(--k8-line); }
 @media (min-width: 1001px) {
-  :global(html[data-runtime-twin-design='proposal']) .canvas:has([data-runtime-settings]) .chrome { padding: 39px 24px 16px; }
+  .pageChrome { padding: 39px 24px 16px; }
 }

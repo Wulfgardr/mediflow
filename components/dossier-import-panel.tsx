@@ -149,8 +149,7 @@ export default function DossierImportPanel({ initialPatientId }: { initialPatien
     const { isAuthenticated, isLocked, user, authRecoveryState } = useSecurity();
     if (!isAuthenticated || isLocked || !user?.id || authRecoveryState !== 'ready') {
         return (
-            <Kree8WorkspaceShell eyebrow="Pazienti" title="Importa documenti" subtitle="Dossier clinico da una cartella del Mac."
-                backHref="/patients/import" backLabel="Torna all’importazione">
+            <Kree8WorkspaceShell title="Importa documenti">
                 <p role="status" className={styles.muted}>Sblocca MediFlow per leggere una cartella.</p>
             </Kree8WorkspaceShell>
         );
@@ -517,7 +516,7 @@ function ActiveDossierImport({ initialPatientId, entry }: { initialPatientId: st
                                         <span>Ho controllato le fonti e confermo che appartengono alla scheda scelta.</span>
                                     </label>
                                     <div className={styles.actions}>
-                                        <button type="button" className={styles.primary} disabled={!linked || identity.blocking || !confirmations[group.key] || !acquirable || Boolean(busy) || backupProposed}
+                                        <button type="button" className="mf-button-primary" disabled={!linked || identity.blocking || !confirmations[group.key] || !acquirable || Boolean(busy) || backupProposed}
                                             onClick={() => { void acquire(effectiveGroup, linked); }}>Salva {formatCountLabel(acquirable, 'originale', 'originali')} nella scheda</button>
                                     </div>
                                     <NewPatientFromDocument group={group} identityBlocking={identity.blocking} busy={Boolean(busy) || backupProposed}
@@ -555,10 +554,7 @@ function ActiveDossierImport({ initialPatientId, entry }: { initialPatientId: st
     );
     if (entry.kind === 'new-patient' || !entry.framed) return content;
     return (
-        <Kree8WorkspaceShell eyebrow="Pazienti" title="Importa documenti"
-            subtitle="Collega i documenti di una cartella alle schede, conservando originali, testo e provenienza."
-            backHref="/patients/import" backLabel="Torna all’importazione"
-            statusLabel="Nessuna scrittura senza la tua conferma.">
+        <Kree8WorkspaceShell title="Importa documenti">
             {content}
         </Kree8WorkspaceShell>
     );
@@ -644,7 +640,7 @@ function DossierReview({ view, busy, ports, operation, setBusy, setNotice, reloa
                 <span>Ho letto le sintesi dei documenti e accetto anche quelle: sono testo riassunto, non verificabile parola per parola. La sintesi prende il posto della voce con il documento intero e il residuo si considera rivisto solo se le pagine lette coincidono.</span>
             </label>
             <div className={styles.actions}>
-                <button type="button" className={styles.primary} disabled={busy || complete === view.documents.length} data-testid="dossier-bulk" onClick={() => { void bulk(); }}>Accetta il verificato e applica</button>
+                <button type="button" className="mf-button-primary" disabled={busy || complete === view.documents.length} data-testid="dossier-bulk" onClick={() => { void bulk(); }}>Accetta il verificato e applica</button>
             </div>
         </div> : null}
         {bulkResult ? <p role="status" data-testid="dossier-bulk-result">
@@ -740,7 +736,7 @@ function DossierDocument({ document, view, busy, result, onSave, onApply, onRetr
             {record.pendingWrites?.length ? <p className={styles.notice} role="status">{formatCountLabel(record.pendingWrites.length, 'scrittura ha', 'scritture hanno')} esito da verificare: applica di nuovo per rileggerle, senza duplicare.</p> : null}
             {record.extraction.state === 'failed' ? <div className={styles.actions}>
                 <span>{record.extractionAttempts?.length ? formatCountLabel(record.extractionAttempts.length, 'tentativo registrato', 'tentativi registrati') : ''}</span>
-                <button type="button" className={styles.secondary} disabled={busy || dirty} onClick={() => { void onRetry(); }}>Riprova l’estrazione dall’originale</button>
+                <button type="button" className="mf-button-secondary" disabled={busy || dirty} onClick={() => { void onRetry(); }}>Riprova l’estrazione dall’originale</button>
             </div> : null}
             {document.text !== null ? <details className={styles.disclosure} ref={fullTextRef} id={`${ids}-full-text`}>
                 <summary>Testo completo{document.textVerified ? '' : ' (non verificato)'}</summary>
@@ -762,7 +758,7 @@ function DossierDocument({ document, view, busy, result, onSave, onApply, onRetr
                         <td role="cell" data-label="Tipo">{DOSSIER_FACT_KIND_LABELS[fact.kind]}<small className={styles.muted}>{ORIGIN_LABEL[fact.origin] ?? fact.origin}</small></td>
                         <td role="cell" data-label="Contenuto">
                             {evidence ? <small>Evidenza, unità {evidence.unit}: <PrivacyBlur>{evidence.excerpt}</PrivacyBlur></small> : null}
-                            {canShowEvidence && <button type="button" className={styles.secondary} aria-controls={`${ids}-full-text`}
+                            {canShowEvidence && <button type="button" className="mf-button-secondary" aria-controls={`${ids}-full-text`}
                                 onClick={() => showEvidence(fact)}>Mostra nel testo</button>}
                             {fact.values.textSource === 'document' ? <small>Testo: il testo completo del documento, conservato sopra.</small> : null}
                             {qualifierNotes(fact).map((note) => <small key={note} data-testid="dossier-qualifier">{note}</small>)}
@@ -798,7 +794,7 @@ function DossierDocument({ document, view, busy, result, onSave, onApply, onRetr
                 <select id={`${ids}-new-kind`} value={newKind} disabled={busy} onChange={(event) => setNewKind(event.currentTarget.value as DossierFactKind)}>
                     {(Object.keys(DOSSIER_FACT_KIND_LABELS) as DossierFactKind[]).map((kind) => <option key={kind} value={kind}>{DOSSIER_FACT_KIND_LABELS[kind]}</option>)}
                 </select>
-                <button type="button" className={styles.secondary} disabled={busy} onClick={() => setDraft((current) => ({ ...current,
+                <button type="button" className="mf-button-secondary" disabled={busy} onClick={() => setDraft((current) => ({ ...current,
                     facts: [...current.facts, createManualDossierFact(newKind, { ...Object.fromEntries(FIELDS[newKind].map((field) => [field.name, ''])), ...DEFAULT_VALUES[newKind] }, crypto.randomUUID())] }))}>Aggiungi</button>
             </div>
             <label className={styles.consent}>
@@ -807,9 +803,9 @@ function DossierDocument({ document, view, busy, result, onSave, onApply, onRetr
                 <span>Ho letto il testo e le pagine non lette: ciò che non è strutturato resta nel documento e nel testo conservato.</span>
             </label>
             <div className={styles.actions}>
-                <button type="button" className={styles.secondary} disabled={!dirty || busy}
+                <button type="button" className="mf-button-secondary" disabled={!dirty || busy}
                     onClick={() => { void onSave((fresh) => ({ ...fresh, facts: draft.facts, residualReview: draft.residualReview, documentDate: draft.documentDate })); }}>Salva revisione</button>
-                <button type="button" className={styles.primary} disabled={dirty || busy || acceptedReady === 0 || document.coverage.gaps.includes('identity_conflict')} onClick={() => { void onApply(); }}>
+                <button type="button" className="mf-button-primary" disabled={dirty || busy || acceptedReady === 0 || document.coverage.gaps.includes('identity_conflict')} onClick={() => { void onApply(); }}>
                     Applica {formatCountLabel(acceptedReady, 'fatto accettato', 'fatti accettati')}
                 </button>
             </div>
@@ -850,13 +846,13 @@ function NewPatientFromDocument({ group, identityBlocking, busy, creating, onSta
             <select id={`${ids}-source`} value={choice} disabled={busy} onChange={(event) => setChoice(event.currentTarget.value)}>
                 {candidates.map((item) => <option key={item.key} value={item.key}>{item.fileName}</option>)}
             </select>
-            <button type="button" className={styles.secondary} disabled={busy || !choice} onClick={() => onStart(choice)}>Crea la scheda da questo documento</button>
+            <button type="button" className="mf-button-secondary" disabled={busy || !choice} onClick={() => onStart(choice)}>Crea la scheda da questo documento</button>
         </div>;
     }
     return <div className={styles.section} data-testid="dossier-new-patient">
         {file && source ? <PatientDocumentCreate dossier={{ file, proposals: groupIdentityProposals(group, source.key),
             onCreated: ({ patientId }) => { void onCreated(patientId); } }} /> : <p role="status">Preparazione del documento…</p>}
-        <div className={styles.actions}><button type="button" className={styles.secondary} onClick={onCancel}>Chiudi la creazione</button></div>
+        <div className={styles.actions}><button type="button" className="mf-button-secondary" onClick={onCancel}>Chiudi la creazione</button></div>
     </div>;
 }
 

@@ -103,13 +103,8 @@ export default function MockSchedaPage() {
     return (
         <PrivacyProvider>
         <Kree8WorkspaceShell
-            eyebrow="Scheda clinica"
             title="Scheda paziente"
-            subtitle="Banco di prova composizione: paziente complesso."
-            backHref="/"
-            backLabel="Pazienti"
             patientLabel={`${mockPatient.lastName} ${mockPatient.firstName}`}
-            statusLabel="9 problemi · 8 terapie · 3 fuori range · 14 referti"
             navItems={navItems}
         >
             <div id="quadro" className={workspaceStyles.anchorStack}>
