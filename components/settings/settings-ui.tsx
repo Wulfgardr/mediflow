@@ -6,8 +6,8 @@ export const SETTINGS_CARD_CLASS = styles.settingSurface;
 export const SETTINGS_SECTION_CARD_CLASS = styles.settingLayer;
 export const SETTINGS_INPUT_CLASS = styles.settingInput;
 export const SETTINGS_LABEL_CLASS = styles.settingLabel;
-export const SETTINGS_PRIMARY_BUTTON_CLASS = `${styles.primaryAction} lume-press disabled:opacity-50`;
-export const SETTINGS_SECONDARY_BUTTON_CLASS = styles.secondaryAction;
+export const SETTINGS_PRIMARY_BUTTON_CLASS = 'mf-button-primary';
+export const SETTINGS_SECONDARY_BUTTON_CLASS = 'mf-button-secondary';
 
 /* WUL-676: proposal copy is explicit and presentation-only. The
    original description remains available on every non-proposal surface and
