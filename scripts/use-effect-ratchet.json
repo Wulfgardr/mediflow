@@ -23,7 +23,7 @@
     "components/document-viewer.tsx": 3,
     "components/dossier-import-panel.tsx": 5,
     "components/drug-autocomplete.tsx": 2,
-    "components/exemption-selector.tsx": 4,
+    "components/exemption-selector.tsx": 2,
     "components/function-models/function-model-picker.tsx": 2,
     "components/function-models/function-preferences-panel.tsx": 7,
     "components/icd-autocomplete.tsx": 3,

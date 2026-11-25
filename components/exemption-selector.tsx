@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import { Search, X } from 'lucide-react';
+import { useLiveQuery } from '@/lib/live-query';
 
 type ExemptionOption = {
     code: string;
@@ -21,29 +22,24 @@ export default function ExemptionSelector({ value, onChange }: ExemptionSelector
     const [results, setResults] = useState<ExemptionOption[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
-    const [detailsByCode, setDetailsByCode] = useState<Record<string, ExemptionOption>>({});
     /* WUL-UIUX (Fase 6-7): pattern combobox ARIA + navigazione da tastiera. */
     const [activeIndex, setActiveIndex] = useState(-1);
     const listboxId = useId();
     const optionId = (index: number) => `${listboxId}-opt-${index}`;
-    const [catalogCount, setCatalogCount] = useState<number | null>(null);
-
-    useEffect(() => {
-        const controller = new AbortController();
-        const loadCount = async () => {
-            try {
-                const response = await fetch('/api/exemptions?count=1', { signal: controller.signal });
-                if (!response.ok) return;
-                const payload = await response.json();
-                setCatalogCount(Number(payload.count || 0));
-            } catch (error) {
-                if ((error as Error).name === 'AbortError') return;
-                console.error('Failed to load exemptions count', error);
-            }
-        };
-        loadCount();
-        return () => controller.abort();
-    }, []);
+    const catalogCount = useLiveQuery(async () => {
+        const response = await fetch('/api/exemptions?count=1');
+        if (!response.ok) return null;
+        const payload = await response.json();
+        return Number(payload.count || 0);
+    }, [], null, ['exemptions']);
+    const codesKey = value.join(',');
+    const detailsByCode = useLiveQuery(async () => {
+        if (!codesKey) return {};
+        const response = await fetch(`/api/exemptions?codes=${encodeURIComponent(codesKey)}`);
+        if (!response.ok) return {};
+        const items: ExemptionOption[] = await response.json();
+        return Object.fromEntries(items.map((item) => [item.code, item])) as Record<string, ExemptionOption>;
+    }, [codesKey], {} as Record<string, ExemptionOption>, ['exemptions']) ?? {};
 
     useEffect(() => {
         const onClickOutside = (event: MouseEvent) => {
@@ -55,35 +51,6 @@ export default function ExemptionSelector({ value, onChange }: ExemptionSelector
         window.addEventListener('mousedown', onClickOutside);
         return () => window.removeEventListener('mousedown', onClickOutside);
     }, []);
-
-    useEffect(() => {
-        const missing = value.filter((code) => !detailsByCode[code]);
-        if (!missing.length) return;
-
-        const controller = new AbortController();
-        const run = async () => {
-            try {
-                const response = await fetch(`/api/exemptions?codes=${encodeURIComponent(missing.join(','))}`, {
-                    signal: controller.signal,
-                });
-                if (!response.ok) return;
-                const items: ExemptionOption[] = await response.json();
-                setDetailsByCode((prev) => {
-                    const next = { ...prev };
-                    for (const item of items) {
-                        next[item.code] = item;
-                    }
-                    return next;
-                });
-            } catch (error) {
-                if ((error as Error).name === 'AbortError') return;
-                console.error('Failed to resolve exemption codes', error);
-            }
-        };
-
-        run();
-        return () => controller.abort();
-    }, [detailsByCode, value]);
 
     useEffect(() => {
         const trimmed = query.trim();
