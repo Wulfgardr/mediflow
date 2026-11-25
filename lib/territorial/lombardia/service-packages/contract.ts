@@ -161,7 +161,8 @@ export type PatientServiceHistoryEntry = Readonly<{
 
 export type ServiceRequestReason =
     | Readonly<{ kind: 'never_performed'; label: 'Mai eseguita' }>
-    | Readonly<{ kind: 'overdue'; lastPerformedAt: string; overdueMonths: number; label: string }>;
+    | Readonly<{ kind: 'overdue'; lastPerformedAt: string; overdueMonths: number; label: string }>
+    | Readonly<{ kind: 'ordered_not_performed'; orderedAt: string; label: string }>;
 
 export type SkippedServiceReason =
     | Readonly<{ kind: 'within_periodicity'; lastPerformedAt: string; validUntil: string; remainingMonths: number; label: string }>
