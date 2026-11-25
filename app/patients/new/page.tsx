@@ -2,7 +2,7 @@
 
 import { PatientIdentifierConflictError } from '@/lib/patient-identity';
 import { formatCountLabel } from '@/lib/format-count';
-import ink from '@/components/ink-secondary.module.css';
+import surface from '@/components/record-surface.module.css';
 import styles from './new-patient.module.css';
 
 import { useCallback, useRef, useState } from 'react';
@@ -16,7 +16,7 @@ import { useRouter } from 'next/navigation';
 import { AlertTriangle, CheckCircle2, FileSearch, FileSpreadsheet, FolderOpen } from 'lucide-react'; // manual CSV and folder entrypoints
 import { v4 as uuidv4 } from 'uuid';
 import PatientForm from '@/components/patient-form';
-import PatientDocumentCreate from '@/components/patient-document-create';
+import { DossierNewPatientImport } from '@/components/dossier-import-panel';
 import { focusPatientCreationTarget } from '@/lib/patient-creation-focus';
 import { useToast } from '@/components/ui/toast-provider';
 import { useConfirm } from '@/components/ui/confirm-dialog';
@@ -247,30 +247,23 @@ export default function NewPatientPage() {
                 <Link href="/patients/import/dossier" className="mf-button-secondary"><FolderOpen size={16} aria-hidden="true" />Importa documenti da cartella</Link>
             </>}
         >
-            <div className={`${ink.surface} ${ink.form} ${ink.stack}`}>
-            <section id="documento" className={`${styles.documentSection} space-y-5 scroll-mt-40`}>
-                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                    <div className="flex items-start gap-4">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[color:var(--lume-surface-field)] text-[color:var(--lume-ink-muted)]">
-                            <FileSearch className="h-5 w-5" />
+            <div className={styles.content}>
+                <section id="documento" className={`${surface.tray} ${styles.documentSection} scroll-mt-40`} data-record-tray="documento">
+                    <div className={surface.island}>
+                        <div className={surface.islandHeader}>
+                            <span className={surface.islandIcon} aria-hidden="true"><FileSearch size={16} /></span>
+                            <h2>Crea la scheda dai documenti</h2>
                         </div>
-                        <div className="space-y-1">
-                            <p className="mf-eyebrow">Documento clinico</p>
-                            <h2 className="text-lg font-semibold tracking-tight text-[color:var(--lume-ink)]">
-                                Crea la scheda da un documento
-                            </h2>
-                            <p className="max-w-3xl text-sm leading-relaxed text-[color:var(--lume-ink-muted)]">
-                                Il testo viene estratto su questo computer. Nome, cognome e codice fiscale li scrivi tu leggendolo, poi confermi
-                                con il PIN: la scheda nasce con il documento allegato. Diagnosi e terapie si aggiungono dopo, nella scheda.
-                            </p>
-                        </div>
+                        <p className={surface.pageMeta}>
+                            I documenti si leggono su questo computer. Confermi i dati anagrafici proposti e il PIN; diagnosi, farmaci ed esami
+                            restano da rivedere, ognuno con la sua fonte.
+                        </p>
                     </div>
-                </div>
-                <PatientDocumentCreate onActiveChange={setDocumentFlowActive} />
-            </section>
+                    <DossierNewPatientImport onActiveChange={setDocumentFlowActive} />
+                </section>
 
             {importMeta && (
-                <section id="controllo" className="space-y-4 scroll-mt-40">
+                <section id="controllo" className={`${surface.tray} scroll-mt-40`} data-record-tray="controllo">
                     <div className={`mf-alert animate-in fade-in slide-in-from-top-4 duration-500 !p-6 ${
                         importMeta.quality?.level === 'red'
                             ? 'mf-alert-critical'
@@ -335,7 +328,7 @@ export default function NewPatientPage() {
                 </section>
             )}
 
-            <div id="dati" ref={focusManualEntry} className="scroll-mt-40" hidden={documentFlowActive}>
+            <div id="dati" ref={focusManualEntry} className={`${surface.tray} ${styles.manualSection} scroll-mt-40`} data-record-tray="dati" hidden={documentFlowActive}>
                 <PatientForm
                     onSubmit={onSubmit}
                     defaultValues={importedData || undefined}

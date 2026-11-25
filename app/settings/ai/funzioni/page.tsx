@@ -64,7 +64,9 @@ export default function SettingsAiFunctionsPage() {
             <fieldset disabled={aiSettingsLoadState !== 'ready'} aria-busy={aiSettingsLoadState === 'loading'}
                 aria-label="Impostazioni delle funzioni locali" data-testid="ai-settings-controls"
                 className={styles.controls}>
-            <FunctionPreferencesPanel onRead={syncFunctionPreferences} onProposalChange={setHasPreferencesPreview} />
+            <div className={styles.preferences}>
+                <FunctionPreferencesPanel onRead={syncFunctionPreferences} onProposalChange={setHasPreferencesPreview} />
+            </div>
 
             <section className={styles.advanced} aria-labelledby="functions-advanced-title">
                 <h3 id="functions-advanced-title">Parametri avanzati</h3>

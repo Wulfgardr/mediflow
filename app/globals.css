@@ -63,6 +63,7 @@
   --background: var(--lume-surface-canvas);
   --foreground: var(--lume-ink);
   --lume-control-height: 40px;
+  --lume-header-command-height: 36px;
 
   /* WUL-UIUX: stack tipografico unico, consumato da body e dai module
      css kree8 (shell + cockpit) al posto degli stack duplicati. */
@@ -1314,8 +1315,20 @@ html:root[data-lume] .mf-button-destructive:disabled {
   opacity: 1;
 }
 
+html:root[data-lume] [data-command-bar='testata'] :is(.mf-button-primary, .mf-button-secondary, .mf-button-text, .mf-button-destructive, .mf-button-icon) {
+  min-height: var(--lume-header-command-height);
+  padding-block: 0;
+  padding-inline: 14px;
+}
+
+html:root[data-lume] [data-command-bar='testata'] .mf-button-icon {
+  width: var(--lume-header-command-height);
+  min-width: var(--lume-header-command-height);
+  padding: 0;
+}
+
 @media (pointer: coarse), (max-width: 700px) {
-  :root { --lume-control-height: 44px; }
+  :root { --lume-control-height: 44px; --lume-header-command-height: 44px; }
 }
 
 .mf-choice-target {

@@ -1,17 +1,12 @@
 'use client';
 
-// WUL-297 settings shell: persistent sidebar + sub-routes.
-
 import type { ReactNode } from 'react';
-/* an explicit local return, never browser-history navigation. */
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import styles from '@/components/settings/settings-lume.module.css';
-import ink from '@/components/ink-secondary.module.css';
 import navigation from '@/components/settings/settings-navigation.module.css';
-import layoutRecipe from '@/components/ink-layout.module.css';
-import sectionRecipe from '@/components/ink-section.module.css';
+import surface from '@/components/record-surface.module.css';
 
 import { Kree8WorkspaceShell } from '@/components/kree8/kree8-workspace-shell';
 import { SettingsNavSidebar } from '@/components/settings/settings-nav-sidebar';
@@ -31,24 +26,23 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
             backLabel="Torna ai pazienti"
             statusLabel="I dati clinici e i servizi restano locali."
         >
-            {/* <lg: la sidebar collassa in una barra compatta (vedi SettingsNavSidebar). */}
-            {/* stable scope for the optional full-runtime design comparison. */}
-            <div data-runtime-settings className={styles.settingsWorkspace + " " + layoutRecipe.columns + " " + sectionRecipe.sections + " " + ink.surface + " grid gap-4 lg:grid-cols-[216px_minmax(0,1fr)] lg:items-start lg:gap-6"}>
-                <aside className={`lg:sticky lg:top-2 ${navigation.indexPane}`}>
+            <div data-runtime-settings className={navigation.workspace}>
+                <aside className={navigation.indexPane}>
                     <SettingsNavSidebar onSearchRequest={openSearch} />
                 </aside>
-                <div className="min-w-0 space-y-8" data-testid="settings-subroute-content">
+                <div className={navigation.content} data-testid="settings-subroute-content">
                     {isSubroute ? (
-                        <Link href="/settings" className={`${styles.returnLink} ${navigation.returnLink}`}>
-                            <ArrowLeft size={16} aria-hidden="true" />
-                            Torna alle impostazioni
-                        </Link>
-                    ) : null}
-                    {children}
+                        <>
+                            <Link href="/settings" className={navigation.returnLink} data-priority={pathname === '/settings/zona-pericolo' ? 'return' : undefined}>
+                                <ArrowLeft size={16} aria-hidden="true" />
+                                Torna alle impostazioni
+                            </Link>
+                            <div className={`${surface.tray} ${styles.subroute}`} data-record-tray="settings">{children}</div>
+                        </>
+                    ) : children}
                 </div>
             </div>
 
-            {/* WUL-297: CMD+K quick-jump across the settings IA. */}
             <SettingsSearchOverlay open={isSearchOpen} onClose={closeSearch} />
         </Kree8WorkspaceShell>
     );

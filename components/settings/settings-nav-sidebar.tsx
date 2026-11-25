@@ -8,45 +8,27 @@ import { usePathname } from 'next/navigation';
 import { SETTINGS_NAV_GROUPS, isSettingsItemActive } from '@/lib/settings-navigation';
 import { cn } from '@/lib/utils';
 
-import styles from './settings-lume.module.css';
 import navigation from './settings-navigation.module.css';
 
-function NavGroups({
-    pathname,
-    testIdPrefix,
-    onNavigate,
-}: {
-    pathname: string;
-    testIdPrefix: string;
-    onNavigate?: (isActive: boolean) => void;
-}) {
+function NavGroups({ pathname }: { pathname: string }) {
     return (
-        <div className={styles.navGroups}>
-            {SETTINGS_NAV_GROUPS.map((group) => (
-                <div key={group.id} className={styles.navGroup}>
-                    <p className={styles.navGroupLabel}>{group.label}</p>
-                    <ul className={styles.navItems}>
-                        {group.items.map((item) => {
-                            const isActive = isSettingsItemActive(item, pathname);
+        <div className={navigation.groups}>
+            {SETTINGS_NAV_GROUPS.map(group => (
+                <div key={group.id}>
+                    <p className={navigation.groupLabel}>{group.label}</p>
+                    <ul className={navigation.items}>
+                        {group.items.map(item => {
+                            const active = isSettingsItemActive(item, pathname);
                             return (
                                 <li key={item.id}>
                                     <Link
                                         href={item.href}
-                                        aria-current={isActive ? 'page' : undefined}
-                                        data-state={isActive ? 'active' : 'idle'}
-                                        data-testid={`${testIdPrefix}${item.id}`}
-                                        onClick={() => onNavigate?.(isActive)}
-                                        className={cn(
-                                            styles.navItem,
-                                            isActive && styles.navItemActive,
-                                            item.tone === 'danger' && styles.navItemDanger,
-                                        )}
+                                        aria-current={active ? 'page' : undefined}
+                                        data-state={active ? 'active' : 'idle'}
+                                        data-testid={`settings-nav-${item.id}`}
+                                        className={cn(navigation.item, item.tone === 'danger' && navigation.danger)}
                                     >
-                                        <span className={styles.navItemCopy}>
-                                            <span className={styles.navItemLabel}>{item.label}</span>
-                                            <span className={styles.navItemDescription}>{item.description}</span>
-                                        </span>
-                                        {isActive ? <span className={`${styles.currentLabel} lume-registro`}>Attiva</span> : null}
+                                        {item.label}
                                     </Link>
                                 </li>
                             );
@@ -58,7 +40,6 @@ function NavGroups({
     );
 }
 
-/* LUME-110/68 */
 export function SettingsNavSidebar({ onSearchRequest }: { onSearchRequest?: () => void }) {
     const pathname = usePathname();
     const stripRef = useRef<HTMLDivElement>(null);
@@ -100,35 +81,38 @@ export function SettingsNavSidebar({ onSearchRequest }: { onSearchRequest?: () =
         return () => observer.disconnect();
     }, [pathname]);
     return (
-        <nav aria-label="Sezioni impostazioni" data-testid="settings-nav-sidebar" data-overview={pathname === "/settings" || pathname === "/settings/"} className={`${styles.navRoot} ${navigation.root}`}>
-            <div ref={stripRef} data-settings-strip className={styles.mobileStrip} aria-describedby="settings-scroll-hint">
+        <nav aria-label="Sezioni impostazioni" data-testid="settings-nav-sidebar" data-overview={pathname === "/settings" || pathname === "/settings/"} className={navigation.root}>
+            <div ref={stripRef} data-settings-strip className={navigation.mobileStrip} aria-describedby="settings-scroll-hint">
                 {SETTINGS_NAV_GROUPS.flatMap(group => group.items).map(item => {
                     const active = isSettingsItemActive(item, pathname);
                     return <Link key={item.id} href={item.href} data-testid={`settings-nav-mobile-${item.id}`}
                         data-state={active ? 'active' : 'idle'} aria-current={active ? 'page' : undefined}
-                        className={cn(styles.navItem, active && styles.navItemActive)}>{item.label}</Link>;
+                        className={cn(navigation.item, item.tone === 'danger' && navigation.danger)}>{item.label}</Link>;
                 })}
             </div>
             <div className={navigation.mobileTools}>
                 <span id="settings-scroll-hint" className={navigation.scrollHint}>Scorri per altre sezioni <span aria-hidden="true">↔</span></span>
-                {onSearchRequest && <button type="button" onClick={onSearchRequest} aria-label="Cerca impostazione" data-testid="settings-search-trigger-mobile" className={styles.mobileStripSearch}><Search size={16} aria-hidden="true" />Cerca impostazione</button>}
+                {onSearchRequest && <button type="button" onClick={onSearchRequest} aria-label="Cerca impostazione" data-testid="settings-search-trigger-mobile" className={navigation.mobileStripSearch}><Search size={16} aria-hidden="true" />Cerca impostazione</button>}
             </div>
 
-            <div ref={desktopRef} className={styles.desktopSidebar}>
-                {desktopOverflows && <span data-index-hint className={navigation.desktopScrollHint}>Scorri l’indice <span aria-hidden="true">↕</span></span>}
-                {onSearchRequest ? (
-                    <button
-                        type="button"
-                        onClick={onSearchRequest}
-                        data-testid="settings-search-trigger"
-                        className={styles.searchButton}
-                    >
-                        <span><Search aria-hidden="true" /> Cerca impostazione</span>
-                        {/* mostra entrambi i modificatori già supportati. */}
-                        <kbd className="lume-registro whitespace-nowrap">⌘/Ctrl + K</kbd>
-                    </button>
+            <div ref={desktopRef} className={navigation.desktopSidebar}>
+                {desktopOverflows || onSearchRequest ? (
+                    <div data-index-hint className={navigation.desktopHead}>
+                        {desktopOverflows && <span className={navigation.desktopScrollHint}>Scorri l’indice <span aria-hidden="true">↕</span></span>}
+                        {onSearchRequest ? (
+                            <button
+                                type="button"
+                                onClick={onSearchRequest}
+                                data-testid="settings-search-trigger"
+                                className={navigation.searchButton}
+                            >
+                                <span><Search aria-hidden="true" /> Cerca impostazione</span>
+                                <kbd className={navigation.shortcut}>⌘K</kbd>
+                            </button>
+                        ) : null}
+                    </div>
                 ) : null}
-                <NavGroups pathname={pathname} testIdPrefix="settings-nav-" />
+                <NavGroups pathname={pathname} />
             </div>
         </nav>
     );

@@ -9,6 +9,7 @@ export const UNIT_SCRIPT_TESTS = Object.freeze([
   'scripts/local-provider-cold-start.test.ts',
   'scripts/measure-cb-redaction.test.ts',
   'scripts/measure-local-load.test.ts',
+  'scripts/estrai-unita-referti.test.mjs',
   'scripts/gpui-comparison-audit.test.mjs',
   'scripts/chat-card-native-owner.test.mjs',
   'scripts/check-command-roles.test.mjs',

@@ -7,6 +7,7 @@ import { useParams } from 'next/navigation';
 import { Activity, ArrowRight, Brain, ClipboardCheck, HeartPulse, ListChecks } from 'lucide-react';
 
 import { Kree8WorkspaceShell } from '@/components/kree8/kree8-workspace-shell';
+import surface from '@/components/record-surface.module.css';
 import styles from '@/components/scales/scale-workspace.module.css';
 import { readCockpitRows } from '@/components/kree8/cockpit-read-snapshot';
 import { subscribeClientAccountAuthority } from '@/lib/security/client-auth-api';
@@ -64,6 +65,10 @@ export default function ScalesPage() {
     const readFailed = !patientRead.loading && Boolean(patientRead.error || !currentRead);
     const patient = !patientRead.loading && !readFailed ? currentRead?.rows[0] : undefined;
     const scales = Object.values(SCALES);
+    const domains = [
+        { title: 'Cognitivo e umore', icon: Brain, scales: scales.filter(scale => ['mmse', 'gds'].includes(scale.id)) },
+        { title: 'Autonomia e mobilità', icon: Activity, scales: scales.filter(scale => !['mmse', 'gds'].includes(scale.id)) },
+    ];
 
     return (
         <div className={styles.screen}><Kree8WorkspaceShell
@@ -77,25 +82,33 @@ export default function ScalesPage() {
             navItems={[]}
         >
             {/* WUL-678: each instrument is one complete, keyboard-accessible target. */}
-            <section id="libreria" className={styles.workspace} aria-label="Scegli una scala">
-                {patientRead.loading ? <p role="status">Caricamento paziente…</p> : readFailed ? <div>
+            <section id="libreria" className={`${styles.workspace} ${surface.tray}`} data-record-tray="libreria" aria-label="Scegli una scala">
+                {patientRead.loading ? <p className={surface.island} role="status">Caricamento paziente…</p> : readFailed ? <div className={surface.island}>
                     <p role="alert">Impossibile leggere la scheda del paziente. Riprova.</p>
                     <button type="button" onClick={refresh} className={styles.control}>Riprova</button>
-                </div> : !patient ? <p role="status">Scheda del paziente non disponibile.</p> : <div className={styles.catalog}>
-                    {scales.map(scale => {
-                        const Icon = getScaleIcon(scale.id);
-                        return (
-                            <Link key={scale.id} href={`/patients/${id}/scales/${scale.id}`} onClick={event => { if (!currentRead?.isCurrent()) event.preventDefault(); }} className={styles.catalogLink}>
-                                <Icon size={20} aria-hidden="true" />
-                                <span>
-                                    <span className={styles.catalogTitle}>{scaleDisplayTitle(scale)}</span>
-                                    <span className={styles.catalogDescription}>{getScaleArea(scale.id)} · {scale.questions.length} domande</span>
-                                </span>
-                                <ArrowRight size={18} aria-hidden="true" />
-                            </Link>
-                        );
-                    })}
-                </div>}
+                </div> : !patient ? <p className={surface.island} role="status">Scheda del paziente non disponibile.</p> : domains.map(({ title, icon: DomainIcon, scales: items }) => (
+                    <section key={title} className={surface.island}>
+                        <div className={surface.islandHeader}>
+                            <span className={surface.islandIcon} aria-hidden="true"><DomainIcon size={16} /></span>
+                            <h3>{title} <span>{formatCountLabel(items.length, 'scala', 'scale')}</span></h3>
+                        </div>
+                        <div className={styles.catalog}>
+                            {items.map(scale => {
+                                const Icon = getScaleIcon(scale.id);
+                                return (
+                                    <Link key={scale.id} href={`/patients/${id}/scales/${scale.id}`} onClick={event => { if (!currentRead?.isCurrent()) event.preventDefault(); }} className={styles.catalogLink}>
+                                        <span className={surface.islandIcon} aria-hidden="true"><Icon size={16} /></span>
+                                        <span>
+                                            <span className={styles.catalogTitle}>{scaleDisplayTitle(scale)}</span>
+                                            <span className={styles.catalogDescription}>{getScaleArea(scale.id)} · {scale.questions.length} domande</span>
+                                        </span>
+                                        <ArrowRight size={18} aria-hidden="true" />
+                                    </Link>
+                                );
+                            })}
+                        </div>
+                    </section>
+                ))}
             </section>
         </Kree8WorkspaceShell></div>
     );

@@ -11,6 +11,7 @@ export const EXPLICIT_NPM_SUITES = Object.freeze([
   { script: 'test:database-import-boundary', workflow: '.github/workflows/openapi-contract-guard.yml', job: 'repository-guards' },
   { script: 'test:new-comments', workflow: '.github/workflows/openapi-contract-guard.yml', job: 'repository-guards' },
   { script: 'test:use-effect-ratchet', workflow: '.github/workflows/openapi-contract-guard.yml', job: 'repository-guards' },
+  { script: 'test:button-system', workflow: '.github/workflows/openapi-contract-guard.yml', job: 'repository-guards' },
   { script: 'test:pairing-state-writers', workflow: '.github/workflows/openapi-contract-guard.yml', job: 'repository-guards' },
   { script: 'test:test-fake-schema-ratchet', workflow: '.github/workflows/openapi-contract-guard.yml', job: 'repository-guards' },
   { script: 'test:attachment-currentness-writers', workflow: '.github/workflows/openapi-contract-guard.yml', job: 'repository-guards' },

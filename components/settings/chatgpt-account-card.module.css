@@ -4,7 +4,8 @@
 .identity { min-width: 0; display: flex; align-items: center; gap: .75rem; }
 .identity > div { min-width: 0; }
 .logo { display: block; flex: 0 0 40px; width: 40px; height: 40px; object-fit: contain; background: white; }
-.identity h3 { margin: 0; font-size: 0.9375rem; line-height: 1.4; font-weight: 600; }
+.identity h3 { margin: 0; font: var(--type-section-heading); }
+:global([data-record-tray]) .identity h3 { font: var(--type-record-island); }
 .card p { margin: 0; font-size: 0.875rem; line-height: 1.55; }
 .identity p, .hint { color: var(--lume-ink-muted); }
 .status { display: inline-flex; align-items: center; min-height: 2rem; padding: .25rem .625rem; border: 1px solid var(--lume-border-color); border-radius: var(--lume-radius-control); font-size: 0.8125rem; font-weight: 600; }

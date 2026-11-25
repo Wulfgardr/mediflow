@@ -1,5 +1,6 @@
 import { formatCountLabel } from '@/lib/format-count';
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import {
   Activity,
   Database,
@@ -16,8 +17,10 @@ import styles from '../kree8-clinical-cockpit-foundation.module.css';
 
 function LiveGovernanceArea({
   patientCount,
+  commandTrigger,
 }: {
   patientCount: number;
+  commandTrigger?: ReactNode;
 }) {
   const settingsLinks: Array<{
     href: string;
@@ -86,18 +89,19 @@ function LiveGovernanceArea({
   ];
 
   return (
-    <div className={styles.areaShell}>
+    <div className={styles.areaShell} data-record-page>
       <header className={styles.areaHeader}>
         <div>
           <p className={styles.areaCaption}>Sistema e impostazioni</p>
           <h1 className={styles.areaTitle}>
             Stato operativo <em>· controlli della postazione</em>
-          <span aria-hidden="true">.</span></h1>
+          </h1>
           <p className={styles.areaSubtitle}>
             Storage autorevole sul Mac home-base; accessi paired, cache ed export
             restano percorsi espliciti.
           </p>
         </div>
+        {commandTrigger}
       </header>
 
       <div className={styles.threeCol}>

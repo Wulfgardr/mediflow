@@ -1,5 +1,4 @@
 import styles from './settings-lume.module.css';
-import navigation from './settings-navigation.module.css';
 import proposalStyles from './settings-proposal.module.css';
 
 /* LUME-110/68 */
@@ -7,8 +6,8 @@ export const SETTINGS_CARD_CLASS = styles.settingSurface;
 export const SETTINGS_SECTION_CARD_CLASS = styles.settingLayer;
 export const SETTINGS_INPUT_CLASS = styles.settingInput;
 export const SETTINGS_LABEL_CLASS = styles.settingLabel;
-export const SETTINGS_PRIMARY_BUTTON_CLASS = `${styles.primaryAction} lume-press disabled:opacity-50`;
-export const SETTINGS_SECONDARY_BUTTON_CLASS = styles.secondaryAction;
+export const SETTINGS_PRIMARY_BUTTON_CLASS = 'mf-button-primary';
+export const SETTINGS_SECONDARY_BUTTON_CLASS = 'mf-button-secondary';
 
 /* WUL-676: proposal copy is explicit and presentation-only. The
    original description remains available on every non-proposal surface and
@@ -40,7 +39,7 @@ export function SettingsSectionIntro({
     const proposalDescription = PROPOSAL_INTRO_COPY[title] ?? description;
 
     return (
-        <div className={`${styles.sectionIntro} ${navigation.sectionIntro}`}>
+        <div className={styles.sectionIntro}>
             <h2>{title}</h2>
             <div className={proposalStyles.proposalDescription}>
                 <p>{proposalDescription}</p>
