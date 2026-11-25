@@ -79,8 +79,9 @@ test('refuses callers without a Web session, from another origin or channel, bef
     assert.equal((await as(null, () => root.POST(page('/api/local-voice', { method: 'POST', json: { subject: PATIENT_A, mode: 'visit' } })))).status, 401);
     assert.equal((await as({ ...USER_A, authChannel: 'native' }, () => root.GET(page(`/api/local-voice?subject=${PATIENT_A}`)))).status, 403);
     const foreign = ['attacker', 'example'].join('.');
+    const foreignOrigin = (() => { const url = new URL(BASE); url.hostname = foreign; return url.origin; })();
     const cases = [
-        page('/api/local-voice', { method: 'POST', json: { subject: PATIENT_A, mode: 'visit' }, headers: { origin: `http://${foreign}` } }),
+        page('/api/local-voice', { method: 'POST', json: { subject: PATIENT_A, mode: 'visit' }, headers: { origin: foreignOrigin } }),
         page('/api/local-voice', { method: 'POST', json: { subject: PATIENT_A, mode: 'visit' }, headers: { 'sec-fetch-site': 'cross-site' } }),
         page(`/api/local-voice?subject=${PATIENT_A}`, { headers: { 'sec-fetch-site': 'same-site' } }),
         page(`/api/local-voice?subject=${PATIENT_A}`, { headers: { host: `${foreign}:3000` } }),
