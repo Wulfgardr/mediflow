@@ -4,6 +4,7 @@ import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { expect, test } from './fixtures/isolated-runtime';
 import { bootstrapUnlockedSession, openUnlockedDocument } from './utils';
 import { omocodicVariant, randomSyntheticTaxCode } from '../lib/patient-identity.test-support';
+import { taxCodeBirthDetails } from '../lib/patient-identity';
 
 test.describe.configure({ retries: 0 });
 const pin = '314159';
@@ -27,8 +28,15 @@ async function labPdf(taxCode: string): Promise<number[]> {
     return [...await document.save()];
 }
 
-async function letterPdf(taxCode: string): Promise<number[]> {
-    return textPdf(['Lettera di dimissione sintetica', 'Cognome: Sintetica', 'Nome: Elena', 'Data di nascita: 03/02/1950',
+function birthOf(taxCode: string): { iso: string; text: string } {
+    const birth = taxCodeBirthDetails(taxCode);
+    if (!birth) throw new Error('Synthetic tax code without birth date');
+    const [year, month, day] = [`19${String(birth.yearSuffix).padStart(2, '0')}`, String(birth.month).padStart(2, '0'), String(birth.day).padStart(2, '0')];
+    return { iso: `${year}-${month}-${day}`, text: `${day}/${month}/${year}` };
+}
+
+async function letterPdf(taxCode: string, surname = 'Sintetica'): Promise<number[]> {
+    return textPdf(['Lettera di dimissione sintetica', `Cognome: ${surname}`, 'Nome: Elena', `Data di nascita: ${birthOf(taxCode).text}`,
         `Codice fiscale paziente: ${taxCode}`, 'Data referto: 02/02/2025', 'Diagnosi: ICD-10 I10 Ipertensione essenziale',
         'Anamnesi familiare: madre con diabete mellito', 'Terapia domiciliare: Ramipril 5 mg 1 cp al mattino']);
 }
@@ -56,6 +64,16 @@ async function capture(info: TestInfo, page: Page, name: string) {
     await info.attach(name, { path: target, contentType: 'image/png' });
 }
 
+async function captureOf(info: TestInfo, target: Locator, name: string) {
+    const path = info.outputPath(name);
+    const page = target.page(), viewport = page.viewportSize();
+    await page.setViewportSize({ width: viewport?.width ?? 1280, height: 2400 });
+    await target.scrollIntoViewIfNeeded();
+    await target.screenshot({ path });
+    if (viewport) await page.setViewportSize(viewport);
+    await info.attach(name, { path, contentType: 'image/png' });
+}
+
 const dropZone = (page: Page) => page.getByTestId('patient-document-create').locator('section[aria-labelledby="patient-document-create-title"]');
 
 test('nuova scheda: trascino due documenti, confermo l’anagrafica proposta e il resto è già in revisione con la fonte', async ({ page }, info) => {
@@ -81,10 +99,17 @@ test('nuova scheda: trascino due documenti, confermo l’anagrafica proposta e i
     for (const label of ['Nome', 'Cognome', 'Codice fiscale']) await expect(create.getByLabel(label, { exact: true })).toHaveValue('');
     await expect(create.getByTestId('patient-document-dossier-proposals')).toContainText('Cognome: Sintetica');
     await capture(info, page, '2-anagrafica-proposta.png');
-    for (const field of ['codice fiscale', 'cognome', 'nome', 'data di nascita']) await create.getByRole('button', { name: `Usa per ${field}` }).click();
+    await captureOf(info, create.locator('form'), '2-anagrafica-proposta-campi.png');
+    await create.getByRole('button', { name: 'Usa tutte le proposte' }).click();
     await expect(create.getByLabel('Codice fiscale', { exact: true })).toHaveValue(taxCode);
+    await expect(create.getByLabel('Cognome', { exact: true })).toHaveValue('Sintetica');
     await expect(create.getByLabel('Nome', { exact: true })).toHaveValue('Elena');
+    await expect(create.getByLabel('Data di nascita', { exact: true })).toHaveValue(birthOf(taxCode).iso);
+    for (const id of ['taxCode', 'lastName', 'firstName', 'birthDate']) await expect(create.locator(`#patient-document-${id}-source`)).toHaveText('Fonte: lettera.pdf');
+    await expect(create.getByTestId('patient-document-undecided')).toHaveCount(0);
+    await captureOf(info, create.locator('form'), '2b-tutte-le-proposte.png');
     await create.getByLabel('Nome', { exact: true }).fill('Elena Maria');
+    await expect(create.locator('#patient-document-firstName-source')).toHaveCount(0);
     await create.getByRole('button', { name: 'Prosegui alla conferma' }).click();
     await create.getByLabel('PIN di conferma').fill(pin);
     await create.getByRole('button', { name: 'Conferma creazione con PIN' }).click();
@@ -114,7 +139,7 @@ test('nuova scheda: trascino due documenti, confermo l’anagrafica proposta e i
     await capture(info, page, '3-dati-clinici-in-revisione.png');
 
     const patient = await page.evaluate(async (id) => (await fetch(`/api/patients/${id}`, { cache: 'no-store' })).json(), patientId);
-    expect(patient).toMatchObject({ firstName: 'Elena Maria', lastName: 'Sintetica', taxCode, birthDate: '1950-02-03T00:00:00.000Z' });
+    expect(patient).toMatchObject({ firstName: 'Elena Maria', lastName: 'Sintetica', taxCode, birthDate: `${birthOf(taxCode).iso}T00:00:00.000Z` });
     for (const resource of ['therapies', 'observations']) expect(await countOf(page, resource, patientId)).toBe(0);
 
     await panel.getByRole('button', { name: 'Scegli altri documenti' }).click();
@@ -158,4 +183,69 @@ test('nuova scheda: documenti di due pazienti, omocodia o scheda già esistente 
     await expect(group.getByTestId('dossier-new-patient').getByTestId('patient-document-create')).toHaveCount(0);
     await capture(info, page, 'scheda-esistente.png');
     expect(await countOf(page, 'attachments', existing)).toBe(0);
+});
+
+test('nuova scheda: due documenti propongono cognomi diversi, «Usa tutte le proposte» non sceglie e il campo resta da decidere', async ({ page }, info) => {
+    test.setTimeout(240_000);
+    const taxCode = randomSyntheticTaxCode();
+    await bootstrapUnlockedSession(page, pin);
+    await openUnlockedDocument(page, '/patients/new', pin);
+    await dropFiles(dropZone(page), [{ name: 'lettera.pdf', bytes: await letterPdf(taxCode) }, { name: 'dimissione.pdf', bytes: await letterPdf(taxCode, 'Sintetico') }]);
+    const group = page.getByTestId('dossier-import').getByTestId('dossier-group');
+    await expect(group).toHaveAttribute('data-identity', 'unmatched_cf', { timeout: 120_000 });
+    const create = group.getByTestId('dossier-new-patient').getByTestId('patient-document-create');
+    await create.getByRole('button', { name: 'Avvia la revisione del documento' }).click();
+    await expect(create.getByRole('heading', { name: 'Revisione dei dati' })).toBeVisible({ timeout: 60_000 });
+    const proposals = create.getByTestId('patient-document-dossier-proposals');
+    await expect(proposals).toContainText('Cognome: Sintetica');
+    await expect(proposals).toContainText('Cognome: Sintetico');
+
+    await create.getByRole('button', { name: 'Usa tutte le proposte' }).click();
+    await expect(create.getByLabel('Cognome', { exact: true })).toHaveValue('');
+    await expect(create.getByTestId('patient-document-undecided')).toHaveText('Da decidere: i documenti propongono valori diversi.');
+    await expect(create.locator('#patient-document-lastName-source')).toHaveText('Da decidere: i documenti propongono valori diversi.');
+    await expect(create.getByText('Scegli il valore di: cognome.')).toBeVisible();
+    await expect(create.getByLabel('Nome', { exact: true })).toHaveValue('Elena');
+    await expect(create.getByLabel('Codice fiscale', { exact: true })).toHaveValue(taxCode);
+    await expect(create.getByRole('button', { name: 'Prosegui alla conferma' })).toBeDisabled();
+    await captureOf(info, create.locator('form'), 'cognome-da-decidere.png');
+
+    await proposals.getByRole('listitem').filter({ hasText: 'Cognome: Sintetico' }).getByRole('button', { name: 'Usa per cognome' }).click();
+    await expect(create.getByLabel('Cognome', { exact: true })).toHaveValue('Sintetico');
+    await expect(create.locator('#patient-document-lastName-source')).toHaveText('Fonte: dimissione.pdf');
+    await expect(create.getByTestId('patient-document-undecided')).toHaveCount(0);
+    await captureOf(info, create.locator('form'), 'cognome-scelto.png');
+    await create.getByRole('button', { name: 'Prosegui alla conferma' }).click();
+    await create.getByLabel('PIN di conferma').fill(pin);
+    await create.getByRole('button', { name: 'Conferma creazione con PIN' }).click();
+    await expect(create.getByRole('heading', { name: 'Scheda creata', exact: true })).toBeVisible({ timeout: 30_000 });
+    const patientId = await group.getByLabel('Scheda di destinazione').inputValue();
+    const patient = await page.evaluate(async (id) => (await fetch(`/api/patients/${id}`, { cache: 'no-store' })).json(), patientId);
+    expect(patient).toMatchObject({ firstName: 'Elena', lastName: 'Sintetico', taxCode });
+});
+
+test('nuova scheda: la data di nascita di un familiare, senza codice fiscale, non entra con «Usa tutte le proposte»', async ({ page }, info) => {
+    test.setTimeout(240_000);
+    const taxCode = randomSyntheticTaxCode();
+    await bootstrapUnlockedSession(page, pin);
+    await openUnlockedDocument(page, '/patients/new', pin);
+    await dropFiles(dropZone(page), [
+        { name: 'lettera.pdf', bytes: await textPdf(['Lettera di dimissione sintetica', 'Cognome: Sintetica', 'Nome: Elena', `Codice fiscale paziente: ${taxCode}`]) },
+        { name: 'familiare.pdf', bytes: await textPdf(['Referto sintetico di un familiare', 'Data di nascita: 15/06/1955']) },
+    ]);
+    const group = page.getByTestId('dossier-import').getByTestId('dossier-group');
+    await expect(group).toHaveAttribute('data-identity', 'unmatched_cf', { timeout: 120_000 });
+    const create = group.getByTestId('dossier-new-patient').getByTestId('patient-document-create');
+    await create.getByRole('button', { name: 'Avvia la revisione del documento' }).click();
+    await expect(create.getByRole('heading', { name: 'Revisione dei dati' })).toBeVisible({ timeout: 60_000 });
+    await expect(create.getByTestId('patient-document-dossier-proposals')).toContainText('Data di nascita: 15/06/1955');
+
+    await create.getByRole('button', { name: 'Usa tutte le proposte' }).click();
+    await expect(create.getByLabel('Codice fiscale', { exact: true })).toHaveValue(taxCode);
+    await expect(create.getByLabel('Cognome', { exact: true })).toHaveValue('Sintetica');
+    await expect(create.getByLabel('Data di nascita', { exact: true })).toHaveValue('');
+    await expect(create.locator('#patient-document-birthDate-source')).toHaveText('Da decidere: la data non corrisponde al codice fiscale.');
+    await expect(create.getByText('Scegli il valore di: data di nascita.')).toBeVisible();
+    await expect(create.getByRole('button', { name: 'Prosegui alla conferma' })).toBeDisabled();
+    await captureOf(info, create.locator('form'), 'data-del-familiare.png');
 });
