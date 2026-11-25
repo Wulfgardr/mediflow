@@ -1,10 +1,11 @@
-use std::io::{self, BufRead, BufReader, Read, Write};
+use std::io::{self, BufRead, Read, Write};
 use std::net::TcpStream;
 use zeroize::Zeroizing;
 
 pub const MAX_HEAD: usize = 16 * 1024;
 pub const MAX_BODY: usize = 1024 * 1024;
 
+#[cfg(test)]
 pub struct Request {
     pub method: String,
     pub path: String,
@@ -12,6 +13,7 @@ pub struct Request {
     pub body: Zeroizing<Vec<u8>>,
 }
 
+#[cfg(test)]
 impl Request {
     pub fn header(&self, name: &str) -> Option<&str> {
         self.headers
@@ -117,7 +119,7 @@ pub fn read_body(reader: &mut impl Read, length: usize) -> Result<Zeroizing<Vec<
 
 #[cfg(test)]
 pub fn read_request(stream: &mut impl Read) -> Result<Request, ReadError> {
-    let mut reader = BufReader::new(stream);
+    let mut reader = std::io::BufReader::new(stream);
     let head = read_head(&mut reader)?;
     let body = read_body(&mut reader, head.length)?;
     Ok(Request {

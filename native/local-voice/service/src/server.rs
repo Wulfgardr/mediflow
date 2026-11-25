@@ -1,5 +1,7 @@
 use crate::auth::{self, Secret, Verifier};
-use crate::http::{self, Request, Response};
+#[cfg(test)]
+use crate::http::Request;
+use crate::http::{self, Response};
 use crate::sessions::{self, Active, Command, Factory, Mode};
 use crate::stream::Refused;
 use serde_json::{Value, json};
@@ -103,30 +105,31 @@ impl Service {
         self.verifier.lock().ok().map(|v| v.secret().mac(message))
     }
 
-    fn answer(&self, request: &Request, nonce: &str) -> Response {
-        let mut response = self.route(request);
+    fn answer(&self, method: &str, path: &str, body: &[u8], nonce: &str) -> Response {
+        let mut response = self.route(method, path, body);
         response.proof = self.sign(&auth::response_message(nonce, response.status));
         response
     }
 
+    #[cfg(test)]
     pub fn handle(&self, request: &Request) -> Response {
         match self.admit(&request.method, &request.path, |name| request.header(name)) {
-            Ok(nonce) => self.answer(request, &nonce),
+            Ok(nonce) => self.answer(&request.method, &request.path, &request.body, &nonce),
             Err(refused) => refused,
         }
     }
 
-    fn route(&self, request: &Request) -> Response {
-        let segments: Vec<&str> = request.path.split('/').collect();
-        match (request.method.as_str(), segments.as_slice()) {
+    fn route(&self, method: &str, path: &str, body: &[u8]) -> Response {
+        let segments: Vec<&str> = path.split('/').collect();
+        match (method, segments.as_slice()) {
             ("GET", ["", "v1", "status"]) => self.status(),
-            ("POST", ["", "v1", "sessions"]) => self.create(&request.body),
+            ("POST", ["", "v1", "sessions"]) => self.create(body),
             ("GET", ["", "v1", "sessions", id]) => {
                 self.with(id, |a| Response::json(200, &a.snapshot()))
             }
             ("DELETE", ["", "v1", "sessions", id]) => self.discard(id),
-            ("POST", ["", "v1", "sessions", id, "audio"]) => self.audio(id, &request.body),
-            ("POST", ["", "v1", "sessions", id, "commands"]) => self.command(id, &request.body),
+            ("POST", ["", "v1", "sessions", id, "audio"]) => self.audio(id, body),
+            ("POST", ["", "v1", "sessions", id, "commands"]) => self.command(id, body),
             (_, ["", "v1", "status"] | ["", "v1", "sessions", ..]) => error(405, "method"),
             _ => error(404, "not-found"),
         }
@@ -265,6 +268,12 @@ impl Service {
             let Some(a) = active.as_ref().filter(|a| a.id == id) else {
                 return error(404, "session-not-found");
             };
+            if command.drains() && a.feed().pending() > 0 {
+                return Response::json(
+                    503,
+                    &json!({ "error": "draining", "pendingSamples": a.feed().pending(), "state": sessions::state_key(a.state()) }),
+                );
+            }
             if !a.allows(command) {
                 return Response::json(
                     409,
@@ -346,13 +355,7 @@ fn exchange(service: &Service, stream: &mut TcpStream) -> Response {
         Ok(body) => body,
         Err(_) => return error(400, "request"),
     };
-    let request = Request {
-        method: head.method,
-        path: head.path,
-        headers: head.headers,
-        body,
-    };
-    service.answer(&request, &nonce)
+    service.answer(&head.method, &head.path, &body, &nonce)
 }
 
 fn serve_connection(service: &Service, mut stream: TcpStream) {
@@ -717,7 +720,11 @@ mod tests {
     #[test]
     fn stop_refuses_while_accepted_audio_is_still_queued_and_loses_nothing() {
         let factory: Factory = Box::new(|source, _prompt| {
-            WhisperSession::with_parts(LoudnessDetector, SlowDecoder(CountingDecoder::default()), source)
+            WhisperSession::with_parts(
+                LoudnessDetector,
+                SlowDecoder(CountingDecoder::default()),
+                source,
+            )
         });
         let service = Service::new(
             PORT,
@@ -726,7 +733,12 @@ mod tests {
             Box::new(|| ModelState::Ready),
         )
         .with_drain_limit(Duration::from_millis(100));
-        let (_, created) = call(&service, "POST", "/v1/sessions", br#"{"mode":"dictation","subject":"s"}"#);
+        let (_, created) = call(
+            &service,
+            "POST",
+            "/v1/sessions",
+            br#"{"mode":"dictation","subject":"s"}"#,
+        );
         let id = created["id"].as_str().unwrap().to_owned();
         let commands = format!("/v1/sessions/{id}/commands");
         call(&service, "POST", &commands, br#"{"command":"start"}"#);
@@ -736,10 +748,17 @@ mod tests {
             audio.extend(silence(0.6));
         }
         for chunk in pcm(&audio).chunks(64_000) {
-            assert_eq!(call(&service, "POST", &format!("/v1/sessions/{id}/audio"), chunk).0, 202);
+            assert_eq!(
+                call(&service, "POST", &format!("/v1/sessions/{id}/audio"), chunk).0,
+                202
+            );
         }
         let (status, refused) = call(&service, "POST", &commands, br#"{"command":"stop"}"#);
-        assert_eq!((status, refused["error"].as_str()), (503, Some("draining")), "{refused}");
+        assert_eq!(
+            (status, refused["error"].as_str()),
+            (503, Some("draining")),
+            "{refused}"
+        );
         assert!(refused["pendingSamples"].as_u64().unwrap() > 0);
         let (_, still) = call(&service, "GET", &format!("/v1/sessions/{id}"), b"");
         assert_eq!(still["state"], "recording");
@@ -754,9 +773,90 @@ mod tests {
         assert_eq!(stopped.0, 202, "{}", stopped.1);
         let review = wait_state(&service, &id, "review");
         assert_eq!(review["acceptedSamples"], audio.len());
-        let words = review["review"]["text"].as_str().unwrap().split_whitespace().count();
+        let words = review["review"]["text"]
+            .as_str()
+            .unwrap()
+            .split_whitespace()
+            .count();
         let decoded = audio.len() / 8_000;
-        assert!(words + 20 >= decoded, "{words} parole per {decoded} blocchi");
+        assert!(
+            words + 20 >= decoded,
+            "{words} parole per {decoded} blocchi"
+        );
+    }
+
+    fn raw(port: u16, head: &str, body: Option<&[u8]>) -> (String, String) {
+        use std::io::{Read, Write};
+        let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .unwrap();
+        stream.write_all(head.as_bytes()).unwrap();
+        let mut first = vec![0u8; 512];
+        let read = stream.read(&mut first).unwrap_or(0);
+        let interim = String::from_utf8_lossy(&first[..read]).into_owned();
+        if let Some(body) = body.filter(|_| interim.starts_with("HTTP/1.1 100 ")) {
+            stream.write_all(body).unwrap();
+        }
+        let mut rest = String::new();
+        let _ = stream.read_to_string(&mut rest);
+        (interim, rest)
+    }
+
+    #[test]
+    fn a_body_is_read_only_after_a_signed_continue_on_the_same_connection() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let factory: Factory = Box::new(|source, _prompt| {
+            WhisperSession::with_parts(LoudnessDetector, CountingDecoder::default(), source)
+        });
+        let service = Arc::new(Service::new(
+            port,
+            Secret::from_hex(KEY).unwrap(),
+            factory,
+            Box::new(|| ModelState::Ready),
+        ));
+        let serving = service.clone();
+        std::thread::spawn(move || serve(serving, listener));
+        let body = br#"{"mode":"visit","subject":"paziente-sintetico-9"}"#;
+        let head = |auth: &str, expect: bool| {
+            format!(
+                "POST /v1/sessions HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nContent-Length: {}\r\nX-MediFlow-Voice-Auth: {auth}\r\n{}\r\n",
+                body.len(),
+                if expect {
+                    "Expect: 100-continue\r\n"
+                } else {
+                    ""
+                }
+            )
+        };
+        let auth = || {
+            let (request, nonce) = signed("POST", "/v1/sessions", b"");
+            (
+                request.header("x-mediflow-voice-auth").unwrap().to_owned(),
+                nonce,
+            )
+        };
+        let (header, _) = auth();
+        let (interim, _) = raw(port, &head(&header, false), None);
+        assert!(interim.starts_with("HTTP/1.1 400 "), "{interim}");
+        let (interim, _) = raw(port, &head(&"0".repeat(10), true), Some(body));
+        assert!(interim.starts_with("HTTP/1.1 401 "), "{interim}");
+        let (header, nonce) = auth();
+        let (interim, rest) = raw(port, &head(&header, true), Some(body));
+        let proof = Secret::from_hex(KEY)
+            .unwrap()
+            .mac(&auth::continue_message(&nonce));
+        assert!(
+            interim.starts_with("HTTP/1.1 100 Continue\r\n"),
+            "{interim}"
+        );
+        assert!(
+            interim.contains(&format!("X-MediFlow-Voice-Proof: {proof}")),
+            "{interim}"
+        );
+        assert!(rest.starts_with("HTTP/1.1 201 "), "{rest}");
+        assert!(rest.contains("paziente-sintetico-9"));
     }
 
     #[test]
