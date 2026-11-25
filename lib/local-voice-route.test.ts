@@ -148,10 +148,11 @@ test('a visit goes through in order, reaches only its user and its subject, and 
     assert.equal((await command('resume', PATIENT_B)).status, 404);
     assert.equal((await command('resume')).status, 200);
     assert.equal((await command('start')).status, 400);
-    fake.state.stopFailures = 1;
+    fake.state.stopFailures = 6;
     const notYet = await command('stop');
-    assert.equal(notYet.status, 409);
-    assert.deepEqual(await notYet.json(), { error: 'audio-pending' });
+    assert.equal(notYet.status, 503);
+    assert.deepEqual(await notYet.json(), { error: 'draining' });
+    assert.equal(fake.state.session?.state, 'recording');
     assert.equal((await command('stop')).status, 200);
 
     const read = (subject: string, user = USER_A) => as(user, () => item.GET(page(`/api/local-voice/${session.id}?subject=${subject}`), params(session.id)));

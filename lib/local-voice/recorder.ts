@@ -4,7 +4,7 @@ import type { LocalVoiceAvailability, LocalVoiceForeign, LocalVoiceMode, LocalVo
 
 export type RecorderNotice =
     | 'off' | 'unsupported' | 'model-missing' | 'model-incomplete' | 'model-invalid' | 'permission-denied' | 'audio-missing' | 'audio-lost'
-    | 'engine-failed' | 'no-microphone' | 'stop-retry' | 'subject-mismatch' | 'failed';
+    | 'engine-failed' | 'no-microphone' | 'draining' | 'stop-retry' | 'subject-mismatch' | 'failed';
 
 export type RecorderView = Readonly<{
     phase: 'checking' | 'unavailable' | 'idle' | 'opening' | 'live' | 'review' | 'foreign';
@@ -173,7 +173,7 @@ export class LocalVoiceRecorder {
                 notice: fault, pending: null });
             return;
         }
-        this.set({ phase: this.view.review ? 'review' : 'live', snapshot: view, notice: fault ?? (this.view.notice === 'stop-retry' ? 'stop-retry' : null) });
+        this.set({ phase: this.view.review ? 'review' : 'live', snapshot: view, notice: fault ?? (this.view.notice === 'stop-retry' || this.view.notice === 'draining' ? this.view.notice : null) });
         if (ACTIVE.has(snapshot.state) || (snapshot.state === 'error' && (fault === 'audio-lost' || fault === 'permission-denied'))) this.schedule();
     }
 
@@ -208,7 +208,9 @@ export class LocalVoiceRecorder {
     private async command(command: 'pause' | 'resume' | 'stop') {
         const reply = await call('POST', this.path('/commands'), { subject: this.subject, command }).catch((): Reply => ({ status: 0, body: { error: 'off' } }));
         if (reply.status !== 200) {
-            this.set({ pending: null, notice: command === 'stop' && reply.body?.error !== 'off' && reply.body?.error !== 'subject-mismatch' ? 'stop-retry' : noticeOf(reply) });
+            const code = reply.body?.error;
+            this.set({ pending: null, notice: code === 'draining' ? 'draining'
+                : command === 'stop' && code !== 'off' && code !== 'subject-mismatch' ? 'stop-retry' : noticeOf(reply) });
             if (reply.body?.error === 'subject-mismatch') await this.apply(reply);
             else this.schedule();
             return false;

@@ -22,6 +22,7 @@ const NOTICES: Record<RecorderNotice, string> = {
     'audio-missing': 'Dal microfono non arriva audio. Controllalo e avvia di nuovo.',
     'audio-lost': 'L’audio si è interrotto. Il testo fin qui resta da rivedere.',
     'engine-failed': 'La trascrizione si è interrotta e il testo è perso.',
+    draining: 'Trascrizione dell’audio ricevuto in corso. Riprova tra poco.',
     'stop-retry': 'Non è ancora possibile terminare. Riprova tra poco.',
     'subject-mismatch': 'La registrazione appartiene a un’altra scheda e non viene mostrata.',
     failed: 'Richiesta non riuscita. Riprova.',
@@ -83,7 +84,7 @@ export function LocalVoiceRecorderPanel({ subject, vocabulary, modes, title, tak
             {view.phase === 'live' || view.phase === 'review' || view.phase === 'opening' ? <Indicator view={view} /> : null}
         </div>
 
-        {view.notice ? <p className={styles.notice} role={view.phase === 'unavailable' ? 'status' : 'alert'} data-testid="local-voice-notice">{NOTICES[view.notice]}</p> : null}
+        {view.notice ? <p className={styles.notice} role={view.phase === 'unavailable' || view.notice === 'draining' ? 'status' : 'alert'} data-testid="local-voice-notice">{NOTICES[view.notice]}</p> : null}
         {snapshot?.limitReached ? <p className={styles.notice} role="status">La registrazione ha raggiunto la durata massima e si è fermata.</p> : null}
 
         {view.phase === 'idle' || view.phase === 'opening' ? <div className={styles.actions}>
