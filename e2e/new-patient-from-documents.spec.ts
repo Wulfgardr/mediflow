@@ -56,6 +56,16 @@ async function capture(info: TestInfo, page: Page, name: string) {
     await info.attach(name, { path: target, contentType: 'image/png' });
 }
 
+async function captureOf(info: TestInfo, target: Locator, name: string) {
+    const path = info.outputPath(name);
+    const page = target.page(), viewport = page.viewportSize();
+    await page.setViewportSize({ width: viewport?.width ?? 1280, height: 2400 });
+    await target.scrollIntoViewIfNeeded();
+    await target.screenshot({ path });
+    if (viewport) await page.setViewportSize(viewport);
+    await info.attach(name, { path, contentType: 'image/png' });
+}
+
 const dropZone = (page: Page) => page.getByTestId('patient-document-create').locator('section[aria-labelledby="patient-document-create-title"]');
 
 test('nuova scheda: trascino due documenti, confermo l’anagrafica proposta e il resto è già in revisione con la fonte', async ({ page }, info) => {
@@ -81,6 +91,7 @@ test('nuova scheda: trascino due documenti, confermo l’anagrafica proposta e i
     for (const label of ['Nome', 'Cognome', 'Codice fiscale']) await expect(create.getByLabel(label, { exact: true })).toHaveValue('');
     await expect(create.getByTestId('patient-document-dossier-proposals')).toContainText('Cognome: Sintetica');
     await capture(info, page, '2-anagrafica-proposta.png');
+    await captureOf(info, create.locator('form'), '2-anagrafica-proposta-campi.png');
     await create.getByRole('button', { name: 'Usa tutte le proposte' }).click();
     await expect(create.getByLabel('Codice fiscale', { exact: true })).toHaveValue(taxCode);
     await expect(create.getByLabel('Cognome', { exact: true })).toHaveValue('Sintetica');
@@ -88,7 +99,7 @@ test('nuova scheda: trascino due documenti, confermo l’anagrafica proposta e i
     await expect(create.getByLabel('Data di nascita', { exact: true })).toHaveValue('1950-02-03');
     for (const id of ['taxCode', 'lastName', 'firstName', 'birthDate']) await expect(create.locator(`#patient-document-${id}-source`)).toHaveText('Fonte: lettera.pdf');
     await expect(create.getByTestId('patient-document-undecided')).toHaveCount(0);
-    await capture(info, page, '2b-tutte-le-proposte.png');
+    await captureOf(info, create.locator('form'), '2b-tutte-le-proposte.png');
     await create.getByLabel('Nome', { exact: true }).fill('Elena Maria');
     await expect(create.locator('#patient-document-firstName-source')).toHaveCount(0);
     await create.getByRole('button', { name: 'Prosegui alla conferma' }).click();
@@ -189,12 +200,13 @@ test('nuova scheda: due documenti propongono cognomi diversi, «Usa tutte le pro
     await expect(create.getByLabel('Nome', { exact: true })).toHaveValue('Elena');
     await expect(create.getByLabel('Codice fiscale', { exact: true })).toHaveValue(taxCode);
     await expect(create.getByRole('button', { name: 'Prosegui alla conferma' })).toBeDisabled();
-    await capture(info, page, 'cognome-da-decidere.png');
+    await captureOf(info, create.locator('form'), 'cognome-da-decidere.png');
 
     await proposals.getByRole('listitem').filter({ hasText: 'Cognome: Sintetico' }).getByRole('button', { name: 'Usa per cognome' }).click();
     await expect(create.getByLabel('Cognome', { exact: true })).toHaveValue('Sintetico');
     await expect(create.locator('#patient-document-lastName-source')).toHaveText('Fonte: dimissione.pdf');
     await expect(create.getByTestId('patient-document-undecided')).toHaveCount(0);
+    await captureOf(info, create.locator('form'), 'cognome-scelto.png');
     await create.getByRole('button', { name: 'Prosegui alla conferma' }).click();
     await create.getByLabel('PIN di conferma').fill(pin);
     await create.getByRole('button', { name: 'Conferma creazione con PIN' }).click();

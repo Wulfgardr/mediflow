@@ -45,7 +45,7 @@ export function groupIdentityProposals(group: DossierDraftGroup, firstSourceKey:
             proposals.push({ ...proposal, sourceName: source.fileName });
         }
     }
-    return proposals;
+    return proposals.sort((a, b) => IDENTITY_FIELDS.indexOf(a.field) - IDENTITY_FIELDS.indexOf(b.field));
 }
 
 export type AllIdentityProposals = Readonly<{ values: Partial<Record<IdentityField, string>>; undecided: IdentityField[] }>;
