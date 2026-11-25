@@ -45,6 +45,12 @@ async function installMaintenanceMocks(page: Page, baseURL: string) {
                 rows.push({ ...data, version: 1 });
                 return route.fulfill({ status: 201, json: { id: data.id, version: 1 } });
             }
+            if (m === 'POST' && p === '/api/ambulatories/commands/prepare') {
+                const row = rows.find(x => x.id === data.ambulatoryId)!;
+                return route.fulfill({ json: { reference: 'a'.repeat(64), operation: data.operation, fallback: null,
+                    target: { id: row.id, name: row.name, version: row.version },
+                    counts: data.operation === 'ambulatory.clear-test.v1' ? { tombstonedPatients: 0, unlinkedPatients: 0, preservedLivePatients: 0, removedMembershipRows: 0 } : null } });
+            }
             if (m === 'PUT') {
                 if (state.holdWrite)
                     await state.holdWrite;
@@ -97,7 +103,7 @@ test('Settings maintenance: scopes, canceled effects and uncertain reset', async
         await mkdir(captureDirectory, { recursive: true });
         await page.screenshot({ path: captureDirectory + '/' + name + '.png', fullPage: false, animations: 'disabled' });
     } return probe; };
-    const mutationCount = () => f.calls.filter(x => x.method !== 'GET').length;
+    const mutationCount = () => f.calls.filter(x => x.method !== 'GET' && x.path !== '/api/ambulatories/commands/prepare').length;
     const cancel = async (name: string, invoke: () => Promise<void>) => { const n = mutationCount(); await invoke(); const dialog = page.getByRole('dialog'); await expect(dialog).toBeVisible(); if (name === 'cleanup-full-cancel') await expect(dialog).toContainText('Elimina tutti i pazienti, inclusi quelli reali, e tutte le voci, terapie, controlli, allegati, conversazioni e messaggi.'); await shot(name, dialog.getByRole('heading')); await dialog.getByRole('button', { name: 'Annulla', exact: true }).click(); await expect(dialog).toHaveCount(0); expect(mutationCount()).toBe(n); };
     const rowAction = async (row: Locator, name: string) => { await row.getByRole('button', { name: 'Azioni', exact: true }).click(); await page.getByRole('menu', { name: 'Azioni', exact: true }).getByRole('menuitem', { name, exact: true }).click(); };
     try {
@@ -198,7 +204,6 @@ test('Settings maintenance: scopes, canceled effects and uncertain reset', async
         await name.fill('Bozza senza versione');
         const beforeMissingVersion = mutationCount();
         await rowAction(testRow, 'Svuota ambiente di test');
-        await page.getByRole('dialog').getByRole('button', { name: 'Svuota', exact: true }).click();
         await expect(page.getByTestId('settings-ambulatories-section').getByRole('alert')).toContainText('Versione della sede non disponibile. Aggiorna la pagina e riprova.');
         expect(mutationCount()).toBe(beforeMissingVersion);
         await expect(testRow.getByRole('button', { name: 'Azioni', exact: true })).toBeDisabled();

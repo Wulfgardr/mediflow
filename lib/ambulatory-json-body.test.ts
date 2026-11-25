@@ -33,18 +33,16 @@ openDbServer();
 const { ambulatories, patients, patientsToAmbulatories } = load('./schema.ts') as typeof import('./schema.ts');
 const create = load('../app/api/ambulatories/route.ts') as typeof import('../app/api/ambulatories/route.ts');
 const item = load('../app/api/ambulatories/[id]/route.ts') as typeof import('../app/api/ambulatories/[id]/route.ts');
-const clear = load('../app/api/ambulatories/clear/route.ts') as typeof import('../app/api/ambulatories/clear/route.ts');
 const sql = new Database(join(dataDir, 'medical.db'));
 const CAP = 4 * 1024 * 1024;
-type Operation = 'create' | 'update' | 'delete' | 'clear';
+type Operation = 'create' | 'update';
 function call(operation: Operation, body?: string, id = 'synthetic-amb', headers: Record<string, string> = {}) {
     const request = new Request('http://127.0.0.1/api/ambulatories', {
-        method: operation === 'update' ? 'PUT' : operation === 'delete' ? 'DELETE' : 'POST',
+        method: operation === 'update' ? 'PUT' : 'POST',
         headers: { 'x-mediflow-archive-generation': archiveGeneration, 'content-type': 'application/json', ...headers }, ...(body === undefined ? {} : { body }),
     });
     const context = { params: Promise.resolve({ id }) };
-    return operation === 'create' ? create.POST(request) : operation === 'clear' ? clear.POST(request)
-        : operation === 'update' ? item.PUT(request, context) : item.DELETE(request, context);
+    return operation === 'create' ? create.POST(request) : item.PUT(request, context);
 }
 function snapshot() {
     const reopened = new Database(join(dataDir, 'medical.db'), { readonly: true });
@@ -62,9 +60,9 @@ test.after(() => {
     delete (globalThis as unknown as Record<symbol, typeof admission>)[stateKey];
     rmSync(dataDir, { recursive: true, force: true });
 });
-test('all four Web adapters reject null without effects', async () => {
+test('both Web adapters reject null without effects', async () => {
     const before = snapshot();
-    for (const operation of ['create', 'update', 'delete', 'clear'] as const) {
+    for (const operation of ['create', 'update'] as const) {
         assert.equal((await call(operation, 'null')).status, 400, operation);
         assert.deepEqual(snapshot(), before);
     }
@@ -85,22 +83,11 @@ test('shared Web envelope and field validation reject array, scalar, wrong type 
     assert.deepEqual(await response.json(), { error: 'JSON payload too large', code: 'JSON_BODY_TOO_LARGE' });
     assert.deepEqual(snapshot(), before);
 });
-test('DELETE absent/empty body retains missing-version error; null is invalid JSON', async () => {
-    const before = snapshot();
-    for (const body of [undefined, '', '  ']) {
-        const response = await call('delete', body);
-        assert.equal(response.status, 400);
-        assert.deepEqual(await response.json(), { error: 'Version is required' });
-    }
-    assert.deepEqual(snapshot(), before);
-});
-test('auth and admin gates precede envelope errors; writer preserves version/not-found priority', async () => {
+test('auth gate precedes envelope errors; writer preserves version/not-found priority', async () => {
     const before = snapshot();
     try {
         admission.role = null;
         assert.equal((await call('update', 'null', 'missing', { 'content-length': String(CAP + 1) })).status, 401);
-        admission.role = 'doctor';
-        assert.equal((await call('clear', 'null', 'missing', { 'content-length': String(CAP + 1) })).status, 403);
     } finally { admission.role = 'admin'; }
     assert.equal((await call('update', JSON.stringify({ version: 1, address: 42 }), 'missing')).status, 404);
     const response = await call('update', JSON.stringify({ address: 42 }), 'missing');

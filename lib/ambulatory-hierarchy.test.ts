@@ -20,7 +20,8 @@ const cookieState = { cookies: new Map<string, string>() };
 const cleanupCookies = installNetworkPatientCookieFixture(dataDir, cookieState);
 const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server');
 openDbServer();
-const host = load('./ambulatory-write.ts') as typeof import('./ambulatory-write');
+const host = { ...load('./ambulatory-write.ts') as typeof import('./ambulatory-write'),
+    ...load('./ambulatory-host-destructive-test-fixture.ts') as typeof import('./ambulatory-host-destructive-test-fixture') };
 const paired = load('./network-ambulatory-write.ts') as typeof import('./network-ambulatory-write');
 const { prepareNetworkPatientCommitGuard } = load('./network-patient-commit-authority.ts') as typeof import('./network-patient-commit-authority');
 const sql = dbServer.$client;

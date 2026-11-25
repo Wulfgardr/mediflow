@@ -1,6 +1,6 @@
 import { revokeNetworkPairedClient } from '@/lib/network-home-base-server';
 import { requireLocalApiToken } from '@/lib/security/local-api-auth';
-import { requireDevicePairingAdminSession } from '@/lib/security/device-pairing-web-auth';
+import { requireLocalWebAdminSession } from '@/lib/security/local-web-admin-session';
 
 const reply = (body: unknown, status: number) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
 
@@ -10,7 +10,7 @@ export async function DELETE(
 ) {
     try {
         const { clientId } = await params;
-        const access = await requireDevicePairingAdminSession(request, true);
+        const access = await requireLocalWebAdminSession(request, true);
         if (!access) {
             const authError = requireLocalApiToken(request);
             if (authError) return authError;

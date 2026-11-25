@@ -230,7 +230,7 @@ test('migration: second required audit failure rolls back links, versions and ev
 test('shared patient: current no-op assign then clear rejects replay; clear audit failure rolls back', async () => {
     reset('unassign');
     sql.exec("UPDATE ambulatories SET type='test' WHERE id='target'");
-    const { clearAmbulatory } = load('./ambulatory-write.ts') as typeof import('./ambulatory-write.ts');
+    const { clearAmbulatory } = load('./ambulatory-host-destructive-test-fixture.ts') as typeof import('./ambulatory-host-destructive-test-fixture.ts');
     const context = { request: new Request('http://127.0.0.1/api/ambulatories/target/clear'),
         session: { id: 'synthetic-session', userId: 'synthetic-member-user', role: 'admin', authChannel: 'web' } } as Parameters<typeof clearAmbulatory>[0];
     assert.equal((await request('assign')).status, 200);
