@@ -60,6 +60,13 @@ export const servicePackageSourceSchema = z.discriminatedUnion('kind', [
     physicianDecisionSourceSchema,
 ]);
 
+const itemSourcesSchema = z.array(servicePackageSourceSchema)
+    .min(1)
+    .refine((sources) => sources.some((source) => source.kind === 'documento'), {
+        message: 'Ogni voce cita almeno un documento',
+    })
+    .readonly();
+
 export const draftApprovalSchema = z.object({
     status: z.literal('draft_pending_approval'),
 }).strict();
@@ -85,7 +92,7 @@ export const servicePackageItemSchema = z.object({
     priority: z.enum(SERVICE_PACKAGE_PRIORITIES),
     exemptionCode: nonEmptyText.nullable(),
     appropriatenessConditions: z.array(nonEmptyText).readonly(),
-    sources: z.array(servicePackageSourceSchema).min(1).readonly(),
+    sources: itemSourcesSchema,
 }).strict();
 
 export const complicationModuleSchema = z.object({

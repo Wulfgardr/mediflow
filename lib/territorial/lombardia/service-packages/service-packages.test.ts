@@ -285,6 +285,17 @@ test('i moduli si attivano solo con la loro complicanza', () => {
     assert.deepEqual(resolveMatchingComplicationModules(pkg, ['GB610']), []);
 });
 
+test('la validazione rifiuta una voce che cita solo la decisione del medico, senza alcun documento', () => {
+    const [visit, ...rest] = DIABETES_T2_PACKAGE.baseItems;
+    const onlyDecisions = visit.sources.filter((source) => source.kind === 'decisione_del_medico');
+    assert.ok(onlyDecisions.length > 0);
+    const candidate = { ...DIABETES_T2_PACKAGE, baseItems: [{ ...visit, sources: onlyDecisions }, ...rest] };
+    const result = validateServicePackage(candidate, CATALOG);
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.ok(result.issues.every((issue) => issue.code === 'SCHEMA_INVALID'));
+    assert.equal(validateServicePackage(DIABETES_T2_PACKAGE, CATALOG).ok, true);
+});
+
 test('la validazione rifiuta fonte assente, data mancante o non valida', () => {
     const [visit, first, ...rest] = DIABETES_T2_PACKAGE.baseItems;
     assert.equal(first.sources[0].kind, 'documento');
