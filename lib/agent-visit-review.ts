@@ -5,7 +5,8 @@ import { isClinicalRichTextHtml, sanitizeClinicalRichTextHtml } from './clinical
 import { cassetteItems } from './agent-cassette-contract';
 import { agentBytes } from './agent-cassette-crypto';
 import { openAgentVisit, type OpenedAgentVisit } from './agent-cassette-client';
-import { reviewedAgentApplicationSchema, agentStructuredKind, type ReviewedAgentApplicationInput, type AgentCassetteIndexEntry, type IncomingAgentCassette, type NewAgentPatient } from './agent-visit-application-contract';
+import { reviewedAgentApplicationSchema, agentItemDecisionSchema, agentStructuredKind, type ReviewedAgentApplicationInput, type AgentCassetteIndexEntry, type IncomingAgentCassette, type NewAgentPatient,
+    type AgentItemDecisionInput } from './agent-visit-application-contract';
 import { collectDossierTaxCodes, excludedProfessionalCode } from './domain/documents/dossier-import';
 import { reviewAgentFact } from './agent-visit-facts';
 import { servicePrescriptionCreateSchema } from './api-schemas/prescriptions';
@@ -15,7 +16,11 @@ import { agentVisitPdfText, type AgentVisitPdf } from './agent-visit-pdf-text';
 
 export type AgentVisitDocument = AgentVisitPdf & { id: string; name: string; hash: string };
 export type AgentVisitReview = { visit: Omit<OpenedAgentVisit, 'cassette'> & { cassette: AgentCassetteIndexEntry }; patient: Patient | null; newPatient: NewAgentPatient | null;
-    documents: AgentVisitDocument[]; appliedItemIds: string[]; currentSummary: Map<string, string>; blockers: string[]; proposalBlockers: string[] };
+    documents: AgentVisitDocument[]; appliedItemIds: string[]; discardedItemIds: string[]; currentSummary: Map<string, string>; blockers: string[]; proposalBlockers: string[];
+    itemBlockers: Map<string, string[]> };
+type ReviewItem = AgentVisitReview['visit']['items'][number];
+export const agentItemDecided = (review: Pick<AgentVisitReview, 'appliedItemIds' | 'discardedItemIds'>, itemId: string) =>
+    review.appliedItemIds.includes(itemId) || review.discardedItemIds.includes(itemId);
 const proposalLabels: Record<string, string> = { therapy: 'la terapia', service: 'la prestazione', diagnosis: 'la diagnosi', exemption: 'l’esenzione', observation: 'l’osservazione' };
 const hex = (value: ArrayBuffer) => [...new Uint8Array(value)].map(byte => byte.toString(16).padStart(2, '0')).join('');
 const text = (value: unknown) => typeof value === 'string' ? value.trim() : '';
@@ -86,17 +91,18 @@ export async function inspectAgentVisit(row: IncomingAgentCassette, patients: Pa
         if (dates.length > 1 || dates[0] && !birthDateMatchesTaxCode(cf, dates[0])) blockers.push('Controlla la data di nascita nei PDF.');
         else newPatient = { ambulatoryId, taxCode: cf, birthDate: dates[0] ?? null };
     }
+    const discardedItemIds = row.discardedItemIds ?? [];
+    const itemBlockers = new Map<string, string[]>();
     for (const item of visit.items) {
         if (item.kind === 'note' || item.kind === 'transcription' || item.kind === 'pdf') continue;
+        if (row.appliedItemIds.includes(item.id) || discardedItemIds.includes(item.id)) continue;
         const source = documents.get(sourceHash(item));
         const kind = item.kind === 'service' ? 'service_prescription' : item.kind;
         const fact = source && reviewAgentFact(kind, values(item), source.text, text(item.value.quote));
-        if (!fact) {
-            proposalBlockers.push('Fonte da verificare per ' + (proposalLabels[item.kind] ?? 'questa proposta') + '.');
-            continue;
-        }
-        item.value.values = fact.values;
-        proposalBlockers.push(...fact.blockers);
+        const found = fact ? fact.blockers : ['Fonte da verificare per ' + (proposalLabels[item.kind] ?? 'questa proposta') + '.'];
+        if (fact) item.value.values = fact.values;
+        if (found.length) itemBlockers.set(item.id, found);
+        proposalBlockers.push(...found);
     }
     const currentSummary = new Map<string, string>();
     if (patient) {
@@ -117,7 +123,7 @@ export async function inspectAgentVisit(row: IncomingAgentCassette, patients: Pa
             currentSummary.set(item.id, before.join('; ') || 'Non presente');
         }
     }
-    return { visit, patient, newPatient, documents: [...documents.values()], appliedItemIds: row.appliedItemIds, currentSummary, blockers, proposalBlockers };
+    return { visit, patient, newPatient, documents: [...documents.values()], appliedItemIds: row.appliedItemIds, discardedItemIds, currentSummary, blockers, proposalBlockers, itemBlockers };
 }
 export async function reopenReviewedAgentItems(review: AgentVisitReview, row: IncomingAgentCassette): Promise<AgentVisitReview['visit']['items'] | null> {
     const visit = await openAgentVisit(row);
@@ -134,7 +140,11 @@ export async function reopenReviewedAgentItems(review: AgentVisitReview, row: In
 }
 export function agentVisitAwaitsReview(review: AgentVisitReview): boolean {
     return review.visit.cassette.status === 'closed' && Boolean(review.patient?.version || review.newPatient) && !review.blockers.length && !review.proposalBlockers.length
-        && review.visit.items.some(item => !review.appliedItemIds.includes(item.id));
+        && review.visit.items.some(item => !agentItemDecided(review, item.id));
+}
+export function agentItemAwaitsDecision(review: AgentVisitReview, itemId: string): boolean {
+    return review.visit.cassette.status === 'closed' && Boolean(review.patient?.version) && !review.newPatient && !review.blockers.length
+        && review.visit.items.some(item => item.id === itemId) && !agentItemDecided(review, itemId);
 }
 
 export async function prepareAgentApplication(review: AgentVisitReview, signal: AbortSignal): Promise<ReviewedAgentApplicationInput | null> {
@@ -143,9 +153,24 @@ export async function prepareAgentApplication(review: AgentVisitReview, signal: 
     if (review.patient && (!patient || patient.deletedAt || patient.isArchived
         || patient.taxCode.trim().toUpperCase() !== review.visit.anchor.fiscalCode || !patient.version)) return null;
     if (patient && patient.version !== review.patient?.version) throw new Error('La scheda è cambiata. Rileggi le differenze prima di applicare la visita.');
-    const selected = review.visit.items.filter(item => !review.appliedItemIds.includes(item.id));
-    const diagnoses = [...(patient?.diagnoses ?? [])], exemptions = [...(patient?.exemptions ?? [])];
+    const selected = review.visit.items.filter(item => !agentItemDecided(review, item.id));
+    const profile = withProposedProfile(patient, selected);
+    const prepared: unknown[] = [];
     for (const item of selected) {
+        signal.throwIfAborted();
+        prepared.push(await prepareAgentItem(review, item, profile));
+    }
+    signal.throwIfAborted();
+    return reviewedAgentApplicationSchema.parse({ visitId: review.visit.cassette.id, phase: 'review',
+        patientId: patient?.id ?? review.visit.cassette.id, expectedVersion: patient?.version ?? 1,
+        ...(review.newPatient ? { newPatient: review.newPatient } : {}),
+        cassetteRevision: review.visit.cassette.revision, items: prepared });
+}
+
+type ProposedProfile = { diagnoses: NonNullable<Patient['diagnoses']>; exemptions: string[] };
+function withProposedProfile(patient: Patient | null | undefined, items: ReviewItem[]): ProposedProfile {
+    const diagnoses = [...(patient?.diagnoses ?? [])], exemptions = [...(patient?.exemptions ?? [])];
+    for (const item of items) {
         if (item.kind === 'diagnosis') {
             const value = values(item);
             const code = value.code ?? '', system = value.system ?? '';
@@ -156,63 +181,86 @@ export async function prepareAgentApplication(review: AgentVisitReview, signal: 
         }
         if (item.kind === 'exemption') { const value = values(item); if (!exemptions.includes(value.code)) exemptions.push(value.code); }
     }
-    const prepared: unknown[] = [];
-    for (const item of selected) {
-        signal.throwIfAborted();
-        const provenance = { visitId: review.visit.cassette.id, source: item.value.source, quote: item.value.quote };
-        const base = { id: item.id, kind: item.kind };
-        switch (item.kind) {
-            case 'note': case 'transcription': {
-                const original = typeof item.value.text === 'string' ? item.value.text : '';
-                const content = isClinicalRichTextHtml(original) ? sanitizeClinicalRichTextHtml(original) : original;
-                if (!content.trim()) throw new Error('Nota vuota.');
-                const title = item.kind === 'note' ? 'Visita' : 'Trascrizione della visita';
-                const metadata = { sourceLabel: 'Cassetta della visita', provenance };
-                prepared.push({ ...base, values: {
-                    title: await db.sealLocalDraft(title), content: await db.sealLocalDraft(content),
-                    metadata: await db.sealLocalDraft(metadata), date: text(item.value.date) || new Date(review.visit.cassette.depositedAt).toISOString(),
-                } });
-                break;
-            }
-            case 'pdf': {
-                const bytes = agentBytes(text(item.value.base64));
-                try {
-                    const sealed = await db.sealPatientDocumentSource(bytes, text(item.value.name));
-                    sealed.fileKey.fill(0);
-                    prepared.push({ ...base, values: { name: sealed.name, data: sealed.data, size: bytes.length } });
-                } finally { bytes.fill(0); }
-                break;
-            }
-            case 'therapy': {
-                const value = values(item);
-                const status = value.status;
-                if (status !== 'active' && status !== 'suspended' && status !== 'completed') throw new Error('Stato della terapia da verificare.');
-                const data = await db.therapies.prepareWritePayload({ drugName: value.drugName, activePrinciple: value.activePrinciple || undefined,
-                    aic: value.aic || undefined, atc: value.atc || undefined, dosage: value.dosage, status, startDate: new Date(value.startDate),
-                    endDate: value.endDate ? new Date(value.endDate) : null, motivation: JSON.stringify(provenance) });
-                prepared.push({ ...base, values: data }); break;
-            }
-            case 'service': {
-                const value = values(item);
-                const data = await db.servicePrescriptions.prepareWritePayload({ serviceName: value.serviceName, prescribedAt: new Date(value.prescribedAt),
-                    category: servicePrescriptionCreateSchema.shape.category.parse(value.category), priority: servicePrescriptionCreateSchema.shape.priority.parse(value.priority || undefined),
-                    clinicalQuestion: value.clinicalQuestion || undefined, requestReference: value.requestReference || undefined,
-                    source: 'document_review', documentRefs: JSON.stringify(provenance) });
-                const lineItems = await Promise.all((value.items ?? '').split('\n').map(line => line.trim()).filter(Boolean).map(async serviceName => ({ serviceName: await db.sealLocalDraft(serviceName) })));
-                prepared.push({ ...base, values: { ...data, lineItems } }); break;
-            }
-            case 'diagnosis': prepared.push({ ...base, values: { diagnoses: await db.sealLocalDraft(diagnoses) } }); break;
-            case 'exemption': prepared.push({ ...base, values: { exemptions: await db.sealLocalDraft(exemptions) } }); break;
-            case 'observation': {
-                const value = values(item);
-                prepared.push({ ...base, values: { codeSystem: 'LOINC', code: value.code, display: value.display, value: value.value,
-                    unitSystem: 'UCUM', unitCode: value.unitCode, observedAt: value.observedAt, refLow: value.refLow || null, refHigh: value.refHigh || null, refText: value.refText || null, notes: await db.sealLocalDraft(provenance) } }); break;
-            }
+    return { diagnoses, exemptions };
+}
+
+async function prepareAgentItem(review: AgentVisitReview, item: ReviewItem, profile: ProposedProfile, corrected = false): Promise<unknown> {
+    const provenance = { visitId: review.visit.cassette.id, source: item.value.source, quote: item.value.quote, ...(corrected ? { corrected: true } : {}) };
+    const base = { id: item.id, kind: item.kind };
+    switch (item.kind) {
+        case 'note': case 'transcription': {
+            const original = typeof item.value.text === 'string' ? item.value.text : '';
+            const content = isClinicalRichTextHtml(original) ? sanitizeClinicalRichTextHtml(original) : original;
+            if (!content.trim()) throw new Error('Nota vuota.');
+            const title = item.kind === 'note' ? 'Visita' : 'Trascrizione della visita';
+            const metadata = { sourceLabel: 'Cassetta della visita', provenance };
+            return { ...base, values: {
+                title: await db.sealLocalDraft(title), content: await db.sealLocalDraft(content),
+                metadata: await db.sealLocalDraft(metadata), date: text(item.value.date) || new Date(review.visit.cassette.depositedAt).toISOString(),
+            } };
+        }
+        case 'pdf': {
+            const bytes = agentBytes(text(item.value.base64));
+            try {
+                const sealed = await db.sealPatientDocumentSource(bytes, text(item.value.name));
+                sealed.fileKey.fill(0);
+                return { ...base, values: { name: sealed.name, data: sealed.data, size: bytes.length } };
+            } finally { bytes.fill(0); }
+        }
+        case 'therapy': {
+            const value = values(item);
+            const status = value.status;
+            if (status !== 'active' && status !== 'suspended' && status !== 'completed') throw new Error('Stato della terapia da verificare.');
+            const data = await db.therapies.prepareWritePayload({ drugName: value.drugName, activePrinciple: value.activePrinciple || undefined,
+                aic: value.aic || undefined, atc: value.atc || undefined, dosage: value.dosage, status, startDate: new Date(value.startDate),
+                endDate: value.endDate ? new Date(value.endDate) : null, motivation: JSON.stringify(provenance) });
+            return { ...base, values: data };
+        }
+        case 'service': {
+            const value = values(item);
+            const data = await db.servicePrescriptions.prepareWritePayload({ serviceName: value.serviceName, prescribedAt: new Date(value.prescribedAt),
+                category: servicePrescriptionCreateSchema.shape.category.parse(value.category), priority: servicePrescriptionCreateSchema.shape.priority.parse(value.priority || undefined),
+                clinicalQuestion: value.clinicalQuestion || undefined, requestReference: value.requestReference || undefined,
+                source: 'document_review', documentRefs: JSON.stringify(provenance) });
+            const lineItems = await Promise.all((value.items ?? '').split('\n').map(line => line.trim()).filter(Boolean).map(async serviceName => ({ serviceName: await db.sealLocalDraft(serviceName) })));
+            return { ...base, values: { ...data, lineItems } };
+        }
+        case 'diagnosis': return { ...base, values: { diagnoses: await db.sealLocalDraft(profile.diagnoses) } };
+        case 'exemption': return { ...base, values: { exemptions: await db.sealLocalDraft(profile.exemptions) } };
+        case 'observation': {
+            const value = values(item);
+            return { ...base, values: { codeSystem: 'LOINC', code: value.code, display: value.display, value: value.value,
+                unitSystem: 'UCUM', unitCode: value.unitCode, observedAt: value.observedAt, refLow: value.refLow || null, refHigh: value.refHigh || null, refText: value.refText || null, notes: await db.sealLocalDraft(provenance) } };
         }
     }
+    throw new Error('Proposta non leggibile.');
+}
+
+export const AGENT_CORRECTABLE_FIELDS = {
+    therapy: ['drugName', 'activePrinciple', 'dosage', 'status', 'startDate', 'endDate'],
+    observation: ['value', 'unitCode', 'observedAt', 'refText'],
+    diagnosis: ['description', 'code', 'system', 'date'],
+} as const satisfies Partial<Record<ReviewItem['kind'], readonly string[]>>;
+export type AgentCorrectableKind = keyof typeof AGENT_CORRECTABLE_FIELDS;
+export const agentItemCorrectable = (kind: string): kind is AgentCorrectableKind => kind in AGENT_CORRECTABLE_FIELDS;
+
+export async function prepareAgentItemDecision(review: AgentVisitReview, itemId: string, decision: 'keep' | 'correct' | 'discard',
+    signal: AbortSignal, correction: Record<string, string> = {}): Promise<AgentItemDecisionInput | null> {
+    if (!agentItemAwaitsDecision(review, itemId)) return null;
+    const original = review.visit.items.find(item => item.id === itemId);
+    if (!original) return null;
+    const target = { visitId: review.visit.cassette.id, cassetteRevision: review.visit.cassette.revision };
+    if (decision === 'discard') return agentItemDecisionSchema.parse({ ...target, decision, itemId, kind: original.kind });
+    if (decision === 'keep' && review.itemBlockers.get(itemId)?.length) return null;
+    if (decision === 'correct' && !agentItemCorrectable(original.kind)) return null;
+    const patient = await db.patients.get(review.patient!.id, { signal });
+    if (!patient || patient.deletedAt || patient.isArchived || patient.taxCode.trim().toUpperCase() !== review.visit.anchor.fiscalCode || !patient.version) return null;
+    if (patient.version !== review.patient!.version) throw new Error('La scheda è cambiata. Rileggi la voce prima di decidere.');
+    const allowed: readonly string[] = agentItemCorrectable(original.kind) ? AGENT_CORRECTABLE_FIELDS[original.kind] : [];
+    const changed = Object.fromEntries(Object.entries(correction).filter(([field]) => allowed.includes(field)).map(([field, value]) => [field, value.trim()]));
+    const item = decision === 'correct' ? { ...original, value: { ...original.value, values: { ...values(original), ...changed } } } : original;
+    const profile = withProposedProfile(patient, [item]);
+    const prepared = await prepareAgentItem(review, item, profile, decision === 'correct');
     signal.throwIfAborted();
-    return reviewedAgentApplicationSchema.parse({ visitId: review.visit.cassette.id, phase: 'review',
-        patientId: patient?.id ?? review.visit.cassette.id, expectedVersion: patient?.version ?? 1,
-        ...(review.newPatient ? { newPatient: review.newPatient } : {}),
-        cassetteRevision: review.visit.cassette.revision, items: prepared });
+    return agentItemDecisionSchema.parse({ ...target, decision, patientId: patient.id, expectedVersion: patient.version, item: prepared });
 }
