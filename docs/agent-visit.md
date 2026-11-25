@@ -28,8 +28,9 @@ npm run agent:visita -- completa --richiesta UUID-DELLA-RICHIESTA
 ```
 
 Conservare `agentRef` dalla ricevuta. Dopo lo sblocco con PIN o passphrase, o dopo
-«Rinnova accesso» riuscito, il client registrato può ritirare il mandato di 24 ore. Il blocco, la scadenza
-della sessione o la revoca in Agenti interrompono l’accesso.
+«Rinnova accesso» riuscito, il client registrato può ritirare il mandato di 24 ore. «Blocca», la revoca
+in Agenti o la scadenza del mandato interrompono l’accesso. «Esci», il blocco per inattività, la
+chiusura del browser e il riavvio del server non lo interrompono.
 
 ```sh
 npm run agent:visita -- ritira --agente UUID-AGENTE
