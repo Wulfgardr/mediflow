@@ -220,7 +220,9 @@ La stima presuppone un trasporto locale adatto. Se manca, il pilota si ferma all
 ### Decisione
 
 Offrire una modalità macOS facoltativa, spenta al primo avvio e disponibile
-per un account v3. Dopo l'abilitazione, il medico avvia la sessione di lavoro
+per un account v3. Dal 25/11/2026 ([ADR 0200](0200-web-standard-launcher-e-ritiro-app-desktop.md))
+è un modulo facoltativo del launcher del Mac, spento in partenza, e non blocca
+la 0.9.1. Su Windows e Linux è dichiarata assente. Dopo l'abilitazione, il medico avvia la sessione di lavoro
 con un Touch ID fresco in MediFlow. Il servizio locale firmato conserva la
 master key aperta nella propria memoria per al massimo 8 ore, finché
 valgono le condizioni sotto. Chiudere la finestra o il browser lascia

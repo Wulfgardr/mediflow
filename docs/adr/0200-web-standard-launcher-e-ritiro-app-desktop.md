@@ -1,11 +1,11 @@
 # ADR 0200: Applicazione Web standard su desktop, launcher sottili per sistema e ritiro delle app desktop native
 
 Date: 2026-11-25
-Status: Proposed
+Status: Accepted (decisione di Leonardo del 25/11/2026)
 
 Refs: WUL-880
 Aggiorna: [ADR 0008](./0008-web-first-with-parity-sweeps.md), [ADR 0048](./0048-apple-shared-client-architecture-and-home-base-runtime.md), [ADR 0068](./0068-cross-platform-runtime-windows-linux.md), [ADR 0114](./0114-intelligent-host-aip-mcp-isolation.md), [ADR 0143](./0143-strong-unlock-credential.md), [ADR 0185](./0185-rotta-di-mediflow.md), [ADR 0190](./0190-mandato-agenti-e-cassetta-della-visita.md), [ADR 0191](./0191-conferma-da-chat-e-cassetta-senza-finestra.md).
-Supera (se accettato): [ADR 0145](./0145-rust-gpui-connected-client.md), [ADR 0169](./0169-gpui-ambulatory-destructive-commands.md), [ADR 0172](./0172-gpui-local-web-session.md), la parte macOS desktop di [ADR 0048](./0048-apple-shared-client-architecture-and-home-base-runtime.md) e la verifica tri-OS di `MediFlowCore` (ADR 0071).
+Supera: [ADR 0145](./0145-rust-gpui-connected-client.md), [ADR 0169](./0169-gpui-ambulatory-destructive-commands.md), [ADR 0172](./0172-gpui-local-web-session.md), la parte macOS desktop di [ADR 0048](./0048-apple-shared-client-architecture-and-home-base-runtime.md) e la verifica tri-OS di `MediFlowCore` (ADR 0071).
 
 ## Problema e contesto
 
@@ -23,13 +23,16 @@ Le misure raccolte su `main` (`a6f6221fa`, 25 novembre 2026) mostrano uno squili
 - **Costo in lavoro e CI:** negli ultimi 30 giorni (dal 26 ottobre 2026, 1.906 commit totali), 414 commit (21,7%) hanno toccato `experiments/gpui-patient-pilot` (101 su 405 negli ultimi 14 giorni, 24,9%). Su GitHub Actions (`gh run list`, finestra di 200 run), `rust-gpui-pilot.yml` è il workflow più lento del repository (47,2 minuti di mediana per PR, 199 run attive su 200, ~44.940 minuti wall-clock proiettati su 30 giorni); `core-tri-os.yml` aggiunge ~2.420 minuti/mese e `apple-native.yml` ~5.890 minuti/mese su runner `macos-15`.
 - **Latenza Web:** la baseline di produzione (`docs/analysis/2026-07-17-baseline-performance.json`, Mac16,5 M4 Max) misura 16,7 ms (200 pazienti) e 135,2 ms (2.000 pazienti) per `/api/patients` inclusa decifratura AES-256-GCM lato client, e 57,3 ms per 1.600 voci di diario. La misura dei gesti Web (`docs/design/misura-base/conti.json`, 13 novembre 2026) registra risposte UI peggiori fra 8 ms e 27 ms sui compiti misurati. Resta da acquisire una nuova baseline sul Mac17,10 (M5 Max) con la scheda aggiornata, ma non esiste un limite prestazionale del Web che giustifichi due riscritture desktop parallele.
 
-## Decisione proposta
+## Decisione
 
 1. **Una sola applicazione desktop: il Web locale.** L'interfaccia browser locale (`Next.js`) è l'unica applicazione desktop di MediFlow su macOS, Windows e Linux. Ogni sviluppo UI desktop avviene una sola volta sul Web.
 2. **Ritiro ordinato delle app desktop native.** Cessano gli sviluppi e i requisiti di parità per `experiments/gpui-patient-pilot` (Rust/GPUI) e per `MediFlowMacApp` (finestra desktop Swift macOS). La rimozione fisica del codice e dei workflow avviene in PR successive, ordinate e reversibili, dopo l'estrazione delle sole componenti non sostituibili dal browser.
 3. **Launcher sottile per sistema operativo.** Su macOS, Windows e Linux l'utente avvia MediFlow tramite un piccolo launcher dedicato al sistema. Il launcher non contiene schermate cliniche né duplicazioni di logica di dominio: gestisce avvio e arresto del backend, stato e diagnosi, proxy HTTPS LAN per i dispositivi mobili, backup pianificato, aggiornamento e rollback, e sul solo macOS ospita i piccoli helper firmati che richiedono API di sistema (Touch ID / Secure Enclave).
 4. **App iOS e iPadOS confermate.** `MediFlowMobileApp` resta parte del prodotto, collegata all'archivio del computer host tramite `/api/v1/network/*`, proxy HTTPS LAN avviato dal launcher e pairing con QR (WUL-951), senza alcuna dipendenza dall'app desktop macOS.
 5. **Intelligenza locale personalizzata per sistema.** Il nucleo funziona senza modelli (ADR 0180). I motori locali restano opzionali e dichiarati per piattaforma: Ollama (tutti e tre i sistemi), OCR Apple Vision su macOS e Tesseract WASM su Windows/Linux (ADR 0198), Whisper locale estratto da GPUI in un servizio autonomo prima della rimozione del pilota Rust, GLiNER2-PII solo dove il sistema garantisce l'isolamento di rete del worker.
+6. **La voce locale diventa un servizio prima del ritiro di GPUI.** `local_voice` (Whisper, rilevamento della voce e attribuzione medico/paziente) esce da `experiments/gpui-patient-pilot` in un servizio locale autonomo, avviato dal launcher. GPUI si toglie solo dopo che il servizio supera la prova dell'ascolto della visita. Il Web ha una propria interfaccia di registrazione, per la visita di un paziente già in archivio e per una prima visita; la prima visita raccoglie anche i dati anagrafici per costruire la scheda di base. Nulla si salva senza la conferma del medico.
+7. **Abbinamento dei dispositivi: scadenza a 30 giorni e VPN privata, in un giro successivo.** Un dispositivo che non si collega da 30 giorni perde l'abbinamento. Fuori dallo studio l'iPhone raggiunge il computer di casa attraverso una VPN privata del medico (per esempio Tailscale), con lo stesso controllo del certificato della rete locale. Nessun ponte cloud di terzi. Il lavoro appartiene a un giro successivo alla 0.9.1 (WUL-951).
+8. **Cassetta a finestra chiusa: modulo facoltativo del launcher macOS.** Il servizio dell'[ADR 0191](./0191-conferma-da-chat-e-cassetta-senza-finestra.md) §2 resta un modulo facoltativo del launcher del Mac, spento in partenza, e non blocca la 0.9.1. Su Windows e Linux è dichiarato assente: la chiave resta solo nella scheda del browser sbloccata (ADR 0143).
 
 ## Che cosa resta nel launcher, cosa passa al Web e cosa non ha equivalente fuori macOS
 
@@ -49,6 +52,29 @@ Le misure raccolte su `main` (`a6f6221fa`, 25 novembre 2026) mostrano uno squili
 | Trascrizione locale Whisper (`local_voice`) | **Servizio/binario locale estratto da GPUI** | Sì (dopo estrazione) | Da portare in giro dedicato | Da portare in giro dedicato |
 
 Nessun ripiego debole è ammesso su Windows o Linux: l'assenza di Secure Enclave, Portachiavi biometrico o confinamento GLiNER viene dichiarata apertamente come stato non disponibile, senza file di chiavi in chiaro né disattivazione dei controlli di rete.
+
+## Il launcher
+
+Il launcher non è una seconda cartella clinica: non mostra pazienti, non scrive dati clinici e non ripete schermate del Web. Prepara, avvia, sorveglia e diagnostica la postazione. Parte da ciò che esiste: `MediFlow.command`, `MediFlow.cmd`, `MediFlow.sh`, `scripts/mediflow.mjs`, `scripts/mediflow-launcher-page.mjs`, `scripts/launcher-state.mjs`, `scripts/local-api-tls-proxy.mjs` e `scripts/windows-launcher-bootstrap/`.
+
+### Stato
+
+Una sezione corta nella pagina di avvio. Entra una riga solo se cambia quello che il medico fa in quel momento; niente grafici, storici o contatori. Il launcher legge senza sessione del medico, oppure con il token locale che già usa (`local-api-token` nella cartella dati), e non riceve mai dati clinici.
+
+| Riga | Che cosa dice al medico | Fonte già nel codice |
+| --- | --- | --- |
+| MediFlow | Avviato, in avvio con il passo corrente, oppure fermo con il motivo | Stato del processo posseduto dal launcher (`scripts/mediflow.mjs`, ricevuta esclusiva e passi di avvio) |
+| Archivio | Pronto, assente, da aggiornare o non leggibile | `GET /api/auth/check`, campo `db.state` (`ready`, `missing`, `schema-missing`, `unavailable`), senza sessione |
+| Motori locali | Pronti oppure non pronti, con il motivo (Ollama spento, modello mancante, versione non ammessa) | `GET /api/ai/fabric/status` con il token locale (`buildFabricStatusSnapshot`, ciclo di vita di Ollama) |
+| iPhone e iPad | Collegamento acceso o spento; almeno un dispositivo abbinato oppure nessuno | `GET /api/system/network-overview` con il token locale (`session.operatingMode`, `hasPairedClients`); proxy da `runtime-status.json` e `local-api-tls-proxy.pid` |
+| Aggiornamento | Versione installata e, se dichiarata, versione disponibile | `lib/update-awareness.ts`: versione del pacchetto e manifesto locale (`MEDIFLOW_UPDATE_MANIFEST_PATH`) |
+
+Proposte, fuori dalla specifica finché manca la fonte:
+
+- **iPhone raggiungibile adesso.** `lastSeenAt` dei dispositivi abbinati non viene mai scritto e `network-overview` restituisce `lastContactAt: null`. Serve prima che il server registri l'ultimo contatto.
+- **Ultima copia di sicurezza.** Esito e ora dell'ultima copia pianificata esistono (`run.lastRunAt`, `run.lastRunStatus` in `lib/backup-scheduler.ts`), ma `GET /api/system/backup-scheduler` chiede la sessione del medico. Serve una lettura con il token locale limitata a ora ed esito.
+- **Aggiornamento disponibile dalla rete.** Oggi esiste solo il manifesto locale; un controllo remoto richiede una decisione su fonte, firma e consenso alla rete.
+- **Servizio locale della voce.** La riga entra quando il servizio estratto da GPUI esiste e dichiara il proprio stato.
 
 ## Abbinamento remoto: adozione selettiva dei pattern di T3 Code
 
@@ -72,7 +98,7 @@ Dall'analisi del modello di abbinamento di T3 Code (`pingdotgg/t3code`, `docs/us
 
 ## Conseguenze sul contratto della 0.9.1
 
-L'accettazione di questo ADR richiede un emendamento esplicito di `docs/releases/0.9.1-contract.md`:
+L'[emendamento del 25 novembre 2026](../releases/0.9.1-contract.md#emendamento-del-25-novembre-2026-il-web-è-lunica-applicazione-desktop) di `docs/releases/0.9.1-contract.md` registra queste conseguenze. La tabella riporta lo stato deciso:
 
 | Issue / Unità 0.9.1 | Stato proposto | Motivazione |
 | --- | --- | --- |
@@ -85,12 +111,13 @@ L'accettazione di questo ADR richiede un emendamento esplicito di `docs/releases
 | **WUL-777** (Accesso v3 nei client Apple) | **Resta (solo iOS/iPadOS)** | Necessaria affinché iPhone e iPad aprano archivi con passphrase v3. |
 | **WUL-951** (Abbinamento con QR) | **Resta (Web + Launcher TLS + iOS/iPadOS)** | Già implementato su Web e client Apple; si appoggia al proxy LAN del launcher. |
 | **WUL-937** (iPhone vede l'archivio tramite Mac) | **Cambia implementazione (via Launcher TLS)** | Non richiede più la compilazione di `MediFlowMacApp` home-base: usa `scripts/local-api-tls-proxy.mjs` avviato dal launcher. |
+| **WUL-828** (Ascolto dell'intera visita) | **Cambia superficie (servizio locale della voce + Web)** | L'obiettivo passa dal client GPUI al servizio locale della voce con l'interfaccia di registrazione Web. |
 | **WUL-936** (Lavoro da remoto con Mac bloccato) | **Resta (perimetro chiarito)** | Verifica l'accesso iPhone/iPad (decifratura sul telefono) e il deposito agenti con Mac bloccato ma sveglio, e conferma il blocco della cassetta ADR 0191 §2. |
 | **WUL-803** (Canale chat GPUI, lane Mythos) | **Solo citata (fuori da questa lane)** | La lane Mythos valuterà l'impatto sul canale di ricomposizione nomi senza finestra GPUI. |
 
 ## Piano di ritiro ordinato e reversibile
 
-Nessuna rimozione avviene insieme a questo ADR. La sequenza prevista dopo l'accettazione è:
+Nessuna rimozione avviene insieme a questo ADR. La sequenza decisa è:
 
 1. Emendamento di `docs/releases/0.9.1-contract.md`.
 2. Estrazione di `experiments/gpui-patient-pilot/app/src/local_voice/` in un binario/servizio autonomo verificato da `scripts/prove-ascolto-visita.mjs` (prerequisito bloccante per non perdere Whisper locale).
@@ -108,4 +135,4 @@ Questa decisione può essere riaperta solo a fronte di evidenze misurate nuove, 
 2. **Blocco strutturale del browser sulle API richieste:** un requisito clinico obbligatorio (es. gestione dispositivi medici locali o accesso hardware) non può essere assolto né dal browser né dal piccolo launcher/helper di sistema.
 3. **Richiesta esplicita di un secondo utente/struttura** che giustifichi e finanzi il costo di manutenzione e firma di una app desktop nativa dedicata (coerente con ADR 0185).
 
-Questa proposta non modifica il runtime, lo schema SQLite, i contratti `/api/v1` o i claim di sicurezza e cifratura vigenti.
+Questa decisione non modifica il runtime, lo schema SQLite, i contratti `/api/v1` o i claim di sicurezza e cifratura vigenti.
