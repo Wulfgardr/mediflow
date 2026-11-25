@@ -14,13 +14,15 @@ export type OpenMicrophone = {
 /** Opens the page microphone and hands 16 kHz mono PCM s16le blocks to `onBlock`; nothing is kept after the hand-off. */
 export async function openMicrophone(onBlock: (pcm: Uint8Array) => void): Promise<OpenMicrophone> {
     if (!navigator.mediaDevices?.getUserMedia || typeof AudioWorkletNode === 'undefined') throw new MicrophoneUnavailable('unsupported');
+    const context = new AudioContext();
+    const running = context.resume();
     let stream: MediaStream;
     try {
         stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
     } catch (error) {
+        await context.close().catch(() => undefined);
         throw new MicrophoneUnavailable(error instanceof DOMException && (error.name === 'NotFoundError' || error.name === 'OverconstrainedError') ? 'unsupported' : 'permission-denied');
     }
-    const context = new AudioContext();
     try {
         await context.audioWorklet.addModule('/local-voice-worklet.js');
     } catch {
@@ -37,7 +39,7 @@ export async function openMicrophone(onBlock: (pcm: Uint8Array) => void): Promis
         if (final) { flushed?.(); flushed = null; }
     };
     source.connect(capture);
-    await context.resume();
+    await running;
     let closed = false;
     return {
         flush: () => closed ? Promise.resolve() : new Promise<void>((resolve) => {

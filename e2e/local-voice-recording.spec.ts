@@ -1,11 +1,7 @@
 import type { Page, TestInfo } from '@playwright/test';
 import { randomBytes } from 'node:crypto';
-import { mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
 
 import { expect, test } from './fixtures/isolated-runtime';
-import { secureLaunch } from './fixtures/secure-browser';
 import { bootstrapUnlockedSession, openUnlockedDocument } from './utils';
 import { startFakeLocalVoice } from '../lib/local-voice/fake-service.test-support';
 import { randomSyntheticTaxCode } from '../lib/patient-identity.test-support';
@@ -15,26 +11,35 @@ test.describe.configure({ mode: 'serial', retries: 0 });
 const pin = '314159';
 const TONE_HZ = 440;
 
-function toneWav(): string {
-    const rate = 48_000, seconds = 4, samples = rate * seconds;
-    const wav = Buffer.alloc(44 + samples * 2);
-    wav.write('RIFF', 0); wav.writeUInt32LE(36 + samples * 2, 4); wav.write('WAVEfmt ', 8);
-    wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22); wav.writeUInt32LE(rate, 24);
-    wav.writeUInt32LE(rate * 2, 28); wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34); wav.write('data', 36); wav.writeUInt32LE(samples * 2, 40);
-    for (let index = 0; index < samples; index += 1) wav.writeInt16LE(Math.round(Math.sin(2 * Math.PI * TONE_HZ * index / rate) * 12_000), 44 + index * 2);
-    const file = path.join(mkdtempSync(path.join(tmpdir(), 'mediflow-voice-tone-')), 'tono-sintetico.wav');
-    writeFileSync(file, wav);
-    return file;
-}
-
 const secret = randomBytes(32).toString('hex');
 const port = 40_000 + Math.floor(Math.random() * 9_000);
 process.env.MEDIFLOW_LOCAL_VOICE_URL = `http://127.0.0.1:${port}`;
 process.env.MEDIFLOW_LOCAL_VOICE_SECRET = secret;
-test.use({
-    permissions: ['microphone'],
-    launchOptions: secureLaunch({ args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', `--use-file-for-fake-audio-capture=${toneWav()}`] }),
-});
+test.use({ permissions: ['microphone'] });
+
+async function syntheticMicrophone(page: Page) {
+    await page.addInitScript((hertz) => {
+        const devices = navigator.mediaDevices;
+        const original = devices.getUserMedia.bind(devices);
+        devices.getUserMedia = async (constraints) => {
+            if (!constraints?.audio) return original(constraints);
+            const context = new AudioContext();
+            const tone = context.createOscillator();
+            const level = context.createGain();
+            const output = context.createMediaStreamDestination();
+            tone.frequency.value = hertz;
+            level.gain.value = 0.35;
+            tone.connect(level).connect(output);
+            tone.start();
+            await context.resume();
+            const [track] = output.stream.getAudioTracks();
+            track.addEventListener('ended', () => { void context.close(); });
+            const stop = track.stop.bind(track);
+            track.stop = () => { stop(); void context.close(); };
+            return output.stream;
+        };
+    }, TONE_HZ);
+}
 
 const VISIT = [
     { speaker: 'doctor' as const, text: 'Buongiorno, come va la pressione in questi giorni?' },
@@ -110,6 +115,7 @@ async function recordUntilReview(page: Page, recorder: ReturnType<Page['getByTes
 test('dalla scheda: registro una visita a due voci, pausa, ripresa, fine, rileggo e porto il testo nella nota', async ({ page }, info) => {
     test.setTimeout(180_000);
     await startService();
+    await syntheticMicrophone(page);
     await bootstrapUnlockedSession(page, pin);
     const patientId = await syntheticPatient(page, 'Ascolto');
     await openUnlockedDocument(page, `/patients/${patientId}/modules`, pin);
@@ -166,6 +172,7 @@ test('da «Nuova scheda»: registro una prima visita, l’anagrafica detta è pr
         { speaker: 'patient', text: `Codice fiscale ${taxCode}.` },
         { speaker: 'doctor', text: 'Bene, misuriamo la pressione.' },
     ]);
+    await syntheticMicrophone(page);
     await bootstrapUnlockedSession(page, pin);
     await openUnlockedDocument(page, '/patients/new', pin);
     const recorder = page.getByTestId('local-voice-recorder');
@@ -205,6 +212,7 @@ test('servizio assente o modello mancante: la pagina lo dice e non offre di regi
     test.setTimeout(120_000);
     await fake?.close();
     fake = null;
+    await syntheticMicrophone(page);
     await bootstrapUnlockedSession(page, pin);
     const patientId = await syntheticPatient(page, 'Silenzio');
     await openUnlockedDocument(page, `/patients/${patientId}/modules`, pin);
@@ -230,6 +238,7 @@ test('servizio assente o modello mancante: la pagina lo dice e non offre di regi
 test('il testo di un altro paziente o di un’altra prima visita non viene preparato', async ({ page, context }, info) => {
     test.setTimeout(180_000);
     await startService();
+    await syntheticMicrophone(page);
     await bootstrapUnlockedSession(page, pin);
     const first = await syntheticPatient(page, 'Primo');
     const second = await syntheticPatient(page, 'Secondo');
@@ -262,6 +271,7 @@ test('il testo di un altro paziente o di un’altra prima visita non viene prepa
     await openUnlockedDocument(page, '/patients/new', pin);
     await recordUntilReview(page, page.getByTestId('local-voice-recorder'), false);
     const other = await context.newPage();
+    await syntheticMicrophone(other);
     await openUnlockedDocument(other, '/patients/new', pin);
     const elsewhere = other.getByTestId('local-voice-recorder');
     await expect(elsewhere.getByTestId('local-voice-foreign')).toContainText('C’è da rivedere la registrazione di una prima visita aperta altrove.');
