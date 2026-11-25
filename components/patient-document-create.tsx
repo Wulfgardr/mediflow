@@ -19,7 +19,7 @@ import {
 } from '@/lib/patient-document-create-client';
 import { OCR_MIN_SHORT_SIDE_PIXELS } from '@/lib/patient-document-image-geometry';
 import { birthError, identifierError, IDENTIFIER_LABELS, IDENTIFIER_TYPES, PATIENT_IDENTIFIER_DUPLICATE, type PatientIdentifierType } from '@/lib/patient-identity';
-import type { DossierIdentityProposal } from '@/lib/domain/documents/dossier-sections';
+import { allIdentityProposals, IDENTITY_FIELDS, sameIdentityValue, type IdentityField, type SourcedIdentityProposal } from '@/lib/dossier-new-patient-entry';
 import type { PatientDocumentCreateReview } from '@/lib/patient-document-create-command';
 import { focusPatientCreationTarget } from '@/lib/patient-creation-focus';
 import { confirmationPinError, isValidConfirmationPin, validateConfirmationPinSubmission } from '@/lib/security/pin-input';
@@ -27,7 +27,7 @@ import { confirmationPinError, isValidConfirmationPin, validateConfirmationPinSu
 /** Dossier (ADR 0175): documento già scelto nel lotto e proposte d'identità con evidenza. */
 export type PatientDocumentDossierSource = Readonly<{
     file: File;
-    proposals: readonly DossierIdentityProposal[];
+    proposals: readonly SourcedIdentityProposal[];
     onCreated: (created: { patientId: string; attachmentId: string }) => void;
 }>;
 
@@ -42,6 +42,26 @@ type Phase =
     | { kind: 'sending'; commandId: string }
     | { kind: 'applied'; patientId: string; verified: 'matched' | 'opened' | 'failed'; commandId: string }
     | { kind: 'uncertain'; commandId: string; text: string; forgettable?: boolean };
+
+const FIELD_NAMES: Record<IdentityField, string> = { taxCode: 'codice fiscale', firstName: 'nome', lastName: 'cognome', birthDate: 'data di nascita' };
+
+function proposalChanges(field: IdentityField, value: string): Partial<Fields> {
+    if (field === 'taxCode') return { identifierType: 'cf', taxCode: value };
+    if (field === 'birthDate') return { birthDate: value, birthYear: '', estimatedBirth: false };
+    return { [field]: value };
+}
+
+function touchedFields(changes: Partial<Fields>): IdentityField[] {
+    return IDENTITY_FIELDS.filter((field) => field in changes
+        || (field === 'taxCode' && 'identifierType' in changes)
+        || (field === 'birthDate' && ('birthYear' in changes || 'estimatedBirth' in changes)));
+}
+
+function fieldValue(fields: Fields, field: IdentityField): string {
+    if (field === 'taxCode') return fields.identifierType === 'cf' ? fields.taxCode : '';
+    if (field === 'birthDate') return fields.estimatedBirth ? '' : fields.birthDate;
+    return fields[field];
+}
 
 const EMPTY: Fields = { firstName: '', lastName: '', identifierType: 'cf', taxCode: '', birthDate: '', estimatedBirth: false, birthYear: '' };
 const UNCERTAIN = 'Esito da verificare. Non ripetere la creazione: rileggi l’esito oppure ritira la lavorazione.';
@@ -86,6 +106,7 @@ export default function PatientDocumentCreate({ onActiveChange, dossier, onDocum
     useEffect(() => { onActiveChange?.(phase.kind !== 'idle'); }, [onActiveChange, phase.kind]);
     const [fields, setFields] = useState<Fields>(EMPTY);
     const [separate, setSeparate] = useState(false);
+    const [undecided, setUndecided] = useState<readonly IdentityField[]>([]);
     const [pin, setPin] = useState('');
     const [dragging, setDragging] = useState(false);
     const [pinSubmitError, setPinSubmitError] = useState<string | null>(null);
@@ -106,7 +127,7 @@ export default function PatientDocumentCreate({ onActiveChange, dossier, onDocum
         work.current.controller.abort();
         work.current.original?.fill(0);
         work.current = { epoch: work.current.epoch + 1, controller: new AbortController(), original: null };
-        setFields(EMPTY); setSeparate(false); setPin(''); setPinSubmitError(null);
+        setFields(EMPTY); setSeparate(false); setUndecided([]); setPin(''); setPinSubmitError(null);
         return work.current;
     }, []);
     const current = (token: { epoch: number }) => work.current.epoch === token.epoch && !work.current.controller.signal.aborted;
@@ -221,6 +242,8 @@ export default function PatientDocumentCreate({ onActiveChange, dossier, onDocum
 
     function changeFields(changes: Partial<Fields>) {
         setFields((value) => ({ ...value, ...changes }));
+        const touched = touchedFields(changes);
+        setUndecided((value) => value.filter((field) => !touched.includes(field)));
         if (phase.kind === 'review' && phase.duplicate) {
             setSeparate(false);
             setPhase({ ...phase, duplicate: null });
@@ -290,7 +313,24 @@ export default function PatientDocumentCreate({ onActiveChange, dossier, onDocum
 
     const sourceLine = (source: Source) => `${source.fileName}, ${(source.size / 1024).toLocaleString('it-IT', { maximumFractionDigits: 0 })} KiB${source.converted
         ? `, immagine allegata come PDF di una pagina${source.reduction < 1 ? `, ridotta al ${Math.round(source.reduction * 100)}% per l’estrazione locale` : ''}` : ''}`;
-    const identityError = fieldError(fields);
+    function applyAllProposals(proposals: readonly SourcedIdentityProposal[]) {
+        const { values, undecided: open } = allIdentityProposals(proposals);
+        changeFields(Object.assign({}, ...Object.entries(values).map(([field, value]) => proposalChanges(field as IdentityField, value))));
+        setUndecided(open);
+    }
+
+    function fieldNote(field: IdentityField) {
+        if (!dossier) return null;
+        const id = `patient-document-${field}-source`;
+        if (undecided.includes(field)) return <p id={id} className="mf-field-helper" data-testid="patient-document-undecided">Da decidere: i documenti propongono valori diversi.</p>;
+        const value = fieldValue(fields, field);
+        const origin = value ? dossier.proposals.find((proposal) => proposal.field === field && sameIdentityValue(proposal.value, value)) : undefined;
+        return origin ? <p id={id} className="mf-field-helper">Fonte: {origin.sourceName}</p> : null;
+    }
+
+    const identityError = undecided.length
+        ? `Scegli il valore di: ${undecided.map((field) => FIELD_NAMES[field]).join(', ')}.`
+        : fieldError(fields);
     const canConfirm = (phase.kind === 'review' || phase.kind === 'confirm') && phase.markerKept && !identityError
         && (phase.duplicate === null || (phase.duplicate === 'possible' && separate));
 
@@ -347,7 +387,7 @@ export default function PatientDocumentCreate({ onActiveChange, dossier, onDocum
                     <div className="mf-alert mf-alert-warning">
                         <h3 ref={heading} tabIndex={-1} className="font-semibold">{phase.kind === 'review' ? 'Revisione dei dati' : 'Conferma della creazione'}</h3>
                         <p className="text-sm">{dossier
-                            ? 'Le proposte del dossier entrano nei campi solo con il tuo gesto: confronta ogni campo con il testo estratto.'
+                            ? 'Le proposte entrano nei campi solo con un tuo gesto: confronta ogni campo con la sua fonte.'
                             : 'MediFlow non compila i dati dal documento: leggi il testo estratto e scrivi tu ogni campo.'}</p>
                         <p className="mt-1 text-xs">Fonte: {sourceLine(phase.source)}</p>
                     </div>
@@ -373,15 +413,15 @@ export default function PatientDocumentCreate({ onActiveChange, dossier, onDocum
                             <legend className="mf-eyebrow mb-2">Dati della nuova scheda</legend>
                             {dossier?.proposals.length ? (
                                 <div className="space-y-2" data-testid="patient-document-dossier-proposals">
-                                    <p className="mf-field-helper">Proposte dal documento, con l’evidenza letta:</p>
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <p className="mf-field-helper">Proposte dai documenti, con il passaggio letto:</p>
+                                        {dossier.proposals.length > 1 && <button type="button" className="mf-button-secondary" onClick={() => applyAllProposals(dossier.proposals)}>Usa tutte le proposte</button>}
+                                    </div>
                                     <ul className="space-y-2">{dossier.proposals.map((proposal) => (
-                                        <li key={`${proposal.field}-${proposal.value}`} className="flex flex-wrap items-center gap-2 text-sm">
-                                            <span>{proposal.excerpt}</span>
-                                            <button type="button" className="mf-button-secondary"
-                                                onClick={() => changeFields(proposal.field === 'taxCode' ? { identifierType: 'cf', taxCode: proposal.value }
-                                                    : proposal.field === 'birthDate' ? { birthDate: proposal.value, birthYear: '', estimatedBirth: false }
-                                                        : { [proposal.field]: proposal.value })}>
-                                                Usa per {proposal.field === 'taxCode' ? 'codice fiscale' : proposal.field === 'firstName' ? 'nome' : proposal.field === 'lastName' ? 'cognome' : 'data di nascita'}
+                                        <li key={`${proposal.field}-${proposal.sourceName}-${proposal.value}`} className="flex flex-wrap items-center gap-2 text-sm">
+                                            <span>{proposal.excerpt} <span className="text-[color:var(--lume-ink-muted)]">({proposal.sourceName})</span></span>
+                                            <button type="button" className="mf-button-secondary" onClick={() => changeFields(proposalChanges(proposal.field, proposal.value))}>
+                                                Usa per {FIELD_NAMES[proposal.field]}
                                             </button>
                                         </li>))}</ul>
                                 </div>) : null}
@@ -393,6 +433,7 @@ export default function PatientDocumentCreate({ onActiveChange, dossier, onDocum
                                     <label htmlFor={`patient-document-${key}`} className="mf-field-label">{label}</label>
                                     <input id={`patient-document-${key}`} className="mf-input" autoComplete={autoComplete}
                                         value={fields[key]} required maxLength={256} onChange={(event) => changeFields({ [key]: event.target.value })} />
+                                    {fieldNote(key)}
                                 </div>
                             ))}
                             <div className="space-y-1">
@@ -407,6 +448,7 @@ export default function PatientDocumentCreate({ onActiveChange, dossier, onDocum
                                 <input id="patient-document-taxCode" className="mf-input" autoComplete="off" value={fields.taxCode} required
                                     maxLength={['cf', 'stp', 'eni'].includes(fields.identifierType) ? 16 : 128}
                                     onChange={(event) => changeFields({ taxCode: event.target.value })} />
+                                {fieldNote('taxCode')}
                             </div>}
                             <div className="space-y-1">
                                 {fields.estimatedBirth ? <>
@@ -417,6 +459,7 @@ export default function PatientDocumentCreate({ onActiveChange, dossier, onDocum
                                     <label htmlFor="patient-document-birthDate" className="mf-field-label">Data di nascita</label>
                                     <input id="patient-document-birthDate" className="mf-input" type="date" value={fields.birthDate}
                                         onChange={(event) => changeFields({ birthDate: event.target.value })} />
+                                    {fieldNote('birthDate')}
                                 </>}
                                 <label className="flex items-start gap-2 text-sm">
                                     <input type="checkbox" checked={fields.estimatedBirth} className="mt-1"

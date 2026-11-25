@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import type { DossierDraftGroup, DossierDraftSource, DossierPatient } from './document-dossier-session';
-import { loneDocumentImage, newPatientDossierStart } from './dossier-new-patient-entry';
+import { allIdentityProposals, groupIdentityProposals, loneDocumentImage, newPatientDossierStart } from './dossier-new-patient-entry';
 import { isValidItalianTaxCode } from './patient-identity';
 import { omocodicVariant, syntheticTaxCode } from './patient-identity.test-support.ts';
 
@@ -73,4 +73,45 @@ test('una sola foto segue la creazione da documento singolo', () => {
     assert.equal(loneDocumentImage([{ type: 'image/jpeg' }])?.type, 'image/jpeg');
     assert.equal(loneDocumentImage([{ type: 'image/jpeg' }, { type: 'application/pdf' }]), null);
     assert.equal(loneDocumentImage([{ type: 'application/pdf' }]), null);
+});
+
+const LETTER = 'Cognome: Sintetica\nNome: Elena\nData di nascita: 03/02/1950';
+
+test('le proposte d’anagrafica vengono da tutti i documenti del lotto, ognuna con il suo file', () => {
+    const proposals = groupIdentityProposals(group(
+        source('esami.pdf', { codes: [CF] }),
+        source('lettera.pdf', { codes: [CF], text: LETTER }),
+    ), 'lettera.pdf');
+    assert.deepEqual(proposals.map((item) => [item.field, item.value, item.sourceName]), [
+        ['taxCode', CF, 'lettera.pdf'], ['lastName', 'Sintetica', 'lettera.pdf'], ['firstName', 'Elena', 'lettera.pdf'], ['birthDate', '1950-02-03', 'lettera.pdf'],
+    ]);
+});
+
+test('un solo gesto porta tutte le proposte concordi nei campi', () => {
+    const proposals = groupIdentityProposals(group(
+        source('lettera.pdf', { codes: [CF], text: LETTER }),
+        source('referto.pdf', { codes: [CF], text: 'COGNOME: SINTETICA\nnato il 3/2/1950' }),
+    ), 'lettera.pdf');
+    assert.deepEqual(allIdentityProposals(proposals), {
+        values: { taxCode: CF, lastName: 'Sintetica', firstName: 'Elena', birthDate: '1950-02-03' }, undecided: [],
+    });
+});
+
+test('due documenti con valori diversi per lo stesso campo: nessuna scelta, il campo resta da decidere', () => {
+    const proposals = groupIdentityProposals(group(
+        source('lettera.pdf', { codes: [CF], text: LETTER }),
+        source('referto.pdf', { codes: [CF], text: 'Cognome: Sintetico\nData di nascita: 04/02/1950' }),
+    ), 'lettera.pdf');
+    assert.deepEqual(proposals.filter((item) => item.field === 'lastName').map((item) => [item.value, item.sourceName]),
+        [['Sintetica', 'lettera.pdf'], ['Sintetico', 'referto.pdf']]);
+    assert.deepEqual(allIdentityProposals(proposals), { values: { taxCode: CF, firstName: 'Elena' }, undecided: ['lastName', 'birthDate'] });
+});
+
+test('i documenti esclusi o illeggibili non propongono anagrafica', () => {
+    const proposals = groupIdentityProposals(group(
+        source('lettera.pdf', { codes: [CF], text: LETTER }),
+        source('escluso.pdf', { status: 'excluded', text: 'Cognome: Diversa' }),
+    ), 'lettera.pdf');
+    assert.equal(allIdentityProposals(proposals).undecided.length, 0);
+    assert.equal(proposals.some((item) => item.sourceName === 'escluso.pdf'), false);
 });
