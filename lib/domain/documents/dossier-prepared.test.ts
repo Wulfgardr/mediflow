@@ -107,8 +107,9 @@ test('WUL-929: dieci esami comuni della tabella LOINC diventano osservazioni; es
         ['INR', '1,1', '{INR}'], ['NT-proBNP', '80', 'pg/mL'],
     ] as const;
     const uncoded = [
-        ['Calcio', '2,3', 'mmol/L'], ['Calcio totale', '2,3', 'mmol/L'], ['FT4', '15', 'pmol/L'], ['FT3', '5', 'pmol/L'], ['Ceruloplasmina', '30', 'mg/dL'], ['Fosforo', '3,4', 'mg/L'], ['Azotemia', '40', 'mg/dL'], ['Acido urico totale', '5,2', 'mg/dL'],
-        ['Lipasi pancreatica', '35', 'U/L'], ['Sideremia', 'negativo', 'ug/dL'], ['PSA totale', '<0,1', 'ng/mL'], ['FT4', '1,1', 'ng/dL'], ['Glicemia', '95', 'mg/dL'],
+        ['Ceruloplasmina', '30', 'mg/dL'], ['Fosforo', '3,4', 'mg/L'], ['Acido urico totale', '5,2', 'mg/dL'],
+        ['Lipasi pancreatica', '35', 'U/L'], ['Sideremia', 'negativo', 'ug/dL'], ['PSA totale', '<0,1', 'ng/mL'],
+        ['LDH', '200', 'U/L'], ['eGFR', '72', 'mL/min/{1.73_m2}'], ['TSH', '2,1', 'm[IU]/L'],
     ] as const;
     const proposals = [...exams, ...uncoded].map(([display, value, unit]): PreparedFactInput => ({
         kind: 'observation', quote: `${display} ${value} ${unit}`, values: { display, value, unit },
@@ -173,8 +174,10 @@ test('every clinical field is checked on the document passage, not on the propos
     // Caso L: valore inventato con citazione di una parola.
     assert.deepEqual(checkOf([{ kind: 'observation', values: { display: 'Creatinina', value: '5', unit: 'mg/dL' }, quote: '5' }]), ['short_quote']);
     // Caso C: esame scambiato su un valore vero.
-    assert.deepEqual(checkOf([{ kind: 'observation', values: { display: 'Glucosio', value: '95', unit: 'mg/dL' }, quote: 'Colesterolo totale 95 mg/dL' }]), [],
-        'glucosio senza catalogo per mg/dL non diventa osservazione');
+    assert.deepEqual(checkOf([{ kind: 'observation', values: { display: 'Ceruloplasmina', value: '95', unit: 'mg/dL' }, quote: 'Colesterolo totale 95 mg/dL' }]), [],
+        'esame fuori catalogo non diventa osservazione');
+    assert.deepEqual(checkOf([{ kind: 'observation', values: { display: 'Glucosio', value: '95', unit: 'mg/dL' }, quote: 'Colesterolo totale 95 mg/dL' }]), ['value_missing'],
+        'glucosio in catalogo su citazione di altro esame resta bloccato');
     const swapped = prepared([{ kind: 'observation', values: { display: 'Creatinina', value: '95', unit: 'mg/dL' }, quote: 'Colesterolo totale 95 mg/dL' }]);
     assert.equal(swapped[0].values.preparedCheck, 'value_missing');
     const creatinine = prepared([{ kind: 'observation', values: { display: 'Creatinina', value: '0,9', unit: 'mg/dL', code: '99999-9', unitCode: 'furlongs' }, quote: 'Creatinina 0,9 mg/dL' }]);

@@ -3,9 +3,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import { LOINC_LAB_TABLE, LOINC_LAB_UNITS, LOINC_LAB_VERSION } from './generated-loinc-lab-catalog';
-import { LOINC_PENDING_VALIDATION, formatMeasureValue, formatUnitForDisplay, loincObservationNames, resolveStaticTerminology, searchStaticTerminology } from './terminology';
+import { DDIMER_UNSPECIFIED_DEFAULT_CODE, LOINC_PENDING_VALIDATION, formatMeasureValue, formatUnitForDisplay, loincObservationNames, loincReportedUnits, resolveStaticTerminology, searchStaticTerminology } from './terminology';
 import { validateObservationDocument } from './fse-validation';
-import { catalogObservationCode } from './domain/documents/dossier-sections';
+import { catalogObservationCode, reportedObservationCode } from './domain/documents/dossier-sections';
+import { observationSeriesKey } from './patient-quadro';
 import {
     LOINC_LAB_MODULE_PATH, LOINC_LAB_TABLE_PATH, LOINC_LAB_TABLE_VERSION, LOINC_LAB_UNITS_NATIVE_PATH, LOINC_LAB_UNITS_PATH, loincCheckDigitValid, loincLabTableCode, parseCsv,
     parseLoincLabTable, parseLoincLabUnits, readLoincLabTable, readLoincLabUnits, renderLoincLabModule, renderLoincLabUnitsNative,
@@ -36,8 +37,8 @@ test('the active catalog is generated from the committed table: same codes, offi
         LOINC_LAB_TABLE.map((row) => [row.code, row.longCommonName, row.unit]));
 });
 
-test('40 active rows enter the static LOINC catalog with official name and unit; the 44 awaiting validation do not', () => {
-    assert.deepEqual([active.length, pending.length], [40, 44]);
+test('81 active rows enter the static LOINC catalog with official name and unit; the 16 awaiting validation do not', () => {
+    assert.deepEqual([active.length, pending.length], [81, 16]);
     for (const row of active) {
         assert.deepEqual(resolveStaticTerminology('LOINC', row.code), {
             system: 'LOINC', code: row.code, display: row.longCommonName, displayIt: row.nameIt,
@@ -64,10 +65,9 @@ test('a name awaiting validation blocks coding in every unit, as on main', () =>
     for (const { name, code } of pendingNames) {
         for (const unit of units) assert.equal(catalogObservationCode(name, unit, '1'), null, `${code} ${name} ${unit}`);
     }
-    for (const [name, unit, value] of [['Calcio', 'mmol/L', '2,3'], ['Calcio totale', 'mmol/L', '2,3'], ['FT4', 'pmol/L', '15'], ['FT3', 'pmol/L', '5']] as const) {
-        assert.equal(catalogObservationCode(name, unit, value), null, `${name} ${unit} awaits the clinical choice between mass and molar units`);
+    for (const [name, unit, value] of [['TSH', 'm[IU]/L', '2,1'], ['CO2 totale', 'mmol/L', '24'], ['Microalbuminuria', 'mg/L', '15'], ['Proteine urine', 'mg/dL', '30']] as const) {
+        assert.equal(catalogObservationCode(name, unit, value), null, `${name} ${unit} awaits validation`);
     }
-    assert.equal(catalogObservationCode('Glicemia', 'mg/dL', '95'), null, 'the pilot glucose shares its name with the serum/plasma entry awaiting validation');
 });
 
 test('every active row with a unit codes under its names, except names another row claims in the same unit or a name awaiting validation', () => {
@@ -97,6 +97,8 @@ test('two units of the same analyte choose two different codes and never share a
     const pairs = [
         ['Magnesio', 'mg/dL', 'mmol/L'], ['Fosforo', 'mg/dL', 'mmol/L'], ['Vitamina B12', 'pg/mL', 'pmol/L'], ['Folati', 'ng/mL', 'nmol/L'],
         ['Vitamina D 25-OH', 'ng/mL', 'nmol/L'], ['Rapporto albumina/creatinina urinario', 'mg/g{creat}', 'mmol/mol{creat}'],
+        ['Calcio totale', 'mg/dL', 'mmol/L'], ['FT4', 'ng/dL', 'pmol/L'], ['FT3', 'pg/mL', 'pmol/L'],
+        ['Urea', 'mg/dL', 'mmol/L'],
     ] as const;
     for (const [name, mass, molar] of pairs) {
         const codes = [catalogObservationCode(name, mass, '1')?.code, catalogObservationCode(name, molar, '1')?.code];
@@ -104,16 +106,14 @@ test('two units of the same analyte choose two different codes and never share a
         assert.notEqual(codes[0], codes[1], name);
         assert.equal(catalogObservationCode(name, 'g/L', '1'), null, name);
     }
-    for (const [name, unit] of [['Calcio totale', 'mmol/L'], ['Calcio totale', 'mg/dL'], ['FT4', 'pmol/L'], ['FT4', 'ng/dL'], ['FT3', 'pmol/L'], ['FT3', 'pg/mL']] as const) {
-        assert.equal(catalogObservationCode(name, unit, '1'), null, `${name} ${unit} is still awaiting validation`);
-    }
 });
 
 test('counterexamples stay uncoded: unexpected unit, awaiting validation, near name, non-numeric value, removed broad synonyms', () => {
     assert.equal(catalogObservationCode('Acido urico', 'mg/dL', '5,2')?.code, loincLabTableCode(table, 'Acido urico', 'mg/dL'));
     for (const [name, unit, value] of [
         ['Acido urico', 'umol/L', '300'], ['Acido urico', '', '5,2'], ['Acido urico', 'mg/dl', '5,2'],
-        ['Azotemia', 'mg/dL', '40'], ['LDH', 'U/L', '200'], ['VES', 'mm/h', '12'], ['eGFR', 'mL/min/{1.73_m2}', '80'], ['HbA1c', 'mmol/mol', '40'],
+        ['LDH', 'U/L', '200'], ['eGFR', 'mL/min/{1.73_m2}', '80'], ['D-dimero', 'ng{FEU}/mL', '320'], ['Troponina', 'ng/L', '12'],
+        ['Microalbuminuria', 'mg/L', '15'], ['Proteine urine', 'mg/dL', '30'],
         ['Acido urico totale', 'mg/dL', '5,2'], ['Ferritina sierica', 'ng/mL', '30'], ['Lipasi pancreatica', 'U/L', '35'],
         ['Acido urico', 'mg/dL', 'negativo'], ['Acido urico', 'mg/dL', '<5'], ['Acido urico', 'mg/dL', ''], ['Acido urico', 'mg/dL', '1e3'],
         ['Acido urico', 'mg/dL', '0x10'], ['Acido urico', 'mg/dL', '5,2 mg/dL'], ['Acido urico', 'mg/dL', '٥'],
@@ -162,7 +162,92 @@ test('every unit of the table is in the UCUM catalog with an Italian reading; va
         ['UI/mL', 'pmol/L', 'µg/L DDU', 'mg/g creatinina', 'mL/min/1,73 m²', 's', '', '', '', '']);
     assert.equal(formatUnitForDisplay('mg/dL'), 'mg/dL');
     assert.deepEqual([formatMeasureValue('1.1', '{INR}'), formatMeasureValue('12', '[IU]/mL')], ['1,1', '12 UI/mL']);
-    assert.equal(units.length, 23, 'same count as the GPUI client test');
+    assert.equal(units.length, 24, 'same count as the GPUI client test');
+});
+
+test('WUL-929 clinical choices: all 14 lab decisions produce expected series, codes, or stay uncoded', () => {
+    assert.deepEqual(catalogObservationCode('Glicemia', 'mg/dL', '98'), { code: '2345-7', unitCode: 'mg/dL' });
+    assert.deepEqual(catalogObservationCode('Glucosio', 'mg/dL', '98'), { code: '2345-7', unitCode: 'mg/dL' });
+    assert.deepEqual(catalogObservationCode('Glicemia su sangue intero', 'mg/dL', '92'), { code: '2339-0', unitCode: 'mg/dL' });
+    assert.deepEqual(catalogObservationCode('Glicemia capillare', 'mg/dL', '92'), { code: '2339-0', unitCode: 'mg/dL' });
+
+    assert.deepEqual(catalogObservationCode('Azotemia', 'mg/dL', '38'), { code: '3091-6', unitCode: 'mg/dL' });
+    assert.deepEqual(catalogObservationCode('Urea', 'mg/dL', '38'), { code: '3091-6', unitCode: 'mg/dL' });
+    assert.deepEqual(catalogObservationCode('Urea', 'mmol/L', '6,3'), { code: '22664-7', unitCode: 'mmol/L' });
+    assert.deepEqual(catalogObservationCode('BUN', 'mg/dL', '18'), { code: '3094-0', unitCode: 'mg/dL' });
+
+    assert.deepEqual(catalogObservationCode('Calcio totale', 'mg/dL', '9,4'), { code: '17861-6', unitCode: 'mg/dL' });
+    assert.deepEqual(catalogObservationCode('Calcio totale', 'mmol/L', '2,35'), { code: '2000-8', unitCode: 'mmol/L' });
+    assert.deepEqual(catalogObservationCode('FT4', 'ng/dL', '1,2'), { code: '3024-7', unitCode: 'ng/dL' });
+    assert.deepEqual(catalogObservationCode('FT4', 'pmol/L', '15,4'), { code: '14920-3', unitCode: 'pmol/L' });
+    assert.deepEqual(catalogObservationCode('FT3', 'pg/mL', '3,1'), { code: '3051-0', unitCode: 'pg/mL' });
+    assert.deepEqual(catalogObservationCode('FT3', 'pmol/L', '4,8'), { code: '14928-6', unitCode: 'pmol/L' });
+
+    assert.deepEqual(catalogObservationCode('HbA1c', '%', '6,5'), { code: '4548-4', unitCode: '%' });
+    for (const name of ['HbA1c', 'Emoglobina glicata', 'HbA1c IFCC']) assert.equal(catalogObservationCode(name, 'mmol/mol', '48'), null, name);
+    assert.equal(LOINC_LAB_TABLE.find((row) => row.code === '59261-8')?.status, 'in_attesa_di_validazione');
+
+    assert.equal(catalogObservationCode('eGFR', 'mL/min/{1.73_m2}', '72'), null);
+    assert.equal(catalogObservationCode('eGFR CKD-EPI', 'mL/min/{1.73_m2}', '72'), null);
+    assert.deepEqual(catalogObservationCode('eGFR CKD-EPI 2021', 'mL/min/{1.73_m2}', '72'), { code: '98979-8', unitCode: 'mL/min/{1.73_m2}' });
+    assert.deepEqual(catalogObservationCode('eGFR CKD-EPI 2009', 'mL/min/{1.73_m2}', '70'), { code: '62238-1', unitCode: 'mL/min/{1.73_m2}' });
+    assert.deepEqual(catalogObservationCode('eGFR MDRD', 'mL/min/{1.73_m2}', '68'), { code: '77147-7', unitCode: 'mL/min/{1.73_m2}' });
+
+    assert.deepEqual(catalogObservationCode('Colesterolo LDL', 'mg/dL', '115'), { code: '2089-1', unitCode: 'mg/dL' });
+    assert.deepEqual(catalogObservationCode('Colesterolo LDL calcolato', 'mg/dL', '112'), { code: '13457-7', unitCode: 'mg/dL' });
+    assert.deepEqual(catalogObservationCode('Colesterolo LDL diretto', 'mg/dL', '118'), { code: '18262-6', unitCode: 'mg/dL' });
+
+    const pcrSeries = [
+        catalogObservationCode('PCR', 'mg/L', '12'),
+        catalogObservationCode('PCR', 'mg/dL', '1,2'),
+        catalogObservationCode('hs-CRP', 'mg/L', '2,4'),
+        catalogObservationCode('hs-CRP', 'mg/dL', '0,24'),
+    ];
+    assert.deepEqual(pcrSeries, [
+        { code: '1988-5', unitCode: 'mg/L' },
+        { code: '1988-5', unitCode: 'mg/dL' },
+        { code: '30522-7', unitCode: 'mg/L' },
+        { code: '30522-7', unitCode: 'mg/dL' },
+    ]);
+    assert.equal(new Set(pcrSeries.map((entry) => observationSeriesKey({ codeSystem: 'LOINC', code: entry!.code, unitSystem: 'UCUM', unitCode: entry!.unitCode }))).size, 4);
+
+    assert.equal(catalogObservationCode('LDH', 'U/L', '210'), null);
+    assert.deepEqual(catalogObservationCode('LDH IFCC', 'U/L', '210'), { code: '14804-9', unitCode: 'U/L' });
+    assert.deepEqual(catalogObservationCode('LDH piruvato-lattato', 'U/L', '340'), { code: '14805-6', unitCode: 'U/L' });
+
+    assert.deepEqual(catalogObservationCode('VES', 'mm/h', '14'), { code: '30341-2', unitCode: 'mm/h' });
+    assert.deepEqual(catalogObservationCode('VES Westergren', 'mm/h', '14'), { code: '4537-7', unitCode: 'mm/h' });
+
+    assert.deepEqual(catalogObservationCode('Neutrofili', '10*3/uL', '4,2'), { code: '751-8', unitCode: '10*3/uL' });
+    assert.deepEqual(catalogObservationCode('Neutrofili', '%', '60'), { code: '770-8', unitCode: '%' });
+    assert.deepEqual(catalogObservationCode('Reticolociti', '%', '1,1'), { code: '17849-1', unitCode: '%' });
+    assert.deepEqual(catalogObservationCode('Reticolociti', '10*3/uL', '55'), { code: '60474-4', unitCode: '10*3/uL' });
+
+    assert.equal(DDIMER_UNSPECIFIED_DEFAULT_CODE, null);
+    assert.deepEqual(loincObservationNames().filter((entry) => entry.name === 'D-dimero'), []);
+    assert.deepEqual(loincObservationNames({ dDimerUnspecified: '48065-7' }).filter((entry) => entry.name === 'D-dimero'),
+        [{ name: 'D-dimero', unit: 'ng{FEU}/mL', code: '48065-7', active: true }]);
+    assert.deepEqual(loincReportedUnits({ dDimerUnspecified: '48065-7' }).filter((entry) => entry.name === 'D-dimero').map((entry) => [entry.reported, entry.unit]),
+        [['ng/mL', 'ng{FEU}/mL'], ['ng/ml', 'ng{FEU}/mL'], ['ug/L', 'ng{FEU}/mL'], ['µg/L', 'ng{FEU}/mL'], ['ng{FEU}/mL', 'ng{FEU}/mL']]);
+    assert.equal(reportedObservationCode('D-dimero', 'ng/mL', '320'), null);
+    assert.deepEqual(reportedObservationCode('D-dimero FEU', 'ng/mL', '320'), { code: '48065-7', unitCode: 'ng{FEU}/mL' });
+    assert.deepEqual(reportedObservationCode('D-dimero DDU', 'ug/L', '180'), { code: '48066-5', unitCode: 'ug/L{DDU}' });
+
+    assert.equal(catalogObservationCode('Troponina', 'ng/L', '10'), null);
+    assert.deepEqual(catalogObservationCode('hs-cTnI', 'ng/L', '12'), { code: '89579-7', unitCode: 'ng/L' });
+    assert.deepEqual(catalogObservationCode('hs-cTnT', 'ng/L', '14'), { code: '67151-1', unitCode: 'ng/L' });
+    assert.deepEqual(catalogObservationCode('Troponina I', 'ng/mL', '0,03'), { code: '10839-9', unitCode: 'ng/mL' });
+    assert.deepEqual(catalogObservationCode('Troponina T', 'ng/mL', '0,02'), { code: '6598-7', unitCode: 'ng/mL' });
+
+    assert.deepEqual(reportedObservationCode('pH urine', '', '6,0'), { code: '5803-2', unitCode: '[pH]' });
+    assert.deepEqual(catalogObservationCode('Peso specifico urine', '{Spec_grav}', '1,020'), { code: '5811-5', unitCode: '{Spec_grav}' });
+    assert.equal(catalogObservationCode('Proteine urine', 'mg/dL', '30'), null);
+    assert.equal(catalogObservationCode('Eritrociti urine (/uL)', '/uL', '12'), null);
+
+    for (const word of ['negativo', 'tracce', '<0,5', '< 0,5', 'positivo']) {
+        assert.equal(catalogObservationCode('PCR', 'mg/L', word), null, word);
+        assert.equal(reportedObservationCode('PCR', 'mg/L', word), null, word);
+    }
 });
 
 test('printed spellings are table data: «nessuna» only for a dimensionless unit, no spaces, no repeats, none on a row without unit', () => {
