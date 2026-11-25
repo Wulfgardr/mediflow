@@ -5,15 +5,14 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test, { type TestContext } from 'node:test';
 import Database from 'better-sqlite3';
-import { attestLocalOllamaModel } from '../lib/ai-providers/ollama-locality';
+import { attestLocalOllamaModel, OLLAMA_METADATA_TIMEOUT_MS } from '../lib/ai-providers/ollama-locality';
 import { runLocalProviderSetup } from './local-provider-setup';
 import * as owner from '../lib/security/web-auth-lifecycle-owner-adapter';
 import { createLocalProviderOnboardingService } from '../lib/ai-providers/fabric/local-provider-onboarding-service';
 import { createHostProviderLifecycleService } from '../lib/ai-providers/fabric/provider-lifecycle-service';
 
-// Real loopback HTTP, with all AbortSignal deadlines and server delays scaled
-// equally: 32 simulated seconds take 640 ms, never half a minute of sleep.
 const SCALE = 0.02;
+const scaledDeadline = (ms: number) => ms === OLLAMA_METADATA_TIMEOUT_MS ? ms : Math.ceil(ms * SCALE);
 const model = { model: 'synthetic:latest', size: 1024, digest: 'synthetic-digest' };
 async function fixture(t: TestContext, options: {
     preloadMs?: number; broken?: 'disconnect' | 'digest' | 'remote'; cancel?: boolean;
@@ -21,7 +20,7 @@ async function fixture(t: TestContext, options: {
     const timeouts: number[] = [];
     const timeout = AbortSignal.timeout.bind(AbortSignal);
     t.mock.method(AbortSignal, 'timeout', (ms: number) => {
-        timeouts.push(ms); return timeout(Math.ceil(ms * SCALE));
+        timeouts.push(ms); return timeout(scaledDeadline(ms));
     });
     const calls: string[] = [];
     const timers: ReturnType<typeof setTimeout>[] = [];
