@@ -38,6 +38,7 @@ pub struct Service {
     active: Mutex<Option<Active>>,
     factory: Factory,
     model: ModelProbe,
+    drain_limit: Duration,
 }
 
 fn error(status: u16, code: &str) -> Response {
@@ -64,42 +65,55 @@ impl Service {
             active: Mutex::new(None),
             factory,
             model,
+            drain_limit: sessions::DRAIN_LIMIT,
         }
     }
 
-    pub fn handle(&self, request: &Request) -> Response {
-        if request.header("origin").is_some()
-            || request.header("sec-fetch-site").is_some()
-            || request.header("sec-fetch-mode").is_some()
+    #[cfg(test)]
+    fn with_drain_limit(mut self, limit: Duration) -> Self {
+        self.drain_limit = limit;
+        self
+    }
+
+    fn admit<'a>(
+        &self,
+        method: &str,
+        path: &str,
+        header: impl Fn(&str) -> Option<&'a str>,
+    ) -> Result<String, Response> {
+        if header("origin").is_some()
+            || header("sec-fetch-site").is_some()
+            || header("sec-fetch-mode").is_some()
         {
-            return error(403, "browser-request");
+            return Err(error(403, "browser-request"));
         }
-        if request.header("host") != Some(format!("127.0.0.1:{}", self.port).as_str()) {
-            return error(403, "host");
+        if header("host") != Some(format!("127.0.0.1:{}", self.port).as_str()) {
+            return Err(error(403, "host"));
         }
-        let checked = {
-            let Ok(mut verifier) = self.verifier.lock() else {
-                return error(503, "unavailable");
-            };
-            request
-                .header("x-mediflow-voice-auth")
-                .ok_or(auth::Refusal::Malformed)
-                .and_then(|h| verifier.check(&request.method, &request.path, h))
+        let Ok(mut verifier) = self.verifier.lock() else {
+            return Err(error(503, "unavailable"));
         };
-        let Ok(nonce) = checked else {
-            return error(401, "unauthorized");
-        };
+        header("x-mediflow-voice-auth")
+            .ok_or(auth::Refusal::Malformed)
+            .and_then(|h| verifier.check(method, path, h))
+            .map_err(|_| error(401, "unauthorized"))
+    }
+
+    fn sign(&self, message: &str) -> Option<String> {
+        self.verifier.lock().ok().map(|v| v.secret().mac(message))
+    }
+
+    fn answer(&self, request: &Request, nonce: &str) -> Response {
         let mut response = self.route(request);
-        let proof = self
-            .verifier
-            .lock()
-            .map(|v| {
-                v.secret()
-                    .mac(&auth::response_message(&nonce, response.status))
-            })
-            .ok();
-        response.proof = proof;
+        response.proof = self.sign(&auth::response_message(nonce, response.status));
         response
+    }
+
+    pub fn handle(&self, request: &Request) -> Response {
+        match self.admit(&request.method, &request.path, |name| request.header(name)) {
+            Ok(nonce) => self.answer(request, &nonce),
+            Err(refused) => refused,
+        }
     }
 
     fn route(&self, request: &Request) -> Response {
@@ -239,7 +253,7 @@ impl Service {
             else {
                 return error(404, "session-not-found");
             };
-            let until = Instant::now() + sessions::DRAIN_LIMIT;
+            let until = Instant::now() + self.drain_limit;
             while Instant::now() < until && (feed.pending() > 0 || self.starting(id)) {
                 std::thread::sleep(Duration::from_millis(20));
             }
@@ -303,14 +317,48 @@ impl Service {
     }
 }
 
+fn exchange(service: &Service, stream: &mut TcpStream) -> Response {
+    let Ok(reading) = stream.try_clone() else {
+        return error(503, "unavailable");
+    };
+    let mut reader = std::io::BufReader::new(reading);
+    let head = match http::read_head(&mut reader) {
+        Ok(head) => head,
+        Err(http::ReadError::TooLarge) => return error(413, "too-large"),
+        Err(_) => return error(400, "request"),
+    };
+    let nonce = match service.admit(&head.method, &head.path, |name| head.header(name)) {
+        Ok(nonce) => nonce,
+        Err(refused) => return refused,
+    };
+    if head.length > 0 {
+        if !head.expects_continue() {
+            return error(400, "expect-continue");
+        }
+        let Some(proof) = service.sign(&auth::continue_message(&nonce)) else {
+            return error(503, "unavailable");
+        };
+        if http::write_continue(stream, &proof).is_err() {
+            return error(400, "request");
+        }
+    }
+    let body = match http::read_body(&mut reader, head.length) {
+        Ok(body) => body,
+        Err(_) => return error(400, "request"),
+    };
+    let request = Request {
+        method: head.method,
+        path: head.path,
+        headers: head.headers,
+        body,
+    };
+    service.answer(&request, &nonce)
+}
+
 fn serve_connection(service: &Service, mut stream: TcpStream) {
     let _ = stream.set_read_timeout(Some(SOCKET_TIMEOUT));
     let _ = stream.set_write_timeout(Some(SOCKET_TIMEOUT));
-    let response = match http::read_request(&mut stream) {
-        Ok(request) => service.handle(&request),
-        Err(http::ReadError::TooLarge) => error(413, "too-large"),
-        Err(_) => error(400, "request"),
-    };
+    let response = exchange(service, &mut stream);
     let _ = http::write_response(&mut stream, &response);
     let _ = stream.shutdown(std::net::Shutdown::Both);
 }
@@ -652,6 +700,63 @@ mod tests {
                 .contains("parola")
         );
         assert_eq!(review["acceptedSamples"], audio.len());
+    }
+
+    struct SlowDecoder(CountingDecoder);
+
+    impl mediflow_local_voice::listening::Decoder for SlowDecoder {
+        fn decode(
+            &mut self,
+            audio: &[f32],
+        ) -> Result<Zeroizing<String>, mediflow_local_voice::listening::EngineFailure> {
+            std::thread::sleep(Duration::from_millis(40));
+            self.0.decode(audio)
+        }
+    }
+
+    #[test]
+    fn stop_refuses_while_accepted_audio_is_still_queued_and_loses_nothing() {
+        let factory: Factory = Box::new(|source, _prompt| {
+            WhisperSession::with_parts(LoudnessDetector, SlowDecoder(CountingDecoder::default()), source)
+        });
+        let service = Service::new(
+            PORT,
+            Secret::from_hex(KEY).unwrap(),
+            factory,
+            Box::new(|| ModelState::Ready),
+        )
+        .with_drain_limit(Duration::from_millis(100));
+        let (_, created) = call(&service, "POST", "/v1/sessions", br#"{"mode":"dictation","subject":"s"}"#);
+        let id = created["id"].as_str().unwrap().to_owned();
+        let commands = format!("/v1/sessions/{id}/commands");
+        call(&service, "POST", &commands, br#"{"command":"start"}"#);
+        let mut audio = Vec::new();
+        for _ in 0..20 {
+            audio.extend(tone(1.5));
+            audio.extend(silence(0.6));
+        }
+        for chunk in pcm(&audio).chunks(64_000) {
+            assert_eq!(call(&service, "POST", &format!("/v1/sessions/{id}/audio"), chunk).0, 202);
+        }
+        let (status, refused) = call(&service, "POST", &commands, br#"{"command":"stop"}"#);
+        assert_eq!((status, refused["error"].as_str()), (503, Some("draining")), "{refused}");
+        assert!(refused["pendingSamples"].as_u64().unwrap() > 0);
+        let (_, still) = call(&service, "GET", &format!("/v1/sessions/{id}"), b"");
+        assert_eq!(still["state"], "recording");
+        let mut stopped = (0, Value::Null);
+        for _ in 0..600 {
+            stopped = call(&service, "POST", &commands, br#"{"command":"stop"}"#);
+            if stopped.0 == 202 {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        assert_eq!(stopped.0, 202, "{}", stopped.1);
+        let review = wait_state(&service, &id, "review");
+        assert_eq!(review["acceptedSamples"], audio.len());
+        let words = review["review"]["text"].as_str().unwrap().split_whitespace().count();
+        let decoded = audio.len() / 8_000;
+        assert!(words + 20 >= decoded, "{words} parole per {decoded} blocchi");
     }
 
     #[test]

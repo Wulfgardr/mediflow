@@ -39,6 +39,10 @@ pub fn request_message(method: &str, path: &str, timestamp: &str, nonce: &str) -
     format!("{LABEL}:request:{method} {path}:{timestamp}:{nonce}")
 }
 
+pub fn continue_message(nonce: &str) -> String {
+    format!("{LABEL}:continue:{nonce}")
+}
+
 pub fn response_message(nonce: &str, status: u16) -> String {
     format!("{LABEL}:response:{nonce}:{status}")
 }

@@ -28,8 +28,27 @@ pub enum ReadError {
     Io,
 }
 
-pub fn read_request(stream: &mut impl Read) -> Result<Request, ReadError> {
-    let mut reader = BufReader::new(stream);
+pub struct Head {
+    pub method: String,
+    pub path: String,
+    pub headers: Vec<(String, String)>,
+    pub length: usize,
+}
+
+impl Head {
+    pub fn header(&self, name: &str) -> Option<&str> {
+        self.headers
+            .iter()
+            .find(|(key, _)| key == name)
+            .map(|(_, value)| value.as_str())
+    }
+    pub fn expects_continue(&self) -> bool {
+        self.header("expect")
+            .is_some_and(|v| v.eq_ignore_ascii_case("100-continue"))
+    }
+}
+
+pub fn read_head(reader: &mut impl BufRead) -> Result<Head, ReadError> {
     let mut head = 0usize;
     let mut line = String::new();
     let mut next_line = |line: &mut String| -> Result<(), ReadError> {
@@ -82,14 +101,38 @@ pub fn read_request(stream: &mut impl Read) -> Result<Request, ReadError> {
     if length > MAX_BODY {
         return Err(ReadError::TooLarge);
     }
-    let mut body = Zeroizing::new(vec![0u8; length]);
-    reader.read_exact(&mut body).map_err(|_| ReadError::Io)?;
-    Ok(Request {
+    Ok(Head {
         method,
         path,
         headers,
+        length,
+    })
+}
+
+pub fn read_body(reader: &mut impl Read, length: usize) -> Result<Zeroizing<Vec<u8>>, ReadError> {
+    let mut body = Zeroizing::new(vec![0u8; length]);
+    reader.read_exact(&mut body).map_err(|_| ReadError::Io)?;
+    Ok(body)
+}
+
+#[cfg(test)]
+pub fn read_request(stream: &mut impl Read) -> Result<Request, ReadError> {
+    let mut reader = BufReader::new(stream);
+    let head = read_head(&mut reader)?;
+    let body = read_body(&mut reader, head.length)?;
+    Ok(Request {
+        method: head.method,
+        path: head.path,
+        headers: head.headers,
         body,
     })
+}
+
+pub fn write_continue(stream: &mut impl Write, proof: &str) -> io::Result<()> {
+    stream.write_all(
+        format!("HTTP/1.1 100 Continue\r\nX-MediFlow-Voice-Proof: {proof}\r\n\r\n").as_bytes(),
+    )?;
+    stream.flush()
 }
 
 pub struct Response {
