@@ -243,8 +243,8 @@ export function updateAmbulatory(context: AmbulatoryCoreContext, id: string, raw
     }, { behavior: 'immediate' });
 }
 
-export function deleteAmbulatory(context: AmbulatoryCoreContext, id: string, expectedVersion: unknown,
-    surface: 'host' | 'network' = 'host'): AmbulatoryMutationResponse {
+export function deleteAmbulatory(context: HostAmbulatoryContext, id: string, expectedVersion: unknown,
+    surface: 'host' = 'host'): AmbulatoryMutationResponse {
     const authorizeCommit = requireCommitGuard(context, surface);
     const parsedVersion = parseExpectedVersion(expectedVersion);
     if (parsedVersion === null) return { status: 400, value: { error: 'Version is required' } };
@@ -252,10 +252,10 @@ export function deleteAmbulatory(context: AmbulatoryCoreContext, id: string, exp
 }
 
 export async function clearAmbulatory(
-    context: AmbulatoryCoreContext,
+    context: HostAmbulatoryContext,
     ambulatoryId: string,
     expectedVersion: unknown,
-    surface: 'host' | 'network' = 'host',
+    surface: 'host' = 'host',
 ): Promise<AmbulatoryMutationResponse> {
     const authorizeCommit = requireCommitGuard(context, surface);
     const parsedVersion = parseExpectedVersion(expectedVersion);
@@ -269,8 +269,8 @@ export async function clearAmbulatory(
     }
 }
 
-export function deleteAmbulatoryInTransaction(tx: Tx, context: AmbulatoryCoreContext, id: string, parsedVersion: number,
-    surface: 'host' | 'network', authorizeCommit: NetworkPatientCommitGuard | undefined): AmbulatoryMutationResponse {
+export function deleteAmbulatoryInTransaction(tx: Tx, context: HostAmbulatoryContext, id: string, parsedVersion: number,
+    surface: 'host', authorizeCommit: NetworkPatientCommitGuard | undefined): AmbulatoryMutationResponse {
     if (authorizeCommit !== requireCommitGuard(context, surface)) throw new TypeError('Ambulatory Tx authority differs from its admitted context');
     const denial = commitDenial(tx, authorizeCommit);
     if (denial) return denial;
@@ -309,8 +309,8 @@ export function deleteAmbulatoryInTransaction(tx: Tx, context: AmbulatoryCoreCon
     return { status: 200, value: { success: true, affectedAmbulatories: affectedRows } };
 }
 
-export function clearAmbulatoryInTransaction(tx: Tx, context: AmbulatoryCoreContext, ambulatoryId: string, parsedVersion: number,
-    surface: 'host' | 'network', authorizeCommit: NetworkPatientCommitGuard | undefined): AmbulatoryMutationResponse {
+export function clearAmbulatoryInTransaction(tx: Tx, context: HostAmbulatoryContext, ambulatoryId: string, parsedVersion: number,
+    surface: 'host', authorizeCommit: NetworkPatientCommitGuard | undefined): AmbulatoryMutationResponse {
     if (authorizeCommit !== requireCommitGuard(context, surface)) throw new TypeError('Ambulatory Tx authority differs from its admitted context');
     if (context.session.role !== 'admin') return { status: 403, value: { error: 'Forbidden' } };
     const denial = commitDenial(tx, authorizeCommit);

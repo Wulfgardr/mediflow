@@ -1,8 +1,7 @@
-import { readNativeNetworkJson, jsonBodyTooLargeResponse, emptyJsonUnlessTooLarge } from '@/lib/native-network-json-body';
+import { readNativeNetworkJson, jsonBodyTooLargeResponse } from '@/lib/native-network-json-body';
 import { NextResponse } from 'next/server';
 import { apiInternalError } from '@/lib/api-error-response';
 import {
-    deleteNetworkAmbulatory,
     NETWORK_AMBULATORY_WRITE_CAPABILITY,
     updateNetworkAmbulatory,
 } from '@/lib/network-ambulatory-write';
@@ -21,19 +20,5 @@ export async function PUT(request: Request, context: RouteContext) {
         const sizeError = jsonBodyTooLargeResponse(error);
         if (sizeError) return sizeError;
         return apiInternalError('Update network ambulatory', error);
-    }
-}
-
-export async function DELETE(request: Request, context: RouteContext) {
-    try {
-        const resolved = await requireNetworkWriteContext(request, NETWORK_AMBULATORY_WRITE_CAPABILITY);
-        if (!resolved.ok) return resolved.response;
-        const { id } = await context.params;
-        const result = await deleteNetworkAmbulatory(resolved.context, id, await readNativeNetworkJson(request).catch(emptyJsonUnlessTooLarge) as Record<string, unknown>);
-        return NextResponse.json(result.value, { status: result.status });
-    } catch (error) {
-        const sizeError = jsonBodyTooLargeResponse(error);
-        if (sizeError) return sizeError;
-        return apiInternalError('Delete network ambulatory', error);
     }
 }
