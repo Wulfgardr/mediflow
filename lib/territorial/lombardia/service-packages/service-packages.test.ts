@@ -23,6 +23,7 @@ import {
     type ApprovedServicePackage,
     type GeneratedServiceRequest,
     type PatientServiceHistoryEntry,
+    type RegionalExemptionCoverageEntry,
     type ServicePackage,
     type ServicePackageItem,
 } from './index';
@@ -113,7 +114,7 @@ test('la visita di controllo dell’Allegato 8 copre le visite di controllo del 
     assert.equal(visits.includes('89.7'), false);
     const table = readExemptionCoverageTable();
     assert.deepEqual(table.filter((entry) => entry.serviceCode === ALLEGATO_8_CONTROL_VISIT).map((entry) => entry.exemptionCode), ['013', '023']);
-    const covered = (exemptions: typeof table) => new Set(exemptions.map((entry) => `${entry.exemptionCode}:${entry.serviceCode}`));
+    const covered = (exemptions: readonly RegionalExemptionCoverageEntry[]) => new Set(exemptions.map((entry) => `${entry.exemptionCode}:${entry.serviceCode}`));
     assert.ok(covered(CATALOG.exemptions).has('013:89.01.8'));
     assert.equal(covered(CATALOG.exemptions).has('013:89.7A.8'), false);
     const withoutVisitRow = expandControlVisitCoverage(table.filter((entry) => entry.serviceCode !== ALLEGATO_8_CONTROL_VISIT), nomenclatore);
