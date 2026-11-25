@@ -94,7 +94,7 @@ test('pubblica i 13 campi e cerca il catalogo LOINC locale con receipt PHI-safe'
 
     const output = await service.execute(permit, {
         schemaVersion: 'mediflow.terminology.search.input.v1',
-        operationId: 'mediflow.terminology.search.v1', system: 'LOINC', query: 'emoglobina', limit: 2,
+        operationId: 'mediflow.terminology.search.v1', system: 'LOINC', query: 'emoglobina (hb)', limit: 2,
     });
 
     assert.equal(output.outcome, 'read');

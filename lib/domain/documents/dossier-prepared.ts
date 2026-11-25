@@ -488,7 +488,7 @@ export function preparedDossierFacts(input: PreparedFactsInput): PreparedFactsRe
                 values.observedAt ||= date;
                 // Codice e unità solo dal catalogo locale, qualunque cosa proponga il file.
                 delete values.code; delete values.unitCode;
-                const coded = catalogObservationCode(values.display ?? '', values.unit ?? '');
+                const coded = catalogObservationCode(values.display ?? '', values.unit ?? '', values.value ?? '');
                 if (!coded) {
                     uncoded.add(values.display?.trim() || 'Esame senza nome');
                     continue;

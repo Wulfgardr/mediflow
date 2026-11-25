@@ -7,6 +7,7 @@ import {
     BULK_NOTE, DOSSIER_PREPARED_SCHEMA, anchorPreparedQuote, parsePreparedExtraction, preparedBulkDecisions, preparedDossierFacts, preparedFactEligible, preparedPatientKey, verifyPreparedFields,
     preparedTokens, type PreparedFactInput, type PreparedSource,
 } from './dossier-prepared';
+import { loincLabTableCode, readLoincLabTable } from '../../../scripts/loinc-lab-table';
 import { extractDossierCandidates, splitDossierUnits, type DossierFact, type DossierFactAssessment, type DossierRecord } from './dossier-import';
 
 // Dati sintetici. CF con carattere di controllo valido calcolato per i test del dossier.
@@ -96,6 +97,30 @@ test('referto sintetico con venti risultati, tre fuori intervallo e due senza co
         assert.deepEqual(result.notes, [note]);
         assert.equal(result.facts.find(fact => fact.kind === 'document_entry')?.values.preparedNotes, note);
     });
+});
+
+test('WUL-929: dieci esami comuni della tabella LOINC diventano osservazioni; esame raro, unità diversa, voce in attesa, nome simile e valore non numerico restano nel diario', () => {
+    const table = readLoincLabTable();
+    const exams = [
+        ['Acido urico', '5,2', 'mg/dL'], ['Magnesio', '2,1', 'mg/dL'], ['Proteine totali', '7,1', 'g/dL'], ['Lipasi', '35', 'U/L'],
+        ['Ferritina', '80', 'ng/mL'], ['Vitamina B12', '400', 'pg/mL'], ['Vitamina D', '32', 'ng/mL'], ['Transferrina', '250', 'mg/dL'],
+        ['INR', '1,1', '{INR}'], ['NT-proBNP', '80', 'pg/mL'],
+    ] as const;
+    const uncoded = [
+        ['Calcio', '2,3', 'mmol/L'], ['Calcio totale', '2,3', 'mmol/L'], ['FT4', '15', 'pmol/L'], ['FT3', '5', 'pmol/L'], ['Ceruloplasmina', '30', 'mg/dL'], ['Fosforo', '3,4', 'mg/L'], ['Azotemia', '40', 'mg/dL'], ['Acido urico totale', '5,2', 'mg/dL'],
+        ['Lipasi pancreatica', '35', 'U/L'], ['Sideremia', 'negativo', 'ug/dL'], ['PSA totale', '<0,1', 'ng/mL'], ['FT4', '1,1', 'ng/dL'], ['Glicemia', '95', 'mg/dL'],
+    ] as const;
+    const proposals = [...exams, ...uncoded].map(([display, value, unit]): PreparedFactInput => ({
+        kind: 'observation', quote: `${display} ${value} ${unit}`, values: { display, value, unit },
+    }));
+    const text = proposals.map(({ quote }) => quote).join('\n');
+    const { units } = splitDossierUnits(text, null);
+    const result = preparedDossierFacts({ source: source(proposals), text, units, documentDate: '2026-10-20', parserFacts: [], now });
+    const observations = result.facts.filter((fact) => fact.kind === 'observation');
+    assert.deepEqual(observations.map(({ values }) => [values.display, values.code, values.value, values.unitCode]),
+        exams.map(([name, value, unit]) => [name, loincLabTableCode(table, name, unit), value, unit]));
+    assert.deepEqual(result.notes, [`Esami senza codice LOINC: ${uncoded.map(([name]) => name).filter((name, index, all) => all.indexOf(name) === index).join(', ')}.`]);
+    assert.notEqual(loincLabTableCode(table, 'Calcio totale', 'mmol/L'), loincLabTableCode(table, 'Calcio ionizzato', 'mmol/L'));
 });
 
 test('parse rejects a foreign schema, prototype kinds and malformed sources with a warning', () => {

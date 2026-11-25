@@ -1,3 +1,5 @@
+import { LOINC_LAB_TABLE, LOINC_LAB_VERSION } from './generated-loinc-lab-catalog';
+
 export type TerminologySystemCode = 'AIC' | 'ATC' | 'ICD-11' | 'LOINC' | 'UCUM' | 'SNOMED-CT' | 'CND';
 
 export type TerminologySystemDescriptor = {
@@ -108,6 +110,24 @@ export const LOINC_PENDING_VALIDATION: (StaticCatalogItem & { note: string })[] 
     { code: '1988-5', display: 'C reactive protein [Mass/volume] in Serum or Plasma', displayIt: 'Proteina C reattiva (PCR)', defaultUnit: 'mg/L', note: 'mg/L vs mg/dL (fattore 10); hs-CRP e voce distinta (30522-7).' },
 ];
 
+const LOINC_LAB_ACTIVE: StaticCatalogItem[] = LOINC_LAB_TABLE.filter((row) => row.status === 'attivo').map((row) => ({
+    code: row.code, display: row.longCommonName, displayIt: row.nameIt, ...(row.unit ? { defaultUnit: row.unit } : {}), version: LOINC_LAB_VERSION,
+}));
+const LOINC_CATALOG: StaticCatalogItem[] = [...LOINC_PILOT, ...LOINC_LAB_ACTIVE];
+
+export interface LoincObservationName { name: string; unit: string; code: string; active: boolean }
+
+const displayNames = (displayIt: string) => [displayIt.replace(/\(.*\)/u, ''), /\(([^)]+)\)/u.exec(displayIt)?.[1] ?? ''];
+
+export function loincObservationNames(): LoincObservationName[] {
+    const fromDisplay = (items: StaticCatalogItem[], active: boolean) => items.flatMap((item) =>
+        displayNames(item.displayIt ?? '').map((name) => ({ name, unit: item.defaultUnit ?? '', code: item.code, active })));
+    const fromTable = LOINC_LAB_TABLE.flatMap((row) => [row.nameIt, row.nameIt.replace(/\(.*\)/u, ''), ...row.synonyms]
+        .map((name) => ({ name, unit: row.unit, code: row.code, active: row.status === 'attivo' })));
+    return [...fromDisplay(LOINC_PILOT, true), ...fromDisplay(LOINC_PENDING_VALIDATION, false), ...fromTable]
+        .filter((entry) => entry.name.trim());
+}
+
 const UCUM_PILOT: StaticCatalogItem[] = [
     { code: 'mm[Hg]', display: 'millimeter of mercury', displayIt: 'mmHg', version: '2.1' },
     { code: '/min', display: 'per minute', displayIt: '/min', version: '2.1' },
@@ -176,7 +196,7 @@ export function normalizeTerminologySystem(value: unknown): TerminologySystemCod
 }
 
 function staticCatalogFor(system: TerminologySystemCode): StaticCatalogItem[] | null {
-    if (system === 'LOINC') return LOINC_PILOT;
+    if (system === 'LOINC') return LOINC_CATALOG;
     if (system === 'UCUM') return UCUM_PILOT;
     return null;
 }

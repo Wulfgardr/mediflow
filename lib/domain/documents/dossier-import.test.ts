@@ -10,6 +10,7 @@ import {
 import { parseDocumentParseEvidenceArtifactSnapshot } from './document-parse-evidence-artifact';
 import { buildDocumentEvidenceBackfillPlan } from './document-evidence-backfill';
 import { isValidItalianTaxCodeChecksum } from './document-identity-resolution';
+import { loincLabTableCode, readLoincLabTable } from '../../../scripts/loinc-lab-table';
 
 // Codici fiscali sintetici con carattere di controllo valido, calcolati per questo test.
 const CF_A = 'RSSMRA80A01F205X';
@@ -309,14 +310,58 @@ test('reported scales and invalidity are transcribed values; unperformed scales 
 });
 
 test('lab LOINC/UCUM only from an exact local catalog match; ambiguous or unknown analytes stay uncoded', () => {
-    const text = 'Creatinina 0,9 mg/dL 0,6-1,2\nGlicemia 110 mg/dL 70-99\nCreatinina 80 umol/L 50-110\nFerritina 30 ng/mL 15-150';
+    const text = 'Creatinina 0,9 mg/dL 0,6-1,2\nGlicemia 110 mg/dL 70-99\nCreatinina 80 umol/L 50-110\nFerritina 30 ng/mL 15-150\nCeruloplasmina 30 mg/dL 20-60';
     const observations = candidates(text).filter((fact) => fact.kind === 'observation');
     assert.deepEqual(observations.map((fact) => [fact.values.display, fact.values.code, fact.values.unitCode]), [
         ['Creatinina', '2160-0', 'mg/dL'],
         ['Glicemia', '', ''],
         ['Creatinina', '', ''],
-        ['Ferritina', '', ''],
+        ['Ferritina', loincLabTableCode(readLoincLabTable(), 'Ferritina', 'ng/mL'), 'ng/mL'],
+        ['Ceruloplasmina', '', ''],
     ]);
+});
+
+test('WUL-929: a synthetic report with ten common exams from the LOINC table yields ten coded observations; a rare exam stays uncoded', () => {
+    const table = readLoincLabTable();
+    const exams = [
+        ['Acido urico', '5,2', 'mg/dL', '3,5-7,2'],
+        ['Magnesio', '2,1', 'mg/dL', '1,6-2,6'],
+        ['Fosforo', '3,4', 'mg/dL', '2,5-4,5'],
+        ['Bilirubina diretta', '0,2', 'mg/dL', '0-0,3'],
+        ['Proteine totali', '7,1', 'g/dL', '6,4-8,3'],
+        ['Lipasi', '35', 'U/L', '13-60'],
+        ['CPK', '120', 'U/L', '30-200'],
+        ['Sideremia', '90', 'ug/dL', '60-170'],
+        ['PSA totale', '1,2', 'ng/mL', '0-4'],
+        ['NT-proBNP', '80', 'pg/mL', '0-125'],
+    ] as const;
+    const text = ['Referto di laboratorio sintetico', ...exams.map((exam) => exam.join(' ')), 'Ceruloplasmina 30 mg/dL 20-60'].join('\n');
+    const observations = candidates(text, '2026-11-20').filter((fact) => fact.kind === 'observation');
+    assert.deepEqual(observations.map((fact) => [fact.values.display, fact.values.code, fact.values.value, fact.values.unit, fact.values.unitCode]), [
+        ...exams.map(([name, value, unit]) => [name, loincLabTableCode(table, name, unit), value.replace(',', '.'), unit, unit]),
+        ['Ceruloplasmina', '', '30', 'mg/dL', ''],
+    ]);
+    assert.deepEqual(observations.slice(0, 10).map((fact) => dossierFactBlockers(fact)), exams.map(() => []));
+    assert.deepEqual(dossierFactBlockers(observations[10]), ['Campo obbligatorio mancante: code.', 'Campo obbligatorio mancante: unitCode.']);
+});
+
+test('WUL-929: right name in an unexpected unit, an exam awaiting validation and a near name stay uncoded', () => {
+    const text = [
+        'Acido urico 300 umol/L 200-420',
+        'Azotemia 40 mg/dL 10-50',
+        'LDH 200 U/L 120-250',
+        'Ferritina sierica 30 ng/mL 15-150',
+        'Ca 2,3 mmol/L 2,1-2,6',
+        'FT4 1,1 ng/dL 0,9-1,7',
+        'Calcio 2,3 mmol/L 2,1-2,6',
+        'Calcio totale 2,3 mmol/L 2,1-2,6',
+        'FT4 15 pmol/L 10-22',
+        'FT3 5 pmol/L 3,1-6,8',
+    ].join('\n');
+    const observations = candidates(text).filter((fact) => fact.kind === 'observation');
+    assert.deepEqual(observations.map((fact) => fact.values.code), observations.map(() => ''));
+    assert.deepEqual(observations.map((fact) => fact.values.display).slice(0, 8),
+        ['Acido urico', 'Azotemia', 'LDH', 'Ferritina sierica', 'Ca', 'FT4', 'Calcio', 'Calcio totale']);
 });
 
 test('residual text is everything no proposal covers, per unit', async () => {

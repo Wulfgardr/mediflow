@@ -73,7 +73,7 @@ export function reviewAgentFact(kind: Kind, input: Record<string, string>, pdfTe
         blockers.push('Codice della diagnosi da verificare sulla fonte.');
     }
     if (kind === 'observation') {
-        const coded = catalogObservationCode(values.display ?? '', values.unit ?? '');
+        const coded = catalogObservationCode(values.display ?? '', values.unit ?? '', values.value ?? '');
         if (coded && (!values.code || values.code === coded.code) && (!values.unitCode || values.unitCode === coded.unitCode)) {
             values.code = coded.code;
             values.unitCode = coded.unitCode;

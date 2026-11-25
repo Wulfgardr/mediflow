@@ -26,6 +26,17 @@ implica approvazione del prodotto da parte della WHO.
 [Provenienza e integrità](https://github.com/Wulfgardr/mediflow/blob/cd20934e20afaf37c283a18966ac5ea72b8d1a31/assets/reference-data/icd11/README.md),
 [attribuzione e condizioni](licenses/who-icd11/NOTICE.md).
 
+## Codici LOINC degli esami di laboratorio
+
+This material contains content from LOINC® (http://loinc.org). LOINC is
+copyright © 1995-2026, Regenstrief Institute, Inc. and the Logical Observation
+Identifiers Names and Codes (LOINC) Committee and is available at no cost under
+the license at https://loinc.org/license/. LOINC® is a registered United States
+trademark of Regenstrief Institute, Inc.
+La tabella degli esami (LOINC 2.83) aggiunge nomi italiani, sinonimi e stato
+di validazione senza modificare codici e nomi ufficiali.
+[Provenienza, versione e condizioni](licenses/loinc/NOTICE.md).
+
 ## Codici QR
 
 Il collegamento delle app Apple genera il QR nel browser con `qr` di Paul

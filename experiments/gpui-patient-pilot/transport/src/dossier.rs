@@ -426,15 +426,19 @@ fn set_default(values: &mut Value, key: &str, value: &str) {
         values[key] = json!(value);
     }
 }
-fn catalog(analyte: &str, unit: &str) -> Value {
+fn catalog(analyte: &str, unit: &str, value: &str) -> Value {
+    if !re(r"^-?[0-9]+(?:[.,][0-9]+)?$").is_match(value.trim_matches(crate::js_whitespace)) {
+        return Value::Null;
+    }
     let entries: Value = serde_json::from_str(include_str!(
         "../../../../native/contracts/dossier-conformance/catalog.json"
     ))
     .unwrap();
     let wanted = normalized_name(analyte);
+    let unit = unit.trim_matches(crate::js_whitespace);
     array(&entries)
         .iter()
-        .find(|e| string(&e["name"]) == wanted && string(&e["unit"]) == unit.trim())
+        .find(|e| string(&e["name"]) == wanted && string(&e["unit"]) == unit)
         .map(|e| json!({"code":e["code"],"unitCode":e["unit"]}))
         .unwrap_or(Value::Null)
 }
@@ -542,7 +546,7 @@ pub fn prepared_facts(input: &Value) -> Value {
                 v.as_object_mut().unwrap().remove("code");
                 v.as_object_mut().unwrap().remove("unitCode");
                 let display = string(&item["values"]["display"]);
-                let coded = catalog(display, string(&v["unit"]));
+                let coded = catalog(display, string(&v["unit"]), string(&v["value"]));
                 if coded.is_null() {
                     let name = display.trim_matches(crate::js_whitespace);
                     let name = if name.is_empty() {
@@ -1723,7 +1727,7 @@ pub fn bulk(input: &Value) -> Value {
 pub fn verify_call(call: &Value) -> Value {
     let a = array(&call["args"]);
     match string(&call["op"]) {
-        "catalog" => catalog(string(&a[0]), string(&a[1])),
+        "catalog" => catalog(string(&a[0]), string(&a[1]), string(&a[2])),
         "preparedTokens" => json!(tokens(string(&a[0]))),
         "anchorPreparedQuote" => anchor(string(&a[0]), array(&a[1]), string(&a[2])),
         "verifyPreparedFields" => verify_fields(
@@ -1780,6 +1784,38 @@ mod tests {
         let note = "Esami senza codice LOINC: Marcatore Beta, Marcatore Alfa, Esame senza nome.";
         assert_eq!(result["notes"], json!([note]));
         assert_eq!(result["facts"][0]["values"]["preparedNotes"], note);
+    }
+
+    #[test]
+    fn molar_calcium_ft4_and_ft3_stay_uncoded_until_the_clinical_choice() {
+        let exams = [
+            ("Calcio", "2,3", "mmol/L"),
+            ("Calcio totale", "2,3", "mmol/L"),
+            ("FT4", "15", "pmol/L"),
+            ("FT3", "5", "pmol/L"),
+        ];
+        for (name, value, unit) in exams {
+            assert_eq!(catalog(name, unit, value), Value::Null, "{name} {unit}");
+        }
+        assert!(!catalog("Calcio ionizzato", "mmol/L", "1,2").is_null());
+        let facts: Vec<Value> = exams
+            .iter()
+            .map(|(name, value, unit)| {
+                json!({"kind": "observation", "values": {"display": name, "value": value, "unit": unit}})
+            })
+            .collect();
+        let result = prepared_facts(&json!({
+            "source": {
+                "sha256": "b".repeat(64),
+                "facts": facts,
+                "summary": {"title": "Referto sintetico", "text": "Risultati di laboratorio"}
+            },
+            "now": "2026-11-25T12:00:00Z"
+        }));
+        assert_eq!(
+            result["notes"],
+            json!(["Esami senza codice LOINC: Calcio, Calcio totale, FT4, FT3."])
+        );
     }
 
     #[test]
