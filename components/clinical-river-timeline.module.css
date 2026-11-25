@@ -19,3 +19,7 @@
     .item { grid-template-columns: minmax(0, 1fr); gap: 8px; }
     .history { align-items: flex-start; gap: 4px 16px; margin-bottom: 20px; }
 }
+
+:global([data-record-tray='timeline']) .item { padding-block: 10px; border-color: var(--lume-record-island-rule); }
+:global([data-record-tray='timeline']) .item:last-child { border-bottom: 0; }
+:global([data-record-tray='timeline']) .history { margin-bottom: 12px; padding-bottom: 8px; }

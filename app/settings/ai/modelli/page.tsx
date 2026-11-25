@@ -79,7 +79,7 @@ export default function SettingsAiModelsPage() {
                     recommended={[...recommended, { name: 'hf.co/unsloth/medgemma-1.5-4b-it-GGUF', desc: 'MedGemma 4B · alternativa da valutare, non predefinita' }]}
                     provider={aiConfig.provider} targetUrl={aiConfig.url} />
                 <ModelSelector selectorId="reasoning" label="Ragionamento testuale"
-                    description="Per riassunti narrativi e supporto testuale generale.."
+                    description="Per riassunti narrativi e supporto testuale generale."
                     icon={<Cpu aria-hidden="true" className="h-5 w-5" />} value={aiConfig.model_reasoning}
                     onChange={value => setAiConfig(previous => ({ ...previous, model_reasoning: value }))}
                     recommended={[...recommended, { name: 'deepseek-r1:14b', desc: 'DeepSeek R1 14B · ragionamento testuale' }]}
@@ -90,7 +90,7 @@ export default function SettingsAiModelsPage() {
                 ]} />
             </div>
 
-            <Disclosure title="Configurazioni consigliate" className={composition.details}>
+            <Disclosure title="Configurazioni consigliate" headingLevel={3} className={composition.details}>
                 <p>Parti dalla memoria del computer, poi scegli i modelli per le tue attività.</p>
                 <p className={styles.hint}>La configurazione consigliata aggiorna la bozza. Verifica i modelli installati e salva per applicarla.</p>
                 <div className={styles.presets}>
@@ -141,7 +141,7 @@ export default function SettingsAiModelsPage() {
             </div>
 
             </fieldset>
-            <Disclosure title="Account OpenAI · ChatGPT" className={composition.details}>
+            <Disclosure title="Account OpenAI · ChatGPT" headingLevel={3} className={composition.details}>
                 <div data-models-auxiliary="account"><ChatGptAccountPanel /></div>
             </Disclosure>
             <div data-models-auxiliary="local">

@@ -30,301 +30,213 @@
   font-size: 0.75rem;
 }
 
-/* ───────────── patient inbox ───────────── */
 
-.inboxLayout {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+.directory { gap: 16px; }
+
+.directoryToolbar {
+  container: patient-directory / inline-size;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 12px;
-  align-items: start;
   min-width: 0;
 }
 
-@media (max-width: 1100px) {
-  .inboxLayout { grid-template-columns: 1fr; }
-}
-
-.worklistPanel {
-  min-width: 0;
-  padding: 16px;
-  background: var(--lume-surface-field);
-  border: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent);
-  border-radius: 20px;
-}
-
-.inboxScope {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.patientScopeActions {
-  margin-left: auto;
-  display: inline-flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.patientSearchRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 12px;
-}
+.directoryToolbar h1 { flex: none; }
+.directoryToolbar > a { flex: none; align-self: stretch; }
 
 .patientSearchField {
-  min-width: 0;
-  flex: 1;
   display: inline-flex;
+  flex: 1 1 240px;
   align-items: center;
   gap: 8px;
-  border: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent);
+  min-width: 140px;
+  min-height: 40px;
+  padding: 0 0 0 12px;
+  border: 1px solid var(--lume-ink-muted);
   border-radius: 10px;
   background: var(--lume-surface-field);
   color: var(--lume-ink-muted);
-  padding: 9px 12px;
 }
 
 .patientSearchField:focus-within:not(:has(> button:focus)) {
   border-color: var(--lume-accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--lume-accent) 36%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--lume-accent) 28%, transparent);
 }
 
 .patientSearchField input {
-  width: 100%;
+  flex: 1;
+  width: 0;
   min-width: 0;
   border: 0;
   outline: 0;
   background: transparent;
   color: var(--lume-ink);
-  font: inherit;
-  font-size: 0.8125rem;
+  font: var(--type-body);
 }
 
 .patientSearchField input::-webkit-search-cancel-button { appearance: none; }
+.patientSearchField input::placeholder { color: var(--lume-ink-muted); }
 
-.patientSearchField input::placeholder {
-  color: var(--lume-ink-muted);
-}
+.inboxScope.inboxScope { flex: none; padding: 2px; }
+.inboxScope.inboxScope > button { min-height: 40px; padding: 8px 16px; }
 
-.scopeChip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--lume-ink-muted);
-  font-size: 0.75rem;
-  cursor: pointer;
-  border: 1px solid color-mix(in srgb, var(--lume-ink) 12%, transparent);
-  transition: background-color var(--lume-dur-fuoco) var(--lume-ease), color var(--lume-dur-fuoco) var(--lume-ease), transform var(--lume-dur-riga) var(--lume-ease);
-}
-
-.scopeChip:hover { color: var(--lume-ink); }
-
-.scopeChip:active { transform: none; }
-
-.scopeChipActive {
-  background: var(--lume-surface-focal);
+.scopeSelect {
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--lume-ink-muted);
+  border-radius: 10px;
+  background: var(--lume-surface-field);
   color: var(--lume-ink);
-  border-color: color-mix(in srgb, var(--lume-ink) 20%, transparent);
+  font: var(--type-record-data);
 }
 
-.resultCount {
-  color: var(--lume-ink-muted);
-  font-size: 0.75rem;
+.directoryAction { min-height: 40px; }
+.directoryToolbar > .directoryAction.directoryAction { min-height: 40px; padding: 8px 16px; }
+
+button.directoryAction {
+  padding: 8px 14px;
+  border: 1px solid var(--lume-record-island-rule);
+  border-radius: 10px;
+  background: var(--lume-record-island);
+  color: var(--lume-ink);
+  font: var(--type-strong);
+  cursor: pointer;
 }
 
-.patientListViewport {
-  max-height: 70vh;
-  overflow: auto;
-  margin-top: 8px;
+.directoryAction:focus-visible { outline: 2px solid var(--lume-accent); outline-offset: 2px; }
+
+.inboxLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 12px;
+  align-items: start;
   min-width: 0;
 }
 
-.patientList {
-  position: relative;
-  width: 100%;
+.worklistPanel { container: patient-worklist / inline-size; }
+
+.worklistPanelHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+  min-height: 36px;
+  padding: 0 0 0 6px;
+  color: var(--lume-ink-muted);
+  font: var(--type-record-data);
 }
 
+.resultCount { color: var(--lume-ink); font: var(--type-record-label); }
+.listTools { display: inline-flex; align-items: center; gap: 8px; margin-inline-start: auto; }
+.keyboardHint { font: var(--type-record-meta); }
+
+.listIsland.listIsland {
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.columnHeadings,
+.patientRow {
+  display: grid;
+  grid-template-columns: minmax(100px, 1.15fr) 64px minmax(100px, 1.2fr) 100px minmax(120px, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.columnHeadings {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--lume-record-island-rule);
+  color: var(--lume-ink-muted);
+  font: var(--type-record-label);
+}
+
+.todoReadState {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--lume-record-island-rule);
+  font: var(--type-record-data);
+}
+
+.listState {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 16px;
+  color: var(--lume-ink-muted);
+  font: var(--type-record-data);
+}
+
+.listState > p { margin: 0; }
+.listState > button { justify-self: start; }
+
+.patientListViewport {
+  height: calc(100dvh - 276px);
+  min-height: 240px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--lume-ink-muted) transparent;
+}
+
+.patientList { position: relative; width: 100%; }
 .patientRowWrap { position: relative; }
 
 .patientRow {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: center;
-  min-height: 62px;
-  padding: 9px 10px;
-  cursor: pointer;
-  transition: background-color var(--lume-dur-fuoco) var(--lume-ease), border-color var(--lume-dur-fuoco) var(--lume-ease), transform var(--lume-dur-riga) var(--lume-ease);
-  border: 1px solid transparent;
-  background: transparent;
+  box-sizing: border-box;
   width: 100%;
+  height: 40px;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 0;
+  border-bottom: 1px solid var(--lume-record-island-rule);
+  border-radius: 0;
+  background: transparent;
+  color: var(--lume-ink);
+  font: var(--type-body);
   text-align: left;
-  border-radius: 14px;
-  color: var(--lume-ink);
+  cursor: pointer;
 }
 
-.patientRow:hover {
-  background: color-mix(in srgb, var(--lume-accent) 6%, var(--lume-surface-field));
-}
+.patientRow:hover { background: var(--lume-record-compact-island); }
 
-.patientRow:active { transform: scale(0.985); }
+.patientRowSelected,
+.patientRowSelected:hover { background: var(--lume-surface-selected); }
 
-.patientRow:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--lume-accent) 40%, transparent);
-}
+.patientRow:focus-visible { outline: 2px solid var(--lume-accent); outline-offset: -2px; }
 
-.patientRowSelected {
-  background: var(--lume-surface-focal);
-  border-color: color-mix(in srgb, var(--lume-ink) 16%, transparent);
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--lume-ink) 8%, transparent);
-}
+.recordIdentity { min-width: 0; }
+.recordIdentity strong { display: block; overflow: hidden; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.recordAge, .patientWhen { color: var(--lume-ink-muted); font: var(--type-meta); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.recordDiagnosis { min-width: 0; overflow: hidden; color: var(--lume-ink-muted); text-overflow: ellipsis; white-space: nowrap; }
 
-.patientRowContent {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.patientName {
-  font-size: 0.875rem;
-  color: var(--lume-ink);
-  font-weight: 600;
-  letter-spacing: -0.008em;
-}
-
-.patientSubline {
-  min-width: 0;
-  font-size: 0.75rem;
-  color: var(--lume-ink-muted);
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  column-gap: 7px;
-  row-gap: 2px;
-}
-
-.patientCode {
-  color: var(--lume-ink-muted);
-  font-size: 0.75rem;
-  font-variant-numeric: tabular-nums;
-}
-
-.patientSeparator { opacity: 0.45; }
-
-.patientDiagnosisText,
-.patientStatusText {
-  color: var(--lume-ink-muted);
-}
-
-.patientSide {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 5px;
-  min-width: 0;
-}
-
-.patientSignal {
-  width: 9px;
-  height: 9px;
-  flex: none;
-  border-radius: 999px;
-}
-
-.patientSignalNeutral { background: var(--lume-ink-muted); }
-.patientSignalWarning { background: var(--lume-signal-warning); }
-.patientSignalCritical { background: var(--lume-signal-critical); }
-.patientSignalSuccess { background: var(--lume-signal-success); }
-.patientSignalPlum { background: var(--lume-signal-plum); }
-
-.patientWhen {
-  color: var(--lume-ink-muted);
-  font-size: 0.75rem;
-  text-align: right;
-  white-space: nowrap;
-}
-
-.patientDiagnosisPill {
-  min-width: 0;
-  max-width: 100%;
-  display: inline-flex;
-}
-
-.patientDiagnosisPill > span {
-  min-width: 0;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+.patientTodo { display: flex; align-items: baseline; gap: 4px; min-width: 0; font: var(--type-meta); }
+.patientTodo > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.todoEmpty { color: var(--lume-ink-muted); }
+.todoDetail { flex: none; color: var(--lume-ink-muted); white-space: nowrap; }
 
 .caseLens {
-  min-width: 0;
-  background: var(--lume-surface-focal);
-  border: 1px solid color-mix(in srgb, var(--lume-ink) 16%, transparent);
-  border-radius: 20px;
-  padding: 16px;
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--lume-ink) 8%, transparent);
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
   position: sticky;
-  top: 0;
+  top: 12px;
+  min-width: 0;
 }
 
-.caseLensHeader { display: flex; flex-direction: column; gap: 4px; }
-
-.caseLensName {
-  margin: 0;
-  letter-spacing: -0.02em;
-  color: var(--lume-ink);
-  font: var(--type-person-preview);
-}
+.caseLensName { overflow-wrap: anywhere; }
 
 .caseLensAtoms {
-  margin: 0;
   display: flex;
-  align-items: center;
   flex-wrap: wrap;
-  gap: 5px 10px;
-  color: var(--lume-ink-muted);
-  font-size: 0.75rem;
-}
-
-.caseLensDiagnoses {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.caseLensStatus {
-  margin: 0;
-  display: flex;
   align-items: center;
-  gap: 7px;
-  color: var(--lume-ink-muted);
-  font-size: 0.75rem;
-}
-
-.caseLensSummary {
+  gap: 4px 8px;
   margin: 0;
-  max-width: 70ch;
-  padding: 12px;
-  border-radius: 14px;
-  background: var(--lume-surface-field);
+  padding: 0 6px;
   color: var(--lume-ink-muted);
-  font-size: 0.8125rem;
-  line-height: 1.6;
+  font: var(--type-record-data);
 }
 
 .caseLensActions {
@@ -334,51 +246,42 @@
   gap: 8px;
 }
 
-.worklistLensActions > [data-lume-action='primary'] {
-  min-height: 44px;
-  min-width: 0;
-  justify-content: center;
-}
+.worklistLensActions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 2px 0 4px; }
+.worklistLensActions > a { flex: 1; justify-content: center; }
 
 .caseLensActionOverflow { position: relative; }
 
 .caseLensOverflowTrigger {
-  width: 44px;
-  height: 44px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid color-mix(in srgb, var(--lume-ink) 14%, transparent);
-  border-radius: 12px;
-  background: var(--lume-surface-field);
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--lume-record-island-rule);
+  border-radius: 10px;
+  background: var(--lume-record-island);
   color: var(--lume-ink);
   cursor: pointer;
 }
 
 .caseLensOverflowTrigger:hover,
-.caseLensMenuItem:hover {
-  background: color-mix(in srgb, var(--lume-accent) 7%, var(--lume-surface-field));
-}
+.caseLensMenuItem:hover { background: var(--lume-record-compact-island); }
 
 .caseLensOverflowTrigger:focus-visible,
-.caseLensMenuItem:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--lume-accent) 40%, transparent);
-}
+.caseLensMenuItem:focus-visible { outline: 2px solid var(--lume-accent); outline-offset: -2px; }
 
 .caseLensActionMenu {
   position: fixed;
   z-index: 1050;
   top: 0;
   left: 0;
-  width: min(230px, calc(100vw - 40px));
-  padding: 6px;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  border: 1px solid color-mix(in srgb, var(--lume-ink) 16%, transparent);
-  border-radius: 14px;
-  background: var(--lume-surface-focal);
+  width: min(230px, calc(100vw - 40px));
+  padding: 6px;
+  border: 1px solid var(--lume-record-island-rule);
+  border-radius: 12px;
+  background: var(--lume-record-island);
   box-shadow: 0 12px 28px color-mix(in srgb, var(--lume-ink) 16%, transparent);
   visibility: hidden;
 }
@@ -386,142 +289,83 @@
 .caseLensActionMenu[data-positioned='true'] { visibility: visible; }
 
 .caseLensMenuItem {
-  min-height: 44px;
-  width: 100%;
-  padding: 9px 10px;
   display: flex;
   align-items: center;
   gap: 9px;
+  width: 100%;
+  min-height: 44px;
+  padding: 9px 10px;
   border: 0;
   border-radius: 10px;
   background: transparent;
   color: var(--lume-ink);
-  font: inherit;
-  font-size: 0.8125rem;
+  font: var(--type-body);
   text-align: left;
   text-decoration: none;
   cursor: pointer;
 }
 
-@media (max-width: 700px) {
-  .worklistPanelHeader {
-    flex-wrap: wrap;
-  }
+.caseLensDiagnoses { display: grid; margin: 0; padding: 0; list-style: none; }
 
-  .patientScopeActions {
-    width: 100%;
-    margin-left: 0;
-  }
-
-  .patientSearchRow {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .patientRow {
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 8px;
-  }
-
-  .patientWhen {
-    max-width: 92px;
-    white-space: normal;
-  }
-
-  .caseLens {
-    position: static;
-  }
-
-  .worklistLensActions { grid-template-columns: minmax(0, 1fr) auto; }
-
+.patientDiagnosisPill {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--lume-record-island-rule);
+  font: var(--type-body);
 }
 
-/* Compact localhost worklist preserves scan order and 44px touch targets. */
-@media (max-width: 480px) {
-  .worklistPanel { padding: 10px; }
+.patientDiagnosisPill:last-child { border-bottom: 0; }
 
-  .inboxScope { gap: 6px; }
+.patientDiagnosisPill > span {
+  min-width: 0;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  white-space: normal;
+}
 
-  .patientSearchRow { margin-top: 8px; }
+.caseLensSummary { margin: 0; color: var(--lume-ink); font: var(--type-record-text); }
+.caseLensCode { margin: 0; color: var(--lume-ink-muted); }
 
-  .scopeChip {
-    min-height: 44px;
-    gap: 5px;
-    padding: 6px 8px;
-    font-size: 0.75rem;
-  }
+@media (max-width: 1200px) {
+  .inboxLayout { grid-template-columns: minmax(0, 1fr) 296px; }
+  .columnHeadings, .patientRow { grid-template-columns: minmax(100px, 1fr) minmax(100px, 1.2fr) minmax(120px, 1fr); }
+  .columnHeadings > :nth-child(2), .columnHeadings > :nth-child(4), .patientRow .recordAge, .patientRow .patientWhen { display: none; }
+}
 
-  .patientScopeActions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    width: 100%;
-    margin-left: 0;
-    gap: 6px;
-  }
+@media (max-width: 850px) {
+  .inboxLayout { grid-template-columns: minmax(0, 1fr); }
+  .caseLens.caseLens { display: none; }
+}
 
-  .patientSearchField { min-height: 44px; }
+@media (max-width: 700px) {
+  .directoryToolbar .patientSearchField { flex-basis: 100%; order: 2; min-height: 44px; }
+  .directoryToolbar .inboxScope { order: 3; }
+  .directoryToolbar > .directoryAction.directoryAction, .inboxScope.inboxScope > button { min-height: 44px; }
+  .keyboardHint { display: none; }
+  .patientListViewport { height: calc(100dvh - 320px); }
+}
 
-  .worklistPanelHeader {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    column-gap: 8px;
-    row-gap: 6px;
-    align-items: center;
-  }
+@container patient-worklist (max-width: 699px) {
+  .columnHeadings, .patientRow { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }
+  .columnHeadings > :nth-child(2), .columnHeadings > :nth-child(3), .columnHeadings > :nth-child(4), .patientRow .recordAge, .patientRow .recordDiagnosis, .patientRow .patientWhen { display: none; }
+  .patientRow { height: 44px; min-height: 44px; }
+}
 
-  .worklistPanelHeader > h2 {
-    min-width: 0;
-    font-size: 0.9375rem;
-    white-space: nowrap;
-  }
+@container patient-directory (max-width: 960px) {
+  .directoryToolbar h1 { flex: 1 0 100%; }
+  .directoryToolbar .patientSearchField { flex-basis: 100%; order: 1; }
+  .directoryToolbar .inboxScope, .directoryToolbar > select, .directoryToolbar > a, .directoryToolbar > button { order: 2; }
+}
 
-  .resultCount {
-    margin-left: 0;
-    white-space: nowrap;
-  }
-
-  .worklistPanelHeader > span:last-child {
-    grid-column: 1 / -1;
-    width: 100%;
-    margin-left: 0;
-  }
-
-  .worklistPanelHeader [data-lume-action='quiet'] {
-    display: inline-flex;
-    justify-content: center;
-    width: 100%;
-    min-height: 45px;
-    white-space: nowrap;
-  }
-
-  .patientRow {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 2px;
-    padding: 5px 8px;
-  }
-
-  .patientRowContent { gap: 2px; }
-
-  .patientSubline {
-    column-gap: 5px;
-    row-gap: 0;
-    font-size: 0.75rem;
-    line-height: 1.35;
-  }
-
-  .patientCode { font-size: 0.75rem; }
-
-  .patientSide {
-    flex-direction: row;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .patientWhen {
-    max-width: none;
-    text-align: left;
-    white-space: nowrap;
-  }
+@media (pointer: coarse) {
+  .patientRow, .directoryAction, .caseLensOverflowTrigger { min-height: 44px; }
+  .directoryToolbar > .directoryAction.directoryAction, .inboxScope.inboxScope > button { min-height: 44px; }
+  .caseLensOverflowTrigger { width: 44px; height: 44px; }
 }
 
 /* #98, #68: Quadro paziente, un solo fuoco e nessuna card elevata interna. */
@@ -679,89 +523,4 @@
   .quadroQuietAction {
     min-height: 44px;
   }
-}
-
-
-/* Punto d'inchiostro: a continuous register with a selected-record inspector. */
-.directoryToolbar { container: patient-directory / inline-size; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 0 0 20px; }
-.directoryToolbar h1 { margin: 0; line-height: 1.1; flex: none; font: var(--type-page-title); }
-.directoryToolbar > a { flex: none; }
-.directoryToolbar .patientSearchField { flex: 1; min-width: 140px; min-height: 40px; border: 1px solid var(--lume-rule-strong); border-radius: 10px; background: var(--lume-surface-focal); padding: 0 12px; }
-.directoryToolbar .patientSearchField input { flex: 1; width: 0; font-size: 0.875rem; background: transparent; }
-.directoryToolbar .inboxScope { display: flex; gap: 12px; padding: 0; border-radius: 10px; background: var(--lume-surface-canvas); margin: 0; }
-.directoryToolbar .scopeChip { min-height: 40px; padding: 8px 16px; border: 0; border-radius: var(--lume-radius-control); font: 0.875rem/1.4 var(--lume-font-sans); }
-.directoryToolbar .scopeChipActive { background: var(--lume-surface-focal); color: var(--lume-ink); font-weight: 600; }
-:global(html[data-runtime-twin-design='proposal']) .inboxLayout { display: grid; grid-template-columns: minmax(0, 1fr) 304px; gap: 28px; align-items: stretch; }
-:global(html[data-runtime-twin-design='proposal']) .worklistPanel { container: patient-worklist / inline-size; padding: 0; border: 0; border-radius: 0; background: transparent; min-width: 0; }
-.worklistPanelHeader { display: flex; justify-content: space-between; align-items: baseline; margin: 0 0 8px; color: var(--lume-ink-muted); font-size: 0.8125rem; }
-.resultCount { font: inherit; }
-.keyboardHint { font-size: 0.75rem; }
-.columnHeadings, :global(html[data-runtime-twin-design='proposal']) .patientRow { display: grid; grid-template-columns: minmax(100px, 1.15fr) 64px minmax(100px, 1.2fr) 100px minmax(120px, 1fr); gap: 12px; align-items: center; }
-.columnHeadings { padding: 8px 16px; font-size: 0.75rem; line-height: 1.5; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--lume-ink-muted); border-bottom: 1px solid var(--lume-rule-strong); }
-:global(html[data-runtime-twin-design='proposal']) .patientListViewport { max-height: none; height: calc(100dvh - 280px); min-height: 240px; margin: 0; scrollbar-width: thin; scrollbar-color: var(--lume-ink-muted) transparent; }
-:global(html[data-runtime-twin-design='proposal']) .patientRowWrap { padding: 0; }
-:global(html[data-runtime-twin-design='proposal']) .patientRow { width: 100%; height: 40px; min-height: 40px; padding: 0 16px; border: 0; border-bottom: 1px solid var(--lume-rule); border-radius: 0; box-shadow: none; background: transparent; text-align: left; font: 0.875rem/1.5 var(--lume-font-sans); transform: none; transition: none; }
-:global(html[data-runtime-twin-design='proposal']) .patientRow:hover { background: var(--lume-surface-hover); }
-:global(html[data-runtime-twin-design='proposal']) .patientRowSelected { background: var(--lume-surface-selected); }
-:global(html[data-runtime-twin-design='proposal']) .patientRow:focus-visible { outline: 2px solid var(--lume-ink-fresh); outline-offset: -2px; }
-.recordIdentity { min-width: 0; overflow-wrap: anywhere; }
-.recordIdentity strong { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 600; }
-.recordAge, .patientWhen { color: var(--lume-ink-muted); font: 0.8125rem/1.5 var(--lume-font-sans); font-variant-numeric: tabular-nums; }
-.recordAge { white-space: nowrap; }
-.recordDiagnosis { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.patientTodo { min-width: 0; display: flex; align-items: baseline; gap: 4px; font-size: 0.8125rem; overflow-wrap: anywhere; }
-.todoEmpty { color: var(--lume-ink-muted); font-weight: 400; }
-.patientTodo > span:first-child { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.todoDetail { flex: none; color: var(--lume-ink-muted); white-space: nowrap; }
-.todoReadState { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 8px 16px; font-size: 0.875rem; }
-:global(html[data-runtime-twin-design='proposal']) :is(.directoryToolbar, .worklistLensActions, .todoReadState) .directoryAction { min-height: 40px; min-width: 40px; padding: 8px 16px; gap: 12px; font: inherit; line-height: 1.5; white-space: normal; }
-button.directoryAction { background: transparent; border: 1px solid var(--lume-rule-strong); border-radius: 10px; color: var(--lume-ink); cursor: pointer; }
-.lensTodo h3 { margin: 0 0 8px; font: var(--type-section); }
-.directoryAction:focus-visible { outline: 2px solid var(--lume-ink-fresh); outline-offset: 2px; }
-:global(html[data-runtime-twin-design='proposal']) .caseLens { display: flex; flex-direction: column; gap: 16px; position: static; align-self: stretch; padding: 20px; border: 0; border-left: 1px solid var(--lume-rule); border-radius: 0; background: var(--lume-surface-hover); box-shadow: none; animation: none; }
-.caseLensName {
-  font: var(--type-person-preview); }
-.caseLensAtoms { font: 0.8125rem/1.5 var(--lume-font-sans); }
-.caseLensSummary { padding: 0; border: 0; background: transparent; font: var(--type-prose); }
-.caseLensStatus { font: 0.875rem/1.5 var(--lume-font-sans); }
-.caseLensDiagnoses { display: grid; gap: 8px; }
-.patientDiagnosisPill { padding: 8px 0; border-bottom: 1px solid var(--lume-rule); }
-.patientDiagnosisPill > span { white-space: normal; }
-.worklistLensActions { display: flex; flex-wrap: wrap; align-items: start; gap: 12px; }
-.worklistLensActions > a { flex: 1; }
-@media (max-width: 1200px) {
-  :global(html[data-runtime-twin-design='proposal']) .inboxLayout { grid-template-columns: minmax(0, 1fr) 240px; gap: 16px; }
-  .columnHeadings, :global(html[data-runtime-twin-design='proposal']) .patientRow { grid-template-columns: minmax(100px, 1fr) minmax(100px, 1.2fr) minmax(120px, 1fr); }
-  .columnHeadings > :nth-child(2), .columnHeadings > :nth-child(4), .patientRow .recordAge, .patientRow .patientWhen { display: none; }
-  .directoryToolbar { flex-wrap: wrap; }
-}
-@media (max-width: 850px) {
-  :global(html[data-runtime-twin-design='proposal']) .inboxLayout { display: block; }
-  :global(html[data-runtime-twin-design='proposal']) .caseLens { display: none; }
-}
-@media (max-width: 700px) {
-  .directoryToolbar h1 { flex: 1; }
-  .directoryToolbar .patientSearchField { flex-basis: 100%; order: 2; min-height: 44px; }
-  .directoryToolbar .inboxScope { order: 3; }
-  .directoryToolbar .scopeChip { min-height: 44px; }
-  :global(html[data-runtime-twin-design='proposal']) :is(.directoryToolbar, .worklistLensActions, .todoReadState) .directoryAction { min-height: 44px; min-width: 44px; }
-  .keyboardHint { display: none; }
-  :global(html[data-runtime-twin-design='proposal']) .patientListViewport { height: calc(100dvh - 320px); }
-}
-@container patient-worklist (max-width: 699px) {
-  .columnHeadings, :global(html[data-runtime-twin-design='proposal']) .patientRow { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }
-  .columnHeadings > :nth-child(2), .columnHeadings > :nth-child(3), .columnHeadings > :nth-child(4), .patientRow .recordAge, .patientRow .recordDiagnosis, .patientRow .patientWhen { display: none; }
-  :global(html[data-runtime-twin-design='proposal']) .patientRow { height: 44px; min-height: 44px; }
-  .recordIdentity strong { display: block; }
-}
-@media (pointer: coarse) {
-  :global(html[data-runtime-twin-design='proposal']) .patientRow, :global(html[data-runtime-twin-design='proposal']) :is(.directoryToolbar, .worklistLensActions, .todoReadState) .directoryAction, .directoryToolbar .scopeChip { min-height: 44px; }
-}
-
-.patientDiagnosisPill > span { border: 0; border-radius: 0; padding: 0; background: transparent; }
-
-@container patient-directory (max-width: 960px) {
-  .directoryToolbar h1 { flex: 0 0 100%; }
-  .directoryToolbar .patientSearchField { flex-basis: 100%; order: 1; }
-  .directoryToolbar .inboxScope, .directoryToolbar > select, .directoryToolbar > a { order: 2; }
 }

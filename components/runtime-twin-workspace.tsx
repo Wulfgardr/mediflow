@@ -74,7 +74,8 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
   const incomingCount = useSyncExternalStore(subscribeAgentIncomingCount, agentIncomingCountSnapshot, agentIncomingCountServerSnapshot);
   const pathname = usePathname();
   const patientId = pathname.match(/^\/patients\/([^/]+)\//)?.[1] ?? null;
-  const wideRecord = !!patientId && proposal && desktop;
+  const unifiedShell = proposal && desktop;
+  const wideRecord = !!patientId && unifiedShell;
   const [opened, setOpened] = useState<string[]>([]);
   const [area, setArea] = useState<string | null>(null);
   const [openCommands, setOpenCommands] = useState<CommandHandler>(null);
@@ -154,7 +155,7 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
   );
   const workspaceBar = (
     <header className={styles.workspaceBar}>
-          {!wideRecord ? railToggle : null}
+          {!unifiedShell ? railToggle : null}
           <nav className={styles.openRecords} aria-label="Cartelle aperte">
             <Link className={styles.directoryTab} href={activeDestination.href} aria-label={activeDestination.label} aria-current={!patientId && currentDestinationHref !== null ? 'page' : undefined}>{activeDestination.label}</Link>
             {records.map((patient, index) => <span className={styles.recordTab} key={patient.id} data-active={patient.id === patientId}>
@@ -163,7 +164,7 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
                 : <button type="button" aria-label={`Chiudi cartella ${index + 1}`} onClick={() => setOpened(value => value.filter(id => id !== patient.id))}><X size={13} aria-hidden /></button>}
             </span>)}
           </nav>
-          {!wideRecord ? <PrivacyModeToggle className={styles.privacy} /> : null}
+          {!unifiedShell ? <PrivacyModeToggle className={styles.privacy} /> : null}
         </header>
   );
 
@@ -172,15 +173,15 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
     <WorkspaceAreaContext.Provider value={setArea}>
     <WorkspaceCommandContext.Provider value={proposal ? registerCommand : null}>
     <DirectoryReturnContext.Provider value={directoryReturn}>
-    <div className={styles.workspace} data-twin-workspace data-active={proposal} data-patient-record={proposal && !!patientId} data-composition={composition} data-rail-open={railOpen}>
+    <div className={styles.workspace} data-twin-workspace data-active={proposal} data-unified-shell={proposal} data-patient-record={proposal && !!patientId} data-composition={composition} data-rail-open={railOpen}>
       <aside className={styles.rail} aria-label="MediFlow">
         <Link href="/?area=incarico" className={styles.brand} aria-label="MediFlow"><span className={styles.recordBrand} aria-hidden="true"><i /><i /><i /></span><strong>MediFlow<span className={styles.brandPoint} aria-hidden="true">.</span></strong></Link>
-        {patientId && proposal ? <Link ref={recordSearch} href="/?area=incarico#ricerca-pazienti" className={styles.recordSearch} aria-label="Cerca pazienti">
-          <Search size={15} aria-hidden /><span>Cerca</span><kbd>⌘K</kbd>
+        {proposal ? <Link ref={recordSearch} href="/?area=incarico#ricerca-pazienti" className={styles.recordSearch} aria-label="Cerca pazienti">
+          <Search size={15} aria-hidden /><span>Cerca</span>{patientId ? <kbd>⌘K</kbd> : null}
         </Link> : null}
         <nav aria-label="Navigazione principale" className={styles.navigation}>
           {destinations.map(({ href, label, icon: Icon }, index) => <Fragment key={href}>
-            {patientId && proposal && (index === 0 || index === 4) ? <span className={styles.railGroup}>{index === 0 ? 'Lavoro' : 'Archivio'}</span> : null}
+            {proposal && (index === 0 || index === 4) ? <span className={styles.railGroup}>{index === 0 ? 'Lavoro' : 'Archivio'}</span> : null}
             <Link key={href} href={href} className={index > 2 ? styles.secondaryDestination : undefined} title={label} aria-label={label} aria-current={currentDestinationHref === href ? 'page' : undefined}><Icon size={17} aria-hidden /><span>{label}</span>{href === '/in-arrivo' && incomingCount > 0 ? <small>{incomingCount}</small> : null}</Link></Fragment>)}
           {patientId && proposal ? <div className={styles.proposalNav}>
             <span className={styles.railGroup}>Proposte del modello</span>
@@ -205,14 +206,14 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
         <div className={styles.railBottom}>
           <div className={styles.railTools}>
             <Link href="/settings" aria-label="Impostazioni" title="Impostazioni" aria-current={currentDestinationHref === '/settings' ? 'page' : undefined}><Settings2 size={17} aria-hidden /><span>Impostazioni</span></Link>
-            {wideRecord ? <>{railToggle}<PrivacyModeToggle className={styles.privacy} />
+            {unifiedShell ? <>{railToggle}<PrivacyModeToggle className={styles.privacy} />
               <button type="button" className={styles.iconButton} onClick={lock} aria-label="Blocca" title="Blocca"><LockKeyhole size={15} aria-hidden /></button>
             </> : null}
           </div>
-          <div className={styles.account} data-identified={wideRecord && !!operator}>
-            {patientId && proposal && operator ? <><span className={styles.initials} aria-hidden="true">{operator.split(/\s+/).filter(Boolean).slice(-2).map(part => part[0]).join('').toLocaleUpperCase('it-IT')}</span>
+          <div className={styles.account} data-identified={unifiedShell && !!operator}>
+            {proposal && operator ? <><span className={styles.initials} aria-hidden="true">{operator.split(/\s+/).filter(Boolean).slice(-2).map(part => part[0]).join('').toLocaleUpperCase('it-IT')}</span>
               <div className={styles.operator}><span>{operator}</span>{user?.ambulatoryName ? <small>{user.ambulatoryName}</small> : null}</div></> : null}
-            {wideRecord ? <button type="button" className={styles.themeButton} aria-label="Cambia tema" title="Cambia tema" onClick={() => setTheme(document.documentElement.classList.contains('dark') ? 'light' : 'dark')}><Moon className={styles.toDark} size={15} aria-hidden /><Sun className={styles.toLight} size={15} aria-hidden /></button>
+            {unifiedShell ? <button type="button" className={styles.themeButton} aria-label="Cambia tema" title="Cambia tema" onClick={() => setTheme(document.documentElement.classList.contains('dark') ? 'light' : 'dark')}><Moon className={styles.toDark} size={15} aria-hidden /><Sun className={styles.toLight} size={15} aria-hidden /></button>
               : <button type="button" onClick={lock} aria-label="Blocca" title="Blocca"><LockKeyhole size={17} aria-hidden /><span>Blocca</span></button>}
           </div>
         </div>

@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/ui/button';
 import { PatientSheetMenu } from '@/components/patient-sheet-menu';
+import surface from '@/components/record-surface.module.css';
 import { CollapsibleSection } from '@/components/kree8/collapsible-section';
 import { ViewState } from '@/components/ui/view-state';
 import { formatCountLabel } from '@/lib/format-count';
@@ -16,7 +17,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { v4 as uuidv4 } from 'uuid';
-import { X, Shield, Ban, Database, Beaker } from 'lucide-react';
+import { Pill, X, Shield, Ban, Database, Beaker } from 'lucide-react';
 import { differenceInYears, format } from 'date-fns';
 import { InkState } from './ui/ink-state';
 import { createTherapyStatusWriteJournal } from '@/lib/therapy-status-confirmation';
@@ -422,7 +423,8 @@ export default function TherapyManager({ patientId, embedded = false, before, ch
 
     const content = (
         <section className={styles.register} data-clinical-register="therapies">
-            {!embedded && <header className={styles.therapyHeading}>
+            {!embedded && <header className={`${styles.therapyHeading} ${surface.islandHeader}`}>
+                <span className={surface.islandIcon} aria-hidden="true"><Pill size={16} /></span>
                 <h2>Terapie farmacologiche <span>{count}</span></h2>{newButton}
             </header>}
 
@@ -670,18 +672,18 @@ export default function TherapyManager({ patientId, embedded = false, before, ch
                     { title: 'Sospese', rows: suspendedTherapies, status: 'suspended' },
                     { title: 'Concluse', rows: endedTherapies, status: 'completed' },
                 ].filter(group => group.rows.length > 0).map((group) => <section key={group.status}>
-                    <header className={styles.sectionHead}><h3>{group.title}</h3></header>
+                    <header className={styles.sectionHead}><h3>{group.title}</h3><span>{formatCountLabel(group.rows.length, 'terapia', 'terapie')}</span></header>
                     <table className={`${styles.table} ${styles.therapyTable} ${styles.therapyRegister}`}><thead><tr><th>Farmaco</th><th>Posologia</th><th>Indicazione</th><th>Periodo</th><th>Azioni</th></tr></thead><tbody>
                         {group.rows.map(t => <tr key={t.id}>
                             <td><strong>{t.drugName}</strong>{t.activePrinciple && <small>{t.activePrinciple}</small>}
                                 {(t.atc || t.aic) && <small className="lume-code">{[t.atc && `ATC ${t.atc}`, t.aic && `AIC ${t.aic}`].filter(Boolean).join(' · ')}</small>}
                             </td>
                             <td className="lume-registro">{t.dosage}</td>
-                            <td data-therapy-cell="indication" data-empty={!t.motivation && !t.diagnosisCode}>{t.motivation && <span>{t.motivation}</span>}{t.diagnosisCode && <small><span className="lume-code">{t.diagnosisCode}</span> {t.diagnosisName}</small>}{!t.motivation && !t.diagnosisCode && <span className={styles.muted}>—</span>}</td>
+                            <td data-therapy-cell="indication" data-empty={!t.motivation && !t.diagnosisCode}>{t.motivation && <span>{t.motivation}</span>}{t.diagnosisCode && <small><span className="lume-code">{t.diagnosisCode}</span> {t.diagnosisName}</small>}{!t.motivation && !t.diagnosisCode && <span className={styles.muted}>–</span>}</td>
                             <td data-therapy-cell="period" className={styles.muted}>
                                 {t.startDate && <div>Dal {format(new Date(t.startDate), 'dd/MM/yyyy', { locale: it })}</div>}
                                 {group.status === 'completed' && <div>Conclusa il {format(new Date(t.endDate || t.updatedAt || t.createdAt), 'dd/MM/yyyy', { locale: it })}</div>}
-                                {!t.startDate && group.status !== 'completed' && '—'}
+                                {!t.startDate && group.status !== 'completed' && '–'}
                             </td>
                             <td><div className={styles.therapyActions}>
                                 {group.status === 'active' ? <Button variant="text" disabled={!!deleteRecovery || statusChange.blocked} onClick={() => startEditing(t)}>Modifica</Button>
@@ -764,7 +766,7 @@ export default function TherapyManager({ patientId, embedded = false, before, ch
             )}
         </section>
     );
-    return embedded ? <CollapsibleSection id="terapie" title="Terapie farmacologiche" count={count}
+    return embedded ? <CollapsibleSection id="terapie" title="Terapie farmacologiche" icon={Pill} count={count}
         defaultOpen={isAdding} headerAction={newButton} surfaceClassName={surfaceClassName} keepMounted>
         <div className="space-y-4">{before}{content}{children}</div>
     </CollapsibleSection> : content;

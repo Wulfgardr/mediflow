@@ -179,7 +179,7 @@ mod tests {
 
     #[test]
     fn laboratory_units_come_from_the_table_with_the_web_reading() {
-        assert_eq!(laboratory_units().len(), 23);
+        assert_eq!(laboratory_units().len(), 24);
         assert_eq!(unit("[IU]/mL"), "UI/mL");
         assert_eq!(unit("pmol/L"), "pmol/L");
         assert_eq!(unit("ug/L{DDU}"), "µg/L DDU");

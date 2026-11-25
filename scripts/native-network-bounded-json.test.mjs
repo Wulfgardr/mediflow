@@ -14,8 +14,7 @@ const operations = [
     ['v1/network/patients/[id]/restore', 'POST'],
     ['v1/network/patients/[id]/attachments', 'POST'],
     ['v1/network/ambulatories', 'POST'],
-    ['v1/network/ambulatories/[id]', 'PUT', 'DELETE'],
-    ['v1/network/ambulatories/clear', 'POST'],
+    ['v1/network/ambulatories/[id]', 'PUT'],
     ['v1/network/fse/validate-document', 'POST'],
     ['v1/network/visit-draft', 'POST'],
     ...['entries', 'therapies', 'checkups', 'observations'].flatMap(kind => [
@@ -71,7 +70,7 @@ function harness(route, { deny = 0, cap, stage = null } = {}) {
     const services = new Set([
         'postNetworkPairingIntent', 'createNetworkScopedPatient', 'updateNetworkScopedPatient', 'deleteNetworkScopedPatient',
         'restoreNetworkScopedPatient', 'createNetworkScopedAttachment', 'createNetworkAmbulatory', 'updateNetworkAmbulatory',
-        'deleteNetworkAmbulatory', 'clearNetworkAmbulatory', 'validateFseDocumentPayload', 'createVisitDraft',
+        'validateFseDocumentPayload', 'createVisitDraft',
         ...['Entry', 'Therapy', 'Checkup', 'Observation', 'ServicePrescription', 'ServicePrescriptionItem', 'ProstheticPrescription']
             .flatMap(name => [`createNetworkScoped${name}`, `updateNetworkScoped${name}`]),
     ]);
@@ -242,8 +241,8 @@ test('patient PUT admits a matching scope assertion with the original request an
     assert.ok(h.events.indexOf('parse') < h.events.indexOf('service'));
 });
 
-test('malformed login and ambulatory DELETE keep existing fallback, not size rejection', async () => {
-    for (const [route, method] of [['auth/native/login', 'POST'], ['v1/network/ambulatories/[id]', 'DELETE']]) {
+test('malformed login keeps existing fallback, not size rejection', async () => {
+    for (const [route, method] of [['auth/native/login', 'POST']]) {
         for (const body of ['', '{']) {
             const h = harness(route);
             const response = await h.route[method](request(h, body).req, ctx);

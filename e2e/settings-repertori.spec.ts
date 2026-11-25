@@ -125,7 +125,7 @@ test('Repertori Impostazioni: dati, lettura pendente e negata senza servizi este
         await openUnlockedDocument(page, '/settings/repertori');
         if (!baseline) {
             const heading = section.getByRole('heading', { name: 'Repertori', level: 2, exact: true });
-            await expect(heading).toHaveCSS('font-size', '15px');
+            await expect(heading).toHaveCSS('font-size', '17px');
             await expect(heading).toHaveCSS('letter-spacing', 'normal');
         }
         await expect(section).toBeVisible(); await capture('lettura-pendente');

@@ -1,4 +1,5 @@
 .panel {
+    composes: settingSurface from "./settings-lume.module.css";
     min-width: 0;
     color: var(--lume-ink);
     font: 0.875rem/1.5 var(--lume-font-sans);
@@ -8,6 +9,7 @@
 .panel h3 {
     font: var(--type-strong);
 }
+.panel .heading h3 { font: var(--type-record-island); }
 .panel h4, .title {
     color: var(--lume-ink);
     font-weight: 600;
@@ -45,7 +47,7 @@
     outline-offset: 2px;
 }
 .section, .row, .notice {
-    border-top: 1px solid var(--lume-rule);
+    border-top: 1px solid var(--lume-record-island-rule);
     padding-block: 16px;
 }
 .section { margin-top: 20px; }
@@ -58,12 +60,12 @@
     min-height: 44px;
     align-items: baseline;
     padding-block: 12px;
-    border-bottom: 1px solid var(--lume-rule);
+    border-bottom: 1px solid var(--lume-record-island-rule);
 }
 .label, .muted, .meta { color: var(--lume-ink-muted); }
 .meta { grid-column: 2; font-size: 0.8125rem; }
 .value { font-weight: 600; font-variant-numeric: tabular-nums; }
-.model { padding-block: 8px; border-bottom: 1px solid var(--lume-rule); }
+.model { padding-block: 8px; border-bottom: 1px solid var(--lume-record-island-rule); }
 .status { display: flex; align-items: center; gap: 8px; font-weight: 600; }
 .positive { color: var(--lume-signal-success); }
 .warning { color: var(--lume-signal-warning); }

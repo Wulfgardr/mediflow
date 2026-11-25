@@ -195,7 +195,7 @@ export function PatientProfileNotesReview({ patientId, mode }: Readonly<{ patien
     }
 
     return <section className="mx-auto max-w-3xl space-y-5 p-6" data-testid={mode === 'commit' ? 'patient-profile-notes-review' : 'patient-profile-review-pilot'}>
-        <h1 className="type-page-title">{mode === 'commit' ? 'Rivedi e salva le note' : 'Prova di revisione delle note'}</h1>
+        <h1>{mode === 'commit' ? 'Rivedi e salva le note' : 'Prova di revisione delle note'}</h1>
         <p>{mode === 'commit' ? 'Prepara le note, verifica il paziente e leggi il contenuto completo prima di salvare nella cartella.'
             : 'Il contenuto viene preparato e mostrato per la conferma. Questa prova non salva modifiche nella cartella.'}</p>
         {value.kind === 'loading' || value.kind === 'pending' ? <p role="status">Verifica in corso…</p> : null}

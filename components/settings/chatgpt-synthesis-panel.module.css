@@ -17,7 +17,7 @@
 .panel *, .panel *::before, .panel *::after { box-sizing: border-box; }
 .panel h2, .panel h3, .panel h4, .panel p, .panel dl { margin: 0; }
 .panel h2, .panel h3, .panel h4 { font-family: inherit; font-weight: 600; line-height: 1.4; }
-.panel h2 { font-size: 0.9375rem; }
+.panel h2 { font: var(--type-record-island); }
 .panel h3 { font-size: 0.9375rem; }
 .panel h4 { font-size: 0.9375rem; }
 .intro, .status, .source, .login, .result, .detailBody { display: grid; gap: .75rem; min-width: 0; }

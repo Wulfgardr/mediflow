@@ -70,8 +70,8 @@ export function AuthHealthScreen({
 
     return (
         <div className={styles.screen}>
-            <main className={styles.sheet} role="alert" aria-labelledby="auth-health-title">
-                <p className={styles.brand}>MediFlow<b>.</b></p>
+            <main className={styles.sheet} data-record-page data-record-island role="alert" aria-labelledby="auth-health-title">
+                <span className={styles.brand} data-record-brand><span className={styles.brandGlyph} data-brand-glyph aria-hidden="true"><i /><i /><i /></span>MediFlow</span>
                 <h1 id="auth-health-title" className={styles.title}>{condition.title}</h1>
                 <p className={styles.text}>{condition.text}</p>
 
@@ -86,7 +86,7 @@ export function AuthHealthScreen({
                     <section className={styles.block}>
                         <h2 className={styles.label}>Comando da eseguire nel terminale</h2>
                         <code className={styles.command}>{remediationCommand}</code>
-                        <p className={styles.note}>Usa la stessa versione di Node con cui avvii MediFlow. Il comando non parte da solo.</p>
+                        <p className={styles.note}>Usa la stessa versione di Node con cui avvii MediFlow.</p>
                     </section>
                 )}
 

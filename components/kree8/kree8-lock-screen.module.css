@@ -6,15 +6,15 @@
   /* Local layer maps 1:1 to the canonical Lume active aliases (app/lume-tokens.css);
      giorno/grafite flip automatically under html.dark, so no scoped dark block is
      needed. Opaque surfaces; borders via color-mix. Nessun gradiente o alone. */
-  --surface-focal: var(--lume-surface-focal);
+  --surface-focal: var(--lume-record-island);
   --surface-field: var(--lume-surface-field);
-  --canvas: var(--lume-surface-canvas);
+  --canvas: var(--lume-record-canvas);
   --chrome: var(--lume-surface-chrome);
   --ink: var(--lume-ink);
   --ink-muted: var(--lume-ink-muted);
   --accent: var(--lume-ink-fresh);
   --accent-ink: var(--lume-surface-focal);
-  --line: var(--lume-rule-strong);
+  --line: var(--lume-ink-muted);
   --critical: var(--lume-signal-critical);
   --critical-bg: color-mix(in srgb, var(--lume-signal-critical) 14%, var(--lume-surface-focal));
   --motion-ease: cubic-bezier(0.4, 0, 0.2, 1);
@@ -40,8 +40,8 @@
      when the card is taller than the viewport, so short heights scroll instead
      of clipping (paired with overflow-y:auto on .lockShell). */
   margin: auto;
-  border: 1px solid var(--line);
-  border-radius: var(--lume-radius-panel);
+  border: 1px solid var(--lume-record-island-rule);
+  border-radius: 14px;
   padding: 24px;
   background: var(--surface-focal);
 }
@@ -51,20 +51,6 @@
   align-items: center;
   gap: 10px;
   margin-bottom: 24px;
-}
-
-.brandWord {
-  color: var(--ink);
-  letter-spacing: -0.01em;
-  font: var(--type-brand);
-}
-.brandDot {
-  display: inline-block;
-  width: .24em;
-  height: .24em;
-  margin-left: .06em;
-  border-radius: 50%;
-  background: var(--ink);
 }
 
 .headerBlock {
@@ -79,7 +65,7 @@
   color: var(--ink);
   line-height: 1.1;
   letter-spacing: 0;
-  font: var(--type-page-title);
+  font: var(--type-record-person);
 }
 
 .form {
@@ -100,10 +86,7 @@
   background: var(--surface-field);
   color: var(--ink);
   padding: 12px 14px;
-  text-align: center;
-  font-size: 0.9375rem;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.4em;
+  font: var(--type-record-data);
   outline: none;
   transition: border-color var(--lume-dur-fuoco) var(--lume-ease), background var(--lume-dur-fuoco) var(--lume-ease);
 }
@@ -111,7 +94,6 @@
 .pinInput::placeholder {
   color: var(--ink-muted);
   font-size: 0.8125rem;
-  letter-spacing: 0.02em;
 }
 
 .pinInput:focus {
@@ -189,7 +171,6 @@
   }
 
   .lockCard {
-    border-radius: 16px;
     padding: 20px;
   }
 
@@ -198,7 +179,7 @@
   }
 
   .title {
-    font: var(--type-page-title);
+    font: var(--type-record-person);
   }
 }
 
@@ -209,4 +190,13 @@
     animation: none !important;
     transition: none !important;
   }
+}
+
+.form[hidden] { display: none; }
+.lockCard :is(input:not([type='file'], [type='checkbox']), textarea):not([aria-invalid='true']) {
+  border-color: var(--lume-ink-muted);
+  border-radius: 10px;
+}
+.lockCard :is(input:not([type='file'], [type='checkbox']), textarea):focus {
+  border-color: var(--lume-accent);
 }
