@@ -18,6 +18,7 @@ import { useSecurity } from '@/components/security-provider';
 import PatientDocumentCreate from '@/components/patient-document-create';
 import { DossierBackupProposal, dossierBackupProposed, dossierWritablePatientCount, type DossierBackupChoice } from '@/components/dossier-backup-proposal';
 import { dossierCreationSource } from '@/lib/dossier-backup-gate';
+import { dossierCreationCandidates, dossierPatientCode, loneDocumentImage, newPatientDossierStart } from '@/lib/dossier-new-patient-entry';
 import { proposeIdentityFields } from '@/lib/domain/documents/dossier-sections';
 import { db } from '@/lib/db';
 import { createDossierPorts } from '@/lib/document-dossier-ports';
@@ -104,12 +105,16 @@ const ASSESSMENT_LABEL: Record<string, string> = {
     new: 'Nuovo rispetto alla scheda', already_present: 'Già in scheda', duplicate_in_dossier: 'Duplicato di un’altra fonte', conflict: 'In conflitto',
 };
 
-function inputFiles(list: FileList): DossierInputFile[] {
-    return [...list].map((file) => ({
+function inputFile(file: File): DossierInputFile {
+    return {
         name: file.name, size: file.size, type: file.type, lastModified: file.lastModified,
         relativePath: (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name,
         read: async () => new Uint8Array(await file.arrayBuffer()),
-    }));
+    };
+}
+
+function inputFiles(list: FileList): DossierInputFile[] {
+    return [...list].map(inputFile);
 }
 
 const ORIGIN_LABEL: Record<DossierFact['origin'], string> = {
@@ -146,10 +151,20 @@ export default function DossierImportPanel({ initialPatientId }: { initialPatien
             </Kree8WorkspaceShell>
         );
     }
-    return <ActiveDossierImport key={user.id} initialPatientId={initialPatientId} />;
+    return <ActiveDossierImport key={user.id} initialPatientId={initialPatientId} entry={FOLDER_ENTRY} />;
 }
 
-function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | null }) {
+type DossierEntry = { kind: 'folder' } | { kind: 'new-patient'; onActiveChange: (active: boolean) => void };
+const FOLDER_ENTRY: DossierEntry = { kind: 'folder' };
+
+export function DossierNewPatientImport({ onActiveChange }: { onActiveChange: (active: boolean) => void }) {
+    const { isAuthenticated, isLocked, user, authRecoveryState } = useSecurity();
+    if (!isAuthenticated || isLocked || !user?.id || authRecoveryState !== 'ready') return null;
+    return <ActiveDossierImport key={user.id} initialPatientId={null} entry={{ kind: 'new-patient', onActiveChange }} />;
+}
+
+function ActiveDossierImport({ initialPatientId, entry }: { initialPatientId: string | null; entry: DossierEntry }) {
+    const newPatient = entry.kind === 'new-patient' ? entry : null;
     const ports = useMemo(() => createDossierPorts(), []);
     const folderInput = useRef<HTMLInputElement>(null);
     const filesInput = useRef<HTMLInputElement>(null);
@@ -240,9 +255,24 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
             if (!op.isCurrent()) return;
             setGroups(next);
             setLinks({});
+            if (newPatient) {
+                const known = await ports.listPatients(op.signal);
+                if (!op.isCurrent()) return;
+                setPatients(known);
+                const start = newPatientDossierStart(next, known);
+                setCreating(start.kind === 'create' ? { groupKey: start.groupKey, sourceKey: start.sourceKey } : null);
+                newPatient.onActiveChange(start.kind === 'create');
+            }
         } catch (error) {
             if (op.isCurrent()) setNotice(error instanceof DossierAbortedError ? error.message : 'Lettura della cartella non riuscita.');
         } finally { if (op.isCurrent()) setBusy(null); }
+    };
+
+    const clearSelection = () => {
+        operation();
+        lastSelection.current = null;
+        setGroups([]); setCreating(null); setOutcomes({}); setMeasured({}); setNotice(null); setConfirmations({}); setConfirmedUncertain({}); setLinks({});
+        newPatient?.onActiveChange(false);
     };
 
     const setExcluded = (groupKey: string, sourceKey: string, excluded: boolean) => {
@@ -301,13 +331,17 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
         if (op.isCurrent()) setView(next);
     };
 
-    return (
-        <Kree8WorkspaceShell eyebrow="Pazienti" title="Importa documenti"
-            subtitle="Collega i documenti di una cartella alle schede, conservando originali, testo e provenienza."
-            backHref="/patients/import" backLabel="Torna all’importazione"
-            statusLabel="Nessuna scrittura senza la tua conferma.">
+    const content = (
             <div className={styles.panel} data-testid="dossier-import" aria-busy={busy ? 'true' : 'false'}>
-                <section className={styles.section} aria-labelledby={`${ids}-pick`}>
+                {newPatient ? groups.length ? <div className={styles.actions}>
+                    <button type="button" className="mf-button-secondary" disabled={Boolean(busy)} onClick={clearSelection}>Scegli altri documenti</button>
+                </div> : <PatientDocumentCreate onActiveChange={newPatient.onActiveChange} onDocuments={(files) => {
+                    if (loneDocumentImage(files)) return false;
+                    setBackupChoice({ kind: 'pending' });
+                    void readFiles(files.map(inputFile), null);
+                    return true;
+                }} />
+                : <section className={styles.section} aria-labelledby={`${ids}-pick`}>
                     <h2 id={`${ids}-pick`}>1. Scegli la cartella</h2>
                     <p>MediFlow legge i file su questo Mac, nei propri processi locali. In questa fase non salva nulla e non invia contenuti a servizi esterni.</p>
                     <p className={styles.muted}>PDF nativi e scansioni, immagini, documenti Office e testo vengono letti; buste firmate .p7m, archivi e messaggi di posta si conservano senza estrarne il contenuto.</p>
@@ -331,12 +365,12 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
                     {prepared ? <p role="status" data-testid="dossier-prepared-status">Estrazione preparata: {formatCountLabel(prepared.extraction.sources.length, 'documento', 'documenti')}
                         {prepared.extraction.preparedAt ? `, preparata il ${prepared.extraction.preparedAt.slice(0, 10)}` : ''}
                         {prepared.warnings.length ? `; ${formatCountLabel(prepared.warnings.length, 'voce ignorata', 'voci ignorate')}: ${prepared.warnings.slice(0, 3).join(' ')}` : '.'}</p> : null}
-                </section>
+                </section>}
                 {busy ? <p role="status" aria-live="polite">{busy}</p> : null}
                 {notice ? <p className={styles.notice} role="alert">{notice}</p> : null}
                 {groups.length ? (
                     <section className={styles.section} aria-labelledby={`${ids}-groups`}>
-                        <h2 id={`${ids}-groups`}>2. Collega le fonti alle schede</h2>
+                        <h2 id={`${ids}-groups`}>{newPatient ? 'Collega i documenti alla scheda' : '2. Collega le fonti alle schede'}</h2>
                         <p className={styles.muted}>Il nome della cartella non sceglie il paziente. Un codice fiscale valido è un indizio, non una prova: conferma tu ogni collegamento.</p>
                         <div className={styles.actions}>
                             <button type="button" className="mf-button-secondary" onClick={() => { void refreshPatients(); }}>Aggiorna elenco schede</button>
@@ -448,21 +482,29 @@ function ActiveDossierImport({ initialPatientId }: { initialPatientId: string | 
                         })}
                     </section>
                 ) : null}
-                <section className={styles.section} aria-labelledby={`${ids}-dossier`}>
-                    <h2 id={`${ids}-dossier`}>3. Rivedi e applica il dossier</h2>
+                {newPatient && !view ? null : <section className={styles.section} aria-labelledby={`${ids}-dossier`}>
+                    <h2 id={`${ids}-dossier`}>{newPatient ? 'Rivedi e applica i dati clinici' : '3. Rivedi e applica il dossier'}</h2>
                     <p className={styles.muted}>Il dossier si rilegge dalla scheda: puoi chiudere la pagina e riprendere. Le proposte non diventano dati finché non le accetti e applichi.</p>
-                    <div className={styles.fileLabel}>
+                    {newPatient ? null : <div className={styles.fileLabel}>
                         <label htmlFor={`${ids}-dossier-patient`}>Scheda</label>
                         <select id={`${ids}-dossier-patient`} value={dossierPatientId} disabled={Boolean(busy)}
                             onChange={(event) => { const value = event.currentTarget.value; setDossierPatientId(value); void loadDossier(value); }}>
                             <option value="">Scegli una scheda</option>
                             {patients.map((patient) => <option key={patient.id} value={patient.id}>{patientLabel(patient)}</option>)}
                         </select>
-                    </div>
+                    </div>}
                     {view ? <DossierReview key={view.patient.id} view={view} busy={Boolean(busy)} ports={ports} operation={operation} setBusy={setBusy} setNotice={setNotice}
                         reload={() => loadDossier(view.patient.id)} /> : null}
-                </section>
+                </section>}
             </div>
+    );
+    if (newPatient) return content;
+    return (
+        <Kree8WorkspaceShell eyebrow="Pazienti" title="Importa documenti"
+            subtitle="Collega i documenti di una cartella alle schede, conservando originali, testo e provenienza."
+            backHref="/patients/import" backLabel="Torna all’importazione"
+            statusLabel="Nessuna scrittura senza la tua conferma.">
+            {content}
         </Kree8WorkspaceShell>
     );
 }
@@ -731,7 +773,7 @@ function NewPatientFromDocument({ group, identityBlocking, busy, creating, onSta
     onStart: (sourceKey: string) => void; onCancel: () => void; onCreated: (patientId: string) => Promise<void>;
 }) {
     const ids = useId();
-    const candidates = group.sources.filter((source) => source.status === 'ready' && source.classification.kind === 'pdf' && source.size <= 10 * 1024 * 1024);
+    const candidates = dossierCreationCandidates(group);
     const [choice, setChoice] = useState(candidates[0]?.key ?? '');
     const [prepared, setPrepared] = useState<{ key: string; file: File } | null>(null);
     const source = group.sources.find((item) => item.key === creating);
@@ -746,7 +788,7 @@ function NewPatientFromDocument({ group, identityBlocking, busy, creating, onSta
         return () => { live = false; };
     }, [source]);
     if (identityBlocking || !candidates.length) return null;
-    const patientCode = source?.taxCodes.find((code) => code.role === 'patient_cf' && code.checksumValid)?.value ?? null;
+    const patientCode = source ? dossierPatientCode(source) : null;
     if (!creating) {
         return <div className={styles.actions} data-testid="dossier-new-patient">
             <label htmlFor={`${ids}-source`}>Nessuna scheda adatta? Crea la scheda da</label>
