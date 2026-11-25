@@ -1,5 +1,6 @@
 import { evaluateDraftGroupIdentity, type DossierDraftGroup, type DossierDraftSource, type DossierPatient } from './document-dossier-session';
 import { proposeIdentityFields, type DossierIdentityProposal } from './domain/documents/dossier-sections';
+import { birthDateMatchesTaxCode } from './patient-identity';
 
 export const PATIENT_DOCUMENT_CREATE_MAX_BYTES = 10 * 1024 * 1024;
 
@@ -59,7 +60,19 @@ export function allIdentityProposals(proposals: readonly DossierIdentityProposal
         if (offered.every((proposal) => sameIdentityValue(proposal.value, offered[0].value))) values[field] = offered[0].value;
         else undecided.push(field);
     }
+    if (values.taxCode && values.birthDate && !birthDateMatchesTaxCode(values.taxCode, values.birthDate)) {
+        delete values.birthDate;
+        undecided.push('birthDate');
+    }
     return { values, undecided };
+}
+
+export type UndecidedReason = 'different-values' | 'birth-date-not-in-tax-code';
+
+export function undecidedReason(proposals: readonly DossierIdentityProposal[], field: IdentityField): UndecidedReason {
+    const offered = proposals.filter((proposal) => proposal.field === field);
+    return offered.every((proposal) => sameIdentityValue(proposal.value, offered[0].value)) && field === 'birthDate'
+        ? 'birth-date-not-in-tax-code' : 'different-values';
 }
 
 export type NewPatientDossierStart =

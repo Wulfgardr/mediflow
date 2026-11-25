@@ -19,7 +19,7 @@ import {
 } from '@/lib/patient-document-create-client';
 import { OCR_MIN_SHORT_SIDE_PIXELS } from '@/lib/patient-document-image-geometry';
 import { birthError, identifierError, IDENTIFIER_LABELS, IDENTIFIER_TYPES, PATIENT_IDENTIFIER_DUPLICATE, type PatientIdentifierType } from '@/lib/patient-identity';
-import { allIdentityProposals, IDENTITY_FIELDS, sameIdentityValue, type IdentityField, type SourcedIdentityProposal } from '@/lib/dossier-new-patient-entry';
+import { allIdentityProposals, IDENTITY_FIELDS, sameIdentityValue, undecidedReason, type IdentityField, type SourcedIdentityProposal, type UndecidedReason } from '@/lib/dossier-new-patient-entry';
 import type { PatientDocumentCreateReview } from '@/lib/patient-document-create-command';
 import { focusPatientCreationTarget } from '@/lib/patient-creation-focus';
 import { confirmationPinError, isValidConfirmationPin, validateConfirmationPinSubmission } from '@/lib/security/pin-input';
@@ -42,6 +42,11 @@ type Phase =
     | { kind: 'sending'; commandId: string }
     | { kind: 'applied'; patientId: string; verified: 'matched' | 'opened' | 'failed'; commandId: string }
     | { kind: 'uncertain'; commandId: string; text: string; forgettable?: boolean };
+
+const UNDECIDED_NOTES: Record<UndecidedReason, string> = {
+    'different-values': 'Da decidere: i documenti propongono valori diversi.',
+    'birth-date-not-in-tax-code': 'Da decidere: la data non corrisponde al codice fiscale.',
+};
 
 const FIELD_NAMES: Record<IdentityField, string> = { taxCode: 'codice fiscale', firstName: 'nome', lastName: 'cognome', birthDate: 'data di nascita' };
 
@@ -322,7 +327,7 @@ export default function PatientDocumentCreate({ onActiveChange, dossier, onDocum
     function fieldNote(field: IdentityField) {
         if (!dossier) return null;
         const id = `patient-document-${field}-source`;
-        if (undecided.includes(field)) return <p id={id} className="mf-field-helper" data-testid="patient-document-undecided">Da decidere: i documenti propongono valori diversi.</p>;
+        if (undecided.includes(field)) return <p id={id} className="mf-field-helper" data-testid="patient-document-undecided">{UNDECIDED_NOTES[undecidedReason(dossier.proposals, field)]}</p>;
         const value = fieldValue(fields, field);
         const origin = value ? dossier.proposals.find((proposal) => proposal.field === field && sameIdentityValue(proposal.value, value)) : undefined;
         return origin ? <p id={id} className="mf-field-helper">Fonte: {origin.sourceName}</p> : null;
