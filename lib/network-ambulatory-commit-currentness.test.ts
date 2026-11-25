@@ -20,13 +20,12 @@ const cleanupCookies = installNetworkPatientCookieFixture(dataDir, cookieState);
 const { dbServer, openDbServer } = load('./db-server.ts') as typeof import('./db-server'); openDbServer();
 const collection = load('../app/api/v1/network/ambulatories/route.ts') as typeof import('../app/api/v1/network/ambulatories/route');
 const detail = load('../app/api/v1/network/ambulatories/[id]/route.ts') as typeof import('../app/api/v1/network/ambulatories/[id]/route');
-const clearRoute = load('../app/api/v1/network/ambulatories/clear/route.ts') as typeof import('../app/api/v1/network/ambulatories/clear/route');
 
 const SCOPE = 'synthetic-ambulatory-scope';
 const TARGET = 'synthetic-ambulatory-target';
 const CREATED = 'synthetic-ambulatory-created';
 const WRITE_CAPABILITY = 'network.ambulatories.write';
-type Operation = 'create' | 'update' | 'delete' | 'clear';
+type Operation = 'create' | 'update';
 
 test.after(() => {
     clearAllSessions(); cleanupCookies(); dbServer.$client.close();
@@ -58,22 +57,17 @@ function snapshot() {
 
 function url(operation: Operation): string {
     return operation === 'create' ? 'http://127.0.0.1/api/v1/network/ambulatories'
-        : operation === 'clear' ? 'http://127.0.0.1/api/v1/network/ambulatories/clear'
         : `http://127.0.0.1/api/v1/network/ambulatories/${TARGET}`;
 }
 
 function body(operation: Operation): Record<string, unknown> {
     return operation === 'create' ? { id: CREATED, name: 'Synthetic created', type: 'live' }
-        : operation === 'clear' ? { ambulatoryId: TARGET, version: 2 }
-        : operation === 'update' ? { name: 'Synthetic renamed', version: 2 }
-        : { version: 2 };
+        : { name: 'Synthetic renamed', version: 2 };
 }
 
 function invoke(operation: Operation, request: Request) {
     return operation === 'create' ? collection.POST(request)
-        : operation === 'clear' ? clearRoute.POST(request)
-        : operation === 'update' ? detail.PUT(request, { params: Promise.resolve({ id: TARGET }) })
-        : detail.DELETE(request, { params: Promise.resolve({ id: TARGET }) });
+        : detail.PUT(request, { params: Promise.resolve({ id: TARGET }) });
 }
 
 async function waitFor(predicate: () => boolean) {
@@ -88,19 +82,16 @@ const revocations: Record<Operation, { status: 401 | 403; apply: (authority: Ret
     create: { status: 403, apply: authority => setClients([{ ...authority.pairedClient,
         grantedCapabilities: ['network.replica.write-patient-profile'] }]) },
     update: { status: 401, apply: () => setClients([]) },
-    delete: { status: 401, apply: authority => retireServerSessionForLogout(authority.session.id) },
-    clear: { status: 403, apply: authority => setClients([{ ...authority.pairedClient,
-        grantedCapabilities: ['network.replica.write-patient-profile'] }]) },
 };
 
-for (const operation of ['create', 'update', 'delete', 'clear'] as const) {
+for (const operation of ['create', 'update'] as const) {
     test(`${operation}: revocation while the body is pending denies before the writer commits`, async () => {
         const authority = fixture();
         const before = snapshot();
         let controller!: ReadableStreamDefaultController<Uint8Array>;
         const stream = new ReadableStream<Uint8Array>({ start(value) { controller = value; } });
         const request = new Request(url(operation), {
-            method: operation === 'update' ? 'PUT' : operation === 'delete' ? 'DELETE' : 'POST',
+            method: operation === 'update' ? 'PUT' : 'POST',
             headers: authority.request.headers, body: stream, duplex: 'half',
         } as RequestInit);
         let reading = false;
@@ -118,13 +109,13 @@ for (const operation of ['create', 'update', 'delete', 'clear'] as const) {
 
 /* A restore replaces the archive after admission; the commit guard must deny with
    the shared 409 contract and leave every domain and audit row untouched. */
-for (const operation of ['create', 'update', 'delete', 'clear'] as const) {
+for (const operation of ['create', 'update'] as const) {
     test(`${operation}: archive replacement after admission denies at commit with 409`, async () => {
         const authority = fixture();
         let controller!: ReadableStreamDefaultController<Uint8Array>;
         const stream = new ReadableStream<Uint8Array>({ start(value) { controller = value; } });
         const request = new Request(url(operation), {
-            method: operation === 'update' ? 'PUT' : operation === 'delete' ? 'DELETE' : 'POST',
+            method: operation === 'update' ? 'PUT' : 'POST',
             headers: authority.request.headers, body: stream, duplex: 'half',
         } as RequestInit);
         let reading = false;

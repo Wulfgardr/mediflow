@@ -1787,17 +1787,18 @@ mod tests {
     }
 
     #[test]
-    fn molar_calcium_ft4_and_ft3_stay_uncoded_until_the_clinical_choice() {
+    fn exams_without_formula_method_or_type_stay_uncoded() {
         let exams = [
-            ("Calcio", "2,3", "mmol/L"),
-            ("Calcio totale", "2,3", "mmol/L"),
-            ("FT4", "15", "pmol/L"),
-            ("FT3", "5", "pmol/L"),
+            ("eGFR", "72", "mL/min/{1.73_m2}"),
+            ("LDH", "210", "U/L"),
+            ("D-dimero", "320", "ng/mL"),
+            ("Troponina", "12", "ng/L"),
         ];
         for (name, value, unit) in exams {
             assert_eq!(catalog(name, unit, value), Value::Null, "{name} {unit}");
         }
-        assert!(!catalog("Calcio ionizzato", "mmol/L", "1,2").is_null());
+        assert_eq!(catalog("Calcio totale", "mmol/L", "2,3")["code"], "2000-8");
+        assert_eq!(catalog("FT4", "pmol/L", "15")["code"], "14920-3");
         let facts: Vec<Value> = exams
             .iter()
             .map(|(name, value, unit)| {
@@ -1814,7 +1815,7 @@ mod tests {
         }));
         assert_eq!(
             result["notes"],
-            json!(["Esami senza codice LOINC: Calcio, Calcio totale, FT4, FT3."])
+            json!(["Esami senza codice LOINC: eGFR, LDH, D-dimero, Troponina."])
         );
     }
 

@@ -16,6 +16,8 @@ test('remote ingress admits closed native and network routes, never the Web surf
         assert.equal(allowsNetworkIngress('GET', route), false, route);
     }
     assert.equal(allowsNetworkIngress('DELETE', '/api/v1/network/node'), false);
+    assert.equal(allowsNetworkIngress('DELETE', '/api/v1/network/ambulatories/amb-1'), false);
+    assert.equal(allowsNetworkIngress('POST', '/api/v1/network/ambulatories/clear'), false);
 });
 
 test('declared network and native routes match their ingress and methods', () => {

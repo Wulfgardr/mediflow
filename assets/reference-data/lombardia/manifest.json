@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "mediflow.lombardia-reference-data.v1",
+  "retrievedAt": "2026-11-25",
+  "tables": [
+    {
+      "file": "nomenclatore-regionale.csv",
+      "rows": 2058,
+      "source": "Regione Lombardia, Nomenclatore tariffario dal 1 ottobre 2025 (Allegato 3 della DGR n. XII/4956 del 08/09/2025, che sostituisce l'Allegato 1 della DGR n. XII/3630 del 16/12/2024)",
+      "sourceUrl": "https://www.regione.lombardia.it/content/dam/rl/canali-tematici-servizi/01-sanita/07-ticket-ed-esenzioni/ticket-esenzioni-prerstazioni-ssr/allegati/Nomenclatore+tariffario+dal+1+ottobre+2025.xlsx",
+      "sourceSha256": "23f58ef3ff730025dc85b17dcbacd2d152527759e6a9390d97200c60f7e88d07",
+      "effectiveFrom": "2025-10-01",
+      "columns": "codice, descrizione, nota (nota nazionale di erogabilità), nota_regionale, branca (prima branca indicata)"
+    },
+    {
+      "file": "esenzioni-prestazioni.csv",
+      "rows": 86,
+      "source": "Allegato 8 al DPCM 12/01/2017, Elenco malattie e condizioni croniche e invalidanti, versione pubblicata da Regione Lombardia aggiornata al 30/10/2026: esenzioni 013 (pagine 22-23) e 023 (pagine 27-28)",
+      "sourceUrl": "https://www.regione.lombardia.it/content/dam/rl/canali-tematici-servizi/01-sanita/07-ticket-ed-esenzioni/ticket-esenzioni-prerstazioni-ssr/allegati/allegato-8-elenco-malattie-condizioni-croniche-ed-invalidanti-30-10-2026.pdf",
+      "sourceSha256": "39c3434e4ed7aa11e15f0bdf673cfd49c678d83b450ccf3c10cbb6048c6065a7",
+      "effectiveFrom": "2026-10-30",
+      "columns": "esenzione, malattia, codice_prestazione, condizione (testo dell'allegato), pagine_allegato_8"
+    }
+  ]
+}
