@@ -306,38 +306,6 @@ final class SettingsAmbulatoriesModel: ObservableObject {
         }
     }
 
-    func delete(_ ambulatory: NetworkAmbulatorySummary) async {
-        await mutate {
-            let connection = try self.connection()
-            let response = try await connection.dataSource.deleteAmbulatory(
-                id: ambulatory.id,
-                expectedVersion: ambulatory.version,
-                credentials: connection.credentials,
-                sessionCookie: connection.sessionCookie
-            )
-            guard response.success else { throw HomeBaseClientError.contract }
-            self.message = "Ambulatorio eliminato."
-        }
-    }
-
-    func clearTestAmbulatory(_ ambulatory: NetworkAmbulatorySummary) async {
-        guard ambulatory.type == "test" else {
-            message = "Puoi svuotare solo un ambulatorio di test."
-            return
-        }
-        await mutate {
-            let connection = try self.connection()
-            let response = try await connection.dataSource.clearAmbulatory(
-                id: ambulatory.id,
-                expectedVersion: ambulatory.version,
-                credentials: connection.credentials,
-                sessionCookie: connection.sessionCookie
-            )
-            guard response.success else { throw HomeBaseClientError.contract }
-            self.message = "Dati di test rimossi dall'ambulatorio."
-        }
-    }
-
     private func connection() throws -> ClinicalWorkspaceConnection {
         guard let connection = connectionProvider() else {
             throw HomeBaseClientError.missingSessionCookie
@@ -447,10 +415,6 @@ struct SettingsWorkspaceView: View {
     @State private var currentPin = ""
     @State private var newPin = ""
     @State private var newPinConfirmation = ""
-    @State private var pendingDeletion: NetworkAmbulatorySummary?
-    @State private var pendingClear: NetworkAmbulatorySummary?
-    @State private var showsDeletionConfirmation = false
-    @State private var showsClearConfirmation = false
     @State private var showsConnectionSetup = false
     @State private var confirmsClearingPairing = false
     @State private var selectedArea: SettingsArea = .connection
@@ -551,22 +515,6 @@ struct SettingsWorkspaceView: View {
                 model: workspaceModel,
                 confirmsClearingPairing: $confirmsClearingPairing
             )
-        }
-        .confirmationDialog("Eliminare questo ambulatorio?", isPresented: $showsDeletionConfirmation, titleVisibility: .visible) {
-            Button("Elimina", role: .destructive) {
-                guard let ambulatory = pendingDeletion else { return }
-                Task { await ambulatoriesModel.delete(ambulatory) }
-            }
-        } message: {
-            Text("L'operazione non può essere annullata.")
-        }
-        .confirmationDialog("Svuotare i dati di test?", isPresented: $showsClearConfirmation, titleVisibility: .visible) {
-            Button("Svuota", role: .destructive) {
-                guard let ambulatory = pendingClear else { return }
-                Task { await ambulatoriesModel.clearTestAmbulatory(ambulatory) }
-            }
-        } message: {
-            Text(pendingClear.map { "I dati di test di \($0.name) verranno rimossi." } ?? "I dati di test verranno rimossi.")
         }
     }
 
@@ -823,16 +771,6 @@ struct SettingsWorkspaceView: View {
                     Button("Rinomina") { ambulatoriesModel.beginRenaming(ambulatory) }
                     if ambulatory.isDefault != true {
                         Button("Rendi predefinito") { Task { await ambulatoriesModel.makeDefault(ambulatory) } }
-                    }
-                    if ambulatory.type == "test" {
-                        Button("Svuota", role: .destructive) {
-                            pendingClear = ambulatory
-                            showsClearConfirmation = true
-                        }
-                    }
-                    Button("Elimina", role: .destructive) {
-                        pendingDeletion = ambulatory
-                        showsDeletionConfirmation = true
                     }
                 }
                 .buttonStyle(.borderless)

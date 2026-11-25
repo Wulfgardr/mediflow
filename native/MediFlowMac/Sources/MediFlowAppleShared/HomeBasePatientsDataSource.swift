@@ -63,16 +63,6 @@ public protocol HomeBasePatientsDataSource: Sendable {
         credentials: HomeBasePairedCredentials, sessionCookie: String
     ) async throws -> HomeBaseAmbulatoryMutationResponse
 
-    func deleteAmbulatory(
-        id: String, expectedVersion: Int,
-        credentials: HomeBasePairedCredentials, sessionCookie: String
-    ) async throws -> HomeBaseAmbulatoryMutationResponse
-
-    func clearAmbulatory(
-        id: String, expectedVersion: Int,
-        credentials: HomeBasePairedCredentials, sessionCookie: String
-    ) async throws -> HomeBaseAmbulatoryMutationResponse
-
     func searchDrugs(
         query: String, limit: Int,
         credentials: HomeBasePairedCredentials, sessionCookie: String, ambulatoryId: String?
