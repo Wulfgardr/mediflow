@@ -733,6 +733,8 @@ export interface DossierCandidateInput {
     documentDate: string | null;
     /** Codici del catalogo esenzioni locale (ADR 0127): solo questi diventano candidati. */
     exemptionCodes: ReadonlySet<string>;
+    /** Classe dichiarata dalla provenienza: sostituisce quella dedotta dal nome e dalla testata. */
+    classification?: DocumentDecisionClassification;
 }
 
 /**
@@ -743,7 +745,7 @@ export interface DossierCandidateInput {
  */
 export function extractDossierCandidates(input: DossierCandidateInput): { facts: DossierFact[]; classification: DocumentDecisionClassification } {
     const facts: DossierFact[] = [];
-    const routed = routeDocumentClass({ fileName: input.fileName, textSample: input.text.slice(0, 2000) });
+    const routed = input.classification ? { classification: input.classification } : routeDocumentClass({ fileName: input.fileName, textSample: input.text.slice(0, 2000) });
     const date = input.documentDate ?? '';
     for (const unit of input.units) {
         const text = unitText(input.text, unit);

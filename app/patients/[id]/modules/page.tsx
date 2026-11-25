@@ -42,6 +42,7 @@ import { PatientSmartImportFabricPreviewCard } from '@/components/patient-smart-
 import ProstheticPrescriptionManager from '@/components/prosthetic-prescription-manager';
 import ServicePrescriptionManager from '@/components/service-prescription-manager';
 import SissWorkspace from '@/components/siss-workspace';
+import FseFolderHandoff from '@/components/fse-folder-handoff';
 import sissStyles from '@/components/siss-workspace.module.css';
 import TherapyManager from '@/components/therapy-manager';
 import TreatmentReasoningPanel from '@/components/treatment-reasoning-panel';
@@ -889,6 +890,7 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
                         summary="Apertura assistita dei portali regionali e diario dei passaggi."
                         surfaceClassName={`${workspaceStyles.clinicalSection} ${sissStyles.section}`}
                     >
+                        <FseFolderHandoff patientId={id} patientTaxCode={patient.taxCode} />
                         {/* SISS presentation reuses the existing export/share gates. */}
                         <SissWorkspace
                             patientId={id}
