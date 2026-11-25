@@ -126,6 +126,14 @@ async function coveredControls(page: Page): Promise<string[]> {
       }
       return false;
     };
+    const scrolledUnder = (element: Element, hit: Element) => {
+      let sticky: Element | null = hit;
+      while (sticky && getComputedStyle(sticky).position !== 'sticky') sticky = sticky.parentElement;
+      if (!sticky) return false;
+      let scroller = sticky.parentElement;
+      while (scroller && getComputedStyle(scroller).overflowY === 'visible') scroller = scroller.parentElement;
+      return !!scroller && scroller.contains(element) && !sticky.contains(element);
+    };
     return controls.flatMap((element) => {
       if (!element.checkVisibility({ opacityProperty: true, visibilityProperty: true })) return [];
       const box = element.getClientRects()[0] ?? element.getBoundingClientRect();
@@ -136,6 +144,7 @@ async function coveredControls(page: Page): Promise<string[]> {
         .flatMap(([x, y]) => {
           const hit = document.elementFromPoint(x, y);
           if (hit && (element.contains(hit) || (element as HTMLInputElement).labels?.[0]?.contains(hit))) return [];
+          if (hit && scrolledUnder(element, hit)) return [];
           const by = hit ? `${hit.tagName.toLowerCase()}.${String(hit.className).split(' ')[0]}` : 'nulla';
           return [`«${label}» coperto da ${by} a ${Math.round(x)},${Math.round(y)}`];
         })
