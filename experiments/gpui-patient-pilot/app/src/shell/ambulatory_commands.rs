@@ -3,11 +3,14 @@ use mediflow_runtime_client::{
     AmbulatoryCommandAuthority, AmbulatoryCommandContext, AmbulatoryCommandIntent,
     AmbulatoryCommandMarker, AmbulatoryCommandOperation, AmbulatoryCommandOutcome,
     AmbulatoryCommandPreview, AmbulatoryCommandRead, AmbulatoryCommandRecoveryStore,
-    AmbulatoryCommandRetirement, HostAmbulatoryCommand,
+    AmbulatoryCommandRetirement, AmbulatoryCommandTerminal, HostAmbulatoryCommand,
 };
-use std::sync::{
-    Arc, OnceLock,
-    atomic::{AtomicBool, Ordering},
+use std::{
+    sync::{
+        Arc, OnceLock,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 fn copy(section: &str, key: &str) -> &'static str {
@@ -86,8 +89,19 @@ pub(super) struct Commands {
     loading: Option<Arc<()>>,
     loaded: bool,
     error: Option<RuntimeError>,
+    #[cfg(all(test, target_os = "macos"))]
+    clock_override_ms: Option<Arc<std::sync::atomic::AtomicU64>>,
 }
 impl Commands {
+    fn now_ms(&self) -> u64 {
+        #[cfg(all(test, target_os = "macos"))]
+        if let Some(clock) = &self.clock_override_ms {
+            return clock.load(Ordering::Acquire);
+        }
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_or(0, |duration| duration.as_millis() as u64)
+    }
     pub(super) fn is_saving(&self) -> bool {
         self.dialog.as_ref().is_some_and(|dialog| dialog.busy)
     }
@@ -132,9 +146,71 @@ impl Commands {
             && self.store.is_some()
     }
 }
+enum AuthorizeResult {
+    Preview(Box<AmbulatoryCommandPreview>),
+    Recovery(AmbulatoryCommandRead),
+}
 enum SendResult {
+    Expired,
     AdmissionFailed(RuntimeError),
     Executed(Result<AmbulatoryCommandRead, RuntimeError>),
+}
+fn dialog_authorized(dialog: &Dialog) -> bool {
+    dialog
+        .flow
+        .as_ref()
+        .is_some_and(|flow| flow.authority() == AmbulatoryCommandAuthority::Authorized)
+}
+fn dialog_state_message(dialog: &Dialog) -> Option<&'static str> {
+    match dialog.phase {
+        Phase::Preparing => Some(copy("stati", "preparazione")),
+        Phase::Authorizing => Some(copy("stati", "autorizzazione")),
+        Phase::Sending => Some(copy("stati", "invio")),
+        Phase::Unknown if dialog.mode.recovery() && dialog_authorized(dialog) => {
+            Some(copy("stati", "non_registrato"))
+        }
+        Phase::Unknown => Some(copy("stati", "ignoto")),
+        Phase::AdmissionFailed => Some(copy("errori", "storage")),
+        Phase::Cancelled => Some(copy(
+            "stati",
+            if dialog.mode.recovery() {
+                "ignoto"
+            } else {
+                "rejected"
+            },
+        )),
+        _ => None,
+    }
+}
+fn dialog_error_context(dialog: &Dialog, error: RuntimeError) -> &'static str {
+    if dialog.ack_error {
+        copy("errori", "ack_locale")
+    } else if error == RuntimeError::Conflict {
+        copy("errori", "piano_cambiato")
+    } else if matches!(
+        error,
+        RuntimeError::Rejected(401) | RuntimeError::Forbidden | RuntimeError::Authentication
+    ) {
+        if dialog.phase == Phase::Failed && dialog.attempted && !dialog.mode.recovery() {
+            copy("errori", "accesso_scaduto_prima_invio")
+        } else {
+            copy("errori", "accesso_scaduto")
+        }
+    } else if dialog.phase == Phase::Unknown {
+        copy("errori", "risposta_persa")
+    } else {
+        copy("errori", "autorizzazione")
+    }
+}
+fn terminal_detail_message(terminal: &AmbulatoryCommandTerminal) -> Option<&'static str> {
+    if terminal.receipt().outcome != AmbulatoryCommandOutcome::Rejected {
+        return None;
+    }
+    match terminal.receipt().reason.as_deref() {
+        Some("plan_changed") => Some(copy("stati", "rejected_piano_cambiato")),
+        Some("not_admissible") => Some(copy("stati", "rejected_non_ammesso")),
+        _ => None,
+    }
 }
 
 impl ClinicalApp {
@@ -433,6 +509,7 @@ impl ClinicalApp {
         if self.withdraw_cancelled_ambulatory_command(cx) {
             return;
         }
+        let now_ms = self.ambulatory_management.destructive.now_ms();
         let Some(dialog) = &mut self.ambulatory_management.destructive.dialog else {
             return;
         };
@@ -459,13 +536,19 @@ impl ClinicalApp {
         let current = flow.clone();
         let cleanup_started = dialog.cleanup_started.clone();
         let task = cx.background_executor().spawn(async move {
+            if current.expired_at(now_ms) {
+                drop(passphrase);
+                return Err(RuntimeError::Rejected(401));
+            }
             let authorization = current.authenticate(&passphrase);
             drop(passphrase);
             authorization?;
             if recovery {
-                Ok(None)
+                current.read_receipt().map(AuthorizeResult::Recovery)
             } else {
-                current.preview().map(Some)
+                current
+                    .preview()
+                    .map(|preview| AuthorizeResult::Preview(Box::new(preview)))
             }
         });
         cx.spawn(async move |this, cx| {
@@ -491,25 +574,34 @@ impl ClinicalApp {
                     .unwrap();
                 dialog.busy = false;
                 match pending.take().unwrap() {
-                    Ok(preview) => {
-                        dialog.preview = preview;
+                    Ok(AuthorizeResult::Preview(preview)) => {
+                        dialog.preview = Some(*preview);
                         dialog.phase = Phase::Confirm;
-                        if !recovery {
-                            dialog.focus_field = Some(1);
-                        }
+                        dialog.focus_field = Some(1);
+                    }
+                    Ok(AuthorizeResult::Recovery(AmbulatoryCommandRead::Unknown)) => {
+                        dialog.phase = Phase::Unknown;
+                        dialog.result = Some(AmbulatoryCommandRead::Unknown);
+                    }
+                    Ok(AuthorizeResult::Recovery(result)) => {
+                        dialog.phase = Phase::Terminal;
+                        dialog.result = Some(result);
                     }
                     Err(error) => {
                         dialog.phase = Phase::Failed;
                         dialog.error = Some(error);
                     }
                 }
-                if this
+                let should_retire = this
                     .ambulatory_management
                     .destructive
                     .dialog
                     .as_ref()
-                    .is_some_and(|dialog| dialog.phase == Phase::Failed)
-                {
+                    .is_some_and(|dialog| {
+                        matches!(dialog.phase, Phase::Failed | Phase::Terminal)
+                            || !dialog_authorized(dialog)
+                    });
+                if should_retire {
                     this.retire_ambulatory_command_access(cx);
                 }
                 cx.notify();
@@ -532,6 +624,7 @@ impl ClinicalApp {
         if self.withdraw_cancelled_ambulatory_command(cx) {
             return;
         }
+        let now_ms = self.ambulatory_management.destructive.now_ms();
         let Some(store) = self.ambulatory_management.destructive.store.clone() else {
             return;
         };
@@ -565,15 +658,20 @@ impl ClinicalApp {
         let current = flow.clone();
         let cleanup_started = dialog.cleanup_started.clone();
         let task = cx.background_executor().spawn(async move {
-            match current.persist_preview(&store) {
-                Err(error) => SendResult::AdmissionFailed(error),
-                Ok(proof) => SendResult::Executed(current.execute(&proof, &word)),
+            if current.expired_at(now_ms) {
+                SendResult::Expired
+            } else {
+                match current.persist_preview(&store) {
+                    Err(error) => SendResult::AdmissionFailed(error),
+                    Ok(proof) => SendResult::Executed(current.execute(&proof, &word)),
+                }
             }
         });
         cx.spawn(async move |this, cx| {
             let mut pending = Some(task.await);
             let _ = this.update(cx, |this, cx| {
                 let error = match pending.as_ref().unwrap() {
+                    SendResult::Expired => Some(RuntimeError::Rejected(401)),
                     SendResult::AdmissionFailed(error) => Some(*error),
                     SendResult::Executed(result) => result.as_ref().err().copied(),
                 };
@@ -584,6 +682,10 @@ impl ClinicalApp {
                 let dialog = state.dialog.as_mut().unwrap();
                 dialog.busy = false;
                 match pending.take().unwrap() {
+                    SendResult::Expired => {
+                        dialog.phase = Phase::Failed;
+                        dialog.error = Some(RuntimeError::Rejected(401));
+                    }
                     SendResult::AdmissionFailed(error) => {
                         dialog.phase = Phase::AdmissionFailed;
                         dialog.error = Some(error);
@@ -694,13 +796,15 @@ impl ClinicalApp {
                         dialog.error = Some(error);
                     }
                 }
-                if this
+                let should_retire = this
                     .ambulatory_management
                     .destructive
                     .dialog
                     .as_ref()
-                    .is_some_and(|dialog| dialog.phase == Phase::Terminal)
-                {
+                    .is_some_and(|dialog| {
+                        dialog.phase == Phase::Terminal || !dialog_authorized(dialog)
+                    });
+                if should_retire {
                     this.retire_ambulatory_command_access(cx);
                 }
                 cx.notify();
@@ -1037,22 +1141,7 @@ impl ClinicalApp {
                 false,
             ));
         }
-        let progress = match dialog.phase {
-            Phase::Preparing => Some(copy("stati", "preparazione")),
-            Phase::Authorizing => Some(copy("stati", "autorizzazione")),
-            Phase::Sending => Some(copy("stati", "invio")),
-            Phase::Unknown => Some(copy("stati", "ignoto")),
-            Phase::AdmissionFailed => Some(copy("errori", "storage")),
-            Phase::Cancelled => Some(copy(
-                "stati",
-                if dialog.mode.recovery() {
-                    "ignoto"
-                } else {
-                    "rejected"
-                },
-            )),
-            _ => None,
-        };
+        let progress = dialog_state_message(dialog);
         if let Some(progress) = progress {
             view = view.child(notice(
                 "ambulatory-command-state",
@@ -1065,22 +1154,7 @@ impl ClinicalApp {
             .error
             .filter(|_| dialog.phase != Phase::AdmissionFailed)
         {
-            let context = if dialog.ack_error {
-                copy("errori", "ack_locale")
-            } else if dialog.phase == Phase::Unknown {
-                copy("errori", "risposta_persa")
-            } else if error == RuntimeError::Conflict {
-                copy("errori", "piano_cambiato")
-            } else if matches!(
-                error,
-                RuntimeError::Rejected(401)
-                    | RuntimeError::Forbidden
-                    | RuntimeError::Authentication
-            ) {
-                copy("errori", "accesso_scaduto")
-            } else {
-                copy("errori", "autorizzazione")
-            };
+            let context = dialog_error_context(dialog, error);
             view = view.child(notice(
                 "ambulatory-command-error",
                 format!("{context} {}", ui_error(error)),
@@ -1169,6 +1243,14 @@ impl ClinicalApp {
                 );
         }
         if let Some(terminal) = terminal {
+            if let Some(detail) = terminal_detail_message(terminal) {
+                view = view.child(notice(
+                    "ambulatory-command-terminal-detail",
+                    detail,
+                    theme,
+                    false,
+                ));
+            }
             if terminal.historical() {
                 view = view.child(notice(
                     "ambulatory-command-historical",
@@ -1191,15 +1273,16 @@ impl ClinicalApp {
                 })),
             );
         }
-        if dialog.phase == Phase::Unknown || dialog.phase == Phase::Failed && dialog.mode.recovery()
-        {
-            if dialog.mode.recovery()
-                && dialog
-                    .flow
-                    .as_ref()
-                    .is_some_and(|flow| flow.authority() == AmbulatoryCommandAuthority::Authorized)
-            {
-                view = view.child(
+        let authorized = dialog_authorized(dialog);
+        let recovery_ready = dialog.mode.recovery()
+            && matches!(dialog.phase, Phase::Confirm | Phase::Unknown)
+            && authorized;
+        let needs_reauthorization = (dialog.phase == Phase::Unknown
+            || dialog.phase == Phase::Failed && dialog.mode.recovery())
+            && !recovery_ready;
+        if recovery_ready {
+            view = view
+                .child(
                     self.ambulatory_button(
                         "ambulatory-command-verify",
                         copy("azioni", "verifica"),
@@ -1210,22 +1293,7 @@ impl ClinicalApp {
                     .on_click(cx.listener(|this, _, _, cx| {
                         this.read_or_close_ambulatory_command(false, cx)
                     })),
-                );
-            } else if state.marker.is_some() || dialog.preview.is_some() {
-                view = view.child(
-                    self.ambulatory_button(
-                        "ambulatory-command-verify",
-                        copy("azioni", "verifica"),
-                        theme,
-                        true,
-                        !dialog.busy,
-                    )
-                    .on_click(cx.listener(|this, _, _, cx| this.recover_ambulatory_command(cx))),
-                );
-            }
-        }
-        if dialog.phase == Phase::Unknown && !dialog.mode.recovery() {
-            view = view
+                )
                 .child(
                     text!(copy("azioni", "chiusura_spiegazione"))
                         .with_id("ambulatory-command-stop-explanation"),
@@ -1236,42 +1304,7 @@ impl ClinicalApp {
                         copy("azioni", "chiusura_operazione"),
                         theme,
                         false,
-                        !dialog.busy,
-                    )
-                    .on_click(cx.listener(|this, _, _, cx| this.recover_ambulatory_command(cx))),
-                );
-        }
-        if dialog.mode.recovery() && matches!(dialog.phase, Phase::Confirm | Phase::Unknown) {
-            if dialog.phase == Phase::Confirm {
-                view = view.child(
-                    self.ambulatory_button(
-                        "ambulatory-command-verify",
-                        copy("azioni", "verifica"),
-                        theme,
-                        true,
-                        !dialog.busy,
-                    )
-                    .on_click(cx.listener(|this, _, _, cx| {
-                        this.read_or_close_ambulatory_command(false, cx)
-                    })),
-                );
-            }
-            let authorized = dialog
-                .flow
-                .as_ref()
-                .is_some_and(|flow| flow.authority() == AmbulatoryCommandAuthority::Authorized);
-            view = view
-                .child(
-                    text!(copy("azioni", "chiusura_spiegazione"))
-                        .with_id("ambulatory-command-stop-explanation"),
-                )
-                .child(
-                    self.ambulatory_button(
-                        "ambulatory-command-stop",
-                        copy("azioni", "chiusura_operazione"),
-                        theme,
-                        false,
-                        !dialog.busy && !dialog.attempted && authorized,
+                        !dialog.busy && !dialog.attempted,
                     )
                     .on_click(
                         cx.listener(|this, _, _, cx| {
@@ -1279,6 +1312,17 @@ impl ClinicalApp {
                         }),
                     ),
                 );
+        } else if needs_reauthorization && (state.marker.is_some() || dialog.preview.is_some()) {
+            view = view.child(
+                self.ambulatory_button(
+                    "ambulatory-command-verify",
+                    copy("azioni", "autorizza_di_nuovo"),
+                    theme,
+                    true,
+                    !dialog.busy,
+                )
+                .on_click(cx.listener(|this, _, _, cx| this.recover_ambulatory_command(cx))),
+            );
         }
         match dialog.cleanup {
             Cleanup::Confirmed(_) => {
@@ -1353,5 +1397,1140 @@ impl ClinicalApp {
                     },
                 ),
         )
+    }
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod tests {
+    use super::*;
+    use serde_json::{Value, json};
+    use std::{
+        collections::HashMap,
+        io::{Read, Write},
+        net::{TcpListener, TcpStream},
+        os::unix::fs::DirBuilderExt,
+        path::PathBuf,
+        sync::{
+            Mutex,
+            atomic::{AtomicU64, Ordering},
+        },
+        thread,
+        time::{Duration, SystemTime, UNIX_EPOCH},
+    };
+
+    const GENERATION: &str = "22222222-2222-4222-8222-222222222222";
+    const PASSPHRASE: &str = "Synthetic scales fixture passphrase";
+    const SALT: &str = "AwMDAwMDAwMDAwMDAwMDAw==";
+    const WRAPPED_KEY: &str =
+        "v3:BQUFBQUFBQUFBQUFAm40aZvQGpityOwyLKhsE40tJdbsjtrugIXzoJ/lk9gjlh5j7pIPeh7DLQ7ikGhA";
+    const PREPARATION_MS: u64 = 300_000;
+    const CHALLENGE_MS: u64 = 30_000;
+
+    #[derive(Clone)]
+    struct FlowState {
+        command_id: String,
+        ambulatory_id: String,
+        original_scope_id: String,
+        expected_version: u64,
+        operation: String,
+        plan_digest: Option<String>,
+        control_id: String,
+        session_id: Option<String>,
+        created_at: u64,
+        expires_at: u64,
+        session_created_at: Option<u64>,
+        expired: bool,
+        retired: bool,
+    }
+
+    #[derive(Clone)]
+    struct LedgerRow {
+        marker: Value,
+        outcome: String,
+        reason: Option<String>,
+        committed_at: u64,
+        result: Value,
+    }
+
+    struct HostState {
+        clock_ms: u64,
+        next_flow: u64,
+        target_version: u64,
+        flows: HashMap<String, FlowState>,
+        controls: HashMap<String, String>,
+        ledger: HashMap<String, LedgerRow>,
+        write_audits: Vec<(String, String, u64)>,
+        retire_calls: usize,
+        execute_calls: usize,
+        receipt_calls: usize,
+        close_calls: usize,
+    }
+
+    struct ControlledHost {
+        session: RuntimeSession,
+        state: Arc<Mutex<HostState>>,
+        socket: std::net::SocketAddr,
+        stop: Arc<AtomicBool>,
+        worker: Option<thread::JoinHandle<()>>,
+        state_dir: PathBuf,
+    }
+
+    impl Drop for ControlledHost {
+        fn drop(&mut self) {
+            self.stop.store(true, Ordering::Release);
+            let _ = TcpStream::connect(self.socket);
+            if let Some(worker) = self.worker.take() {
+                let _ = worker.join();
+            }
+            let _ = std::fs::remove_dir_all(&self.state_dir);
+        }
+    }
+
+    impl ControlledHost {
+        fn new(initial_clock_ms: u64) -> Self {
+            let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+            let socket = listener.local_addr().unwrap();
+            let state = Arc::new(Mutex::new(HostState {
+                clock_ms: initial_clock_ms,
+                next_flow: 0,
+                target_version: 2,
+                flows: HashMap::new(),
+                controls: HashMap::new(),
+                ledger: HashMap::new(),
+                write_audits: Vec::new(),
+                retire_calls: 0,
+                execute_calls: 0,
+                receipt_calls: 0,
+                close_calls: 0,
+            }));
+            let shared = state.clone();
+            let stop = Arc::new(AtomicBool::new(false));
+            let stopping = stop.clone();
+            let worker = thread::spawn(move || {
+                loop {
+                    let Ok((mut stream, _)) = listener.accept() else {
+                        break;
+                    };
+                    if stopping.load(Ordering::Acquire) {
+                        break;
+                    }
+                    stream
+                        .set_read_timeout(Some(Duration::from_secs(10)))
+                        .unwrap();
+                    let Some((route, headers, body)) = read_http(&mut stream) else {
+                        continue;
+                    };
+                    let (status, extra_headers, payload) =
+                        handle_request(&shared, &route, &headers, &body);
+                    let body_text = if status == 204 {
+                        String::new()
+                    } else {
+                        payload.to_string()
+                    };
+                    let _ = write!(
+                        stream,
+                        "HTTP/1.1 {status} Synthetic\r\n{extra_headers}Content-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body_text}",
+                        body_text.len()
+                    );
+                    let _ = stream.flush();
+                }
+            });
+            let client = RuntimeClient::new(RuntimeConfig {
+                base_url: format!("http://{socket}"),
+                tls_pin_sha256: None,
+            })
+            .unwrap();
+            let session = client
+                .login(
+                    PairingCredentials::new("synthetic-device", "x".repeat(64)).unwrap(),
+                    "synthetic",
+                    PASSPHRASE,
+                )
+                .unwrap();
+            session.list_ambulatories().unwrap();
+            static COUNTER: AtomicU64 = AtomicU64::new(0);
+            let dir = std::env::temp_dir().canonicalize().unwrap().join(format!(
+                "mediflow-wul854-{}-{}",
+                std::process::id(),
+                COUNTER.fetch_add(1, Ordering::Relaxed)
+            ));
+            let mut builder = std::fs::DirBuilder::new();
+            builder.recursive(true).mode(0o700);
+            builder.create(&dir).unwrap();
+            Self {
+                session,
+                state,
+                socket,
+                stop,
+                worker: Some(worker),
+                state_dir: dir,
+            }
+        }
+
+        fn advance_ms(&self, delta_ms: u64) {
+            self.state.lock().unwrap().clock_ms += delta_ms;
+        }
+
+        fn web_clear_target(&self) {
+            let mut state = self.state.lock().unwrap();
+            state.target_version += 1;
+            let version = state.target_version;
+            state
+                .write_audits
+                .push(("web".into(), "ambulatory.cleared".into(), version));
+        }
+
+        fn preferences(&self) -> LocalPreferencesStore {
+            LocalPreferencesStore::from_directory(&self.state_dir).unwrap()
+        }
+
+        fn journal_json_count(&self) -> usize {
+            let recovery = self.state_dir.join("ambulatory-command-recovery");
+            let Ok(entries) = std::fs::read_dir(recovery) else {
+                return 0;
+            };
+            entries
+                .filter_map(|entry| entry.ok())
+                .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "json"))
+                .count()
+        }
+    }
+
+    fn read_http(stream: &mut TcpStream) -> Option<(String, HashMap<String, String>, Value)> {
+        let mut bytes = Vec::new();
+        let mut buf = [0u8; 4096];
+        let header_end = loop {
+            let read = stream.read(&mut buf).ok()?;
+            if read == 0 {
+                return None;
+            }
+            bytes.extend_from_slice(&buf[..read]);
+            if let Some(pos) = bytes.windows(4).position(|window| window == b"\r\n\r\n") {
+                break pos;
+            }
+        };
+        let head = String::from_utf8(bytes[..header_end].to_vec()).ok()?;
+        let mut lines = head.lines();
+        let first = lines.next()?;
+        let mut parts = first.split_whitespace();
+        let route = format!("{} {}", parts.next()?, parts.next()?);
+        let mut headers = HashMap::new();
+        for line in lines {
+            if let Some((name, value)) = line.split_once(':') {
+                headers.insert(name.trim().to_ascii_lowercase(), value.trim().to_owned());
+            }
+        }
+        let len = headers
+            .get("content-length")
+            .and_then(|value| value.parse::<usize>().ok())
+            .unwrap_or(0);
+        while bytes.len() < header_end + 4 + len {
+            let read = stream.read(&mut buf).ok()?;
+            if read == 0 {
+                break;
+            }
+            bytes.extend_from_slice(&buf[..read]);
+        }
+        let body = if len == 0 {
+            Value::Null
+        } else {
+            serde_json::from_slice(&bytes[header_end + 4..header_end + 4 + len])
+                .unwrap_or(Value::Null)
+        };
+        Some((route, headers, body))
+    }
+
+    fn cookie_part(headers: &HashMap<String, String>, name: &str) -> Option<String> {
+        headers.get("cookie")?.split(';').find_map(|segment| {
+            let (k, v) = segment.trim().split_once('=')?;
+            (k == name).then(|| v.to_owned())
+        })
+    }
+
+    fn authorize_flow(
+        state: &mut HostState,
+        headers: &HashMap<String, String>,
+    ) -> Result<String, (u16, Value)> {
+        let Some(reference) = headers
+            .get("x-mediflow-ambulatory-command-reference")
+            .cloned()
+        else {
+            return Err((401, json!({"code":"AMBULATORY_COMMAND_DENIED"})));
+        };
+        let now = state.clock_ms;
+        let Some(flow) = state.flows.get_mut(&reference) else {
+            return Err((401, json!({"code":"AMBULATORY_COMMAND_DENIED"})));
+        };
+        if flow.expired {
+            return Err((401, json!({"code":"AMBULATORY_AUTHORIZATION_EXPIRED"})));
+        }
+        if now < flow.created_at || now >= flow.expires_at {
+            flow.expired = true;
+            return Err((401, json!({"code":"AMBULATORY_PREPARATION_EXPIRED"})));
+        }
+        let session_id = cookie_part(headers, "mediflow_session");
+        let control_id = cookie_part(headers, "mediflow_auth_control");
+        if session_id.is_none()
+            || session_id != flow.session_id
+            || control_id.as_deref() != Some(flow.control_id.as_str())
+        {
+            return Err((401, json!({"code":"AMBULATORY_COMMAND_DENIED"})));
+        }
+        let Some(session_created_at) = flow.session_created_at else {
+            return Err((401, json!({"code":"AMBULATORY_COMMAND_DENIED"})));
+        };
+        if now >= session_created_at + CHALLENGE_MS {
+            flow.expired = true;
+            return Err((401, json!({"code":"AMBULATORY_CHALLENGE_EXPIRED"})));
+        }
+        Ok(reference)
+    }
+
+    fn terminal_reply(row: &LedgerRow) -> Value {
+        let mut receipt = row.marker.clone();
+        receipt.as_object_mut().unwrap().extend(
+            json!({
+                "outcome": row.outcome,
+                "reason": row.reason,
+                "committedAt": row.committed_at,
+                "result": row.result
+            })
+            .as_object()
+            .unwrap()
+            .clone(),
+        );
+        json!({"outcome":"terminal","historical":false,"receipt":receipt})
+    }
+
+    fn handle_request(
+        shared: &Arc<Mutex<HostState>>,
+        route: &str,
+        headers: &HashMap<String, String>,
+        body: &Value,
+    ) -> (u16, String, Value) {
+        let mut state = shared.lock().unwrap();
+        match route {
+            "GET /api/auth/check" => {
+                let extra = if cookie_part(headers, "mediflow_auth_control").is_some() {
+                    format!("ETag: \"{}\"\r\n", "e".repeat(64))
+                } else {
+                    String::new()
+                };
+                (
+                    200,
+                    extra,
+                    json!({"status":"ok","isSetup":true,"archiveGeneration":GENERATION,
+                        "unlock":{"credential":"passphrase","kdfVersion":3,"salt":SALT}}),
+                )
+            }
+            "POST /api/auth/native/login" => (
+                200,
+                format!(
+                    "Set-Cookie: mediflow_session={}; Path=/; HttpOnly\r\n",
+                    "a".repeat(64)
+                ),
+                json!({"success":true,"id":"synthetic-admin","username":"synthetic","role":"admin",
+                    "archiveGeneration":GENERATION,"salt":SALT,"encryptedMasterKey":WRAPPED_KEY}),
+            ),
+            "GET /api/v1/network/capabilities" => (
+                200,
+                String::new(),
+                json!({"protocolVersion":"1.14.0",
+                    "hostPorts": serde_json::from_str::<Value>(include_str!("../../../transport/tests/fixtures/host-ports.json")).unwrap(),
+                    "operatingMode":"network-home-base",
+                    "capabilities":[{"key":"network.ambulatories.write","requiresPairing":true,"status":"available"}]}),
+            ),
+            "GET /api/v1/network/ambulatories" => (
+                200,
+                String::new(),
+                json!([
+                    {"id":"scope","name":"Sede principale","type":"live","isDefault":true,"version":1},
+                    {"id":"target","name":"Sede prova","type":"test","isDefault":false,"version":state.target_version}
+                ]),
+            ),
+            "POST /api/auth/ambulatory-commands/begin" => {
+                state.next_flow += 1;
+                let n = state.next_flow;
+                let purpose = body["purpose"].as_str().unwrap().to_owned();
+                let reference = format!("{n:064x}");
+                let control_id = format!("ctrl_{n:040x}");
+                let (
+                    command_id,
+                    ambulatory_id,
+                    original_scope_id,
+                    expected_version,
+                    operation,
+                    plan_digest,
+                ) = if purpose == "execute" {
+                    (
+                        format!("11111111-1111-4111-8111-{n:012x}"),
+                        body["command"]["ambulatoryId"].as_str().unwrap().to_owned(),
+                        body["command"]["originalScopeId"]
+                            .as_str()
+                            .unwrap()
+                            .to_owned(),
+                        body["command"]["expectedVersion"].as_u64().unwrap(),
+                        body["command"]["operation"].as_str().unwrap().to_owned(),
+                        None,
+                    )
+                } else {
+                    (
+                        body["command"]["commandId"].as_str().unwrap().to_owned(),
+                        body["command"]["ambulatoryId"].as_str().unwrap().to_owned(),
+                        body["command"]["originalScopeId"]
+                            .as_str()
+                            .unwrap()
+                            .to_owned(),
+                        body["command"]["expectedVersion"].as_u64().unwrap(),
+                        body["command"]["operation"].as_str().unwrap().to_owned(),
+                        Some(body["command"]["planDigest"].as_str().unwrap().to_owned()),
+                    )
+                };
+                let created_at = state.clock_ms;
+                let expires_at = created_at + PREPARATION_MS;
+                let flow = FlowState {
+                    command_id: command_id.clone(),
+                    ambulatory_id: ambulatory_id.clone(),
+                    original_scope_id: original_scope_id.clone(),
+                    expected_version,
+                    operation: operation.clone(),
+                    plan_digest,
+                    control_id: control_id.clone(),
+                    session_id: None,
+                    created_at,
+                    expires_at,
+                    session_created_at: None,
+                    expired: false,
+                    retired: false,
+                };
+                state.controls.insert(control_id.clone(), reference.clone());
+                state.flows.insert(reference.clone(), flow);
+                (
+                    200,
+                    format!("Set-Cookie: mediflow_auth_control={control_id}; Path=/; HttpOnly\r\n"),
+                    json!({
+                        "protocol": "ambulatory.destructive.v1",
+                        "contractVersion": 1,
+                        "purpose": purpose,
+                        "command": {
+                            "protocol": "ambulatory.destructive.v1",
+                            "commandId": command_id,
+                            "originalArchiveGeneration": GENERATION,
+                            "originalScopeId": original_scope_id,
+                            "ambulatoryId": ambulatory_id,
+                            "expectedVersion": expected_version,
+                            "operation": operation
+                        },
+                        "reference": reference,
+                        "currentArchiveGeneration": GENERATION,
+                        "expiresAt": expires_at
+                    }),
+                )
+            }
+            "POST /api/auth/login" => {
+                let control_id = cookie_part(headers, "mediflow_auth_control").unwrap();
+                let reference = state.controls.get(&control_id).unwrap().clone();
+                let session_id = format!("{:064x}", state.next_flow + 1000);
+                let now = state.clock_ms;
+                let flow = state.flows.get_mut(&reference).unwrap();
+                flow.session_id = Some(session_id.clone());
+                flow.session_created_at = Some(now);
+                (
+                    200,
+                    format!("Set-Cookie: mediflow_session={session_id}; Path=/; HttpOnly\r\n"),
+                    json!({"success":true,"id":"synthetic-admin","username":"synthetic","role":"admin","archiveGeneration":GENERATION}),
+                )
+            }
+            "POST /api/auth/ambulatory-commands/preview" => {
+                let reference = match authorize_flow(&mut state, headers) {
+                    Ok(reference) => reference,
+                    Err((status, value)) => return (status, String::new(), value),
+                };
+                let target_version = state.target_version;
+                let flow = state.flows.get_mut(&reference).unwrap();
+                if flow.expected_version != target_version {
+                    return (
+                        409,
+                        String::new(),
+                        json!({"code":"AMBULATORY_PLAN_NOT_ADMISSIBLE"}),
+                    );
+                }
+                let digest = "b".repeat(64);
+                flow.plan_digest = Some(digest.clone());
+                let challenge_expires_at = flow.session_created_at.unwrap() + CHALLENGE_MS;
+                (
+                    200,
+                    String::new(),
+                    json!({
+                        "marker": {
+                            "protocol": "ambulatory.destructive.v1",
+                            "commandId": flow.command_id,
+                            "originalArchiveGeneration": GENERATION,
+                            "originalScopeId": flow.original_scope_id,
+                            "ambulatoryId": flow.ambulatory_id,
+                            "expectedVersion": flow.expected_version,
+                            "operation": flow.operation,
+                            "planDigest": digest
+                        },
+                        "target": {
+                            "id": flow.ambulatory_id,
+                            "version": target_version,
+                            "name": "Sede prova",
+                            "type": "test",
+                            "isDefault": false,
+                            "parentId": null,
+                            "createdAt": 2000
+                        },
+                        "fallback": null,
+                        "counts": {
+                            "tombstonedPatients": 0,
+                            "unlinkedPatients": 0,
+                            "preservedLivePatients": 0,
+                            "removedMembershipRows": 0
+                        },
+                        "challengeExpiresAt": challenge_expires_at
+                    }),
+                )
+            }
+            "POST /api/auth/ambulatory-commands/execute" => {
+                state.execute_calls += 1;
+                let reference = match authorize_flow(&mut state, headers) {
+                    Ok(reference) => reference,
+                    Err((status, value)) => return (status, String::new(), value),
+                };
+                let flow = state.flows.get(&reference).unwrap().clone();
+                if let Some(existing) = state.ledger.get(&flow.command_id) {
+                    return (200, String::new(), terminal_reply(existing));
+                }
+                let marker = json!({
+                    "protocol": "ambulatory.destructive.v1",
+                    "commandId": flow.command_id,
+                    "originalArchiveGeneration": GENERATION,
+                    "originalScopeId": flow.original_scope_id,
+                    "ambulatoryId": flow.ambulatory_id,
+                    "expectedVersion": flow.expected_version,
+                    "operation": flow.operation,
+                    "planDigest": flow.plan_digest.clone().unwrap()
+                });
+                let committed_at = state.clock_ms / 1000;
+                let row = if state.target_version != flow.expected_version {
+                    LedgerRow {
+                        marker,
+                        outcome: "rejected".into(),
+                        reason: Some("plan_changed".into()),
+                        committed_at,
+                        result: Value::Null,
+                    }
+                } else {
+                    state.target_version += 1;
+                    let version = state.target_version;
+                    state.write_audits.push((
+                        "native".into(),
+                        "ambulatory.cleared".into(),
+                        version,
+                    ));
+                    LedgerRow {
+                        marker,
+                        outcome: "applied".into(),
+                        reason: None,
+                        committed_at,
+                        result: json!({
+                            "targetVersion": version,
+                            "affectedAmbulatories": [{"id": flow.ambulatory_id, "version": version}],
+                            "clear": {"tombstonedPatients": 0, "unlinkedPatients": 0, "preservedLivePatients": 0, "removedMembershipRows": 0}
+                        }),
+                    }
+                };
+                let reply = terminal_reply(&row);
+                state.ledger.insert(flow.command_id, row);
+                (200, String::new(), reply)
+            }
+            "POST /api/auth/ambulatory-commands/receipt" => {
+                state.receipt_calls += 1;
+                let reference = match authorize_flow(&mut state, headers) {
+                    Ok(reference) => reference,
+                    Err((status, value)) => return (status, String::new(), value),
+                };
+                let command_id = state.flows.get(&reference).unwrap().command_id.clone();
+                if let Some(existing) = state.ledger.get(&command_id) {
+                    (200, String::new(), terminal_reply(existing))
+                } else {
+                    (200, String::new(), json!({"outcome":"unknown"}))
+                }
+            }
+            "POST /api/auth/ambulatory-commands/close" => {
+                state.close_calls += 1;
+                let reference = match authorize_flow(&mut state, headers) {
+                    Ok(reference) => reference,
+                    Err((status, value)) => return (status, String::new(), value),
+                };
+                let flow = state.flows.get(&reference).unwrap().clone();
+                if let Some(existing) = state.ledger.get(&flow.command_id) {
+                    return (200, String::new(), terminal_reply(existing));
+                }
+                let row = LedgerRow {
+                    marker: json!({
+                        "protocol": "ambulatory.destructive.v1",
+                        "commandId": flow.command_id,
+                        "originalArchiveGeneration": GENERATION,
+                        "originalScopeId": flow.original_scope_id,
+                        "ambulatoryId": flow.ambulatory_id,
+                        "expectedVersion": flow.expected_version,
+                        "operation": flow.operation,
+                        "planDigest": flow.plan_digest.clone().unwrap()
+                    }),
+                    outcome: "closed".into(),
+                    reason: None,
+                    committed_at: state.clock_ms / 1000,
+                    result: Value::Null,
+                };
+                let reply = terminal_reply(&row);
+                state.ledger.insert(flow.command_id, row);
+                (200, String::new(), reply)
+            }
+            "POST /api/auth/ambulatory-commands/retire" => {
+                state.retire_calls += 1;
+                if let Some(reference) = headers.get("x-mediflow-ambulatory-command-reference")
+                    && let Some(flow) = state.flows.get_mut(reference)
+                {
+                    flow.retired = true;
+                }
+                (204, String::new(), Value::Null)
+            }
+            other => panic!("unexpected route: {other}"),
+        }
+    }
+
+    fn settle(cx: &mut gpui::VisualTestContext) {
+        for _ in 0..8 {
+            cx.run_until_parked();
+            thread::sleep(Duration::from_millis(20));
+            cx.run_until_parked();
+        }
+    }
+
+    fn wait_until(
+        view: &Entity<ClinicalApp>,
+        cx: &mut gpui::VisualTestContext,
+        predicate: impl Fn(&ClinicalApp) -> bool,
+    ) {
+        let deadline = std::time::Instant::now() + Duration::from_secs(10);
+        while std::time::Instant::now() < deadline {
+            cx.run_until_parked();
+            if view.read_with(cx, |app, _| predicate(app)) {
+                return;
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
+        panic!("timed out waiting for ambulatory command state");
+    }
+
+    fn draw(cx: &mut gpui::VisualTestContext) {
+        for _ in 0..6 {
+            let pending = cx.update(|window, cx| {
+                window.refresh();
+                window.draw(cx).clear(cx);
+                window.simulate_next_frame(cx)
+            });
+            cx.run_until_parked();
+            if pending == 0 {
+                return;
+            }
+        }
+    }
+
+    fn now_unix_ms() -> u64 {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64
+    }
+
+    fn setup_app<'a>(
+        cx: &'a mut gpui::TestAppContext,
+        host: &ControlledHost,
+    ) -> (Entity<ClinicalApp>, &'a mut gpui::VisualTestContext) {
+        crate::native_lock::monitor_installed();
+        let (view, cx) =
+            cx.add_window_view(|window, cx| ClinicalApp::new(String::new(), window, cx));
+        cx.simulate_resize(gpui::size(px(1200.), px(1100.)));
+        let rows = host.session.list_ambulatories().unwrap();
+        view.update(cx, |app, cx| {
+            app.area = Area::Settings;
+            app.settings_page = SettingsPage::Ambulatories;
+            app.local_preferences = host.preferences();
+            app.session = Some(host.session.clone());
+            app.scope = Some("scope".into());
+            app.ambulatory_management.initial_scope = false;
+            app.ambulatories = Load::Ready(rows);
+            app.load_ambulatory_command_recovery(cx);
+        });
+        wait_until(&view, cx, |app| {
+            app.ambulatory_management.destructive.loaded
+        });
+        (view, cx)
+    }
+
+    #[gpui::test]
+    fn concurrent_web_clear_and_expired_confirm_then_recovery_after_challenge_or_preparation_expiry_and_within_time(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let host = ControlledHost::new(now_unix_ms());
+        let (view, cx) = setup_app(cx, &host);
+
+        view.update(cx, |app, cx| {
+            assert!(app.can_open_ambulatory_command());
+            app.open_ambulatory_command("target", AmbulatoryCommandOperation::ClearTest, cx);
+        });
+        wait_until(&view, cx, |app| {
+            app.ambulatory_management
+                .destructive
+                .dialog
+                .as_ref()
+                .is_some_and(|dialog| dialog.phase == Phase::Authentication)
+        });
+
+        view.update(cx, |app, cx| {
+            let dialog = app
+                .ambulatory_management
+                .destructive
+                .dialog
+                .as_ref()
+                .unwrap();
+            dialog.fields[0]
+                .editor
+                .update(cx, |input, cx| input.set_content(PASSPHRASE, cx));
+            app.authorize_ambulatory_command(cx);
+        });
+        wait_until(&view, cx, |app| {
+            app.ambulatory_management
+                .destructive
+                .dialog
+                .as_ref()
+                .is_some_and(|dialog| dialog.phase == Phase::Confirm)
+        });
+
+        host.web_clear_target();
+        host.advance_ms(CHALLENGE_MS + 1_000);
+
+        view.update(cx, |app, cx| {
+            let dialog = app
+                .ambulatory_management
+                .destructive
+                .dialog
+                .as_ref()
+                .unwrap();
+            dialog.fields[1]
+                .editor
+                .update(cx, |input, cx| input.set_content("SVUOTA", cx));
+            app.confirm_ambulatory_command(cx);
+        });
+        wait_until(&view, cx, |app| {
+            app.ambulatory_management
+                .destructive
+                .dialog
+                .as_ref()
+                .is_some_and(|dialog| {
+                    !dialog.busy && matches!(dialog.cleanup, Cleanup::Confirmed(_))
+                })
+        });
+        {
+            let state = host.state.lock().unwrap();
+            assert_eq!(state.target_version, 3);
+            assert_eq!(state.write_audits.len(), 1);
+            assert!(state.ledger.is_empty());
+        }
+        view.read_with(cx, |app, _| {
+            let dialog = app
+                .ambulatory_management
+                .destructive
+                .dialog
+                .as_ref()
+                .unwrap();
+            assert!(dialog.phase == Phase::Unknown);
+            assert_eq!(
+                dialog_error_context(dialog, dialog.error.unwrap()),
+                copy("errori", "accesso_scaduto")
+            );
+        });
+        assert_eq!(host.journal_json_count(), 1);
+
+        view.update(cx, |app, cx| {
+            app.recover_ambulatory_command(cx);
+        });
+        wait_until(&view, cx, |app| {
+            app.ambulatory_management
+                .destructive
+                .dialog
+                .as_ref()
+                .is_some_and(|dialog| dialog.phase == Phase::Authentication)
+        });
+
+        view.update(cx, |app, cx| {
+            let dialog = app
+                .ambulatory_management
+                .destructive
+                .dialog
+                .as_ref()
+                .unwrap();
+            dialog.fields[0]
+                .editor
+                .update(cx, |input, cx| input.set_content(PASSPHRASE, cx));
+            app.authorize_ambulatory_command(cx);
+        });
+        wait_until(&view, cx, |app| {
+            app.ambulatory_management
+                .destructive
+                .dialog
+                .as_ref()
+                .is_some_and(|dialog| !dialog.busy && dialog.phase != Phase::Authorizing)
+        });
+        view.read_with(cx, |app, _| {
+            let dialog = app
+                .ambulatory_management
+                .destructive
+                .dialog
+                .as_ref()
+                .unwrap();
+            assert!(dialog.phase == Phase::Unknown);
+            assert!(dialog_authorized(dialog));
+            assert_eq!(
+                dialog_state_message(dialog),
+                Some(copy("stati", "non_registrato"))
+            );
+        });
+
+        host.advance_ms(CHALLENGE_MS + 1_000);
+        let retire_before_expired_close = host.state.lock().unwrap().retire_calls;
+        view.update(cx, |app, cx| {
+            app.read_or_close_ambulatory_command(true, cx);
+        });
+        wait_until(&view, cx, |app| {
+            app.ambulatory_management
+                .destructive
+                .dialog
+                .as_ref()
+                .is_some_and(|dialog| {
+                    !dialog.busy && matches!(dialog.cleanup, Cleanup::Confirmed(_))
+                })
+        });
+        settle(cx);
+        draw(cx);
+        assert!(
+            host.state.lock().unwrap().retire_calls > retire_before_expired_close,
+            "expired recovery close must retire its dedicated WebP3 session"
+        );
+        view.read_with(cx, |app, _| {
+            let dialog = app
+                .ambulatory_management
+                .destructive
+                .dialog
+                .as_ref()
+                .unwrap();
+            assert_eq!(
+                dialog_error_context(dialog, dialog.error.unwrap()),
+                copy("errori", "accesso_scaduto")
+            );
+        });
+        assert!(
+            cx.debug_bounds("ambulatory-command-stop").is_none(),
+            "expired recovery must not leave a disabled Chiudi operazione button"
+        );
+        let reauthorize_button = cx
+            .debug_bounds("ambulatory-command-verify")
+            .expect("expired recovery must offer re-authorization");
+        cx.simulate_click(reauthorize_button.center(), gpui::Modifiers::default());
+        wait_until(&view, cx, |app| {
+            app.ambulatory_management
+                .destructive
+                .dialog
+                .as_ref()
+                .is_some_and(|dialog| dialog.phase == Phase::Authentication)
+        });
+        host.advance_ms(PREPARATION_MS + 1_000);
+        let retire_before_expired_prep = host.state.lock().unwrap().retire_calls;
+        view.update(cx, |app, cx| {
+            let dialog = app
+                .ambulatory_management
+                .destructive
+                .dialog
+                .as_ref()
+                .unwrap();
+            dialog.fields[0]
+                .editor
+                .update(cx, |input, cx| input.set_content(PASSPHRASE, cx));
+            app.authorize_ambulatory_command(cx);
+        });
+        wait_until(&view, cx, |app| {
+            app.ambulatory_management
+                .destructive
+                .dialog
+                .as_ref()
+                .is_some_and(|dialog| {
+                    !dialog.busy && matches!(dialog.cleanup, Cleanup::Confirmed(_))
+                })
+        });
+        settle(cx);
+        view.read_with(cx, |app, _| {
+            let dialog = app
+                .ambulatory_management
+                .destructive
+                .dialog
+                .as_ref()
+                .unwrap();
+            assert!(
+                dialog.phase == Phase::Failed,
+                "expired 5-minute preparation must not pretend recovery authorization succeeded"
+            );
+            assert_eq!(
+                dialog_error_context(dialog, dialog.error.unwrap()),
+                copy("errori", "accesso_scaduto")
+            );
+        });
+        assert!(
+            host.state.lock().unwrap().retire_calls > retire_before_expired_prep,
+            "expired 5-minute recovery preparation must retire its WebP3 session"
+        );
+
+        view.update(cx, |app, cx| {
+            app.recover_ambulatory_command(cx);
+        });
+        wait_until(&view, cx, |app| {
+            app.ambulatory_management
+                .destructive
+                .dialog
+                .as_ref()
+                .is_some_and(|dialog| dialog.phase == Phase::Authentication)
+        });
+        view.update(cx, |app, cx| {
+            let dialog = app
+                .ambulatory_management
+                .destructive
+                .dialog
+                .as_ref()
+                .unwrap();
+            dialog.fields[0]
+                .editor
+                .update(cx, |input, cx| input.set_content(PASSPHRASE, cx));
+            app.authorize_ambulatory_command(cx);
+        });
+        wait_until(&view, cx, |app| {
+            app.ambulatory_management
+                .destructive
+                .dialog
+                .as_ref()
+                .is_some_and(|dialog| !dialog.busy && dialog.phase == Phase::Unknown)
+        });
+        host.advance_ms(5_000);
+        view.update(cx, |app, cx| {
+            app.read_or_close_ambulatory_command(true, cx);
+        });
+        wait_until(&view, cx, |app| {
+            app.ambulatory_management
+                .destructive
+                .dialog
+                .as_ref()
+                .is_some_and(|dialog| {
+                    dialog.phase == Phase::Terminal
+                        && matches!(dialog.cleanup, Cleanup::Confirmed(_))
+                })
+        });
+        view.update(cx, |app, cx| {
+            app.close_ambulatory_command_view(cx);
+        });
+        wait_until(&view, cx, |app| app.can_open_ambulatory_command());
+        assert_eq!(host.journal_json_count(), 0);
+        let state = host.state.lock().unwrap();
+        assert_eq!(state.target_version, 3);
+        assert_eq!(state.write_audits.len(), 1);
+        assert_eq!(state.ledger.len(), 1);
+        assert_eq!(state.ledger.values().next().unwrap().outcome, "closed");
+    }
+
+    #[gpui::test]
+    fn concurrent_web_clear_within_challenge_explains_plan_change_and_unblocks_commands(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let host = ControlledHost::new(now_unix_ms());
+        let (view, cx) = setup_app(cx, &host);
+
+        view.update(cx, |app, cx| {
+            app.open_ambulatory_command("target", AmbulatoryCommandOperation::ClearTest, cx);
+        });
+        wait_until(&view, cx, |app| {
+            app.ambulatory_management
+                .destructive
+                .dialog
+                .as_ref()
+                .is_some_and(|dialog| dialog.phase == Phase::Authentication)
+        });
+        view.update(cx, |app, cx| {
+            let dialog = app
+                .ambulatory_management
+                .destructive
+                .dialog
+                .as_ref()
+                .unwrap();
+            dialog.fields[0]
+                .editor
+                .update(cx, |input, cx| input.set_content(PASSPHRASE, cx));
+            app.authorize_ambulatory_command(cx);
+        });
+        wait_until(&view, cx, |app| {
+            app.ambulatory_management
+                .destructive
+                .dialog
+                .as_ref()
+                .is_some_and(|dialog| dialog.phase == Phase::Confirm)
+        });
+
+        host.web_clear_target();
+        host.advance_ms(10_000);
+
+        view.update(cx, |app, cx| {
+            let dialog = app
+                .ambulatory_management
+                .destructive
+                .dialog
+                .as_ref()
+                .unwrap();
+            dialog.fields[1]
+                .editor
+                .update(cx, |input, cx| input.set_content("SVUOTA", cx));
+            app.confirm_ambulatory_command(cx);
+        });
+        wait_until(&view, cx, |app| {
+            app.ambulatory_management
+                .destructive
+                .dialog
+                .as_ref()
+                .is_some_and(|dialog| {
+                    dialog.phase == Phase::Terminal
+                        && matches!(dialog.cleanup, Cleanup::Confirmed(_))
+                })
+        });
+        view.read_with(cx, |app, _| {
+            let dialog = app
+                .ambulatory_management
+                .destructive
+                .dialog
+                .as_ref()
+                .unwrap();
+            let Some(AmbulatoryCommandRead::Terminal(terminal)) = &dialog.result else {
+                panic!("expected terminal rejected receipt");
+            };
+            assert_eq!(
+                terminal.receipt().outcome,
+                AmbulatoryCommandOutcome::Rejected
+            );
+            assert_eq!(
+                terminal_detail_message(terminal),
+                Some(copy("stati", "rejected_piano_cambiato"))
+            );
+        });
+        view.update(cx, |app, cx| {
+            app.close_ambulatory_command_view(cx);
+        });
+        wait_until(&view, cx, |app| app.can_open_ambulatory_command());
+        assert_eq!(host.journal_json_count(), 0);
+        let state = host.state.lock().unwrap();
+        assert_eq!(state.target_version, 3);
+        assert_eq!(state.write_audits.len(), 1);
+        assert_eq!(state.ledger.len(), 1);
+        assert_eq!(state.ledger.values().next().unwrap().outcome, "rejected");
+    }
+
+    #[gpui::test]
+    fn confirm_after_local_challenge_expiry_never_persists_recovery_marker_or_blocks_commands(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let initial = now_unix_ms();
+        let clock = Arc::new(AtomicU64::new(initial));
+        let host = ControlledHost::new(initial);
+        let (view, cx) = setup_app(cx, &host);
+        view.update(cx, |app, _| {
+            app.ambulatory_management.destructive.clock_override_ms = Some(clock.clone());
+        });
+
+        view.update(cx, |app, cx| {
+            app.open_ambulatory_command("target", AmbulatoryCommandOperation::ClearTest, cx);
+        });
+        wait_until(&view, cx, |app| {
+            app.ambulatory_management
+                .destructive
+                .dialog
+                .as_ref()
+                .is_some_and(|dialog| dialog.phase == Phase::Authentication)
+        });
+        view.update(cx, |app, cx| {
+            let dialog = app
+                .ambulatory_management
+                .destructive
+                .dialog
+                .as_ref()
+                .unwrap();
+            dialog.fields[0]
+                .editor
+                .update(cx, |input, cx| input.set_content(PASSPHRASE, cx));
+            app.authorize_ambulatory_command(cx);
+        });
+        wait_until(&view, cx, |app| {
+            app.ambulatory_management
+                .destructive
+                .dialog
+                .as_ref()
+                .is_some_and(|dialog| dialog.phase == Phase::Confirm)
+        });
+
+        host.web_clear_target();
+        host.advance_ms(CHALLENGE_MS + 1_000);
+        clock.fetch_add(CHALLENGE_MS + 1_000, Ordering::AcqRel);
+
+        view.update(cx, |app, cx| {
+            let dialog = app
+                .ambulatory_management
+                .destructive
+                .dialog
+                .as_ref()
+                .unwrap();
+            dialog.fields[1]
+                .editor
+                .update(cx, |input, cx| input.set_content("SVUOTA", cx));
+            app.confirm_ambulatory_command(cx);
+        });
+        wait_until(&view, cx, |app| {
+            app.ambulatory_management
+                .destructive
+                .dialog
+                .as_ref()
+                .is_some_and(|dialog| {
+                    !dialog.busy && matches!(dialog.cleanup, Cleanup::Confirmed(_))
+                })
+        });
+        view.read_with(cx, |app, _| {
+            let dialog = app
+                .ambulatory_management
+                .destructive
+                .dialog
+                .as_ref()
+                .unwrap();
+            assert!(dialog.phase == Phase::Failed);
+            assert!(app.ambulatory_management.destructive.marker.is_none());
+            assert_eq!(
+                dialog_error_context(dialog, dialog.error.unwrap()),
+                copy("errori", "accesso_scaduto_prima_invio")
+            );
+        });
+        assert_eq!(host.journal_json_count(), 0);
+        assert_eq!(host.state.lock().unwrap().execute_calls, 0);
+
+        view.update(cx, |app, cx| {
+            app.close_ambulatory_command_view(cx);
+        });
+        wait_until(&view, cx, |app| app.can_open_ambulatory_command());
+        let state = host.state.lock().unwrap();
+        assert_eq!(state.target_version, 3);
+        assert_eq!(state.write_audits.len(), 1);
+        assert!(state.ledger.is_empty());
     }
 }
