@@ -1,4 +1,5 @@
 esenzione,malattia,codice_prestazione,condizione,pagine_allegato_8
+013,DIABETE MELLITO,VISITA DI CONTROLLO,"Necessaria al monitoraggio della malattia, delle complicanze più frequenti ed alla prevenzione degli ulteriori aggravamenti. Il prescrittore identifica la tipologia di visita richiesta ed il relativo codice tra quelli presenti nel nomenclatore della specialistica ambulatoriale",22-23
 013,DIABETE MELLITO,90.04.5,Con cadenza annuale o più frequente con valori patologici e/o in presenza di steatosi epatica,22-23
 013,DIABETE MELLITO,90.09.2,Con cadenza annuale o più frequente con valori patologici e/o in presenza di steatosi epatica,22-23
 013,DIABETE MELLITO,90.11.1,,22-23
@@ -45,6 +46,7 @@ esenzione,malattia,codice_prestazione,condizione,pagine_allegato_8
 013,DIABETE MELLITO,96.59.1,,22-23
 013,DIABETE MELLITO,05.31,,22-23
 013,DIABETE MELLITO,90.41.8,"Nel DMT1, in gravidanza, diabete pre-gestazionale, diabete gestazionale",22-23
+023,INSUFFICIENZA RENALE CRONICA,VISITA DI CONTROLLO,"Necessaria al monitoraggio della malattia, delle complicanze più frequenti ed alla prevenzione degli ulteriori aggravamenti. Il prescrittore identifica la tipologia di visita richiesta ed il relativo codice tra quelli presenti nel nomenclatore della specialistica ambulatoriale",27-28
 023,INSUFFICIENZA RENALE CRONICA,90.05.1,,27-28
 023,INSUFFICIENZA RENALE CRONICA,90.06.2,,27-28
 023,INSUFFICIENZA RENALE CRONICA,90.11.4,,27-28

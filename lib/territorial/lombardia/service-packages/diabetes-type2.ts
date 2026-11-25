@@ -1,17 +1,19 @@
 import {
     LOMBARDIA_SERVICE_CODE_SYSTEM,
     LOMBARDIA_SERVICE_PACKAGE_SCHEMA,
-    type DraftServicePackage,
+    type ApprovedServicePackage,
+    type DocumentSource,
+    type PhysicianDecisionSource,
     type ServicePackageItem,
-    type ServicePackageSource,
 } from './contract';
 
 const ALLEGATO_8_URL = 'https://www.regione.lombardia.it/content/dam/rl/canali-tematici-servizi/01-sanita/07-ticket-ed-esenzioni/ticket-esenzioni-prerstazioni-ssr/allegati/allegato-8-elenco-malattie-condizioni-croniche-ed-invalidanti-30-10-2026.pdf';
 const NOMENCLATORE_URL = 'https://www.regione.lombardia.it/content/dam/rl/canali-tematici-servizi/01-sanita/07-ticket-ed-esenzioni/ticket-esenzioni-prerstazioni-ssr/allegati/Nomenclatore+tariffario+dal+1+ottobre+2025.xlsx';
 const SID_AMD_2018_URL = 'https://aemmedi.it/wp-content/uploads/2009/06/AMD-Standard-unico1.pdf';
 
-function allegato8(exemption: '013' | '023'): ServicePackageSource {
+function allegato8(exemption: '013' | '023'): DocumentSource {
     return {
+        kind: 'documento',
         document: 'Allegato 8 al DPCM 12/01/2017, malattie e condizioni croniche e invalidanti (versione Regione Lombardia aggiornata al 30/10/2026)',
         sectionOrTable: exemption === '013'
             ? 'Esenzione 013 Diabete mellito, pagine 22-23'
@@ -22,7 +24,8 @@ function allegato8(exemption: '013' | '023'): ServicePackageSource {
     };
 }
 
-const NOMENCLATORE_2025: ServicePackageSource = {
+const NOMENCLATORE_2025: DocumentSource = {
+    kind: 'documento',
     document: 'Nomenclatore regionale tariffario della specialistica ambulatoriale, Allegato 3 della DGR n. XII/4956 del 08/09/2025',
     sectionOrTable: 'Riga del codice, in vigore dal 01/10/2025',
     publishedAt: '2025-09-08',
@@ -31,8 +34,9 @@ const NOMENCLATORE_2025: ServicePackageSource = {
     status: 'vigente',
 };
 
-function sidAmd2018(sectionOrTable: string): ServicePackageSource {
+function sidAmd2018(sectionOrTable: string): DocumentSource {
     return {
+        kind: 'documento',
         document: 'AMD-SID, Standard italiani per la cura del diabete mellito 2018',
         sectionOrTable,
         publishedAt: '2018-04-27',
@@ -49,11 +53,30 @@ const SID_NEPHROPATHY_FOLLOW_UP = sidAmd2018('Cap. V.B Nefropatia diabetica, tra
 const SID_RETINOPATHY = sidAmd2018('Cap. V.C Retinopatia diabetica, screening e follow-up, pagine 190-191 del PDF');
 const SID_NAFLD = sidAmd2018('Cap. V.H Epatopatia steatosica non alcolica, pagina 228 del PDF');
 
+const PACKAGE_APPROVER = 'Leonardo Pegollo';
+const DECIDED_ON = '2026-11-25';
+
+function physicianDecision(decision: string): PhysicianDecisionSource {
+    return { kind: 'decisione_del_medico', decidedBy: PACKAGE_APPROVER, decidedAt: DECIDED_ON, decision };
+}
+
 function labItem(item: Omit<ServicePackageItem, 'category' | 'priority'>): ServicePackageItem {
     return { ...item, category: 'lab', priority: 'P' };
 }
 
 const BASE_ITEMS: readonly ServicePackageItem[] = [
+    {
+        id: 'dm2-visita-endocrinologica',
+        serviceCode: '89.01.8',
+        serviceName: 'Visita endocrinologica di controllo',
+        category: 'visit',
+        priority: 'P',
+        periodicityMonths: 12,
+        clinicalQuestion: 'Diabete mellito tipo 2: visita di controllo per il monitoraggio della malattia e delle complicanze',
+        exemptionCode: '013',
+        appropriatenessConditions: [],
+        sources: [physicianDecision('Visita endocrinologica di controllo 89.01.8 ogni 12 mesi'), allegato8('013'), NOMENCLATORE_2025],
+    },
     labItem({
         id: 'dm2-emoglobina-glicata',
         serviceCode: '90.28.1',
@@ -63,6 +86,16 @@ const BASE_ITEMS: readonly ServicePackageItem[] = [
         exemptionCode: '013',
         appropriatenessConditions: ['Ogni 3 mesi se il compenso è instabile o la terapia è cambiata'],
         sources: [SID_HBA1C, allegato8('013')],
+    }),
+    labItem({
+        id: 'dm2-glicemia',
+        serviceCode: '90.27.1',
+        serviceName: 'Glucosio',
+        periodicityMonths: 12,
+        clinicalQuestion: 'Diabete mellito tipo 2: controllo della glicemia',
+        exemptionCode: '013',
+        appropriatenessConditions: [],
+        sources: [physicianDecision('Glicemia 90.27.1 ogni 12 mesi'), allegato8('013')],
     }),
     labItem({
         id: 'dm2-colesterolo-totale',
@@ -115,6 +148,16 @@ const BASE_ITEMS: readonly ServicePackageItem[] = [
         sources: [SID_NEPHROPATHY_SCREENING, allegato8('013')],
     }),
     labItem({
+        id: 'dm2-esame-urine',
+        serviceCode: '90.44.3',
+        serviceName: 'Urine esame completo',
+        periodicityMonths: 12,
+        clinicalQuestion: 'Diabete mellito tipo 2: esame delle urine di controllo',
+        exemptionCode: '013',
+        appropriatenessConditions: [],
+        sources: [physicianDecision('Esame urine completo 90.44.3 ogni 12 mesi'), allegato8('013')],
+    }),
+    labItem({
         id: 'dm2-alt',
         serviceCode: '90.04.5',
         serviceName: 'Alanina aminotransferasi (ALT) (GPT)',
@@ -147,7 +190,7 @@ const BASE_ITEMS: readonly ServicePackageItem[] = [
             'Ogni 12 mesi con retinopatia non proliferante lieve, ogni 6-12 mesi se moderata',
             'In alternativa: prima visita oculistica 95.02',
         ],
-        sources: [SID_RETINOPATHY, allegato8('013')],
+        sources: [SID_RETINOPATHY, allegato8('013'), physicianDecision('Fotografia del fundus 95.11 ogni 24 mesi, preferita alla prima visita oculistica 95.02')],
     },
     {
         id: 'dm2-elettrocardiogramma',
@@ -163,13 +206,13 @@ const BASE_ITEMS: readonly ServicePackageItem[] = [
     },
 ];
 
-export const DIABETES_T2_PACKAGE_DRAFT: DraftServicePackage = {
+export const DIABETES_T2_PACKAGE: ApprovedServicePackage = {
     schemaVersion: LOMBARDIA_SERVICE_PACKAGE_SCHEMA,
     id: 'lom.dm2.monitoraggio',
     territory: 'lom',
     codeSystem: LOMBARDIA_SERVICE_CODE_SYSTEM,
     title: 'Monitoraggio diabete mellito tipo 2',
-    approval: { status: 'draft_pending_approval' },
+    approval: { status: 'approved', approvedBy: PACKAGE_APPROVER, approvedAt: DECIDED_ON },
     activation: {
         icd11Codes: ['5A11'],
         diagnosisLabel: 'Diabete mellito di tipo 2',

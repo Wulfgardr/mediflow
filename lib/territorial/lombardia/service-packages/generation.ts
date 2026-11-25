@@ -5,6 +5,7 @@ import {
 import {
     LOMBARDIA_SERVICE_CODE_SYSTEM,
     isValidIsoCalendarDate,
+    servicePackageSourceKey,
     type ApprovedServicePackage,
     type ComplicationModule,
     type ExemptionApplicationStatus,
@@ -173,11 +174,7 @@ function mergeModuleItem(existing: EffectiveItem, incoming: ServicePackageItem, 
     const sources = [
         ...existing.item.sources,
         ...incoming.sources.filter((candidate) => (
-            !existing.item.sources.some((saved) => (
-                saved.document === candidate.document
-                && saved.sectionOrTable === candidate.sectionOrTable
-                && saved.publishedAt === candidate.publishedAt
-            ))
+            !existing.item.sources.some((saved) => servicePackageSourceKey(saved) === servicePackageSourceKey(candidate))
         )),
     ];
     return {
