@@ -16,7 +16,7 @@ export async function openMicrophone(onBlock: (pcm: Uint8Array) => void): Promis
     if (!navigator.mediaDevices?.getUserMedia || typeof AudioWorkletNode === 'undefined') throw new MicrophoneUnavailable('unsupported');
     let stream: MediaStream;
     try {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+        stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
     } catch (error) {
         throw new MicrophoneUnavailable(error instanceof DOMException && (error.name === 'NotFoundError' || error.name === 'OverconstrainedError') ? 'unsupported' : 'permission-denied');
     }
