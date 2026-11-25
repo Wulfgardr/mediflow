@@ -1,6 +1,7 @@
 import { InkState } from '@/components/ui/ink-state';
 import { formatCountLabel } from '@/lib/format-count';
 import surface from '@/components/record-surface.module.css';
+import { PageHeader } from '@/components/ui/page-header';
 import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import {
@@ -64,18 +65,14 @@ function DiarioArea({
 
   return (
     <div className={`${surface.page} ${diaryStyles.page}`} data-record-page data-testid="lume-diario">
-      <header className={surface.pageHeader}>
-        <div className={surface.pageHeading}>
-          <h1 className={surface.pageTitle}>Diario</h1>
-          <p className={surface.pageMeta}>
-            {!hasSnapshot ? '…' : `${formatCountLabel(visibleEntries.length, 'voce', 'voci')} · ${formatCountLabel(diaryState.patientCount, 'paziente', 'pazienti')}`}
-          </p>
-        </div>
-        <div className={surface.pageActions}>
+      <PageHeader
+        title="Diario"
+        meta={!hasSnapshot ? '…' : `${formatCountLabel(visibleEntries.length, 'voce', 'voci')} · ${formatCountLabel(diaryState.patientCount, 'paziente', 'pazienti')}`}
+        actions={<>
           {onRetry && diaryState.canRefresh && diaryState.status !== 'error' && <button type="button" className="mf-button-secondary" disabled={isLoading} onClick={onRetry}>Aggiorna</button>}
           {commandTrigger}
-        </div>
-      </header>
+        </>}
+      />
 
       <div className={diaryStyles.tools}>
         <input className={surface.field} type="search" aria-label="Cerca nel diario" placeholder="Cerca paziente o contenuto" value={query} onChange={event => setQuery(event.target.value)} />

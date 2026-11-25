@@ -444,11 +444,11 @@ export function Kree8WorkspaceShell({
               <ArrowLeft size={13} aria-hidden />
               <span className={styles.backButtonLabel}>{backLabel}</span>
             </Link>
-            <div className={styles.headerActionCluster}>
+            <div className={styles.headerActionCluster} data-command-bar="testata">
               {/* WUL-297: persistent privacy affordance in the app header */}
               {!proposal ? <PrivacyModeToggle showLabel /> : null}
               {primaryAction && PrimaryActionIcon ? (
-                <Link href={primaryAction.href} className={isClinical ? (pendingForms ? 'mf-button-secondary' : 'mf-button-primary') : styles.headerPrimaryAction}>
+                <Link href={primaryAction.href} className={isClinical && pendingForms ? 'mf-button-secondary' : 'mf-button-primary'}>
                   <PrimaryActionIcon size={14} aria-hidden="true" />
                   {primaryAction.label}
                 </Link>

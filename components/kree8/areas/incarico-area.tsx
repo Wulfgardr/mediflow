@@ -36,6 +36,7 @@ import patientStyles from '../kree8-clinical-cockpit-patient-inbox.module.css';
 import { useDirectoryReturn } from '@/components/runtime-twin-workspace';
 import { useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import surface from '@/components/record-surface.module.css';
+import { PageHeader } from '@/components/ui/page-header';
 import type { SemanticSignal } from '@/lib/ui-semantic-signal';
 
 const STATUS_PILL: Record<SemanticSignal, string> = {
@@ -357,8 +358,8 @@ function IncaricoArea({
       const anchor = event.target instanceof Element ? event.target.closest('a') : null;
       if (selected && anchor?.getAttribute('href')?.startsWith(`/patients/${selected.id}/`)) rememberRow(selected.id);
     }} data-patient-directory={proposal ? 'proposal' : undefined}>
-      <header className={patientStyles.directoryToolbar}>
-        <h1 className={surface.pageTitle}>Pazienti</h1>
+      <PageHeader title="Pazienti" actions={<Link href="/patients/new" className="mf-button-primary" data-lume-action="primary"><Plus size={16} aria-hidden />Nuova scheda</Link>} />
+      <div className={patientStyles.directoryToolbar} data-patient-directory-tools>
         <label className={classNames('mf-composite-field', patientStyles.patientSearchField)}>
           <Search size={16} aria-hidden="true" />
           <input id="ricerca-pazienti" ref={attachSearchInput} type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Nome, codice o diagnosi" aria-label="Cerca nella lista pazienti" />
@@ -369,8 +370,7 @@ function IncaricoArea({
           <button type="button" aria-pressed={list === 'archivio'} onClick={() => setList('archivio')}>Archivio</button>
         </div>
         {isReview ? <select className={patientStyles.scopeSelect} aria-label="Ambito pazienti" value={scope} onChange={event => setScope(event.target.value as InboxScope)}><option value="ambulatorio">Ambulatorio locale</option><option value="network">Rete locale</option><option value="tutti">Tutti gli ambulatori</option></select> : null}
-        <Link href="/patients/new" className={classNames(styles.primaryBtn, patientStyles.directoryAction)} data-lume-action="primary"><Plus size={16} aria-hidden />Nuova scheda</Link>
-      </header>
+      </div>
       <div className={patientStyles.inboxLayout}>
         <section className={classNames(surface.tray, patientStyles.worklistPanel)} data-record-tray="elenco" aria-label={list === 'attivi' ? 'Pazienti in carico' : 'Archivio pazienti'} data-testid="lume-worklist">
           <header className={patientStyles.worklistPanelHeader}>

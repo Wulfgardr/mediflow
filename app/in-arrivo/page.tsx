@@ -8,6 +8,7 @@ import { agentIncomingSnapshot, agentIncomingServerSnapshot, subscribeAgentIncom
 import { agentVisitAwaitsReview, type AgentVisitReview } from '@/lib/agent-visit-review';
 import { CircleDashed, FileText, Inbox, NotebookPen } from 'lucide-react';
 import surface from '@/components/record-surface.module.css';
+import { PageHeader } from '@/components/ui/page-header';
 import css from './in-arrivo.module.css';
 import DocumentViewer from '@/components/document-viewer';
 import { agentReviewFieldLabels as fieldLabels, agentReviewFieldValues as fieldValues, agentReviewItemLabels } from '@/lib/agent-visit-review-labels';
@@ -82,24 +83,20 @@ function UnlockedIncoming() {
         ? applicationError.message : null;
 
     return <main className={`${surface.page} ${css.page}`} data-record-page>
-        <header className={surface.pageHeader}>
-            <div className={surface.pageHeading}>
-                <h1 className={surface.pageTitle}>In arrivo</h1>
-                {visits.length > 0 ? (
-                    <p className={surface.pageMeta}>
-                        {applicable.length === 1 ? '1 visita pronta' : `${applicable.length} visite pronte`}
-                        {blockedCount > 0 ? ` · ${blockedCount === 1 ? '1 da verificare' : `${blockedCount} da verificare`}` : ''}
-                    </p>
-                ) : null}
-            </div>
-            <div className={surface.pageActions}>
+        <PageHeader
+            title="In arrivo"
+            meta={visits.length > 0 ? <>
+                {applicable.length === 1 ? '1 visita pronta' : `${applicable.length} visite pronte`}
+                {blockedCount > 0 ? ` · ${blockedCount === 1 ? '1 da verificare' : `${blockedCount} da verificare`}` : ''}
+            </> : null}
+            actions={<>
                 <Link href="/settings/agenti" className="mf-button-secondary">Agenti</Link>
                 <button type="button" className="mf-button-secondary" disabled={busy} onClick={() => { void refreshAgentIncoming(); }}>Aggiorna</button>
                 {visits.length > 0 ? (
                     <button type="button" className={applicable.length ? 'mf-button-primary' : 'mf-button-secondary'} disabled={busy || !applicable.length} onClick={() => { void applyReviewedAgentVisits(applicable.map(value => value.visit.cassette.id)); }}>Applica tutte le visite senza dubbi</button>
                 ) : null}
-            </div>
-        </header>
+            </>}
+        />
         {error && <p role="alert" className={css.alert}>{error}</p>}
         {generalApplicationError && <p role="alert" className={css.alert}>{generalApplicationError}</p>}
         {pdfError && <p role="alert" className={css.alert}>{pdfError}</p>}
