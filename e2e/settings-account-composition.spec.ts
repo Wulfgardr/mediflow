@@ -150,7 +150,7 @@ test('access and profile settings preserve form drafts and denied outcomes', asy
         await page.getByRole('button', { name: 'Il tuo modo di lavorare', exact: true }).click();
         const activity = page.getByRole('radio', { name: 'Consultare e compilare cartelle', exact: true });
         await activity.check(); await expect(save).not.toHaveAttribute('data-settings-primary', 'true');
-        await expect(profile.locator(':is(button,a).mf-button-primary:visible')).toHaveCount(1);
+        await expect(profile.locator(':is(button,a):is(.mf-button-primary, [class*="primaryAction"]):visible')).toHaveCount(1);
         await page.getByRole('button', { name: 'Il tuo modo di lavorare', exact: true }).click();
         await expect(save).toHaveAttribute('data-settings-primary', 'true'); await expect(name).toHaveValue('Bozza W19 inventata non salvata');
         await page.getByRole('button', { name: 'Il tuo modo di lavorare', exact: true }).click(); await expect(activity).toBeChecked();
