@@ -126,9 +126,17 @@ async function coveredControls(page: Page): Promise<string[]> {
       }
       return false;
     };
+    const scrolledUnder = (element: Element, hit: Element) => {
+      let sticky: Element | null = hit;
+      while (sticky && getComputedStyle(sticky).position !== 'sticky') sticky = sticky.parentElement;
+      if (!sticky) return false;
+      let scroller = sticky.parentElement;
+      while (scroller && getComputedStyle(scroller).overflowY === 'visible') scroller = scroller.parentElement;
+      return !!scroller && scroller.contains(element) && !sticky.contains(element);
+    };
     return controls.flatMap((element) => {
       if (!element.checkVisibility({ opacityProperty: true, visibilityProperty: true })) return [];
-      const box = element.getBoundingClientRect();
+      const box = element.getClientRects()[0] ?? element.getBoundingClientRect();
       if (box.width <= 2 || box.height <= 2 || box.top < 0 || box.left < 0 || box.bottom > innerHeight || box.right > innerWidth) return [];
       const label = (element.getAttribute('aria-label') || (element as HTMLElement).innerText || element.getAttribute('placeholder') || element.tagName).trim().slice(0, 40);
       return [[box.x + box.width / 2, box.y + box.height / 2], [box.x + box.width / 2, box.y + Math.min(3, box.height / 2)]]
@@ -136,6 +144,7 @@ async function coveredControls(page: Page): Promise<string[]> {
         .flatMap(([x, y]) => {
           const hit = document.elementFromPoint(x, y);
           if (hit && (element.contains(hit) || (element as HTMLInputElement).labels?.[0]?.contains(hit))) return [];
+          if (hit && scrolledUnder(element, hit)) return [];
           const by = hit ? `${hit.tagName.toLowerCase()}.${String(hit.className).split(' ')[0]}` : 'nulla';
           return [`«${label}» coperto da ${by} a ${Math.round(x)},${Math.round(y)}`];
         })
@@ -163,4 +172,86 @@ for (const theme of ['light', 'dark'] as const) {
     }
     expect(problems).toEqual([]);
   });
+}
+
+const SETTINGS_PAGES = [
+  '/settings', '/settings/profilo', '/settings/accesso', '/settings/aspetto', '/settings/ambulatories',
+  '/settings/agenti', '/settings/backup', '/settings/conservazione', '/settings/compliance', '/settings/repertori',
+  '/settings/ai', '/settings/ai/funzioni', '/settings/ai/modelli', '/settings/ai/fabric', '/settings/ai/governance',
+  '/settings/ai/chatgpt', '/settings/diagnostica', '/settings/zona-pericolo', '/settings/sviluppo',
+];
+
+async function settingsGeometry(page: Page) {
+  return page.evaluate(() => {
+    const visible = (element: Element) => {
+      const box = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      return box.width > 0 && box.height > 0 && style.visibility !== 'hidden' && style.display !== 'none';
+    };
+    const fields = [...document.querySelectorAll('[data-runtime-settings] :is(input:not([type=checkbox], [type=radio], [type=range], [type=file], [type=hidden], [type=color]), select)')]
+      .filter(visible)
+      .filter((element) => !element.closest('.mf-composite-field'))
+      .map((element) => ({ name: element.getAttribute('aria-label') || element.id || element.getAttribute('name') || element.tagName, height: Math.round(element.getBoundingClientRect().height) }));
+    const search = document.querySelector('[data-testid=settings-search-trigger]');
+    const order = [...document.querySelectorAll('[data-runtime-settings] .mf-button-primary')].filter(visible).flatMap((primary) => {
+      const after = [];
+      for (let next = primary.nextElementSibling; next; next = next.nextElementSibling) {
+        if (visible(next) && next.matches('.mf-button-secondary, .mf-button-text')) after.push((next as HTMLElement).innerText.trim());
+      }
+      return after.length ? [`${(primary as HTMLElement).innerText.trim()} prima di ${after.join(', ')}`] : [];
+    });
+    return { fields, search: search && visible(search) ? Math.round(search.getBoundingClientRect().height) : null, order };
+  });
+}
+
+for (const viewport of VIEWPORTS) {
+  test(`impostazioni sul canone della vista paziente, ${viewport.name}`, async ({ page }) => {
+    test.setTimeout(300_000);
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+    const patientId = await createPatient(page);
+    const canon = await settle(page, `/patients/${patientId}/modules`);
+    const problems: string[] = [];
+    for (const route of SETTINGS_PAGES) {
+      const view = await settle(page, route);
+      const settings = await settingsGeometry(page);
+      if (!view.title || Math.abs(view.title.y - canon.title!.y) > 1 || Math.abs(view.title.x - canon.title!.x) > 1) {
+        problems.push(`${route}: titolo a ${JSON.stringify(view.title)}, la vista paziente a ${JSON.stringify(canon.title)}`);
+      }
+      if (!view.crumbVisible) problems.push(`${route}: il percorso in alto è coperto`);
+      if (view.primaries.length > 1) problems.push(`${route}: ${view.primaries.length} principali (${view.primaries.join(', ')})`);
+      for (const field of settings.fields) if (field.height !== 40) problems.push(`${route}: campo «${field.name}» alto ${field.height}`);
+      if (settings.search !== null && settings.search !== 40) problems.push(`${route}: ricerca dell'indice alta ${settings.search}`);
+      for (const wrong of settings.order) problems.push(`${route}: ${wrong}`);
+    }
+    expect(problems).toEqual([]);
+  });
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  for (const width of COVERAGE_WIDTHS) {
+    test(`nessun comando o percorso coperto nelle Impostazioni, ${width} px, tema ${theme}`, async ({ page }) => {
+      test.setTimeout(300_000);
+      await page.setViewportSize({ width, height: 1000 });
+      await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+      const problems: string[] = [];
+      for (const route of SETTINGS_PAGES) {
+        await settle(page, route);
+        await page.evaluate((selected) => {
+          localStorage.setItem('mediflow-theme', selected);
+          document.documentElement.classList.remove('light', 'dark');
+          document.documentElement.classList.add(selected);
+        }, theme);
+        for (const problem of await coveredControls(page)) problems.push(`${route}: ${problem}`);
+        const search = await page.evaluate(() => {
+          const trigger = document.querySelector('[data-testid=settings-search-trigger]');
+          if (!trigger?.checkVisibility()) return null;
+          const box = trigger.getBoundingClientRect();
+          return [box.y + 3, box.y + box.height / 2].every((y) => trigger.contains(document.elementFromPoint(box.x + box.width / 2, y)));
+        });
+        if (search === false) problems.push(`${route}: «Cerca impostazione» coperto nell'indice`);
+      }
+      expect(problems).toEqual([]);
+    });
+  }
 }

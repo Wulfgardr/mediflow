@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { FUNCTION_META, FUNCTION_STATE_LABELS } from '@/lib/function-status';
 import { createLocalProviderOnboardingWorkflow, INITIAL_LOCAL_ONBOARDING_VIEW } from './local-provider-onboarding-workflow';
-import { SETTINGS_CARD_CLASS, SETTINGS_PRIMARY_BUTTON_CLASS, SETTINGS_SECONDARY_BUTTON_CLASS } from './settings-ui';
+import { SETTINGS_CARD_CLASS, SETTINGS_SECONDARY_BUTTON_CLASS } from './settings-ui';
 
 const messages: Record<string, string> = {
     reading_configuration: 'Lettura della configurazione salvata e dello stato locale. Nessuna attivazione in corso.',
@@ -81,7 +81,7 @@ export function LocalProviderOnboardingPanel({ configurationRevision = 0 }: { co
             ? `Versione di Ollama trovata: ${view.versionMismatch.serverVersion}. Versioni ammesse: ${view.versionMismatch.supportedVersions}. Aggiorna MediFlow o installa una versione di Ollama ammessa.`
             : explain(view.messageCode)}</p>
         <div className="flex flex-wrap gap-3">
-            <button type="button" className={SETTINGS_PRIMARY_BUTTON_CLASS} disabled={!canActivate}
+            <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={!canActivate}
                 onClick={() => void workflow.current?.activate()}>
                 {phase === 'verifying' ? 'Verifica in corso…' : status?.state === 'degraded' ? 'Verifica e recupera locale' : 'Verifica e attiva locale'}
             </button>

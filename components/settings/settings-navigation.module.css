@@ -65,12 +65,19 @@
     font: var(--type-meta);
 }
 
-.desktopScrollHint {
+.desktopHead {
     position: sticky;
     top: 0;
     z-index: 2;
-    padding: 12px 2px 6px;
+    display: grid;
+    gap: 12px;
+    margin-bottom: -6px;
+    padding-bottom: 6px;
     background: var(--lume-record-rail);
+}
+
+.desktopScrollHint {
+    padding: 12px 2px 6px;
 }
 
 .searchButton, .mobileStripSearch {
@@ -78,7 +85,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 6px;
-    min-height: 36px;
+    min-height: var(--lume-control-height);
     padding: 6px 8px;
     border: 1px solid var(--lume-ink-muted);
     border-radius: 10px;
@@ -88,7 +95,7 @@
     text-align: start;
 }
 
-.searchButton > span { display: flex; align-items: center; gap: 6px; }
+.searchButton > span { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
 .searchButton svg, .mobileStripSearch svg { flex: none; width: 16px; height: 16px; }
 .mobileStripSearch { margin-block: 6px; }
 .shortcut { white-space: nowrap; color: var(--lume-ink-muted); font: var(--type-record-meta); }
