@@ -17,7 +17,7 @@ import { agentVisitPdfText, type AgentVisitPdf } from './agent-visit-pdf-text';
 export type AgentVisitDocument = AgentVisitPdf & { id: string; name: string; hash: string };
 export type AgentVisitReview = { visit: Omit<OpenedAgentVisit, 'cassette'> & { cassette: AgentCassetteIndexEntry }; patient: Patient | null; newPatient: NewAgentPatient | null;
     documents: AgentVisitDocument[]; appliedItemIds: string[]; discardedItemIds: string[]; correctedItemIds: string[]; currentSummary: Map<string, string>; blockers: string[]; proposalBlockers: string[];
-    itemBlockers: Map<string, string[]> };
+    itemBlockers: Map<string, string[]>; inRecordItemIds: string[] };
 type ReviewItem = AgentVisitReview['visit']['items'][number];
 export const agentItemDecided = (review: Pick<AgentVisitReview, 'appliedItemIds' | 'discardedItemIds'>, itemId: string) =>
     review.appliedItemIds.includes(itemId) || review.discardedItemIds.includes(itemId);
@@ -105,6 +105,8 @@ export async function inspectAgentVisit(row: IncomingAgentCassette, patients: Pa
         proposalBlockers.push(...found);
     }
     const currentSummary = new Map<string, string>();
+    const inRecordItemIds = patient ? visit.items.filter(item => !row.appliedItemIds.includes(item.id) && !discardedItemIds.includes(item.id)
+        && agentItemAlreadyInRecord(patient, item)).map(item => item.id) : [];
     if (patient) {
         const [therapies, services, observations] = await Promise.all([
             visit.items.some(item => item.kind === 'therapy') ? db.therapies.query({ patientId: patient.id }).toArray({ signal, rejectAuthUnavailable: true }) : [],
@@ -123,7 +125,7 @@ export async function inspectAgentVisit(row: IncomingAgentCassette, patients: Pa
             currentSummary.set(item.id, before.join('; ') || 'Non presente');
         }
     }
-    return { visit, patient, newPatient, documents: [...documents.values()], appliedItemIds: row.appliedItemIds, discardedItemIds, correctedItemIds: row.correctedItemIds ?? [], currentSummary, blockers, proposalBlockers, itemBlockers };
+    return { visit, patient, newPatient, documents: [...documents.values()], appliedItemIds: row.appliedItemIds, discardedItemIds, correctedItemIds: row.correctedItemIds ?? [], currentSummary, blockers, proposalBlockers, itemBlockers, inRecordItemIds };
 }
 export async function reopenReviewedAgentItems(review: AgentVisitReview, row: IncomingAgentCassette): Promise<AgentVisitReview['visit']['items'] | null> {
     const visit = await openAgentVisit(row);
@@ -244,6 +246,26 @@ export const AGENT_CORRECTABLE_FIELDS = {
 export type AgentCorrectableKind = keyof typeof AGENT_CORRECTABLE_FIELDS;
 export const agentItemCorrectable = (kind: string): kind is AgentCorrectableKind => kind in AGENT_CORRECTABLE_FIELDS;
 
+const DRUG_IDENTITY_FIELDS = ['drugName', 'activePrinciple'] as const;
+const DRUG_CODE_FIELDS = ['aic', 'atc'] as const;
+export function agentCorrectionDropsDrugCodes(item: ReviewItem, correction: Record<string, string>): boolean {
+    if (item.kind !== 'therapy') return false;
+    const deposited = values(item);
+    return DRUG_CODE_FIELDS.some(field => deposited[field])
+        && DRUG_IDENTITY_FIELDS.some(field => field in correction && normalized(correction[field] ?? '') !== normalized(deposited[field] ?? ''));
+}
+function correctedValues(item: ReviewItem, correction: Record<string, string>): Record<string, string> {
+    const corrected = { ...values(item), ...correction };
+    if (agentCorrectionDropsDrugCodes(item, correction)) for (const field of DRUG_CODE_FIELDS) delete corrected[field];
+    return corrected;
+}
+export function agentItemAlreadyInRecord(patient: Pick<Patient, 'diagnoses' | 'exemptions'>, item: ReviewItem): boolean {
+    if (item.kind !== 'diagnosis' && item.kind !== 'exemption') return false;
+    const proposed = withProposedProfile(patient as Patient, [item]);
+    return proposed.diagnoses.length === (patient.diagnoses ?? []).length && proposed.exemptions.length === (patient.exemptions ?? []).length;
+}
+export const AGENT_ITEM_IN_RECORD = 'Questa voce è già in scheda: scarta la proposta o modifica la voce dalla scheda.';
+
 export async function prepareAgentItemDecision(review: AgentVisitReview, itemId: string, decision: 'keep' | 'correct' | 'discard',
     signal: AbortSignal, correction: Record<string, string> = {}): Promise<AgentItemDecisionInput | null> {
     if (!agentItemAwaitsDecision(review, itemId)) return null;
@@ -258,7 +280,8 @@ export async function prepareAgentItemDecision(review: AgentVisitReview, itemId:
     if (patient.version !== review.patient!.version) throw new Error('La scheda è cambiata. Rileggi la voce prima di decidere.');
     const allowed: readonly string[] = agentItemCorrectable(original.kind) ? AGENT_CORRECTABLE_FIELDS[original.kind] : [];
     const changed = Object.fromEntries(Object.entries(correction).filter(([field]) => allowed.includes(field)).map(([field, value]) => [field, value.trim()]));
-    const item = decision === 'correct' ? { ...original, value: { ...original.value, values: { ...values(original), ...changed } } } : original;
+    const item = decision === 'correct' ? { ...original, value: { ...original.value, values: correctedValues(original, changed) } } : original;
+    if (agentItemAlreadyInRecord(patient, item)) throw new Error(AGENT_ITEM_IN_RECORD);
     const profile = withProposedProfile(patient, [item]);
     const prepared = await prepareAgentItem(review, item, profile, decision === 'correct');
     signal.throwIfAborted();
