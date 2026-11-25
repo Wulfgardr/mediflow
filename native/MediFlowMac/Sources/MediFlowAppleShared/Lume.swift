@@ -159,6 +159,49 @@ public enum LumePalette {
         return colorScheme == .dark ? grafite : giorno
     }
 
+    static let recordHexValues: [String: [String: String]] = [
+        "giorno": [
+            "canvas": "#e4e7ec",
+            "ink": "#14161a",
+            "accent": "#2450b4",
+            "warning-fill": "#fbebd9",
+            "critical-fill": "#fbe8e6",
+            "success-fill": "#e2f1e9",
+            "panel": "#ffffff",
+            "rail": "#f2f4f7",
+            "tray": "#f0f2f4",
+            "tray-rule": "#dfe1e5",
+            "tray-light": "#ffffff",
+            "tray-shadow": "#d9dce1",
+            "island": "#ffffff",
+            "compact-island": "#f3f4f6",
+            "island-rule": "#e7e8eb",
+            "change": "#e3ebfa",
+            "change-rule": "#bccbe8",
+            "proposal-rule": "#2b8098",
+        ],
+        "grafite": [
+            "canvas": "#0d0f12",
+            "ink": "#eceef1",
+            "accent": "#8cabf7",
+            "warning-fill": "#33281e",
+            "critical-fill": "#3a2321",
+            "success-fill": "#1b2f26",
+            "panel": "#17191e",
+            "rail": "#16191d",
+            "tray": "#101216",
+            "tray-rule": "#24262b",
+            "tray-light": "#1d1f23",
+            "tray-shadow": "#08090b",
+            "island": "#1f2228",
+            "compact-island": "#1f2228",
+            "island-rule": "#2f3238",
+            "change": "#1c273d",
+            "change-rule": "#364566",
+            "proposal-rule": "#4a97ad",
+        ],
+    ]
+
     /// Code-first mirror used by the fail-closed JSON parity test.
     public static let tokenHexValues: [String: String] = {
         var tokens = ["signal.warning": warningHex, "signal.critical": criticalHex,
@@ -180,6 +223,9 @@ public enum LumePalette {
                 "signal.success": hex(for: .positive, using: palette),
             ]
             for (role, value) in values { tokens["register.\(name).\(role)"] = value }
+        }
+        for (name, roles) in recordHexValues {
+            for (role, value) in roles { tokens["record.\(name).\(role)"] = value }
         }
         return tokens
     }()
