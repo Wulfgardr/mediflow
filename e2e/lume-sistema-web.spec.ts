@@ -243,6 +243,13 @@ for (const theme of ['light', 'dark'] as const) {
           document.documentElement.classList.add(selected);
         }, theme);
         for (const problem of await coveredControls(page)) problems.push(`${route}: ${problem}`);
+        const search = await page.evaluate(() => {
+          const trigger = document.querySelector('[data-testid=settings-search-trigger]');
+          if (!trigger?.checkVisibility()) return null;
+          const box = trigger.getBoundingClientRect();
+          return [box.y + 3, box.y + box.height / 2].every((y) => trigger.contains(document.elementFromPoint(box.x + box.width / 2, y)));
+        });
+        if (search === false) problems.push(`${route}: «Cerca impostazione» coperto nell'indice`);
       }
       expect(problems).toEqual([]);
     });
