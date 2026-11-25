@@ -145,6 +145,16 @@
   ],
   "breakingOverrides": [
     {
+      "change": "DELETE /api/v1/network/ambulatories/{id} was removed",
+      "trackingIssue": "WUL-946",
+      "reason": "Legacy paired ambulatory deletion bypassed the ADR 0169 confirmed destructive command and was reachable over LAN. Destructive ambulatory operations now use only the confirmed host command."
+    },
+    {
+      "change": "POST /api/v1/network/ambulatories/clear was removed",
+      "trackingIssue": "WUL-946",
+      "reason": "Legacy paired ambulatory clear bypassed the ADR 0169 confirmed destructive command and was reachable over LAN. Destructive ambulatory operations now use only the confirmed host command."
+    },
+    {
       "change": "GET /api/v1/network/capabilities response 200.hostPorts became required",
       "trackingIssue": "WUL-771",
       "reason": "PR 624 review correction: protocol 1.14 hosts must advertise the versioned host-port roster already required by the GPUI client. The producer always emits hostPorts; OpenAPI and TypeScript now require it too. Older consumers may ignore the added response field; a response omitting it is invalid and the GPUI client rejects it."

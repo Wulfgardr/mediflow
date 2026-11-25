@@ -1,7 +1,7 @@
 /* paired adapters use the same admitted transaction and audit owner. */
 import type { NetworkWriteContext } from './network-write-context';
 import { prepareNetworkPatientCommitGuard } from './network-patient-commit-authority';
-import { clearAmbulatory, createAmbulatory, deleteAmbulatory, updateAmbulatory, type AmbulatoryMutationResponse } from './ambulatory-write';
+import { createAmbulatory, updateAmbulatory, type AmbulatoryMutationResponse } from './ambulatory-write';
 
 export const NETWORK_AMBULATORY_WRITE_CAPABILITY = 'network.ambulatories.write';
 
@@ -21,22 +21,4 @@ export async function updateNetworkAmbulatory(
 ): Promise<AmbulatoryMutationResponse> {
     return updateAmbulatory({ ...context, authorizeCommit: await prepareNetworkPatientCommitGuard(
         context, NETWORK_AMBULATORY_WRITE_CAPABILITY) }, id, body, 'network');
-}
-
-export async function deleteNetworkAmbulatory(
-    context: NetworkWriteContext,
-    id: string,
-    body: Record<string, unknown>,
-): Promise<AmbulatoryMutationResponse> {
-    return deleteAmbulatory({ ...context, authorizeCommit: await prepareNetworkPatientCommitGuard(
-        context, NETWORK_AMBULATORY_WRITE_CAPABILITY) }, id, body.version, 'network');
-}
-
-export async function clearNetworkAmbulatory(
-    context: NetworkWriteContext,
-    ambulatoryId: string,
-    body: Record<string, unknown>,
-): Promise<AmbulatoryMutationResponse> {
-    return clearAmbulatory({ ...context, authorizeCommit: await prepareNetworkPatientCommitGuard(
-        context, NETWORK_AMBULATORY_WRITE_CAPABILITY) }, ambulatoryId, body.version, 'network');
 }
