@@ -13,7 +13,7 @@ use std::time::{Duration, Instant};
 
 /// Perché la registrazione manca o si è fermata.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Fault {
+pub enum Fault {
     /// Modello vocale non installato.
     ModelMissing,
     /// File del modello presenti ma diversi da quelli attesi.
@@ -30,7 +30,7 @@ pub(crate) enum Fault {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum State {
+pub enum State {
     /// Consenso e avvio: microfono chiuso.
     Disclosure,
     /// Verifica del modello e apertura del microfono, all'avvio o alla ripresa.
@@ -46,7 +46,7 @@ pub(crate) enum State {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Event {
+pub enum Event {
     Start,
     /// Il microfono consegna audio.
     CaptureRunning,
@@ -63,9 +63,9 @@ pub(crate) enum Event {
     EngineFailed,
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 impl Event {
-    pub(crate) const ALL: [Self; 11] = [
+    pub const ALL: [Self; 11] = [
         Self::Start,
         Self::CaptureRunning,
         Self::Pause,
@@ -82,7 +82,7 @@ impl Event {
 
 /// I cinque stati che la vista mostra sempre.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Visible {
+pub enum Visible {
     Ready,
     Recording,
     Paused,
@@ -92,7 +92,7 @@ pub(crate) enum Visible {
 
 /// Forma dell'indicatore: ogni stato visibile ne ha una sua, oltre al colore.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Shape {
+pub enum Shape {
     /// Cerchio vuoto.
     Ring,
     /// Cerchio pieno.
@@ -106,7 +106,7 @@ pub(crate) enum Shape {
 }
 
 impl Visible {
-    pub(crate) fn label(self) -> &'static str {
+    pub fn label(self) -> &'static str {
         match self {
             Self::Ready => "Pronta",
             Self::Recording => "In registrazione",
@@ -115,7 +115,7 @@ impl Visible {
             Self::Error => "Errore",
         }
     }
-    pub(crate) fn shape(self) -> Shape {
+    pub fn shape(self) -> Shape {
         match self {
             Self::Ready => Shape::Ring,
             Self::Recording => Shape::Dot,
@@ -125,7 +125,7 @@ impl Visible {
         }
     }
     /// Nome stabile per i selettori delle prove.
-    pub(crate) fn key(self) -> &'static str {
+    pub fn key(self) -> &'static str {
         match self {
             Self::Ready => "ready",
             Self::Recording => "recording",
@@ -137,15 +137,15 @@ impl Visible {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct Illegal {
-    pub(crate) state: State,
-    pub(crate) event: Event,
+pub struct Illegal {
+    pub state: State,
+    pub event: Event,
 }
 
 /// Tabella dei passaggi. `recorded`: c'è già stato almeno un tratto in
 /// registrazione (decide fra microfono assente e microfono perso, e se si può
 /// terminare mentre il microfono si riapre).
-pub(crate) fn next(state: State, event: Event, recorded: bool) -> Option<State> {
+pub fn next(state: State, event: Event, recorded: bool) -> Option<State> {
     use Event as E;
     use State::*;
     Some(match (state, event) {
@@ -173,7 +173,7 @@ pub(crate) fn next(state: State, event: Event, recorded: bool) -> Option<State> 
 }
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct Machine {
+pub struct Machine {
     state: State,
     /// Tempo in registrazione dei tratti già chiusi.
     recorded: Duration,
@@ -190,7 +190,7 @@ impl Default for Machine {
 }
 
 impl Machine {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             state: State::Disclosure,
             recorded: Duration::ZERO,
@@ -199,15 +199,15 @@ impl Machine {
         }
     }
     /// Sessione che non può partire: modello assente, sistema non supportato.
-    pub(crate) fn failed(fault: Fault) -> Self {
+    pub fn failed(fault: Fault) -> Self {
         Self {
             state: State::Error(fault),
             ..Self::new()
         }
     }
     /// Per le prove: macchina già in `state`, con `elapsed` di registrazione.
-    #[cfg(test)]
-    pub(crate) fn at(state: State, elapsed: Duration, now: Instant) -> Self {
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn at(state: State, elapsed: Duration, now: Instant) -> Self {
         let running = state == State::Recording;
         Self {
             state,
@@ -218,16 +218,16 @@ impl Machine {
                 || matches!(state, State::Paused | State::Finalizing | State::Review),
         }
     }
-    pub(crate) fn state(&self) -> State {
+    pub fn state(&self) -> State {
         self.state
     }
-    pub(crate) fn has_recorded(&self) -> bool {
+    pub fn has_recorded(&self) -> bool {
         self.has_recorded
     }
-    pub(crate) fn allows(&self, event: Event) -> bool {
+    pub fn allows(&self, event: Event) -> bool {
         next(self.state, event, self.has_recorded).is_some()
     }
-    pub(crate) fn apply(&mut self, event: Event, now: Instant) -> Result<State, Illegal> {
+    pub fn apply(&mut self, event: Event, now: Instant) -> Result<State, Illegal> {
         let Some(state) = next(self.state, event, self.has_recorded) else {
             return Err(Illegal {
                 state: self.state,
@@ -245,19 +245,19 @@ impl Machine {
         Ok(state)
     }
     /// Tempo in registrazione fino a `now`, pause escluse.
-    pub(crate) fn elapsed(&self, now: Instant) -> Duration {
+    pub fn elapsed(&self, now: Instant) -> Duration {
         self.recorded
             + self
                 .since
                 .map_or(Duration::ZERO, |since| now.saturating_duration_since(since))
     }
-    #[cfg(test)]
-    pub(crate) fn visible(&self) -> Visible {
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn visible(&self) -> Visible {
         self.visible_for(self.state)
     }
     /// Stato visibile di `state` con la storia di questa macchina: la vista
     /// può mostrare un errore al posto di una fine senza testo.
-    pub(crate) fn visible_for(&self, state: State) -> Visible {
+    pub fn visible_for(&self, state: State) -> Visible {
         match state {
             State::Disclosure => Visible::Ready,
             // Il microfono non consegna ancora audio: prima dell'avvio la
@@ -273,7 +273,7 @@ impl Machine {
 }
 
 /// Tempo trascorso come lo mostra l'indicatore: «03:12», «1:05:09».
-pub(crate) fn clock(elapsed: Duration) -> String {
+pub fn clock(elapsed: Duration) -> String {
     let seconds = elapsed.as_secs();
     let (hours, minutes, seconds) = (seconds / 3600, seconds / 60 % 60, seconds % 60);
     if hours > 0 {

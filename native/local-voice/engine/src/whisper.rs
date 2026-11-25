@@ -2,11 +2,11 @@
 //! Il ponte Swift cattura il microfono e consegna blocchi a 16 kHz; il thread
 //! li legge, li passa al ciclo di ascolto e pubblica solo il testo stabile.
 
-use super::listening::{Decoder, Dictation, EngineFailure, Segment, SpeechDetector};
-use super::model::{self, ModelFile, ModelStatus};
-use super::recording::Machine;
-use super::voices::{self, Speaker};
-use super::{Event, State};
+use crate::listening::{Decoder, Dictation, EngineFailure, Segment, SpeechDetector};
+use crate::model::{self, ModelFile, ModelStatus};
+use crate::recording::Machine;
+use crate::voices::{self, Speaker};
+use crate::{Event, State};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender, TryRecvError};
 use std::sync::{Arc, Mutex};
@@ -24,7 +24,7 @@ const PROMPT_CHARACTERS: usize = 600;
 
 /// Prompt iniziale con i nomi dei farmaci delle terapie del paziente aperto.
 /// Nessuna sostituzione successiva: il prompt orienta il modello e basta.
-pub(crate) fn vocabulary_prompt<'a>(names: impl IntoIterator<Item = &'a str>) -> Zeroizing<String> {
+pub fn vocabulary_prompt<'a>(names: impl IntoIterator<Item = &'a str>) -> Zeroizing<String> {
     let mut prompt = Zeroizing::new(String::new());
     let mut seen: Vec<String> = Vec::new();
     for name in names {
@@ -56,13 +56,13 @@ fn context_parameters() -> WhisperContextParameters<'static> {
     parameters
 }
 
-pub(crate) struct WhisperDecoder {
+pub struct WhisperDecoder {
     state: WhisperState,
     prompt: Zeroizing<String>,
 }
 
 impl WhisperDecoder {
-    pub(crate) fn load(path: &Path, prompt: Zeroizing<String>) -> Result<Self, EngineFailure> {
+    pub fn load(path: &Path, prompt: Zeroizing<String>) -> Result<Self, EngineFailure> {
         whisper_rs::install_logging_hooks();
         let context = WhisperContext::new_with_params(path, context_parameters())
             .map_err(|_| EngineFailure)?;
@@ -87,8 +87,8 @@ impl Decoder for WhisperDecoder {
             params.set_initial_prompt(&self.prompt);
         }
         let padded;
-        let audio = if audio.len() < super::listening::SAMPLE_RATE {
-            let mut buffer = Zeroizing::new(vec![0.0; super::listening::SAMPLE_RATE]);
+        let audio = if audio.len() < crate::listening::SAMPLE_RATE {
+            let mut buffer = Zeroizing::new(vec![0.0; crate::listening::SAMPLE_RATE]);
             buffer[..audio.len()].copy_from_slice(audio);
             padded = buffer;
             &padded[..]
@@ -104,12 +104,12 @@ impl Decoder for WhisperDecoder {
     }
 }
 
-pub(crate) struct SileroDetector {
+pub struct SileroDetector {
     context: WhisperVadContext,
 }
 
 impl SileroDetector {
-    pub(crate) fn load(path: &Path) -> Result<Self, EngineFailure> {
+    pub fn load(path: &Path) -> Result<Self, EngineFailure> {
         whisper_rs::install_logging_hooks();
         let mut parameters = WhisperVadContextParams::new();
         parameters.set_n_threads(1);
@@ -130,7 +130,7 @@ impl SpeechDetector for SileroDetector {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum SourcePhase {
+pub enum SourcePhase {
     Starting,
     Running,
     PermissionDenied,
@@ -140,7 +140,7 @@ pub(crate) enum SourcePhase {
 
 /// Sorgente dei blocchi audio: il microfono tramite il ponte Swift, oppure,
 /// nelle prove, file letti da disco e iniettati a blocchi da 0,5 s.
-pub(crate) trait AudioSource: Send {
+pub trait AudioSource: Send {
     fn start(&mut self);
     fn phase(&mut self) -> SourcePhase;
     /// Aggiunge a `out` i campioni a 16 kHz arrivati dall'ultima lettura.
@@ -155,61 +155,61 @@ pub(crate) trait AudioSource: Send {
 /// Microfono aperto che non consegna audio per questo tempo: è perso, e la
 /// registrazione si ferma invece di restare «in registrazione» a vuoto. Il
 /// microfono consegna un pezzo ogni 85 ms circa.
-pub(crate) const STALL: Duration = Duration::from_secs(2);
+pub const STALL: Duration = Duration::from_secs(2);
 
 #[derive(Default)]
-pub(crate) struct Shared {
+pub struct Shared {
     /// La sessione è stata ritirata: il thread finisce da solo e non pubblica più nulla.
     retired: bool,
-    pub(crate) machine: Machine,
-    pub(crate) stable: Zeroizing<String>,
-    pub(crate) provisional: Zeroizing<String>,
+    pub machine: Machine,
+    pub stable: Zeroizing<String>,
+    pub provisional: Zeroizing<String>,
     open_confirmed: usize,
     finals: usize,
-    pub(crate) transcript: Option<Zeroizing<String>>,
+    pub transcript: Option<Zeroizing<String>>,
     /// Frasi definitive con i loro tempi: pubblicate con il testo da rivedere.
-    pub(crate) segments: Vec<Segment>,
+    pub segments: Vec<Segment>,
     /// La registrazione si è fermata da sola alla durata massima.
-    pub(crate) limit_reached: bool,
+    pub limit_reached: bool,
     /// Ascolto della visita: le frasi si attribuiscono a medico e paziente.
-    pub(crate) two_voices: bool,
+    pub two_voices: bool,
     /// Voce di ogni frase, nell'ordine di `segments`, con il testo da rivedere.
-    pub(crate) speakers: Vec<Speaker>,
+    pub speakers: Vec<Speaker>,
     /// Per le misure: millisecondi di ogni impronta e dell'attribuzione.
-    #[cfg(test)]
-    pub(crate) print_ms: Vec<f64>,
-    #[cfg(test)]
-    pub(crate) attribution_ms: f64,
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
+    pub print_ms: Vec<f64>,
+    #[cfg(any(test, feature = "test-support"))]
+    pub attribution_ms: f64,
+    #[cfg(any(test, feature = "test-support"))]
     windows: Vec<(usize, usize, usize)>,
     /// Per le prove: massimo di campioni audio trattenuti dal ciclo.
-    #[cfg(test)]
-    pub(crate) max_retained: usize,
+    #[cfg(any(test, feature = "test-support"))]
+    pub max_retained: usize,
     /// Per le prove: campioni rimasti nel ciclo dopo l'annullamento.
-    #[cfg(test)]
-    pub(crate) retained_after_cancel: Option<usize>,
+    #[cfg(any(test, feature = "test-support"))]
+    pub retained_after_cancel: Option<usize>,
     /// Per le prove: pause la cui ultima frase è già trascritta.
-    #[cfg(test)]
-    pub(crate) pauses_flushed: usize,
+    #[cfg(any(test, feature = "test-support"))]
+    pub pauses_flushed: usize,
 }
 
-pub(crate) struct Engine {
-    pub(crate) directory: PathBuf,
-    pub(crate) files: [&'static ModelFile; 2],
-    pub(crate) prompt: Zeroizing<String>,
+pub struct Engine {
+    pub directory: PathBuf,
+    pub files: [&'static ModelFile; 2],
+    pub prompt: Zeroizing<String>,
     /// In produzione [`load_whisper`]; nelle prove un motore finto sugli
     /// stessi file verificati.
-    pub(crate) load: Loader,
+    pub load: Loader,
 }
 
 /// Ciclo di ascolto con rilevatore e decodificatore già caricati.
-pub(crate) type Listener = Box<dyn FnOnce(&mut dyn AudioSource, &Receiver<Event>, &Mutex<Shared>)>;
+pub type Listener = Box<dyn FnOnce(&mut dyn AudioSource, &Receiver<Event>, &Mutex<Shared>)>;
 /// Carica il motore dai file della cartella, dopo la verifica dello SHA-256.
-pub(crate) type Loader =
+pub type Loader =
     fn(&Path, &[&'static ModelFile; 2], Zeroizing<String>) -> Result<Listener, EngineFailure>;
 
 /// whisper.cpp con Metal e Silero sulla CPU.
-pub(crate) fn load_whisper(
+pub fn load_whisper(
     directory: &Path,
     files: &[&'static ModelFile; 2],
     prompt: Zeroizing<String>,
@@ -224,12 +224,12 @@ pub(crate) fn load_whisper(
 
 /// Per le prove: stato, lunghezza del provvisorio e del confermato della
 /// frase aperta, definitivi e finestre (inizio, fine, parole).
-#[cfg(test)]
-pub(crate) type Snapshot = (State, usize, usize, usize, Vec<(usize, usize, usize)>);
+#[cfg(any(test, feature = "test-support"))]
+pub type Snapshot = (State, usize, usize, usize, Vec<(usize, usize, usize)>);
 
 /// Sessione di dettatura con whisper: comandi verso il thread di lavoro e
 /// lettura dello stato pubblicato.
-pub(crate) struct WhisperSession {
+pub struct WhisperSession {
     shared: Arc<Mutex<Shared>>,
     commands: Sender<Event>,
     worker: Option<JoinHandle<()>>,
@@ -238,7 +238,7 @@ pub(crate) struct WhisperSession {
 }
 
 impl WhisperSession {
-    pub(crate) fn new(engine: Engine, source: Box<dyn AudioSource>) -> Self {
+    pub fn new(engine: Engine, source: Box<dyn AudioSource>) -> Self {
         let shared = Arc::new(Mutex::new(Shared::default()));
         let (commands, receiver) = mpsc::channel();
         let worker_shared = shared.clone();
@@ -260,7 +260,7 @@ impl WhisperSession {
     /// Ritiro che aspetta il rilascio del motore, al massimo `limit`. Serve
     /// prima di `exit()`: la distruzione statica del dispositivo Metal di
     /// ggml abortisce se trova ancora buffer di un contesto whisper.
-    pub(crate) fn close(mut self, limit: Duration) -> bool {
+    pub fn close(mut self, limit: Duration) -> bool {
         let done = self.done.take();
         drop(self);
         done.is_none_or(|done| {
@@ -272,43 +272,42 @@ impl WhisperSession {
     }
     /// Comando del medico: il thread lo esegue solo se la macchina lo
     /// ammette nello stato in cui lo trova.
-    pub(crate) fn send(&self, command: Event) {
+    pub fn send(&self, command: Event) {
         let _ = self.commands.send(command);
     }
-    #[cfg(test)]
-    pub(crate) fn start(&self) {
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn start(&self) {
         self.send(Event::Start);
     }
-    #[cfg(test)]
-    pub(crate) fn stop(&self) {
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn stop(&self) {
         self.send(Event::Stop);
     }
     fn read<T>(&self, f: impl FnOnce(&Shared) -> T) -> Option<T> {
         self.shared.lock().ok().map(|s| f(&s))
     }
-    pub(crate) fn machine(&self) -> Machine {
-        let broken = Machine::failed(super::Fault::EngineFailed);
+    pub fn machine(&self) -> Machine {
+        let broken = Machine::failed(crate::Fault::EngineFailed);
         if self.worker.is_none() {
             return broken;
         }
         self.read(|s| s.machine).unwrap_or(broken)
     }
-    pub(crate) fn state(&self) -> State {
+    pub fn state(&self) -> State {
         self.machine().state()
     }
     /// Testo stabile mentre si parla: solo da mostrare, mai da trasferire.
-    pub(crate) fn stable_text(&self) -> Zeroizing<String> {
+    pub fn stable_text(&self) -> Zeroizing<String> {
         self.read(|s| Zeroizing::new(s.stable.as_str().to_owned()))
             .unwrap_or_default()
     }
     /// Testo provvisorio della frase in corso: solo da mostrare.
-    pub(crate) fn provisional_text(&self) -> Zeroizing<String> {
+    pub fn provisional_text(&self) -> Zeroizing<String> {
         self.read(|s| Zeroizing::new(s.provisional.as_str().to_owned()))
             .unwrap_or_default()
     }
     /// Frasi con i loro tempi, solo con il testo da rivedere.
-    #[cfg(test)]
-    pub(crate) fn segments(&self) -> Vec<Segment> {
+    pub fn segments(&self) -> Vec<Segment> {
         self.read(|s| {
             if s.machine.state().reviewable() && s.transcript.is_some() {
                 s.segments.clone()
@@ -318,14 +317,14 @@ impl WhisperSession {
         })
         .unwrap_or_default()
     }
-    pub(crate) fn limit_reached(&self) -> bool {
+    pub fn limit_reached(&self) -> bool {
         self.read(|s| s.limit_reached).unwrap_or(false)
     }
-    pub(crate) fn two_voices(&self) -> bool {
+    pub fn two_voices(&self) -> bool {
         self.read(|s| s.two_voices).unwrap_or(false)
     }
     /// Ascolto della visita a due voci; vale solo prima dell'avvio.
-    pub(crate) fn set_two_voices(&self, two_voices: bool) {
+    pub fn set_two_voices(&self, two_voices: bool) {
         publish(&self.shared, |s| {
             if s.machine.state() == State::Disclosure {
                 s.two_voices = two_voices;
@@ -334,7 +333,7 @@ impl WhisperSession {
     }
     /// Frasi attribuite a medico o paziente, solo con il testo da rivedere
     /// dell'ascolto a due voci.
-    pub(crate) fn attributed(&self) -> Vec<(Speaker, Zeroizing<String>)> {
+    pub fn attributed(&self) -> Vec<(Speaker, Zeroizing<String>)> {
         self.read(|s| {
             if !(s.two_voices && s.machine.state().reviewable() && s.transcript.is_some()) {
                 return Vec::new();
@@ -347,7 +346,7 @@ impl WhisperSession {
         })
         .unwrap_or_default()
     }
-    pub(crate) fn transcript(&self) -> Option<Zeroizing<String>> {
+    pub fn transcript(&self) -> Option<Zeroizing<String>> {
         self.read(|s| {
             s.machine
                 .state()
@@ -358,8 +357,8 @@ impl WhisperSession {
         .flatten()
     }
     /// Sessione di prova: rilevatore, decodificatore e sorgente dati dal test.
-    #[cfg(test)]
-    pub(crate) fn with_parts<V, D>(detector: V, decoder: D, source: Box<dyn AudioSource>) -> Self
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn with_parts<V, D>(detector: V, decoder: D, source: Box<dyn AudioSource>) -> Self
     where
         V: SpeechDetector + Send + 'static,
         D: Decoder + Send + 'static,
@@ -367,11 +366,8 @@ impl WhisperSession {
         Self::with_dictation(Dictation::new(detector, decoder), source)
     }
     /// Sessione di prova con una dettatura già configurata dal test.
-    #[cfg(test)]
-    pub(crate) fn with_dictation<V, D>(
-        dictation: Dictation<V, D>,
-        source: Box<dyn AudioSource>,
-    ) -> Self
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn with_dictation<V, D>(dictation: Dictation<V, D>, source: Box<dyn AudioSource>) -> Self
     where
         V: SpeechDetector + Send + 'static,
         D: Decoder + Send + 'static,
@@ -395,13 +391,13 @@ impl WhisperSession {
             done: Some(done),
         }
     }
-    #[cfg(test)]
-    pub(crate) fn shared_for_test(&self) -> Arc<Mutex<Shared>> {
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn shared_for_test(&self) -> Arc<Mutex<Shared>> {
         self.shared.clone()
     }
     /// Stato pubblicato, per le misure delle prove.
-    #[cfg(test)]
-    pub(crate) fn snapshot(&self) -> Snapshot {
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn snapshot(&self) -> Snapshot {
         let s = self.shared.lock().unwrap();
         (
             s.machine.state(),
@@ -412,8 +408,8 @@ impl WhisperSession {
         )
     }
     /// Attende che il thread arrivi a uno stato finale (solo per le prove).
-    #[cfg(test)]
-    pub(crate) fn wait_for(&self, wanted: &[State]) -> State {
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn wait_for(&self, wanted: &[State]) -> State {
         for _ in 0..12_000 {
             let state = self.state();
             if wanted.contains(&state) {
@@ -541,11 +537,11 @@ fn attribute<V: SpeechDetector, D: Decoder>(
     if !shared.lock().is_ok_and(|s| s.two_voices) {
         return Vec::new();
     }
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     let started = Instant::now();
     let prints: Vec<_> = dictation.segments().iter().map(|s| s.voice).collect();
     let speakers = voices::attribute(&prints);
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     {
         let elapsed = started.elapsed().as_secs_f64() * 1000.0;
         let print_ms = dictation.print_ms.clone();
@@ -589,7 +585,7 @@ fn publish_live<V: SpeechDetector, D: Decoder>(
 /// microfono: in registrazione solo mentre arriva audio; in pausa e dopo la
 /// fine il microfono è chiuso; se il microfono manca, si chiude o tace oltre
 /// [`STALL`], la registrazione si ferma subito in errore.
-pub(crate) fn listen<V: SpeechDetector, D: Decoder>(
+pub fn listen<V: SpeechDetector, D: Decoder>(
     mut dictation: Dictation<V, D>,
     source: &mut dyn AudioSource,
     commands: &Receiver<Event>,
@@ -603,7 +599,7 @@ pub(crate) fn listen<V: SpeechDetector, D: Decoder>(
         dictation.set_two_voices(true);
     }
     source.start();
-    let mut blocks = Zeroizing::new(Vec::with_capacity(super::listening::MAX_UTTERANCE));
+    let mut blocks = Zeroizing::new(Vec::with_capacity(crate::listening::MAX_UTTERANCE));
     let mut last_audio = Instant::now();
     let outcome = loop {
         let paused = current(shared) == State::Paused;
@@ -633,7 +629,7 @@ pub(crate) fn listen<V: SpeechDetector, D: Decoder>(
                     break Event::EngineFailed;
                 }
                 publish_live(shared, &dictation);
-                #[cfg(test)]
+                #[cfg(any(test, feature = "test-support"))]
                 publish(shared, |s| s.pauses_flushed += 1);
                 continue;
             }
@@ -675,7 +671,7 @@ pub(crate) fn listen<V: SpeechDetector, D: Decoder>(
             break Event::EngineFailed;
         }
         blocks.zeroize();
-        #[cfg(test)]
+        #[cfg(any(test, feature = "test-support"))]
         {
             let retained = dictation.retained_samples();
             publish(shared, |s| s.max_retained = s.max_retained.max(retained));
@@ -723,7 +719,7 @@ pub(crate) fn listen<V: SpeechDetector, D: Decoder>(
         _ => {
             source.stop();
             dictation.wipe();
-            #[cfg(test)]
+            #[cfg(any(test, feature = "test-support"))]
             {
                 let retained = dictation.retained_samples();
                 if let Ok(mut s) = shared.lock() {
@@ -749,7 +745,7 @@ pub(crate) fn listen<V: SpeechDetector, D: Decoder>(
     let segments = dictation.segments().to_vec();
     let speakers = attribute(shared, &dictation);
     let finals = dictation.finals_count();
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     let windows = dictation.windows.clone();
     dictation.wipe();
     drop(dictation);
@@ -757,7 +753,7 @@ pub(crate) fn listen<V: SpeechDetector, D: Decoder>(
         s.finals = finals;
         s.segments = segments;
         s.speakers = speakers;
-        #[cfg(test)]
+        #[cfg(any(test, feature = "test-support"))]
         {
             s.windows = windows;
         }
@@ -771,7 +767,7 @@ pub(crate) fn listen<V: SpeechDetector, D: Decoder>(
 }
 
 #[cfg(local_voice_capture)]
-pub(crate) mod swift {
+pub mod swift {
     use super::{AudioSource, SourcePhase};
     use std::ffi::c_void;
 
@@ -786,13 +782,13 @@ pub(crate) mod swift {
 
     /// Cattura del microfono nel ponte Swift: conversione a 16 kHz mono e
     /// consegna dei campioni a Rust. Nessun file audio.
-    pub(crate) struct SwiftCapture(*mut c_void);
+    pub struct SwiftCapture(*mut c_void);
     // SAFETY: il ponte protegge stato e campioni con un lock; il puntatore si
     // usa da un solo thread alla volta (quello di lavoro) e si rilascia una volta.
     unsafe impl Send for SwiftCapture {}
 
     impl SwiftCapture {
-        pub(crate) fn new() -> Option<Self> {
+        pub fn new() -> Option<Self> {
             let pointer = unsafe { MFVoiceCaptureCreate() };
             (!pointer.is_null()).then_some(Self(pointer))
         }
@@ -848,25 +844,28 @@ pub(crate) mod swift {
     }
 }
 
-#[cfg(test)]
-pub(crate) mod tests {
-    use super::super::listening::tests::{CountingDecoder, LoudnessDetector, silence, tone};
-    use super::super::listening::{BLOCK, Dictation};
+#[cfg(any(test, feature = "test-support"))]
+pub mod tests {
     use super::*;
+    use crate::listening::BLOCK;
+    #[cfg(test)]
+    use crate::listening::Dictation;
+    #[cfg(test)]
+    use crate::listening::tests::{CountingDecoder, LoudnessDetector, silence, tone};
 
     /// Decodificatore che resta fermo finché il test non lo sblocca.
-    pub(crate) struct BlockingDecoder {
+    pub struct BlockingDecoder {
         entered: Option<Sender<()>>,
         release: Arc<(Mutex<bool>, std::sync::Condvar)>,
         finished: Sender<()>,
     }
-    pub(crate) struct Gate {
-        pub(crate) entered: Receiver<()>,
-        pub(crate) release: Arc<(Mutex<bool>, std::sync::Condvar)>,
-        pub(crate) finished: Receiver<()>,
+    pub struct Gate {
+        pub entered: Receiver<()>,
+        pub release: Arc<(Mutex<bool>, std::sync::Condvar)>,
+        pub finished: Receiver<()>,
     }
     impl BlockingDecoder {
-        pub(crate) fn new() -> (Self, Gate) {
+        pub fn new() -> (Self, Gate) {
             let (entered, entered_rx) = mpsc::channel();
             let (finished, finished_rx) = mpsc::channel();
             let release = Arc::new((Mutex::new(false), std::sync::Condvar::new()));
@@ -883,7 +882,7 @@ pub(crate) mod tests {
                 },
             )
         }
-        pub(crate) fn open(release: &Arc<(Mutex<bool>, std::sync::Condvar)>) {
+        pub fn open(release: &Arc<(Mutex<bool>, std::sync::Condvar)>) {
             *release.0.lock().unwrap() = true;
             release.1.notify_all();
         }
@@ -908,32 +907,32 @@ pub(crate) mod tests {
 
     /// Sorgente che consegna un file già in memoria a blocchi da 0,5 s, come
     /// farebbe il microfono.
-    pub(crate) struct InjectedSource {
-        pub(crate) audio: Vec<f32>,
-        pub(crate) position: usize,
-        pub(crate) phase: SourcePhase,
-        pub(crate) after_start: SourcePhase,
+    pub struct InjectedSource {
+        pub audio: Vec<f32>,
+        pub position: usize,
+        pub phase: SourcePhase,
+        pub after_start: SourcePhase,
         /// Velocità rispetto al tempo reale (1,0 = come il microfono); 0 = senza attese.
-        pub(crate) speed: f64,
-        pub(crate) started: Option<std::time::Instant>,
+        pub speed: f64,
+        pub started: Option<std::time::Instant>,
         /// Campioni consegnati alla volta: 0,5 s, o circa 85 ms come il tap
         /// del microfono (4096 campioni a 48 kHz).
-        pub(crate) chunk: usize,
+        pub chunk: usize,
         /// Posizione da cui l'orologio conta l'arrivo (dopo una ripresa).
-        pub(crate) base: usize,
+        pub base: usize,
         /// Microfono chiuso (pausa o fine): oltre questa posizione non arriva nulla.
-        pub(crate) closed_at: Option<usize>,
+        pub closed_at: Option<usize>,
         /// Il microfono si stacca a questa posizione.
-        pub(crate) fail_at: Option<usize>,
+        pub fail_at: Option<usize>,
         /// Il microfono resta aperto ma tace da questa posizione.
-        pub(crate) silent_from: Option<usize>,
+        pub silent_from: Option<usize>,
         /// Il microfono non si riapre dopo la pausa.
-        pub(crate) fail_on_resume: bool,
+        pub fail_on_resume: bool,
         /// Gesti ricevuti dalla sorgente, in ordine: per le prove.
-        pub(crate) log: Arc<Mutex<Vec<&'static str>>>,
+        pub log: Arc<Mutex<Vec<&'static str>>>,
     }
     impl InjectedSource {
-        pub(crate) fn new(audio: Vec<f32>) -> Self {
+        pub fn new(audio: Vec<f32>) -> Self {
             Self {
                 audio,
                 position: 0,
@@ -950,7 +949,7 @@ pub(crate) mod tests {
                 log: Arc::default(),
             }
         }
-        pub(crate) fn paced(audio: Vec<f32>, speed: f64) -> Self {
+        pub fn paced(audio: Vec<f32>, speed: f64) -> Self {
             Self {
                 speed,
                 ..Self::new(audio)
@@ -1031,14 +1030,14 @@ pub(crate) mod tests {
     /// Visita sintetica generata mentre la si legge, senza tenerla in
     /// memoria: ogni minuto dieci frasi da 2 s con 1 s di pausa, un monologo
     /// da 25 s (più lungo di una frase) e 5 s di silenzio.
-    pub(crate) struct SyntheticVisit {
-        pub(crate) total: usize,
+    pub struct SyntheticVisit {
+        pub total: usize,
         position: usize,
         phase: SourcePhase,
-        pub(crate) log: Arc<Mutex<Vec<&'static str>>>,
+        pub log: Arc<Mutex<Vec<&'static str>>>,
     }
     impl SyntheticVisit {
-        pub(crate) fn minutes(minutes: usize) -> Self {
+        pub fn minutes(minutes: usize) -> Self {
             Self {
                 total: minutes * 60 * 16_000,
                 position: 0,
@@ -1092,13 +1091,14 @@ pub(crate) mod tests {
         }
     }
 
+    #[cfg(test)]
     /// Campioni che il ciclo può trattenere in qualunque momento: la frase
     /// aperta, il contesto del rilevatore e il resto di una finestra.
-    const RETAINED_BOUND: usize = super::super::listening::MAX_UTTERANCE + 33 * 512 + 512;
+    const RETAINED_BOUND: usize = crate::listening::MAX_UTTERANCE + 33 * 512 + 512;
 
     #[test]
     fn a_long_recording_keeps_audio_bounded_and_reaches_review_in_segments() {
-        use super::super::listening::SAMPLE_RATE;
+        use crate::listening::SAMPLE_RATE;
         let source = SyntheticVisit::minutes(12);
         let log = source.log.clone();
         let session = WhisperSession::with_parts(
@@ -1139,7 +1139,7 @@ pub(crate) mod tests {
 
     #[test]
     fn the_recording_stops_by_itself_at_sixty_minutes() {
-        use super::super::listening::{MAX_RECORDING, SAMPLE_RATE};
+        use crate::listening::{MAX_RECORDING, SAMPLE_RATE};
         let source = SyntheticVisit::minutes(61);
         let log = source.log.clone();
         let session = WhisperSession::with_parts(
@@ -1157,7 +1157,7 @@ pub(crate) mod tests {
         // L'ultima frase prima del limite è nel testo, niente dopo i 60 minuti.
         assert!(last.start >= 59 * 60 * SAMPLE_RATE);
         assert_eq!(MAX_RECORDING, 60 * 60 * SAMPLE_RATE);
-        assert!(super::super::LIMIT_REACHED.contains("60 minuti"));
+        assert!(crate::LIMIT_REACHED.contains("60 minuti"));
     }
 
     /// Visita sintetica a due voci: frasi alternate fra una voce grave che
@@ -1165,7 +1165,7 @@ pub(crate) mod tests {
     /// testo da rivedere le tiene nell'ordine in cui sono state dette.
     #[test]
     fn a_two_voice_visit_attributes_each_sentence_to_doctor_or_patient() {
-        use super::super::voices::tests::synthetic_voice;
+        use crate::voices::tests::synthetic_voice;
         let mut audio = silence(0.5);
         let mut truth = Vec::new();
         for turn in 0..10u32 {
@@ -1200,7 +1200,7 @@ pub(crate) mod tests {
     /// La dettatura a una voce non calcola impronte né attribuisce frasi.
     #[test]
     fn dictation_keeps_one_voice_and_computes_no_print() {
-        use super::super::voices::tests::synthetic_voice;
+        use crate::voices::tests::synthetic_voice;
         let mut audio = synthetic_voice(1.5, 115.0, 600.0, 1_100.0, 1);
         audio.extend(silence(1.0));
         audio.extend(synthetic_voice(1.5, 210.0, 850.0, 1_900.0, 2));
@@ -1229,7 +1229,7 @@ pub(crate) mod tests {
             CountingDecoder::default(),
             Box::new(SyntheticVisit::minutes(15)),
         );
-        let session = super::super::Session::with_whisper(whisper);
+        let session = crate::Session::with_whisper(whisper);
         session.start();
         let started = Instant::now();
         while session.state() != State::Review {
@@ -1264,10 +1264,11 @@ pub(crate) mod tests {
             "{}",
             text.chars().count()
         );
-        assert!(super::super::LIMIT_REACHED.contains("80.000 caratteri"));
-        assert_eq!(super::super::listening::MAX_TRANSCRIPT_CHARS, 80_000);
+        assert!(crate::LIMIT_REACHED.contains("80.000 caratteri"));
+        assert_eq!(crate::listening::MAX_TRANSCRIPT_CHARS, 80_000);
     }
 
+    #[cfg(test)]
     fn session_with(source: InjectedSource) -> (Arc<Mutex<Shared>>, Sender<Event>, JoinHandle<()>) {
         let shared = Arc::new(Mutex::new(Shared::default()));
         assert!(transition(&shared, Event::Start));
@@ -1281,6 +1282,7 @@ pub(crate) mod tests {
         (shared, commands, worker)
     }
 
+    #[cfg(test)]
     fn wait(shared: &Mutex<Shared>, wanted: State) -> State {
         for _ in 0..4_000 {
             let state = shared.lock().unwrap().machine.state();
@@ -1310,7 +1312,7 @@ pub(crate) mod tests {
 
     #[test]
     fn permission_denied_and_missing_microphone_keep_no_text() {
-        use super::super::Fault;
+        use crate::Fault;
         for (phase, state) in [
             (
                 SourcePhase::PermissionDenied,
@@ -1331,6 +1333,7 @@ pub(crate) mod tests {
         }
     }
 
+    #[cfg(test)]
     /// Alternanza di 2 s di voce e 1 s di silenzio: una frase ogni 3 s.
     fn speech(seconds: usize) -> Vec<f32> {
         let mut audio = Vec::new();
@@ -1343,7 +1346,7 @@ pub(crate) mod tests {
 
     #[test]
     fn microphone_lost_midway_stops_at_once_and_keeps_the_text_for_review() {
-        use super::super::Fault;
+        use crate::Fault;
         let mut source = InjectedSource::new(speech(30));
         source.fail_at = Some(9 * 16_000);
         let log = source.log.clone();
@@ -1351,7 +1354,7 @@ pub(crate) mod tests {
         worker.join().unwrap();
         let s = shared.lock().unwrap();
         assert_eq!(s.machine.state(), State::Error(Fault::MicrophoneLost));
-        assert_eq!(s.machine.visible(), super::super::Visible::Error);
+        assert_eq!(s.machine.visible(), crate::Visible::Error);
         assert_eq!(*log.lock().unwrap(), ["start", "stop"], "microphone closed");
         // Tre frasi da 2 s prima del distacco, nessuna dopo.
         let text = s.transcript.clone().expect("text kept for review");
@@ -1362,7 +1365,7 @@ pub(crate) mod tests {
 
     #[test]
     fn a_silent_microphone_is_lost_after_the_stall_not_shown_as_recording() {
-        use super::super::Fault;
+        use crate::Fault;
         let mut source = InjectedSource::new(speech(30));
         source.silent_from = Some(6 * 16_000);
         let log = source.log.clone();
@@ -1463,7 +1466,7 @@ pub(crate) mod tests {
 
     #[test]
     fn a_microphone_that_does_not_reopen_after_pause_is_lost_not_missing() {
-        use super::super::Fault;
+        use crate::Fault;
         let mut source = InjectedSource::paced(speech(30), 20.0);
         source.fail_on_resume = true;
         let log = source.log.clone();
@@ -1532,7 +1535,7 @@ pub(crate) mod tests {
         );
         assert_eq!(session.state(), State::Disclosure);
         session.start();
-        let invalid = State::Error(super::super::Fault::ModelInvalid);
+        let invalid = State::Error(crate::Fault::ModelInvalid);
         assert_eq!(session.wait_for(&[invalid]), invalid);
         assert!(session.transcript().is_none());
         std::fs::remove_dir_all(directory).unwrap();
@@ -1561,6 +1564,7 @@ pub(crate) mod tests {
         assert!(prompt.starts_with("Farmaco0, Farmaco1"));
     }
 
+    #[cfg(test)]
     fn read_wav(path: &str) -> Vec<f32> {
         let bytes = std::fs::read(path).unwrap();
         assert_eq!(&bytes[..4], b"RIFF");
@@ -1613,7 +1617,7 @@ pub(crate) mod tests {
         }
         let mut audio = read_wav(&var("MEDIFLOW_VOCE_FILE"));
         audio.extend(silence(2.0));
-        let session = super::super::Session::open(
+        let session = crate::Session::open(
             Engine {
                 directory: directory.clone(),
                 files: model::FILES,

@@ -15,32 +15,32 @@ use std::{
     },
     time::Duration,
 };
-pub(crate) struct ModelFile {
-    pub(crate) name: &'static str,
-    pub(crate) url: &'static str,
-    pub(crate) sha256: &'static str,
-    pub(crate) size: u64,
+pub struct ModelFile {
+    pub name: &'static str,
+    pub url: &'static str,
+    pub sha256: &'static str,
+    pub size: u64,
 }
 
 /// whisper large-v3-turbo q5_0 (MIT) e Silero VAD v6.2.0 in formato ggml
 /// (MIT). URL con revisione fissata; hash uguali all'oid LFS di Hugging Face e
 /// a quelli registrati nel banco (`motori/INVENTARIO.md`).
-pub(crate) const WHISPER: ModelFile = ModelFile {
+pub const WHISPER: ModelFile = ModelFile {
     name: "ggml-large-v3-turbo-q5_0.bin",
     url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-large-v3-turbo-q5_0.bin",
     sha256: "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2",
     size: 574_041_195,
 };
-pub(crate) const VAD: ModelFile = ModelFile {
+pub const VAD: ModelFile = ModelFile {
     name: "ggml-silero-v6.2.0.bin",
     url: "https://huggingface.co/ggml-org/whisper-vad/resolve/9ffd54a1e1ee413ddf265af9913beaf518d1639b/ggml-silero-v6.2.0.bin",
     sha256: "2aa269b785eeb53a82983a20501ddf7c1d9c48e33ab63a41391ac6c9f7fb6987",
     size: 885_098,
 };
-pub(crate) const FILES: [&ModelFile; 2] = [&WHISPER, &VAD];
+pub const FILES: [&ModelFile; 2] = [&WHISPER, &VAD];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum ModelStatus {
+pub enum ModelStatus {
     /// Nessun file del modello nella cartella.
     Missing,
     /// File presenti ma incompleti o con hash diverso.
@@ -48,19 +48,19 @@ pub(crate) enum ModelStatus {
     Verified,
 }
 
-pub(crate) fn directory() -> Option<PathBuf> {
+pub fn directory() -> Option<PathBuf> {
     let home = PathBuf::from(std::env::var_os("HOME")?);
     home.is_absolute()
         .then(|| home.join("Library/Application Support/MediFlow GPUI/modelli-voce"))
 }
 
-pub(crate) fn sha256_file(path: &Path) -> io::Result<String> {
+pub fn sha256_file(path: &Path) -> io::Result<String> {
     hash_file(path, &AtomicBool::new(false))
 }
 
 /// Controllo rapido: presenza e dimensione. Serve a scegliere il motore senza
 /// leggere 0,57 GB nel thread dell'interfaccia.
-pub(crate) fn quick_status(directory: &Path, files: &[&ModelFile]) -> ModelStatus {
+pub fn quick_status(directory: &Path, files: &[&ModelFile]) -> ModelStatus {
     let sizes: Vec<Option<u64>> = files
         .iter()
         .map(|f| fs::metadata(directory.join(f.name)).ok().map(|m| m.len()))
@@ -75,7 +75,7 @@ pub(crate) fn quick_status(directory: &Path, files: &[&ModelFile]) -> ModelStatu
 }
 
 /// Verifica completa: dimensione e SHA-256 di ogni file.
-pub(crate) fn verify(directory: &Path, files: &[&ModelFile]) -> ModelStatus {
+pub fn verify(directory: &Path, files: &[&ModelFile]) -> ModelStatus {
     match quick_status(directory, files) {
         ModelStatus::Verified => {}
         other => return other,
@@ -91,12 +91,12 @@ pub(crate) fn verify(directory: &Path, files: &[&ModelFile]) -> ModelStatus {
 }
 
 /// Peso complessivo dei file, in byte.
-pub(crate) fn total_size(files: &[&ModelFile]) -> u64 {
+pub fn total_size(files: &[&ModelFile]) -> u64 {
     files.iter().map(|f| f.size).sum()
 }
 
 /// Host da cui si scaricano i file, letto dagli URL fissati.
-pub(crate) fn source_host(files: &[&ModelFile]) -> Option<&'static str> {
+pub fn source_host(files: &[&ModelFile]) -> Option<&'static str> {
     let hosts: Vec<&'static str> = files
         .iter()
         .filter_map(|f| f.url.split_once("://")?.1.split('/').next())
@@ -107,7 +107,7 @@ pub(crate) fn source_host(files: &[&ModelFile]) -> Option<&'static str> {
 
 /// `MEDIFLOW_NETWORK_DISABLED` presente con un valore diverso da `0` blocca le
 /// uscite verso Internet, come per il catalogo AIFA (ADR 0125).
-pub(crate) fn network_disabled() -> bool {
+pub fn network_disabled() -> bool {
     switch_disables(std::env::var_os("MEDIFLOW_NETWORK_DISABLED").as_deref())
 }
 fn switch_disables(value: Option<&std::ffi::OsStr>) -> bool {
@@ -120,7 +120,7 @@ fn partial_path(directory: &Path, file: &ModelFile) -> PathBuf {
 
 /// Perché un'installazione non è riuscita.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum InstallError {
+pub enum InstallError {
     /// Uscite di rete disattivate da `MEDIFLOW_NETWORK_DISABLED`.
     NetworkDisabled,
     /// Server non raggiungibile.
@@ -139,28 +139,28 @@ pub(crate) enum InstallError {
 /// Come raggiungere i file: in produzione solo HTTPS; nelle prove un server
 /// HTTP sul loopback.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Transport {
+pub enum Transport {
     Https,
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     LoopbackHttp,
 }
 
 /// Che cosa installare e dove.
 #[derive(Clone)]
-pub(crate) struct Catalog {
-    pub(crate) directory: PathBuf,
-    pub(crate) files: Vec<&'static ModelFile>,
-    pub(crate) transport: Transport,
+pub struct Catalog {
+    pub directory: PathBuf,
+    pub files: Vec<&'static ModelFile>,
+    pub transport: Transport,
     /// Interruttore delle uscite verso Internet, ricontrollato prima di ogni
     /// richiesta. In produzione [`network_disabled`].
-    pub(crate) network_disabled: fn() -> bool,
+    pub network_disabled: fn() -> bool,
 }
 impl Catalog {
     /// Il modello vero, nella cartella dell'app.
-    pub(crate) fn installed() -> Option<Self> {
+    pub fn installed() -> Option<Self> {
         Some(Self::pinned(directory()?))
     }
-    pub(crate) fn pinned(directory: PathBuf) -> Self {
+    pub fn pinned(directory: PathBuf) -> Self {
         Self {
             directory,
             files: FILES.to_vec(),
@@ -168,24 +168,24 @@ impl Catalog {
             network_disabled,
         }
     }
-    pub(crate) fn quick_status(&self) -> ModelStatus {
+    pub fn quick_status(&self) -> ModelStatus {
         quick_status(&self.directory, &self.files)
     }
-    pub(crate) fn verify(&self) -> ModelStatus {
+    pub fn verify(&self) -> ModelStatus {
         verify(&self.directory, &self.files)
     }
-    pub(crate) fn total_size(&self) -> u64 {
+    pub fn total_size(&self) -> u64 {
         total_size(&self.files)
     }
     /// Avvio: i parziali lasciati da un'uscita brusca non servono a nulla.
-    pub(crate) fn remove_partials(&self) {
+    pub fn remove_partials(&self) {
         for file in &self.files {
             let _ = fs::remove_file(partial_path(&self.directory, file));
         }
     }
     /// Toglie i file del modello e gli eventuali parziali: la dettatura non è
     /// più disponibile finché il modello non si reinstalla.
-    pub(crate) fn remove(&self) -> io::Result<()> {
+    pub fn remove(&self) -> io::Result<()> {
         for file in &self.files {
             for path in [
                 self.directory.join(file.name),
@@ -213,25 +213,25 @@ struct Shared {
     child: Mutex<Option<std::process::Child>>,
     /// Preso per rinominare i parziali e per toglierli all'uscita.
     commit: Mutex<()>,
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     child_pid: std::sync::atomic::AtomicU32,
     /// Prove: il thread si ferma prima delle rinomine finché il test non lo
     /// lascia andare.
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     hold_commit: AtomicBool,
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     at_commit: AtomicBool,
 }
 
 /// Un'installazione in corso su un thread suo. L'interfaccia legge avanzamento
 /// ed esito e può annullare senza aspettare il thread.
-pub(crate) struct Download {
+pub struct Download {
     shared: Arc<Shared>,
     total: u64,
     partials: Vec<PathBuf>,
 }
 impl Download {
-    pub(crate) fn start(catalog: Catalog) -> Self {
+    pub fn start(catalog: Catalog) -> Self {
         Self::start_with(catalog, Shared::default())
     }
     fn start_with(catalog: Catalog, shared: Shared) -> Self {
@@ -260,14 +260,14 @@ impl Download {
         }
     }
     /// Byte ricevuti e byte attesi.
-    pub(crate) fn progress(&self) -> (u64, u64) {
+    pub fn progress(&self) -> (u64, u64) {
         (
             self.shared.received.load(Ordering::Relaxed).min(self.total),
             self.total,
         )
     }
     /// Esito, quando il thread ha finito e ha già pulito.
-    pub(crate) fn outcome(&self) -> Option<Result<(), InstallError>> {
+    pub fn outcome(&self) -> Option<Result<(), InstallError>> {
         *self
             .shared
             .outcome
@@ -276,13 +276,13 @@ impl Download {
     }
     /// Chiede l'annullamento e torna subito: il thread ferma `curl`, cancella
     /// il parziale e pubblica `Cancelled`.
-    pub(crate) fn cancel(&self) {
+    pub fn cancel(&self) {
         self.shared.cancel.store(true, Ordering::SeqCst);
     }
     /// Uscita dall'app: il thread di lavoro muore con il processo, quindi qui
     /// si ferma il suo `curl` (SIGKILL al suo PID, poi `wait`) e si tolgono i
     /// parziali, senza aspettare il thread. Pochi millisecondi.
-    pub(crate) fn shutdown(&self) {
+    pub fn shutdown(&self) {
         self.cancel();
         if let Some(mut child) = self
             .shared
@@ -299,8 +299,8 @@ impl Download {
             let _ = fs::remove_file(path);
         }
     }
-    #[cfg(test)]
-    pub(crate) fn child_pid(&self) -> Option<u32> {
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn child_pid(&self) -> Option<u32> {
         Some(self.shared.child_pid.load(Ordering::SeqCst)).filter(|pid| *pid != 0)
     }
 }
@@ -336,7 +336,7 @@ fn install(catalog: &Catalog, shared: &Shared) -> Result<(), InstallError> {
 /// Rinomina i parziali verificati. Tiene il lucchetto di `commit`, lo stesso
 /// dell'uscita dall'app: o si rinominano tutti o nessuno.
 fn commit(catalog: &Catalog, pending: &[&ModelFile], shared: &Shared) -> Result<(), InstallError> {
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     {
         shared.at_commit.store(true, Ordering::SeqCst);
         while shared.hold_commit.load(Ordering::SeqCst) {
@@ -445,7 +445,7 @@ fn fetch(
     ]);
     match catalog.transport {
         Transport::Https => command.args(["--proto", "=https", "--proto-redir", "=https"]),
-        #[cfg(test)]
+        #[cfg(any(test, feature = "test-support"))]
         Transport::LoopbackHttp => command.args(["--proto", "=http", "--noproxy", "*"]),
     };
     let child = command
@@ -457,7 +457,7 @@ fn fetch(
         .stderr(Stdio::null())
         .spawn()
         .map_err(|_| InstallError::Unreachable)?;
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     shared.child_pid.store(child.id(), Ordering::SeqCst);
     *shared.child.lock().unwrap_or_else(|e| e.into_inner()) = Some(child);
     loop {
@@ -509,8 +509,8 @@ fn curl_result(code: Option<i32>) -> Result<(), InstallError> {
     }
 }
 
-#[cfg(test)]
-pub(crate) mod tests {
+#[cfg(any(test, feature = "test-support"))]
+pub mod tests {
     use super::*;
     use std::{
         collections::HashMap,
@@ -520,7 +520,7 @@ pub(crate) mod tests {
         time::Instant,
     };
 
-    pub(crate) fn temp(name: &str) -> PathBuf {
+    pub fn temp(name: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!("mediflow-voce-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
@@ -535,7 +535,7 @@ pub(crate) mod tests {
 
     /// Che cosa risponde il server di prova a una richiesta.
     #[derive(Clone)]
-    pub(crate) enum Reply {
+    pub enum Reply {
         Serve(Vec<u8>),
         /// Dichiara tutti i byte, ne manda `usize` e chiude.
         Truncate(Vec<u8>, usize),
@@ -545,15 +545,15 @@ pub(crate) mod tests {
 
     /// Server HTTP sul loopback, porta scelta dal sistema. Per ogni percorso
     /// una coda di risposte; l'ultima si ripete. Conta le connessioni.
-    pub(crate) struct LoopbackServer {
-        pub(crate) port: u16,
+    pub struct LoopbackServer {
+        pub port: u16,
         connections: Arc<AtomicUsize>,
         stop: Arc<AtomicBool>,
         replies: Arc<Mutex<HashMap<String, Vec<Reply>>>>,
         thread: Option<std::thread::JoinHandle<()>>,
     }
     impl LoopbackServer {
-        pub(crate) fn start() -> Self {
+        pub fn start() -> Self {
             let listener = TcpListener::bind("127.0.0.1:0").unwrap();
             listener.set_nonblocking(true).unwrap();
             let port = listener.local_addr().unwrap().port();
@@ -584,14 +584,14 @@ pub(crate) mod tests {
                 thread: Some(thread),
             }
         }
-        pub(crate) fn set(&self, path: &str, replies: Vec<Reply>) {
+        pub fn set(&self, path: &str, replies: Vec<Reply>) {
             self.replies.lock().unwrap().insert(path.into(), replies);
         }
-        pub(crate) fn connections(&self) -> usize {
+        pub fn connections(&self) -> usize {
             self.connections.load(Ordering::SeqCst)
         }
         /// Un file inventato servito da questo server.
-        pub(crate) fn file(&self, name: &str, content: &[u8]) -> &'static ModelFile {
+        pub fn file(&self, name: &str, content: &[u8]) -> &'static ModelFile {
             self.set(&format!("/{name}"), vec![Reply::Serve(content.to_vec())]);
             Box::leak(Box::new(ModelFile {
                 name: Box::leak(name.to_owned().into_boxed_str()),
@@ -663,7 +663,7 @@ pub(crate) mod tests {
         let _ = stream.flush();
     }
 
-    pub(crate) fn loopback_catalog(directory: PathBuf, files: Vec<&'static ModelFile>) -> Catalog {
+    pub fn loopback_catalog(directory: PathBuf, files: Vec<&'static ModelFile>) -> Catalog {
         Catalog {
             directory,
             files,
@@ -671,7 +671,7 @@ pub(crate) mod tests {
             network_disabled: || false,
         }
     }
-    pub(crate) fn wait(download: &Download) -> Result<(), InstallError> {
+    pub fn wait(download: &Download) -> Result<(), InstallError> {
         let started = Instant::now();
         loop {
             if let Some(outcome) = download.outcome() {
@@ -684,6 +684,7 @@ pub(crate) mod tests {
             std::thread::sleep(Duration::from_millis(2));
         }
     }
+    #[cfg(test)]
     fn names(dir: &Path) -> Vec<String> {
         fs::read_dir(dir)
             .map(|entries| {
@@ -695,7 +696,7 @@ pub(crate) mod tests {
             })
             .unwrap_or_default()
     }
-    pub(crate) fn invented(len: usize, seed: u8) -> Vec<u8> {
+    pub fn invented(len: usize, seed: u8) -> Vec<u8> {
         (0..len)
             .map(|i| (i as u8).wrapping_mul(31).wrapping_add(seed))
             .collect()
@@ -923,7 +924,7 @@ pub(crate) mod tests {
     }
 
     /// Processo ancora vivo (zombie compresi: `ps` li elenca finché nessuno li raccoglie).
-    pub(crate) fn alive(pid: u32) -> bool {
+    pub fn alive(pid: u32) -> bool {
         Command::new("/bin/ps")
             .args(["-o", "stat=", "-p", &pid.to_string()])
             .output()

@@ -1,15 +1,10 @@
-// Prova locale dell'ascolto della visita (WUL-828 punto 3) con il modello whisper vero:
-// una visita inventata di oltre dieci minuti a due voci (scripts/fixtures/visita-due-voci.json),
-// generata con `say` del Mac, nessun microfono e nessuno scaricamento. Il test Rust
-// `real_model_long_session_in_segments` la ascolta a blocchi come farebbe il microfono; qui si
-// controlla che medico e paziente siano attribuiti, si misura l'errore di parola e si verifica
-// che il calcolo stia al passo con il tempo reale. Il rapporto va in rapporto.json.
-// Uso: node scripts/prove-ascolto-visita.mjs <ggml-large-v3-turbo-q5_0.bin> <ggml-silero-v6.2.0.bin>
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir, userInfo } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { localVoiceClient } from '../lib/local-voice/client.mjs';
+import { startLocalVoiceService } from './local-voice-service.mjs';
 
 export const SAMPLE_RATE = 16_000;
 export const VOICES = { M: 'Eddy (Italian (Italy))', P: 'Grandma (Italian (Italy))' };
@@ -159,36 +154,107 @@ export function cargoPath(home = userInfo().homedir) {
   return path.join(home, '.cargo', 'bin', 'cargo');
 }
 
-export async function main([whisper, vad] = process.argv.slice(2)) {
-  if (!whisper || !vad) throw new Error('servono i file del modello whisper e del rilevatore Silero');
-  const home = userInfo().homedir;
-  const work = mkdtempSync(path.join(process.env.TMPDIR || tmpdir(), 'ascolto-visita-'));
-  const clips = TURNS.map(([role, text], index) => {
+const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+export const MODEL_FILES = ['ggml-large-v3-turbo-q5_0.bin', 'ggml-silero-v6.2.0.bin'];
+
+/** Cartella del modello per il servizio: i due file, con il loro nome, nella stessa cartella. */
+export function modelDirectory(whisper, vad) {
+  const directory = path.dirname(path.resolve(whisper));
+  if (path.dirname(path.resolve(vad)) !== directory || path.basename(whisper) !== MODEL_FILES[0] || path.basename(vad) !== MODEL_FILES[1]) {
+    throw new Error(`servono ${MODEL_FILES.join(' e ')} nella stessa cartella`);
+  }
+  return directory;
+}
+
+/** Servizio compilato in release dal pacchetto native/local-voice, se non è già indicato. */
+export function serviceBinary(env = process.env, home = userInfo().homedir) {
+  if (env.MEDIFLOW_LOCAL_VOICE_BINARY) return env.MEDIFLOW_LOCAL_VOICE_BINARY;
+  const manifest = path.join(ROOT, 'native', 'local-voice', 'Cargo.toml');
+  const target = env.CARGO_TARGET_DIR || path.join(ROOT, 'native', 'local-voice', 'target');
+  run(cargoPath(home), ['build', '--release', '--locked', '--manifest-path', manifest, '-p', 'mediflow-voice'],
+    { ...env, RUSTUP_HOME: path.join(home, '.rustup'), CARGO_HOME: path.join(home, '.cargo'), CARGO_TARGET_DIR: target },
+    path.join(ROOT, 'native', 'local-voice'));
+  return path.join(target, 'release', 'mediflow-voice');
+}
+
+/** Battute pronunciate da `say` e convertite in WAV a 16 kHz, montate in una visita. */
+export function synthesizeVisit(turns, work) {
+  const clips = turns.map(([role, text], index) => {
     const aiff = path.join(work, `${index}.aiff`);
     const wav = path.join(work, `${index}.wav`);
     run('/usr/bin/say', ['-v', VOICES[role], '-r', '175', '-o', aiff, text], process.env);
     run('/usr/bin/afconvert', ['-f', 'WAVE', '-d', `LEI16@${SAMPLE_RATE}`, '-c', '1', aiff, wav], process.env);
-    return { role, samples: readWav(readFileSync(wav)) };
+    const samples = readWav(readFileSync(wav));
+    rmSync(aiff); rmSync(wav);
+    return { role, samples };
   });
-  const { audio, timeline } = assemble(clips);
-  const visit = path.join(work, 'visita.wav');
-  writeFileSync(visit, writeWav(audio));
-  const out = path.join(work, 'risultato.json');
-  const env = {
-    ...process.env, RUSTUP_HOME: path.join(home, '.rustup'), CARGO_HOME: path.join(home, '.cargo'),
-    MEDIFLOW_VOCE_WHISPER: whisper, MEDIFLOW_VOCE_VAD: vad, MEDIFLOW_VOCE_FILES: visit,
-    MEDIFLOW_VOCE_OUT: out, MEDIFLOW_VOCE_DUE: '1',
+  return assemble(clips);
+}
+
+function rssMegabytes(pid) {
+  const result = spawnSync('/bin/ps', ['-o', 'rss=', '-p', String(pid)], { encoding: 'utf8' });
+  return Number(result.stdout.trim()) / 1024 || 0;
+}
+
+/**
+ * Una visita attraverso il servizio: avvio, audio a blocchi da 16 s (il servizio rallenta chi
+ * manda troppo in fretta), fine, attesa del testo da rivedere. Al termine la sessione si scarta.
+ */
+export async function listenThroughService(service, audio, { mode = 'visit', subject = 'visita-sintetica', vocabulary = [], chunkSeconds = 16, timeoutMs = 30 * 60_000 } = {}) {
+  const client = localVoiceClient(service);
+  const created = await client.create({ mode, subject, vocabulary });
+  const rss = [];
+  const started = performance.now();
+  try {
+    await client.command(created.id, 'start');
+    const chunk = chunkSeconds * SAMPLE_RATE;
+    for (let at = 0; at < audio.length; at += chunk) {
+      const part = audio.subarray(at, at + chunk);
+      await client.audio(created.id, new Uint8Array(part.buffer, part.byteOffset, part.byteLength));
+      if (service.pid) rss.push(rssMegabytes(service.pid));
+    }
+    await client.command(created.id, 'stop');
+    const until = performance.now() + timeoutMs;
+    for (;;) {
+      const snapshot = await client.get(created.id);
+      if (!['preparing', 'recording', 'paused', 'finalizing'].includes(snapshot.state)) {
+        return { snapshot, seconds: (performance.now() - started) / 1000, rss };
+      }
+      if (performance.now() > until) throw new Error('il servizio non ha finito in tempo');
+      if (service.pid) rss.push(rssMegabytes(service.pid));
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+  } finally {
+    await client.discard(created.id);
+  }
+}
+
+export async function main([whisper, vad] = process.argv.slice(2)) {
+  if (!whisper || !vad) throw new Error('servono i file del modello whisper e del rilevatore Silero');
+  const models = modelDirectory(whisper, vad);
+  const binary = serviceBinary();
+  const work = mkdtempSync(path.join(process.env.TMPDIR || tmpdir(), 'ascolto-visita-'));
+  const { audio, timeline } = synthesizeVisit(TURNS, work);
+  const service = await startLocalVoiceService({ binary, models });
+  let listened;
+  try {
+    listened = await listenThroughService(service, audio);
+  } finally {
+    await service.stop();
+  }
+  const { snapshot, seconds, rss } = listened;
+  if (snapshot.state !== 'review') throw new Error(`il servizio ha chiuso in ${snapshot.state} (${snapshot.fault})`);
+  const label = { doctor: 'Medico', patient: 'Paziente' };
+  const result = {
+    durata_audio_s: audio.length / SAMPLE_RATE, calcolo_s: seconds, rtf: seconds / (audio.length / SAMPLE_RATE),
+    rss_mb_massimo: Math.max(0, ...rss),
+    frasi: snapshot.review.lines.map(line => [line.startMs / 1000, line.endMs / 1000, line.text, label[line.speaker]]),
   };
-  // La cartella del progetto Rust fissa la versione del compilatore (rust-toolchain.toml).
-  const pilot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'experiments', 'gpui-patient-pilot');
-  run(cargoPath(home), ['test', '-p', 'mediflow-gpui-patient-pilot', '--locked', '--',
-    '--ignored', '--exact', 'local_voice::whisper::tests::real_model_long_session_in_segments'], env, pilot);
-  const result = JSON.parse(readFileSync(out, 'utf8'));
   const report = measure(result, timeline);
   writeFileSync(path.join(work, 'rapporto.json'), JSON.stringify(report, null, 1));
   console.log(`audio ${report.audio_s.toFixed(0)} s, calcolo ${report.calcolo_s.toFixed(0)} s (RTF ${report.rtf.toFixed(2)}), ` +
     `errore di parola ${(report.errore_di_parola * 100).toFixed(1)}%, attribuzione ${(report.attribuzione * 100).toFixed(0)}% del parlato, ` +
-    `${report.frasi} frasi, ${report.battute} battute`);
+    `${report.frasi} frasi, ${report.battute} battute, memoria massima ${report.rss_mb_massimo.toFixed(0)} MB`);
   console.log(`rapporto: ${path.join(work, 'rapporto.json')}`);
   const failures = gates(report, result.frasi);
   if (failures.length) throw new Error(failures.join('; '));
@@ -201,7 +267,6 @@ export function measure(result, timeline) {
     rss_mb_massimo: result.rss_mb_massimo, battute: timeline.length, frasi: result.frasi.length,
     errore_di_parola: wordErrorRate(TURNS.map(([, text]) => text).join(' '), result.frasi.map(f => f[2]).join(' ')),
     attribuzione: attributionScore(result.frasi, timeline),
-    tempi_impronta_ms: result.tempi_impronta_ms, tempo_attribuzione_ms: result.tempo_attribuzione_ms,
   };
 }
 

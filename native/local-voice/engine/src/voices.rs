@@ -5,7 +5,7 @@
 //! della persona: il medico corregge l'attribuzione prima di preparare la
 //! bozza.
 
-use super::listening::SAMPLE_RATE;
+use crate::listening::SAMPLE_RATE;
 
 /// Finestra di 25 ms con passo di 10 ms, trasformata su 512 punti.
 const FRAME: usize = 400;
@@ -25,29 +25,29 @@ const QUIET: f32 = 6.9;
 const SILENT_RMS: f32 = 1e-3;
 
 /// Medie e dispersioni dei 12 coefficienti, più l'altezza della voce.
-pub(crate) const PRINT: usize = 2 * COEFFICIENTS + 1;
+pub const PRINT: usize = 2 * COEFFICIENTS + 1;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) struct VoicePrint {
-    pub(crate) values: [f32; PRINT],
+pub struct VoicePrint {
+    pub values: [f32; PRINT],
     /// Finestre con voce: pesano la frase nei gruppi.
-    pub(crate) frames: usize,
+    pub frames: usize,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Speaker {
+pub enum Speaker {
     Doctor,
     Patient,
 }
 
 impl Speaker {
-    pub(crate) fn label(self) -> &'static str {
+    pub fn label(self) -> &'static str {
         match self {
             Self::Doctor => "Medico",
             Self::Patient => "Paziente",
         }
     }
-    pub(crate) fn other(self) -> Self {
+    pub fn other(self) -> Self {
         match self {
             Self::Doctor => Self::Patient,
             Self::Patient => Self::Doctor,
@@ -57,7 +57,7 @@ impl Speaker {
 
 /// Bozza della visita: una riga per turno, «Medico: …» o «Paziente: …»; le
 /// frasi consecutive della stessa persona stanno sulla stessa riga.
-pub(crate) fn draft(lines: &[(Speaker, &str)]) -> String {
+pub fn draft(lines: &[(Speaker, &str)]) -> String {
     let mut out = String::new();
     let mut previous = None;
     for (speaker, text) in lines {
@@ -82,7 +82,7 @@ pub(crate) fn draft(lines: &[(Speaker, &str)]) -> String {
 
 /// Scambia medico e paziente all'inizio di ogni riga, lasciando com'è il
 /// resto del testo, correzioni del medico comprese.
-pub(crate) fn swap_speakers(text: &str) -> String {
+pub fn swap_speakers(text: &str) -> String {
     text.split('\n')
         .map(|line| {
             for speaker in [Speaker::Doctor, Speaker::Patient] {
@@ -204,7 +204,7 @@ fn pitch(frame: &[f32], window: &[f32]) -> Option<f32> {
 /// Impronta di una frase: medie e dispersioni dei coefficienti sulle
 /// finestre con voce, più il logaritmo della mediana dell'altezza. Meno di
 /// 0,25 s di voce: nessuna impronta.
-pub(crate) fn voice_print(audio: &[f32]) -> Option<VoicePrint> {
+pub fn voice_print(audio: &[f32]) -> Option<VoicePrint> {
     if audio.len() < FRAME {
         return None;
     }
@@ -366,7 +366,7 @@ fn two_means(points: &[[f32; PRINT]], weights: &[f32], a: usize, b: usize) -> (V
 /// gruppo della prima frase con un'impronta, perché la visita la apre il
 /// medico. Le frasi senza impronta prendono la voce della frase precedente.
 /// Con meno di due impronte tutto resta al medico.
-pub(crate) fn attribute(prints: &[Option<VoicePrint>]) -> Vec<Speaker> {
+pub fn attribute(prints: &[Option<VoicePrint>]) -> Vec<Speaker> {
     let valid: Vec<(usize, VoicePrint)> = prints
         .iter()
         .enumerate()
@@ -437,13 +437,13 @@ pub(crate) fn attribute(prints: &[Option<VoicePrint>]) -> Vec<Speaker> {
     speakers
 }
 
-#[cfg(test)]
-pub(crate) mod tests {
+#[cfg(any(test, feature = "test-support"))]
+pub mod tests {
     use super::*;
 
     /// Voce sintetica: impulsi glottali a `f0` Hz passati in due risonanze
     /// (formanti) a `f1` e `f2` Hz, con una leggera variazione dell'altezza.
-    pub(crate) fn synthetic_voice(seconds: f32, f0: f32, f1: f32, f2: f32, seed: u32) -> Vec<f32> {
+    pub fn synthetic_voice(seconds: f32, f0: f32, f1: f32, f2: f32, seed: u32) -> Vec<f32> {
         let n = (seconds * SAMPLE_RATE as f32) as usize;
         let mut phase = 0.0f32;
         let mut source = Vec::with_capacity(n);
