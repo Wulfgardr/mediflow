@@ -23,3 +23,11 @@ export function randomSyntheticTaxCode(): string {
     if (!check) throw new Error('Synthetic tax code unavailable');
     return prefix + check;
 }
+
+export function omocodicVariant(code: string): string {
+    const letters = 'LMNPQRSTUV';
+    const prefix = `${code.slice(0, 14)}${letters[Number(code[14])]}`;
+    const check = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'].find((letter) => isValidItalianTaxCode(prefix + letter));
+    if (!check) throw new Error('Omocodic variant unavailable');
+    return prefix + check;
+}
