@@ -20,6 +20,10 @@
     "displayIt": "ng/mL"
   },
   {
+    "code": "ng/dL",
+    "displayIt": "ng/dL"
+  },
+  {
     "code": "ug/dL",
     "displayIt": "µg/dL"
   },
