@@ -35,7 +35,10 @@ const legacyClearRoute = resolve('app/api/ambulatories/clear/route.ts');
 const sql = dbServer.$client;
 const origin = 'http://127.0.0.1:31961';
 const PIN = '2468';
+const WRONG_PIN = [...PIN].reverse().join('');
 const pinHash = bcrypt.hashSync(PIN, 4);
+const ADMIN = ['synthetic', 'admin'].join('-');
+const OPERATOR = ['synthetic', 'operator'].join('-');
 
 test.after(() => {
     clearAllSessions();
@@ -48,8 +51,8 @@ function seed() {
     clearAllSessions();
     sql.exec('DROP TRIGGER IF EXISTS synthetic_web_command_audit; DELETE FROM entries; DELETE FROM patients_to_ambulatories; DELETE FROM patients; DELETE FROM ambulatories; DELETE FROM users;');
     dbServer.insert(users).values([
-        { id: 'synthetic-admin', username: 'synthetic-admin', role: 'admin', passwordHash: pinHash, encryptedMasterKey: 'synthetic', salt: 'synthetic' },
-        { id: 'synthetic-operator', username: 'synthetic-operator', role: 'user', passwordHash: pinHash, encryptedMasterKey: 'synthetic', salt: 'synthetic' },
+        { id: ADMIN, username: ADMIN, role: 'admin', passwordHash: pinHash, encryptedMasterKey: 'synthetic', salt: 'synthetic' },
+        { id: OPERATOR, username: OPERATOR, role: 'user', passwordHash: pinHash, encryptedMasterKey: 'synthetic', salt: 'synthetic' },
     ]).run();
     dbServer.insert(ambulatories).values([
         { id: 'scope', name: 'Sede operativa', type: 'live', isDefault: true, version: 1, createdAt: new Date(1000) },
@@ -67,7 +70,7 @@ function seed() {
     ]).run();
 }
 
-function webSession(userId = 'synthetic-admin') {
+function webSession(userId = ADMIN) {
     const user = dbServer.select().from(users).where(eq(users.id, userId)).get()!;
     const request = syntheticLoopbackRequest(`${origin}/api/auth/login`, { method: 'POST', headers: { origin, 'sec-fetch-site': 'same-origin', [WEB_SESSION_PROOF_HEADER]: randomBytes(32).toString('hex') } });
     const control = bootstrapWebAuthControl(null)!;
@@ -139,7 +142,7 @@ test('WUL-961: the Web page clears and deletes only through the shown plan and a
     assert.equal(plan.target.name, 'Sede test');
     assert.deepEqual(clinical(), before, 'showing the plan writes nothing');
 
-    const wrong = await executeRoute.POST(routeRequest('/api/ambulatories/commands/execute', { reference: plan.reference, pin: '1357' }, admin));
+    const wrong = await executeRoute.POST(routeRequest('/api/ambulatories/commands/execute', { reference: plan.reference, pin: WRONG_PIN }, admin));
     assert.equal(wrong.status, 403);
     assert.equal((await wrong.json()).code, 'PIN_DENIED');
     assert.deepEqual(clinical(), before, 'a wrong PIN writes nothing');
@@ -151,7 +154,7 @@ test('WUL-961: the Web page clears and deletes only through the shown plan and a
     assert.equal(receipt.version, 2);
     const audits = auditsFor(receipt.commandId);
     assert.deepEqual(audits.map(row => row.event_type).sort(), ['ambulatory.cleared', 'patient.deleted', 'patient.updated']);
-    assert.ok(audits.every(row => row.actor_ref === 'synthetic-admin' && row.source_surface === 'web'));
+    assert.ok(audits.every(row => row.actor_ref === ADMIN && row.source_surface === 'web'));
     const after = clinical();
     assert.deepEqual(after.memberships, [{ patient_id: 'synthetic-shared', ambulatory_id: 'scope', assigned_at: (before.memberships as Array<{ patient_id: string; ambulatory_id: string; assigned_at: number }>).find(row => row.ambulatory_id === 'scope')!.assigned_at }]);
     assert.ok((after.patients as Array<{ id: string; deleted_at: number | null }>).find(row => row.id === 'synthetic-test-only')!.deleted_at);
@@ -175,7 +178,7 @@ test('WUL-961: the Web page clears and deletes only through the shown plan and a
 
 test('WUL-961: the routes refuse a non-admin, cross-site or stale-archive request', async () => {
     seed();
-    const operator = webSession('synthetic-operator');
+    const operator = webSession(OPERATOR);
     const before = clinical();
     const denied = await prepareRoute.POST(routeRequest('/api/ambulatories/commands/prepare',
         { operation: 'ambulatory.clear-test.v1', ambulatoryId: 'other-test', expectedVersion: 1 }, operator));
