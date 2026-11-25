@@ -1,18 +1,24 @@
 import crypto from 'node:crypto';
 import http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { localVoiceResponseProof, signLocalVoiceRequest } from './client.mjs';
 
-const ALLOWED = { ready: ['start'], preparing: ['stop'], recording: ['pause', 'stop'], paused: ['resume', 'stop'] };
-const VISIBLE = { ready: 'ready', preparing: 'ready', recording: 'recording', paused: 'paused', finalizing: 'stopped', review: 'stopped', cancelled: 'stopped', error: 'error' };
+type Line = { speaker: 'doctor' | 'patient'; text: string };
+type Suggestion = { original: string; replacement: string };
+type FakeSession = { id: string; subject: string; mode: 'visit' | 'dictation'; vocabulary: string[]; state: string; fault: string | null };
+export type FakeLocalVoiceState = { model: string; lines: Line[]; drugSuggestions: Suggestion[]; session: FakeSession | null; blocks: Uint8Array[];
+    requests: Array<{ method: string | undefined; path: string; bytes: number }>; subjectOverride: string | null; stopFailures: number };
 
-/**
- * Synthetic stand-in for mediflow-voice (ADR 0204): same signatures and proofs, scripted transcript.
- * @param {{ secret: string, port?: number, model?: 'ready' | 'missing' | 'incomplete', lines?: Array<{ speaker: 'doctor' | 'patient', text: string }>, drugSuggestions?: Array<{ original: string, replacement: string }> }} options
- */
-export async function startFakeLocalVoice({ secret, port = 0, model = 'ready', lines = [], drugSuggestions = [] }) {
-    const state = { model, lines, drugSuggestions, session: null, blocks: [], requests: [], subjectOverride: null, stopFailures: 0 };
+const ALLOWED: Record<string, string[]> = { ready: ['start'], preparing: ['stop'], recording: ['pause', 'stop'], paused: ['resume', 'stop'] };
+const VISIBLE: Record<string, string> = { ready: 'ready', preparing: 'ready', recording: 'recording', paused: 'paused', finalizing: 'stopped', review: 'stopped', cancelled: 'stopped', error: 'error' };
+
+/** Synthetic stand-in for mediflow-voice (ADR 0204): same signatures and proofs, scripted transcript. */
+export async function startFakeLocalVoice({ secret, port = 0, model = 'ready', lines = [], drugSuggestions = [] }: {
+    secret: string; port?: number; model?: string; lines?: Line[]; drugSuggestions?: Suggestion[];
+}) {
+    const state: FakeLocalVoiceState = { model, lines, drugSuggestions, session: null, blocks: [], requests: [], subjectOverride: null, stopFailures: 0 };
     const snapshot = () => {
-        const session = state.session;
+        const session = state.session!;
         const samples = state.blocks.reduce((total, block) => total + block.length / 2, 0);
         const text = session.mode === 'visit'
             ? state.lines.map((line) => `${line.speaker === 'doctor' ? 'Medico' : 'Paziente'}: ${line.text}`).join('\n')
@@ -34,12 +40,12 @@ export async function startFakeLocalVoice({ secret, port = 0, model = 'ready', l
         };
     };
     const server = http.createServer((request, response) => {
-        const chunks = [];
+        const chunks: Buffer[] = [];
         request.on('data', (chunk) => chunks.push(chunk));
         request.on('end', () => {
             const [stamp, nonce] = String(request.headers['x-mediflow-voice-auth'] ?? '').split('.');
             const path = request.url ?? '';
-            const reply = (status, body) => {
+            const reply = (status: number, body?: unknown) => {
                 response.writeHead(status, { 'content-type': 'application/json', 'x-mediflow-voice-proof': localVoiceResponseProof(secret, nonce ?? '', status) });
                 response.end(body === undefined ? '' : JSON.stringify(body));
             };
@@ -80,8 +86,8 @@ export async function startFakeLocalVoice({ secret, port = 0, model = 'ready', l
             return reply(404, { error: 'not-found' });
         });
     });
-    await new Promise((resolve) => server.listen(port, '127.0.0.1', resolve));
-    const address = server.address();
+    await new Promise<void>((resolve) => server.listen(port, '127.0.0.1', resolve));
+    const address = server.address() as AddressInfo;
     return {
         url: `http://127.0.0.1:${address.port}`,
         state,
@@ -89,6 +95,6 @@ export async function startFakeLocalVoice({ secret, port = 0, model = 'ready', l
             const all = Buffer.concat(state.blocks.map((block) => Buffer.from(block)));
             return new Int16Array(all.buffer, all.byteOffset, all.byteLength / 2);
         },
-        close: () => new Promise((resolve) => { server.closeAllConnections(); server.close(resolve); }),
+        close: () => new Promise<void>((resolve) => { server.closeAllConnections(); server.close(() => resolve()); }),
     };
 }

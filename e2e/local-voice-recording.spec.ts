@@ -7,7 +7,7 @@ import path from 'node:path';
 import { expect, test } from './fixtures/isolated-runtime';
 import { secureLaunch } from './fixtures/secure-browser';
 import { bootstrapUnlockedSession, openUnlockedDocument } from './utils';
-import { startFakeLocalVoice } from '../lib/local-voice/fake-service.test-support.mjs';
+import { startFakeLocalVoice } from '../lib/local-voice/fake-service.test-support';
 import { randomSyntheticTaxCode } from '../lib/patient-identity.test-support';
 import { taxCodeBirthDetails } from '../lib/patient-identity';
 
