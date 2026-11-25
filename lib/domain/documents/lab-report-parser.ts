@@ -17,10 +17,28 @@ export interface ParsedLabResult {
 const NUMBER_SOURCE = String.raw`-?\d+(?:[.,]\d+)?`;
 const UNIT_SOURCE = String.raw`(?:mg\/dL|mg\/L|g\/dL|g\/L|mmol\/L|mEq\/L|U\/L|UI\/L|mUI\/L|uUI\/mL|[µμ]UI\/mL|ng\/mL|ng\/dL|pg\/mL|pg|fL|%|[µμu]g\/dL|[µμu]mol\/L|10(?:\^|\*)[36]\/[µμu]L)`;
 const RANGE_SOURCE = String.raw`(?:${NUMBER_SOURCE}\s*[-–]\s*${NUMBER_SOURCE}|[<>]=?\s*${NUMBER_SOURCE})`;
-const LAB_ROW = new RegExp(
-    String.raw`^(?<analyte>[\p{L}][\p{L}\p{N}()./' +%-]{1,79}?)\s+(?<leadingMark>\*{1,2}\s*)?(?<value>${NUMBER_SOURCE})(?<valueMark>\s*\*{1,2})?\s+(?<unit>${UNIT_SOURCE})\s+\(?(?<range>${RANGE_SOURCE})\)?(?:\s+(?<flag>H|L|ALTO|BASSO|HIGH|LOW|↑|↓|\*{1,2}))?$`,
+const labRow = (unitSource: string | null) => new RegExp(
+    String.raw`^(?<analyte>[\p{L}][\p{L}\p{N}()./' +%-]{1,79}?)\s+(?<leadingMark>\*{1,2}\s*)?(?<value>${NUMBER_SOURCE})(?<valueMark>\s*\*{1,2})?\s+${unitSource === null ? '' : String.raw`(?<unit>${unitSource})\s+`}\(?(?<range>${RANGE_SOURCE})\)?(?:\s+(?<flag>H|L|ALTO|BASSO|HIGH|LOW|↑|↓|\*{1,2}))?$`,
     'iu',
 );
+const LAB_ROW_WITHOUT_UNIT = labRow(null);
+
+export interface LabReportUnits {
+    spellings: readonly string[];
+    acceptsMissingUnit: (analyte: string) => boolean;
+}
+
+const LEGACY_UNITS: LabReportUnits = { spellings: [], acceptsMissingUnit: () => false };
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\/]/gu, '\\$&');
+const unitRows = new WeakMap<LabReportUnits, RegExp>();
+function labRowWithUnit(units: LabReportUnits): RegExp {
+    const cached = unitRows.get(units);
+    if (cached) return cached;
+    const spellings = [...units.spellings].sort((a, b) => b.length - a.length).map(escapeRegExp);
+    const row = labRow(spellings.length ? `(?:${[UNIT_SOURCE, ...spellings].join('|')})` : UNIT_SOURCE);
+    unitRows.set(units, row);
+    return row;
+}
 
 const HEADER_OR_NOISE = /^(?:esame|analita|parametro|risultato|valore|unita|unità|intervallo|range|valori? di riferimento|metodo|materiale|campione)\b/i;
 
@@ -101,7 +119,7 @@ function explicitFlag(value: string | undefined): ObservationRangeFlag | undefin
     return /^(?:H|ALTO|HIGH|↑)$/i.test(value) ? 'alto' : 'basso';
 }
 
-function parseLabRow(sourceLine: string, lineNumber: number): ParsedLabResult | undefined {
+function parseLabRow(sourceLine: string, lineNumber: number, units: LabReportUnits): ParsedLabResult | undefined {
     const normalizedLine = sourceLine
         .replace(/\u00a0/g, ' ')
         .replace(/[|;\t]+/g, ' ')
@@ -109,7 +127,9 @@ function parseLabRow(sourceLine: string, lineNumber: number): ParsedLabResult | 
         .trim();
     if (!normalizedLine || HEADER_OR_NOISE.test(normalizedLine)) return undefined;
 
-    const match = normalizedLine.match(LAB_ROW);
+    const withUnit = normalizedLine.match(labRowWithUnit(units));
+    const withoutUnit = withUnit ? null : normalizedLine.match(LAB_ROW_WITHOUT_UNIT);
+    const match = withUnit ?? (withoutUnit?.groups && units.acceptsMissingUnit(withoutUnit.groups.analyte.trim()) ? withoutUnit : null);
     if (!match?.groups) return undefined;
     const analyte = match.groups.analyte.trim();
     if (analyte.length < 2 || /\d{4,}/.test(analyte)) return undefined;
@@ -131,7 +151,7 @@ function parseLabRow(sourceLine: string, lineNumber: number): ParsedLabResult | 
     return {
         analyte,
         value,
-        unit: normalizeUnit(match.groups.unit),
+        unit: match.groups.unit === undefined ? '' : normalizeUnit(match.groups.unit),
         referenceRange,
         flag: statedFlag ?? calculatedFlag,
         lineNumber,
@@ -140,10 +160,10 @@ function parseLabRow(sourceLine: string, lineNumber: number): ParsedLabResult | 
 }
 
 /** Estrae solo righe complete e non ambigue. Nessun dato viene persistito. */
-export function parseItalianLabReport(text: string): ParsedLabResult[] {
+export function parseItalianLabReport(text: string, units: LabReportUnits = LEGACY_UNITS): ParsedLabResult[] {
     const results: ParsedLabResult[] = [];
     for (const [index, line] of text.replace(/\r/g, '').split('\n').entries()) {
-        const parsed = parseLabRow(line, index + 1);
+        const parsed = parseLabRow(line, index + 1, units);
         if (parsed) results.push(parsed);
     }
     return results;
