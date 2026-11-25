@@ -169,12 +169,14 @@ test('una decisione del medico senza data, con data impossibile o con un indiriz
     const decision = visit.sources.find((source) => source.kind === 'decisione_del_medico');
     assert.ok(decision);
     const others = visit.sources.filter((source) => source !== decision);
+    const documentUrl = others.find((source) => source.kind === 'documento')?.url;
+    assert.ok(documentUrl);
     const withDecision = (candidate: unknown) => ({ ...DIABETES_T2_PACKAGE, baseItems: [{ ...visit, sources: [candidate, ...others] }, ...rest] });
     const withoutDate = Object.fromEntries(Object.entries(decision).filter(([key]) => key !== 'decidedAt'));
     for (const candidate of [
         withoutDate,
         { ...decision, decidedAt: '2026-11-31' },
-        { ...decision, url: 'https://example.org' },
+        { ...decision, url: documentUrl },
         { ...decision, decidedBy: '' },
         { ...decision, kind: 'parere' },
     ]) {
