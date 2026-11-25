@@ -9,13 +9,15 @@ trademark of Regenstrief Institute, Inc.
 Versione usata: LOINC 2.83. [Licenza](https://loinc.org/license/).
 
 La tabella `assets/reference-data/loinc/esami-laboratorio-it.csv` è un
-sottoinsieme di 84 codici. Codice, Long Common Name e parti assiali
+sottoinsieme di 97 codici. Codice, Long Common Name e parti assiali
 (componente, proprietà, sistema, scala, metodo) sono riportati senza modifiche,
 come letti a novembre 2026 sul server terminologico HL7
 (`https://tx.fhir.org/r4/CodeSystem/$lookup?system=http://loinc.org&code=<codice>`,
 indicato riga per riga nella colonna `fonte_url`). Sono colonne locali di
 MediFlow, non contenuto LOINC: `nome_it`, `sinonimi_it`, `unita_ucum`,
-`unita_alternative`, `unita_referto`, `verifica`, `ambiguita` e `stato`.
+`altre_unita_ucum`, `unita_alternative`, `unita_referto`, `verifica`, `ambiguita`
+e `stato`. `altre_unita_ucum` elenca eventuali ulteriori unità UCUM ammesse per
+lo stesso codice LOINC come serie distinte, senza conversioni.
 `unita_referto` elenca come l'unità è scritta sui referti italiani letti dal
 programma, maiuscole comprese; `nessuna` vale solo per un'unità UCUM senza
 dimensione. La lettura italiana delle unità UCUM della tabella sta in

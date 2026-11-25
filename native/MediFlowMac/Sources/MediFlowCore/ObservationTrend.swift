@@ -61,13 +61,15 @@ public enum ObservationTrendComputer {
     }
 
     /// For each non-deleted observation, the trend of its numeric value versus the
-    /// nearest earlier non-deleted observation sharing its codeSystem+code.
+    /// nearest earlier non-deleted observation sharing its codeSystem, code and unit.
     /// Returned as a map keyed by observation id; ids absent from the map (the
     /// first reading of a code, a non-numeric reading, or a deleted one) are `.none`.
     public static func compute(_ observations: [HomeBaseObservationSummary]) -> [String: ObservationTrend] {
         var result: [String: ObservationTrend] = [:]
         let live = observations.filter { $0.deletedAt == nil }
-        let groups = Dictionary(grouping: live) { CodeKey(system: $0.codeSystem, code: $0.code) }
+        let groups = Dictionary(grouping: live) {
+            SeriesKey(system: $0.codeSystem, code: $0.code, unitSystem: $0.unitSystem, unitCode: $0.unitCode)
+        }
         for group in groups.values {
             // Chronological order; tie-break by id so equal timestamps are deterministic.
             let sorted = group.sorted {
@@ -93,8 +95,10 @@ public enum ObservationTrendComputer {
         return result
     }
 
-    private struct CodeKey: Hashable {
+    private struct SeriesKey: Hashable {
         let system: String
         let code: String
+        let unitSystem: String
+        let unitCode: String
     }
 }

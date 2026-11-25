@@ -49,7 +49,7 @@ const LOINC_PILOT: StaticCatalogItem[] = [
     { code: '59408-5', display: 'Oxygen saturation in Arterial blood by Pulse oximetry', displayIt: 'Saturazione O2 (SpO2)', defaultUnit: '%', version: '2.78' },
     { code: '8310-5', display: 'Body temperature', displayIt: 'Temperatura corporea', defaultUnit: 'Cel', version: '2.78' },
     { code: '29463-7', display: 'Body weight', displayIt: 'Peso corporeo', defaultUnit: 'kg', version: '2.78' },
-    { code: '2339-0', display: 'Glucose [Mass/volume] in Blood', displayIt: 'Glicemia', defaultUnit: 'mg/dL', version: '2.78' },
+    { code: '2339-0', display: 'Glucose [Mass/volume] in Blood', displayIt: 'Glicemia su sangue intero', defaultUnit: 'mg/dL', version: '2.78' },
 
     /* WUL-UIUX: subset ematologia/chimica clinica. Solo voci con codice
        LOINC e unita UCUM standard e non ambigui clinicamente (concordi tra
@@ -97,18 +97,14 @@ const LOINC_PILOT: StaticCatalogItem[] = [
  * grandezza. La `note` documenta la decisione aperta.
  */
 export const LOINC_PENDING_VALIDATION: (StaticCatalogItem & { note: string })[] = [
-    { code: '2345-7', display: 'Glucose [Mass/volume] in Serum or Plasma', displayIt: 'Glicemia (siero/plasma)', defaultUnit: 'mg/dL', note: 'Distinta da 2339-0 (sangue/POCT), gia in catalogo: scegliere quale matrice esporre.' },
     { code: '2028-9', display: 'Carbon dioxide, total [Moles/volume] in Serum or Plasma', displayIt: 'CO2 totale (bicarbonati)', defaultUnit: 'mmol/L', note: 'Etichetta bicarbonati vs CO2 totale da confermare.' },
-    { code: '17861-6', display: 'Calcium [Mass/volume] in Serum or Plasma', displayIt: 'Calcio totale (Ca)', defaultUnit: 'mg/dL', note: 'mg/dL (massa) vs mmol/L (moli, codice 2000-8): scelta clinica.' },
-    { code: '3094-0', display: 'Urea nitrogen [Mass/volume] in Serum or Plasma', displayIt: 'Azoto ureico (BUN)', defaultUnit: 'mg/dL', note: 'BUN vs urea intera (22664-7): differenza fattore ~2,14. In Italia si referta spesso l\'urea.' },
-    { code: '62238-1', display: 'Glomerular filtration rate/1.73 sq M.predicted (CKD-EPI)', displayIt: 'eGFR (CKD-EPI)', defaultUnit: 'mL/min/{1.73_m2}', note: 'Unita composta con annotazione UCUM; scelta della formula (CKD-EPI 2009/2021, MDRD) e clinica.' },
-    { code: '13457-7', display: 'Cholesterol in LDL [Mass/volume] calculated', displayIt: 'Colesterolo LDL (calcolato)', defaultUnit: 'mg/dL', note: 'Calcolato (Friedewald) vs diretto (18262-6).' },
     { code: '3016-3', display: 'Thyrotropin [Units/volume] in Serum or Plasma', displayIt: 'TSH', defaultUnit: 'm[IU]/L', note: 'Notazione unita internazionali (mUI/L vs uUI/mL) da validare.' },
-    { code: '3024-7', display: 'Thyroxine (T4) free [Mass/volume] in Serum or Plasma', displayIt: 'FT4 (tiroxina libera)', defaultUnit: 'ng/dL', note: 'ng/dL (massa) vs pmol/L (moli, 14920-3).' },
-    { code: '3051-0', display: 'Triiodothyronine (T3) free [Mass/volume] in Serum or Plasma', displayIt: 'FT3 (triiodotironina libera)', defaultUnit: 'pg/mL', note: 'pg/mL (massa) vs pmol/L (moli).' },
-    { code: '4548-4', display: 'Hemoglobin A1c/Hemoglobin.total in Blood', displayIt: 'Emoglobina glicata (HbA1c)', defaultUnit: '%', note: 'NGSP (%) vs IFCC (mmol/mol, 59261-8); protocolli diversi, valori diversi.' },
-    { code: '1988-5', display: 'C reactive protein [Mass/volume] in Serum or Plasma', displayIt: 'Proteina C reattiva (PCR)', defaultUnit: 'mg/L', note: 'mg/L vs mg/dL (fattore 10); hs-CRP e voce distinta (30522-7).' },
 ];
+
+export type DDimerUnspecifiedCode = '48065-7' | null;
+export const DDIMER_UNSPECIFIED_DEFAULT_CODE: DDimerUnspecifiedCode = null;
+const DDIMER_UNSPECIFIED_NAMES = ['D-dimero', 'Dimero D'] as const;
+const WHOLE_BLOOD_GLUCOSE_SYNONYMS = ['Glicemia capillare', 'Glicemia da glucometro', 'Glicemia (sangue intero)'] as const;
 
 const LOINC_LAB_ACTIVE: StaticCatalogItem[] = LOINC_LAB_TABLE.filter((row) => row.status === 'attivo').map((row) => ({
     code: row.code, display: row.longCommonName, displayIt: row.nameIt, ...(row.unit ? { defaultUnit: row.unit } : {}), version: LOINC_LAB_VERSION,
@@ -118,20 +114,32 @@ const LOINC_CATALOG: StaticCatalogItem[] = [...LOINC_PILOT, ...LOINC_LAB_ACTIVE]
 export interface LoincObservationName { name: string; unit: string; code: string; active: boolean }
 
 const displayNames = (displayIt: string) => [displayIt.replace(/\(.*\)/u, ''), /\(([^)]+)\)/u.exec(displayIt)?.[1] ?? ''];
+export interface LoincNameOptions { dDimerUnspecified?: DDimerUnspecifiedCode }
 
-export function loincObservationNames(): LoincObservationName[] {
+const tableRowNames = (row: typeof LOINC_LAB_TABLE[number], { dDimerUnspecified = DDIMER_UNSPECIFIED_DEFAULT_CODE }: LoincNameOptions) => [
+    row.nameIt,
+    row.nameIt.replace(/\(.*\)/u, ''),
+    ...row.synonyms,
+    ...(dDimerUnspecified === row.code ? DDIMER_UNSPECIFIED_NAMES : []),
+];
+
+export function loincObservationNames(options: LoincNameOptions = {}): LoincObservationName[] {
     const fromDisplay = (items: StaticCatalogItem[], active: boolean) => items.flatMap((item) =>
         displayNames(item.displayIt ?? '').map((name) => ({ name, unit: item.defaultUnit ?? '', code: item.code, active })));
-    const fromTable = LOINC_LAB_TABLE.flatMap((row) => [row.nameIt, row.nameIt.replace(/\(.*\)/u, ''), ...row.synonyms]
-        .map((name) => ({ name, unit: row.unit, code: row.code, active: row.status === 'attivo' })));
-    return [...fromDisplay(LOINC_PILOT, true), ...fromDisplay(LOINC_PENDING_VALIDATION, false), ...fromTable]
+    const wholeBloodGlucose = WHOLE_BLOOD_GLUCOSE_SYNONYMS.map((name) => ({ name, unit: 'mg/dL', code: '2339-0', active: true }));
+    const fromTable = LOINC_LAB_TABLE.flatMap((row) => {
+        const units = row.unit ? [row.unit, ...row.additionalUnits] : [''];
+        return tableRowNames(row, options).flatMap((name) =>
+            units.map((unit) => ({ name, unit, code: row.code, active: row.status === 'attivo' })));
+    });
+    return [...fromDisplay(LOINC_PILOT, true), ...wholeBloodGlucose, ...fromDisplay(LOINC_PENDING_VALIDATION, false), ...fromTable]
         .filter((entry) => entry.name.trim());
 }
 
 export interface LoincReportedUnit { name: string; reported: string; unit: string }
 
-export function loincReportedUnits(): LoincReportedUnit[] {
-    return LOINC_LAB_TABLE.filter((row) => row.status === 'attivo').flatMap((row) => [row.nameIt, row.nameIt.replace(/\(.*\)/u, ''), ...row.synonyms]
+export function loincReportedUnits(options: LoincNameOptions = {}): LoincReportedUnit[] {
+    return LOINC_LAB_TABLE.filter((row) => row.status === 'attivo').flatMap((row) => tableRowNames(row, options)
         .filter((name) => name.trim())
         .flatMap((name) => row.reportUnits.map((reported) => ({ name, reported, unit: row.unit }))));
 }
