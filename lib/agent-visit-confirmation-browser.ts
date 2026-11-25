@@ -27,13 +27,13 @@ export async function agentVisitPresentation(review: AgentVisitReview, plan: Age
         if (sourceItem.kind === 'pdf') {
             const document = review.documents.find(value => value.id === sourceItem.id);
             if (!document || document.beyondText) throw unavailable();
-            proposals.push({ title: agentReviewItemLabels.pdf, fields: [{ label: 'Testo', value: shownWhole(document.text.trim()) }], current: 'Non presente',
+            proposals.push({ id: sourceItem.id, kind: sourceItem.kind, title: agentReviewItemLabels.pdf, fields: [{ label: 'Testo', value: shownWhole(document.text.trim()) }], current: 'Non presente',
                 sourceName: shownWhole(document.name), sourceQuote: 'Depositato dall’agente', sourceHash: document.hash });
             continue;
         }
         if (sourceItem.kind === 'note' || sourceItem.kind === 'transcription') {
             const value = shownWhole(sourceItem.value.text);
-            proposals.push({ title: agentReviewItemLabels[sourceItem.kind], fields: [{ label: 'Testo', value }], current: 'Non presente',
+            proposals.push({ id: sourceItem.id, kind: sourceItem.kind, title: agentReviewItemLabels[sourceItem.kind], fields: [{ label: 'Testo', value }], current: 'Non presente',
                 sourceName: 'Cassetta della visita', sourceQuote: depositedText[sourceItem.kind], sourceHash: await textHash(value) });
             continue;
         }
@@ -47,7 +47,7 @@ export async function agentVisitPresentation(review: AgentVisitReview, plan: Age
             if (!label || typeof value !== 'string') throw unavailable();
             return { label, value: agentReviewFieldValues[field]?.[value] ?? value };
         });
-        proposals.push({ title: agentReviewItemLabels[sourceItem.kind], fields,
+        proposals.push({ id: sourceItem.id, kind: sourceItem.kind, title: agentReviewItemLabels[sourceItem.kind], fields,
             current: review.currentSummary.get(sourceItem.id) ?? 'Non presente', sourceName: source.fileName, sourceQuote: quote, sourceHash: source.sha256 });
     }
     return { patient: (review.patient.lastName + ' ' + review.patient.firstName).trim() || review.patient.taxCode, fiscalCode: review.visit.anchor.fiscalCode, proposals };

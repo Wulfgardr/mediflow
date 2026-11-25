@@ -440,3 +440,29 @@ clinica.
   stessa sorte. Il modello deve trovare controesempi togliendo il
   controllo di generazione o il ritiro al blocco. Le assunzioni sugli
   eventi OS si provano sul bundle, fuori dal modello.
+
+## Aggiornamento del 25/11/2026: ciò che il riquadro lega al piano (WUL-945)
+
+La revisione di sicurezza del 23/11 ha osservato che piano e presentazione
+arrivano dalla pagina Web come due oggetti separati e che nessun passaggio
+li confronta. La challenge passa a `mediflow.visit-confirmation.v2` e porta,
+derivati dall'host e non dalla pagina:
+
+- il codice fiscale della scheda che il piano modifica, letto nell'archivio;
+- l'elenco ordinato delle voci del piano, con identificativo e tipo.
+
+La presentazione cifrata per il riquadro indica per ogni proposta lo stesso
+identificativo e tipo. Il riquadro apre la presentazione solo se codice
+fiscale e voci coincidono con la challenge. Una voce in più, in meno, con
+un altro tipo o in un altro ordine, o una scheda con un altro codice fiscale,
+chiude il riquadro senza gesto e senza firma, quindi senza scrittura né
+ricevuta. Un riquadro che conosce solo la versione 1 rifiuta la challenge
+nuova. Il formato della ricevuta e degli eventi d'audit non cambia.
+
+Resta un limite. Testi di nota, trascrizione e PDF, farmaco e posologia,
+prestazione e voci, diagnosi ed esenzioni arrivano all'host già cifrati con
+la chiave dell'archivio, che vive solo nella pagina sbloccata. Né l'host né
+il riquadro possono verificare che il testo mostrato sia quello cifrato nel
+piano. Per questi valori la corrispondenza dipende ancora dalla pagina.
+Chiuderla richiede una decisione su chi altro può leggere il testo in
+chiaro al momento della conferma.
