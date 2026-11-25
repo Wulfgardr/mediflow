@@ -9,9 +9,18 @@
     width: 100%;
     overflow-wrap: anywhere;
 }
+.embeddedPanel {
+    color: var(--lume-ink);
+    display: grid;
+    gap: var(--surface-tray-inset, 10px);
+    max-width: 100%;
+    min-width: 0;
+    width: 100%;
+    overflow-wrap: anywhere;
+}
 .section { composes: island from './record-surface.module.css'; gap: 16px; }
 .section h2 { font: 600 0.875rem/1.5 var(--lume-font-sans); }
-.panel p { line-height: 1.55; margin: 0; }
+:is(.panel, .embeddedPanel) p { line-height: 1.55; margin: 0; }
 .muted { color: var(--lume-ink-muted); font-size: 0.875rem; }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .primary, .secondary, .fileLabel, .consent, .disclosure summary {
@@ -34,8 +43,8 @@
 }
 .primary { background: var(--lume-ink-fresh); color: var(--lume-surface-focal); }
 .secondary { background: var(--lume-surface-field); color: var(--lume-ink); }
-.panel button:disabled, .panel input:disabled { opacity: 0.55; cursor: not-allowed; }
-.panel :is(button, a, input, summary):focus-visible, .panel h2:focus {
+:is(.panel, .embeddedPanel) :is(button, input):disabled { opacity: 0.55; cursor: not-allowed; }
+:is(.panel, .embeddedPanel) :is(button, a, input, summary):focus-visible, :is(.panel, .embeddedPanel) h2:focus {
     outline: 2px solid var(--lume-ink-fresh);
     outline-offset: 4px;
 }
@@ -60,7 +69,7 @@
 .table td p { font-size: 0.875rem; margin-top: 8px; }
 .table small { display: block; line-height: 1.5; }
 .table code { font: var(--type-code); white-space: normal; }
-.panel progress { width: 100%; height: 16px; accent-color: var(--lume-ink-fresh); }
+:is(.panel, .embeddedPanel) progress { width: 100%; height: 16px; accent-color: var(--lume-ink-fresh); }
 @media (max-width: 640px) {
     .actions { align-items: stretch; flex-direction: column; }
     .table, .table tbody { display: block; }
@@ -70,10 +79,10 @@
     .table td, .table th:first-child, .table td:first-child { display: block; width: auto; padding: 0; border: 0; }
     .table td::before { content: attr(data-label); display: block; font-weight: 600; color: var(--lume-ink-muted); margin-bottom: 4px; }
 }
-@media (prefers-reduced-motion: reduce) { .panel *, .panel *::before, .panel *::after { transition: none; animation: none; } }
+@media (prefers-reduced-motion: reduce) { :is(.panel, .embeddedPanel) :is(*, *::before, *::after) { transition: none; animation: none; } }
 @media (forced-colors: active) { .primary, .secondary, .notice { border: 1px solid ButtonText; } }
 
-.panel { font: 0.875rem/1.5 var(--lume-font-sans); }
+.panel, .embeddedPanel { font: 0.875rem/1.5 var(--lume-font-sans); }
 .preview tbody td { color: var(--lume-ink-pencil); }
 .preview td:nth-child(2) { text-decoration: underline dashed; text-underline-offset: 4px; }
 .previewLayout { display: grid; grid-template-columns: minmax(0,1fr) minmax(240px,.4fr); gap: 40px; align-items: start; }
