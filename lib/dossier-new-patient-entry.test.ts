@@ -102,8 +102,10 @@ test('due documenti con valori diversi per lo stesso campo: nessuna scelta, il c
         source('lettera.pdf', { codes: [CF], text: LETTER }),
         source('referto.pdf', { codes: [CF], text: 'Cognome: Sintetico\nData di nascita: 04/02/1950' }),
     ), 'lettera.pdf');
-    assert.deepEqual(proposals.filter((item) => item.field === 'lastName').map((item) => [item.value, item.sourceName]),
-        [['Sintetica', 'lettera.pdf'], ['Sintetico', 'referto.pdf']]);
+    assert.deepEqual(proposals.map((item) => [item.field, item.value, item.sourceName]), [
+        ['taxCode', CF, 'lettera.pdf'], ['lastName', 'Sintetica', 'lettera.pdf'], ['lastName', 'Sintetico', 'referto.pdf'],
+        ['firstName', 'Elena', 'lettera.pdf'], ['birthDate', '1950-02-03', 'lettera.pdf'], ['birthDate', '1950-02-04', 'referto.pdf'],
+    ]);
     assert.deepEqual(allIdentityProposals(proposals), { values: { taxCode: CF, firstName: 'Elena' }, undecided: ['lastName', 'birthDate'] });
 });
 
