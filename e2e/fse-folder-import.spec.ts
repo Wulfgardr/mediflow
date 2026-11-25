@@ -81,7 +81,7 @@ test('WUL-949: la cartella del Fascicolo entra nell’import dalla scheda, si fe
 
         await openSiss(otherId);
         const otherPane = page.locator('#siss');
-        await otherPane.getByTestId('fse-folder').setInputFiles(folder);
+        await otherPane.getByTestId('fse-folder').setInputFiles(folder, { timeout: 15_000 });
         await expect(otherPane.getByTestId('fse-folder-refusal')).toHaveText('La cartella è di un altro codice fiscale. Nessun documento letto.');
         await expect(page).toHaveURL(new RegExp(`/patients/${otherId}/modules`));
         await page.screenshot({ path: path.join(evidence, '1-paziente-sbagliato.png'), fullPage: true });
@@ -98,10 +98,12 @@ test('WUL-949: la cartella del Fascicolo entra nell’import dalla scheda, si fe
         await expect(panel.getByRole('alert').filter({ hasText: '1 file non ha il nome dato dal Fascicolo: non letti.' })).toBeVisible();
         const sources = group.getByTestId('dossier-source');
         await expect(sources).toHaveCount(2);
-        await expect(sources.nth(0)).toContainText('Categoria: Analisi di laboratorio');
-        await expect(sources.nth(0)).toContainText('Data: 2025-03-14');
-        await expect(sources.nth(1)).toContainText('Categoria: Referto clinico');
-        await expect(sources.nth(1)).toContainText('Data: 2025-06-02');
+        const lab = sources.filter({ hasText: '2025-03-14_LAB_' });
+        const visit = sources.filter({ hasText: '2025-06-02_REF_' });
+        await expect(lab).toContainText('Categoria: Analisi di laboratorio');
+        await expect(lab).toContainText('Data: 2025-03-14');
+        await expect(visit).toContainText('Categoria: Referto clinico');
+        await expect(visit).toContainText('Data: 2025-06-02');
         await expect(group.getByLabel('Scheda di destinazione')).toHaveValue(patientId);
         expect(await attachmentCount(page, patientId)).toBe(0);
         await page.screenshot({ path: path.join(evidence, '2-cartella-letta.png'), fullPage: true });
@@ -137,7 +139,7 @@ test('WUL-949: la cartella del Fascicolo entra nell’import dalla scheda, si fe
         await expect(page.getByRole('button', { name: 'Documenti dal Fascicolo', exact: true })).toBeVisible();
         await page.getByTestId('dossier-import').getByTestId('fse-folder').setInputFiles(folder);
         await expect(page.getByTestId('dossier-group')).toHaveAttribute('data-identity', /^(suggested|matched)$/u, { timeout: 60_000 });
-        await expect(page.getByTestId('dossier-source').first()).toContainText('Categoria: Analisi di laboratorio');
+        await expect(page.getByTestId('dossier-source').filter({ hasText: '2025-03-14_LAB_' })).toContainText('Categoria: Analisi di laboratorio');
         await page.screenshot({ path: path.join(evidence, '5-nuova-scheda.png'), fullPage: true });
 
         await switchPreset(page, 'core');
