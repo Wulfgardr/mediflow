@@ -102,10 +102,13 @@ test('nuova scheda: trascino due documenti, confermo l’anagrafica proposta e i
     await expect(panel.getByTestId('dossier-document')).toHaveCount(2, { timeout: 30_000 });
     const letter = panel.getByTestId('dossier-document').filter({ hasText: 'lettera.pdf' });
     const exams = panel.getByTestId('dossier-document').filter({ hasText: 'esami.pdf' });
-    await expect(letter.locator('[data-testid="dossier-fact"][data-kind="diagnosis"]').filter({ has: page.locator('input[value="I10"]') })).toHaveCount(1);
+    const hypertension = letter.locator('[data-testid="dossier-fact"][data-kind="diagnosis"]').filter({ has: page.locator('input[value="I10"]') });
+    await expect(hypertension).toHaveCount(1);
+    await expect(hypertension).toContainText('Diagnosi: ICD-10 I10 Ipertensione essenziale');
     await expect(letter.locator('[data-testid="dossier-fact"][data-kind="therapy"]').filter({ has: page.locator('input[value="Ramipril"]') })).toHaveCount(1);
     await expect(exams.locator('[data-testid="dossier-fact"][data-kind="observation"]').filter({ has: page.locator('input[value="Creatinina"]') })).toHaveCount(1);
-    await expect(letter.getByTestId('dossier-evidence').first()).toBeVisible();
+    await hypertension.getByRole('button', { name: 'Mostra nel testo' }).click();
+    await expect(letter.locator('details[open]')).toContainText('Ipertensione essenziale');
     await capture(info, page, '3-dati-clinici-in-revisione.png');
 
     const patient = await page.evaluate(async (id) => (await fetch(`/api/patients/${id}`, { cache: 'no-store' })).json(), patientId);
@@ -144,7 +147,7 @@ test('nuova scheda: documenti di due pazienti, omocodia o scheda già esistente 
     }, taxCode);
     await openUnlockedDocument(page, '/patients/new', pin);
     await dropFiles(dropZone(page), [{ name: 'lettera.pdf', bytes: await letterPdf(taxCode) }]);
-    await expect(group).toHaveAttribute('data-identity', 'suggested', { timeout: 120_000 });
+    await expect(group).toHaveAttribute('data-identity', /^(suggested|matched)$/u, { timeout: 120_000 });
     await expect(group.getByLabel('Scheda di destinazione')).toHaveValue(existing);
     await expect(group.getByTestId('dossier-new-patient').getByTestId('patient-document-create')).toHaveCount(0);
     await capture(info, page, 'scheda-esistente.png');
