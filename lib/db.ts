@@ -942,7 +942,7 @@ class MedicalApiClient {
     private sessionReads: AbortController | null = null;
 
     patients: ApiTable<Patient, PatientAddOptions>;
-    ambulatories: ApiTable<Ambulatory>;
+    ambulatories: Omit<ApiTable<Ambulatory>, 'delete' | 'bulkDelete' | 'clear'>;
     entries: ApiTable<ClinicalEntry>;
     therapies: ApiTable<Therapy>;
     observations: ApiTable<Observation>;

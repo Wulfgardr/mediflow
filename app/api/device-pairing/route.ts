@@ -2,7 +2,7 @@ import { getNetworkOperatingMode, loadNetworkPairingState, loadNetworkSettingsSn
 import { readNetworkPairingEndpoint } from '@/lib/network-pairing-endpoint';
 import { issueDevicePairingOffer } from '@/lib/network-pairing-offers-server';
 import { readNativeNetworkJson } from '@/lib/native-network-json-body';
-import { requireDevicePairingAdminSession } from '@/lib/security/device-pairing-web-auth';
+import { requireLocalWebAdminSession } from '@/lib/security/local-web-admin-session';
 import { verifyHostCredentials } from '@/lib/security/host-credential-verification';
 import { isValidConfirmationPin } from '@/lib/security/pin-input';
 
@@ -10,7 +10,7 @@ const reply = (body: unknown, status = 200) => Response.json(body, { status, hea
 
 export async function GET(request: Request) {
     try {
-        if (!await requireDevicePairingAdminSession(request, false)) return reply({ code: 'LOCAL_ADMIN_REQUIRED' }, 403);
+        if (!await requireLocalWebAdminSession(request, false)) return reply({ code: 'LOCAL_ADMIN_REQUIRED' }, 403);
         const { clients } = await loadNetworkPairingState();
         return reply({ clients: clients.map(({ clientId, deviceName, clientPlatform, appVersion,
             grantedCapabilities, pairedAt, lastSeenAt }) =>
@@ -22,7 +22,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
     try {
-        const access = await requireDevicePairingAdminSession(request, true);
+        const access = await requireLocalWebAdminSession(request, true);
         if (!access) return reply({ code: 'LOCAL_ADMIN_REQUIRED' }, 403);
         const payload = await readNativeNetworkJson(request, 128, {
             signal: AbortSignal.any([request.signal, AbortSignal.timeout(2000)]),
@@ -39,7 +39,7 @@ export async function POST(request: Request) {
         if (await getNetworkOperatingMode() !== 'network-home-base') return reply({ code: 'NETWORK_MODE_DISABLED' }, 409);
         const endpoint = await readNetworkPairingEndpoint((await loadNetworkSettingsSnapshot()).clinicName);
         if (!endpoint) return reply({ code: 'PAIRING_ENDPOINT_UNAVAILABLE' }, 409);
-        const current = await requireDevicePairingAdminSession(request, true);
+        const current = await requireLocalWebAdminSession(request, true);
         if (!current || current.session.id !== access.session.id || current.session.userId !== access.session.userId
             || current.generation !== access.generation) return reply({ code: 'LOCAL_ADMIN_REQUIRED' }, 403);
         const offer = issueDevicePairingOffer({ archiveGeneration: current.generation, actorRef: current.session.userId, endpoint });

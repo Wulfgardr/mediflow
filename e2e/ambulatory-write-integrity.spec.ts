@@ -96,20 +96,38 @@ test('ambulatory clear rolls back audit failure, preserves live patients and rel
         await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
         const row = page.getByRole('treeitem').filter({ has: page.getByRole('heading', { name: new RegExp(name) }) });
         const actions: Array<{ submittedVersion: number; status: number }> = [];
-        const clear = async () => {
+        const pin = process.env.E2E_PIN || '1234';
+        const openPlan = async () => {
             await row.getByRole('button', { name: 'Azioni', exact: true }).click();
+            const prepared = page.waitForResponse(r => new URL(r.url()).pathname === '/api/ambulatories/commands/prepare' && r.request().method() === 'POST');
             await page.getByRole('menu', { name: 'Azioni', exact: true }).getByRole('menuitem', { name: 'Svuota ambiente di test', exact: true }).click();
+            const plan = await prepared;
+            expect(plan.status()).toBe(200);
             const dialog = page.getByRole('dialog');
-            await expect(dialog).toContainText('saranno spostati nel Cestino');
-            await expect(dialog).toContainText('sedi operative resteranno disponibili');
+            await expect(dialog).toContainText(new RegExp(`Svuotare «${name}»`));
+            await expect(dialog).toContainText('1 paziente va nel Cestino.');
+            await expect(dialog).toContainText('1 paziente resta nelle altre sedi.');
+            return { dialog, submittedVersion: plan.request().postDataJSON().expectedVersion as number };
+        };
+        const clear = async () => {
+            const { dialog, submittedVersion } = await openPlan();
             if (!actions.length) await page.screenshot({ path: testInfo.outputPath('clear-confirmation.png') });
-            const response = page.waitForResponse(r => new URL(r.url()).pathname === '/api/ambulatories/clear' && r.request().method() === 'POST');
+            await dialog.getByLabel('PIN di conferma').fill(pin);
+            const response = page.waitForResponse(r => new URL(r.url()).pathname === '/api/ambulatories/commands/execute' && r.request().method() === 'POST');
             await dialog.getByRole('button', { name: 'Svuota', exact: true }).click();
             const result = await response;
-            actions.push({ submittedVersion: result.request().postDataJSON().version as number, status: result.status() });
+            actions.push({ submittedVersion, status: result.status() });
             await expect(dialog).toHaveCount(0);
             return result.status();
         };
+        const wrongPin = await openPlan();
+        await wrongPin.dialog.getByLabel('PIN di conferma').fill(pin === '9753' ? '9754' : '9753');
+        await wrongPin.dialog.getByRole('button', { name: 'Svuota', exact: true }).click();
+        await expect(wrongPin.dialog.getByRole('alert')).toHaveText('PIN non accettato.');
+        await page.screenshot({ path: testInfo.outputPath('clear-wrong-pin.png') });
+        expect(read()).toEqual(before);
+        await wrongPin.dialog.getByRole('button', { name: 'Annulla', exact: true }).click();
+        await expect(wrongPin.dialog).toHaveCount(0);
         sql.exec("CREATE TRIGGER synthetic_ambulatory_ui_audit BEFORE INSERT ON audit_events WHEN NEW.event_type='patient.deleted' BEGIN SELECT RAISE(IGNORE); END");
         expect(await clear()).toBe(500);
         expect(read()).toEqual(before);
@@ -196,7 +214,11 @@ test('ambulatory clear rolls back audit failure, preserves live patients and rel
             expect(currentList.status()).toBe(200);
             const currentAmbulatory = (await currentList.json() as Array<{ id: string; version: number }>).find(item => item.id === id);
             expect(currentAmbulatory).toBeTruthy();
-            const deleted = await documentRequests(page).delete(`/api/ambulatories/${id}`, { data: { version: currentAmbulatory!.version } });
+            const prepared = await documentRequests(page).post('/api/ambulatories/commands/prepare',
+                { data: { operation: 'ambulatory.delete.v1', ambulatoryId: id, expectedVersion: currentAmbulatory!.version } });
+            expect(prepared.status()).toBe(200);
+            const deleted = await documentRequests(page).post('/api/ambulatories/commands/execute',
+                { data: { reference: (await prepared.json() as { reference: string }).reference, pin: process.env.E2E_PIN || '1234' } });
             expect(deleted.status()).toBe(200);
             const finalList = await documentRequests(page).get('/api/ambulatories');
             expect(finalList.status()).toBe(200);

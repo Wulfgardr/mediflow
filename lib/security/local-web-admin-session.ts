@@ -4,7 +4,7 @@ import { isTrustedWebMutationRequest } from './request-transport';
 import { readAuthenticatedWebSession } from './server-auth';
 import { archiveGenerationForSession, currentArchiveGeneration } from './archive-session-generation';
 
-export async function requireDevicePairingAdminSession(request: Request, mutation: boolean) {
+export async function requireLocalWebAdminSession(request: Request, mutation: boolean) {
     if (!hasAttestedLoopbackIngress(request) || request.headers.has('authorization')
         || request.headers.has('x-mediflow-token') || (mutation && !isTrustedWebMutationRequest(request))) return null;
     const session = await readAuthenticatedWebSession();
