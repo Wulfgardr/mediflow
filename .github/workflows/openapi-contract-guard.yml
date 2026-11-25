@@ -80,6 +80,11 @@ jobs:
         run: |
           npm run test:use-effect-ratchet
           npm run check:use-effect-ratchet
+      - name: Button system ratchet and tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          npm run test:button-system
+          npm run check:button-system
       - name: Pairing state single-writer guard and tests
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: |
