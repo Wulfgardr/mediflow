@@ -65,7 +65,7 @@ export function cargoTestCommand(root) {
 
 const gpuiDirectory = 'experiments/gpui-patient-pilot';
 const gpuiWorkflow = '.github/workflows/rust-gpui-pilot.yml';
-const gpuiPaths = [`${gpuiDirectory}/**`, 'app/fonts/**', 'native/MediFlowMac/Sources/MediFlowAppleShared/Resources/Fonts/**',
+const gpuiPaths = [`${gpuiDirectory}/**`, 'native/local-voice/**', 'app/fonts/**', 'native/MediFlowMac/Sources/MediFlowAppleShared/Resources/Fonts/**',
   'docs/design/punto-inchiostro/tokens/punto-inchiostro.tokens.json', 'docs/design/lume/tokens/lume.tokens.json',
   'public/brand/mediflow/*.svg', 'native/contracts/crypto-golden-vectors.v3.json', 'native/contracts/recovery-backup-golden.v1.json', 'native/contracts/dossier-conformance/**', 'scripts/*dossier*', 'app/api/**', 'lib/**', 'drizzle/**',
   'packages/web-auth-lifecycle-owner/**', 'package.json', 'package-lock.json', 'scripts/prepare-e2e-db.mjs',
@@ -105,9 +105,7 @@ export function cargoGpuiPilotTestCommand(root) {
   const client = gpuiTables(root, `${gpuiDirectory}/client/Cargo.toml`, ['[package]', '[lib]', '[dependencies]', '[dev-dependencies]', '[[test]]']);
   const transport = gpuiTables(root, `${gpuiDirectory}/transport/Cargo.toml`, ['[package]', '[lib]', '[[bin]]', '[dependencies]', "[target.'cfg(windows)'.dependencies]"]);
   const app = gpuiTables(root, `${gpuiDirectory}/app/Cargo.toml`, ['[package]', '[[bin]]', "[target.'cfg(windows)'.dependencies]", '[dependencies]', '[dev-dependencies]', "[target.'cfg(target_os = \"macos\")'.dependencies]", "[target.'cfg(target_os = \"macos\")'.dev-dependencies]"]);
-  exactFields(app["[target.'cfg(target_os = \"macos\")'.dependencies]"], {
-    'whisper-rs': '{ version = "=0.16.0", default-features = false, features = ["metal"] }',
-  }, 'macOS local voice engine');
+  if (app["[target.'cfg(target_os = \"macos\")'.dependencies]"]) throw new Error('Pilot Cargo macOS local voice engine moved to native/local-voice');
   exactFields(app["[target.'cfg(windows)'.dependencies]"], {
     'raw-window-handle': '"0.6"',
     'mediflow-local-state': '{ path = "../state" }',
@@ -123,6 +121,7 @@ export function cargoGpuiPilotTestCommand(root) {
   }, 'state Windows dependencies');
   exactFields(app['[dev-dependencies]'], {
     gpui: '{ workspace = true, features = ["test-support"] }', gpui_platform: '{ workspace = true, features = ["test-support"] }', 'chrono-tz': '"0.10"',
+    'mediflow-local-voice': '{ path = "../../../native/local-voice/engine", features = ["test-support"] }',
   }, 'app test-support dependencies');
   exactFields(app["[target.'cfg(target_os = \"macos\")'.dev-dependencies]"], {
     gpui_apple: '{ git = "https://github.com/zed-industries/zed", rev = "56934ec0560bce8929025497411de7f5322fb6ca" }',
@@ -164,7 +163,7 @@ export function cargoGpuiPilotTestCommand(root) {
     || !build.includes('cargo:rerun-if-changed=src/documents/adobe_glyph_names.h')) throw new Error('Pilot glyph list binding changed');
   read(root, `${gpuiDirectory}/app/src/documents/adobe_glyph_names.h`);
   const files = ['client/tests/flow.rs', 'client/tests/patient_names.rs', 'app/src/demo_app_tests.rs', 'app/src/demo_ui_cli.rs', 'app/src/shell/ui_cli.rs', 'app/src/chat_access/owner.rs', 'app/src/chat_access/chain.rs', 'app/src/chat_access/native.rs', 'app/src/chat_access/card.rs', 'app/src/chat_access/references.rs', 'app/src/clinical_text.rs', 'app/src/clinical_units.rs', 'app/src/components.rs', 'app/src/demo.rs', 'app/src/documents.rs', 'app/src/documents/pdf.rs', 'app/tests/document_pdf.rs', 'app/tests/identity_contract.rs', 'app/src/editing.rs', 'app/src/main.rs', 'app/src/native_lock.rs', 'app/src/navigation.rs', 'app/src/patient_forms.rs', 'app/src/patient_text.rs', 'app/src/platform_integration.rs', 'app/src/references.rs', 'app/src/shell.rs', 'app/src/shell/account_profile.rs', 'app/src/shell/agenda_flow.rs', 'app/src/shell/ambulatories.rs', 'app/src/shell/ambulatory_commands.rs', 'app/src/shell/ai_preferences.rs', 'app/src/shell/ai_status.rs', 'app/src/shell/analytics.rs', 'app/src/shell/chat_access.rs', 'app/src/shell/document_details.rs', 'app/src/shell/document_library.rs', 'app/src/shell/patient_document.rs', 'app/src/shell/settings.rs', 'app/src/shell/local_preferences.rs', 'app/src/shell/local_settings.rs', 'app/src/shell/local_host.rs', 'app/src/shell/local_host/archives.rs', 'app/src/shell/local_host/security.rs', 'app/src/shell/local_host/models.rs', 'app/src/shell/local_host/models/provider.rs', 'app/src/shell/local_host/parameters.rs', 'app/src/shell/local_host/chatgpt.rs', 'app/src/shell/notes_recovery_tests.rs', 'app/src/shell/rendered_command.rs', 'app/src/shell/scales.rs', 'app/src/shell/therapy_picker.rs', 'app/src/shell/view_state.rs', 'app/src/shell/voice_model.rs', 'app/src/shell/who_lookup.rs', 'app/src/text_input.rs', 'app/src/theme.rs', 'app/src/title.rs',
-    'transport/src/dto.rs', 'transport/src/account_profile.rs', 'transport/src/ambulatories.rs', 'transport/src/ambulatory_command_recovery.rs', 'transport/src/ambulatory_command_transport.rs', 'transport/src/ambulatory_commands.rs', 'transport/src/ai_preferences.rs', 'transport/src/analytics.rs', 'transport/src/catalogs.rs', 'transport/src/context.rs', 'transport/src/crypto.rs', 'transport/src/http.rs', 'transport/src/local_host.rs', 'transport/src/local_host/models.rs', 'transport/src/local_host/parameters.rs', 'transport/src/local_host/chatgpt.rs', 'transport/src/ports.rs', 'transport/src/profile_query.rs', 'transport/src/retirement_notice.rs', 'transport/src/scales.rs', 'transport/src/session.rs', 'transport/src/session/patient_document.rs', 'transport/src/who.rs', 'transport/src/bin/mediflow-runtime-probe.rs', 'app/src/shell/local_host/controls.rs', 'transport/src/local_host/controls.rs', 'app/src/shell/local_host/network.rs', 'app/src/shell/local_host/governance.rs', 'transport/src/local_host/governance.rs', 'app/src/shell/local_host/references.rs', 'transport/src/local_host/references.rs', 'app/src/local_voice/mod.rs', 'app/src/local_voice/drug_review.rs', 'app/src/local_voice/listening.rs', 'app/src/local_voice/model.rs', 'app/src/local_voice/recording.rs', 'app/src/local_voice/voices.rs', 'app/src/local_voice/whisper.rs', 'app/src/shell/local_voice.rs', 'app/src/shell/local_host/archives/schedule.rs', 'transport/src/local_host/archives.rs', 'app/src/chat_access/adapter.rs', 'app/src/chat_access/clinical.rs', 'app/src/shell/local_host/work_profile.rs', 'app/src/shell/local_host/macos_preferences.rs', 'transport/src/local_host/work_profile.rs', 'transport/src/local_host/who_administration.rs', 'app/src/shell/local_host/who_administration.rs', 'app/src/shell/local_host/controls/audit.rs', 'app/src/shell/local_host/controls/diagnostics.rs', 'app/src/shell/document_curation.rs', 'app/src/shell/dossier_import.rs', 'transport/src/dossier.rs', 'transport/src/dossier_transport_tests.rs', 'transport/src/local_host/dossier.rs', 'transport/src/local_host/documents.rs', 'transport/src/local_host/territorial.rs', 'transport/src/local_host/drug_catalog.rs', 'app/src/shell/local_host/drug_catalog.rs', 'transport/src/local_host/retention.rs', 'app/src/shell/local_host/retention.rs', 'transport/src/local_host/patient_insight.rs', 'transport/src/local_host/rich_text.rs', 'transport/tests/patient_insight_live.rs', 'app/src/shell/patient_insight/tests.rs', 'transport/src/local_host/document_synthesis.rs', 'transport/tests/document_synthesis_live.rs', 'app/src/shell/document_synthesis/tests.rs',
+    'transport/src/dto.rs', 'transport/src/account_profile.rs', 'transport/src/ambulatories.rs', 'transport/src/ambulatory_command_recovery.rs', 'transport/src/ambulatory_command_transport.rs', 'transport/src/ambulatory_commands.rs', 'transport/src/ai_preferences.rs', 'transport/src/analytics.rs', 'transport/src/catalogs.rs', 'transport/src/context.rs', 'transport/src/crypto.rs', 'transport/src/http.rs', 'transport/src/local_host.rs', 'transport/src/local_host/models.rs', 'transport/src/local_host/parameters.rs', 'transport/src/local_host/chatgpt.rs', 'transport/src/ports.rs', 'transport/src/profile_query.rs', 'transport/src/retirement_notice.rs', 'transport/src/scales.rs', 'transport/src/session.rs', 'transport/src/session/patient_document.rs', 'transport/src/who.rs', 'transport/src/bin/mediflow-runtime-probe.rs', 'app/src/shell/local_host/controls.rs', 'transport/src/local_host/controls.rs', 'app/src/shell/local_host/network.rs', 'app/src/shell/local_host/governance.rs', 'transport/src/local_host/governance.rs', 'app/src/shell/local_host/references.rs', 'transport/src/local_host/references.rs', 'app/src/shell/local_voice.rs', 'app/src/shell/local_host/archives/schedule.rs', 'transport/src/local_host/archives.rs', 'app/src/chat_access/adapter.rs', 'app/src/chat_access/clinical.rs', 'app/src/shell/local_host/work_profile.rs', 'app/src/shell/local_host/macos_preferences.rs', 'transport/src/local_host/work_profile.rs', 'transport/src/local_host/who_administration.rs', 'app/src/shell/local_host/who_administration.rs', 'app/src/shell/local_host/controls/audit.rs', 'app/src/shell/local_host/controls/diagnostics.rs', 'app/src/shell/document_curation.rs', 'app/src/shell/dossier_import.rs', 'transport/src/dossier.rs', 'transport/src/dossier_transport_tests.rs', 'transport/src/local_host/dossier.rs', 'transport/src/local_host/documents.rs', 'transport/src/local_host/territorial.rs', 'transport/src/local_host/drug_catalog.rs', 'app/src/shell/local_host/drug_catalog.rs', 'transport/src/local_host/retention.rs', 'app/src/shell/local_host/retention.rs', 'transport/src/local_host/patient_insight.rs', 'transport/src/local_host/rich_text.rs', 'transport/tests/patient_insight_live.rs', 'app/src/shell/patient_insight/tests.rs', 'transport/src/local_host/document_synthesis.rs', 'transport/tests/document_synthesis_live.rs', 'app/src/shell/document_synthesis/tests.rs',
     'app/src/shell/document_synthesis/tests/chat.rs', 'app/src/shell/generation.rs', 'transport/src/local_host/smart_import/tests.rs', 'transport/tests/smart_import_live.rs', 'app/src/shell/smart_import/tests.rs', 'app/src/shell/smart_import/tests/chat.rs', 'app/src/shell/who_lookup/tests/chat.rs', 'app/src/shell/open_loops.rs', 'transport/src/session/open_loops.rs', 'app/src/shell/patient_record.rs', 'app/src/shell/record_changes.rs', 'app/src/shell/record_capture.rs'].map(file => `${gpuiDirectory}/${file}`);
   for (const file of [...files, `${gpuiDirectory}/app/src/shell/clinical_forms.rs`, `${gpuiDirectory}/app/src/shell/threshold_actions.rs`, `${gpuiDirectory}/client/src/lib.rs`, `${gpuiDirectory}/transport/src/bin/mediflow-runtime-probe.rs`, `${gpuiDirectory}/Cargo.lock`, `${gpuiDirectory}/state/src/lib.rs`, `${gpuiDirectory}/transport/src/local_host/archives.rs`, `${gpuiDirectory}/transport/src/local_host/security.rs`, `${gpuiDirectory}/transport/src/patient_identity.rs`]) read(root, file);
   return { files, executable: 'cargo', args: ['test', '--manifest-path', manifest, '--workspace', '--all-targets', '--locked'], toolchain };
@@ -262,6 +261,40 @@ export function collectPatientDocumentKeyErasureSelection(root) {
   } };
 }
 
+const localVoiceDirectory = 'native/local-voice';
+const localVoiceWorkflow = '.github/workflows/local-voice.yml';
+const localVoicePaths = [`${localVoiceDirectory}/**`, 'lib/local-voice/**', 'scripts/local-voice-service*', 'scripts/prove-ascolto-visita.mjs',
+  'scripts/fixtures/visita-due-voci.json', localVoiceWorkflow];
+const localVoiceTriggers = { pull_request: { paths: localVoicePaths }, push: { branches: ['main'], paths: localVoicePaths }, workflow_dispatch: null };
+export function collectLocalVoiceSelection(root) {
+  const manifest = `${localVoiceDirectory}/Cargo.toml`;
+  const workspace = gpuiTables(root, manifest, ['[workspace]', '[workspace.package]']);
+  exactFields(workspace['[workspace]'], { members: '["engine", "service"]', resolver: '"3"' }, 'local voice workspace membership');
+  const toolchain = /^"(\d+\.\d+\.\d+)"$/u.exec(workspace['[workspace.package]']?.['rust-version'])?.[1];
+  const rust = gpuiTables(root, `${localVoiceDirectory}/rust-toolchain.toml`, ['[toolchain]']);
+  if (!toolchain) throw new Error('Local voice requires an exact Rust version');
+  exactFields(rust['[toolchain]'], { channel: `"${toolchain}"`, profile: '"minimal"', components: '["rustfmt", "clippy"]' }, 'local voice toolchain');
+  const engine = ['lib.rs', 'drug_review.rs', 'listening.rs', 'model.rs', 'recording.rs', 'voices.rs', 'whisper.rs'].map(file => `${localVoiceDirectory}/engine/src/${file}`);
+  const service = ['auth.rs', 'http.rs', 'server.rs', 'stream.rs'].map(file => `${localVoiceDirectory}/service/src/${file}`);
+  const node = 'scripts/local-voice-service.test.mjs';
+  for (const file of [...engine, ...service, node, `${localVoiceDirectory}/Cargo.lock`, `${localVoiceDirectory}/engine/build.rs`]) read(root, file);
+  const suite = { workflow: localVoiceWorkflow, job: 'local-voice', triggers: localVoiceTriggers };
+  const install = collectLiteralCiBinding(root, { ...suite, ciCall: `rustup toolchain install ${toolchain} --profile minimal --component rustfmt --component clippy` });
+  const cargo = collectLiteralCiBinding(root, { ...suite, ciCall: `cargo test --manifest-path ${manifest} --workspace --all-targets --locked` });
+  const build = collectLiteralCiBinding(root, { ...suite, ciCall: `cargo build --manifest-path ${manifest} -p mediflow-voice --release --locked` });
+  const binding = collectLiteralCiBinding(root, { ...suite, ciCall: `node --test ${node}` });
+  const ci = yaml(root, localVoiceWorkflow), job = ci.jobs['local-voice'];
+  const env = { ...ci.env, ...job.env, ...job.steps[binding.stepIndex].env };
+  if (job.env?.RUSTUP_TOOLCHAIN !== toolchain || install.stepIndex >= cargo.stepIndex || cargo.stepIndex >= build.stepIndex || build.stepIndex >= binding.stepIndex
+    || [install, cargo, build, binding].some(item => item.jobIf !== null || item.stepIf !== null)
+    || binding.runsOn !== '${{ matrix.os }}'
+    || JSON.stringify(binding.matrix) !== JSON.stringify({ os: ['macos-latest', 'ubuntu-24.04'] })
+    || env.MEDIFLOW_LOCAL_VOICE_BINARY !== `\${{ github.workspace }}/${localVoiceDirectory}/target/release/mediflow-voice`) throw new Error('Local voice CI binding changed');
+  return { files: [...engine, ...service, node], errors: [], mode: 'conditional', conditional: true,
+    binding: { ...cargo, node: binding, toolchain,
+      scope: 'Synthetic engine and service tests; loopback, signature and sandbox checks on macOS; no model, no microphone' } };
+}
+
 const uiTarget = 'MediFlowMobileAppUITests';
 function swiftSources(root, folder) {
   const files = [];
@@ -357,6 +390,10 @@ export function collectNativeToolSelections(root) {
     catch (error) { result['memory:patient-document-key'] = { files: [], errors: [error.message], mode: 'conditional', conditional: true }; }
     try { result['http:gpui-comparison'] = collectGpuiComparisonSelection(root); }
     catch (error) { result['http:gpui-comparison'] = { files: [], errors: [error.message], mode: 'conditional', conditional: true }; }
+  }
+  if (fs.existsSync(path.join(root, localVoiceDirectory))) {
+    try { result['cargo:local-voice'] = collectLocalVoiceSelection(root); }
+    catch (error) { result['cargo:local-voice'] = { files: [], errors: [error.message], mode: 'conditional', conditional: true }; }
   }
   if (fs.existsSync(path.join(root, `${appleProject}/project.yml`))) {
     try { result['xcode:mobile-ui'] = collectXcodeUiSelection(root); }

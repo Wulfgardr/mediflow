@@ -1849,7 +1849,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                 return result;
             }});`);
     }
-    for (const name of ['local-ui-navigation-deadline.mjs', 'mediflow.mjs', 'windows-system-command.mjs', 'mediflow-launcher-page.mjs', 'launcher-state.mjs', 'runtime-leases.mjs', 'windows-runtime-job-deadlines.mjs', 'windows-runtime-job.mjs', 'windows-runtime-job-helper.mjs', 'local-ui-web-identity.mjs', 'local-ui-pairing-transport.mjs']) {
+    for (const name of ['local-ui-navigation-deadline.mjs', 'mediflow.mjs', 'windows-system-command.mjs', 'mediflow-launcher-page.mjs', 'launcher-state.mjs', 'runtime-leases.mjs', 'windows-runtime-job-deadlines.mjs', 'windows-runtime-job.mjs', 'windows-runtime-job-helper.mjs', 'local-ui-web-identity.mjs', 'local-ui-pairing-transport.mjs', 'local-voice-service.mjs']) {
         const rawBytes = readFileSync(path.join(repoRoot, 'scripts', name), 'utf8');
         const bytes = name === 'mediflow.mjs' && !lifecycle?.job
             ? rawBytes.replaceAll("choice === 'web' && process.platform === 'win32'", 'false') : lifecycle?.job === 'simulated' && name === 'mediflow.mjs'

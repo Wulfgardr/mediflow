@@ -1,0 +1,65 @@
+name: Local voice service
+
+on:
+  pull_request:
+    paths:
+      - 'native/local-voice/**'
+      - 'lib/local-voice/**'
+      - 'scripts/local-voice-service*'
+      - 'scripts/prove-ascolto-visita.mjs'
+      - 'scripts/fixtures/visita-due-voci.json'
+      - '.github/workflows/local-voice.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'native/local-voice/**'
+      - 'lib/local-voice/**'
+      - 'scripts/local-voice-service*'
+      - 'scripts/prove-ascolto-visita.mjs'
+      - 'scripts/fixtures/visita-due-voci.json'
+      - '.github/workflows/local-voice.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: local-voice-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  local-voice:
+    name: Local voice service (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-24.04]
+    env:
+      RUSTUP_TOOLCHAIN: '1.98.1'
+      CARGO_INCREMENTAL: '0'
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444b
+        with:
+          node-version: '24.18.0'
+      - name: Install source-pinned Rust toolchain
+        run: rustup toolchain install 1.98.1 --profile minimal --component rustfmt --component clippy
+      - name: Format
+        run: cargo fmt --manifest-path native/local-voice/Cargo.toml --all --check
+      - name: Lint
+        run: cargo clippy --manifest-path native/local-voice/Cargo.toml --workspace --all-targets --locked -- -Dwarnings
+      - name: Engine and service tests
+        run: cargo test --manifest-path native/local-voice/Cargo.toml --workspace --all-targets --locked
+      - name: Build the service
+        run: cargo build --manifest-path native/local-voice/Cargo.toml -p mediflow-voice --release --locked
+      - name: Service boundary on the loopback
+        env:
+          MEDIFLOW_LOCAL_VOICE_BINARY: ${{ github.workspace }}/native/local-voice/target/release/mediflow-voice
+        run: node --test scripts/local-voice-service.test.mjs

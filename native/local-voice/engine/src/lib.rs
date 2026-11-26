@@ -1,25 +1,25 @@
 use zeroize::Zeroizing;
 
 #[cfg(unix)]
-pub(crate) mod drug_review;
+pub mod drug_review;
 
 #[cfg(target_os = "macos")]
-pub(crate) mod listening;
+pub mod listening;
 #[cfg(target_os = "macos")]
-pub(crate) mod model;
+pub mod model;
 #[cfg(target_os = "macos")]
-pub(crate) mod voices;
+pub mod voices;
 #[cfg(target_os = "macos")]
-pub(crate) mod whisper;
+pub mod whisper;
 
-pub(crate) mod recording;
+pub mod recording;
 
-pub(crate) use recording::{Event, Fault, State, Visible};
+pub use recording::{Event, Fault, State, Visible};
 
 impl State {
     /// Messaggio dello stato: che cosa succede e, in errore, come rimediare.
     /// In registrazione l'indicatore basta.
-    pub(crate) fn message(self) -> Option<&'static str> {
+    pub fn message(self) -> Option<&'static str> {
         Some(match self {
             Self::Disclosure => {
                 "L'audio viene trascritto sul Mac. Il testo resta qui da rivedere, anche se pronunci nomi o altri identificativi. Nessun invio alla chat o al modello."
@@ -38,7 +38,7 @@ impl State {
     /// Stati in cui il testo già trascritto si rivede: la fine normale e
     /// l'interruzione del microfono dopo l'avvio, che ferma la registrazione ma
     /// non butta il testo.
-    pub(crate) fn reviewable(self) -> bool {
+    pub fn reviewable(self) -> bool {
         matches!(
             self,
             Self::Review | Self::Error(Fault::MicrophoneLost | Fault::PermissionDenied)
@@ -47,20 +47,20 @@ impl State {
 }
 
 /// Avviso quando la registrazione si è fermata da sola.
-pub(crate) const LIMIT_REACHED: &str =
+pub const LIMIT_REACHED: &str =
     "La registrazione si è fermata da sola: 60 minuti o 80.000 caratteri sono il massimo.";
 
 /// Attesa massima del rilascio del motore all'uscita dell'app: il thread
 /// finisce prima il passo in corso (verifica del modello, caricamento o una
 /// decodifica).
-pub(crate) const RELEASE_BEFORE_EXIT: std::time::Duration = std::time::Duration::from_secs(10);
+pub const RELEASE_BEFORE_EXIT: std::time::Duration = std::time::Duration::from_secs(10);
 /// Testo massimo della revisione: la trascrizione più le etichette di medico e
 /// paziente e le correzioni. Resta sotto i 262.144 caratteri UTF-16 di una
 /// voce di diario.
-pub(crate) const MAX_REVIEW_CHARS: usize = 120_000;
+pub const MAX_REVIEW_CHARS: usize = 120_000;
 
 impl Fault {
-    pub(crate) fn message(self) -> &'static str {
+    pub fn message(self) -> &'static str {
         match self {
             Self::ModelMissing => "Modello vocale non installato.",
             Self::ModelInvalid => {
@@ -86,13 +86,13 @@ impl Fault {
 /// Testo mentre si parla, in due inchiostri: confermato (frasi definitive e
 /// prefisso confermato) e provvisorio (l'ultimo parziale oltre quel prefisso).
 /// Nessuno dei due è modificabile o trasferibile.
-pub(crate) struct LiveText {
-    pub(crate) confirmed: Zeroizing<String>,
-    pub(crate) provisional: Zeroizing<String>,
+pub struct LiveText {
+    pub confirmed: Zeroizing<String>,
+    pub provisional: Zeroizing<String>,
 }
 impl LiveText {
     /// Testo intero e intervallo in byte del provvisorio.
-    pub(crate) fn joined(&self) -> (Zeroizing<String>, std::ops::Range<usize>) {
+    pub fn joined(&self) -> (Zeroizing<String>, std::ops::Range<usize>) {
         let mut text = Zeroizing::new(self.confirmed.as_str().to_owned());
         if !text.is_empty() && !self.provisional.is_empty() {
             text.push(' ');
@@ -115,31 +115,31 @@ enum Backend {
     Unsupported,
 }
 
-pub(crate) struct Session {
-    #[cfg(test)]
+pub struct Session {
+    #[cfg(any(test, feature = "test-support"))]
     synthetic: Option<(recording::Machine, Zeroizing<String>)>,
     /// Per le prove: testo dal vivo (confermato, provvisorio) deciso dal test.
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     synthetic_live: Option<std::sync::Arc<std::sync::Mutex<(String, String)>>>,
     /// Per le prove: frasi della visita già attribuite.
-    #[cfg(all(test, target_os = "macos"))]
+    #[cfg(all(any(test, feature = "test-support"), target_os = "macos"))]
     synthetic_visit: Option<Vec<(voices::Speaker, String)>>,
     backend: Backend,
 }
 impl Session {
     fn with_backend(backend: Backend) -> Self {
         Self {
-            #[cfg(test)]
+            #[cfg(any(test, feature = "test-support"))]
             synthetic: None,
-            #[cfg(test)]
+            #[cfg(any(test, feature = "test-support"))]
             synthetic_live: None,
-            #[cfg(all(test, target_os = "macos"))]
+            #[cfg(all(any(test, feature = "test-support"), target_os = "macos"))]
             synthetic_visit: None,
             backend,
         }
     }
     /// `prompt`: nomi dei farmaci del paziente aperto.
-    pub(crate) fn new(prompt: Zeroizing<String>) -> Self {
+    pub fn new(prompt: Zeroizing<String>) -> Self {
         #[cfg(local_voice_capture)]
         if let Some(directory) = model::directory() {
             return Self::open(
@@ -162,8 +162,11 @@ impl Session {
     /// Senza file del modello la dettatura manca e si porta all'installazione;
     /// un file presente ma alterato si scopre alla verifica completa, all'avvio.
     #[cfg(target_os = "macos")]
-    #[cfg_attr(not(any(test, local_voice_capture)), allow(dead_code))]
-    pub(crate) fn open(
+    #[cfg_attr(
+        not(any(test, feature = "test-support", local_voice_capture)),
+        allow(dead_code)
+    )]
+    pub fn open(
         engine: whisper::Engine,
         capture: impl FnOnce() -> Option<Box<dyn whisper::AudioSource>>,
     ) -> Self {
@@ -177,8 +180,8 @@ impl Session {
     }
     /// Sessione di prova ferma in `state`; in registrazione o in pausa il
     /// tempo trascorso parte da `elapsed`.
-    #[cfg(all(test, target_os = "macos"))]
-    pub(crate) fn synthetic_at(state: State, elapsed: std::time::Duration, text: &str) -> Self {
+    #[cfg(all(any(test, feature = "test-support"), target_os = "macos"))]
+    pub fn synthetic_at(state: State, elapsed: std::time::Duration, text: &str) -> Self {
         Self {
             synthetic: Some((
                 recording::Machine::at(state, elapsed, std::time::Instant::now()),
@@ -188,8 +191,8 @@ impl Session {
         }
     }
     /// Visita di prova ferma in revisione, con frasi già attribuite.
-    #[cfg(all(test, target_os = "macos"))]
-    pub(crate) fn synthetic_visit(lines: &[(voices::Speaker, &str)]) -> Self {
+    #[cfg(all(any(test, feature = "test-support"), target_os = "macos"))]
+    pub fn synthetic_visit(lines: &[(voices::Speaker, &str)]) -> Self {
         let text: Vec<&str> = lines.iter().map(|(_, t)| *t).collect();
         Self {
             synthetic_visit: Some(lines.iter().map(|(s, t)| (*s, (*t).to_owned())).collect()),
@@ -200,12 +203,12 @@ impl Session {
             )
         }
     }
-    #[cfg(all(test, target_os = "macos"))]
-    pub(crate) fn synthetic(state: State, text: &str) -> Self {
+    #[cfg(all(any(test, feature = "test-support"), target_os = "macos"))]
+    pub fn synthetic(state: State, text: &str) -> Self {
         Self::synthetic_at(state, std::time::Duration::ZERO, text)
     }
-    #[cfg(all(test, target_os = "macos"))]
-    pub(crate) fn with_whisper(session: whisper::WhisperSession) -> Self {
+    #[cfg(all(any(test, feature = "test-support"), target_os = "macos"))]
+    pub fn with_whisper(session: whisper::WhisperSession) -> Self {
         Self::with_backend(Backend::Whisper(session))
     }
     fn send(&self, command: Event) {
@@ -216,29 +219,29 @@ impl Session {
         #[cfg(not(target_os = "macos"))]
         let _ = command;
     }
-    pub(crate) fn start(&self) {
+    pub fn start(&self) {
         self.send(Event::Start);
     }
     /// Ascolto della visita: come l'avvio, ma ogni frase va a medico o paziente.
-    pub(crate) fn start_visit(&self) {
+    pub fn start_visit(&self) {
         #[cfg(target_os = "macos")]
         if let Backend::Whisper(whisper) = &self.backend {
             whisper.set_two_voices(true);
         }
         self.send(Event::Start);
     }
-    pub(crate) fn pause(&self) {
+    pub fn pause(&self) {
         self.send(Event::Pause);
     }
-    pub(crate) fn resume(&self) {
+    pub fn resume(&self) {
         self.send(Event::Resume);
     }
-    pub(crate) fn stop(&self) {
+    pub fn stop(&self) {
         self.send(Event::Stop);
     }
     /// Dove la dettatura manca per il modello, assente o alterato, il gesto
     /// che porta a Impostazioni, Voce locale.
-    pub(crate) fn model_action(&self, state: State) -> Option<&'static str> {
+    pub fn model_action(&self, state: State) -> Option<&'static str> {
         match state {
             State::Error(Fault::ModelMissing) => Some("Installa il modello"),
             State::Error(Fault::ModelInvalid) => Some("Reinstalla il modello"),
@@ -247,8 +250,8 @@ impl Session {
     }
     /// Testo mentre si parla (solo whisper): da mostrare, mai modificabile né
     /// trasferibile.
-    #[cfg(all(test, target_os = "macos"))]
-    pub(crate) fn synthetic_live(
+    #[cfg(all(any(test, feature = "test-support"), target_os = "macos"))]
+    pub fn synthetic_live(
         state: State,
         live: std::sync::Arc<std::sync::Mutex<(String, String)>>,
     ) -> Self {
@@ -257,8 +260,8 @@ impl Session {
             ..Self::synthetic(state, "")
         }
     }
-    pub(crate) fn live_text(&self) -> Option<LiveText> {
-        #[cfg(test)]
+    pub fn live_text(&self) -> Option<LiveText> {
+        #[cfg(any(test, feature = "test-support"))]
         if let Some(live) = &self.synthetic_live {
             let (confirmed, provisional) = live.lock().unwrap().clone();
             return Some(LiveText {
@@ -281,8 +284,8 @@ impl Session {
         None
     }
     /// Stato, tempo trascorso e passaggi possibili della registrazione.
-    pub(crate) fn machine(&self) -> recording::Machine {
-        #[cfg(test)]
+    pub fn machine(&self) -> recording::Machine {
+        #[cfg(any(test, feature = "test-support"))]
         if let Some((machine, _)) = &self.synthetic {
             return *machine;
         }
@@ -294,11 +297,11 @@ impl Session {
             Backend::Unsupported => recording::Machine::failed(Fault::Unsupported),
         }
     }
-    pub(crate) fn state(&self) -> State {
+    pub fn state(&self) -> State {
         self.machine().state()
     }
     /// La registrazione si è fermata da sola alla durata massima.
-    pub(crate) fn limit_reached(&self) -> bool {
+    pub fn limit_reached(&self) -> bool {
         #[cfg(target_os = "macos")]
         if let Backend::Whisper(whisper) = &self.backend {
             return whisper.limit_reached();
@@ -306,8 +309,8 @@ impl Session {
         false
     }
     /// Ascolto della visita a due voci, scelto all'avvio.
-    pub(crate) fn two_voices(&self) -> bool {
-        #[cfg(all(test, target_os = "macos"))]
+    pub fn two_voices(&self) -> bool {
+        #[cfg(all(any(test, feature = "test-support"), target_os = "macos"))]
         if self.synthetic_visit.is_some() {
             return true;
         }
@@ -319,10 +322,10 @@ impl Session {
     }
     /// Testo da rivedere: nell'ascolto della visita, a righe per medico e
     /// paziente; nella dettatura, la trascrizione così com'è.
-    pub(crate) fn review_text(&self) -> Option<Zeroizing<String>> {
+    pub fn review_text(&self) -> Option<Zeroizing<String>> {
         #[cfg(target_os = "macos")]
         let state = self.state();
-        #[cfg(all(test, target_os = "macos"))]
+        #[cfg(all(any(test, feature = "test-support"), target_os = "macos"))]
         if let Some(visit) = &self.synthetic_visit {
             let lines: Vec<(voices::Speaker, &str)> =
                 visit.iter().map(|(s, t)| (*s, t.as_str())).collect();
@@ -339,8 +342,8 @@ impl Session {
         }
         self.transcript()
     }
-    pub(crate) fn transcript(&self) -> Option<Zeroizing<String>> {
-        #[cfg(test)]
+    pub fn transcript(&self) -> Option<Zeroizing<String>> {
+        #[cfg(any(test, feature = "test-support"))]
         if let Some((machine, text)) = &self.synthetic {
             return reviewed_text(machine.state(), text);
         }
@@ -354,7 +357,7 @@ impl Session {
     }
     /// Ritira la sessione e aspetta, al massimo `limit`, che il motore sia
     /// rilasciato. Solo per l'uscita del processo.
-    pub(crate) fn close(self, limit: std::time::Duration) -> bool {
+    pub fn close(self, limit: std::time::Duration) -> bool {
         match self.backend {
             #[cfg(target_os = "macos")]
             Backend::Whisper(whisper) => whisper.close(limit),
@@ -366,7 +369,7 @@ impl Session {
     }
 }
 
-pub(crate) fn reviewed_text(state: State, text: &str) -> Option<Zeroizing<String>> {
+pub fn reviewed_text(state: State, text: &str) -> Option<Zeroizing<String>> {
     (state.reviewable()
         && !text.trim().is_empty()
         && text.chars().count() <= MAX_REVIEW_CHARS
