@@ -263,7 +263,8 @@ export function collectPatientDocumentKeyErasureSelection(root) {
 
 const localVoiceDirectory = 'native/local-voice';
 const localVoiceWorkflow = '.github/workflows/local-voice.yml';
-const localVoicePaths = [`${localVoiceDirectory}/**`, 'lib/local-voice/**', 'scripts/local-voice-service*', 'scripts/prove-ascolto-visita.mjs',
+const localVoicePaths = [`${localVoiceDirectory}/**`, 'lib/local-voice/**', 'scripts/local-voice-service*',
+  'scripts/local-voice-binary*', 'scripts/install-local-voice-binary*', 'scripts/prove-ascolto-visita.mjs',
   'scripts/fixtures/visita-due-voci.json', localVoiceWorkflow];
 const localVoiceTriggers = { pull_request: { paths: localVoicePaths }, push: { branches: ['main'], paths: localVoicePaths }, workflow_dispatch: null };
 export function collectLocalVoiceSelection(root) {

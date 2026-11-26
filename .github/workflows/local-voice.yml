@@ -6,6 +6,8 @@ on:
       - 'native/local-voice/**'
       - 'lib/local-voice/**'
       - 'scripts/local-voice-service*'
+      - 'scripts/local-voice-binary*'
+      - 'scripts/install-local-voice-binary*'
       - 'scripts/prove-ascolto-visita.mjs'
       - 'scripts/fixtures/visita-due-voci.json'
       - '.github/workflows/local-voice.yml'
@@ -15,6 +17,8 @@ on:
       - 'native/local-voice/**'
       - 'lib/local-voice/**'
       - 'scripts/local-voice-service*'
+      - 'scripts/local-voice-binary*'
+      - 'scripts/install-local-voice-binary*'
       - 'scripts/prove-ascolto-visita.mjs'
       - 'scripts/fixtures/visita-due-voci.json'
       - '.github/workflows/local-voice.yml'
@@ -44,6 +48,7 @@ jobs:
       RUSTUP_TOOLCHAIN: '1.98.1'
       CARGO_INCREMENTAL: '0'
       CARGO_TERM_COLOR: always
+      ZERO_AR_DATE: '1'
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444b
@@ -58,8 +63,56 @@ jobs:
       - name: Engine and service tests
         run: cargo test --manifest-path native/local-voice/Cargo.toml --workspace --all-targets --locked
       - name: Build the service
+        env:
+          RUSTFLAGS: --remap-path-prefix=${{ github.workspace }}=/build
         run: cargo build --manifest-path native/local-voice/Cargo.toml -p mediflow-voice --release --locked
       - name: Service boundary on the loopback
         env:
           MEDIFLOW_LOCAL_VOICE_BINARY: ${{ github.workspace }}/native/local-voice/target/release/mediflow-voice
         run: node --test scripts/local-voice-service.test.mjs
+      - name: Package and hash macOS arm64 binary
+        if: matrix.os == 'macos-latest'
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = "arm64"
+          BINARY="native/local-voice/target/release/mediflow-voice"
+          OUT="${RUNNER_TEMP}/mediflow-voice-darwin-arm64"
+          mkdir -p "$OUT"
+          cp "$BINARY" "$OUT/mediflow-voice"
+          chmod 755 "$OUT/mediflow-voice"
+          SHA="$(shasum -a 256 "$OUT/mediflow-voice" | awk '{print $1}')"
+          BYTES="$(wc -c < "$OUT/mediflow-voice" | tr -d '[:space:]')"
+          printf '%s  mediflow-voice\n' "$SHA" > "$OUT/mediflow-voice.sha256"
+          node -e '
+            const fs = require("node:fs");
+            const { execFileSync } = require("node:child_process");
+            const read = (cmd, args) => execFileSync(cmd, args, { encoding: "utf8" }).trim();
+            const meta = {
+              platform: "darwin",
+              arch: "arm64",
+              sha256: process.argv[1],
+              bytes: Number(process.argv[2]),
+              runId: Number(process.env.GITHUB_RUN_ID || 0),
+              commit: process.env.GITHUB_SHA || "",
+              rust: read("rustc", ["--version"]),
+              cargo: read("cargo", ["--version"]),
+              cmake: read("cmake", ["--version"]).split("\n")[0],
+              clang: read("clang", ["--version"]).split("\n")[0],
+              macos: read("sw_vers", ["-productVersion"]),
+              signed: false,
+            };
+            fs.writeFileSync(process.argv[3], JSON.stringify(meta, null, 2) + "\n");
+            console.log("MEDIFLOW_VOICE_ARTIFACT", JSON.stringify(meta));
+            const manifest = JSON.parse(fs.readFileSync("scripts/local-voice-binary.json", "utf8"));
+            const pinned = manifest.platforms?.["darwin-arm64"]?.sha256;
+            console.log("PINNED_SHA256_MATCH", pinned === meta.sha256, { pinned, built: meta.sha256 });
+          ' "$SHA" "$BYTES" "$OUT/build-metadata.json"
+          otool -L "$OUT/mediflow-voice"
+      - name: Upload macOS arm64 binary artifact
+        if: matrix.os == 'macos-latest'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mediflow-voice-darwin-arm64
+          path: ${{ runner.temp }}/mediflow-voice-darwin-arm64
+          retention-days: 90
+          if-no-files-found: error
