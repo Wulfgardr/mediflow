@@ -12,12 +12,11 @@ const fiscalCode = 'RSSMRA80A01F205X';
 const captures = process.env.MEDIFLOW_DA_DECIDERE_CAPTURES;
 test.describe.configure({ retries: 0 });
 
-test('the physician decides a kit visit one proposal at a time, and the visit is never reported as applied in full', async ({ page, isolatedRuntime }, info) => {
-    test.setTimeout(150000);
-    const shot = async (name: string) => {
-        await page.screenshot({ path: info.outputPath(name + '.png'), fullPage: true });
-        if (captures) await page.screenshot({ path: path.join(captures, name + '.png'), fullPage: true });
-    };
+type Runtime = { url: string; dataDirectory: string };
+type Info = { outputPath: (...segments: string[]) => string };
+type Page = Parameters<typeof createSyntheticAgentMandate>[0];
+
+async function pairKitAndCreatePatient(page: Page, isolatedRuntime: Runtime, info: Info) {
     await createSyntheticAgentMandate(page);
     const credentials = info.outputPath('private-agent');
     mkdirSync(credentials, { mode: 0o700 });
@@ -32,15 +31,11 @@ test('the physician decides a kit visit one proposal at a time, and the visit is
         if (!response.ok) throw new Error('SYNTHETIC_PATIENT_SETUP_FAILED');
         return response.json() as Promise<{ id: string }>;
     }, fiscalCode);
+    return { credentials, agentRef: access.agentRef, patient };
+}
 
-    const visitId = randomUUID();
-    const directory = info.outputPath(visitId);
-    mkdirSync(directory, { mode: 0o700 });
-    const note = 'S: Controllo sintetico.\nO: Dati sintetici.\nA: Stabile.\nP: Vitamina D e visita pneumologica.';
-    const therapy = 'Prescrivo Dibase colecalciferolo 25.000 UI una fiala ogni 15 giorni, AIC 036588019, ATC A11CC05.';
-    const service = 'Prescritta visita pneumologica di controllo.';
-    const exemption = 'Confermata esenzione codice E30.';
-    const source = async (lines: string[], documentDate: string | null, facts: unknown[], isNote = false) => {
+function syntheticSources(directory: string) {
+    return async (lines: string[], documentDate: string | null, facts: unknown[], isNote = false) => {
         const pdf = await PDFDocument.create(), font = await pdf.embedFont(StandardFonts.Helvetica), sheet = pdf.addPage();
         lines.forEach((line, index) => sheet.drawText(line, { x: 40, y: 780 - index * 24, font, size: 11 }));
         const bytes = await pdf.save();
@@ -51,6 +46,31 @@ test('the physician decides a kit visit one proposal at a time, and the visit is
             documentType: isNote ? 'visita_specialistica' : 'altro', facts,
             coverage: { pages: null, unreadablePages: [], complete: false, note: 'Originale da rivedere dal medico' } };
     };
+}
+
+async function openDaDecidere(page: Page, url: string) {
+    await page.goto(url + '/in-arrivo');
+    await page.getByLabel('Passphrase', { exact: true }).fill(agentVisitPassphrase);
+    await page.getByRole('button', { name: 'Sblocca', exact: true }).click();
+    await expect(page).toHaveURL(/\/da-decidere$/u);
+}
+
+test('the physician decides a kit visit one proposal at a time, and the visit is never reported as applied in full', async ({ page, isolatedRuntime }, info) => {
+    test.setTimeout(150000);
+    const shot = async (name: string) => {
+        await page.screenshot({ path: info.outputPath(name + '.png'), fullPage: true });
+        if (captures) await page.screenshot({ path: path.join(captures, name + '.png'), fullPage: true });
+    };
+    const { credentials, agentRef, patient } = await pairKitAndCreatePatient(page, isolatedRuntime, info);
+
+    const visitId = randomUUID();
+    const directory = info.outputPath(visitId);
+    mkdirSync(directory, { mode: 0o700 });
+    const note = 'S: Controllo sintetico.\nO: Dati sintetici.\nA: Stabile.\nP: Vitamina D e visita pneumologica.';
+    const therapy = 'Prescrivo Dibase colecalciferolo 25.000 UI una fiala ogni 15 giorni, AIC 036588019, ATC A11CC05.';
+    const service = 'Prescritta visita pneumologica di controllo.';
+    const exemption = 'Confermata esenzione codice E30.';
+    const source = syntheticSources(directory);
     const prescription = await source(['Paziente CF ' + fiscalCode, 'Data Prescrizione: 17/11/2026', therapy, service, exemption], null, [
         { kind: 'therapy', values: { drugName: 'Dibase', activePrinciple: 'colecalciferolo', dosage: '25.000 UI una fiala ogni 15 giorni', aic: '036588019', atc: 'A11CC05' }, quote: therapy },
         { kind: 'service_prescription', values: { serviceName: 'visita pneumologica di controllo' }, quote: service },
@@ -62,13 +82,10 @@ test('the physician decides a kit visit one proposal at a time, and the visit is
     const extraction = path.join(directory, 'estrazione-preparata.json');
     writeFileSync(extraction, JSON.stringify({ schema: 'mediflow.dossier_prepared_extraction.v1',
         preparedAt: new Date().toISOString(), preparedBy: 'Ambulatorio Codex', sources: [prescription, visitNote] }));
-    const receipt = await prepareAndDepositAgentVisit(credentials, access.agentRef, extraction, fiscalCode, undefined, visitId);
+    const receipt = await prepareAndDepositAgentVisit(credentials, agentRef, extraction, fiscalCode, undefined, visitId);
     expect(receipt.status).toBe('closed');
 
-    await page.goto(isolatedRuntime.url + '/in-arrivo');
-    await page.getByLabel('Passphrase', { exact: true }).fill(agentVisitPassphrase);
-    await page.getByRole('button', { name: 'Sblocca', exact: true }).click();
-    await expect(page).toHaveURL(/\/da-decidere$/u);
+    await openDaDecidere(page, isolatedRuntime.url);
     await expect(page.getByRole('heading', { name: 'Da decidere', exact: true, level: 1 })).toBeVisible();
     const visit = page.getByRole('region', { name: 'Visita ' + visitId });
     await expect(visit.getByText('Pronta da applicare', { exact: true })).toBeVisible({ timeout: 30000 });
@@ -134,4 +151,61 @@ test('the physician decides a kit visit one proposal at a time, and the visit is
     await expect(page).toHaveURL(/\/da-decidere\?vista=documenti$/u);
     await expect(page.getByRole('button', { name: 'Scegli cartella', exact: true })).toBeVisible();
     await shot('5-filtro-documenti');
+});
+
+test('a therapy from a prescription without a stated status asks the physician, and Tieni writes the chosen status once, with audit, on the visit chart', async ({ page, isolatedRuntime }, info) => {
+    test.setTimeout(150000);
+    const shot = async (name: string) => {
+        await page.screenshot({ path: info.outputPath(name + '.png'), fullPage: true });
+        if (captures) await page.screenshot({ path: path.join(captures, name + '.png'), fullPage: true });
+    };
+    const { credentials, agentRef, patient } = await pairKitAndCreatePatient(page, isolatedRuntime, info);
+    const visitId = randomUUID();
+    const directory = info.outputPath(visitId);
+    mkdirSync(directory, { mode: 0o700 });
+    const source = syntheticSources(directory);
+    const drug = 'FARMACO SINTETICO 150MG 28 compresse';
+    const recipe = await source(['Paziente CF ' + fiscalCode, 'Data Prescrizione: 23/11/2026', 'Rp/', drug, 'Confezioni: 1'], null, [
+        { kind: 'therapy', values: { drugName: 'FARMACO SINTETICO 150MG' }, quote: drug },
+    ]);
+    const note = 'S: Ricetta sintetica.\nO: Dati sintetici.\nA: Stabile.\nP: Terapia dalla ricetta.';
+    const visitNote = await source(['Codice fiscale paziente: ' + fiscalCode, 'Data visita: 2026-11-23', ...note.split('\n')], '2026-11-23', [
+        { kind: 'document_entry', values: { text: note, date: '2026-11-23' }, quote: note },
+    ], true);
+    const extraction = path.join(directory, 'estrazione-preparata.json');
+    writeFileSync(extraction, JSON.stringify({ schema: 'mediflow.dossier_prepared_extraction.v1',
+        preparedAt: new Date().toISOString(), preparedBy: 'Ambulatorio Codex', sources: [recipe, visitNote] }));
+    expect((await prepareAndDepositAgentVisit(credentials, agentRef, extraction, fiscalCode, undefined, visitId)).status).toBe('closed');
+
+    await openDaDecidere(page, isolatedRuntime.url);
+    const visit = page.getByRole('region', { name: 'Visita ' + visitId });
+    const proposal = visit.locator('article').filter({ has: page.getByRole('heading', { name: 'Terapia proposta', exact: true }) });
+    await expect(proposal.getByText('Il documento non indica lo stato della terapia: sceglilo prima di tenerla.', { exact: true })).toBeVisible({ timeout: 30000 });
+    await expect(proposal.getByText(/status|Campo obbligatorio|non valido/u)).toHaveCount(0);
+    const keep = proposal.getByRole('button', { name: 'Tieni', exact: true });
+    await expect(keep).toBeDisabled();
+    await expect(visit.getByRole('button', { name: 'Applica la visita', exact: true })).toBeDisabled();
+    await shot('6-ricetta-senza-stato');
+
+    const database = new Database(path.join(isolatedRuntime.dataDirectory, 'medical.db'), { readonly: true, fileMustExist: true });
+    try {
+        const therapies = () => database.prepare('SELECT id, patient_id AS patientId, drug_name AS drug, status, dosage FROM therapies').all() as
+            Array<{ id: string; patientId: string; drug: string; status: string; dosage: string }>;
+        await proposal.getByRole('radio', { name: 'In corso', exact: true }).check();
+        await expect(keep).toBeEnabled();
+        await shot('7-ricetta-stato-scelto');
+        await keep.click();
+        await expect(visit.getByRole('region', { name: 'Voci decise' }).getByText('In scheda', { exact: true })).toHaveCount(1);
+        const written = therapies();
+        expect(written.map(({ patientId, drug, status, dosage }) => ({ patientId, drug, status, dosage })))
+            .toEqual([{ patientId: patient.id, drug: 'FARMACO SINTETICO 150MG', status: 'active', dosage: 'non indicata nel documento' }]);
+        expect(database.prepare("SELECT 1 FROM audit_events WHERE event_type = 'therapy.created' AND subject_ref = ?").all(written[0]!.id)).toHaveLength(1);
+        const applied = database.prepare("SELECT redacted_metadata AS metadata FROM audit_events WHERE event_type = 'agent.item.applied' AND request_id = ?")
+            .all(visitId) as Array<{ metadata: string }>;
+        expect(applied).toHaveLength(1);
+        expect(JSON.parse(applied[0]!.metadata).flags ?? []).not.toContain('corrected');
+        await visit.getByRole('button', { name: 'Applica la visita', exact: true }).click();
+        await expect(visit).toHaveCount(0);
+        expect(therapies()).toHaveLength(1);
+    } finally { database.close(); }
 });
