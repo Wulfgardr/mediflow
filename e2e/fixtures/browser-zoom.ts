@@ -1,7 +1,7 @@
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { chromium, expect } from '@playwright/test';
+import { chromium, expect, test } from '@playwright/test';
 import { secureLaunch } from './secure-browser';
 
 export async function openBrowserZoomFixture(baseURL: string) {
@@ -18,6 +18,10 @@ export async function openBrowserZoomFixture(baseURL: string) {
     }));
     const worker = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker');
     const page = context.pages()[0];
+    page.on('crash', () => {
+        test.info().annotations.push({ type: 'renderer-crash', description: `Zoom page renderer crashed at ${page.url()}` });
+        void context.close();
+    });
     return { page, async setZoom(factor: number) {
         const actual = await worker.evaluate(async factor => {
             const tabs = (globalThis as unknown as { chrome: { tabs: {
