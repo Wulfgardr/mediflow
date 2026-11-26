@@ -105,10 +105,16 @@ async function captureLongNameAt400(page: Page, target: Locator, name: string, f
         const box = element.getBoundingClientRect(), x = box.x + box.width / 2;
         let top = 0, bottom = innerHeight;
         for (const overlay of document.querySelectorAll<HTMLElement>('body *')) {
-            if (overlay.contains(element) || !['sticky', 'fixed'].includes(getComputedStyle(overlay).position)) continue;
+            const style = getComputedStyle(overlay);
+            if (overlay.contains(element) || !['sticky', 'fixed'].includes(style.position)) continue;
             const rect = overlay.getBoundingClientRect();
             if (rect.left > x || rect.right < x || rect.bottom <= 0 || rect.top >= innerHeight) continue;
-            if (rect.top <= innerHeight / 2) top = Math.max(top, rect.bottom); else bottom = Math.min(bottom, rect.top);
+            let scroller = overlay.parentElement;
+            while (scroller && !/auto|scroll/u.test(getComputedStyle(scroller).overflowY)) scroller = scroller.parentElement;
+            const stuck = style.position === 'sticky' && style.top !== 'auto' && scroller?.contains(element)
+                ? scroller.getBoundingClientRect().top + parseFloat(style.top) : rect.top;
+            const edge = stuck < rect.top ? { top: stuck, bottom: stuck + rect.height } : rect;
+            if (edge.top <= innerHeight / 2) top = Math.max(top, edge.bottom); else bottom = Math.min(bottom, edge.top);
         }
         for (let owner = element.parentElement; owner; owner = owner.parentElement) {
             if (owner.scrollHeight <= owner.clientHeight || !/auto|scroll/u.test(getComputedStyle(owner).overflowY)) continue;
