@@ -8,7 +8,7 @@ export const LOCAL_VOICE_ENDPOINT_FRAME = 'mediflow-local-voice-endpoint';
  * @param {NodeJS.Process} channel @param {NodeJS.ProcessEnv} [env]
  */
 export function installLocalVoiceEndpoint(channel, env = process.env) {
-  channel.on('message', frame => {
+  channel.on('message', function localVoiceEndpointFrame(frame) {
     if (frame?.type !== LOCAL_VOICE_ENDPOINT_FRAME) return;
     const endpoint = localVoiceEndpoint(frame.url, frame.secret);
     if (endpoint) Object.assign(env, { MEDIFLOW_LOCAL_VOICE_URL: endpoint.url, MEDIFLOW_LOCAL_VOICE_SECRET: endpoint.secret });

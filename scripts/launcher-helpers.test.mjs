@@ -3367,7 +3367,7 @@ test('Windows Job startup follows bounded phases and rejects stalled or invalid 
       await runtime;assert.equal(globalThis.serverStarted,true);assert.equal(timers.size,0);
       frame('drained',{active:0});helper.emit('close',0);await job.closed;
       const missingOwner=assert.rejects(startSourceRuntime('web'),/Web owner timeout/);
-      advance(3*budget);await missingOwner;assert.equal(process.listenerCount('message'),0);
+      advance(3*budget);await missingOwner;assert.deepEqual(process.listeners('message').map(listener=>listener.name),['localVoiceEndpointFrame']);
       for (const phase of ['node','bootstrap','assigning']) {
         pending=make();const rejected=assert.rejects(pending,new RegExp('phase='+phase));
         if(phase!=='node') frame('bootstrap');if(phase==='assigning') frame('assigning');
