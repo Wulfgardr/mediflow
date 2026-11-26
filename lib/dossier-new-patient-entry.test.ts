@@ -98,7 +98,7 @@ test('un solo gesto porta tutte le proposte concordi nei campi', () => {
         source('referto.pdf', { codes: [CF], text: 'COGNOME: SINTETICA\nnato il 1/1/1980' }),
     ), 'lettera.pdf');
     assert.deepEqual(allIdentityProposals(proposals), {
-        values: { taxCode: CF, lastName: 'Sintetica', firstName: 'Elena', birthDate: '1980-01-01' }, undecided: [],
+        values: { taxCode: CF, lastName: 'Sintetica', firstName: 'Elena', birthDate: '1980-01-01' }, undecided: [], leftOut: [],
     });
 });
 
@@ -111,7 +111,7 @@ test('due documenti con valori diversi per lo stesso campo: nessuna scelta, il c
         ['taxCode', CF, 'lettera.pdf'], ['lastName', 'Sintetica', 'lettera.pdf'], ['lastName', 'Sintetico', 'referto.pdf'],
         ['firstName', 'Elena', 'lettera.pdf'], ['birthDate', '1980-01-01', 'lettera.pdf'], ['birthDate', '1980-01-02', 'referto.pdf'],
     ]);
-    assert.deepEqual(allIdentityProposals(proposals), { values: { taxCode: CF, firstName: 'Elena' }, undecided: ['lastName', 'birthDate'] });
+    assert.deepEqual(allIdentityProposals(proposals), { values: { taxCode: CF, firstName: 'Elena' }, undecided: ['lastName', 'birthDate'], leftOut: [] });
 });
 
 test('una data di nascita che non corrisponde al codice fiscale proposto resta da decidere', () => {
@@ -125,7 +125,7 @@ test('una data di nascita che non corrisponde al codice fiscale proposto resta d
     ), 'lettera.pdf');
     assert.deepEqual(proposals.filter((item) => item.field === 'birthDate').map((item) => [item.value, item.sourceName]), [[relativeBirth, 'familiare.pdf']]);
     assert.deepEqual(allIdentityProposals(proposals), {
-        values: { taxCode: CF, lastName: 'Sintetica', firstName: 'Elena' }, undecided: ['birthDate'],
+        values: { taxCode: CF, lastName: 'Sintetica', firstName: 'Elena' }, undecided: ['birthDate'], leftOut: [],
     });
     assert.equal(undecidedReason(proposals, 'birthDate'), 'birth-date-not-in-tax-code');
 });
@@ -141,7 +141,7 @@ test('valori diversi per lo stesso campo hanno il loro motivo, anche per la data
 
 test('senza codice fiscale la data di nascita proposta non si confronta con nulla', () => {
     const proposals = groupIdentityProposals(group(source('lettera.pdf', { text: 'Cognome: Sintetica\nData di nascita: 03/02/1950' })), 'lettera.pdf');
-    assert.deepEqual(allIdentityProposals(proposals), { values: { lastName: 'Sintetica', birthDate: '1950-02-03' }, undecided: [] });
+    assert.deepEqual(allIdentityProposals(proposals), { values: { lastName: 'Sintetica', birthDate: '1950-02-03' }, undecided: [], leftOut: [] });
 });
 
 test('i documenti esclusi o illeggibili non propongono anagrafica', () => {
@@ -220,4 +220,58 @@ test('le proposte dette passano dagli stessi controlli: valori diversi fra fonti
     assert.equal(all.values.firstName, 'Anna');
     assert.equal(all.values.taxCode, CF);
     if (!birthDateMatchesTaxCode(CF, '1951-03-12')) assert.ok(all.undecided.includes('birthDate'));
+});
+
+const fill = (...sources: DossierDraftSource[]) => allIdentityProposals(groupIdentityProposals(group(...sources), sources[0].key));
+const values = (...sources: DossierDraftSource[]) => fill(...sources).values;
+
+test('senza codice fiscale il gesto non prende la data da un documento che non riporta cognome e nome scelti', () => {
+    const all = fill(
+        source('lettera.pdf', { text: 'Cognome: Sintetica\nNome: Elena' }),
+        source('familiare.pdf', { text: 'Data di nascita: 15/06/1955' }),
+    );
+    assert.deepEqual(all, { values: { lastName: 'Sintetica', firstName: 'Elena' }, undecided: [], leftOut: ['birthDate'] });
+});
+
+test('senza codice fiscale un documento con lo stesso cognome ma senza il nome non dà dati al gesto', () => {
+    assert.deepEqual(values(
+        source('lettera.pdf', { text: 'Cognome: Sintetica\nNome: Elena' }),
+        source('familiare.pdf', { text: 'Cognome: Sintetica\nData di nascita: 15/06/1955' }),
+    ), { lastName: 'Sintetica', firstName: 'Elena' });
+});
+
+test('senza codice fiscale il gesto prende la data da un documento con lo stesso cognome e nome', () => {
+    assert.deepEqual(fill(
+        source('lettera.pdf', { text: 'Cognome: Sintetica\nNome: Elena' }),
+        source('referto.pdf', { text: 'Cognome:  Sintetica\nNome: Elena\nData di nascita: 15/06/1955' }),
+    ), { values: { lastName: 'Sintetica', firstName: 'Elena', birthDate: '1955-06-15' }, undecided: [], leftOut: [] });
+});
+
+test('senza codice fiscale né cognome e nome concordi, con più documenti il gesto non prende nulla', () => {
+    assert.deepEqual(fill(
+        source('lettera.pdf', { text: 'Cognome: Sintetica' }),
+        source('familiare.pdf', { text: 'Nome: Elena\nData di nascita: 15/06/1955' }),
+    ), { values: {}, undecided: [], leftOut: ['lastName', 'firstName', 'birthDate'] });
+});
+
+test('con il codice fiscale il gesto non prende un cognome da un documento senza codice né cognome e nome', () => {
+    assert.deepEqual(fill(
+        source('lettera.pdf', { codes: [CF], text: 'Nome: Elena' }),
+        source('familiare.pdf', { text: 'Cognome: Sintetico' }),
+    ), { values: { taxCode: CF, firstName: 'Elena' }, undecided: [], leftOut: ['lastName'] });
+});
+
+test('con il codice fiscale una data che vi corrisponde entra anche da un documento senza nome', () => {
+    assert.deepEqual(values(
+        source('lettera.pdf', { codes: [CF], text: 'Cognome: Sintetica\nNome: Elena' }),
+        source('esami.pdf', { text: 'Data di nascita: 01/01/1980' }),
+    ), { taxCode: CF, lastName: 'Sintetica', firstName: 'Elena', birthDate: '1980-01-01' });
+});
+
+test('le proposte ricordano tutti i documenti che riportano lo stesso valore', () => {
+    const proposals = groupIdentityProposals(group(
+        source('lettera.pdf', { text: 'Cognome: Sintetica' }),
+        source('referto.pdf', { text: 'Cognome:  Sintetica ' }),
+    ), 'lettera.pdf');
+    assert.deepEqual(proposals.map((item) => [item.value, item.sourceName, item.sourceKeys]), [['Sintetica', 'lettera.pdf', ['lettera.pdf', 'referto.pdf']]]);
 });

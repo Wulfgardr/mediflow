@@ -779,7 +779,7 @@ export async function main(args = process.argv.slice(2)) {
     update({ step: 'avvio', message: choice === 'agenti' ? 'Avvio dell’accesso per agenti. Collega un client al protocollo del terminale.' : 'Avvio di MediFlow.' });
     let target = null;
     if (choice === 'mac') {
-      const owned = run(native, [], false, { ...process.env, MEDIFLOW_NODE_BINARY: process.execPath,
+      const owned = run(native, [], false, { ...process.env, MEDIFLOW_LOCAL_VOICE_URL: undefined, MEDIFLOW_LOCAL_VOICE_SECRET: undefined, MEDIFLOW_NODE_BINARY: process.execPath,
         MEDIFLOW_APP_REVISION: current.revision, MEDIFLOW_APP_BRANCH: current.branch,
         MEDIFLOW_APP_WORKTREE_HASH: current.worktreeHash, MEDIFLOW_APP_SOURCE_FINGERPRINT: current.sourceFingerprint,
         MEDIFLOW_APP_FINGERPRINT: current.sourceFingerprint });
@@ -818,7 +818,10 @@ export async function main(args = process.argv.slice(2)) {
         void webJob.closed.then(() => finishGeneration(true), error => finishGeneration(true, error));
         bindRuntimeOwnership([ownership, archiveOwnership], { kind: 'windows-job', web: childOwner.token, guardian: webJob.owner });
       }
-      if (choice === 'web') owned.send({ type: 'mediflow-web-owner-start', nonce: env.MEDIFLOW_WEB_OWNER_GATE });
+      if (choice === 'web') {
+        sendVoiceEndpoint(voice?.current() ?? null);
+        owned.send({ type: 'mediflow-web-owner-start', nonce: env.MEDIFLOW_WEB_OWNER_GATE });
+      }
       owned.on('message', frame => {
         if (frame?.type === LOCAL_VOICE_ENDPOINT_REQUEST) { if (owned === voiceChild) sendVoiceEndpoint(voice?.current() ?? null); return; }
         if (frame?.type === 'mediflow-ui-lease' && owned === child && leases) {
