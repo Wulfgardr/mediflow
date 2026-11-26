@@ -162,3 +162,45 @@ test('synthetic visit audio streamed to the service comes back as text attribute
     rmSync(work, { recursive: true, force: true });
   }
 });
+
+test('the Web runtime takes the voice endpoint only from a valid launcher frame and clears it otherwise', async () => {
+  const { EventEmitter } = await import('node:events');
+  const { LOCAL_VOICE_ENDPOINT_FRAME, installLocalVoiceEndpoint } = await import('./local-voice-web-endpoint.mjs');
+  const channel = new EventEmitter(), env = {};
+  installLocalVoiceEndpoint(/** @type {any} */ (channel), env);
+  const secret = 'b'.repeat(64);
+  channel.emit('message', { type: LOCAL_VOICE_ENDPOINT_FRAME, url: 'http://127.0.0.1:4100', secret });
+  assert.deepEqual(env, { MEDIFLOW_LOCAL_VOICE_URL: 'http://127.0.0.1:4100', MEDIFLOW_LOCAL_VOICE_SECRET: secret });
+  channel.emit('message', { type: 'other', url: 'http://127.0.0.1:4200', secret });
+  assert.equal(env.MEDIFLOW_LOCAL_VOICE_URL, 'http://127.0.0.1:4100');
+  channel.emit('message', { type: LOCAL_VOICE_ENDPOINT_FRAME, url: 'http://192.168.1.2:4100', secret });
+  assert.deepEqual(env, {});
+  channel.emit('message', { type: LOCAL_VOICE_ENDPOINT_FRAME, url: 'http://127.0.0.1:4300', secret });
+  channel.emit('message', { type: LOCAL_VOICE_ENDPOINT_FRAME, url: null, secret: null });
+  assert.deepEqual(env, {});
+});
+
+test('the launcher supervisor publishes null when the service falls and a new endpoint after each restart', async () => {
+  const published = [];
+  let count = 0;
+  const exits = [];
+  const start = async () => {
+    count++;
+    let exit;
+    const exited = new Promise(resolve => { exit = resolve; });
+    exits.push(exit);
+    return { url: `http://127.0.0.1:${4100 + count}`, secret: 'c'.repeat(64), pid: count, exited, stop: async () => exit(0) };
+  };
+  const { superviseLocalVoiceService } = await import('./local-voice-service.mjs');
+  const supervisor = superviseLocalVoiceService({ binary: '/x', publish: endpoint => published.push(endpoint?.url ?? null), restarts: 1, start });
+  assert.equal((await supervisor.ensure()).url, 'http://127.0.0.1:4101');
+  exits[0](137);
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.deepEqual(published, [null, 'http://127.0.0.1:4102']);
+  exits[1](137);
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.deepEqual(published, [null, 'http://127.0.0.1:4102', null]);
+  assert.equal(supervisor.current(), null);
+  await supervisor.stop();
+  assert.equal(count, 2);
+});

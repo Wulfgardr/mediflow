@@ -11,12 +11,14 @@ import { checkNode, knownMainUpdates, openUrl, probeRunningInstance, readProduct
 import { verifySourceRuntime } from './source-runtime.mjs';
 import { initializeWindowsSystemCommand, windowsTaskkillCommand, windowsProcessCreationTimeTicks } from './windows-system-command.mjs';
 import { macDerivedDataDirectory } from './build-input-metadata.mjs';
-import { createChoiceServer } from './mediflow-launcher-page.mjs';
+import { createChoiceServer, launcherServices } from './mediflow-launcher-page.mjs';
 import { containWindowsWeb } from './windows-runtime-job.mjs';
 import { createRuntimeLeases, acquireRuntimeLease, recordChildOwner, verifyChildOwner, runtimeProcessIdentity } from './runtime-leases.mjs';
 import { prepareLauncherState, localUiArchiveLock } from './launcher-state.mjs';
 import { verifyOwnedWeb } from './local-ui-web-identity.mjs';
-import { localVoiceBinary, startLocalVoiceService } from './local-voice-service.mjs';
+import { localVoiceBinary, superviseLocalVoiceService } from './local-voice-service.mjs';
+import { LOCAL_VOICE_ENDPOINT_FRAME, LOCAL_VOICE_ENDPOINT_REQUEST } from './local-voice-web-endpoint.mjs';
+import { localVoiceClient } from '../lib/local-voice/client.mjs';
 import { pairingDirectory, readPairingRequests, bridgeExistingLocalUi, frames, writeFrame } from './local-ui-pairing-transport.mjs';
 
 import { localUiNavigationDeadline } from './local-ui-navigation-deadline.mjs';
@@ -492,24 +494,32 @@ export async function main(args = process.argv.slice(2)) {
   if (!ownership.claimed) throw new Error('Un avvio di questa cartella è già in corso. Controlla il terminale e riprova.');
   const native = nativeApplication(ROOT);
   const dirty = identity.worktreeHash !== 'clean';
-  let state = { busy: false, ready: false, url: null, message: 'Scegli come aprire MediFlow.', needsInstall: false };
+  let state = { busy: false, ready: false, url: null, message: 'Scegli come aprire MediFlow.', needsInstall: false, voice: process.platform === 'darwin' ? 'absent' : 'unsupported' };
   let child = null, chooser = null, closing = false, installApproval = null, failedBuild = null, generation = 0;
   let terminal = null, useTerminal = false, webSecret = null, instance = null;
-  let voice = null;
+  let voiceChild = null;
+  const voiceBinary = localVoiceBinary(ROOT);
+  const voice = process.platform === 'darwin' && fs.existsSync(voiceBinary) ? superviseLocalVoiceService({ binary: voiceBinary, models: process.env.MEDIFLOW_LOCAL_VOICE_MODELS || undefined, log,
+    publish: endpoint => {
+      void refreshVoiceState(endpoint);
+      sendVoiceEndpoint(endpoint);
+    } }) : null;
+  const sendVoiceEndpoint = endpoint => {
+    if (voiceChild && voiceChild === child && voiceChild.connected) voiceChild.send({ type: LOCAL_VOICE_ENDPOINT_FRAME, url: endpoint?.url ?? null, secret: endpoint?.secret ?? null }, () => {});
+  };
+  let voiceStateGeneration = 0;
+  const refreshVoiceState = async endpoint => {
+    const generation = ++voiceStateGeneration;
+    if (!endpoint) { state.voice = voice ? 'stopped' : process.platform === 'darwin' ? 'absent' : 'unsupported'; return; }
+    let next;
+    try { const { model } = await localVoiceClient(endpoint).status(); next = ['ready', 'missing', 'incomplete'].includes(model) ? model : 'stopped'; }
+    catch { next = 'stopped'; }
+    if (generation === voiceStateGeneration) state.voice = next;
+  };
   const localVoiceEnv = async () => {
-    const binary = localVoiceBinary(ROOT);
-    if (process.platform !== 'darwin' || !fs.existsSync(binary)) return {};
-    if (!voice) {
-      try {
-        const started = await startLocalVoiceService({ binary });
-        voice = started;
-        void started.exited.then(() => { if (voice === started) voice = null; });
-      } catch (error) {
-        log(`Voce locale non avviata: ${error.message}`);
-        return {};
-      }
-    }
-    return { MEDIFLOW_LOCAL_VOICE_URL: voice.url, MEDIFLOW_LOCAL_VOICE_SECRET: voice.secret };
+    const endpoint = await voice?.ensure() ?? null;
+    await refreshVoiceState(endpoint);
+    return { MEDIFLOW_LOCAL_VOICE_URL: endpoint?.url, MEDIFLOW_LOCAL_VOICE_SECRET: endpoint?.secret };
   };
   const pairRequests = new Map();
   const ipcStopChildren = new WeakSet();
@@ -765,7 +775,7 @@ export async function main(args = process.argv.slice(2)) {
       pairRequests.clear();
       instance = crypto.randomUUID();
       webSecret = choice === 'web' ? crypto.randomBytes(32).toString('hex') : null;
-      const voiceEnv = choice === 'agenti' ? {} : await localVoiceEnv();
+      const voiceEnv = choice === 'agenti' ? { MEDIFLOW_LOCAL_VOICE_URL: undefined, MEDIFLOW_LOCAL_VOICE_SECRET: undefined } : await localVoiceEnv();
       if (closing) return;
       const env = { ...process.env, ...voiceEnv, ...(webSecret ? { MEDIFLOW_LOCAL_UI_WEB_SECRET: webSecret, MEDIFLOW_LOCAL_UI_INSTANCE: instance } : {}), HOSTNAME: '127.0.0.1', PORT: String(port),
         ...(choice === 'web' ? { MEDIFLOW_PLUGIN_LOCAL_UI: '1', MEDIFLOW_RUNTIME_UI_LEASE: pluginChannel ? '1' : '0' } : {}),
@@ -776,6 +786,7 @@ export async function main(args = process.argv.slice(2)) {
       const owned = choice === 'sviluppo'
         ? run(process.execPath, [path.join(ROOT, 'node_modules/next/dist/bin/next'), 'dev', '--hostname', '127.0.0.1', '--port', String(port)], true, env)
         : run(process.execPath, [path.join(ROOT, 'scripts/source-runtime.mjs'), choice === 'agenti' ? 'headless' : 'web'], true, env);
+      voiceChild = choice === 'web' ? owned : null;
       if (choice === 'web') {
         /** @type {RuntimeCustody} */
         const runtime = process.platform === 'win32' ? { kind: 'windows-job', web: childOwner.token }
@@ -791,6 +802,7 @@ export async function main(args = process.argv.slice(2)) {
       }
       if (choice === 'web') owned.send({ type: 'mediflow-web-owner-start', nonce: env.MEDIFLOW_WEB_OWNER_GATE });
       owned.on('message', frame => {
+        if (frame?.type === LOCAL_VOICE_ENDPOINT_REQUEST) { if (owned === voiceChild) sendVoiceEndpoint(voice?.current() ?? null); return; }
         if (frame?.type === 'mediflow-ui-lease' && owned === child && leases) {
           const accepted = leases.uiLease(frame.id, frame.expiresAt);
           if (owned.connected) owned.send({ type: 'mediflow-ui-lease-result', requestId: frame.requestId, accepted }, () => {});
@@ -887,7 +899,7 @@ export async function main(args = process.argv.slice(2)) {
     choose(selected, remember);
   };
   try {
-    chooser = await createChoiceServer({ root: ROOT, state: () => ({ ...state, runtimeOwner: leases?.receipt.owner ?? null }), choose,
+    chooser = await createChoiceServer({ root: ROOT, state: () => ({ ...state, services: launcherServices(state), runtimeOwner: leases?.receipt.owner ?? null }), choose,
       navigate, cancelNavigation,
       install: () => installApproval?.(true), stop: () => {
         if (preparing) throw Object.assign(new Error('Preparazione in corso. Attendi il completamento prima di arrestare MediFlow.'), { statusCode: 409 });

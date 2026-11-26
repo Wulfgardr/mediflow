@@ -55,3 +55,38 @@ export async function startLocalVoiceService({ binary, models, secret = crypto.r
   };
   return { ...endpoint, pid: /** @type {number} */ (child.pid), stop, exited };
 }
+
+/**
+ * Keeps one service alive for the launcher. `publish` receives the current endpoint, or null as soon as the
+ * service is gone, so the Web never keeps an address nobody answers on.
+ * @param {{ binary: string, models?: string, publish: (endpoint: { url: string, secret: string } | null) => void, log?: (message: string) => void,
+ *   restarts?: number, start?: typeof startLocalVoiceService }} options
+ */
+export function superviseLocalVoiceService({ binary, models, publish, log = () => {}, restarts = 3, start = startLocalVoiceService }) {
+  let service = null, starting = null, stopped = false, left = restarts;
+  const launch = () => starting ||= (async () => {
+    try {
+      const started = await start({ binary, models });
+      if (stopped) { await started.stop(); return null; }
+      service = started;
+      void started.exited.then(() => {
+        if (service !== started) return;
+        service = null;
+        publish(null);
+        if (stopped) return;
+        if (left-- > 0) { log('Il servizio della voce si è arrestato: riavvio.'); void launch().then(endpoint => endpoint && publish(endpoint)); }
+        else log('Il servizio della voce si è arrestato più volte: registrazione locale non disponibile fino al prossimo avvio.');
+      });
+      return { url: started.url, secret: started.secret };
+    } catch (error) {
+      log(`Voce locale non avviata: ${error.message}`);
+      return null;
+    } finally { starting = null; }
+  })();
+  return {
+    ensure: async () => service ? { url: service.url, secret: service.secret } : launch(),
+    current: () => service ? { url: service.url, secret: service.secret } : null,
+    pid: () => service?.pid ?? null,
+    stop: async () => { stopped = true; await starting; await service?.stop(); service = null; },
+  };
+}
