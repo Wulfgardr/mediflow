@@ -82,7 +82,7 @@ test('i metadati del modello e i testi del Modelfile restano aperti: non decidon
 });
 
 test('i marker remoti noti restano negati come modello non locale anche con lo schema chiuso', async (t) => {
-    const altered = clone(REAL['0.40.18']); altered.show.remote_host = 'https://ollama.com:443';
+    const altered = clone(REAL['0.40.18']); altered.show.remote_host = 'remote.invalid';
     serve(t, '0.40.18', altered);
     await assert.rejects(attestLocalOllamaModel('http://127.0.0.1:11434', MODEL),
         (error) => error instanceof OllamaLocalityError && error.code === 'model_not_local');
