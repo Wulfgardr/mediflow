@@ -36,6 +36,11 @@ import {
     DOSSIER_PREPARED_MAX_BYTES, PREPARED_CHECK_LABELS, parsePreparedExtraction, type PreparedCheck, type PreparedExtraction,
 } from '@/lib/domain/documents/dossier-prepared';
 import { formatCountLabel } from '@/lib/format-count';
+import { documentClassLabel } from '@/lib/ai-labels';
+import { settleDossierSelection, stagedDossierSelection } from '@/lib/dossier-pending-selection';
+import { dossierFolderDeletionAdvice, dossierFolderSettlement } from '@/lib/dossier-folder-settlement';
+import { useTerritorialPacks } from '@/lib/territorial-pack-client';
+import FseFolderButton, { fseUnreadNotice, type FseFolderReady } from '@/components/fse-folder-button';
 import styles from './patient-bulk-import-panel.module.css';
 
 type FieldSpec = { name: string; label: string; type?: 'date' | 'textarea' | 'select'; options?: Array<[string, string]> };
@@ -95,7 +100,7 @@ const EXTRACTION_LABEL: Record<string, string> = {
 };
 const ACQUIRE_LABEL: Record<string, string> = {
     stored: 'Originale salvato e riletto identico', reused: 'Già in MediFlow: riusato, non duplicato',
-    duplicate_in_selection: 'Copia identica di un altro file selezionato', excluded: 'Escluso da te', unreadable: 'Non leggibile dal browser',
+    duplicate_in_selection: 'Copia identica di un altro file selezionato', already_imported: 'Già importato: saltato', excluded: 'Escluso da te', unreadable: 'Non leggibile dal browser',
     unsupported_format: 'Formato non ammesso', identity_unconfirmed: 'Non salvato: ruolo del codice fiscale da confermare',
     source_changed: 'Il file è cambiato dopo la lettura: rileggi la cartella', too_large: 'Oltre il limite di dimensione dell’archivio',
     readback_mismatch: 'Rilettura diversa dall’originale', write_failed: 'Salvataggio non confermato', artifact_conflict: 'Artefatto esistente non compatibile o non leggibile',
@@ -153,6 +158,7 @@ export default function DossierImportPanel({ initialPatientId }: { initialPatien
     return <ActiveDossierImport key={user.id} initialPatientId={initialPatientId} entry={FOLDER_ENTRY} />;
 }
 
+type FolderOrigin = { declaredTaxCode: string; patientId: string | null; unread: number };
 type DossierEntry = { kind: 'folder'; framed: boolean } | { kind: 'new-patient'; onActiveChange: (active: boolean) => void };
 const FOLDER_ENTRY: DossierEntry = { kind: 'folder', framed: true };
 const EMBEDDED_FOLDER_ENTRY: DossierEntry = { kind: 'folder', framed: false };
@@ -192,9 +198,12 @@ function ActiveDossierImport({ initialPatientId, entry }: { initialPatientId: st
     // Estrazione preparata (ADR 0176): solo in memoria, mai nello storage del browser.
     const preparedInput = useRef<HTMLInputElement>(null);
     const [prepared, setPrepared] = useState<{ extraction: PreparedExtraction; warnings: string[]; fileName: string } | null>(null);
-    const lastSelection = useRef<DossierInputFile[] | null>(null);
+    const lastSelection = useRef<readonly DossierInputFile[] | null>(null);
+    const lastOrigin = useRef<FolderOrigin | undefined>(undefined);
+    const [folderUnread, setFolderUnread] = useState(0);
     const [backupChoice, setBackupChoice] = useState<DossierBackupChoice>({ kind: 'pending' });
     const backupProposed = dossierBackupProposed(groups, backupChoice);
+    const { lombardy } = useTerritorialPacks();
 
     useEffect(() => () => { generation.current += 1; }, []);
     useEffect(() => {
@@ -229,8 +238,6 @@ function ActiveDossierImport({ initialPatientId, entry }: { initialPatientId: st
         } catch { if (op.isCurrent()) setNotice('Dossier non leggibile. Riprova.'); }
         finally { if (op.isCurrent()) setBusy(null); }
     }, [operation, ports]);
-    useEffect(() => { if (initialPatientId) void loadDossier(initialPatientId); }, [initialPatientId, loadDossier]);
-
     const readSelection = async (list: FileList | null) => {
         if (!list?.length) return;
         setBackupChoice({ kind: 'pending' });
@@ -246,7 +253,7 @@ function ActiveDossierImport({ initialPatientId, entry }: { initialPatientId: st
         if (!parsed.ok) { setNotice(parsed.error); return; }
         setPrepared({ extraction: parsed.value, warnings: parsed.warnings, fileName: file.name });
         // Una cartella già letta si rilegge con le nuove proposte: nessun dato salvato nel frattempo.
-        if (lastSelection.current) await readFiles(lastSelection.current, parsed.value);
+        if (lastSelection.current) await readFiles(lastSelection.current, parsed.value, lastOrigin.current);
     };
 
     const retireNewPatientDossier = () => {
@@ -255,31 +262,51 @@ function ActiveDossierImport({ initialPatientId, entry }: { initialPatientId: st
         setDossierPatientId('');
     };
 
-    const readFiles = async (files: DossierInputFile[], extraction: PreparedExtraction | null) => {
+    const readFiles = useCallback(async (files: readonly DossierInputFile[], extraction: PreparedExtraction | null, origin?: FolderOrigin): Promise<boolean> => {
         lastSelection.current = files;
+        lastOrigin.current = origin;
         const op = operation();
-        retireNewPatientDossier();
+        if (newPatient) { setView(null); setDossierPatientId(''); }
         setGroups([]); setOutcomes({}); setMeasured({}); setNotice(null); setConfirmations({}); setConfirmedUncertain({});
         setBusy(`Lettura locale di ${formatCountLabel(files.length, 'file', 'file')}…`);
         try {
-            const next = await buildDossierInventory(ports, files, { ...op, prepared: extraction, onProgress: (done, total) => {
-                if (op.isCurrent()) setBusy(`Lettura locale: ${done} di ${total}. Nessun file viene ancora salvato.`);
-            } });
-            if (!op.isCurrent()) return;
+            const next = await buildDossierInventory(ports, files, { ...op, prepared: extraction,
+                ...(origin ? { declaredTaxCode: origin.declaredTaxCode, ...(origin.patientId ? { skipImportedFor: origin.patientId } : {}) } : {}),
+                onProgress: (done, total) => {
+                    if (op.isCurrent()) setBusy(`Lettura locale: ${done} di ${total}. Nessun file viene ancora salvato.`);
+                } });
+            if (!op.isCurrent()) return false;
             setGroups(next);
-            setLinks({});
+            setLinks(origin?.patientId ? Object.fromEntries(next.map((group) => [group.key, origin.patientId!])) : {});
+            setFolderUnread(origin?.unread ?? 0);
+            if (origin?.unread) setNotice(fseUnreadNotice(origin.unread));
             if (newPatient) {
                 const known = await ports.listPatients(op.signal);
-                if (!op.isCurrent()) return;
+                if (!op.isCurrent()) return false;
                 setPatients(known);
                 const start = newPatientDossierStart(next, known);
                 setCreating(start.kind === 'create' ? { groupKey: start.groupKey, sourceKey: start.sourceKey } : null);
                 newPatient.onActiveChange(start.kind === 'create');
             }
+            return true;
         } catch (error) {
             if (op.isCurrent()) setNotice(error instanceof DossierAbortedError ? error.message : 'Lettura della cartella non riuscita.');
+            return false;
         } finally { if (op.isCurrent()) setBusy(null); }
+    }, [newPatient, operation, ports]);
+
+    const readFseFolder = (reading: FseFolderReady, patientId: string | null) => {
+        setBackupChoice({ kind: 'pending' });
+        void readFiles(reading.files, prepared?.extraction ?? null,
+            { declaredTaxCode: reading.taxCode, patientId, unread: reading.malformed.length });
     };
+
+    const openPatient = useCallback(async (patientId: string) => {
+        const staged = stagedDossierSelection(patientId);
+        await loadDossier(patientId);
+        if (staged && await readFiles(staged.files, null, { declaredTaxCode: staged.declaredTaxCode, patientId, unread: staged.unread })) settleDossierSelection(staged);
+    }, [loadDossier, readFiles]);
+    useEffect(() => { if (initialPatientId) void openPatient(initialPatientId); }, [initialPatientId, openPatient]);
 
     const clearSelection = () => {
         operation();
@@ -345,16 +372,24 @@ function ActiveDossierImport({ initialPatientId, entry }: { initialPatientId: st
         if (op.isCurrent()) setView(next);
     };
 
+    const deletionAdvice = groups.some((group) => group.declaredTaxCode)
+        ? dossierFolderDeletionAdvice(dossierFolderSettlement(groups, outcomes, folderUnread)) : null;
+    const fsePatient = initialPatientId ? patients.find((patient) => patient.id === initialPatientId) ?? null : null;
     const content = (
             <div className={newPatient ? styles.embeddedPanel : styles.panel} data-testid="dossier-import" aria-busy={busy ? 'true' : 'false'}>
                 {newPatient ? groups.length ? <div className={styles.actions}>
                     <button type="button" className="mf-button-secondary" disabled={Boolean(busy)} onClick={clearSelection}>Scegli altri documenti</button>
-                </div> : <PatientDocumentCreate onActiveChange={newPatient.onActiveChange} onDocuments={(files) => {
-                    if (loneDocumentImage(files)) return false;
-                    setBackupChoice({ kind: 'pending' });
-                    void readFiles(files.map(inputFile), null);
-                    return true;
-                }} />
+                </div> : <>
+                    <PatientDocumentCreate onActiveChange={newPatient.onActiveChange} onDocuments={(files) => {
+                        if (loneDocumentImage(files)) return false;
+                        setBackupChoice({ kind: 'pending' });
+                        void readFiles(files.map(inputFile), null);
+                        return true;
+                    }} />
+                    {lombardy ? <div className={styles.actions}>
+                        <FseFolderButton patient={null} disabled={Boolean(busy)} onReady={(reading) => readFseFolder(reading, null)} />
+                    </div> : null}
+                </>
                 : <section className={styles.section} aria-labelledby={`${ids}-pick`}>
                     <h2 id={`${ids}-pick`}>1. Scegli la cartella</h2>
                     <p>MediFlow legge i file su questo Mac, nei propri processi locali. In questa fase non salva nulla e non invia contenuti a servizi esterni.</p>
@@ -362,6 +397,8 @@ function ActiveDossierImport({ initialPatientId, entry }: { initialPatientId: st
                     <div className={styles.actions}>
                         <button type="button" className="mf-button-secondary" disabled={Boolean(busy)} onClick={() => folderInput.current?.click()}>Scegli cartella</button>
                         <button type="button" className="mf-button-secondary" disabled={Boolean(busy)} onClick={() => filesInput.current?.click()}>Scegli file</button>
+                        {lombardy ? <FseFolderButton patient={fsePatient} disabled={Boolean(busy) || (initialPatientId !== null && !fsePatient)}
+                            onReady={(reading) => readFseFolder(reading, initialPatientId)} /> : null}
                         <input ref={folderInput} type="file" hidden multiple data-testid="dossier-folder"
                             {...({ webkitdirectory: '' } as Record<string, string>)} onChange={(event) => { const list = event.currentTarget.files; void readSelection(list); event.currentTarget.value = ''; }} />
                         <input ref={filesInput} type="file" hidden multiple data-testid="dossier-files"
@@ -372,7 +409,7 @@ function ActiveDossierImport({ initialPatientId, entry }: { initialPatientId: st
                         <button type="button" className="mf-button-secondary" disabled={Boolean(busy)} onClick={() => preparedInput.current?.click()}>
                             {prepared ? 'Sostituisci estrazione preparata' : 'Carica estrazione preparata'}</button>
                         {prepared ? <button type="button" className="mf-button-secondary" disabled={Boolean(busy)}
-                            onClick={() => { setPrepared(null); if (lastSelection.current) void readFiles(lastSelection.current, null); }}>Rimuovi estrazione</button> : null}
+                            onClick={() => { setPrepared(null); if (lastSelection.current) void readFiles(lastSelection.current, null, lastOrigin.current); }}>Rimuovi estrazione</button> : null}
                         <input ref={preparedInput} type="file" hidden accept="application/json,.json" data-testid="dossier-prepared"
                             onChange={(event) => { const list = event.currentTarget.files; void loadPrepared(list); event.currentTarget.value = ''; }} />
                     </div>
@@ -409,7 +446,7 @@ function ActiveDossierImport({ initialPatientId, entry }: { initialPatientId: st
                             const acquirable = effectiveGroup.sources.filter((source) => source.status === 'ready' && !activeUncertainKeys.has(source.key)).length;
                             return (
                                 <article key={group.key} className={styles.section} data-testid="dossier-group" data-group={group.key} data-identity={identity.status}>
-                                    <h3><PrivacyBlur>{groupTitle(group.key, group.sources)}</PrivacyBlur> · {formatCountLabel(group.sources.length, 'fonte', 'fonti')}</h3>
+                                    <h3><PrivacyBlur>{group.declaredTaxCode ? 'Cartella del Fascicolo' : groupTitle(group.key, group.sources)}</PrivacyBlur> · {formatCountLabel(group.sources.length, 'fonte', 'fonti')}</h3>
                                     <table className={styles.table} role="table">
                                         <caption>Inventario: ogni file selezionato ha uno stato.</caption>
                                         <thead><tr><th scope="col">N.</th><th scope="col">File</th><th scope="col">Lettura</th><th scope="col">Esito</th></tr></thead>
@@ -425,15 +462,18 @@ function ActiveDossierImport({ initialPatientId, entry }: { initialPatientId: st
                                                 <td role="cell" data-label="N.">{index + 1}</td>
                                                 <td role="cell" data-label="File"><PrivacyBlur>{source.relativePath}</PrivacyBlur>
                                                     <small className={styles.muted}>{source.classification.reason}</small></td>
-                                                <td role="cell" data-label="Lettura">{describeExtraction(source)}
+                                                <td role="cell" data-label="Lettura">{source.status === 'already_imported' ? null : describeExtraction(source)}
+                                                    {source.categoryLabel ? <small data-testid="dossier-source-category">Categoria: {source.categoryLabel}</small> : null}
                                                     <small>{source.documentDate ? `Data: ${source.documentDate.value}` : 'Nessuna data esplicita'}</small>
-                                                    <small>{taxCodes.length ? <>CF letti: <PrivacyBlur>{taxCodes.join(', ')}</PrivacyBlur></> : 'Nessun CF leggibile'}</small>
-                                                    <small>{formatCountLabel(source.facts.length, 'proposta', 'proposte')}</small>
+                                                    {source.status === 'already_imported' ? null : <>
+                                                        <small>{taxCodes.length ? <>CF letti: <PrivacyBlur>{taxCodes.join(', ')}</PrivacyBlur></> : 'Nessun CF leggibile'}</small>
+                                                        <small>{formatCountLabel(source.facts.length, 'proposta', 'proposte')}</small>
+                                                    </>}
                                                     {source.prepared ? <small data-testid="dossier-source-prepared">Estrazione preparata: {formatCountLabel(source.prepared.facts, 'proposta', 'proposte')}{source.prepared.patientLabel ? <>, paziente <PrivacyBlur>{source.prepared.patientLabel}</PrivacyBlur></> : ''}{source.prepared.notes.length ? `. ${source.prepared.notes.join(' ')}` : ''}</small>
                                                         : prepared && source.status === 'ready' ? <small className={styles.notice} data-testid="dossier-source-prepared">Assente dall’estrazione preparata: solo proposte del parser locale.</small> : null}</td>
                                                 <td role="cell" data-label="Esito">
                                                     {outcome ? <strong data-testid="dossier-acquire-outcome">{ACQUIRE_LABEL[outcome.status === 'failed' || outcome.status === 'skipped' ? outcome.reason : outcome.status]}</strong>
-                                                        : source.status === 'duplicate_in_selection' ? ACQUIRE_LABEL.duplicate_in_selection
+                                                        : source.status === 'duplicate_in_selection' || source.status === 'already_imported' ? ACQUIRE_LABEL[source.status]
                                                         : source.status === 'unreadable' || source.status === 'unsupported_format' ? ACQUIRE_LABEL[source.status] : null}
                                                     {measured[source.key] ? <small>Spazio misurato: originale {measured[source.key].original} byte cifrati, testo e artefatto {measured[source.key].artifact} byte cifrati</small> : null}
                                                     {isUncertain && uncertainDoc ? <small className={styles.notice} data-testid="dossier-source-uncertain">Codice fiscale incerto (<PrivacyBlur>{uncertainDoc.codes.join(', ')}</PrivacyBlur>): conferma questo documento o escludilo.</small> : null}
@@ -494,6 +534,7 @@ function ActiveDossierImport({ initialPatientId, entry }: { initialPatientId: st
                                 </article>
                             );
                         })}
+                        {deletionAdvice ? <p role="status" data-testid="fse-cleanup">{deletionAdvice}</p> : null}
                     </section>
                 ) : null}
                 {newPatient && !view ? null : <section className={styles.section} aria-labelledby={`${ids}-dossier`}>
@@ -687,7 +728,8 @@ function DossierDocument({ document, view, busy, result, onSave, onApply, onRetr
     };
     return (
         <article className={styles.section} data-testid="dossier-document" data-complete={document.coverage.complete ? 'true' : 'false'}>
-            <h3><PrivacyBlur>{record.source.fileName}</PrivacyBlur> · {record.documentDate ? record.documentDate.value : 'data non indicata'}</h3>
+            <h3><PrivacyBlur>{record.source.fileName}</PrivacyBlur> · {record.documentDate ? record.documentDate.value : 'data non indicata'}
+                {record.classification !== 'unknown' ? ` · ${documentClassLabel(record.classification)}` : ''}</h3>
             <p className={styles.muted}>{describeExtraction(record)} · originale {record.preservation.state === 'verified' ? 'riletto identico' : record.preservation.state === 'mismatch' ? 'diverso alla rilettura' : 'da rileggere'}
                 {record.preservation.reusedExisting ? ' · già presente in MediFlow' : ''}</p>
             {document.coverage.gaps.length ? <ul data-testid="dossier-gaps">{document.coverage.gaps.map((gap) => <li key={gap}>{DOSSIER_GAP_LABELS[gap]}</li>)}</ul>

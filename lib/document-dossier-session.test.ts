@@ -1029,3 +1029,80 @@ test('WUL-925: one uncertain document does not block coherent ones and is never 
     const tamperedDoc = reloaded.documents.find((doc) => doc.attachment.id === confirmedAttachmentId)!;
     assert.equal(tamperedDoc.coverage.gaps.includes('identity_conflict'), true);
 });
+
+function fseFolder(cf: string, entries: Array<[string, string]>) {
+    const { files, ...rest } = setup(entries.map(([name, text]) => [`FSE_${cf}/${name}`, text]));
+    return { ...rest, files: files.map((item) => ({ ...item, hints: { categoryLabel: 'Analisi di laboratorio', classification: 'lab_report' as const } })) };
+}
+
+test('WUL-949 la cartella del Fascicolo porta categoria e data del nome nei documenti da rivedere', async () => {
+    const { files, ports } = fseFolder(CF_A, [['2025-01-10_LAB_Emocromo_Ente_0a1b2c3d.pdf', `%PDF-1.4 sintetico\nVisita sintetica\nPaziente: Mario Rossi codice fiscale ${CF_A}`]]);
+    const [group] = await buildDossierInventory(ports, files, { ...live, declaredTaxCode: CF_A, skipImportedFor: 'pa' });
+    const [source] = group.sources;
+    assert.equal(group.declaredTaxCode, CF_A);
+    assert.equal(source.categoryLabel, 'Analisi di laboratorio');
+    assert.equal(source.classificationResult, 'lab_report');
+    assert.deepEqual(source.documentDate, { value: '2025-01-10', source: 'file_name' });
+});
+
+test('WUL-949 la cartella di un codice fiscale diverso dalla scheda blocca il gruppo senza scritture', async () => {
+    const { files, ports, attachments, counts } = fseFolder(CF_A, [['2025-01-10_LAB_Esami_Ente_0a1b2c3d.pdf', labText(CF_A)]]);
+    const [group] = await buildDossierInventory(ports, files, { ...live, declaredTaxCode: CF_A });
+    const patients = await ports.listPatients(live.signal);
+    const identity = evaluateDraftGroupIdentity(group, patients, 'pb');
+    assert.equal(identity.blocking, true);
+    assert.equal(identity.status, 'discordant');
+    await assert.rejects(acquireDossierGroup(ports, { group, patientId: 'pb', confirmed: true, ...live }), DossierIdentityBlocked);
+    assert.equal(attachments.size, 0);
+    assert.deepEqual(counts(), { artifactUpdates: 0, attachmentCreates: 0, clinicalCreates: 0 });
+});
+
+test('WUL-949 un documento con il codice fiscale di un altro paziente nella cartella del Fascicolo blocca anche senza scheda scelta', async () => {
+    const { files, ports } = fseFolder(CF_A, [['2025-01-10_LAB_Esami_Ente_0a1b2c3d.pdf', labText(CF_B)]]);
+    const [group] = await buildDossierInventory(ports, files, { ...live, declaredTaxCode: CF_A });
+    const identity = evaluateDraftGroupIdentity(group, await ports.listPatients(live.signal), null);
+    assert.equal(identity.blocking, true);
+    assert.equal(dossierGroupDestination(group, await ports.listPatients(live.signal), undefined), '');
+});
+
+test('WUL-949 alla seconda importazione i documenti già nel dossier della scheda si saltano senza riscritture', async () => {
+    const { files, ports, attachments, counts } = fseFolder(CF_A, [
+        ['2025-01-10_LAB_Esami_Ente_0a1b2c3d.pdf', labText(CF_A)],
+    ]);
+    const [first] = await buildDossierInventory(ports, files, { ...live, declaredTaxCode: CF_A, skipImportedFor: 'pa' });
+    assert.deepEqual(first.sources.map((item) => item.status), ['ready']);
+    await acquireDossierGroup(ports, { group: first, patientId: 'pa', confirmed: true, ...live });
+    const before = counts();
+    const [second] = await buildDossierInventory(ports, files, { ...live, declaredTaxCode: CF_A, skipImportedFor: 'pa' });
+    assert.deepEqual(second.sources.map((item) => item.status), ['already_imported']);
+    assert.equal(second.sources[0].extraction.state, 'not_extracted');
+    assert.deepEqual(second.sources[0].documentDate, { value: '2025-01-10', source: 'file_name' });
+    const outcomes = await acquireDossierGroup(ports, { group: second, patientId: 'pa', confirmed: true, ...live });
+    assert.deepEqual(outcomes, [{ key: 's1', status: 'skipped', reason: 'already_imported' }]);
+    assert.equal(attachments.size, 1);
+    assert.deepEqual(counts(), before);
+    const [plain] = await buildDossierInventory(ports, files, live);
+    assert.deepEqual(plain.sources.map((item) => item.status), ['ready']);
+});
+
+test('WUL-949 si salta solo un originale con conservazione verificata e attuale; gli altri tornano alla rilettura', async () => {
+    for (const damage of ['pending_readback', 'mismatch', 'original_changed'] as const) {
+        const { files, ports, attachments } = fseFolder(CF_A, [['2025-01-10_LAB_Esami_Ente_0a1b2c3d.pdf', labText(CF_A)]]);
+        const [first] = await buildDossierInventory(ports, files, { ...live, declaredTaxCode: CF_A, skipImportedFor: 'pa' });
+        await acquireDossierGroup(ports, { group: first, patientId: 'pa', confirmed: true, ...live });
+        const stored = [...attachments.values()][0];
+        if (damage === 'original_changed') {
+            stored.bytes = enc.encode(labText(CF_A, 'Data prelievo: 12/12/2025'));
+            stored.meta.currentness = { ...stored.meta.currentness!, sourceRef: 'f'.repeat(64) };
+        } else {
+            const snapshot = JSON.parse(stored.meta.parseEvidenceArtifactSnapshot!);
+            snapshot.dossier.preservation = { reusedExisting: false, state: damage };
+            stored.meta.parseEvidenceArtifactSnapshot = JSON.stringify(snapshot);
+        }
+        const [again] = await buildDossierInventory(ports, files, { ...live, declaredTaxCode: CF_A, skipImportedFor: 'pa' });
+        assert.deepEqual(again.sources.map((item) => item.status), ['ready'], damage);
+        const [outcome] = await acquireDossierGroup(ports, { group: again, patientId: 'pa', confirmed: true, ...live });
+        if (damage === 'original_changed') assert.deepEqual([outcome.status, 'reason' in outcome && outcome.reason], ['failed', 'readback_mismatch'], damage);
+        else assert.deepEqual([outcome.status, 'verified' in outcome && outcome.verified], ['reused', true], damage);
+    }
+});
