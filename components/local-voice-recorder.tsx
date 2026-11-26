@@ -111,7 +111,7 @@ export function LocalVoiceRecorderPanel({ subject, vocabulary, modes, title, tak
                 {snapshot.state === 'error' && !['audio-lost', 'permission-denied'].includes(snapshot.fault ?? '')
                     ? <Button variant="secondary" disabled={busy} onClick={() => void recorder.discard()}>Nuova registrazione</Button> : null}
             </div>
-            {snapshot.state === 'preparing' ? <p className={styles.muted} role="status">Avvio della trascrizione…</p> : null}
+            {snapshot.state === 'ready' || snapshot.state === 'preparing' ? <p className={styles.muted} role="status">Avvio della trascrizione…</p> : null}
             {view.pending === 'stop' || snapshot.state === 'finalizing' ? <p className={styles.muted} role="status">Chiusura della trascrizione…</p> : null}
             {snapshot.live && (snapshot.live.confirmed || snapshot.live.provisional) ? <PrivacyBlur>
                 <p className={styles.live} data-testid="local-voice-live" aria-label="Trascrizione in corso">

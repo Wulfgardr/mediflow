@@ -5,7 +5,7 @@ import { localVoiceContinueProof, localVoiceResponseProof, signLocalVoiceRequest
 
 type Line = { speaker: 'doctor' | 'patient'; text: string };
 type Suggestion = { original: string; replacement: string };
-type FakeSession = { id: string; subject: string; mode: 'visit' | 'dictation'; vocabulary: string[]; state: string; fault: string | null };
+type FakeSession = { id: string; subject: string; mode: 'visit' | 'dictation'; vocabulary: string[]; state: string; fault: string | null; pending: string | null };
 export type FakeLocalVoiceState = { model: string; lines: Line[]; drugSuggestions: Suggestion[]; session: FakeSession | null; blocks: Uint8Array[];
     requests: Array<{ method: string | undefined; path: string; bytes: number }>; subjectOverride: string | null; stopFailures: number };
 
@@ -61,17 +61,25 @@ export async function startFakeLocalVoice({ secret, port = 0, model = 'ready', l
                 if (state.session && !['cancelled'].includes(state.session.state)) return reply(409, { error: 'session-active' });
                 const input = JSON.parse(body.toString('utf8'));
                 state.blocks = [];
-                state.session = { id: crypto.randomBytes(16).toString('hex'), subject: input.subject, mode: input.mode, vocabulary: input.vocabulary, state: 'ready', fault: null };
+                state.session = { id: crypto.randomBytes(16).toString('hex'), subject: input.subject, mode: input.mode, vocabulary: input.vocabulary, state: 'ready', fault: null, pending: null };
                 return reply(201, snapshot());
             }
             const match = /^\/v1\/sessions\/([a-f0-9]{32})(\/commands|\/audio)?$/u.exec(path);
             if (!match || !state.session || state.session.id !== match[1]) return reply(404, { error: 'session-not-found' });
             const session = state.session;
-            if (request.method === 'GET' && !match[2]) return reply(200, snapshot());
+            const answered = (status: number, body?: unknown) => {
+                const result = reply(status, body);
+                if (session.pending) { session.state = session.pending; session.pending = null; }
+                return result;
+            };
+            if (request.method === 'GET' && !match[2]) {
+                if (session.pending) { session.state = session.pending; session.pending = null; }
+                return reply(200, snapshot());
+            }
             if (request.method === 'DELETE' && !match[2]) { state.session = null; state.blocks = []; return reply(204); }
             if (request.method === 'POST' && match[2] === '/audio') {
                 if (session.state === 'paused') return reply(409, { error: 'paused' });
-                if (!['preparing', 'recording'].includes(session.state)) return reply(409, { error: 'not-recording' });
+                if (!['preparing', 'recording'].includes(session.state)) return answered(409, { error: 'not-recording' });
                 state.blocks.push(new Uint8Array(body));
                 session.state = 'recording';
                 return reply(202, { acceptedSamples: body.length / 2, pendingSamples: 0 });
@@ -80,7 +88,9 @@ export async function startFakeLocalVoice({ secret, port = 0, model = 'ready', l
                 const { command } = JSON.parse(body.toString('utf8'));
                 if (!(ALLOWED[session.state] ?? []).includes(command)) return reply(409, { error: 'not-allowed' });
                 if ((command === 'stop' || command === 'pause') && state.stopFailures > 0) { state.stopFailures -= 1; return reply(503, { error: 'draining' }); }
-                session.state = command === 'start' ? 'preparing' : command === 'pause' ? 'paused' : command === 'resume' ? 'recording' : 'review';
+                const next = command === 'start' ? 'preparing' : command === 'pause' ? 'paused' : command === 'resume' ? 'preparing' : 'review';
+                if (command === 'start' || command === 'resume') { session.pending = next; return reply(202, snapshot()); }
+                session.state = next;
                 return reply(202, snapshot());
             }
             return reply(404, { error: 'not-found' });

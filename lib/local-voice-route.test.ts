@@ -125,8 +125,10 @@ test('a visit goes through in order, reaches only its user and its subject, and 
     assert.equal(created.status, 200);
     const session = await created.json() as { id: string; subject: string; state: string };
     assert.equal(session.subject, PATIENT_A);
-    assert.equal(session.state, 'preparing');
+    assert.equal(session.state, 'ready');
     assert.deepEqual((fake.state.session as unknown as { vocabulary: string[] }).vocabulary, ['Ramipril']);
+    const started = await as(USER_A, () => item.GET(page(`/api/local-voice/${session.id}?subject=${PATIENT_A}`), params(session.id)));
+    assert.equal((await started.json() as { state: string }).state, 'preparing');
 
     const send = (seq: number, marker: number, subject = PATIENT_A, user = USER_A) =>
         as(user, () => audio.POST(page(`/api/local-voice/${session.id}/audio?subject=${subject}&seq=${seq}`, { method: 'POST', body: block(marker) }), params(session.id)));

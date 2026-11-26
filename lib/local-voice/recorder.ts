@@ -19,7 +19,8 @@ export type RecorderView = Readonly<{
 type Reply = { status: number; body: Record<string, unknown> | null };
 
 const POLL_MS = 500;
-const ACTIVE = new Set(['preparing', 'recording', 'paused', 'finalizing']);
+const ACTIVE = new Set(['ready', 'preparing', 'recording', 'paused', 'finalizing']);
+const LISTENING = new Set(['preparing', 'recording']);
 const FAULTS = new Set<RecorderNotice>(['model-missing', 'model-invalid', 'permission-denied', 'audio-missing', 'audio-lost', 'engine-failed', 'unsupported']);
 const INITIAL: RecorderView = { phase: 'checking', availability: null, foreign: null, snapshot: null, review: null, notice: null, pending: null };
 
@@ -174,6 +175,10 @@ export class LocalVoiceRecorder {
             return;
         }
         this.set({ phase: this.view.review ? 'review' : 'live', snapshot: view, notice: fault ?? (this.view.notice === 'stop-retry' || this.view.notice === 'draining' ? this.view.notice : null) });
+        if (LISTENING.has(snapshot.state) && this.microphone && !this.sending && this.view.pending === null) {
+            this.sending = true;
+            void this.pump();
+        }
         if (ACTIVE.has(snapshot.state) || (snapshot.state === 'error' && (fault === 'audio-lost' || fault === 'permission-denied'))) this.schedule();
     }
 
@@ -199,8 +204,6 @@ export class LocalVoiceRecorder {
         }
         this.session = reply.body.id;
         this.sequence = 0;
-        this.sending = true;
-        void this.pump();
         this.set({ pending: null });
         await this.apply(reply);
     }
@@ -233,10 +236,7 @@ export class LocalVoiceRecorder {
         if (!this.session || this.view.pending) return;
         this.set({ pending: 'resume' });
         if (!await this.openMicrophone()) { this.set({ pending: null }); return; }
-        if (await this.command('resume')) {
-            this.sending = true;
-            void this.pump();
-        } else await this.closeMicrophone(false);
+        if (!await this.command('resume')) await this.closeMicrophone(false);
     }
 
     async stop(): Promise<void> {
