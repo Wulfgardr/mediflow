@@ -13,6 +13,7 @@ import { RuntimeTwinFolderContext, useRuntimeTwinDesign } from '@/components/run
 import styles from './kree8-workspace-shell.module.css';
 import { RuntimeTwinPatientNavigation, useRecordCrumb, useWorkspaceCrumb } from '@/components/runtime-twin-workspace';
 import { PageHeader } from '@/components/ui/page-header';
+import { openPatientRecordId } from '@/lib/workspace-destination';
 import { RecordToolbar } from '@/components/record-toolbar';
 import twin from './twin-patient-shell.module.css';
 import layout from '@/components/ink-layout.module.css';
@@ -120,7 +121,8 @@ export function Kree8WorkspaceShell({
   const elapsed = visit && recordVisit ? (civilDay(recordVisit.today) - civilDay(visit.date)) / 86_400_000 : undefined;
   const breadcrumb = elapsed === undefined ? 'Scheda paziente' : elapsed === 0 ? 'Visita di oggi'
     : elapsed === 1 ? 'Ritorno dopo un giorno' : `Ritorno dopo ${elapsed} giorni`;
-  useRecordCrumb(folderMode ? recordVisit?.id : undefined, breadcrumb, recordVisit?.proposals);
+  const titledRecordId = !isClinical && patientLabel ? openPatientRecordId(pathname) ?? undefined : undefined;
+  useRecordCrumb(folderMode ? recordVisit?.id : titledRecordId, folderMode ? breadcrumb : 'Scheda paziente', folderMode ? recordVisit?.proposals : undefined);
   useWorkspaceCrumb(isClinical ? undefined : parent?.href, parent?.label);
 
   /* a patient route may unmount the invoking control before the title
