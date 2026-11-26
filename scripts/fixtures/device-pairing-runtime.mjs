@@ -1,9 +1,9 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { mkdtempSync, openSync, closeSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, openSync, closeSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { request as httpsRequest } from 'node:https';
 import { createServer } from 'node:net';
-import { networkInterfaces } from 'node:os';
+import { networkInterfaces, tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
@@ -27,8 +27,9 @@ async function freePort() {
     return port;
 }
 
-export async function startDevicePairingFixture({ source = root } = {}) {
-    const directory = mkdtempSync(join(root, 'tmp-device-pairing-'));
+export async function startDevicePairingFixture({ source = root, launcher = false } = {}) {
+    const directory = launcher ? realpathSync(mkdtempSync(join(tmpdir(), 'mediflow-device-launcher-'))) : mkdtempSync(join(root, 'tmp-device-pairing-'));
+    const home = launcher ? realpathSync(mkdtempSync(join(tmpdir(), 'mediflow-device-home-'))) : null;
     const children = [];
     const tlsPort = await freePort();
     const httpPort = await freePort();
@@ -55,11 +56,12 @@ export async function startDevicePairingFixture({ source = root } = {}) {
             if (child.exitCode !== null || child.signalCode !== null) return;
             const closed = new Promise(resolve => child.once('exit', resolve));
             child.kill('SIGTERM');
-            const timer = setTimeout(() => child.kill('SIGKILL'), 5000);
+            const timer = setTimeout(() => child.kill('SIGKILL'), 20000);
             await closed;
             clearTimeout(timer);
         }));
         rmSync(directory, { recursive: true, force: true });
+        if (home) rmSync(home, { recursive: true, force: true });
     }
 
     async function waitFor(child, predicate, name) {
@@ -72,8 +74,12 @@ export async function startDevicePairingFixture({ source = root } = {}) {
 
     try {
         if (!peer) throw new Error('The test requires one non-loopback IPv4 interface');
-        const server = launch([resolve(root, 'node_modules/next/dist/bin/next'), 'dev', '--webpack',
-            '--hostname', '127.0.0.1', '--port', String(httpPort)], 'next.log');
+        const server = launcher
+            ? launch([resolve(source, 'scripts/mediflow.mjs'), '--scelta', 'web', '--senza-browser'], 'next.log', {
+                HOME: home, XDG_CONFIG_HOME: join(home, 'config'), PORT: String(httpPort),
+                MEDIFLOW_TLS_PORT: String(tlsPort), MEDIFLOW_LOCAL_VOICE_BINARY: join(directory, 'no-voice') })
+            : launch([resolve(root, 'node_modules/next/dist/bin/next'), 'dev', '--webpack',
+                '--hostname', '127.0.0.1', '--port', String(httpPort)], 'next.log');
         await waitFor(server, async () => {
             try { return (await fetch(httpOrigin + '/api/auth/check')).ok; } catch { return false; }
         }, 'Next');
@@ -93,13 +99,15 @@ export async function startDevicePairingFixture({ source = root } = {}) {
             body: JSON.stringify({ username: 'admin', password: pin, displayName: 'Operatore sintetico',
                 ambulatoryName: 'MediFlow Prova', ...unlock, recovery: { wrappedMasterKey, salt, verifier } }),
         });
-        if (setup.status !== 200) throw new Error('Synthetic setup returned ' + setup.status);
+        if (setup.status !== 200) throw new Error('Synthetic setup returned ' + setup.status + ' ' + await setup.text());
         const mode = await fetch(httpOrigin + '/api/settings/network.mode', {
             method: 'PUT', headers: { Authorization: 'Bearer ' + localApiToken, 'Content-Type': 'application/json' },
             body: JSON.stringify({ value: 'network-home-base' }),
         });
         if (mode.status !== 200) throw new Error('Changing the synthetic network mode returned ' + mode.status);
 
+        if (launcher) return { httpOrigin, peer, tlsPort, directory, launcher: server, ...await signIn(), localApiToken, close, signIn,
+            verifier: (await deriveUnlockMaterial(passphrase, Buffer.from(unlock.salt, 'base64'))).verifier };
         const certPath = join(directory, 'test.crt');
         const keyPath = join(directory, 'test.key');
         execFileSync('openssl', ['req', '-newkey', 'rsa:2048', '-x509', '-nodes', '-days', '1',
@@ -130,15 +138,15 @@ export async function startDevicePairingFixture({ source = root } = {}) {
             try { return (await lan('/api/auth/check')).status === 200; } catch { return false; }
         }, 'TLS proxy');
 
-        const material = await deriveUnlockMaterial(passphrase, Buffer.from(unlock.salt, 'base64'));
         async function signIn() {
+            const material = await deriveUnlockMaterial(passphrase, Buffer.from(unlock.salt, 'base64'));
             const web = await loginWithWebAuthControl(httpOrigin, { username: 'admin', verifier: material.verifier });
             if (web.response.status !== 200) throw new Error('Synthetic Web login returned ' + web.response.status);
             const webHeaders = { ...web.webHeaders, 'Content-Type': 'application/json', Origin: httpOrigin, 'Sec-Fetch-Site': 'same-origin' };
             return { web, webHeaders };
         }
         return { httpOrigin, peer, tlsPort, directory, ...await signIn(), localApiToken, lan, close,
-            signIn, verifier: material.verifier };
+            signIn, verifier: (await deriveUnlockMaterial(passphrase, Buffer.from(unlock.salt, 'base64'))).verifier };
     } catch (error) {
         for (const name of ['next.log', 'proxy.log']) {
             try { console.error(readFileSync(join(directory, name), 'utf8').split('\n').slice(-12).join('\n')); } catch {}

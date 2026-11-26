@@ -35,6 +35,8 @@ const options = {
     key: fs.readFileSync(keyPath)
 };
 
+if (process.connected) process.once('disconnect', () => process.exit(0));
+
 const server = https.createServer(options, (req, res) => {
     if (!isLoopbackAddress(req.socket.remoteAddress) && !allowsNetworkIngress(req.method, req.url)) {
         const agentOnly = isAgentOnlyIngress(req.url);
