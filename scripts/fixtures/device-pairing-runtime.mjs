@@ -1,9 +1,9 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { mkdtempSync, openSync, closeSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, openSync, closeSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { request as httpsRequest } from 'node:https';
 import { createServer } from 'node:net';
-import { networkInterfaces } from 'node:os';
+import { networkInterfaces, tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
@@ -27,8 +27,8 @@ async function freePort() {
     return port;
 }
 
-export async function startDevicePairingFixture({ source = root, proxy: ownProxy = true } = {}) {
-    const directory = mkdtempSync(join(root, 'tmp-device-pairing-'));
+export async function startDevicePairingFixture({ source = root, launcher = false } = {}) {
+    const directory = launcher ? realpathSync(mkdtempSync(join(tmpdir(), 'mediflow-device-launcher-'))) : mkdtempSync(join(root, 'tmp-device-pairing-'));
     const children = [];
     const tlsPort = await freePort();
     const httpPort = await freePort();
@@ -55,7 +55,7 @@ export async function startDevicePairingFixture({ source = root, proxy: ownProxy
             if (child.exitCode !== null || child.signalCode !== null) return;
             const closed = new Promise(resolve => child.once('exit', resolve));
             child.kill('SIGTERM');
-            const timer = setTimeout(() => child.kill('SIGKILL'), 5000);
+            const timer = setTimeout(() => child.kill('SIGKILL'), 20000);
             await closed;
             clearTimeout(timer);
         }));
@@ -72,8 +72,13 @@ export async function startDevicePairingFixture({ source = root, proxy: ownProxy
 
     try {
         if (!peer) throw new Error('The test requires one non-loopback IPv4 interface');
-        const server = launch([resolve(root, 'node_modules/next/dist/bin/next'), 'dev', '--webpack',
-            '--hostname', '127.0.0.1', '--port', String(httpPort)], 'next.log');
+        if (launcher) mkdirSync(join(directory, 'home'));
+        const server = launcher
+            ? launch([resolve(source, 'scripts/mediflow.mjs'), '--scelta', 'web', '--senza-browser'], 'next.log', {
+                HOME: join(directory, 'home'), XDG_CONFIG_HOME: join(directory, 'home/config'), PORT: String(httpPort),
+                MEDIFLOW_TLS_PORT: String(tlsPort), MEDIFLOW_LOCAL_VOICE_BINARY: join(directory, 'no-voice') })
+            : launch([resolve(root, 'node_modules/next/dist/bin/next'), 'dev', '--webpack',
+                '--hostname', '127.0.0.1', '--port', String(httpPort)], 'next.log');
         await waitFor(server, async () => {
             try { return (await fetch(httpOrigin + '/api/auth/check')).ok; } catch { return false; }
         }, 'Next');
@@ -100,7 +105,7 @@ export async function startDevicePairingFixture({ source = root, proxy: ownProxy
         });
         if (mode.status !== 200) throw new Error('Changing the synthetic network mode returned ' + mode.status);
 
-        if (!ownProxy) return { httpOrigin, peer, directory, ...await signIn(), localApiToken, close, signIn,
+        if (launcher) return { httpOrigin, peer, tlsPort, directory, launcher: server, ...await signIn(), localApiToken, close, signIn,
             verifier: (await deriveUnlockMaterial(passphrase, Buffer.from(unlock.salt, 'base64'))).verifier };
         const certPath = join(directory, 'test.crt');
         const keyPath = join(directory, 'test.key');
