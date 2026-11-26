@@ -9,7 +9,8 @@ export const headerCommandNames = (voice: boolean) => voice
 export const headerCommands = (header: Locator) => header.locator('a:visible,button:visible,summary:visible');
 
 export async function expectHeaderCommands(header: Locator, voice: boolean) {
-    await expect(headerCommands(header)).toHaveText(headerCommandNames(voice));
+    await expect.poll(() => headerCommands(header).evaluateAll((elements) => elements
+        .map((element) => element.getAttribute('aria-label') ?? element.textContent?.trim() ?? ''))).toEqual(headerCommandNames(voice));
     await expect(header.getByRole('link', { name: 'Registra la visita', exact: true })).toHaveCount(voice ? 1 : 0);
 }
 
