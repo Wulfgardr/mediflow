@@ -94,6 +94,12 @@ test('valid redemption requires TLS, consumes the secret once and revocation imm
     const paired = { 'x-mediflow-paired-client-id': clientId, 'x-mediflow-paired-client-token': pairedClientToken };
     assert.equal((await redeem(offer)).status, 404);
     assert.equal((await fixture.lan('/api/v1/network/patients', { headers: paired })).status, 401);
+    const unpairedCheck = await fixture.lan('/api/auth/check');
+    assert.equal(unpairedCheck.status, 401);
+    assert.ok(!unpairedCheck.text.includes('archiveGeneration') && !unpairedCheck.text.includes('salt'));
+    const pairedCheck = await fixture.lan('/api/auth/check', { headers: paired });
+    assert.equal(pairedCheck.status, 200);
+    assert.ok(pairedCheck.text.includes('archiveGeneration'));
     const login = await fixture.lan('/api/auth/native/login', { method: 'POST',
         headers: { ...paired, 'Content-Type': 'application/json' },
         body: JSON.stringify({ verifier: fixture.verifier }),
@@ -111,6 +117,7 @@ test('valid redemption requires TLS, consumes the secret once and revocation imm
     assert.equal(revoked.status, 200);
     assert.equal((await fixture.lan('/api/v1/network/patients', { headers: session })).status, 401);
     assert.equal((await fixture.lan('/api/v1/network/node', { headers: paired })).status, 401);
+    assert.equal((await fixture.lan('/api/auth/check', { headers: paired })).status, 401);
     const records = audit();
     assert.deepEqual(records.map(record => record.event_type), [
         'network.pairing.offer.created', 'network.pairing.offer.redeemed', 'network.pairing.client.revoked',

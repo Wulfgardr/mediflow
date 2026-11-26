@@ -136,7 +136,10 @@ export async function startDevicePairingFixture({ source = root, launcher = fals
             });
         }
         await waitFor(proxy, async () => {
-            try { return (await lan('/api/auth/check')).status === 200; } catch { return false; }
+            try {
+                const status = (await lan('/api/auth/check')).status;
+                return status === 200 || status === 401;
+            } catch { return false; }
         }, 'TLS proxy');
 
         async function signIn() {

@@ -153,11 +153,17 @@ test('an unpaired device, an unrecognised certificate and a stopped proxy read n
     ]) {
         const res = await device(phone.origin, phone.fingerprint, route, { method, body });
         if (route === '/api/v1/network/pairing-intents') assert.equal(res.status, 403);
-        if (route === '/api/v1/network/node' || route === '/api/v1/network/capabilities') assert.equal(res.status, 401);
+        if (route === '/api/v1/network/node' || route === '/api/v1/network/capabilities' || route === '/api/auth/check') {
+            assert.equal(res.status, 401);
+            assert.ok(!res.text.includes('archiveGeneration') && !res.text.includes('salt'));
+        }
         for (const name of forbiddenNames) {
             assert.ok(!res.text.includes(name), `${method} ${route} leaked ${name}: ${res.text}`);
         }
     }
+    const pairedCheck = await device(phone.origin, phone.fingerprint, '/api/auth/check', { headers: phone.paired });
+    assert.equal(pairedCheck.status, 200, pairedCheck.text);
+    assert.ok(pairedCheck.text.includes('archiveGeneration'));
 
     const received = [];
     const impostor = https.createServer({ key: readFileSync(join(fixture.directory, 'impostor.key')), cert: readFileSync(join(fixture.directory, 'impostor.crt')) },
