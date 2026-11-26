@@ -273,5 +273,10 @@
     "path": "e2e/agent-visit-utils.ts",
     "reason": "WUL-870: setup sintetico del mandato e del pairing usato da agent-cassette.spec.ts; nessuna registrazione autonoma di test.",
     "owner": "WUL-870"
+  },
+  {
+    "path": "e2e/local-voice-utils.ts",
+    "reason": "WUL-966: microfono sintetico e paziente sintetico importati dalle spec della registrazione; nessun test autonomo.",
+    "owner": "WUL-966"
   }
 ]
