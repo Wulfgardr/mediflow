@@ -4,14 +4,16 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { ArrowLeft, ChevronRight, FolderOpen, type LucideIcon } from 'lucide-react';
+import { ArrowLeft, ChevronRight, type LucideIcon } from 'lucide-react';
 
 // WUL-297: Privacy Mode is always reachable from the workspace header.
 import PrivacyBlur from '@/components/privacy-blur';
 import { PrivacyModeToggle } from '@/components/privacy-mode-toggle';
 import { RuntimeTwinFolderContext, useRuntimeTwinDesign } from '@/components/runtime-twin-design';
 import styles from './kree8-workspace-shell.module.css';
-import { RuntimeTwinPatientNavigation, useRecordCrumb } from '@/components/runtime-twin-workspace';
+import { RuntimeTwinPatientNavigation, useRecordCrumb, useWorkspaceCrumb } from '@/components/runtime-twin-workspace';
+import { PageHeader } from '@/components/ui/page-header';
+import { openPatientRecordId } from '@/lib/workspace-destination';
 import { RecordToolbar } from '@/components/record-toolbar';
 import twin from './twin-patient-shell.module.css';
 import layout from '@/components/ink-layout.module.css';
@@ -44,17 +46,14 @@ export type Kree8WorkspaceNavGroups = readonly [
 type Kree8WorkspaceShellProps = {
   variant?: 'default' | 'clinical' | 'overview';
   writing?: boolean;
-  eyebrow: string;
+  eyebrow?: string;
   title: string;
-  subtitle: string;
-  backHref: string;
-  backLabel: string;
+  parent?: { href: string; label: string };
   patientLabel?: string;
   patientAtoms?: string[];
   patientDetails?: PatientHeaderDetails;
   recordVisit?: { id: string; reference?: { date: Date; author?: string }; today: Date; proposals?: number };
   prescriptionAction?: ReactNode;
-  statusLabel?: string;
   navItems?: Kree8WorkspaceNavItem[];
   navigationClassName?: string;
   navGroups?: Kree8WorkspaceNavGroups;
@@ -77,15 +76,12 @@ export function Kree8WorkspaceShell({
   writing = false,
   eyebrow,
   title,
-  subtitle,
-  backHref,
-  backLabel,
+  parent,
   patientLabel,
   patientAtoms = [],
   patientDetails,
   recordVisit,
   prescriptionAction,
-  statusLabel,
   navItems = [],
   navigationClassName,
   navGroups,
@@ -125,7 +121,9 @@ export function Kree8WorkspaceShell({
   const elapsed = visit && recordVisit ? (civilDay(recordVisit.today) - civilDay(visit.date)) / 86_400_000 : undefined;
   const breadcrumb = elapsed === undefined ? 'Scheda paziente' : elapsed === 0 ? 'Visita di oggi'
     : elapsed === 1 ? 'Ritorno dopo un giorno' : `Ritorno dopo ${elapsed} giorni`;
-  useRecordCrumb(folderMode ? recordVisit?.id : undefined, breadcrumb, recordVisit?.proposals);
+  const titledRecordId = !isClinical && patientLabel ? openPatientRecordId(pathname) ?? undefined : undefined;
+  useRecordCrumb(folderMode ? recordVisit?.id : titledRecordId, folderMode ? breadcrumb : 'Scheda paziente', folderMode ? recordVisit?.proposals : undefined);
+  useWorkspaceCrumb(isClinical ? undefined : parent?.href, parent?.label);
 
   /* a patient route may unmount the invoking control before the title
      mounts. Treat only body or that detached control as unowned focus, once per
@@ -424,9 +422,9 @@ export function Kree8WorkspaceShell({
     <RuntimeTwinFolderContext.Provider value={visibleFolder ?? null}>
     <div className={`${sectionRecipe.sections} ${folderMode ? twin.patientShell : `${styles.shell} ${isClinical ? styles.clinicalShell : ''} ${overviewMode ? styles.overviewShell : ''}`}`} ref={rootRef}>
       <main className={`${layout.container} ${folderMode ? twin.patientCanvas : `${styles.canvas} ${isClinical ? styles.clinicalCanvas : ''}`}`} data-writing={writing} data-folder-section={visibleFolder} data-record-page={proposal ? '' : undefined} data-testid={isClinical ? 'lume-scheda-scroll' : undefined}>
-        <header
-          className={`${layout.plane} ${folderMode ? twin.patientHeader : `${styles.chrome} ${isClinical ? styles.clinicalChrome : ''}`}`}
-          data-testid={isClinical ? 'lume-scheda-header' : undefined}
+        {isClinical ? <header
+          className={`${layout.plane} ${folderMode ? twin.patientHeader : `${styles.chrome} ${styles.clinicalChrome}`}`}
+          data-testid="lume-scheda-header"
         >
           {folderMode ? <>
             {patientDetails ? <PatientHeaderIdentity name={title} details={patientDetails} titleRef={patientTitleRef} /> : <div className={twin.identity}>
@@ -439,61 +437,48 @@ export function Kree8WorkspaceShell({
               {headerActions}
             </RecordToolbar>
           </> : <>
-          {(!overviewMode || primaryAction || headerActions) && <div className={styles.chromeTopRow}>
-            <Link href={backHref} className={styles.backButton} aria-label={backLabel} title={backLabel}>
+          <div className={styles.chromeTopRow}>
+            {parent ? <Link href={parent.href} className={styles.backButton} aria-label={parent.label} title={parent.label}>
               <ArrowLeft size={13} aria-hidden />
-              <span className={styles.backButtonLabel}>{backLabel}</span>
-            </Link>
+              <span className={styles.backButtonLabel}>{parent.label}</span>
+            </Link> : null}
             <div className={styles.headerActionCluster} data-command-bar="testata">
-              {/* WUL-297: persistent privacy affordance in the app header */}
               {!proposal ? <PrivacyModeToggle showLabel /> : null}
               {primaryAction && PrimaryActionIcon ? (
-                <Link href={primaryAction.href} className={isClinical && pendingForms ? 'mf-button-secondary' : 'mf-button-primary'}>
+                <Link href={primaryAction.href} className={pendingForms ? 'mf-button-secondary' : 'mf-button-primary'}>
                   <PrimaryActionIcon size={14} aria-hidden="true" />
                   {primaryAction.label}
                 </Link>
               ) : null}
               {headerActions}
             </div>
-          </div>}
-
-          {isClinical ? (
-            <div className={styles.clinicalIdentity}>
-              <p className={styles.clinicalLabel}>{eyebrow}</p>
-              <h1 ref={patientTitleRef} tabIndex={-1} className={`${styles.clinicalName} type-person`}><PrivacyBlur>{title}</PrivacyBlur></h1>
-              <p className={`${styles.clinicalAtoms} lume-registro`} data-testid="lume-scheda-atoms">
-                {patientAtoms.map((atom, index) => (
-                  <span key={`${atom}-${index}`} className={styles.clinicalAtomGroup}>
-                    {index > 0 ? <span className={styles.clinicalDot} aria-hidden="true">·</span> : null}
-                    <PrivacyBlur><span data-testid="lume-register-value">{atom}</span></PrivacyBlur>
-                  </span>
-                ))}
-              </p>
-              {patientDetails ? <PatientHeaderAllergies details={patientDetails} /> : null}
-            </div>
-          ) : (
-            <div className={styles.hero}>
-              <span className={styles.brandMark} aria-hidden>
-                <FolderOpen size={12} />
-              </span>
-              <div className={styles.heroText}>
-                {!proposal ? <p className={styles.eyebrow}>{eyebrow}</p> : null}
-                <h1 className={proposal ? styles.title : `${styles.title} type-page-title`}>
-                  <span className={styles.titleMain}>{title}</span>{proposal ? null : <span aria-hidden="true">.</span>}
-                </h1>
-                {patientLabel ? (
-                  <p className={styles.patientLabel} data-testid="lume-workspace-patient-label">
-                    <PrivacyBlur>{patientLabel}</PrivacyBlur>
-                  </p>
-                ) : null}
-                {patientDetails ? <PatientHeaderAllergies details={patientDetails} /> : null}
-                {!proposal ? <p className={styles.subtitle}>{subtitle}</p> : null}
-                {statusLabel && !proposal ? <p className={styles.statusLine}>{statusLabel}</p> : null}
-              </div>
-            </div>
-          )}
+          </div>
+          <div className={styles.clinicalIdentity}>
+            <p className={styles.clinicalLabel}>{eyebrow}</p>
+            <h1 ref={patientTitleRef} tabIndex={-1} className={`${styles.clinicalName} type-person`}><PrivacyBlur>{title}</PrivacyBlur></h1>
+            <p className={`${styles.clinicalAtoms} lume-registro`} data-testid="lume-scheda-atoms">
+              {patientAtoms.map((atom, index) => (
+                <span key={`${atom}-${index}`} className={styles.clinicalAtomGroup}>
+                  {index > 0 ? <span className={styles.clinicalDot} aria-hidden="true">·</span> : null}
+                  <PrivacyBlur><span data-testid="lume-register-value">{atom}</span></PrivacyBlur>
+                </span>
+              ))}
+            </p>
+            {patientDetails ? <PatientHeaderAllergies details={patientDetails} /> : null}
+          </div>
           </>}
-        </header>
+        </header> : <div className={`${layout.plane} ${styles.pageChrome}`}>
+          <PageHeader
+            title={title}
+            meta={patientLabel ? <span data-testid="lume-workspace-patient-label"><PrivacyBlur>{patientLabel}</PrivacyBlur></span> : undefined}
+            details={patientDetails ? <PatientHeaderAllergies details={patientDetails} /> : undefined}
+            actions={primaryAction || headerActions || !proposal ? <>
+              {!proposal ? <PrivacyModeToggle showLabel /> : null}
+              {primaryAction && PrimaryActionIcon ? <Link href={primaryAction.href} className="mf-button-primary"><PrimaryActionIcon size={14} aria-hidden="true" />{primaryAction.label}</Link> : null}
+              {headerActions}
+            </> : undefined}
+          />
+        </div>}
 
         {folderMode ? <RuntimeTwinPatientNavigation items={renderedNavItems} active={folderSection} lastVisit={visit} /> : renderedNavItems.length > 0 ? (
           <nav

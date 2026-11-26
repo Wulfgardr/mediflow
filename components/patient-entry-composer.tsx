@@ -1182,11 +1182,7 @@ export function PatientEntryComposer({ embedded = false, sheetSource, focusRef }
 
     return (
         <Kree8WorkspaceShell
-            eyebrow="Diario clinico"
             title="Nuova voce clinica"
-            subtitle="Registra una visita, un contatto remoto o una nota breve."
-            backHref={`/patients/${id}/modules`}
-            backLabel="Torna alla scheda paziente"
             patientDetails={patient ? patientAllergiesForHeader(patient.allergies) : undefined}
             patientLabel={patient ? `${patient.lastName} ${patient.firstName}` : undefined}
             navItems={workspaceNavItems}

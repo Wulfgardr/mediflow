@@ -131,9 +131,7 @@ export default function PatientBulkImportPanel({ initialAmbulatoryCookie }: { in
     const { isAuthenticated, isLocked, user, authRecoveryState } = useSecurity();
     if (!isAuthenticated || isLocked || !user?.id || authRecoveryState !== 'ready') {
         return (
-            <Kree8WorkspaceShell eyebrow="Pazienti" title="Importa elenco"
-                subtitle="Aggiungi più schede da un CSV, dopo averle controllate."
-                backHref="/?area=incarico" backLabel="Torna alla lista">
+            <Kree8WorkspaceShell title="Importa elenco">
                 <p role="status" className={styles.muted}>Sblocca MediFlow per preparare un’anteprima.</p>
             </Kree8WorkspaceShell>
         );
@@ -172,10 +170,7 @@ function ActivePatientBulkImport({ operatorId, initialAmbulatoryCookie }: {
     const showReceipt = receipt && (snapshot.phase !== 'preview' || unresolved);
 
     return (
-        <Kree8WorkspaceShell eyebrow="Pazienti" title="Importa elenco"
-            subtitle="Aggiungi più schede da un CSV, dopo averle controllate."
-            backHref="/?area=incarico" backLabel="Torna alla lista"
-            statusLabel="Le schede esistenti non vengono modificate."
+        <Kree8WorkspaceShell title="Importa elenco"
             headerActions={<Link href="/patients/import/dossier" className="mf-button-secondary">Importa documenti da cartella</Link>}>
             <div className={styles.panel} data-testid="patient-bulk-import" data-phase={snapshot.phase}>
                 <section className={styles.section} aria-labelledby="bulk-file-title">
@@ -256,18 +251,18 @@ function ActivePatientBulkImport({ operatorId, initialAmbulatoryCookie }: {
                                 <span>Ho controllato l’anteprima e confermo le righe da aggiungere.</span>
                             </label>
                             <div className={styles.actions}>
-                                <button type="button" className={styles.primary} disabled={!reviewed || eligible === 0 || !session}
+                                <button type="button" className="mf-button-primary" disabled={!reviewed || eligible === 0 || !session}
                                     onClick={() => { void session?.confirm(snapshot.previewRevision, reviewed); }}>
                                     Conferma e aggiungi {formatCountLabel(eligible, 'paziente', 'pazienti')}
                                 </button>
-                                <button type="button" className={styles.secondary} onClick={() => session?.cancel()}>Annulla anteprima</button>
+                                <button type="button" className="mf-button-secondary" onClick={() => session?.cancel()}>Annulla anteprima</button>
                             </div>
                         </aside> : null}
                         </div>
                     </section>
                 ) : null}
                 {busy && snapshot.phase !== 'reconciling' ? <div className={styles.actions}>
-                    <button type="button" className={styles.secondary} disabled={snapshot.phase === 'stopping'}
+                    <button type="button" className="mf-button-secondary" disabled={snapshot.phase === 'stopping'}
                         onClick={() => session?.cancel()}>{snapshot.phase === 'stopping' ? 'Interruzione in corso…' : 'Annulla importazione'}</button>
                 </div> : null}
                 {showReceipt ? (
@@ -289,7 +284,7 @@ function ActivePatientBulkImport({ operatorId, initialAmbulatoryCookie }: {
                         </table>
                         {counts.unknown > 0 ? <>
                             <p className={styles.notice}>Non ripetere l’importazione: una scheda potrebbe essere già salvata. Torna nello stesso ambulatorio e verifica gli identificativi.</p>
-                            <button type="button" className={styles.secondary} disabled={busy || receipt.active || !session}
+                            <button type="button" className="mf-button-secondary" disabled={busy || receipt.active || !session}
                                 onClick={() => { void session?.reconcile(); }}>Verifica esiti sconosciuti</button>
                         </> : null}
                         <p className={styles.muted}>Questo promemoria resta solo in memoria nella finestra corrente. Ricaricare o chiudere completamente la pagina lo perde; prima annota gli identificativi ancora da verificare. Un identificativo non trovato non dimostra un annullamento.</p>

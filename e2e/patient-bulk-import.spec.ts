@@ -264,7 +264,7 @@ test('React lifecycle: mount, template, preview, cleanup and remount never auto-
         await expect(page.getByTestId('patient-bulk-preview-count')).toHaveText('2 da aggiungere · 2 escluse · 4 righe totali');
         await page.getByRole('button', { name: 'Annulla anteprima', exact: true }).click();
         await expect(page.getByTestId('patient-bulk-preview-count')).toHaveCount(0);
-        await page.getByRole('link', { name: 'Torna alla lista', exact: true }).click();
+        await page.getByRole('navigation', { name: 'Cartelle aperte' }).getByRole('link', { name: 'Pazienti', exact: true }).click();
         await expect(page.getByTestId('patient-bulk-import')).toHaveCount(0);
         await enterImportViaNewPatient(page);
         await expect(template).toHaveAttribute('href', href!);
