@@ -93,7 +93,7 @@ export async function startDevicePairingFixture({ source = root, proxy: ownProxy
             body: JSON.stringify({ username: 'admin', password: pin, displayName: 'Operatore sintetico',
                 ambulatoryName: 'MediFlow Prova', ...unlock, recovery: { wrappedMasterKey, salt, verifier } }),
         });
-        if (setup.status !== 200) throw new Error('Synthetic setup returned ' + setup.status);
+        if (setup.status !== 200) throw new Error('Synthetic setup returned ' + setup.status + ' ' + await setup.text());
         const mode = await fetch(httpOrigin + '/api/settings/network.mode', {
             method: 'PUT', headers: { Authorization: 'Bearer ' + localApiToken, 'Content-Type': 'application/json' },
             body: JSON.stringify({ value: 'network-home-base' }),
