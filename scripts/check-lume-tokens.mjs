@@ -260,6 +260,8 @@ export const TEXT_MIN_RATIO = 4.5;
 export const SIGNAL_TEXT_WEIGHT = 0.6;
 export const SIGNAL_TINT_WEIGHT = 0.1;
 const ACCENT_TEXT_SURFACES = ['field', 'focal'];
+export const SCROLLBAR_THUMB_WEIGHT = { giorno: 0.72, grafite: 0.54 };
+export const SCROLLBAR_THUMB_RATIO = { min: 3, max: 4.5 };
 
 export function parseHexColor(value) {
   if (typeof value !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(value)) {
@@ -373,6 +375,16 @@ export function buildContract() {
         minRatio: 3,
       });
     }
+    for (const [label, background] of [
+      ...['canvas', 'field', 'focal'].map((surface) => [`surface.${surface}`, `register.${register}.surface.${surface}`]),
+      ...['canvas', 'panel', 'rail'].map((surface) => [`record.${surface}`, `record.${register}.${surface}`]),
+    ]) {
+      checks.push({
+        register, label: `scrollbar thumb on ${label}`,
+        text: `register.${register}.ink.muted`, textWeight: SCROLLBAR_THUMB_WEIGHT[register],
+        background, minRatio: SCROLLBAR_THUMB_RATIO.min, maxRatio: SCROLLBAR_THUMB_RATIO.max,
+      });
+    }
   }
   return checks;
 }
@@ -380,14 +392,17 @@ export function buildContract() {
 export function evaluateContract(tokens, contract = buildContract()) {
   for (const signal of SIGNALS) resolveColor(tokens, `signal.${signal}`);
   const checks = contract.map((c) => {
-    const text = c.signal
-      ? mixHexColors(resolveColor(tokens, c.signal), SIGNAL_TEXT_WEIGHT, resolveColor(tokens, c.ink))
-      : resolveColor(tokens, c.text);
     const background = c.signal
       ? mixHexColors(resolveColor(tokens, c.signal), SIGNAL_TINT_WEIGHT, resolveColor(tokens, c.surface))
       : resolveColor(tokens, c.background);
+    const text = c.signal
+      ? mixHexColors(resolveColor(tokens, c.signal), SIGNAL_TEXT_WEIGHT, resolveColor(tokens, c.ink))
+      : c.textWeight === undefined
+        ? resolveColor(tokens, c.text)
+        : mixHexColors(resolveColor(tokens, c.text), c.textWeight, background);
     const ratio = contrastRatio(text, background);
-    return { ...c, measuredText: text, measuredBackground: background, ratio, pass: ratio >= c.minRatio };
+    const pass = ratio >= c.minRatio && (c.maxRatio === undefined || ratio <= c.maxRatio);
+    return { ...c, measuredText: text, measuredBackground: background, ratio, pass };
   });
   return { checks, pass: checks.every((c) => c.pass) };
 }
@@ -398,7 +413,8 @@ export function formatReport(result) {
     lines.push(`register ${register}`);
     for (const c of result.checks.filter((x) => x.register === register)) {
       const ratio = `${c.ratio.toFixed(3)}:1`.padStart(9);
-      lines.push(`  ${c.pass ? 'PASS' : 'FAIL'}  ${ratio}  (min ${c.minRatio}:1)  ${c.label}`);
+      const bounds = c.maxRatio === undefined ? `min ${c.minRatio}:1` : `${c.minRatio}-${c.maxRatio}:1`;
+      lines.push(`  ${c.pass ? 'PASS' : 'FAIL'}  ${ratio}  (${bounds})  ${c.label}`);
     }
   }
   const failed = result.checks.filter((c) => !c.pass).length;
@@ -625,6 +641,49 @@ export function verifyGlobalStyles(css) {
   };
 }
 
+const SCROLLBAR_APPEARANCE = /scrollbar-color\s*:|::-webkit-scrollbar|scrollbar-width\s*:\s*(?!none\b)[a-z]/g;
+
+export function findScrollbarAppearance(relativePath, source) {
+  return [...source.matchAll(SCROLLBAR_APPEARANCE)].map((match) => ({
+    path: relativePath, line: lineAt(source, match.index), value: match[0],
+  }));
+}
+
+export function verifyScrollbarSource(globalCss, sources) {
+  const rules = parseStyleRules(globalCss);
+  const thumb = (register) => `color-mix(in srgb, var(--lume-ink-muted) ${cssWeight(SCROLLBAR_THUMB_WEIGHT[register])}, transparent)`;
+  const declared = (selector, property) => rules.filter((rule) => rule.depth === 0 && rule.declarations.has(property)
+    && rule.selectors.includes(selector)).map((rule) => rule.declarations.get(property));
+  const colors = rules.filter((rule) => rule.declarations.has('scrollbar-color'));
+  if (colors.length !== 1 || !colors[0].selectors.includes(':root') || colors[0].depth !== 0
+    || colors[0].declarations.get('scrollbar-color') !== 'var(--lume-scrollbar-thumb) transparent') {
+    throw new Error('global CSS requires one :root scrollbar-color: var(--lume-scrollbar-thumb) transparent');
+  }
+  for (const [selector, register] of [[':root', 'giorno'], [':root.dark', 'grafite']]) {
+    const values = declared(selector, '--lume-scrollbar-thumb');
+    if (values.length !== 1 || values[0] !== thumb(register)) {
+      throw new Error(`global CSS ${selector} --lume-scrollbar-thumb must be ${thumb(register)}`);
+    }
+  }
+  if (rules.filter((rule) => rule.declarations.has('--lume-scrollbar-thumb')).length !== 2) {
+    throw new Error('global CSS declares --lume-scrollbar-thumb outside :root and :root.dark');
+  }
+  if (declared('*', 'scrollbar-width')[0] !== 'thin') throw new Error('global CSS requires * { scrollbar-width: thin }');
+  const strays = sources.flatMap(({ relativePath, source }) => findScrollbarAppearance(relativePath, source));
+  if (strays.length > 0) {
+    const first = strays[0];
+    throw new Error(`scrollbar appearance belongs to app/globals.css only: ${first.path}:${first.line} ${first.value}`
+      + ' (per nascondere una barra usa scrollbar-width: none)');
+  }
+  return { strays: 0 };
+}
+
+export function loadScrollbarSources(rootDir = ROOT_DIR) {
+  return PALETTE_SOURCE_DIRS.flatMap((directory) => walkColorSource(path.join(rootDir, directory)))
+    .map((file) => ({ relativePath: path.relative(rootDir, file).split(path.sep).join('/'), source: readFileSync(file, 'utf8') }))
+    .filter(({ relativePath }) => relativePath !== 'app/globals.css');
+}
+
 function normalizeHex(value) {
   const trimmed = value.trim();
   parseHexColor(trimmed); 
@@ -686,6 +745,7 @@ function main() {
     result = evaluateContract(tokens);
     mirror = verifyCssMirror(tokens, loadCssMirror());
     globalStyles = verifyGlobalStyles(loadGlobalStyles());
+    verifyScrollbarSource(loadGlobalStyles(), loadScrollbarSources());
     palette = scanPalette({ tokens });
   } catch (error) {
     console.error(`lume token check failed: ${error.message}`);
@@ -698,6 +758,7 @@ function main() {
     `CSS source app/globals.css: ${globalStyles.semanticRecipes} semantic, `
     + `${globalStyles.scrimRecipes} scrim and ${globalStyles.shadowRecipes} shadow recipes matched`,
   );
+  console.log('Scrollbar: one definition in app/globals.css, no local overrides');
   console.log(formatPaletteReport(palette));
   process.exitCode = result.pass && palette.violations.length === 0 && palette.allowlistIssues.length === 0 ? 0 : 1;
 }

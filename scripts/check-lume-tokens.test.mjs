@@ -23,6 +23,10 @@ import {
   paletteFingerprint,
   scanPalette,
   scanPaletteSource,
+  buildContract,
+  SCROLLBAR_THUMB_RATIO,
+  verifyScrollbarSource,
+  loadScrollbarSources,
 } from './check-lume-tokens.mjs';
 
 function validTokens() {
@@ -40,7 +44,7 @@ test('WCAG primitives match known reference values', () => {
 test('committed token source passes the whole contract', () => {
   const result = evaluateContract(loadTokens());
   assert.equal(result.pass, true);
-  assert.equal(result.checks.length, 134);
+  assert.equal(result.checks.length, 146);
   assert.ok(result.checks.every((c) => c.ratio >= c.minRatio));
   const bind = result.checks.find(
     (c) => c.register === 'giorno' && c.label === 'ink.muted on surface.chrome',
@@ -453,4 +457,52 @@ test('type scale permits semantic colors, roles, rem controls and scoped hiding 
   assert.deepEqual(scanTypeSource(allowed.path, `${allowed.selector} { font-size: 0; }`), []);
   assert.equal(scanTypeSource(allowed.path, '.other { font-size: 0; }').length, 1);
   assert.equal(scanTypeSource('components/other.css', `${allowed.selector} { font-size: 0; }`).length, 1);
+});
+
+test('scrollbar thumb stays findable and quiet in Giorno and Grafite', () => {
+  const thumbs = evaluateContract(validTokens()).checks.filter((c) => c.label.startsWith('scrollbar thumb'));
+  assert.equal(thumbs.length, 12);
+  for (const check of thumbs) assert.ok(check.pass, `${check.register} ${check.label}: ${check.ratio.toFixed(2)}:1`);
+});
+
+test('scrollbar thumb at full muted ink is rejected as too loud', () => {
+  const loud = buildContract().map((c) => c.label.startsWith('scrollbar thumb') ? { ...c, textWeight: 1 } : c);
+  const failed = evaluateContract(validTokens(), loud).checks.filter((c) => !c.pass);
+  assert.ok(failed.length > 0);
+  assert.ok(failed.every((c) => c.label.startsWith('scrollbar thumb') && c.ratio > SCROLLBAR_THUMB_RATIO.max));
+});
+
+test('scrollbar thumb as faint as the field rule is rejected as unfindable', () => {
+  const faint = buildContract().map((c) => c.label.startsWith('scrollbar thumb') ? { ...c, textWeight: 0.36 } : c);
+  const failed = evaluateContract(validTokens(), faint).checks.filter((c) => c.label.startsWith('scrollbar thumb'));
+  assert.ok(failed.every((c) => !c.pass && c.ratio < SCROLLBAR_THUMB_RATIO.min));
+});
+
+test('scrollbar appearance has one definition in app/globals.css', () => {
+  assert.deepEqual(verifyScrollbarSource(loadGlobalStyles(), loadScrollbarSources()), { strays: 0 });
+});
+
+test('a local scrollbar colour, webkit pseudo-element or width is rejected', () => {
+  const globalCss = loadGlobalStyles();
+  for (const source of [
+    '.list { scrollbar-color: var(--lume-ink-muted) transparent; }',
+    '.canvas::-webkit-scrollbar-thumb { background: var(--lume-ink); }',
+    '.page { overflow: auto; scrollbar-width: thin; }',
+    '<div className="[scrollbar-width:auto]" />',
+  ]) {
+    assert.throws(() => verifyScrollbarSource(globalCss, [{ relativePath: 'components/x.module.css', source }]),
+      /scrollbar appearance belongs to app\/globals\.css only/);
+  }
+  assert.deepEqual(verifyScrollbarSource(globalCss, [{ relativePath: 'components/x.module.css',
+    source: '.rail { overflow-x: auto; scrollbar-width: none; scrollbar-gutter: stable; }' }]), { strays: 0 });
+});
+
+test('global scrollbar definition must keep the measured weights', () => {
+  const globalCss = loadGlobalStyles();
+  assert.throws(() => verifyScrollbarSource(globalCss.replace('var(--lume-ink-muted) 72%', 'var(--lume-ink-muted) 100%'), []),
+    /--lume-scrollbar-thumb must be/);
+  assert.throws(() => verifyScrollbarSource(globalCss.replace('scrollbar-color: var(--lume-scrollbar-thumb) transparent;', ''), []),
+    /one :root scrollbar-color/);
+  assert.throws(() => verifyScrollbarSource(globalCss.replace('* { scrollbar-width: thin; }', ''), []),
+    /scrollbar-width: thin/);
 });

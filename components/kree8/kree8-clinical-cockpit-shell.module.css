@@ -159,8 +159,8 @@
     align-items: center;
     gap: 6px;
     -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
   }
-  .rail::-webkit-scrollbar { display: none; }
 }
 
 .brand {
@@ -449,14 +449,6 @@
 }
 
 .canvas[data-lume-context='diario'] .focusSurface { --k8-focus-wash: 1.5%; }
-
-.canvas::-webkit-scrollbar { width: 10px; }
-
-.canvas::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--lume-ink) 36%, transparent);
-  border-radius: var(--radius-pill);
-  border: 2px solid var(--lume-surface-canvas);
-}
 
 .toolbar {
   display: flex;
