@@ -7,11 +7,11 @@
     "darwin-arm64": {
       "artifact": "mediflow-voice-darwin-arm64",
       "asset": "mediflow-voice-0.9.1-darwin-arm64",
-      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-      "bytes": 0,
+      "sha256": "2d2bc0634862616daa44d187bb584595112323df0d879349e2a7dd03bfdc285b",
+      "bytes": 3026880,
       "workflow": ".github/workflows/local-voice.yml",
-      "runId": 0,
-      "commit": "",
+      "runId": 45798023040,
+      "commit": "31aef446b25423e52f3a895fac58aeab2a89e50d",
       "rustToolchain": "1.98.1",
       "signed": false
     }
