@@ -154,12 +154,27 @@ test('WUL-949: la cartella del Fascicolo entra nell’import dalla scheda, si fe
         await expect(page.getByTestId('dossier-source').filter({ hasText: '2025-03-14_LAB_' })).toContainText('Categoria: Analisi di laboratorio');
         await page.screenshot({ path: path.join(evidence, '5-nuova-scheda.png'), fullPage: true });
 
+        await page.goto(`/da-decidere?vista=documenti&patientId=${patientId}`);
+        await unlockIfNeeded(page, PIN);
+        const review = page.getByTestId('dossier-import');
+        await review.getByTestId('fse-folder').setInputFiles(folder);
+        const reviewGroup = review.getByTestId('dossier-group');
+        await expect(reviewGroup.locator('[data-source-status="already_imported"]')).toHaveCount(3, { timeout: 60_000 });
+        await expect(reviewGroup.getByLabel('Scheda di destinazione')).toHaveValue(patientId);
+        await expect(review.getByTestId('fse-cleanup')).toHaveText('Tutti i 3 file della cartella sono in MediFlow, riletti identici. Puoi cancellare la cartella dai Download.');
+        await page.screenshot({ path: path.join(evidence, '8-da-decidere-documenti.png') });
+        expect(await attachmentCount(page, patientId)).toBe(3);
+
         await switchPreset(page, 'core');
         await page.goto(`/patients/${patientId}/modules`);
         await unlockIfNeeded(page, PIN);
         await expect(page.getByRole('navigation', { name: 'Sezioni della vista', exact: true })).toBeVisible();
         await expect(page.getByTestId('fse-folder')).toHaveCount(0);
         await page.goto(`/patients/import/dossier?patientId=${patientId}`);
+        await unlockIfNeeded(page, PIN);
+        await expect(page.getByRole('button', { name: 'Scegli cartella', exact: true })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Documenti dal Fascicolo', exact: true })).toHaveCount(0);
+        await page.goto(`/da-decidere?vista=documenti&patientId=${patientId}`);
         await unlockIfNeeded(page, PIN);
         await expect(page.getByRole('button', { name: 'Scegli cartella', exact: true })).toBeVisible();
         await expect(page.getByRole('button', { name: 'Documenti dal Fascicolo', exact: true })).toHaveCount(0);
