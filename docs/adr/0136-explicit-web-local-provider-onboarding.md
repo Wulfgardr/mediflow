@@ -288,3 +288,59 @@ coincide in tutti i casi con quello sopra documentato per la 0.40.16.
 Le prime due prove esercitano anche l'intervallo oltre il vecchio limite
 CLI di 30 secondi. Sono prove HTTP del prodotto costruito, senza finestre,
 e non attestano l'interazione visiva Web o GPUI.
+
+## Compatibilità locale Ollama 0.40.18, WUL-840, 26 novembre 2026
+
+Ollama.app sul Mac di riferimento si è aggiornato da solo a 0.40.18 e main
+`25500ca7b` lo rifiuta con `provider_version_unsupported` prima di inviare
+un prompt. La versione è ora ammessa puntualmente, conservando le precedenti.
+Restano negate 0.40.17, 0.40.19, 0.40.180, 0.41.0, anteprime e suffissi build
+della 0.40.18. Non è ammesso un intervallo 0.40.x.
+
+Sono state lette le note ufficiali di
+[0.40.17](https://github.com/ollama/ollama/releases/tag/v0.40.17) e
+[0.40.18](https://github.com/ollama/ollama/releases/tag/v0.40.18) e il
+[delta da 0.40.16](https://github.com/ollama/ollama/compare/v0.40.16...v0.40.18),
+310 file confrontati sugli alberi delle due etichette. In `api/types.go`
+cambiano solo gli schemi degli strumenti, che conservano le parole chiave non
+modellate; ShowResponse, ListResponse e ProcessResponse non cambiano.
+`server/routes.go` cambia il pensiero per i modelli Harmony, gli output
+strutturati, gli offset dei media e i ruoli per Inkling 2; `server/sched.go`
+il riavvio per context shift; `server/show_safetensors.go` solo i tensori in
+modalità verbose. Nessuno di questi file tocca marker remoti, digest o
+percorsi cloud. Cambia il default di `OLLAMA_NUM_PARALLEL` da 1 a 0, cioè il
+valore del backend: su Apple silicon il server accetta più richieste insieme.
+Il resto del delta riguarda soprattutto runner MLX, renderer dei modelli,
+llama.cpp, `ollama launch`, `discover`, il middleware Anthropic e la
+documentazione cloud. Queste modifiche non sono qualificate da questa prova
+locale.
+
+Sul Mac17,10 con 48 GB, macOS 27.3 build 26C5047e, il binario installato ha
+SHA-256 `a7064306915e10abe1a5cc4276f0a9495f69f5d7984a80c76f005d21e0871c65`,
+firma Developer ID del team 3MU9H2V9Y9; `codesign --verify --deep --strict`
+dell'app è riuscita. Il daemon è quello di Ollama.app in uso, ascolta solo su
+127.0.0.1:11434, ha `OLLAMA_NO_CLOUD=1` e `disable_ollama_cloud` attivo e
+non aveva socket verso l'esterno. Non è stato riavviato: la rete del daemon
+non è limitata da una sandbox in questa prova. Comando di attivazione e
+osservatore girano in una sandbox di macOS con rete limitata a localhost; la
+sonda TCP verso 192.0.2.1:9 fallisce con EPERM. Nessun modello scaricato.
+
+Il modello già installato `qwen3.5:35b-a3b`, safetensors nvfp4, runner MLX,
+ha digest `26025611beeb3fe9e4850b1fdae686bebba7cdfa7f13ddb04955f19872ee022a`,
+lo stesso della prova 0.40.16. Con la regola di main il comando
+`setup:local-provider admit` su una cartella dati sintetica nega con
+`local_attestation_failed`, causa `provider_version_unsupported`, e non
+precarica il modello. Con la modifica lo stesso comando ammette in 17,3
+secondi a freddo, stato `available_unqualified`, senza inferenza.
+L'attestazione canonica passa versione, tags, show, precaricamento senza
+prompt e processi caricati; i tags letti prima e dopo ogni stadio mantengono
+il digest e quello dei processi caricati coincide. ShowResponse espone gli
+stessi campi osservati con la 0.40.16. L'adapter di produzione ripete i
+cinque stadi per l'operazione e restituisce un testo sintetico non vuoto, con
+risposta HTTP 200. Nessun marker remoto nelle risposte osservate.
+
+I sette nuovi casi positivi sono rossi sulla base e verdi sulla modifica; i
+casi negativi nuovi passano. La prova riguarda solo questo binario e questo
+modello. Non promuove `available_unqualified`, non attribuisce causalità al
+digest e non qualifica UI, latenza, richieste parallele, qualità clinica o uso
+clinico.
