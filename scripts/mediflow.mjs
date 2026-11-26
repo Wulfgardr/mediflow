@@ -11,7 +11,7 @@ import { checkNode, knownMainUpdates, openUrl, probeRunningInstance, readProduct
 import { verifySourceRuntime } from './source-runtime.mjs';
 import { initializeWindowsSystemCommand, windowsTaskkillCommand, windowsProcessCreationTimeTicks } from './windows-system-command.mjs';
 import { macDerivedDataDirectory } from './build-input-metadata.mjs';
-import { createChoiceServer } from './mediflow-launcher-page.mjs';
+import { createChoiceServer, launcherServices } from './mediflow-launcher-page.mjs';
 import { containWindowsWeb } from './windows-runtime-job.mjs';
 import { createRuntimeLeases, acquireRuntimeLease, recordChildOwner, verifyChildOwner, runtimeProcessIdentity } from './runtime-leases.mjs';
 import { prepareLauncherState, localUiArchiveLock } from './launcher-state.mjs';
@@ -895,7 +895,7 @@ export async function main(args = process.argv.slice(2)) {
     choose(selected, remember);
   };
   try {
-    chooser = await createChoiceServer({ root: ROOT, state: () => ({ ...state, runtimeOwner: leases?.receipt.owner ?? null }), choose,
+    chooser = await createChoiceServer({ root: ROOT, state: () => ({ ...state, services: launcherServices(state), runtimeOwner: leases?.receipt.owner ?? null }), choose,
       navigate, cancelNavigation,
       install: () => installApproval?.(true), stop: () => {
         if (preparing) throw Object.assign(new Error('Preparazione in corso. Attendi il completamento prima di arrestare MediFlow.'), { statusCode: 409 });

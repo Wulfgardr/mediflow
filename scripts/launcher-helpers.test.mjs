@@ -3631,6 +3631,7 @@ test('launcher starts the voice service, the Web receives its address and secret
     const first = await voiceSettles(f, ({ state }) => state.voice === 'ready');
     assert.match(first.web.url, /^http:\/\/127\.0\.0\.1:\d+$/u);
     assert.equal(first.web.available, true, JSON.stringify(first));
+    assert.deepEqual(first.state.services, [{ id: 'voice', title: 'Registrazione della visita', detail: 'Pronta.', ready: true }]);
     const environment = await (await fetch(first.state.url + '/fixture-env')).json();
     assert.equal(environment.MEDIFLOW_LOCAL_VOICE_URL, first.web.url);
     assert.match(environment.MEDIFLOW_LOCAL_VOICE_SECRET, /^[a-f0-9]{64}$/u);
@@ -3651,6 +3652,7 @@ test('launcher starts the voice service, the Web receives its address and secret
     process.kill(last.pid, 'SIGKILL');
     const gone = await voiceSettles(f, ({ web, state }) => web.url === null && state.voice === 'stopped');
     assert.equal(gone.web.available, false);
+    assert.equal(gone.state.services[0].detail, 'Non attiva. Riapri MediFlow per riprovare.');
     assert.deepEqual(processesRunning(binary), []);
     assert.match(f.output(), /registrazione locale non disponibile/u);
     assert.ok(!f.output().includes(secret));
@@ -3674,6 +3676,7 @@ test('without the voice binary the Web gets no voice address, even one inherited
     const { state, web } = await launcherVoice(f);
     assert.deepEqual(web, { url: null, available: false, status: null });
     assert.equal(state.voice, process.platform === 'darwin' ? 'absent' : 'unsupported');
+    assert.deepEqual(state.services.map(row => row.detail), process.platform === 'darwin' ? ['Non installata su questo Mac.'] : []);
 });
 
 test('launcher with the real voice binary and the installed model', { skip: voiceSkip || (process.env.MEDIFLOW_LOCAL_VOICE_REAL_BINARY ? false : 'MEDIFLOW_LOCAL_VOICE_REAL_BINARY non impostato'), timeout: 120_000 }, async t => {
