@@ -122,7 +122,7 @@ async function coveredControls(page: Page): Promise<string[]> {
       for (let node = element.parentElement; node; node = node.parentElement) {
         if (getComputedStyle(node).overflow === 'visible') continue;
         const box = node.getBoundingClientRect();
-        if (x < box.left || x > box.right || y < box.top || y > box.bottom) return true;
+        if (x < box.left || x >= box.right || y < box.top || y >= box.bottom) return true;
       }
       return false;
     };
