@@ -60,6 +60,7 @@
     "HomeBasePatientsClientTests.swift",
     "HomeBaseRuntimeNodeResolutionTests.swift",
     "HomeBaseRuntimeStatusTests.swift",
+    "HomeBaseTLSPinningTests.swift",
     "HomeBaseWHOClientTests.swift",
     "HomeBaseWHOContractTests.swift",
     "ICDCatalogTests.swift",
