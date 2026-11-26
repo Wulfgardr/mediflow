@@ -97,12 +97,16 @@ export function createLocalVoiceBridge({ endpoint = localVoiceEndpointFromEnv, p
 
         async create(user: string, input: { subject?: unknown; mode?: unknown; vocabulary?: unknown }): Promise<LocalVoiceReply> {
             const subject = localVoiceSubject(input.subject);
-            const mode = input.mode === 'visit' || input.mode === 'dictation' ? input.mode : null;
+            const mode: LocalVoiceMode | null = input.mode === 'visit' || input.mode === 'dictation' ? input.mode : null;
             if (!subject || !mode) return { status: 400, body: { error: 'request' } };
             const voice = connect();
             if (!voice) return { status: 503, body: { error: 'off' } };
             try {
-                const request = { mode, subject, vocabulary: vocabularyOf(input.vocabulary) };
+                const request: { mode: LocalVoiceMode; subject: string; vocabulary: string[] } = {
+                    mode,
+                    subject,
+                    vocabulary: vocabularyOf(input.vocabulary),
+                };
                 const created = await voice.create(request).catch(async (error: unknown) => {
                     const orphan = orphanOf(error);
                     if (!orphan || owners.has(orphan)) throw error;
