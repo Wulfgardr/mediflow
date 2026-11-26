@@ -15,16 +15,21 @@ import { certificatePin } from './launcher-lan-proxy.mjs';
 let fixture, lanReachable = false;
 
 async function selfReachable(address) {
-    const server = net.createServer(socket => socket.end('ok'));
+    const accepted = new Set();
+    const server = net.createServer(socket => { accepted.add(socket); socket.on('error', () => {}); socket.end('ok'); });
     await new Promise(resolve => server.listen(0, '0.0.0.0', resolve));
+    const client = net.connect({ host: address, port: server.address().port, localAddress: address });
     try {
         return await new Promise(resolve => {
-            const socket = net.connect({ host: address, port: server.address().port, localAddress: address });
-            socket.setTimeout(2000, () => { socket.destroy(); resolve(false); });
-            socket.once('data', () => { socket.destroy(); resolve(true); });
-            socket.once('error', () => resolve(false));
+            const timer = setTimeout(() => resolve(false), 2000);
+            client.once('data', () => { clearTimeout(timer); resolve(true); });
+            client.once('error', () => { clearTimeout(timer); resolve(false); });
         });
-    } finally { await new Promise(resolve => server.close(resolve)); }
+    } finally {
+        client.destroy();
+        for (const socket of accepted) socket.destroy();
+        server.close();
+    }
 }
 
 before(async () => {
