@@ -136,7 +136,7 @@ test('da «Nuova scheda»: registro una prima visita, l’anagrafica detta è pr
     const year = 1900 + birth.yearSuffix;
     await startService('ready', [
         { speaker: 'doctor', text: 'Buongiorno, è la prima volta da me: mi dice i suoi dati?' },
-        { speaker: 'patient', text: `Cognome: Bianchi. Nome: Anna. Sono nata il ${birth.day} ${months[birth.month - 1]} ${year}.` },
+        { speaker: 'patient', text: `Cognome Bianchi. Nome Anna. Sono nata il ${birth.day} ${months[birth.month - 1]} ${year}.` },
         { speaker: 'patient', text: `Codice fiscale ${taxCode}.` },
         { speaker: 'doctor', text: 'Bene, misuriamo la pressione.' },
     ]);
@@ -160,7 +160,8 @@ test('da «Nuova scheda»: registro una prima visita, l’anagrafica detta è pr
     await create.getByRole('button', { name: 'Avvia la revisione del documento' }).click();
     await expect(create.getByRole('heading', { name: 'Revisione dei dati' })).toBeVisible({ timeout: 60_000 });
     const proposals = create.getByTestId('patient-document-dossier-proposals');
-    await expect(proposals).toContainText('Cognome: Bianchi');
+    await expect(proposals).toContainText('Cognome Bianchi');
+    await expect(proposals).toContainText('Nome Anna');
     await expect(proposals).toContainText(`nata il ${birth.day} ${months[birth.month - 1]} ${year}`);
     await capture(info, page, '7-anagrafica-proposta-dalla-visita.png');
     await create.getByRole('button', { name: 'Usa tutte le proposte' }).click();

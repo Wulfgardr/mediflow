@@ -254,6 +254,37 @@ function birthMatch(text: string): [string, string, string, string] | null {
     return spoken ? [spoken[0], spoken[1], String(MONTHS.indexOf(spoken[2].toLowerCase()) + 1), spoken[3]] : null;
 }
 
+const SPOKEN_CUE = String.raw`(?:\s*[:,]\s*|\s+(?:è|fa)\s+|\s+)`;
+const SPOKEN_SURNAME = new RegExp(String.raw`\b[Cc]ognome${SPOKEN_CUE}(${NAME_TOKEN})`, 'u');
+const SPOKEN_GIVEN = new RegExp(String.raw`(?<![Cc]og)\b[Nn]ome${SPOKEN_CUE}(${NAME_TOKEN})`, 'u');
+const NAME_WORD = String.raw`(?!${LABEL_WORD})[A-ZÀ-Ý][A-Za-zÀ-ÿ'’]+`;
+const SPOKEN_CALLED = new RegExp(String.raw`\b[MmSs]i\s+chiam[oa]\s+(${NAME_WORD})((?:\s+${NAME_WORD}){0,2})`, 'u');
+const RELATIVE = /\b(?:moglie|marit[oi]|figli[oae]?|madre|padre|mamma|papà|genitori|fratell[oi]|sorell[ae]|nonn[oai]|zi[oa]|nipot[ei]|cugin[oai]|compagn[oa]|fidanzat[oa]|suocer[oa]|cognat[oa]|genero|nuora|badante|vicin[oa]|amic[oa]|parente)\b/iu;
+
+/**
+ * Forme parlate dell'anagrafica, solo per la trascrizione di una visita: «Cognome Bianchi», «di nome Anna»,
+ * «mi chiamo Anna Bianchi». Una frase che nomina un familiare non propone nulla per il paziente.
+ */
+export function proposeSpokenIdentityFields(text: string, patientTaxCode: string | null): DossierIdentityProposal[] {
+    const proposals = proposeIdentityFields(text, patientTaxCode);
+    const offer = (field: DossierIdentityProposal['field'], value: string, excerpt: string) => {
+        if (!proposals.some((proposal) => proposal.field === field)) proposals.push({ field, value: value.trim(), excerpt: excerpt.trim() });
+    };
+    for (const sentence of text.split(/[.!?;\n]+/u)) {
+        if (RELATIVE.test(sentence)) continue;
+        const surname = SPOKEN_SURNAME.exec(sentence);
+        if (surname) offer('lastName', surname[1], surname[0]);
+        const given = SPOKEN_GIVEN.exec(sentence);
+        if (given) offer('firstName', given[1], given[0]);
+        const called = SPOKEN_CALLED.exec(sentence);
+        if (called) {
+            offer('firstName', called[1], called[0]);
+            if (called[2].trim()) offer('lastName', called[2], called[0]);
+        }
+    }
+    return proposals;
+}
+
 /** Proposte d'anagrafica da etichette esplicite: il medico le inserisce solo con un gesto. */
 export function proposeIdentityFields(text: string, patientTaxCode: string | null): DossierIdentityProposal[] {
     const proposals: DossierIdentityProposal[] = [];
