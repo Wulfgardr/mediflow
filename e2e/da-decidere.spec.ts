@@ -180,7 +180,7 @@ test('a therapy from a prescription without a stated status asks the physician, 
     await openDaDecidere(page, isolatedRuntime.url);
     const visit = page.getByRole('region', { name: 'Visita ' + visitId });
     const proposal = visit.locator('article').filter({ has: page.getByRole('heading', { name: 'Terapia proposta', exact: true }) });
-    await expect(proposal.getByText('Il documento non indica lo stato della terapia: sceglilo prima di tenerla.', { exact: true })).toBeVisible({ timeout: 30000 });
+    await expect(proposal.getByText('Il documento non indica lo stato della terapia: sceglilo.', { exact: true })).toBeVisible({ timeout: 30000 });
     await expect(proposal.getByText(/status|Campo obbligatorio|non valido/u)).toHaveCount(0);
     await expect(proposal.getByText('Manca lo stato', { exact: true })).toBeVisible();
     await expect(proposal.getByRole('heading', { name: 'Terapia proposta', exact: true })).toBeVisible();

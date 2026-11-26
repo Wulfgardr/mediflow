@@ -173,3 +173,28 @@ test('a therapy whose source states the status is kept as deposited, without ask
         assert.equal(JSON.parse(String(await f.opened(kept.item.values.motivation))).physicianFields, undefined);
     } finally { get.mock.restore(); query.mock.restore(); f.close(); }
 });
+
+test('a first visit with a prescription therapy without status waits for the physician choice, then the whole visit carries that status', async () => {
+    const f = await fixture({ kind: 'therapy', values: { drugName: 'FARMACO SINTETICO 150MG' }, quote: recipeQuote });
+    try {
+        const signal = new AbortController().signal;
+        const review = await inspectAgentVisit(f.row(), [], null, signal, pdfText(recipeText), 'synthetic-ambulatory');
+        assert.ok(review.newPatient);
+        assert.deepEqual(review.itemNeeds.get(f.proposalId), ['status']);
+        assert.equal(agentItemAwaitsDecision(review, f.proposalId), false);
+        assert.equal(agentVisitAwaitsReview(review), false);
+        assert.equal(await prepareAgentApplication(review, signal), null);
+        assert.equal(agentVisitAwaitsReview(review, { [f.proposalId]: { status: 'attiva' } }), false);
+        assert.equal(await prepareAgentApplication(review, signal, { [f.proposalId]: { status: 'attiva' } }), null);
+        const choices = { [f.proposalId]: { status: 'suspended', drugName: 'Altro', dosage: '1 compressa' } };
+        assert.equal(agentVisitAwaitsReview(review, choices), true);
+        const plan = await prepareAgentApplication(review, signal, choices);
+        assert.ok(plan && plan.newPatient?.taxCode === cf);
+        const therapy = plan.items.find(item => item.id === f.proposalId);
+        assert.ok(therapy && therapy.kind === 'therapy');
+        assert.equal(therapy.values.status, 'suspended');
+        assert.equal(therapy.values.drugName, 'FARMACO SINTETICO 150MG');
+        assert.equal(therapy.values.dosage, 'non indicata nel documento');
+        assert.deepEqual(JSON.parse(String(await f.opened(therapy.values.motivation))).physicianFields, ['status']);
+    } finally { f.close(); }
+});

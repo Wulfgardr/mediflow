@@ -23,7 +23,7 @@ function Filters({ view, visits }: { view: DaDecidereView; visits: number }) {
 function UnlockedDaDecidere({ view, patientId }: { view: DaDecidereView; patientId: string | null }) {
     const snapshot = useSyncExternalStore(subscribeAgentIncoming, agentIncomingSnapshot, agentIncomingServerSnapshot);
     const { visits, busy, error } = snapshot;
-    const applicable = visits.filter(agentVisitAwaitsReview);
+    const applicable = visits.filter(review => agentVisitAwaitsReview(review));
     const blockedCount = visits.length - applicable.length;
     const meta = view === 'visite' && visits.length > 0 ? <>
         {applicable.length === 1 ? '1 visita pronta' : `${applicable.length} visite pronte`}

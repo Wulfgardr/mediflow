@@ -21,7 +21,8 @@ export type AgentVisitReview = { visit: Omit<OpenedAgentVisit, 'cassette'> & { c
 export const AGENT_THERAPY_STATUSES = ['active', 'suspended', 'completed'] as const;
 const AGENT_PHYSICIAN_FIELD_VALUES = { status: AGENT_THERAPY_STATUSES } as const;
 export type AgentPhysicianField = keyof typeof AGENT_PHYSICIAN_FIELD_VALUES;
-export const AGENT_THERAPY_STATUS_NEEDED = 'Il documento non indica lo stato della terapia: sceglilo prima di tenerla.';
+export const AGENT_THERAPY_STATUS_NEEDED = 'Il documento non indica lo stato della terapia: sceglilo.';
+export type AgentPhysicianChoices = Readonly<Record<string, Record<string, string>>>;
 type ReviewItem = AgentVisitReview['visit']['items'][number];
 export const agentItemDecided = (review: Pick<AgentVisitReview, 'appliedItemIds' | 'discardedItemIds'>, itemId: string) =>
     review.appliedItemIds.includes(itemId) || review.discardedItemIds.includes(itemId);
@@ -149,8 +150,12 @@ export async function reopenReviewedAgentItems(review: AgentVisitReview, row: In
     }
     return visit.items.map((item, index) => item.kind === 'pdf' ? item : review.visit.items[index]!);
 }
-export function agentVisitAwaitsReview(review: AgentVisitReview): boolean {
-    return review.visit.cassette.status === 'closed' && Boolean(review.patient?.version || review.newPatient) && !review.blockers.length && !review.proposalBlockers.length
+function physicianChoicesComplete(review: AgentVisitReview, choices: AgentPhysicianChoices): boolean {
+    return [...review.itemNeeds].every(([itemId, fields]) => agentItemDecided(review, itemId) || suppliedPhysicianValues(fields, choices[itemId] ?? {}) !== null);
+}
+export function agentVisitAwaitsReview(review: AgentVisitReview, choices: AgentPhysicianChoices = {}): boolean {
+    return review.visit.cassette.status === 'closed' && Boolean(review.patient?.version || review.newPatient) && !review.blockers.length
+        && review.proposalBlockers.every(message => message === AGENT_THERAPY_STATUS_NEEDED) && physicianChoicesComplete(review, choices)
         && review.visit.items.some(item => !agentItemDecided(review, item.id));
 }
 export function agentItemAwaitsDecision(review: AgentVisitReview, itemId: string): boolean {
@@ -158,18 +163,21 @@ export function agentItemAwaitsDecision(review: AgentVisitReview, itemId: string
         && review.visit.items.some(item => item.id === itemId) && !agentItemDecided(review, itemId);
 }
 
-export async function prepareAgentApplication(review: AgentVisitReview, signal: AbortSignal): Promise<ReviewedAgentApplicationInput | null> {
-    if (!agentVisitAwaitsReview(review)) return null;
+export async function prepareAgentApplication(review: AgentVisitReview, signal: AbortSignal, choices: AgentPhysicianChoices = {}): Promise<ReviewedAgentApplicationInput | null> {
+    if (!agentVisitAwaitsReview(review, choices)) return null;
     const patient = review.patient ? await db.patients.get(review.patient.id, { signal }) : null;
     if (review.patient && (!patient || patient.deletedAt || patient.isArchived
         || patient.taxCode.trim().toUpperCase() !== review.visit.anchor.fiscalCode || !patient.version)) return null;
     if (patient && patient.version !== review.patient?.version) throw new Error('La scheda è cambiata. Rileggi le differenze prima di applicare la visita.');
-    const selected = review.visit.items.filter(item => !agentItemDecided(review, item.id));
+    const selected = review.visit.items.filter(item => !agentItemDecided(review, item.id)).map(item => {
+        const supplied = suppliedPhysicianValues(review.itemNeeds.get(item.id) ?? [], choices[item.id] ?? {});
+        return supplied && Object.keys(supplied).length ? { ...item, value: { ...item.value, values: { ...values(item), ...supplied } } } : item;
+    });
     const profile = withProposedProfile(patient, selected);
     const prepared: unknown[] = [];
     for (const item of selected) {
         signal.throwIfAborted();
-        prepared.push(await prepareAgentItem(review, item, profile));
+        prepared.push(await prepareAgentItem(review, item, profile, false, review.itemNeeds.get(item.id) ?? []));
     }
     signal.throwIfAborted();
     return reviewedAgentApplicationSchema.parse({ visitId: review.visit.cassette.id, phase: 'review',

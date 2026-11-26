@@ -4,7 +4,7 @@ import { clientArchiveGeneration } from './security/client-auth-api';
 import { db } from './db';
 import { notifyDbChange } from './live-query';
 import { openAgentVisit } from './agent-cassette-client';
-import { agentItemDecided, agentVisitAwaitsReview, inspectAgentVisit, prepareAgentApplication, prepareAgentItemDecision, reopenReviewedAgentItems, type AgentVisitReview } from './agent-visit-review';
+import { agentItemDecided, agentVisitAwaitsReview, type AgentPhysicianChoices, inspectAgentVisit, prepareAgentApplication, prepareAgentItemDecision, reopenReviewedAgentItems, type AgentVisitReview } from './agent-visit-review';
 import { agentVisitPresentation, sealVisitConfirmationPresentation } from './agent-visit-confirmation-browser';
 import type { VisitConfirmationTicket } from './agent-visit-confirmation-contract';
 import type { AgentApplicationReceipt, AgentCassetteIndexPage, AgentItemDecision, AgentItemDecisionReceipt, IncomingAgentCassette } from './agent-visit-application-contract';
@@ -52,8 +52,8 @@ async function reopenForApplication(review: AgentVisitReview, signal: AbortSigna
     if (!items) throw new Error(notApplied);
     return { ...review, appliedItemIds: row.appliedItemIds, discardedItemIds: row.discardedItemIds ?? [], correctedItemIds: row.correctedItemIds ?? [], visit: { ...review.visit, items } };
 }
-async function apply(review: AgentVisitReview, signal: AbortSignal) {
-    const input = await prepareAgentApplication(review, signal);
+async function apply(review: AgentVisitReview, signal: AbortSignal, choices: AgentPhysicianChoices) {
+    const input = await prepareAgentApplication(review, signal, choices);
     if (!input) throw new Error(notApplied);
     signal.throwIfAborted();
     const response = await fetch(inbox, { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -74,7 +74,7 @@ export async function attemptNativeConfirmation(signal: AbortSignal, readPdf?: P
     const ticket: VisitConfirmationTicket | null = await offer.json();
     if (!ticket) return;
     const existing = snapshot.visits.find(review => review.visit.cassette.id === ticket.visitId && review.visit.cassette.revision === ticket.revision);
-    if (!existing?.patient?.version || existing.blockers.length || existing.proposalBlockers.length
+    if (!existing?.patient?.version || existing.blockers.length || existing.proposalBlockers.length || existing.itemNeeds.size
         || existing.visit.items.some(item => agentItemDecided(existing, item.id))) return;
     const send = (input: unknown) => fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' },
         signal, body: JSON.stringify(input) });
@@ -166,7 +166,7 @@ export function startAgentIncoming(): () => void {
     void run();
     return () => { controller.abort(); clearTimeout(timer); publish(empty); };
 }
-export async function applyReviewedAgentVisits(ids: string[]): Promise<void> {
+export async function applyReviewedAgentVisits(ids: string[], choices: AgentPhysicianChoices = {}): Promise<void> {
     const signal = db.getSessionReadSignal();
     while (inFlight) await inFlight;
     signal.throwIfAborted();
@@ -183,13 +183,13 @@ export async function applyReviewedAgentVisits(ids: string[]): Promise<void> {
                 const created = newPatient && createdPatients.get(newPatient.taxCode);
                 const patient = review.patient ?? created;
                 try {
-                    if (!agentVisitAwaitsReview(review)) throw new Error(notApplied);
+                    if (!agentVisitAwaitsReview(review, choices)) throw new Error(notApplied);
                     const reopened = await reopenForApplication(review, signal);
                     if (created && newPatient?.birthDate && created.birthDate?.toISOString().slice(0, 10) !== newPatient.birthDate) throw new Error(notApplied);
                     const known = patient && versions.get(patient.id);
                     const expectedVersion = known?.reviewed === patient?.version ? known?.committed : patient?.version;
                     const current = patient ? { ...reopened, patient: { ...patient, version: expectedVersion }, newPatient: null } : reopened;
-                    const applied = await apply(current, signal);
+                    const applied = await apply(current, signal, choices);
                     if (applied.patient?.version) {
                         if (newPatient) createdPatients.set(newPatient.taxCode, applied.patient);
                         if (patient?.version) versions.set(patient.id, { reviewed: patient.version, committed: applied.patient.version });

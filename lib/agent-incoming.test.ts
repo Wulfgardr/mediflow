@@ -466,3 +466,39 @@ test('L6: a note without any PDF, or a PDF whose text cannot be read, blocks the
         assert.deepEqual(agentAppliedItemIds(visitId), []);
     }
 });
+
+test('a therapy without a stated status keeps the native confirmation out; «Applica la visita» writes it once with the status the physician chose', async () => {
+    const therapies = mock.method(db.therapies, 'query', () => ({ toArray: async () => [] }));
+    try {
+        await withNativeConfirmation(async (_agreement, shownPlans, actions) => {
+            posts.length = 0;
+            const line = 'FARMACO SINTETICO 150MG 28 compresse';
+            const recipe = syntheticPdf('Paziente CF ' + cf + '\nData Prescrizione: 23/11/2026\nRp/\n' + line);
+            const f = await depositCassette('local', false, [
+                { kind: 'pdf', value: { name: 'ricetta.pdf' }, pdf: recipe },
+                { kind: 'therapy', value: { values: { drugName: 'FARMACO SINTETICO 150MG' }, quote: line, source: { sha256: pdfHash(recipe), fileName: 'ricetta.pdf' } } },
+            ]);
+            const therapyId = f.ids[1]!;
+            await refreshAgentIncoming(db.getSessionReadSignal(), contentReadPdf);
+            const before = snapshot();
+            assert.equal(startVisitConfirmation(f.principal, f.visitId).status, 'waiting');
+            await attemptNativeConfirmation(db.getSessionReadSignal(), contentReadPdf);
+            assert.equal(shownPlans.length, 0);
+            assert.deepEqual(actions, []);
+            assert.equal(posts.length, 0);
+            assert.deepEqual(snapshot(), before);
+            const shown = shownVisit(f.visitId)!;
+            assert.equal(agentVisitAwaitsReview(shown), false);
+            await applyReviewedAgentVisits([f.visitId]);
+            assert.equal(posts.length, 0);
+            await refreshAgentIncoming(db.getSessionReadSignal(), contentReadPdf);
+            await applyReviewedAgentVisits([f.visitId], { [therapyId]: { status: 'active' } });
+            assert.deepEqual(agentAppliedItemIds(f.visitId).sort(), [...f.ids].sort());
+            assert.deepEqual(database.prepare('SELECT patient_id AS patientId, status FROM therapies WHERE id=?').all(therapyId), [{ patientId: fixture.patientId, status: 'active' }]);
+            assert.equal(database.prepare("SELECT count(*) FROM audit_events WHERE event_type='therapy.created' AND subject_ref=?").pluck().get(therapyId), 1);
+            assert.equal(visitApplied(f.visitId).length, 1);
+            await applyReviewedAgentVisits([f.visitId], { [therapyId]: { status: 'active' } });
+            assert.equal(database.prepare('SELECT count(*) FROM therapies WHERE id=?').pluck().get(therapyId), 1);
+        });
+    } finally { therapies.mock.restore(); }
+});

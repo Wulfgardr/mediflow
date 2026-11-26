@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { CircleDashed, FileText, Inbox, NotebookPen } from 'lucide-react';
 import { taxCodeBirthDetails } from '@/lib/patient-identity';
 import { applyReviewedAgentVisits, decideAgentVisitItem, readIncomingAgentPdf } from '@/lib/agent-incoming';
-import { AGENT_CORRECTABLE_FIELDS, AGENT_THERAPY_STATUSES, AGENT_THERAPY_STATUS_NEEDED, agentCorrectionDropsDrugCodes, agentItemAwaitsDecision, agentItemCorrectable, agentVisitAwaitsReview, type AgentVisitReview } from '@/lib/agent-visit-review';
+import { AGENT_CORRECTABLE_FIELDS, AGENT_THERAPY_STATUSES, AGENT_THERAPY_STATUS_NEEDED, agentCorrectionDropsDrugCodes, agentItemAwaitsDecision, agentItemDecided, agentItemCorrectable, agentVisitAwaitsReview, type AgentVisitReview } from '@/lib/agent-visit-review';
 import type { AgentItemDecision } from '@/lib/agent-visit-application-contract';
 import { AGENT_DOSAGE_NOT_STATED, agentReviewDisplayValue, agentReviewDocumentLabel, agentReviewFieldLabels as fieldLabels, agentReviewFieldValues as fieldValues,
     agentReviewItemLabels, agentReviewShownFields } from '@/lib/agent-visit-review-labels';
@@ -146,7 +146,7 @@ export function VisitQueue({ visits, busy, applicationError }: Snapshot) {
     const decide = async (visitId: string, itemId: string, decision: AgentItemDecision, correction?: Record<string, string>) => {
         if (await decideAgentVisitItem(visitId, itemId, decision, correction)) setCorrecting(null);
     };
-    const applicable = visits.filter(agentVisitAwaitsReview);
+    const choices = Object.fromEntries(Object.entries(chosenStatus).map(([itemId, status]) => [itemId, { status }]));
     const generalApplicationError = applicationError && !visits.some(({ visit }) => visit.cassette.id === applicationError.visitId)
         ? applicationError.message : null;
 
@@ -181,10 +181,10 @@ export function VisitQueue({ visits, busy, applicationError }: Snapshot) {
             const proposals = pending.filter(item => item.kind !== 'pdf' && item.kind !== 'note' && item.kind !== 'transcription');
             const itemError = applicationError?.visitId === visit.cassette.id && applicationError.itemId ? applicationError : null;
             const visitError = applicationError?.visitId === visit.cassette.id && !applicationError.itemId ? applicationError.message : null;
-            const itemsBlocked = !review.blockers.length && review.proposalBlockers.length > 0;
+            const isApplicable = agentVisitAwaitsReview(review, choices);
+            const itemsBlocked = !review.blockers.length && !isApplicable && review.proposalBlockers.length > 0;
             const actionMessages = [...review.blockers, ...(itemsBlocked ? ['Decidi prima le voci segnate.'] : []), ...(visitError ? [visitError] : [])];
             const actionMessagesId = `visita-${visit.cassette.id}-esito`;
-            const isApplicable = applicable.includes(review);
             const fiscalCode = typeof visit.anchor.fiscalCode === 'string' ? visit.anchor.fiscalCode : null;
             const birth = review.newPatient && taxCodeBirthDetails(review.newPatient.taxCode);
             const hasPatientName = Boolean(review.patient && (review.patient.firstName || review.patient.lastName));
@@ -329,7 +329,7 @@ export function VisitQueue({ visits, busy, applicationError }: Snapshot) {
                                     {itemBlockers.map(message => <p key={message} className={css.itemBlocker}>{message}</p>)}
                                     {review.itemNeeds.get(item.id)?.includes('status') && correcting !== item.id ? <>
                                         <p className={css.itemBlocker}>{AGENT_THERAPY_STATUS_NEEDED}</p>
-                                        {agentItemAwaitsDecision(review, item.id) ? <StatusChoice item={item} chosen={chosenStatus[item.id]} busy={busy}
+                                        {visit.cassette.status === 'closed' && !review.blockers.length && !agentItemDecided(review, item.id) ? <StatusChoice item={item} chosen={chosenStatus[item.id]} busy={busy}
                                             onChoose={status => setChosenStatus(current => ({ ...current, [item.id]: status }))} /> : null}
                                     </> : null}
                                     {correcting === item.id ? null : gestures(item)}
@@ -379,7 +379,7 @@ export function VisitQueue({ visits, busy, applicationError }: Snapshot) {
                         </span>
                         <button type="button" className={isApplicable ? 'mf-button-primary' : 'mf-button-secondary'} disabled={busy || !isApplicable}
                             aria-describedby={actionMessages.length > 0 ? actionMessagesId : undefined}
-                            onClick={() => { void applyReviewedAgentVisits([visit.cassette.id]); }}>
+                            onClick={() => { void applyReviewedAgentVisits([visit.cassette.id], choices); }}>
                             Applica la visita
                         </button>
                     </div>
