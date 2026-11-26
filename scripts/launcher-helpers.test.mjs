@@ -536,6 +536,7 @@ test('a verified instance stays valid when the local browser cannot be opened', 
 
 
 import http from 'node:http';
+import https from 'node:https';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { atomicJson, buildDecision, claimLauncher, releaseLauncher, findExistingInstance, needsTextMenu, parseArguments, requireFreePort, selectChoice, stopOwnedChild, textualChoice } from './mediflow.mjs';
@@ -1615,6 +1616,12 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                 }
             };
             cp.spawn = (executable, argv, options) => {
+                if (executable === process.execPath && argv.length === 1 && argv[0] === ${JSON.stringify(path.join(source, 'scripts/local-api-tls-proxy.mjs'))}) {
+                    const proxy = spawn(executable, argv, options);
+                    record({type:'lan-proxy-created',pid:proxy.pid});
+                    proxy.once('exit',()=>record({type:'lan-proxy-exit',pid:proxy.pid}));
+                    return proxy;
+                }
                 if (executable === '/usr/bin/sandbox-exec' && process.env.MEDIFLOW_LOCAL_VOICE_BINARY && argv.at(-1) === process.env.MEDIFLOW_LOCAL_VOICE_BINARY) {
                     const service = spawn(executable, argv, options);
                     record({type:'voice-created',pid:service.pid});
@@ -1855,13 +1862,16 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                 return result;
             }});`);
     }
-    for (const name of ['local-ui-navigation-deadline.mjs', 'mediflow.mjs', 'windows-system-command.mjs', 'mediflow-launcher-page.mjs', 'launcher-state.mjs', 'runtime-leases.mjs', 'windows-runtime-job-deadlines.mjs', 'windows-runtime-job.mjs', 'windows-runtime-job-helper.mjs', 'local-ui-web-identity.mjs', 'local-ui-pairing-transport.mjs', 'local-voice-service.mjs', 'local-voice-web-endpoint.mjs']) {
+    for (const name of ['local-ui-navigation-deadline.mjs', 'mediflow.mjs', 'windows-system-command.mjs', 'mediflow-launcher-page.mjs', 'launcher-state.mjs', 'runtime-leases.mjs', 'windows-runtime-job-deadlines.mjs', 'windows-runtime-job.mjs', 'windows-runtime-job-helper.mjs', 'local-ui-web-identity.mjs', 'local-ui-pairing-transport.mjs', 'local-voice-service.mjs', 'local-voice-web-endpoint.mjs', 'launcher-lan-proxy.mjs']) {
         const rawBytes = readFileSync(path.join(repoRoot, 'scripts', name), 'utf8');
         const bytes = name === 'mediflow.mjs' && !lifecycle?.job
             ? rawBytes.replaceAll("choice === 'web' && process.platform === 'win32'", 'false') : lifecycle?.job === 'simulated' && name === 'mediflow.mjs'
                 ? rawBytes.replaceAll("choice === 'web' && process.platform === 'win32'", "choice === 'web'") : rawBytes;
         writeFileSync(path.join(source, 'scripts', name), name === 'mediflow.mjs' ? bytes.replace('const startOptionalOllama = () => {', 'const startOptionalOllama = () => { process.stderr.write(\"FIXTURE_OLLAMA_START\\n\"); return;') : bytes);
     }
+    mkdirSync(path.join(source, 'lib/security'), { recursive: true });
+    for (const name of ['network-ingress-policy.mjs', 'loopback-ingress.mjs']) writeFileSync(path.join(source, 'lib/security', name), readFileSync(path.join(repoRoot, 'lib/security', name)));
+    writeFileSync(path.join(source, 'scripts/local-api-tls-proxy.mjs'), readFileSync(path.join(repoRoot, 'scripts/local-api-tls-proxy.mjs')));
     mkdirSync(path.join(source, 'lib/local-voice'), { recursive: true });
     writeFileSync(path.join(source, 'lib/local-voice/client.mjs'), readFileSync(path.join(repoRoot, 'lib/local-voice/client.mjs')));
     mkdirSync(path.join(source, 'scripts/windows-launcher-bootstrap'), { recursive: true });
@@ -1924,6 +1934,13 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                     res.end(JSON.stringify({ok})); return; }
                 if (_req.url === '/fixture-lock') { live = false; pairing().snapshot(); res.end('{}'); return; }
                 if (_req.url === '/fixture-env') { res.end(JSON.stringify(process.env)); return; }
+                if (_req.url === '/api/system/network-overview') {
+                    const token = fs.existsSync(process.env.MEDIFLOW_DATA_DIR + '/local-api-token') ? fs.readFileSync(process.env.MEDIFLOW_DATA_DIR + '/local-api-token', 'utf8').trim() : null;
+                    if (!token || _req.headers.authorization !== 'Bearer ' + token) { res.writeHead(401); res.end('{}'); return; }
+                    const mode = fs.existsSync(process.env.MEDIFLOW_DATA_DIR + '/fixture-network-mode') ? fs.readFileSync(process.env.MEDIFLOW_DATA_DIR + '/fixture-network-mode', 'utf8').trim() : 'local-only';
+                    res.setHeader('Content-Type', 'application/json');
+                    res.end(JSON.stringify({ session: { operatingMode: mode, pairingState: 'required' } })); return;
+                }
                 if (_req.url === '/fixture-voice') {
                     const endpoint = localVoiceEndpointFromEnv();
                     const status = endpoint ? await localVoiceClient(endpoint).status().catch(error => ({ error: error.code })) : null;
@@ -3737,4 +3754,47 @@ test('a voice service that falls or restarts while the Web starts never leaves t
       console.log('ok');
     `], {encoding:'utf8',timeout:10000});
     assert.equal(result.status, 0, result.stdout + result.stderr);
+});
+
+test('launcher keeps the iPhone proxy on only while the Web is in home-base mode and stops it with MediFlow', { skip: process.platform === 'win32' ? 'openssl non garantito su Windows' : false, timeout: 60_000 }, async t => {
+    const tlsPort = await reservedNonEphemeralPort();
+    const f = await ordinaryLauncherFixture(t, 'web', [], true, true, { MEDIFLOW_TLS_PORT: String(tlsPort) });
+    writeFileSync(path.join(f.data, 'local-api-token'), crypto.randomBytes(32).toString('hex'), { mode: 0o600 });
+    await f.until(() => f.output().includes('Pronto:'));
+    const receipt = JSON.parse(readFileSync(launcherReceiptFile(f.stateFiles.lockDirectory)));
+    const state = async () => (await fetch(new URL('state', receipt.choiceUrl))).json();
+    const settle = async predicate => { for (let i = 0; i < 200; i++) { const value = await state(); if (predicate(value)) return value; await new Promise(r => setTimeout(r, 50)); } assert.fail(JSON.stringify(await state()) + f.output()); };
+    const off = await settle(value => value.lan.state === 'off');
+    assert.deepEqual(off.services.find(row => row.id === 'lan'), { id: 'lan', title: 'iPhone e iPad', detail: 'Spento. Si accende con «Abilita home-base» nelle Impostazioni.', ready: false });
+    assert.equal(existsSync(path.join(f.data, 'runtime-status.json')), false);
+    assert.ok(!f.observations().some(event => event.type === 'lan-proxy-created'));
+
+    writeFileSync(path.join(f.data, 'fixture-network-mode'), 'network-home-base');
+    const on = await settle(value => value.lan.state === 'on');
+    assert.equal(on.lan.port, tlsPort);
+    assert.equal(on.services.find(row => row.id === 'lan').detail, 'Acceso. Nessun dispositivo abbinato: «Collega un dispositivo» nelle Impostazioni.');
+    const published = JSON.parse(readFileSync(path.join(f.data, 'runtime-status.json'), 'utf8'));
+    assert.equal(published.port, tlsPort);
+    assert.equal(published.bindHost, '0.0.0.0');
+    const forwarded = await new Promise((resolve, reject) => {
+        const request = https.request({ host: '127.0.0.1', port: tlsPort, path: '/api/auth/check', rejectUnauthorized: false }, response => {
+            response.resume(); resolve({ status: response.statusCode, pin: response.socket.getPeerCertificate().fingerprint256.replaceAll(':', '').toLowerCase() });
+        });
+        request.once('error', reject); request.end();
+    });
+    assert.deepEqual(forwarded, { status: 200, pin: published.tlsPin });
+
+    writeFileSync(path.join(f.data, 'fixture-network-mode'), 'local-only');
+    await settle(value => value.lan.state === 'off');
+    assert.equal(existsSync(path.join(f.data, 'runtime-status.json')), false);
+    writeFileSync(path.join(f.data, 'fixture-network-mode'), 'network-home-base');
+    await settle(value => value.lan.state === 'on');
+    const created = f.observations().filter(event => event.type === 'lan-proxy-created').map(event => event.pid);
+    assert.equal(created.length, 2);
+    const stop = new URL('stop', receipt.choiceUrl);
+    assert.equal((await fetch(stop, { method: 'POST', headers: { Origin: stop.origin, 'Content-Type': 'application/json' }, body: '{}' })).status, 200);
+    await f.closed;
+    for (const pid of created) assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' }, `proxy ${pid} still running`);
+    assert.equal(existsSync(path.join(f.data, 'runtime-status.json')), false);
+    assert.equal(existsSync(path.join(f.data, 'local-api-tls-proxy.pid')), false);
 });
