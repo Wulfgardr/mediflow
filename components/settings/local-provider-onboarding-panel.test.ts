@@ -21,7 +21,7 @@ test('mounted panel: inert initial read, single explicit click, refresh, recover
         define: { 'process.env.NODE_ENV': '"test"' }, tsconfig: path.resolve('tsconfig.json') }).outputFiles[0].text;
     let status = { provider: 'ollama', credentialClass: 'local_model', model: 'synthetic-local', state: 'missing', revision: 'a'.repeat(64),
         version: 0, receipt: null as string | null, canActivate: true, inference: 'not_run', qualification: 'not_assessed' };
-    let posts = 0; let functions = 0; let fail: false | 'unreachable' | 'version' = false;
+    let posts = 0; let functions = 0; let fail: false | 'unreachable' | 'version' | 'field' = false;
     let releaseFirstPost!: () => void;
     const firstPost = new Promise<void>(resolve => { releaseFirstPost = resolve; });
     const server = createServer(async (req, res) => {
@@ -36,10 +36,12 @@ test('mounted panel: inert initial read, single explicit click, refresh, recover
                 // Keep the first request pending until the UI's in-flight state has been observed.
                 if (posts === 1) await firstPost;
                 if (fail) {
-                    res.statusCode = fail === 'version' ? 409 : 503;
+                    res.statusCode = fail === 'unreachable' ? 503 : 409;
                     res.end(JSON.stringify(fail === 'version'
                         ? { error: 'provider_version_unsupported', versionMismatch: { serverVersion: '0.41.0', supportedVersions: '0.32.x, 0.33.3, 0.34.2, 0.40.4' } }
-                        : { error: 'provider_unreachable' })); return;
+                        : fail === 'field'
+                            ? { error: 'provider_field_unknown', unknownField: { serverVersion: '0.40.25', endpoint: 'show', field: 'cloud_route' } }
+                            : { error: 'provider_unreachable' })); return;
                 }
                 status = { ...status, state: 'available_unqualified', version: status.version + 1, receipt: 'receipt_' + 'a'.repeat(32) };
             }
@@ -79,10 +81,14 @@ test('mounted panel: inert initial read, single explicit click, refresh, recover
         await expect(page.getByRole('status')).toContainText('Versioni ammesse: 0.32.x, 0.33.3, 0.34.2, 0.40.4');
         await expect(page.getByRole('status')).toContainText('Aggiorna MediFlow o installa una versione di Ollama ammessa');
         await expect(page.getByRole('status')).not.toContainText('non è raggiungibile');
+        fail = 'field';
+        await page.getByRole('button', { name: 'Riprendi dalla lettura dello stato' }).click();
+        await page.getByRole('button', { name: 'Verifica e recupera locale' }).click();
+        await expect(page.getByRole('status')).toHaveText('Ollama 0.40.25 risponde con un campo che MediFlow non conosce: cloud_route in /api/show. Le funzioni locali restano spente finché un aggiornamento di MediFlow non lo ammette.');
         fail = false; status = { ...status, state: 'revoked', canActivate: false };
         await page.getByRole('button', { name: 'Riprendi dalla lettura dello stato' }).click();
         await expect(page.getByRole('status')).toContainText('non può riattivarlo');
-        await expect(activate).toBeDisabled(); assert.equal(posts, 3);
+        await expect(activate).toBeDisabled(); assert.equal(posts, 4);
     } finally { releaseFirstPost(); await browser?.close(); server.closeAllConnections(); await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())); }
 });
 

@@ -202,7 +202,7 @@ test('ambiguous duplicate intent is invalid JSON input, not a second activation 
     assert.equal(attest.mock.callCount(), 0); assert.equal(fs.existsSync(path.join(root, 'ai')), false);
 });
 
-for (const serverVersion of ['0.40.4', '0.41.0']) test(`route con attestazione canonica e Ollama ${serverVersion}`, async () => {
+for (const serverVersion of ['0.40.4', '0.41.0', '0.40.25']) test(`route con attestazione canonica e Ollama ${serverVersion}`, async () => {
     const canonicalAttestor = locality.attestLocalOllamaModel;
     const attest = fixture();
     attest.mock.mockImplementation(canonicalAttestor);
@@ -212,7 +212,7 @@ for (const serverVersion of ['0.40.4', '0.41.0']) test(`route con attestazione c
         const model = { name: 'synthetic-local', model: 'synthetic-local', size: 4096, digest: 'a'.repeat(64) };
         if (pathname === '/api/version') return Response.json({ version: serverVersion });
         if (pathname === '/api/tags' || pathname === '/api/ps') return Response.json({ models: [model] });
-        if (pathname === '/api/show') return Response.json({ details: { family: 'synthetic' } });
+        if (pathname === '/api/show') return Response.json({ details: { family: 'synthetic' }, ...(serverVersion === '0.40.25' ? { cloud_route: 'remote' } : {}) });
         if (pathname === '/api/generate') return Response.json({ model: model.model });
         throw new Error('Unexpected synthetic operation');
     });
@@ -223,10 +223,16 @@ for (const serverVersion of ['0.40.4', '0.41.0']) test(`route con attestazione c
         assert.equal(response.status, 200);
         assert.equal((await response.json()).state, 'available_unqualified');
         assert.deepEqual(paths, ['/api/version', '/api/tags', '/api/show', '/api/generate', '/api/ps']);
+    } else if (serverVersion === '0.40.25') {
+        assert.equal(response.status, 409);
+        assert.deepEqual(await response.json(), { error: 'provider_field_unknown',
+            unknownField: { serverVersion: '0.40.25', endpoint: 'show', field: 'cloud_route' } });
+        assert.deepEqual(paths, ['/api/version', '/api/tags', '/api/show']);
+        assert.equal(fs.existsSync(path.join(root, 'ai')), false);
     } else {
         assert.equal(response.status, 409);
         assert.deepEqual(await response.json(), { error: 'provider_version_unsupported',
-            versionMismatch: { serverVersion: '0.41.0', supportedVersions: '0.32.x, 0.33.3, 0.34.2, 0.40.4, 0.40.5, 0.40.6, 0.40.16, 0.40.18' } });
+            versionMismatch: { serverVersion: '0.41.0', supportedVersions: '0.32.x, 0.33.3, 0.34.2, 0.40.4, 0.40.5, 0.40.6, 0.40.16 e successive 0.40' } });
         assert.deepEqual(paths, ['/api/version']);
         assert.equal(fs.existsSync(path.join(root, 'ai')), false);
     }
