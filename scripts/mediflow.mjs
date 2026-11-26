@@ -19,6 +19,7 @@ import { verifyOwnedWeb } from './local-ui-web-identity.mjs';
 import { localVoiceBinary, superviseLocalVoiceService } from './local-voice-service.mjs';
 import { LOCAL_VOICE_ENDPOINT_FRAME, LOCAL_VOICE_ENDPOINT_REQUEST } from './local-voice-web-endpoint.mjs';
 import { localVoiceClient } from '../lib/local-voice/client.mjs';
+import { LAN_PROXY_DEFAULT_PORT, createLanProxyController, readNetworkOverview } from './launcher-lan-proxy.mjs';
 import { pairingDirectory, readPairingRequests, bridgeExistingLocalUi, frames, writeFrame } from './local-ui-pairing-transport.mjs';
 
 import { localUiNavigationDeadline } from './local-ui-navigation-deadline.mjs';
@@ -521,6 +522,10 @@ export async function main(args = process.argv.slice(2)) {
     await refreshVoiceState(endpoint);
     return { MEDIFLOW_LOCAL_VOICE_URL: endpoint?.url, MEDIFLOW_LOCAL_VOICE_SECRET: endpoint?.secret };
   };
+  const lanPort = Number(process.env.MEDIFLOW_TLS_PORT || LAN_PROXY_DEFAULT_PORT);
+  const lan = createLanProxyController({ root: ROOT, dataDir, port: lanPort, log,
+    readOverview: target => readNetworkOverview(target, dataDir) });
+  let lanPoll = null;
   const pairRequests = new Map();
   const ipcStopChildren = new WeakSet();
   let childOwner = null, leases = null, webJob = null, webJobPending = null, preparing = false;
@@ -528,6 +533,8 @@ export async function main(args = process.argv.slice(2)) {
     if (child && child.exitCode === null && child.signalCode === null && leases?.external) {
       throw new Error('MediFlow è ancora utilizzato da un altro client.');
     }
+    clearInterval(lanPoll); lanPoll = null;
+    await lan.detach();
     if (webJobPending) await webJobPending;
     if (webJob) {
       await webJob.stop();
@@ -714,6 +721,7 @@ export async function main(args = process.argv.slice(2)) {
     const attempt = ++generation;
     const finishGeneration = (jobClosed = false, error = undefined) => {
       if (closing || attempt !== generation) return;
+      clearInterval(lanPoll); lanPoll = null; void lan.detach();
       if (jobClosed || (pluginChannel && !webJob)) { void shutdown(error); return; }
       update({ ready: false, busy: false, url: null, step: 'errore', message: 'MediFlow si è arrestato. Controlla i log nel terminale prima di riaprire.' });
     };
@@ -874,6 +882,10 @@ export async function main(args = process.argv.slice(2)) {
     child.once('exit', () => finishGeneration());
     if (!options.reuseOnly && remember && choice !== 'sviluppo') atomicJson(preferencesFile, { schemaVersion: 1, choice });
     else if (!options.reuseOnly && !remember) atomicJson(preferencesFile, { schemaVersion: 1, choice: null });
+    if (choice === 'web' || choice === 'sviluppo') {
+      void lan.follow(target);
+      lanPoll = setInterval(() => void lan.refresh(), 3000);
+    }
     update({ busy: false, ready: true, navigationReady: choice === 'web', url: target, step: 'pronto', message: choice === 'mac' ? 'App per Mac avviata. Lascia aperto il terminale.' : `Pronto: ${target}` });
     if (options.noBrowser) log(`Per cambiare scelta o arrestare: ${chooser.url}`);
   };
@@ -899,7 +911,7 @@ export async function main(args = process.argv.slice(2)) {
     choose(selected, remember);
   };
   try {
-    chooser = await createChoiceServer({ root: ROOT, state: () => ({ ...state, services: launcherServices(state), runtimeOwner: leases?.receipt.owner ?? null }), choose,
+    chooser = await createChoiceServer({ root: ROOT, state: () => ({ ...state, lan: lan.status(), services: launcherServices({ ...state, lan: lan.status(), lanPort }), runtimeOwner: leases?.receipt.owner ?? null }), choose,
       navigate, cancelNavigation,
       install: () => installApproval?.(true), stop: () => {
         if (preparing) throw Object.assign(new Error('Preparazione in corso. Attendi il completamento prima di arrestare MediFlow.'), { statusCode: 409 });

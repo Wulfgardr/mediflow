@@ -27,7 +27,7 @@ async function freePort() {
     return port;
 }
 
-export async function startDevicePairingFixture({ source = root } = {}) {
+export async function startDevicePairingFixture({ source = root, proxy: ownProxy = true } = {}) {
     const directory = mkdtempSync(join(root, 'tmp-device-pairing-'));
     const children = [];
     const tlsPort = await freePort();
@@ -100,6 +100,8 @@ export async function startDevicePairingFixture({ source = root } = {}) {
         });
         if (mode.status !== 200) throw new Error('Changing the synthetic network mode returned ' + mode.status);
 
+        if (!ownProxy) return { httpOrigin, peer, directory, ...await signIn(), localApiToken, close, signIn,
+            verifier: (await deriveUnlockMaterial(passphrase, Buffer.from(unlock.salt, 'base64'))).verifier };
         const certPath = join(directory, 'test.crt');
         const keyPath = join(directory, 'test.key');
         execFileSync('openssl', ['req', '-newkey', 'rsa:2048', '-x509', '-nodes', '-days', '1',
@@ -130,15 +132,15 @@ export async function startDevicePairingFixture({ source = root } = {}) {
             try { return (await lan('/api/auth/check')).status === 200; } catch { return false; }
         }, 'TLS proxy');
 
-        const material = await deriveUnlockMaterial(passphrase, Buffer.from(unlock.salt, 'base64'));
         async function signIn() {
+            const material = await deriveUnlockMaterial(passphrase, Buffer.from(unlock.salt, 'base64'));
             const web = await loginWithWebAuthControl(httpOrigin, { username: 'admin', verifier: material.verifier });
             if (web.response.status !== 200) throw new Error('Synthetic Web login returned ' + web.response.status);
             const webHeaders = { ...web.webHeaders, 'Content-Type': 'application/json', Origin: httpOrigin, 'Sec-Fetch-Site': 'same-origin' };
             return { web, webHeaders };
         }
         return { httpOrigin, peer, tlsPort, directory, ...await signIn(), localApiToken, lan, close,
-            signIn, verifier: material.verifier };
+            signIn, verifier: (await deriveUnlockMaterial(passphrase, Buffer.from(unlock.salt, 'base64'))).verifier };
     } catch (error) {
         for (const name of ['next.log', 'proxy.log']) {
             try { console.error(readFileSync(join(directory, name), 'utf8').split('\n').slice(-12).join('\n')); } catch {}
