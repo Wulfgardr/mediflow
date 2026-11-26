@@ -385,6 +385,7 @@ async function runVolume(count) {
             await page.getByRole('button', { name: 'Rivedi', exact: true }).click();
             await page.getByRole('button', { name: 'Conferma e registra', exact: true }).click();
             await expect(page.getByRole('region', { name: 'Esito della registrazione' })).toContainText('Registrata alle');
+            await page.getByRole('link', { name: 'Chiudi la voce', exact: true }).click();
             series.postWrite.push(await measure(page, cdp, serverRequests));
           }
           if (iteration < idleRuns && idleSeconds) {

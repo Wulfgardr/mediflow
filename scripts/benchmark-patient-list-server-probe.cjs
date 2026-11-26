@@ -1,14 +1,29 @@
 const { AsyncLocalStorage } = require('node:async_hooks');
+const { readdirSync } = require('node:fs');
 const { Server } = require('node:http');
 const { createRequire } = require('node:module');
 const path = require('node:path');
 
 const context = new AsyncLocalStorage();
-const Database = createRequire(path.resolve('server.js'))('better-sqlite3');
-const calibration = new Database(':memory:');
-const statement = Object.getPrototypeOf(calibration.prepare('SELECT 1'));
-calibration.close();
-for (const method of ['all', 'get']) {
+const loadBundleModule = createRequire(path.resolve('server.js'));
+const aliasDir = path.resolve(process.env.MEDIFLOW_NEXT_DIST_DIR, 'node_modules');
+let aliases = [];
+try {
+  aliases = readdirSync(aliasDir)
+    .filter(name => /^better-sqlite3-[a-f0-9]{16}$/u.test(name))
+    .map(name => path.join(aliasDir, name));
+} catch (error) {
+  if (error.code !== 'ENOENT') throw error;
+}
+const packages = ['better-sqlite3', ...aliases];
+const statementPrototypes = new Set();
+for (const name of packages) {
+  const Database = loadBundleModule(name);
+  const calibration = new Database(':memory:');
+  statementPrototypes.add(Object.getPrototypeOf(calibration.prepare('SELECT 1')));
+  calibration.close();
+}
+for (const statement of statementPrototypes) for (const method of ['all', 'get']) {
   const original = statement[method];
   statement[method] = function (...args) {
     const sample = context.getStore();
