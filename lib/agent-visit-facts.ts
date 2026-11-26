@@ -96,9 +96,10 @@ export function reviewAgentFact(kind: Kind, input: Record<string, string>, pdfTe
         blockers.push('Valori o soggetto della proposta da verificare sulla fonte.');
     }
     if (kind === 'therapy') values.dosage ||= 'non indicata nel documento';
+    const askPhysician = kind === 'therapy' && !values.status ? ['status'] : [];
     for (const evidence of context) {
         const contextualValues = { ...values, contextReview: contextReview(evidence, kind === 'therapy' && isHistoricalTherapy(values.status)) };
-        blockers.push(...dossierFactBlockers({ factId: '', kind, values: contextualValues, negated: evidence.negated, origin: 'prepared', evidence: null, decision: 'pending' }));
+        blockers.push(...dossierFactBlockers({ factId: '', kind, values: contextualValues, negated: evidence.negated, origin: 'prepared', evidence: null, decision: 'pending' }, { askPhysician }));
     }
-    return { values, blockers: [...new Set(blockers)] };
+    return { values, blockers: [...new Set(blockers)], askPhysician };
 }
