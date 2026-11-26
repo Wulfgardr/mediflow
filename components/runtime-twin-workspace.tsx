@@ -25,7 +25,7 @@ const destinations = [
   { href: '/?area=incarico', label: 'Pazienti', icon: Users },
   { href: '/?area=turno', label: 'Agenda', icon: CalendarDays },
   { href: '/?area=diario', label: 'Diario', icon: BookOpen },
-  { href: '/in-arrivo', label: 'In arrivo', icon: Inbox },
+  { href: '/da-decidere', label: 'Da decidere', icon: Inbox },
   { href: '/?area=repertori', label: 'Repertori', icon: FolderOpen },
   { href: '/analytics', label: 'Analisi', icon: Activity },
   { href: '/scales', label: 'Scale', icon: ClipboardList },
@@ -182,7 +182,7 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
         <nav aria-label="Navigazione principale" className={styles.navigation}>
           {destinations.map(({ href, label, icon: Icon }, index) => <Fragment key={href}>
             {proposal && (index === 0 || index === 4) ? <span className={styles.railGroup}>{index === 0 ? 'Lavoro' : 'Archivio'}</span> : null}
-            <Link key={href} href={href} className={index > 2 ? styles.secondaryDestination : undefined} title={label} aria-label={label} aria-current={currentDestinationHref === href ? 'page' : undefined}><Icon size={17} aria-hidden /><span>{label}</span>{href === '/in-arrivo' && incomingCount > 0 ? <small>{incomingCount}</small> : null}</Link></Fragment>)}
+            <Link key={href} href={href} className={index > 2 ? styles.secondaryDestination : undefined} title={label} aria-label={label} aria-current={currentDestinationHref === href ? 'page' : undefined}><Icon size={17} aria-hidden /><span>{label}</span>{href === '/da-decidere' && incomingCount > 0 ? <small>{incomingCount}</small> : null}</Link></Fragment>)}
           {patientId && proposal ? <div className={styles.proposalNav}>
             <span className={styles.railGroup}>Proposte del modello</span>
             <Link href={`/patients/${patientId}/modules#patient-insight`} title="Proposte del Quadro paziente">

@@ -1,6 +1,6 @@
 export const workspaceDestinationHrefs = [
   '/?area=incarico', '/?area=turno', '/?area=diario', '/?area=repertori',
-  '/analytics', '/scales', '/settings',
+  '/da-decidere', '/analytics', '/scales', '/settings',
 ] as const;
 
 export function currentWorkspaceDestination(pathname: string, area: string | null): string | null {

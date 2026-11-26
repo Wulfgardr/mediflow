@@ -125,7 +125,7 @@ export default function AgentSettingsPage() {
         <header className="flex flex-wrap items-center justify-between gap-2 px-1.5">
             <h2 id="agenti-title" className="[font:var(--type-record-island)]">Agenti</h2>
             <div className="flex flex-wrap gap-2">
-                <Link href="/in-arrivo" className={SETTINGS_SECONDARY_BUTTON_CLASS}>In arrivo</Link>
+                <Link href="/da-decidere" className={SETTINGS_SECONDARY_BUTTON_CLASS}>Da decidere</Link>
                 <button className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={busy} onClick={() => { void run(refresh, false); }}>Aggiorna</button>
             </div>
         </header>
@@ -347,7 +347,7 @@ export default function AgentSettingsPage() {
             <fieldset><legend>Operazioni consentite</legend>{AGENT_OPERATIONS.map((operation, index) => <label className="flex gap-2" key={operation}>
                 <input type="checkbox" checked={operations.includes(operation)} onChange={event => setOperations(current => event.target.checked ? [...current, operation] : current.filter(value => value !== operation))} />{operationLabels[index]}
             </label>)}</fieldset>
-            <p>Nota, trascrizione, PDF e proposte attendono la tua conferma in «In arrivo».</p>
+            <p>Nota, trascrizione, PDF e proposte attendono la tua conferma in «Da decidere».</p>
             <label className="block">PIN di conferma<input className={SETTINGS_INPUT_CLASS} type="password" inputMode="numeric" autoComplete="off" required aria-invalid={Boolean(pinError)} aria-describedby={pinError ? 'agent-mandate-pin-error' : undefined} value={pin} onChange={event => {
                 setPin(event.target.value); setPinSubmitError(null);
             }} /></label>

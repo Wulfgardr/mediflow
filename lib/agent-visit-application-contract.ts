@@ -7,7 +7,7 @@ import { clinicalContentAllowed } from './agent-mandate-contract';
 
 export type AgentCassetteIndexEntry = Pick<AgentCassette, 'id' | 'archiveGeneration' | 'status' | 'revision' | 'depositedAt'>;
 export type AgentCassetteIndexPage = { visits: AgentCassetteIndexEntry[]; next: string | null };
-export type IncomingAgentCassette = AgentCassette & { appliedItemIds: string[] };
+export type IncomingAgentCassette = AgentCassette & { appliedItemIds: string[]; discardedItemIds?: string[]; correctedItemIds?: string[] };
 
 const sealed = z.string().regex(/^ENC:[A-Za-z0-9+/]+=*:[A-Za-z0-9+/]+=*$/u);
 const noteValues = z.object({ title: sealed, content: sealed, date: dateInputSchema, metadata: sealed }).strict();
@@ -49,3 +49,16 @@ export const agentCassetteConfirmsNatively = (cassette: Pick<AgentCassette, 'mod
     clinicalContentAllowed(cassette.modelProvider, cassette.allowsClinicalEgress);
 export type AgentApplicationReceipt = { visitId: string; phase: 'review'; status: 'applied'; eventId: string; itemCount: number;
     patientVersion: number; modelProvider: string; allowsClinicalEgress: boolean };
+export const AGENT_ITEM_DECISIONS = ['keep', 'correct', 'discard'] as const;
+export type AgentItemDecision = typeof AGENT_ITEM_DECISIONS[number];
+const decisionTarget = { visitId: id, cassetteRevision: z.number().int().positive() };
+export const agentItemDecisionSchema = z.discriminatedUnion('decision', [
+    z.object({ ...decisionTarget, decision: z.literal('discard'), itemId: id,
+        kind: z.enum(['note', 'transcription', 'pdf', 'therapy', 'service', 'diagnosis', 'exemption', 'observation']) }).strict(),
+    z.object({ ...decisionTarget, decision: z.enum(['keep', 'correct']), patientId: z.string().min(1).max(256),
+        expectedVersion: z.number().int().positive().max(Number.MAX_SAFE_INTEGER - 2), item: agentApplicationItemSchema }).strict(),
+]);
+export type AgentItemDecisionInput = z.input<typeof agentItemDecisionSchema>;
+export type AgentVisitDecisionState = 'pending' | 'partial' | 'applied' | 'decided';
+export type AgentItemDecisionReceipt = { visitId: string; itemId: string; decision: AgentItemDecision; status: 'decided'; eventId: string;
+    patientVersion: number | null; visitState: AgentVisitDecisionState };
