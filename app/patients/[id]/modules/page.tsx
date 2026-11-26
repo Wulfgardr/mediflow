@@ -679,7 +679,7 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
                 showToast('Impossibile preparare il contesto del paziente per Codex.', 'error');
                 return;
             }
-            const result = await sendPatientContextToLocalKit(payload);
+            const result = await sendPatientContextToLocalKit(payload, patient);
             if (!result.ok) {
                 if (result.code === 'LOCAL_KIT_INACTIVE') {
                     showToast('Collega e attiva Codex in Impostazioni · Agenti.', 'error');
