@@ -9,6 +9,13 @@
       "prerequisites": "Node 24, npm ci and prepare:dependencies, OpenSSL, an explicit synthetic MEDIFLOW_DATA_DIR and a non-loopback IPv4 interface. The test starts its own server and TLS proxy."
     },
     {
+      "id": "launcher-lan-proxy",
+      "mode": "local",
+      "kind": "strip-test",
+      "files": ["scripts/launcher-lan-proxy.test.mjs"],
+      "prerequisites": "Node 24, npm ci, prepare:dependencies and npm run build on a clean committed checkout, OpenSSL. The test starts the real launcher (choice web) on synthetic data, ports and HOME of its own; without a reachable non-loopback IPv4 the device goes through loopback to the same TLS proxy and says so."
+    },
+    {
       "id": "scripts/verify-local-operation.mjs",
       "mode": "local",
       "kind": "node-script",

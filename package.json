@@ -165,6 +165,7 @@
     "test:fabric-settings-view": "bash scripts/fabric-settings-view-test.sh",
     "test:server-auth-policy": "bash scripts/server-auth-policy-test.sh",
     "test:admin-auth-boundary": "node --test scripts/admin-route-auth-boundary.test.mjs",
+    "test:launcher:lan-proxy": "node --import ./scripts/register-strip-types-loader.mjs --test scripts/launcher-lan-proxy.test.mjs",
     "test:network:pairing-offers": "node --import ./scripts/register-strip-types-loader.mjs --test scripts/network-pairing-offers.test.mjs",
     "test:network:home-base-readonly": "bash scripts/network-home-base-readonly-smoke.sh",
     "test:network:home-base-write": "bash scripts/network-home-base-write-smoke.sh",
