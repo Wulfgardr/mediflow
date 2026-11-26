@@ -85,10 +85,14 @@ function startProxyFromEnv() {
         cert: fs.readFileSync(certPath),
         key: fs.readFileSync(keyPath)
     };
+    const enableLoopbackProbe = process.env.MEDIFLOW_TLS_LOOPBACK_PROBE === '1'
+        && !loopbackHosts.has(bindHost)
+        && bindHost !== '0.0.0.0'
+        && bindHost !== '::';
 
     if (process.connected) process.once('disconnect', () => process.exit(0));
 
-    const server = https.createServer(options, (req, res) => {
+    const handleRequest = (req, res) => {
         const loopbackPeer = isLoopbackAddress(req.socket.remoteAddress);
         if (!loopbackPeer && !allowsNetworkIngress(req.method, req.url)) {
             const agentOnly = isAgentOnlyIngress(req.url);
@@ -140,12 +144,37 @@ function startProxyFromEnv() {
         });
 
         req.pipe(proxyRequest, { end: true });
-    });
+    };
 
-    server.listen(port, bindHost, () => {
-        console.log(`TLS proxy listening on https://${bindHost}:${server.address().port}`);
+    const server = https.createServer(options, handleRequest);
+    const loopbackServer = enableLoopbackProbe ? https.createServer(options, handleRequest) : null;
+
+    const announce = (listeningPort) => {
+        console.log(`TLS proxy listening on https://${bindHost}:${listeningPort}`);
         console.log(`Forwarding to ${target.toString()}`);
         console.log(`Transport mode: ${networkMode}`);
+    };
+
+    const shutdown = () => {
+        loopbackServer?.close();
+        server.close(() => process.exit(0));
+    };
+    process.once('SIGTERM', shutdown);
+    process.once('SIGINT', shutdown);
+
+    server.listen(port, bindHost, () => {
+        const listeningPort = server.address().port;
+        if (!loopbackServer) {
+            announce(listeningPort);
+            return;
+        }
+        loopbackServer.once('error', (error) => {
+            console.error('Loopback probe listener error:', error.message);
+            server.close(() => process.exit(1));
+        });
+        loopbackServer.listen(listeningPort, '127.0.0.1', () => {
+            announce(listeningPort);
+        });
     });
 }
 

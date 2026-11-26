@@ -114,10 +114,10 @@ export async function startDevicePairingFixture({ source = root, launcher = fals
         execFileSync('openssl', ['req', '-newkey', 'rsa:2048', '-x509', '-nodes', '-days', '1',
             '-keyout', keyPath, '-out', certPath, '-subj', '/CN=localhost',
             '-addext', 'subjectAltName=DNS:localhost'], { stdio: 'ignore' });
-        writeFileSync(join(directory, 'runtime-status.json'), JSON.stringify({ bindHost: '0.0.0.0', port: tlsPort, certPath }));
+        writeFileSync(join(directory, 'runtime-status.json'), JSON.stringify({ bindHost: peer, loopbackProbe: true, port: tlsPort, certPath }));
         const proxy = launch([resolve(source, 'scripts/local-api-tls-proxy.mjs')], 'proxy.log', {
             MEDIFLOW_TLS_CERT_PATH: certPath, MEDIFLOW_TLS_KEY_PATH: keyPath,
-            MEDIFLOW_TLS_BIND_HOST: '0.0.0.0', MEDIFLOW_TLS_PORT: String(tlsPort),
+            MEDIFLOW_TLS_BIND_HOST: peer, MEDIFLOW_TLS_LOOPBACK_PROBE: '1', MEDIFLOW_TLS_PORT: String(tlsPort),
             MEDIFLOW_TLS_NETWORK_MODE: 'network-home-base', MEDIFLOW_HTTP_TARGET: httpOrigin,
         });
         function lan(path, { method = 'GET', headers = {}, body } = {}) {

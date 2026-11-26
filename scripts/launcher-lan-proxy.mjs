@@ -2,9 +2,12 @@ import { execFileSync, spawn } from 'node:child_process';
 import { X509Certificate } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { readPairingAddress } from '../lib/network-pairing-address.mjs';
 
 export const LAN_PROXY_DEFAULT_PORT = 3443;
 const LISTENING = /^TLS proxy listening on https:\/\/[^\s]+:(\d+)$/mu;
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
+const WILDCARD_HOSTS = new Set(['0.0.0.0', '::']);
 
 /** @param {string} certPath */
 export function certificatePin(certPath) {
@@ -42,16 +45,25 @@ export function lanCertificate(dataDir, { run = execFileSync } = {}) {
  * in `runtime-status.json`, the file the Web reads to offer pairing.
  * @param {{ root: string, dataDir: string, target: string, port?: number, bindHost?: string, timeoutMs?: number }} options
  */
-export async function startLanProxy({ root, dataDir, target, port = LAN_PROXY_DEFAULT_PORT, bindHost = '0.0.0.0', timeoutMs = 10_000 }) {
+export async function startLanProxy({ root, dataDir, target, port = LAN_PROXY_DEFAULT_PORT, bindHost, timeoutMs = 10_000 }) {
   const targetUrl = new URL(target);
   if (targetUrl.protocol !== 'http:' || targetUrl.hostname !== '127.0.0.1') throw new Error('Il proxy inoltra solo verso MediFlow su questo computer.');
+  const resolvedBindHost = bindHost === undefined ? await readPairingAddress('0.0.0.0') : bindHost;
+  if (!resolvedBindHost) {
+    throw Object.assign(new Error('nessuna rete disponibile'), { code: 'LAN_PROXY_NO_NETWORK' });
+  }
+  if (WILDCARD_HOSTS.has(resolvedBindHost)) {
+    throw Object.assign(new Error('Il proxy non può ascoltare su tutte le reti.'), { code: 'LAN_PROXY_WILDCARD_FORBIDDEN' });
+  }
+  const loopbackProbe = !LOOPBACK_HOSTS.has(resolvedBindHost);
   const { certPath, keyPath, pin } = lanCertificate(dataDir);
   const statusFile = path.join(dataDir, 'runtime-status.json'), pidFile = path.join(dataDir, 'local-api-tls-proxy.pid');
   const child = spawn(process.execPath, [path.join(root, 'scripts/local-api-tls-proxy.mjs')], {
     cwd: root, stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
     env: { PATH: process.env.PATH ?? '', ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
       MEDIFLOW_DATA_DIR: dataDir, MEDIFLOW_TLS_CERT_PATH: certPath, MEDIFLOW_TLS_KEY_PATH: keyPath, MEDIFLOW_TLS_PORT: String(port),
-      MEDIFLOW_TLS_BIND_HOST: bindHost, MEDIFLOW_TLS_NETWORK_MODE: 'network-home-base', MEDIFLOW_HTTP_TARGET: targetUrl.origin } });
+      MEDIFLOW_TLS_BIND_HOST: resolvedBindHost, MEDIFLOW_TLS_LOOPBACK_PROBE: loopbackProbe ? '1' : '0',
+      MEDIFLOW_TLS_NETWORK_MODE: 'network-home-base', MEDIFLOW_HTTP_TARGET: targetUrl.origin } });
   child.channel?.unref();
   const exited = new Promise(resolve => child.once('exit', code => resolve(code)));
   let stderr = '';
@@ -75,7 +87,7 @@ export async function startLanProxy({ root, dataDir, target, port = LAN_PROXY_DE
   });
   fs.writeFileSync(pidFile, `${child.pid}\n`, { mode: 0o600 });
   fs.writeFileSync(statusFile, `${JSON.stringify({ generatedAt: new Date().toISOString(), baseURL: `https://localhost:${listening}/api/v1`,
-    tlsPin: pin, networkMode: 'network-home-base', port: listening, bindHost, httpTarget: targetUrl.origin, certPath,
+    tlsPin: pin, networkMode: 'network-home-base', port: listening, bindHost: resolvedBindHost, loopbackProbe, httpTarget: targetUrl.origin, certPath,
     proxyPidPath: pidFile, owner: 'launcher' }, null, 2)}\n`, { mode: 0o600 });
   const publishedPid = () => { try { return fs.readFileSync(pidFile, 'utf8').trim(); } catch { return null; } };
   const unpublish = () => {
@@ -92,7 +104,7 @@ export async function startLanProxy({ root, dataDir, target, port = LAN_PROXY_DE
     }
     unpublish();
   };
-  return { port: listening, pin, pid: /** @type {number} */ (child.pid), exited, stop };
+  return { port: listening, bindHost: resolvedBindHost, pin, pid: /** @type {number} */ (child.pid), exited, stop };
 }
 
 function isOrphanLanProxyProcess(pid) {
@@ -144,7 +156,16 @@ export async function stopOrphanLanProxy(dataDir, activePid = null) {
  * @param {{ root: string, dataDir: string, port?: number, readOverview: (target: string) => Promise<{ operatingMode: string, hasPairedClients: boolean } | null>,
  *   log?: (message: string) => void, start?: typeof startLanProxy, attempts?: number }} options
  */
-export function createLanProxyController({ root, dataDir, port = LAN_PROXY_DEFAULT_PORT, readOverview, log = () => {}, start = startLanProxy, attempts = 3 }) {
+export function createLanProxyController({
+  root,
+  dataDir,
+  port = LAN_PROXY_DEFAULT_PORT,
+  readOverview,
+  log = () => {},
+  start = startLanProxy,
+  resolveBindHost = () => readPairingAddress('0.0.0.0'),
+  attempts = 3,
+}) {
   let proxy = null, target = null, busy = null, pending = false, failures = 0;
   /** @type {{ state: 'off' | 'on' | 'error' | 'unknown', paired: boolean, port: number | null, reason: string | null }} */
   let status = { state: 'unknown', paired: false, port: null, reason: null };
@@ -159,15 +180,32 @@ export function createLanProxyController({ root, dataDir, port = LAN_PROXY_DEFAU
       status = { state: overview ? 'off' : 'unknown', paired: false, port: null, reason: null };
       return;
     }
+    let nextBindHost = null;
+    try { nextBindHost = await resolveBindHost(); } catch { nextBindHost = null; }
+    if (!nextBindHost || WILDCARD_HOSTS.has(nextBindHost)) {
+      const hadProxy = !!proxy;
+      await halt();
+      await stopOrphanLanProxy(dataDir, null);
+      failures = 0;
+      if (hadProxy) log('Rete non disponibile: collegamento per iPhone e iPad spento.');
+      status = { state: 'off', paired: overview.hasPairedClients, port: null, reason: 'no-network' };
+      return;
+    }
+    if (proxy && proxy.bindHost !== nextBindHost) {
+      log(`Indirizzo di rete cambiato (${proxy.bindHost} -> ${nextBindHost}): sposto il collegamento per iPhone e iPad.`);
+      await halt();
+      failures = 0;
+    }
     if (!proxy && failures < attempts) {
       await stopOrphanLanProxy(dataDir, null);
       try {
-        const started = await start({ root, dataDir, target, port });
-        proxy = started;
+        const started = await start({ root, dataDir, target, port, bindHost: nextBindHost });
+        const active = { ...started, bindHost: started.bindHost ?? nextBindHost };
+        proxy = active;
         failures = 0;
-        log(`Collegamento per iPhone e iPad acceso sulla porta ${started.port}.`);
-        void started.exited.then(() => {
-          if (proxy !== started) return;
+        log(`Collegamento per iPhone e iPad acceso su ${active.bindHost}:${active.port}.`);
+        void active.exited.then(() => {
+          if (proxy !== active) return;
           proxy = null; failures++;
           status = { ...status, state: 'error', port: null, reason: 'stopped' };
           log('Il collegamento per iPhone e iPad si è arrestato.');

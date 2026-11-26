@@ -34,7 +34,11 @@ export async function readNetworkPairingEndpoint(displayName?: string): Promise<
 
         const certificate = new X509Certificate(await readFile(certPath));
         const fingerprint = certificate.fingerprint256.replaceAll(':', '').toLowerCase();
-        const probeHost = bindHost === '0.0.0.0' ? '127.0.0.1' : bindHost === '::' ? '::1' : address;
+        const probeHost = descriptor.loopbackProbe === true || bindHost === '0.0.0.0'
+            ? '127.0.0.1'
+            : bindHost === '::'
+                ? '::1'
+                : address;
         await presentsCertificate(probeHost, port, fingerprint);
         const computer = (displayName?.trim() || hostname()).replace(/[^\p{L}\p{N} ._-]/gu, '').slice(0, 63).trim() || 'MediFlow';
         return { origin: new URL(`https://${address}:${port}`).origin, fingerprint, computer };

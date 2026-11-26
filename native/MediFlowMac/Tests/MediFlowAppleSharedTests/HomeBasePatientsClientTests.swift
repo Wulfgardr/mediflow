@@ -332,6 +332,8 @@ final class HomeBasePatientsClientTests: XCTestCase {
                 headerFields: path.hasSuffix("login") ? ["Set-Cookie": "mediflow_session=v3-session; Path=/; HttpOnly"] : nil)!
             if path == "/api/auth/check" {
                 XCTAssertNil(request.value(forHTTPHeaderField: "Cookie"))
+                XCTAssertEqual(request.value(forHTTPHeaderField: "X-MediFlow-Paired-Client-Id"), self.creds.clientId)
+                XCTAssertEqual(request.value(forHTTPHeaderField: "X-MediFlow-Paired-Client-Token"), self.creds.clientToken)
                 return (response, try JSONSerialization.data(withJSONObject: ["status": "ok", "isSetup": true,
                     "archiveGeneration": "synthetic-generation", "unlock": ["credential": "passphrase", "kdfVersion": 3, "salt": vector["salt"]!]]))
             }

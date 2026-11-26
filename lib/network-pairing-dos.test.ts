@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import http from 'node:http';
 import https from 'node:https';
+import net from 'node:net';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
@@ -23,6 +24,7 @@ import {
 import { settings } from './schema';
 import { createPairingRateLimiter } from '../scripts/local-api-tls-proxy.mjs';
 import { startLanProxy } from '../scripts/launcher-lan-proxy.mjs';
+import { readPairingAddress } from './network-pairing-address';
 
 const load = createRequire(import.meta.url);
 const dataDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-wul897-dos-')));
@@ -214,50 +216,82 @@ test('TLS proxy pairing rate limiter bounds per-IP requests and evicts stale buc
     assert.equal(allow('198.51.100.1').allowed, true);
 });
 
-test('real TLS proxy enforces non-loopback ingress allowlist and per-IP pairing rate limit', { skip: process.platform === 'win32' }, async () => {
-    const peer = Object.entries(os.networkInterfaces())
-        .sort(([a], [b]) => a.localeCompare(b))
-        .flatMap(([, addresses]) => addresses ?? [])
-        .find((address) => address.family === 'IPv4' && !address.internal && !address.address.startsWith('169.254.'))?.address;
+test('real TLS proxy enforces non-loopback ingress allowlist, single-network bind and per-IP pairing rate limit', { skip: process.platform === 'win32' }, async () => {
+    const peer = await readPairingAddress('0.0.0.0');
     assert.ok(peer, 'A non-loopback IPv4 interface is required');
 
+    const otherAddress = Object.entries(os.networkInterfaces())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .flatMap(([, addresses]) => addresses ?? [])
+        .find((address) => address.family === 'IPv4' && !address.internal && !address.address.startsWith('169.254.') && address.address !== peer)?.address;
+
     const proxyDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-proxy-ratelimit-')));
-    let forwardedPairing = 0;
+    let forwardedRedeem = 0;
     const backend = http.createServer((req, res) => {
-        if (req.url?.startsWith('/api/v1/network/pairing-intents')) forwardedPairing += 1;
+        if (req.url?.startsWith('/api/v1/network/pairing-offers/redeem')) forwardedRedeem += 1;
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true }));
     });
     await new Promise<void>((resolve) => backend.listen(0, '127.0.0.1', resolve));
     const backendPort = (backend.address() as { port: number }).port;
+
+    await assert.rejects(
+        startLanProxy({
+            root: process.cwd(),
+            dataDir: proxyDir,
+            target: `http://127.0.0.1:${backendPort}`,
+            port: 0,
+            bindHost: '0.0.0.0',
+        }),
+        { code: 'LAN_PROXY_WILDCARD_FORBIDDEN' },
+    );
+
     const proxy = await startLanProxy({
         root: process.cwd(),
         dataDir: proxyDir,
         target: `http://127.0.0.1:${backendPort}`,
         port: 0,
-        bindHost: '0.0.0.0',
+    });
+    assert.equal(proxy.bindHost, peer);
+
+    const tcpConnects = (host: string, port: number, localAddress: string) => new Promise<boolean>((resolve) => {
+        const socket = net.connect({ host, port, localAddress });
+        const timer = setTimeout(() => { socket.destroy(); resolve(false); }, 1000);
+        socket.once('connect', () => { clearTimeout(timer); socket.destroy(); resolve(true); });
+        socket.once('error', () => { clearTimeout(timer); resolve(false); });
     });
 
-    const callFromLan = (method: string, targetPath: string) => new Promise<{ status: number; body: string; headers: http.IncomingHttpHeaders }>((resolve, reject) => {
-        const req = https.request(`https://127.0.0.1:${proxy.port}${targetPath}`, {
-            method,
-            localAddress: peer,
-            rejectUnauthorized: false,
-            servername: 'localhost',
-        }, (res) => {
-            let body = '';
-            res.on('data', (chunk) => { body += chunk; });
-            res.on('end', () => resolve({ status: res.statusCode ?? 0, body, headers: res.headers }));
+    const callFromLan = (method: string, targetPath: string) =>
+        new Promise<{ status: number; body: string; headers: http.IncomingHttpHeaders }>((resolve, reject) => {
+            const req = https.request(`https://127.0.0.1:${proxy.port}${targetPath}`, {
+                method,
+                localAddress: peer,
+                rejectUnauthorized: false,
+                servername: 'localhost',
+                timeout: 1500,
+            }, (res) => {
+                let body = '';
+                res.on('data', (chunk) => { body += chunk; });
+                res.on('end', () => resolve({ status: res.statusCode ?? 0, body, headers: res.headers }));
+            });
+            req.once('timeout', () => req.destroy(Object.assign(new Error('Connection timed out'), { code: 'ETIMEDOUT' })));
+            req.once('error', reject);
+            req.end(method === 'POST' ? '{}' : undefined);
         });
-        req.once('error', reject);
-        req.end(method === 'POST' ? '{}' : undefined);
-    });
 
     try {
+        assert.equal(await tcpConnects(peer, proxy.port, peer), true);
+        if (otherAddress) {
+            assert.equal(await tcpConnects(otherAddress, proxy.port, otherAddress), false);
+        }
+
         assert.equal((await callFromLan('GET', '/api/patients')).status, 403);
         assert.equal((await callFromLan('GET', '/api/settings/network.mode')).status, 403);
         assert.equal((await callFromLan('POST', '/api/device-pairing')).status, 403);
         assert.equal((await callFromLan('GET', '/api/backup/export')).status, 403);
+        assert.equal((await callFromLan('POST', '/api/v1/network/pairing-intents')).status, 403);
+        assert.equal((await callFromLan('GET', '/api/v1/network/pairing-intents')).status, 403);
+        assert.equal((await callFromLan('POST', '/api/v1/network/pairing-intents/id-1/confirm')).status, 403);
         assert.equal((await callFromLan('GET', '/api/agent/status')).status, 404);
         assert.equal((await callFromLan('GET', '/api/agent-mandates')).status, 404);
         assert.equal((await callFromLan('GET', '/api/auth/check')).status, 200);
@@ -265,7 +299,7 @@ test('real TLS proxy enforces non-loopback ingress allowlist and per-IP pairing 
         let passed = 0;
         let rateLimited = 0;
         for (let index = 0; index < 60; index += 1) {
-            const res = await callFromLan('POST', '/api/v1/network/pairing-intents');
+            const res = await callFromLan('POST', '/api/v1/network/pairing-offers/redeem');
             if (res.status === 200) passed += 1;
             else if (res.status === 429) {
                 rateLimited += 1;
@@ -275,7 +309,7 @@ test('real TLS proxy enforces non-loopback ingress allowlist and per-IP pairing 
         }
         assert.equal(passed, 20);
         assert.equal(rateLimited, 40);
-        assert.equal(forwardedPairing, 20);
+        assert.equal(forwardedRedeem, 20);
     } finally {
         await proxy.stop();
         await new Promise<void>((resolve) => backend.close(() => resolve()));
