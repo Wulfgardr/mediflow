@@ -9,6 +9,9 @@ const renewButton = (page: Page) => page.getByRole('button', { name: 'Rinnova ac
 const lock = (page: Page) => page.getByRole('button', { name: 'Blocca', exact: true });
 const lockAll = (page: Page) => page.getByRole('button', { name: 'Blocca tutte le schede', exact: true });
 const pinField = (page: Page) => page.getByLabel('PIN operatore', { exact: true });
+const isRouterPrefetchCancelledByNext = (request: Request) => request.method() === 'GET'
+  && request.headers()['next-router-prefetch'] === '1' && new URL(request.url()).searchParams.has('_rsc')
+  && request.failure()?.errorText === 'net::ERR_ABORTED';
 
 function deferred() {
   let release: () => void = () => undefined;
@@ -120,7 +123,7 @@ test('a failed explicit lock keeps the PIN disabled until a confirmed lock', asy
   await expect(navigation(sibling)).toBeVisible();
   mutations.length = 0;
   const failedPaths: string[] = [];
-  sibling.on('requestfailed', request => failedPaths.push(authPath(request)));
+  sibling.on('requestfailed', request => { if (!isRouterPrefetchCancelledByNext(request)) failedPaths.push(authPath(request)); });
   await sibling.route('**/api/auth/lock', route => route.abort('failed'));
   try {
     await lock(sibling).click();
