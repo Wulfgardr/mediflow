@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import crypto from 'node:crypto';
-import { chmodSync, closeSync, constants as fsConstants, existsSync, fstatSync, lstatSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, closeSync, constants as fsConstants, existsSync, fstatSync, lstatSync, mkdtempSync, openSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -8,9 +8,23 @@ export const LOCAL_VOICE_READY = 'MEDIFLOW_LOCAL_VOICE_READY';
 export const LOCAL_VOICE_MANIFEST_RELATIVE = 'scripts/local-voice-binary.json';
 export const LOCAL_VOICE_BINARY_RELATIVE = 'native/local-voice/target/release/mediflow-voice';
 export const LOCAL_VOICE_MAX_BINARY_BYTES = 256 * 1024 * 1024;
-export const LOCAL_VOICE_SANDBOX_PROFILE = '(version 1) (allow default) (deny network*)'
-  + ' (allow network-bind (local ip "localhost:*")) (allow network-inbound (local ip "localhost:*"))'
-  + ' (deny file-write*) (deny process-fork)';
+
+/** @param {string[]} executables the only programs the confined service may execute, as resolved paths */
+export function localVoiceSandboxProfile(executables) {
+  return '(version 1) (allow default) (deny network*)'
+    + ' (allow network-bind (local ip "localhost:*")) (allow network-inbound (local ip "localhost:*"))'
+    + ' (deny file-write*) (deny process-fork)'
+    + ` (deny process-exec) (allow process-exec ${executables.map(file => `(literal ${JSON.stringify(file)})`).join(' ')})`
+    + ' (deny lsopen) (deny appleevent-send)';
+}
+
+/** A script runs through the interpreter its first line names: that interpreter is the only other program it may execute. @param {string} binary @param {Buffer} bytes the verified bytes the binary was staged from */
+export function localVoiceExecutables(binary, bytes) {
+  const resolved = realpathSync(binary);
+  const head = bytes.subarray(0, 512).toString('latin1');
+  const interpreter = head.startsWith('#!') ? head.slice(2).split(/\s/u).find(Boolean) : undefined;
+  return interpreter && path.isAbsolute(interpreter) ? [resolved, realpathSync(interpreter)] : [resolved];
+}
 
 const SHA256_RE = /^[a-f0-9]{64}$/u;
 
@@ -96,8 +110,9 @@ export function localVoiceBinary(root, env = process.env) {
   return env.MEDIFLOW_LOCAL_VOICE_BINARY || path.join(root, LOCAL_VOICE_BINARY_RELATIVE);
 }
 
-export function localVoiceLaunch(binary, platform = process.platform) {
-  if (platform === 'darwin') return { command: '/usr/bin/sandbox-exec', args: ['-p', LOCAL_VOICE_SANDBOX_PROFILE, binary] };
+/** @param {string} binary @param {NodeJS.Platform} [platform] @param {string[]} [executables] */
+export function localVoiceLaunch(binary, platform = process.platform, executables = [binary]) {
+  if (platform === 'darwin') return { command: '/usr/bin/sandbox-exec', args: ['-p', localVoiceSandboxProfile(executables), binary] };
   return { command: binary, args: [] };
 }
 
@@ -135,17 +150,20 @@ export async function startLocalVoiceService({ binary, expectedSha256, expectedB
     if (!sha256Matches(sha256Buffer(read.bytes), expectedSha256)) throw new Error('local-voice-binary-mismatch');
     bytes = read.bytes;
   }
+  if (!SHA256_RE.test(secret)) throw new Error('local-voice-secret');
   const staged = stageVerifiedBinary(bytes);
-  const { command, args } = localVoiceLaunch(staged.stagedBinary, platform);
-  const env = { PATH: '/usr/bin:/bin', HOME: process.env.HOME ?? '', MEDIFLOW_LOCAL_VOICE_SECRET: secret,
-    ...(models ? { MEDIFLOW_LOCAL_VOICE_MODELS: models } : {}) };
   let child;
   try {
+    const executables = localVoiceExecutables(staged.stagedBinary, bytes);
+    const { command, args } = localVoiceLaunch(executables[0], platform, executables);
+    const env = { PATH: '/usr/bin:/bin', HOME: process.env.HOME ?? '', ...(models ? { MEDIFLOW_LOCAL_VOICE_MODELS: models } : {}) };
     child = spawn(command, args, { env, stdio: ['pipe', 'pipe', 'inherit'] });
   } catch (error) {
     staged.cleanup();
     throw error;
   }
+  child.stdin.on('error', () => {});
+  child.stdin.write(`${secret}\n`);
   const exited = new Promise(resolve => child.once('exit', code => { staged.cleanup(); resolve(code); }));
   let port;
   try {
@@ -166,7 +184,7 @@ export async function startLocalVoiceService({ binary, expectedSha256, expectedB
     staged.cleanup();
     throw error;
   }
-  if (!Number.isInteger(port) || port < 1 || port > 65535 || !SHA256_RE.test(secret)) {
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
     child.kill('SIGKILL');
     staged.cleanup();
     throw new Error('local-voice-port');

@@ -195,3 +195,24 @@ test('a service that answers for another subject at creation is told to forget i
     assert.equal(response.status, 409);
     assert.equal(fake.state.session, null);
 });
+
+test('after the Web server restarts, a session nobody can read any more neither blocks recording nor keeps its text in the service', async () => {
+    const endpoint = () => ({ url: fake.url, secret });
+    const before = createLocalVoiceBridge({ endpoint });
+    const created = await before.create('voice-user-a', { subject: PATIENT_A, mode: 'visit' });
+    assert.equal(created.status, 200);
+    const id = (created.body as { id: string }).id;
+    await before.snapshot('voice-user-a', id, PATIENT_A);
+    assert.equal((await before.command('voice-user-a', id, PATIENT_A, 'stop')).status, 200);
+    assert.equal(fake.state.session?.state, 'review');
+
+    const restarted = createLocalVoiceBridge({ endpoint });
+    assert.equal((await restarted.snapshot('voice-user-a', id, PATIENT_A)).status, 404);
+    assert.deepEqual((await restarted.status('voice-user-a', PATIENT_A)).body, { availability: 'ready', session: null });
+    const again = await restarted.create('voice-user-a', { subject: PATIENT_A, mode: 'visit' });
+    assert.equal(again.status, 200, JSON.stringify(again.body));
+    assert.notEqual((again.body as { id: string }).id, id);
+    assert.notEqual(fake.state.session?.id, id);
+    await restarted.discard('voice-user-a', (again.body as { id: string }).id, PATIENT_A);
+    assert.equal(fake.state.session, null);
+});

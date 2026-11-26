@@ -3610,7 +3610,7 @@ function fakeVoiceBinary(t) {
     const binary = path.join(directory, 'mediflow-voice');
     writeFileSync(binary, `#!${process.execPath}
 const crypto = require('node:crypto'), http = require('node:http');
-const key = Buffer.from(process.env.MEDIFLOW_LOCAL_VOICE_SECRET, 'hex');
+let key = null, pending = '';
 const mac = message => crypto.createHmac('sha256', key).update(message).digest('hex');
 const server = http.createServer((request, response) => {
   const [time, nonce, signature] = String(request.headers['x-mediflow-voice-auth']).split('.');
@@ -3619,7 +3619,13 @@ const server = http.createServer((request, response) => {
   response.writeHead(status, { 'content-type': 'application/json', 'x-mediflow-voice-proof': mac('mediflow.local-voice.v1:response:' + nonce + ':' + status) });
   response.end(JSON.stringify(status === 200 ? { service: 'mediflow-voice', model: 'ready', session: null } : { error: 'auth' }));
 });
-server.listen(0, '127.0.0.1', () => process.stdout.write('MEDIFLOW_LOCAL_VOICE_READY ' + JSON.stringify({ port: server.address().port }) + '\\n'));
+process.stdin.on('data', chunk => {
+  if (key) return;
+  pending += chunk;
+  if (!pending.includes('\\n')) return;
+  key = Buffer.from(pending.slice(0, pending.indexOf('\\n')), 'hex');
+  server.listen(0, '127.0.0.1', () => process.stdout.write('MEDIFLOW_LOCAL_VOICE_READY ' + JSON.stringify({ port: server.address().port }) + '\\n'));
+});
 process.stdin.on('end', () => process.exit(0));
 process.stdin.resume();
 `, { mode: 0o755 });

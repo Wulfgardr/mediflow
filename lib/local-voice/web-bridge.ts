@@ -41,6 +41,12 @@ function vocabularyOf(value: unknown): string[] {
     return [...new Set(terms)].slice(0, MAX_VOCABULARY);
 }
 
+function orphanOf(error: unknown): string | null {
+    if (!(error instanceof LocalVoiceError) || error.code !== 'session-active') return null;
+    const id = (error.body as { session?: { id?: unknown } } | undefined)?.session?.id;
+    return typeof id === 'string' && SESSION.test(id) ? id : null;
+}
+
 function failure(error: unknown): LocalVoiceReply {
     if (error instanceof LocalVoiceError) {
         if (error.code === 'unreachable' || error.code === 'identity') return { status: 503, body: { error: 'off' } };
@@ -81,8 +87,8 @@ export function createLocalVoiceBridge({ endpoint = localVoiceEndpointFromEnv, p
             try { status = await voice.status(); } catch { return { status: 200, body: { availability: 'off', session: null } }; }
             const availability: LocalVoiceAvailability = status.model === 'ready' ? 'ready' : status.model === 'incomplete' ? 'model-incomplete' : 'model-missing';
             const current = status.session;
-            if (!current) return { status: 200, body: { availability, session: null } };
-            const owner = owners.get(current.id);
+            const owner = current ? owners.get(current.id) : undefined;
+            if (!current || !owner) return { status: 200, body: { availability, session: null } };
             const own = owner?.user === user && owner.subject === expected && current.subject === expected;
             return { status: 200, body: { availability, session: own
                 ? { id: current.id, state: current.state, own: true }
@@ -96,7 +102,13 @@ export function createLocalVoiceBridge({ endpoint = localVoiceEndpointFromEnv, p
             const voice = connect();
             if (!voice) return { status: 503, body: { error: 'off' } };
             try {
-                const created = await voice.create({ mode, subject, vocabulary: vocabularyOf(input.vocabulary) });
+                const request = { mode, subject, vocabulary: vocabularyOf(input.vocabulary) };
+                const created = await voice.create(request).catch(async (error: unknown) => {
+                    const orphan = orphanOf(error);
+                    if (!orphan || owners.has(orphan)) throw error;
+                    await voice.discard(orphan);
+                    return voice.create(request);
+                });
                 if (created.subject !== subject) {
                     await voice.discard(created.id).catch(() => undefined);
                     return { status: 409, body: { error: 'subject-mismatch' } };

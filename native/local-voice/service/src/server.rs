@@ -5,12 +5,13 @@ use crate::http::{self, Response};
 use crate::sessions::{self, Active, Command, Factory, Mode};
 use crate::stream::Refused;
 use serde_json::{Value, json};
-use std::io::{Read, Write};
+use std::io::{BufRead, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+use zeroize::Zeroizing;
 
 pub const READY: &str = "MEDIFLOW_LOCAL_VOICE_READY";
 pub const MAX_CONNECTIONS: usize = 16;
@@ -424,13 +425,17 @@ fn models_directory() -> Option<PathBuf> {
         .then(|| home.join("Library/Application Support/MediFlow GPUI/modelli-voce"))
 }
 
+pub fn read_secret(input: &mut impl BufRead) -> Option<Secret> {
+    let mut line = Zeroizing::new(String::new());
+    input.take(66).read_line(&mut line).ok()?;
+    Secret::from_hex(line.strip_suffix('\n')?)
+}
+
 pub fn run_from_env() -> i32 {
-    let Some(secret) = std::env::var("MEDIFLOW_LOCAL_VOICE_SECRET")
-        .ok()
-        .and_then(|s| Secret::from_hex(&s))
-    else {
+    let mut input = std::io::BufReader::new(std::io::stdin());
+    let Some(secret) = read_secret(&mut input) else {
         eprintln!(
-            "mediflow-voice: MEDIFLOW_LOCAL_VOICE_SECRET deve essere di 64 cifre esadecimali"
+            "mediflow-voice: la prima riga dello standard input deve essere il segreto di 64 cifre esadecimali"
         );
         return 2;
     };
@@ -450,8 +455,7 @@ pub fn run_from_env() -> i32 {
     let watcher = service.clone();
     std::thread::spawn(move || {
         let mut sink = [0u8; 256];
-        let mut stdin = std::io::stdin();
-        while stdin.read(&mut sink).is_ok_and(|n| n > 0) {}
+        while input.read(&mut sink).is_ok_and(|n| n > 0) {}
         watcher.shutdown();
         std::process::exit(0);
     });
@@ -471,7 +475,6 @@ mod tests {
     };
     use mediflow_local_voice::whisper::WhisperSession;
     use std::time::{SystemTime, UNIX_EPOCH};
-    use zeroize::Zeroizing;
 
     const KEY: &str = "5f5e5d5c5b5a595857565554535251504f4e4d4c4b4a49484746454443424140";
     const PORT: u16 = 41_000;
@@ -986,5 +989,25 @@ mod tests {
         let (request, _) = signed("GET", "/v1/status", b"");
         assert_eq!(service.handle(&request).status, 200);
         assert_eq!(service.handle(&request).status, 401);
+    }
+
+    #[test]
+    fn the_secret_arrives_only_as_the_first_line_of_standard_input() {
+        let mut input = std::io::Cursor::new(format!("{KEY}\nresto"));
+        assert!(read_secret(&mut input).is_some());
+        let mut rest = String::new();
+        input.read_to_string(&mut rest).unwrap();
+        assert_eq!(rest, "resto");
+        for broken in [
+            KEY.to_owned(),
+            format!("{}\n", &KEY[2..]),
+            format!("{KEY}0\n"),
+            String::new(),
+        ] {
+            assert!(
+                read_secret(&mut std::io::Cursor::new(broken.clone())).is_none(),
+                "{broken}"
+            );
+        }
     }
 }
