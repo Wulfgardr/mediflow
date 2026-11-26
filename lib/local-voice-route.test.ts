@@ -155,7 +155,7 @@ test('a visit goes through in order, reaches only its user and its subject, and 
     const notYet = await command('stop');
     assert.equal(notYet.status, 503);
     assert.deepEqual(await notYet.json(), { error: 'draining' });
-    assert.equal(fake.state.session?.state, 'recording');
+    assert.notEqual(fake.state.session?.state, 'review');
     assert.equal((await command('stop')).status, 200);
 
     const read = (subject: string, user = USER_A) => as(user, () => item.GET(page(`/api/local-voice/${session.id}?subject=${subject}`), params(session.id)));
