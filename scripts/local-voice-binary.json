@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "version": "0.9.1",
+  "binary": "mediflow-voice",
+  "relativePath": "native/local-voice/target/release/mediflow-voice",
+  "platforms": {
+    "darwin-arm64": {
+      "artifact": "mediflow-voice-darwin-arm64",
+      "asset": "mediflow-voice-0.9.1-darwin-arm64",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "bytes": 0,
+      "workflow": ".github/workflows/local-voice.yml",
+      "runId": 0,
+      "commit": "",
+      "rustToolchain": "1.98.1",
+      "signed": false
+    }
+  }
+}

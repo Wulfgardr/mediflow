@@ -16,7 +16,7 @@ import { containWindowsWeb } from './windows-runtime-job.mjs';
 import { createRuntimeLeases, acquireRuntimeLease, recordChildOwner, verifyChildOwner, runtimeProcessIdentity } from './runtime-leases.mjs';
 import { prepareLauncherState, localUiArchiveLock } from './launcher-state.mjs';
 import { verifyOwnedWeb } from './local-ui-web-identity.mjs';
-import { localVoiceBinary, superviseLocalVoiceService } from './local-voice-service.mjs';
+import { localVoiceBinary, pinnedLocalVoiceEntry, superviseLocalVoiceService, verifyLocalVoiceBinary } from './local-voice-service.mjs';
 import { LOCAL_VOICE_ENDPOINT_FRAME, LOCAL_VOICE_ENDPOINT_REQUEST } from './local-voice-web-endpoint.mjs';
 import { localVoiceClient } from '../lib/local-voice/client.mjs';
 import { LAN_PROXY_DEFAULT_PORT, createLanProxyController, readNetworkOverview } from './launcher-lan-proxy.mjs';
@@ -495,12 +495,23 @@ export async function main(args = process.argv.slice(2)) {
   if (!ownership.claimed) throw new Error('Un avvio di questa cartella è già in corso. Controlla il terminale e riprova.');
   const native = nativeApplication(ROOT);
   const dirty = identity.worktreeHash !== 'clean';
-  let state = { busy: false, ready: false, url: null, message: 'Scegli come aprire MediFlow.', needsInstall: false, voice: process.platform === 'darwin' ? 'absent' : 'unsupported' };
+  const voiceBinary = localVoiceBinary(ROOT);
+  const voicePinned = pinnedLocalVoiceEntry(ROOT, { platform: process.platform, arch: process.arch, version: identity.version });
+  const voiceCheck = verifyLocalVoiceBinary(voiceBinary, { root: ROOT, platform: process.platform, arch: process.arch, version: identity.version });
+  const initialVoiceState = voiceCheck.ok ? 'stopped'
+    : voiceCheck.reason === 'unsupported' ? 'unsupported'
+      : voiceCheck.reason === 'absent' ? 'absent'
+        : voiceCheck.reason === 'unpinned' ? 'unpinned' : 'untrusted';
+  let state = { busy: false, ready: false, url: null, message: 'Scegli come aprire MediFlow.', needsInstall: false, voice: initialVoiceState };
   let child = null, chooser = null, closing = false, installApproval = null, failedBuild = null, generation = 0;
   let terminal = null, useTerminal = false, webSecret = null, instance = null;
   let voiceChild = null;
-  const voiceBinary = localVoiceBinary(ROOT);
-  const voice = process.platform === 'darwin' && fs.existsSync(voiceBinary) ? superviseLocalVoiceService({ binary: voiceBinary, models: process.env.MEDIFLOW_LOCAL_VOICE_MODELS || undefined, log,
+  if (!voiceCheck.ok && ['mismatch', 'invalid', 'manifest-invalid', 'version-mismatch'].includes(voiceCheck.reason)) {
+    log(`Voce locale non avviata: verifica del programma fallita (${voiceCheck.reason}).`);
+  }
+  const voice = voiceCheck.ok && voicePinned.ok ? superviseLocalVoiceService({
+    binary: voiceBinary, expectedSha256: voicePinned.entry.sha256, expectedBytes: voicePinned.entry.bytes,
+    models: process.env.MEDIFLOW_LOCAL_VOICE_MODELS || undefined, log,
     publish: endpoint => {
       void refreshVoiceState(endpoint);
       sendVoiceEndpoint(endpoint);
@@ -511,7 +522,7 @@ export async function main(args = process.argv.slice(2)) {
   let voiceStateGeneration = 0;
   const refreshVoiceState = async endpoint => {
     const generation = ++voiceStateGeneration;
-    if (!endpoint) { state.voice = voice ? 'stopped' : process.platform === 'darwin' ? 'absent' : 'unsupported'; return; }
+    if (!endpoint) { state.voice = voice ? 'stopped' : initialVoiceState; return; }
     let next;
     try { const { model } = await localVoiceClient(endpoint).status(); next = ['ready', 'missing', 'incomplete'].includes(model) ? model : 'stopped'; }
     catch { next = 'stopped'; }
