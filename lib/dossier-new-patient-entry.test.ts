@@ -9,7 +9,7 @@ import { omocodicVariant, syntheticTaxCode } from './patient-identity.test-suppo
 const CF = syntheticTaxCode('nuova-scheda');
 const OTHER = syntheticTaxCode('altro-paziente');
 
-function source(key: string, options: { codes?: string[]; kind?: 'pdf' | 'image'; size?: number; status?: DossierDraftSource['status']; text?: string } = {}): DossierDraftSource {
+function source(key: string, options: { codes?: string[]; kind?: 'pdf' | 'image'; size?: number; status?: DossierDraftSource['status']; text?: string; transcript?: boolean } = {}): DossierDraftSource {
     return {
         key, group: '.', relativePath: key, fileName: key, size: options.size ?? 2048, sha256: key,
         classification: { kind: options.kind ?? 'pdf', mediaType: options.kind === 'image' ? 'image/png' : 'application/pdf', extractable: true, reason: '' },
@@ -17,7 +17,8 @@ function source(key: string, options: { codes?: string[]; kind?: 'pdf' | 'image'
         text: options.text ?? '', taxCodes: (options.codes ?? []).map((value) => ({ value, role: 'patient_cf' as const, checksumValid: true })),
         patientNames: [], documentDate: null as unknown as DossierDraftSource['documentDate'], facts: [],
         classificationResult: null as unknown as DossierDraftSource['classificationResult'], status: options.status ?? 'ready',
-        file: { name: key, size: 2048, type: 'application/pdf', lastModified: 0, relativePath: key, read: async () => new Uint8Array() },
+        file: { name: key, size: 2048, type: 'application/pdf', lastModified: 0, relativePath: key, read: async () => new Uint8Array(),
+            ...(options.transcript ? { origin: 'visit-transcript' as const } : {}) },
     };
 }
 const group = (...sources: DossierDraftSource[]): DossierDraftGroup => ({ key: '.', sources });
@@ -150,4 +151,52 @@ test('i documenti esclusi o illeggibili non propongono anagrafica', () => {
     ), 'lettera.pdf');
     assert.equal(allIdentityProposals(proposals).undecided.length, 0);
     assert.equal(proposals.some((item) => item.sourceName === 'escluso.pdf'), false);
+});
+
+const spokenNames = (text: string, transcript = true) => groupIdentityProposals(group(source('visita.pdf', { text, transcript })), 'visita.pdf')
+    .filter((proposal) => proposal.field === 'lastName' || proposal.field === 'firstName')
+    .map((proposal) => [proposal.field, proposal.value, proposal.excerpt]);
+
+test('trascrizione di una visita: nome e cognome detti senza due punti diventano proposte con il passaggio', () => {
+    assert.deepEqual(spokenNames('Medico: Mi dice cognome e nome?\nPaziente: Cognome Bianchi. Nome Anna. Sono nata il 12 marzo 1951.'),
+        [['lastName', 'Bianchi', 'Cognome Bianchi'], ['firstName', 'Anna', 'Nome Anna']]);
+    assert.deepEqual(spokenNames('Paziente: Di cognome Bianchi, di nome Anna Maria.'),
+        [['lastName', 'Bianchi', 'cognome Bianchi'], ['firstName', 'Anna Maria', 'nome Anna Maria']]);
+    assert.deepEqual(spokenNames('Paziente: Il mio cognome è De Luca, il nome è Anna.'),
+        [['lastName', 'De Luca', 'cognome è De Luca'], ['firstName', 'Anna', 'nome è Anna']]);
+    assert.deepEqual(spokenNames('Paziente: Buongiorno, mi chiamo Anna Bianchi.'),
+        [['lastName', 'Bianchi', 'mi chiamo Anna Bianchi'], ['firstName', 'Anna', 'mi chiamo Anna Bianchi']]);
+    assert.deepEqual(spokenNames('Medico: La signora si chiama Anna Bianchi, giusto?'),
+        [['lastName', 'Bianchi', 'si chiama Anna Bianchi'], ['firstName', 'Anna', 'si chiama Anna Bianchi']]);
+    assert.deepEqual(spokenNames('Paziente: Cognome: Bianchi. Nome: Anna.'),
+        [['lastName', 'Bianchi', 'Cognome: Bianchi'], ['firstName', 'Anna', 'Nome: Anna']]);
+});
+
+test('trascrizione di una visita: il nome di un familiare non diventa una proposta per il paziente', () => {
+    for (const text of [
+        'Paziente: Il cognome di mia moglie è Rossi.',
+        'Paziente: Mia moglie si chiama Maria Rossi.',
+        'Paziente: Mio figlio di nome Luca abita qui vicino.',
+        'Paziente: Mia madre, di cognome Verdi, aveva il diabete.',
+        'Medico: Suo marito come si chiama? Paziente: Mio marito si chiama Paolo Neri.',
+        'Paziente: Il nome del farmaco è Ramipril.',
+        'Paziente: Prendo il Ramipril. Cognome del medico di prima Bianchi.',
+    ]) assert.deepEqual(spokenNames(text), [], text);
+    assert.deepEqual(spokenNames('Paziente: Mia moglie si chiama Maria Rossi. Io mi chiamo Paolo Neri.'),
+        [['lastName', 'Neri', 'mi chiamo Paolo Neri'], ['firstName', 'Paolo', 'mi chiamo Paolo Neri']]);
+});
+
+test('un documento che non è una trascrizione resta alle etichette scritte', () => {
+    assert.deepEqual(spokenNames('Paziente: Cognome Bianchi. Nome Anna. Mi chiamo Anna Bianchi.', false), []);
+    assert.deepEqual(spokenNames('Cognome: Bianchi Nome: Anna', false), [['lastName', 'Bianchi', 'Cognome: Bianchi'], ['firstName', 'Anna', 'Nome: Anna']]);
+});
+
+test('le proposte dette passano dagli stessi controlli: valori diversi fra fonti e data fuori dal codice fiscale', () => {
+    const spoken = source('visita.pdf', { text: 'Paziente: Cognome Bianchi. Nome Anna. Sono nata il 12 marzo 1951.', transcript: true, codes: [CF] });
+    const letter = source('lettera.pdf', { text: 'Cognome: Bianco Nome: Anna' });
+    const all = allIdentityProposals(groupIdentityProposals(group(spoken, letter), 'visita.pdf'));
+    assert.ok(all.undecided.includes('lastName'));
+    assert.equal(all.values.firstName, 'Anna');
+    assert.equal(all.values.taxCode, CF);
+    if (!birthDateMatchesTaxCode(CF, '1951-03-12')) assert.ok(all.undecided.includes('birthDate'));
 });
