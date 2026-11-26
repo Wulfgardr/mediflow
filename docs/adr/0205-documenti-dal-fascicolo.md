@@ -1,6 +1,6 @@
 # ADR 0205: documenti dal Fascicolo Sanitario Elettronico nell'import Dossier
 
-Data: 2026-11-25. Stato: **Proposed**.
+Data: 2026-11-25. Stato: **Accepted** (decisione di Leonardo del 26/11/2026, con i tre punti non verificati accettati come limiti).
 Riferimenti: WUL-949, [ADR 0158](./0158-territorial-packs.md), [ADR 0177](./0177-moduli-di-giurisdizione.md), ADR 0175 e 0176 (dossier da cartella ed estrazione preparata, ritirati dall'albero ma vigenti nel codice di `lib/document-dossier-session.ts`).
 
 ## Contesto
@@ -33,13 +33,15 @@ L'estensione salva con `chrome.downloads` nella cartella dei download di Chrome 
 
 Il testo è «Tutti i N file della cartella sono in MediFlow, riletti identici. Puoi cancellare la cartella dai Download.» (con un solo file, «Il file della cartella è in MediFlow, riletto identico.»). Il numero resta perché il medico può confrontarlo con quanti file ha scaricato l'estensione. La forma «N su N» non serve: il consiglio compare solo quando i due numeri coincidono, e un conteggio parziale accanto a un invito a cancellare suggerirebbe che cancellare sia possibile anche prima. MediFlow non cancella file del disco: la cancellazione resta un gesto del medico, insieme alla voce nella cronologia dei download di Chrome.
 
-## Non verificato
+## Limiti accettati
+
+Il 26/11/2026 Leonardo ha accettato l'ADR con questi tre punti non verificati:
 
 - Se ogni scaricamento lascia nel Fascicolo un accesso che il paziente vede nel proprio registro degli accessi.
 - Se le condizioni d'uso del portale operatori ammettono lo scarico automatico o in blocco dei documenti.
 - Che il canale ufficiale per un gestionale richieda una registrazione presso ARIA; questa decisione non lo sostituisce.
 
-Restano punti da chiarire prima dell'uso oltre la prova di Leonardo. Riga proposta per i limiti delle note di rilascio:
+Restano punti da chiarire prima dell'uso oltre la prova di Leonardo. La riga dei limiti dichiarati nelle note di rilascio:
 
 > Documenti dal Fascicolo: MediFlow importa la cartella scaricata dall'estensione separata di Chrome e non parla con il portale SISS. Non sono verificati il registro degli accessi visibile al paziente, le condizioni d'uso del portale per lo scarico in blocco e la registrazione presso ARIA richiesta dal canale ufficiale.
 
