@@ -1,5 +1,6 @@
 import { expect, type Page } from '@playwright/test';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
@@ -112,6 +113,7 @@ test('WUL-949: la cartella del Fascicolo entra nell’import dalla scheda, si fe
         await group.getByLabel('Ho controllato le fonti e confermo che appartengono alla scheda scelta.').check();
         await group.getByRole('button', { name: 'Salva 2 originali nella scheda', exact: true }).click();
         await expect(group.getByTestId('dossier-acquire-outcome')).toHaveText(['Originale salvato e riletto identico', 'Originale salvato e riletto identico'], { timeout: 60_000 });
+        await expect(panel.getByTestId('fse-cleanup'), 'un file della cartella non è stato letto: nessun consiglio di cancellarla').toHaveCount(0);
         const documents = panel.getByTestId('dossier-document');
         await expect(documents).toHaveCount(2, { timeout: 30_000 });
         await expect(documents.nth(0).getByRole('heading', { level: 3 })).toContainText('2025-03-14 · Referto di laboratorio');
@@ -137,8 +139,10 @@ test('WUL-949: la cartella del Fascicolo entra nell’import dalla scheda, si fe
         await group.getByLabel('Ho controllato le fonti e confermo che appartengono alla scheda scelta.').check();
         await group.getByRole('button', { name: 'Salva 1 originale nella scheda', exact: true }).click();
         await expect(group.locator('[data-source-status="ready"]').getByTestId('dossier-acquire-outcome')).toHaveText('Originale salvato e riletto identico', { timeout: 60_000 });
-        await expect(group.getByTestId('fse-cleanup')).toHaveText('Tutti i documenti della cartella sono in MediFlow. Puoi cancellare la cartella dai Download.');
-        await group.screenshot({ path: path.join(evidence, '4b-proposta-di-pulizia.png') });
+        const advice = panel.getByTestId('fse-cleanup');
+        await expect(advice).toHaveText('Tutti i 3 file della cartella sono in MediFlow, riletti identici. Puoi cancellare la cartella dai Download.');
+        await advice.scrollIntoViewIfNeeded();
+        await page.screenshot({ path: path.join(evidence, '4b-proposta-di-pulizia.png') });
         expect(await attachmentCount(page, patientId)).toBe(3);
         expect(await attachmentCount(page, otherId)).toBe(0);
 
@@ -164,6 +168,57 @@ test('WUL-949: la cartella del Fascicolo entra nell’import dalla scheda, si fe
         await expect(page.getByTestId('patient-document-create')).toBeVisible();
         await expect(page.getByRole('button', { name: 'Documenti dal Fascicolo', exact: true })).toHaveCount(0);
         await page.screenshot({ path: path.join(evidence, '6-senza-lombardia.png'), fullPage: true });
+    } finally {
+        rmSync(root, { recursive: true, force: true });
+    }
+});
+
+test('WUL-949: con un’estrazione preparata che copre parte della cartella il consiglio di cancellarla aspetta tutti i gruppi', async ({ page }, info) => {
+    test.setTimeout(240_000);
+    const evidence = process.env.FSE_EVIDENCE_DIR || info.outputPath('fascicolo');
+    mkdirSync(evidence, { recursive: true });
+    const taxCode = randomSyntheticTaxCode();
+    const root = mkdtempSync(path.join(tmpdir(), 'mediflow-fse-prepared-e2e-'));
+    const folder = path.join(root, `FSE_${taxCode}`);
+    mkdirSync(folder);
+    try {
+        const covered = '2025-03-14_LAB_REFERTO_SPECIALISTICO_LABORATORIO_ASST_SINTETICA_0a1b2c3d.pdf';
+        await writeFseDocument(folder, covered, taxCode, 'Esami sintetici');
+        await writeFseDocument(folder, '2025-06-02_REF_VISITA_CARDIOLOGICA_ASST_SINTETICA_1b2c3d4e.pdf', taxCode, 'Visita sintetica');
+        const preparedPath = path.join(root, 'estrazione.json');
+        writeFileSync(preparedPath, JSON.stringify({ schema: 'mediflow.dossier_prepared_extraction.v1', preparedAt: new Date().toISOString(), preparedBy: 'e2e', sources: [{
+            sha256: createHash('sha256').update(readFileSync(path.join(folder, covered))).digest('hex'), fileName: covered, documentDate: '2025-03-14',
+            patient: { taxCode, lastName: 'Sintetico', firstName: 'Mario' }, summary: { title: 'Esami', text: 'Esami sintetici nella norma.' },
+            coverage: { pages: 1, unreadablePages: [], complete: true }, facts: [] }] }));
+
+        await bootstrapUnlockedSession(page, PIN);
+        await switchPreset(page, 'core+it+lom');
+        const patientId = await createPatient(page, 'Sintetico', taxCode);
+        await page.goto(`/patients/import/dossier?patientId=${patientId}`);
+        await unlockIfNeeded(page, PIN);
+        const panel = page.getByTestId('dossier-import');
+        await panel.getByTestId('dossier-prepared').setInputFiles(preparedPath);
+        await expect(panel.getByTestId('dossier-prepared-status')).toContainText('1 documento');
+        await expect(panel.getByRole('button', { name: 'Documenti dal Fascicolo', exact: true })).toBeEnabled();
+        await panel.getByTestId('fse-folder').setInputFiles(folder);
+        const groups = panel.getByTestId('dossier-group');
+        await expect(groups).toHaveCount(2, { timeout: 60_000 });
+        const preparedGroup = panel.locator(`[data-testid="dossier-group"][data-group="cf:${taxCode}"]`);
+        const folderGroup = panel.locator('[data-testid="dossier-group"][data-group="."]');
+        const save = async (group: typeof preparedGroup) => {
+            await expect(group.getByLabel('Scheda di destinazione')).toHaveValue(patientId);
+            await group.getByLabel('Ho controllato le fonti e confermo che appartengono alla scheda scelta.').check();
+            await group.getByRole('button', { name: 'Salva 1 originale nella scheda', exact: true }).click();
+            await expect(group.getByTestId('dossier-acquire-outcome')).toHaveText('Originale salvato e riletto identico', { timeout: 60_000 });
+        };
+        await save(preparedGroup);
+        await expect(panel.getByTestId('fse-cleanup'), 'l’altro gruppo della cartella non è salvato: nessun consiglio di cancellarla').toHaveCount(0);
+        await preparedGroup.scrollIntoViewIfNeeded();
+        await page.screenshot({ path: path.join(evidence, '7-estrazione-parziale-senza-consiglio.png') });
+        expect(await attachmentCount(page, patientId)).toBe(1);
+        await save(folderGroup);
+        await expect(panel.getByTestId('fse-cleanup')).toHaveText('Tutti i 2 file della cartella sono in MediFlow, riletti identici. Puoi cancellare la cartella dai Download.');
+        expect(await attachmentCount(page, patientId)).toBe(2);
     } finally {
         rmSync(root, { recursive: true, force: true });
     }
