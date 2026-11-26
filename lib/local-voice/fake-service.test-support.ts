@@ -91,6 +91,7 @@ export async function startFakeLocalVoice({ secret, port = 0, model = 'ready', l
                 const next = command === 'start' ? 'preparing' : command === 'pause' ? 'paused' : command === 'resume' ? 'preparing' : 'review';
                 if (command === 'start' || command === 'resume') { session.pending = next; return reply(202, snapshot()); }
                 session.state = next;
+                session.pending = null;
                 return reply(202, snapshot());
             }
             return reply(404, { error: 'not-found' });
