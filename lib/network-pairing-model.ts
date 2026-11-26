@@ -8,6 +8,7 @@ import type {
 import { createConfirmedPairingResponse, type PairingIntentDraftResult } from './network-contract';
 
 export const NETWORK_PAIRING_STATE_KEY = 'network.pairing.state';
+export const NETWORK_PAIRING_INTENTS_KEY = 'network.pairing.intents';
 export const NETWORK_PAIRED_CLIENT_ID_HEADER = 'x-mediflow-paired-client-id';
 export const NETWORK_PAIRED_CLIENT_TOKEN_HEADER = 'x-mediflow-paired-client-token';
 
@@ -183,6 +184,26 @@ function boundPendingPairingIntents(intents: NetworkPairingIntentResponse[]): Ne
         if (fitsPendingPairingIntent(intent)) bounded.push(intent);
     }
     return bounded;
+}
+
+export function parsePendingPairingIntents(
+    rawValue: string | null | undefined,
+    now: Date = new Date()
+): NetworkPairingIntentResponse[] {
+    if (!rawValue) return [];
+    try {
+        const parsed = JSON.parse(rawValue) as Record<string, unknown>;
+        const intents = Array.isArray(parsed.intents)
+            ? parsed.intents.map(parsePairingIntent).filter((item): item is NetworkPairingIntentResponse => item !== null)
+            : [];
+        return boundPendingPairingIntents(pruneExpiredPairingIntents(intents, now));
+    } catch {
+        return [];
+    }
+}
+
+export function serializePendingPairingIntents(intents: NetworkPairingIntentResponse[]): string {
+    return JSON.stringify({ intents: boundPendingPairingIntents(intents) });
 }
 
 export function serializeNetworkPairingState(state: NetworkPairingState): string {

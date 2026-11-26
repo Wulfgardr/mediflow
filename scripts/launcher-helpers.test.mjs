@@ -3832,3 +3832,54 @@ test('the iPhone proxy ends and frees its port when the launcher that started it
     assert.equal(alive(), false, `proxy ${pid} still running after its launcher was killed`);
     assert.equal(await accepts(), false, `port ${port} still accepts connections`);
 });
+
+test('LAN proxy controller terminates an orphan proxy when archive is local-only and cleans stale files', { skip: process.platform === 'win32' || spawnSync('openssl', ['version'], { windowsHide: true }).error ? 'openssl non disponibile' : false, timeout: 30_000 }, async t => {
+    const { startLanProxy, createLanProxyController } = await import('./launcher-lan-proxy.mjs');
+    const data = mkdtempSync(path.join(tmpdir(), 'mediflow-lan-orphan-local-'));
+    t.after(() => rmSync(data, { recursive: true, force: true }));
+    const orphan = await startLanProxy({ root: repoRoot, dataDir: data, target: 'http://127.0.0.1:9', port: 0, bindHost: '127.0.0.1' });
+    t.after(async () => { await orphan.stop(); });
+    const controller = createLanProxyController({
+        root: repoRoot,
+        dataDir: data,
+        port: orphan.port,
+        readOverview: async () => ({ operatingMode: 'local-only', hasPairedClients: false }),
+    });
+    await controller.follow('http://127.0.0.1:9');
+    assert.deepEqual(controller.status(), { state: 'off', paired: false, port: null, reason: null });
+    assert.throws(() => process.kill(orphan.pid, 0), { code: 'ESRCH' });
+    assert.equal(existsSync(path.join(data, 'runtime-status.json')), false);
+    assert.equal(existsSync(path.join(data, 'local-api-tls-proxy.pid')), false);
+});
+
+test('LAN proxy controller re-syncs and stops the proxy if mode switches to local-only while busy', async () => {
+    const { createLanProxyController } = await import('./launcher-lan-proxy.mjs');
+    const data = mkdtempSync(path.join(tmpdir(), 'mediflow-lan-race-'));
+    try {
+        let mode = 'network-home-base';
+        let releaseStart;
+        const startGate = new Promise(resolve => { releaseStart = resolve; });
+        let stopCalled = 0;
+        const controller = createLanProxyController({
+            root: repoRoot,
+            dataDir: data,
+            port: 0,
+            readOverview: async () => ({ operatingMode: mode, hasPairedClients: false }),
+            start: async () => {
+                await startGate;
+                return { port: 43443, pin: 'a'.repeat(64), pid: 999999, exited: new Promise(() => {}), stop: async () => { stopCalled += 1; } };
+            },
+        });
+        const firstFollow = controller.follow('http://127.0.0.1:9');
+        await new Promise(resolve => setTimeout(resolve, 20));
+        mode = 'local-only';
+        const refreshDuringBusy = controller.refresh();
+        releaseStart();
+        await Promise.all([firstFollow, refreshDuringBusy]);
+        assert.deepEqual(controller.status(), { state: 'off', paired: false, port: null, reason: null });
+        assert.equal(controller.pid(), null);
+        assert.equal(stopCalled, 1);
+    } finally {
+        rmSync(data, { recursive: true, force: true });
+    }
+});
