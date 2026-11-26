@@ -116,8 +116,12 @@ function redactKnownValue(
 ): void {
     const trimmed = value.trim();
     if (!trimmed) return;
-    redact(entity, new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(trimmed)}(?![\\p{L}\\p{N}])`, 'giu'));
+    const words = trimmed.split(/[\s,.\-\p{Cf}]+/u).filter(Boolean).map(escapeRegExp);
+    if (!words.length) return;
+    redact(entity, new RegExp(`(?<![\\p{L}\\p{N}])${words.join(KNOWN_VALUE_SEPARATOR)}(?![\\p{L}\\p{N}])`, 'giu'));
 }
+
+const KNOWN_VALUE_SEPARATOR = '[\\s,.\\-\\p{Cf}]{1,3}';
 
 function tokenLabel(entity: string): string {
     return {
