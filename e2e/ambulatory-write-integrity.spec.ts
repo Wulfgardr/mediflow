@@ -96,20 +96,41 @@ test('ambulatory clear rolls back audit failure, preserves live patients and rel
         await unlockIfNeeded(page, process.env.E2E_PIN || '1234');
         const row = page.getByRole('treeitem').filter({ has: page.getByRole('heading', { name: new RegExp(name) }) });
         const actions: Array<{ submittedVersion: number; status: number }> = [];
-        const clear = async () => {
+        const pin = process.env.E2E_PIN || '1234';
+        const openPlan = async (alreadyCleared = false) => {
             await row.getByRole('button', { name: 'Azioni', exact: true }).click();
+            const prepared = page.waitForResponse(r => new URL(r.url()).pathname === '/api/ambulatories/commands/prepare' && r.request().method() === 'POST');
             await page.getByRole('menu', { name: 'Azioni', exact: true }).getByRole('menuitem', { name: 'Svuota ambiente di test', exact: true }).click();
+            const plan = await prepared;
+            expect(plan.status()).toBe(200);
             const dialog = page.getByRole('dialog');
-            await expect(dialog).toContainText('saranno spostati nel Cestino');
-            await expect(dialog).toContainText('sedi operative resteranno disponibili');
+            await expect(dialog).toContainText(new RegExp(`Svuotare «${name}»`));
+            if (alreadyCleared) await expect(dialog).toContainText('La sede è già vuota.');
+            else {
+                await expect(dialog).toContainText('1 paziente va nel Cestino.');
+                await expect(dialog).toContainText('1 paziente resta nelle altre sedi.');
+            }
+            return { dialog, submittedVersion: plan.request().postDataJSON().expectedVersion as number };
+        };
+        const clear = async (alreadyCleared = false) => {
+            const { dialog, submittedVersion } = await openPlan(alreadyCleared);
             if (!actions.length) await page.screenshot({ path: testInfo.outputPath('clear-confirmation.png') });
-            const response = page.waitForResponse(r => new URL(r.url()).pathname === '/api/ambulatories/clear' && r.request().method() === 'POST');
+            await dialog.getByLabel('PIN di conferma').fill(pin);
+            const response = page.waitForResponse(r => new URL(r.url()).pathname === '/api/ambulatories/commands/execute' && r.request().method() === 'POST');
             await dialog.getByRole('button', { name: 'Svuota', exact: true }).click();
             const result = await response;
-            actions.push({ submittedVersion: result.request().postDataJSON().version as number, status: result.status() });
+            actions.push({ submittedVersion, status: result.status() });
             await expect(dialog).toHaveCount(0);
             return result.status();
         };
+        const wrongPin = await openPlan();
+        await wrongPin.dialog.getByLabel('PIN di conferma').fill(pin === '9753' ? '9754' : '9753');
+        await wrongPin.dialog.getByRole('button', { name: 'Svuota', exact: true }).click();
+        await expect(wrongPin.dialog.getByRole('alert')).toHaveText('PIN non accettato.');
+        await page.screenshot({ path: testInfo.outputPath('clear-wrong-pin.png') });
+        expect(read()).toEqual(before);
+        await wrongPin.dialog.getByRole('button', { name: 'Annulla', exact: true }).click();
+        await expect(wrongPin.dialog).toHaveCount(0);
         sql.exec("CREATE TRIGGER synthetic_ambulatory_ui_audit BEFORE INSERT ON audit_events WHEN NEW.event_type='patient.deleted' BEGIN SELECT RAISE(IGNORE); END");
         expect(await clear()).toBe(500);
         expect(read()).toEqual(before);
@@ -132,7 +153,7 @@ test('ambulatory clear rolls back audit failure, preserves live patients and rel
         await page.unroute('**/api/ambulatories');
         await page.getByRole('button', { name: 'Riprova', exact: true }).click();
         await expect(row.getByRole('button', { name: 'Azioni', exact: true })).toBeEnabled();
-        expect(await clear()).toBe(200);
+        expect(await clear(true)).toBe(200);
         await expect(row.getByRole('button', { name: 'Azioni', exact: true })).toBeEnabled();
         expect(actions).toEqual([{ submittedVersion: 1, status: 500 }, { submittedVersion: 1, status: 200 }, { submittedVersion: 2, status: 200 }]);
         const after = read();
@@ -196,7 +217,11 @@ test('ambulatory clear rolls back audit failure, preserves live patients and rel
             expect(currentList.status()).toBe(200);
             const currentAmbulatory = (await currentList.json() as Array<{ id: string; version: number }>).find(item => item.id === id);
             expect(currentAmbulatory).toBeTruthy();
-            const deleted = await documentRequests(page).delete(`/api/ambulatories/${id}`, { data: { version: currentAmbulatory!.version } });
+            const prepared = await documentRequests(page).post('/api/ambulatories/commands/prepare',
+                { data: { operation: 'ambulatory.delete.v1', ambulatoryId: id, expectedVersion: currentAmbulatory!.version } });
+            expect(prepared.status()).toBe(200);
+            const deleted = await documentRequests(page).post('/api/ambulatories/commands/execute',
+                { data: { reference: (await prepared.json() as { reference: string }).reference, pin: process.env.E2E_PIN || '1234' } });
             expect(deleted.status()).toBe(200);
             const finalList = await documentRequests(page).get('/api/ambulatories');
             expect(finalList.status()).toBe(200);
@@ -215,6 +240,83 @@ test('ambulatory clear rolls back audit failure, preserves live patients and rel
                 console.error('Ambulatory fixture cleanup failed:', cleanupError);
             }
             if (!primaryError) throw cleanupError;
+        }
+    }
+});
+
+test('a sede is deleted only after its plan and the PIN, and a sede with patients is refused before any dialog', async ({ page, baseURL }, testInfo) => {
+    test.skip(process.env.MF085_SYNTHETIC_E2E !== '1', 'Requires an isolated synthetic server.');
+    const dir = process.env.MEDIFLOW_DATA_DIR;
+    const url = new URL(baseURL!);
+    if (!dir || !isAbsolute(dir) || url.hostname !== '127.0.0.1' || !url.port || url.port === '3000') {
+        throw new Error('Dedicated synthetic data and loopback port required');
+    }
+    const pin = process.env.E2E_PIN || '1234';
+    await bootstrapUnlockedSession(page, pin);
+    const stamp = Date.now();
+    const ids: string[] = [];
+    for (const name of [`Sede vuota ${stamp}`, `Sede con paziente ${stamp}`]) {
+        const created = await documentRequests(page).post('/api/ambulatories', { data: { name, type: 'live' } });
+        expect(created.status()).toBe(201);
+        ids.push((await created.json() as { id: string }).id);
+    }
+    const sql = new Database(join(dir, 'medical.db'), { fileMustExist: true });
+    const patientId = randomUUID();
+    try {
+        const patient = await documentRequests(page).post('/api/patients', { data: {
+            id: patientId, firstName: 'Sintetico', lastName: 'Sede', taxCode: `SED${patientId.replaceAll('-', '').slice(0, 13).toUpperCase()}`, isAdi: false,
+        } });
+        expect(patient.status()).toBe(201);
+        sql.prepare('INSERT INTO patients_to_ambulatories (patient_id, ambulatory_id) VALUES (?, ?)').run(patientId, ids[1]);
+        await page.goto('/settings/ambulatories');
+        await unlockIfNeeded(page, pin);
+        const rowOf = (name: string) => page.getByRole('treeitem').filter({ has: page.getByRole('heading', { name }) });
+        const openAction = async (name: string) => {
+            await rowOf(name).getByRole('button', { name: 'Azioni', exact: true }).click();
+            await page.getByRole('menu', { name: 'Azioni', exact: true }).getByRole('menuitem', { name: 'Elimina sede', exact: true }).click();
+        };
+
+        await openAction(`Sede con paziente ${stamp}`);
+        await expect(page.getByTestId('settings-ambulatories-section').getByRole('alert')).toContainText('La sede ha ancora pazienti: spostali prima di eliminarla.');
+        await expect(page.getByRole('dialog')).toHaveCount(0);
+        await page.screenshot({ path: testInfo.outputPath('delete-blocked.png') });
+        await page.getByRole('button', { name: 'Riprova', exact: true }).click();
+
+        const auditBefore = (sql.prepare("SELECT COUNT(*) AS count FROM audit_events WHERE event_type='ambulatory.deleted' AND subject_ref=?").get(ids[0]) as { count: number }).count;
+        await openAction(`Sede vuota ${stamp}`);
+        const dialog = page.getByRole('dialog');
+        await expect(dialog).toContainText(`Eliminare la sede «Sede vuota ${stamp}»?`);
+        await expect(dialog).toContainText('Nessun paziente e nessun reparto collegato.');
+        await page.screenshot({ path: testInfo.outputPath('delete-confirmation.png') });
+        await dialog.getByLabel('PIN di conferma').fill(pin);
+        let releaseExecute = () => {};
+        const held = new Promise<void>(resolve => { releaseExecute = resolve; });
+        await page.route('**/api/ambulatories/commands/execute', async route => { await held; await route.continue(); });
+        const executed = page.waitForResponse(r => new URL(r.url()).pathname === '/api/ambulatories/commands/execute');
+        await dialog.getByRole('button', { name: 'Elimina', exact: true }).click();
+        await expect(dialog.getByRole('button', { name: 'Annulla', exact: true })).toBeDisabled();
+        await page.keyboard.press('Escape');
+        await expect(dialog, 'the dialog stays open while the command is being executed').toBeVisible({ timeout: 3000 });
+        releaseExecute();
+        expect((await executed).status()).toBe(200);
+        await page.unroute('**/api/ambulatories/commands/execute');
+        await expect(dialog).toHaveCount(0);
+        await expect(page.getByTestId('settings-ambulatories-section').getByRole('status').filter({ hasText: 'Ambulatorio eliminato.' })).toBeVisible();
+        await expect(rowOf(`Sede vuota ${stamp}`)).toHaveCount(0);
+        await page.screenshot({ path: testInfo.outputPath('delete-completed.png') });
+        expect(sql.prepare('SELECT id FROM ambulatories WHERE id=?').get(ids[0])).toBeUndefined();
+        expect((sql.prepare("SELECT COUNT(*) AS count FROM audit_events WHERE event_type='ambulatory.deleted' AND subject_ref=? AND source_surface='web'").get(ids[0]) as { count: number }).count).toBe(auditBefore + 1);
+    } finally {
+        sql.prepare('DELETE FROM patients_to_ambulatories WHERE patient_id=? AND ambulatory_id=?').run(patientId, ids[1]);
+        sql.close();
+        const leftover = (await (await documentRequests(page).get('/api/ambulatories')).json() as Array<{ id: string; version: number }>).find(item => item.id === ids[1]);
+        if (leftover) {
+            const prepared = await documentRequests(page).post('/api/ambulatories/commands/prepare',
+                { data: { operation: 'ambulatory.delete.v1', ambulatoryId: leftover.id, expectedVersion: leftover.version } });
+            expect(prepared.status()).toBe(200);
+            const removed = await documentRequests(page).post('/api/ambulatories/commands/execute',
+                { data: { reference: (await prepared.json() as { reference: string }).reference, pin } });
+            expect(removed.status()).toBe(200);
         }
     }
 });

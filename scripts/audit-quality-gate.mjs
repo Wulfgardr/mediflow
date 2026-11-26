@@ -180,10 +180,8 @@ const REQUIRED_ROUTE_AUDIT = [
     /* eight ordinary ambulatory writers, including test-container clear. */
     { route: 'app/api/ambulatories/route.ts', events: ['ambulatory.created'],
         writerContracts: [ambulatoryAuditContract('POST', 'host', 'create')] },
-    { route: 'app/api/ambulatories/[id]/route.ts', events: ['ambulatory.updated', 'ambulatory.deleted'],
-        writerContracts: [ambulatoryAuditContract('PUT', 'host', 'update'), ambulatoryAuditContract('DELETE', 'host', 'delete')] },
-    { route: 'app/api/ambulatories/clear/route.ts', events: ['ambulatory.cleared', 'patient.deleted'],
-        writerContracts: [ambulatoryAuditContract('POST', 'host', 'clear')] },
+    { route: 'app/api/ambulatories/[id]/route.ts', events: ['ambulatory.updated'],
+        writerContracts: [ambulatoryAuditContract('PUT', 'host', 'update')] },
     { route: 'app/api/v1/network/ambulatories/route.ts', events: ['ambulatory.created'],
         writerContracts: [ambulatoryAuditContract('POST', 'network', 'create')] },
     { route: 'app/api/v1/network/ambulatories/[id]/route.ts', events: ['ambulatory.updated'],

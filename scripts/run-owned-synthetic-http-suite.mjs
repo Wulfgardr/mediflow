@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import net from 'node:net';
@@ -120,7 +120,7 @@ async function run() {
                             MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1', MEDIFLOW_THERAPY_HTTP_ONLY_PAIRED: '0', MF085_SYNTHETIC_E2E: '1',
                             MEDIFLOW_PROVIDER_V2_ENABLED: '0', MEDIFLOW_PROVIDER_V2_NETWORK: '0',
                             TMPDIR: dataDir, E2E_BASE_URL: `http://127.0.0.1:${port}`,
-                            MEDIFLOW_LOCAL_API_TOKEN: randomUUID(), E2E_USERNAME: 'admin', E2E_PIN: randomUUID(),
+                            MEDIFLOW_LOCAL_API_TOKEN: randomUUID(), E2E_USERNAME: 'admin', E2E_PIN: String(randomInt(10_000_000, 100_000_000)),
                         } });
                     pid = child.pid;
                     timer = setTimeout(() => {

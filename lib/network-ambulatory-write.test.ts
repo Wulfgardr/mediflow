@@ -18,8 +18,8 @@ type LoadedModules = {
     schema: typeof import('./schema.ts');
     createAmbulatory: typeof import('./ambulatory-write.ts').createAmbulatory;
     updateAmbulatory: typeof import('./ambulatory-write.ts').updateAmbulatory;
-    deleteAmbulatory: typeof import('./ambulatory-write.ts').deleteAmbulatory;
-    clearAmbulatory: typeof import('./ambulatory-write.ts').clearAmbulatory;
+    deleteAmbulatory: typeof import('./ambulatory-host-destructive-test-fixture.ts').deleteAmbulatory;
+    clearAmbulatory: typeof import('./ambulatory-host-destructive-test-fixture.ts').clearAmbulatory;
     createNetworkAmbulatory: typeof import('./network-ambulatory-write.ts').createNetworkAmbulatory;
 };
 
@@ -48,8 +48,9 @@ async function loadModules(): Promise<LoadedModules> {
         cleanupCookies = installNetworkPatientCookieFixture(dataDir, cookieState);
         modulesPromise = Promise.all([
             import('./db-server.ts'), import('./schema.ts'), import('./ambulatory-write.ts'), import('./network-ambulatory-write.ts'),
-        ]).then(([dbServerModule, schema, ambulatoryWrite, networkWrite]) => ({
-            dbServer: dbServerModule.dbServer, schema, ...ambulatoryWrite, ...networkWrite,
+            import('./ambulatory-host-destructive-test-fixture.ts'),
+        ]).then(([dbServerModule, schema, ambulatoryWrite, networkWrite, hostDestructive]) => ({
+            dbServer: dbServerModule.dbServer, schema, ...ambulatoryWrite, ...networkWrite, ...hostDestructive,
         }));
     }
     if (!archiveBound) { await modulesPromise; bindSyntheticArchiveSessions('ambulatory-test-session'); archiveBound = true; }

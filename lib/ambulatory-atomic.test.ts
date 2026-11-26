@@ -20,7 +20,7 @@ const { dbServer, openDbServer } = await import('./db-server.ts');
 openDbServer();
 bindSyntheticArchiveSessions('synthetic-session', 'synthetic-native', 'synthetic-local-api');
 const schema = await import('./schema.ts');
-const host = await import('./ambulatory-write.ts');
+const host = { ...await import('./ambulatory-write.ts'), ...await import('./ambulatory-host-destructive-test-fixture.ts') };
 const paired = await import('./network-ambulatory-write.ts');
 const sql = new Database(join(dataDir, 'medical.db'));
 const baseline = process.env.MEDIFLOW_AMBULATORY_BASELINE === '1';

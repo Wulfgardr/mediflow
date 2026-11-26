@@ -2,17 +2,29 @@
 
 import { formatCountLabel } from '@/lib/format-count';
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { db, Ambulatory, ApiConflictError } from '@/lib/db';
+import { db, Ambulatory } from '@/lib/db';
 import { Plus, Loader2, CornerDownRight } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { SETTINGS_INPUT_CLASS, SETTINGS_LABEL_CLASS, SETTINGS_PRIMARY_BUTTON_CLASS } from '@/components/settings/settings-ui';
-import { useConfirm } from '@/components/ui/confirm-dialog';
 import styles from '@/components/settings/maintenance-pages.module.css';
 import { PatientSheetMenu } from '@/components/patient-sheet-menu';
 import { ViewState } from '@/components/ui/view-state';
+import { AmbulatoryDestructiveDialog } from '@/components/settings/ambulatory-destructive-dialog';
+import { prepareAmbulatoryCommand, type WebAmbulatoryPlan, type WebAmbulatoryReceipt } from '@/lib/web-ambulatory-destructive-client';
+import type { AmbulatoryDestructiveOperation } from '@/lib/ambulatory-destructive-command-contract';
+
+const commandRefusals: Record<string, string> = {
+    VERSION_CONFLICT: 'La sede è cambiata. Aggiorna l’elenco e riprova se serve.',
+    AMBULATORY_NOT_FOUND: 'La sede non è più disponibile. Aggiorna l’elenco.',
+    AMBULATORY_HAS_PATIENTS: 'La sede ha ancora pazienti: spostali prima di eliminarla.',
+    AMBULATORY_HAS_CHILDREN: 'La sede ha dei reparti: spostali prima di eliminarla.',
+    LAST_AMBULATORY: 'È l’unica sede: non si può eliminare.',
+    SET_ANOTHER_DEFAULT_FIRST: 'Scegli prima un’altra sede predefinita.',
+};
+const commandFailure = (operation: AmbulatoryDestructiveOperation, code: string) => commandRefusals[code]
+    ?? (operation === 'ambulatory.clear-test.v1' ? 'Errore durante lo svuotamento' : "Errore durante l'eliminazione");
 
 export default function AmbulatoryManagerPage() {
-    const confirm = useConfirm();
     const [ambulatories, setAmbulatories] = useState<Ambulatory[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isCreating, setIsCreating] = useState(false);
@@ -27,10 +39,11 @@ export default function AmbulatoryManagerPage() {
     const [newAddress, setNewAddress] = useState('');
     const [newParentId, setNewParentId] = useState<string>('');
     const [newType, setNewType] = useState<'live' | 'test'>('live');
-    const [isClearing, setIsClearing] = useState(false);
+    const [isPreparing, setIsPreparing] = useState(false);
+    const [command, setCommand] = useState<WebAmbulatoryPlan | null>(null);
     // Keep hierarchy rendering linear even when the sede list grows.
     const ambulatoryById = useMemo(() => new Map(ambulatories.map((item) => [item.id, item])), [ambulatories]);
-    const actionsBlocked = isLoading || isCreating || isClearing || isUpdating || Boolean(readError || actionError);
+    const actionsBlocked = isLoading || isCreating || isUpdating || Boolean(readError || actionError);
     const selectedParent = newParentId ? ambulatoryById.get(newParentId) : null;
 
     useEffect(() => {
@@ -82,54 +95,39 @@ export default function AmbulatoryManagerPage() {
         }
     };
 
-    const handleClear = async (id: string) => {
+    const openCommand = async (operation: AmbulatoryDestructiveOperation, id: string) => {
+        if (isPreparing) return;
         const target = ambulatoryById.get(id);
-        const { confirmed } = await confirm({
-            title: `Svuotare "${target?.name || 'ambiente di test'}"?`,
-            message: 'Tutti i pazienti verranno rimossi da questo ambiente. Quelli presenti solo in ambienti di prova saranno spostati nel Cestino; quelli presenti anche in sedi operative resteranno disponibili.',
-            confirmLabel: 'Svuota',
-            tone: 'danger'
-        });
-        if (!confirmed) return;
         if (typeof target?.version !== 'number') {
             setActionError('Versione della sede non disponibile. Aggiorna la pagina e riprova.');
             return;
         }
         setAcceptedAction('');
-        setIsClearing(true);
+        setIsPreparing(true);
         try {
-            const res = await fetch('/api/ambulatories/clear', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ambulatoryId: id, version: target.version })
-            });
-            if (!res.ok) {
-                const payload = await res.json().catch(() => null) as { code?: string } | null;
-                if (res.status === 409 && payload?.code === 'VERSION_CONFLICT') {
-                    setActionError('La sede è cambiata. Aggiorna l’elenco e riprova se serve.');
-                    return;
-                }
-                if (res.status === 404) {
-                    setActionError('La sede non è più disponibile. Aggiorna l’elenco.');
-                    return;
-                }
-                throw new Error("Failed to clear");
-            }
-            // preserve accepted currentness even when the following read fails.
-            const accepted = await res.json() as { version?: number };
-            if (!Number.isSafeInteger(accepted.version) || accepted.version! <= target.version) {
-                throw new Error('Missing accepted ambulatory version');
-            }
-            setAmbulatories(current => current.map(item => item.id === id ? { ...item, version: accepted.version! } : item));
-            setAcceptedAction('Ambiente di test svuotato');
-            await loadAmbulatories();
-        } catch (e) {
-            console.error(e);
-            setActionError('Errore durante lo svuotamento');
+            const prepared = await prepareAmbulatoryCommand(operation, id, target.version);
+            if (prepared.ok) setCommand(prepared.value);
+            else setActionError(commandFailure(operation, prepared.code));
+        } catch {
+            setActionError(commandFailure(operation, 'NETWORK'));
         } finally {
-            setIsClearing(false);
+            setIsPreparing(false);
         }
     };
+
+    const handleCommandApplied = async (receipt: WebAmbulatoryReceipt, plan: WebAmbulatoryPlan) => {
+        setCommand(null);
+        if (plan.operation === 'ambulatory.clear-test.v1') {
+            setAmbulatories(current => current.map(item => item.id === receipt.ambulatoryId ? { ...item, version: receipt.version! } : item));
+            setAcceptedAction('Ambiente di test svuotato');
+        } else {
+            setAmbulatories(current => current.filter(item => item.id !== receipt.ambulatoryId));
+            setAcceptedAction('Ambulatorio eliminato.');
+        }
+        await loadAmbulatories();
+    };
+
+    const handleClear = (id: string) => openCommand('ambulatory.clear-test.v1', id);
 
     // Helper to build tree
     interface AmbulatoryNodeData extends Ambulatory {
@@ -180,30 +178,7 @@ export default function AmbulatoryManagerPage() {
         </div>;
     };
 
-    const handleDelete = async (id: string) => {
-        const { confirmed } = await confirm({
-            title: `Eliminare la sede «${ambulatoryById.get(id)?.name ?? "Sede"}»?`,
-            message: 'La sede verrà rimossa. Se contiene pazienti o reparti associati, l’eliminazione sarà bloccata: spostali prima di riprovare.',
-            confirmLabel: 'Elimina',
-            tone: 'danger'
-        });
-        if (!confirmed) return;
-        setAcceptedAction('');
-        setIsUpdating(true);
-        try {
-            const target = ambulatoryById.get(id);
-            if (typeof target?.version !== 'number') throw new Error('Missing ambulatory version');
-            await db.ambulatories.delete(id, { version: target?.version });
-            setAcceptedAction('Ambulatorio eliminato.');
-            await loadAmbulatories();
-        } catch (error) {
-            if (error instanceof ApiConflictError) {
-                setActionError('La sede è cambiata. Aggiorna l’elenco e riprova se serve.');
-            } else {
-                setActionError("Errore durante l'eliminazione");
-            }
-        } finally { setIsUpdating(false); }
-    };
+    const handleDelete = (id: string) => openCommand('ambulatory.delete.v1', id);
 
     const handleSetDefault = async (id: string) => {
         setAcceptedAction('');
@@ -250,12 +225,15 @@ export default function AmbulatoryManagerPage() {
                 </div>
                 <div className={styles.actions}><button onClick={handleCreate} disabled={!newName || actionsBlocked} className={SETTINGS_PRIMARY_BUTTON_CLASS} data-settings-primary="true">{isCreating ? <Loader2 aria-hidden /> : <Plus aria-hidden />}Aggiungi</button></div>
             </section>
-            <section id="sedi" className={styles.section} aria-busy={isLoading}>
+            <section id="sedi" className={styles.section} aria-busy={isLoading || isPreparing}>
                 <h3 className={styles.heading}>Sedi configurate</h3>
                 <p className={styles.meta}>La sede predefinita viene usata per i nuovi dati quando non scegli un contesto diverso.</p>
                 {ambulatories.length > 0 ? <div role="tree" aria-label="Sedi configurate">{buildTree(ambulatories).map(root => renderAmbulatoryNode(root))}</div>
                     : !isLoading && !readError && !actionError ? <ViewState state="empty" title="Nessuna sede configurata." /> : null}
             </section>
+            {command && <AmbulatoryDestructiveDialog key={command.reference} plan={command} onClose={() => setCommand(null)}
+                onApplied={handleCommandApplied}
+                onFailed={code => { const operation = command.operation; setCommand(null); setActionError(commandFailure(operation, code)); }} />}
         </section>
     );
 }

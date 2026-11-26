@@ -1355,6 +1355,28 @@
       "classification": "ambulatory-destructive-command"
     },
     {
+      "file": "lib/security/web-ambulatory-destructive-service.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "ambulatory-destructive-command"
+    },
+    {
+      "file": "lib/ambulatory-host-destructive-test-fixture.ts",
+      "target": "lib/db-server.ts",
+      "capability": "server:lib/db-server.ts",
+      "form": "import",
+      "symbols": [
+        "dbServer"
+      ],
+      "count": 1,
+      "classification": "synthetic-support"
+    },
+    {
       "file": "lib/security/account-reset-journal-crash-fixture.ts",
       "target": "lib/sqlite-schema-open.ts",
       "capability": "server:lib/sqlite-schema-open.ts",
