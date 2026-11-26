@@ -66,8 +66,8 @@ export function assertNodeRuntime(contract, runtime = process.versions) {
     return { version: runtime.node, moduleVersion: String(runtime.modules) };
 }
 
-export function verifyNativeBindingInChild(root = defaultRoot) {
-    const env = { ...process.env };
+export function verifyNativeBindingInChild(root = defaultRoot, inherited = process.env) {
+    const env = { ...inherited };
     for (const name of ['NODE_OPTIONS', 'NODE_PATH', 'LD_PRELOAD', 'LD_LIBRARY_PATH', 'DYLD_INSERT_LIBRARIES', 'DYLD_LIBRARY_PATH']) delete env[name];
     execFileSync(process.execPath, [fileURLToPath(import.meta.url), 'probe-native-binding', path.resolve(root)],
         { env, windowsHide: true, timeout: 30000, stdio: ['ignore', 'pipe', 'pipe'] });

@@ -8,6 +8,8 @@ import { generatePayloadLedger, verifyPayloadLedger } from './generate-runtime-p
 import { physicalFiles, physicalRecord } from './launch-bundled-headless-supervisor.mjs';
 import { assertBuildInputMetadata } from './build-input-metadata.mjs';
 import { WINDOWS_JOB_STARTUP_TIMEOUT_MS } from './windows-runtime-job-deadlines.mjs';
+import { launcherSystemEnvironment } from './launcher-child-env.mjs';
+import { installWebIdentityKey } from './local-ui-web-identity.mjs';
 import { installLocalVoiceEndpoint } from './local-voice-web-endpoint.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -82,7 +84,7 @@ export async function prepareSourceRuntime(root = ROOT) {
   if (fs.realpathSync(web) !== web) throw new Error('Source runtime must be physical');
   const identity = readJson(path.join(web, 'mediflow-build-identity.json'));
   const checkSource = () => {
-    const git = args => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
+    const git = args => execFileSync('git', args, { cwd: root, encoding: 'utf8', env: launcherSystemEnvironment() }).trim();
     if (git(['rev-parse', 'HEAD']) !== identity.revision || git(['status', '--porcelain', '--untracked-files=normal'])) {
       throw new Error('Source differs from the committed build');
     }
@@ -114,7 +116,7 @@ export async function prepareSourceRuntime(root = ROOT) {
 // with the commit of a later preparation. Source production uses committed code.
 async function buildSourceRuntime(root = ROOT, args = []) {
   assertBuildInputMetadata({ sourceRoot: root, payloadRoot: standaloneDirectory(root), protectedRoots: [process.env.MEDIFLOW_DATA_DIR] });
-  const git = args => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
+  const git = args => execFileSync('git', args, { cwd: root, encoding: 'utf8', env: launcherSystemEnvironment() }).trim();
   if (git(['status', '--porcelain', '--untracked-files=normal'])) throw new Error('Commit source changes before a production build');
   const revision = git(['rev-parse', 'HEAD']);
   const branch = git(['branch', '--show-current']) || 'detached';
@@ -164,7 +166,7 @@ export function verifySourceRuntime(root = ROOT) {
     throw new Error('Source runtime build identity mismatch');
   }
   // This probe executes only the now-verified binding, against in-memory SQLite.
-  if (process.platform === 'win32') verifyNativeBindingInChild(web);
+  if (process.platform === 'win32') verifyNativeBindingInChild(web, launcherSystemEnvironment());
   else verifyNativeBinding(web);
   return { web, identity };
 }
@@ -189,6 +191,7 @@ export async function startSourceRuntime(mode, root = ROOT) {
           process.platform === 'win32' ? WINDOWS_JOB_STARTUP_TIMEOUT_MS : 30000);
         const receive = frame => {
           if (frame?.type !== 'mediflow-web-owner-start' || frame.nonce !== process.env.MEDIFLOW_WEB_OWNER_GATE) return;
+          if (process.env.MEDIFLOW_PLUGIN_LOCAL_UI === '1' && !installWebIdentityKey(frame.webIdentityKey)) return;
           clearTimeout(timer); process.off('message', receive); resolve();
         };
         process.on('message', receive);

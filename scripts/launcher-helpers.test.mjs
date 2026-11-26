@@ -1863,7 +1863,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                 return result;
             }});`);
     }
-    for (const name of ['local-ui-navigation-deadline.mjs', 'mediflow.mjs', 'windows-system-command.mjs', 'mediflow-launcher-page.mjs', 'launcher-state.mjs', 'runtime-leases.mjs', 'windows-runtime-job-deadlines.mjs', 'windows-runtime-job.mjs', 'windows-runtime-job-helper.mjs', 'local-ui-web-identity.mjs', 'local-ui-pairing-transport.mjs', 'local-voice-service.mjs', 'local-voice-web-endpoint.mjs', 'launcher-lan-proxy.mjs']) {
+    for (const name of ['launcher-child-env.mjs', 'local-ui-navigation-deadline.mjs', 'mediflow.mjs', 'windows-system-command.mjs', 'mediflow-launcher-page.mjs', 'launcher-state.mjs', 'runtime-leases.mjs', 'windows-runtime-job-deadlines.mjs', 'windows-runtime-job.mjs', 'windows-runtime-job-helper.mjs', 'local-ui-web-identity.mjs', 'local-ui-pairing-transport.mjs', 'local-voice-service.mjs', 'local-voice-web-endpoint.mjs', 'launcher-lan-proxy.mjs']) {
         const rawBytes = readFileSync(path.join(repoRoot, 'scripts', name), 'utf8');
         const bytes = name === 'mediflow.mjs' && !lifecycle?.job
             ? rawBytes.replaceAll("choice === 'web' && process.platform === 'win32'", 'false') : lifecycle?.job === 'simulated' && name === 'mediflow.mjs'
@@ -1903,7 +1903,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
         import fs from 'node:fs';
         import { spawn } from 'node:child_process';
         import crypto from 'node:crypto';
-        import { webIdentityProof } from ${JSON.stringify(new URL('./local-ui-web-identity.mjs', import.meta.url).href)};
+        import { installWebIdentityKey, ownedWebIdentityProof } from ${JSON.stringify(new URL('./local-ui-web-identity.mjs', import.meta.url).href)};
         import { installLocalUiWebNavigation } from ${JSON.stringify(new URL('./local-ui-web-navigation.mjs', import.meta.url).href)};
         import { installLocalVoiceEndpoint } from ${JSON.stringify(new URL('./local-voice-web-endpoint.mjs', import.meta.url).href)};
         import { localVoiceClient, localVoiceEndpointFromEnv } from ${JSON.stringify(new URL('../lib/local-voice/client.mjs', import.meta.url).href)};
@@ -1911,8 +1911,19 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
         if (process.argv[1].endsWith('source-runtime.mjs')) {
             if (process.connected) installLocalVoiceEndpoint(process);
             if (process.env.MEDIFLOW_WEB_OWNER_GATE) await new Promise(resolve => {
-                const receive = frame => { if (frame.type === 'mediflow-web-owner-start' && frame.nonce === process.env.MEDIFLOW_WEB_OWNER_GATE) { process.off('message',receive); resolve(); } };
-                process.on('message',receive);
+                const receive = frame => {
+                    if (frame.type !== 'mediflow-web-owner-start' || frame.nonce !== process.env.MEDIFLOW_WEB_OWNER_GATE) return;
+                    const key = frame.webIdentityKey ?? process.env.MEDIFLOW_LOCAL_UI_WEB_SECRET;
+                    if (!installWebIdentityKey(key)) return;
+                    if (${Boolean(overrides.MEDIFLOW_LOCAL_API_TOKEN && voice.manifest)}) {
+                        fs.appendFileSync(${JSON.stringify(observationFile)}, JSON.stringify({
+                            type: 'web-identity-fingerprint', digest: crypto.hash('sha256', key),
+                        }) + '\\n');
+                    }
+                    process.off('message', receive);
+                    resolve();
+                };
+                process.on('message', receive);
             });
             fs.appendFileSync(${JSON.stringify(observationFile)}, JSON.stringify({type:'child-runtime',pid:process.pid,node:process.version,execPath:process.execPath,uv:process.versions.uv,actualOS:process.platform,at:Date.now()})+'\\n');
             ${lifecycle?.group ? `
@@ -1957,7 +1968,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                 }
                 if (${JSON.stringify(webIdentity)} && _req.url === '/api/plugin-local-ui/identity') {
                     let challenge = ''; for await (const part of _req) challenge += part;
-                    const proof = ${JSON.stringify(webIdentity)} === 'invalid-delayed' ? '0'.repeat(64) : webIdentityProof(process.env.MEDIFLOW_LOCAL_UI_WEB_SECRET, challenge);
+                    const proof = ${JSON.stringify(webIdentity)} === 'invalid-delayed' ? '0'.repeat(64) : ownedWebIdentityProof(challenge);
                     process.stderr.write('FIXTURE_IDENTITY_PROOF\\n');
                     res.setHeader('Content-Length', '64');
                     if (${JSON.stringify(webIdentity)} === 'cold-identity') setTimeout(() => res.end(proof), 1250);
@@ -3728,6 +3739,42 @@ test('another process of the same user finds the voice secret neither in the env
     assert.equal(table.some(line => line.includes(secret)), false, 'secret readable with ps -E in some process');
 });
 
+test('launcher children keep the Web identity key and shell API token out of process metadata', { skip: voiceSkip, timeout: 60_000 }, async t => {
+    const binary = fakeVoiceBinary(t);
+    const tlsPort = await reservedNonEphemeralPort();
+    const token = crypto.randomUUID();
+    const f = await ordinaryLauncherFixture(t, 'web', [], true, true, {
+        MEDIFLOW_LOCAL_VOICE_BINARY: binary, MEDIFLOW_TLS_PORT: String(tlsPort), MEDIFLOW_LOCAL_API_TOKEN: token,
+    }, null, null, { manifest: voiceManifestForFile(binary) });
+    writeFileSync(path.join(f.data, 'local-api-token'), token, { mode: 0o600 });
+    writeFileSync(path.join(f.data, 'fixture-network-mode'), 'network-home-base');
+    await f.until(() => f.output().includes('Pronto:'));
+    await voiceSettles(f, ({ state, web }) => web.available && state.lan.state === 'on');
+
+    const processes = execFileSync('/bin/ps', ['-A', '-o', 'pid=,ppid='], { encoding: 'utf8' })
+        .trim().split('\n').map(line => line.trim().split(/\s+/u).map(Number));
+    const descendants = new Set([f.child.pid]);
+    for (let previous = 0; descendants.size !== previous;) {
+        previous = descendants.size;
+        for (const [pid, parent] of processes) if (descendants.has(parent)) descendants.add(pid);
+    }
+    descendants.delete(f.child.pid);
+    for (const type of ['child-runtime', 'voice-created', 'lan-proxy-created']) {
+        const found = f.observations().find(event => event.type === type);
+        assert.ok(descendants.has(found?.pid), type + ' was not inspected');
+    }
+    const metadata = execFileSync('/bin/ps', ['-E', '-ww', '-p', [...descendants].join(','), '-o', 'pid=,command='], { encoding: 'utf8' });
+    const fingerprint = f.observations().find(event => event.type === 'web-identity-fingerprint');
+    assert.match(fingerprint?.digest ?? '', /^[a-f0-9]{64}$/u);
+    const keyPresent = (metadata.match(/[a-f0-9]{64}/gu) ?? [])
+        .some(candidate => crypto.hash('sha256', candidate) === fingerprint.digest);
+    const exposed = [
+        ['Web identity key', /(?:^|\s)MEDIFLOW_LOCAL_UI_WEB_SECRET=/u.test(metadata) || keyPresent],
+        ['shell API token', /(?:^|\s)MEDIFLOW_LOCAL_API_TOKEN=/u.test(metadata) || metadata.includes(token)],
+    ].filter(([, present]) => present).map(([name]) => name);
+    assert.deepEqual(exposed, []);
+});
+
 test('launcher stops the voice service with MediFlow', { skip: voiceSkip, timeout: 60_000 }, async t => {
     const binary = fakeVoiceBinary(t);
     const f = await ordinaryLauncherFixture(t, 'web', [], true, true, { MEDIFLOW_LOCAL_VOICE_BINARY: binary }, null, null, { manifest: voiceManifestForFile(binary) });
@@ -3867,7 +3914,7 @@ test('a voice service that falls or restarts while the Web starts never leaves t
 
 test('launcher keeps the iPhone proxy on only while the Web is in home-base mode and stops it with MediFlow', { skip: process.platform === 'win32' ? 'openssl non garantito su Windows' : false, timeout: 60_000 }, async t => {
     const tlsPort = await reservedNonEphemeralPort();
-    const f = await ordinaryLauncherFixture(t, 'web', [], true, true, { MEDIFLOW_TLS_PORT: String(tlsPort) });
+    const f = await ordinaryLauncherFixture(t, 'web', [], true, true, { MEDIFLOW_TLS_PORT: String(tlsPort), MEDIFLOW_LOCAL_API_TOKEN: 'unused-shell-token' });
     writeFileSync(path.join(f.data, 'local-api-token'), crypto.randomBytes(32).toString('hex'), { mode: 0o600 });
     await f.until(() => f.output().includes('Pronto:'));
     const receipt = JSON.parse(readFileSync(launcherReceiptFile(f.stateFiles.lockDirectory)));
