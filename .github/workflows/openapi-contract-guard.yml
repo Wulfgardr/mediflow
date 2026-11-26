@@ -110,6 +110,11 @@ jobs:
         run: |
           npm run test:ci-guards-wired
           npm run check:ci-guards-wired
+      - name: Seatbelt profile guard and tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          npm run test:seatbelt-profiles
+          npm run check:seatbelt-profiles
       - name: Dossier conformance corpus drift guard and tests
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: |

@@ -134,6 +134,7 @@ const nextConfig: NextConfig = {
       "./scripts/node-runtime-contract.mjs",
       "./.nvmrc",
       "./scripts/document-child-launcher.mjs",
+      "./scripts/seatbelt-profile.mjs",
       "./scripts/document-windows-sandbox.mjs",
       "./scripts/document-child-network-guard.mjs",
       "./scripts/anydoc-local-extraction-worker.mjs",

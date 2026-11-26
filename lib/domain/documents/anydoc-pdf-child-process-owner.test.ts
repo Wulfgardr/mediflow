@@ -14,6 +14,7 @@ import {
     runAnyDocPdfMaterializationChild,
     runAnyDocPdfRenderingChild,
 } from './anydoc-pdf-child-process-owner';
+import { documentChildSandboxProfile } from '../../../scripts/document-child-launcher.mjs';
 
 const ONE_PIXEL_PNG = Buffer.from(
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
@@ -151,7 +152,7 @@ test('both real PDF callers pass the exact owned root, heap and conditional addo
         const networkNamespace = process.platform === 'linux' && process.arch === 'arm64'
             ? ['/usr/bin/unshare', '--user', '--map-current-user', '--net', '--']
             : [];
-        const prefix = process.platform === 'darwin' ? ['-p', '(version 1) (allow default) (deny network*) (deny file-write*) (deny process-fork)', process.execPath]
+        const prefix = process.platform === 'darwin' ? ['-p', documentChildSandboxProfile(process.execPath), process.execPath]
             : process.platform === 'linux' ? ['--data=1073741824', '--', ...networkNamespace, process.execPath] : [];
         assert.equal(call.command, command);
         assert.deepEqual(call.args, [...prefix, ...core]);

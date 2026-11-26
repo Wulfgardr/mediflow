@@ -3,6 +3,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { readFileSync, statSync, realpathSync } from 'node:fs';
+import { pythonExecutablesForSandbox, seatbeltProfile } from '../scripts/seatbelt-profile.mjs';
 import { parseRedactionRuntimeIdentity } from './ai-redaction-evidence';
 import { REDACTION_WORKER_SHA256, type RedactionRuntimeIdentity } from './redaction-runtime-identity';
 const runtimeObservations = new WeakMap<object, RedactionRuntimeIdentity>();
@@ -35,6 +36,14 @@ export function decodeGlinerEntities(text: string, input: unknown): readonly Neu
         }
     }
     return Object.freeze(spans);
+}
+
+/** Confines the local GLiNER worker to offline, read-only execution of its own Python interpreter. */
+export function glinerSandboxProfile(pythonExecutable: string): string {
+    return seatbeltProfile({
+        rules: '(deny network*) (deny file-write*) (allow file-write* (literal "/dev/null")) (deny process-fork)',
+        programs: pythonExecutablesForSandbox(pythonExecutable),
+    });
 }
 
 /** Host-only local installation paths. This runner never grants remote admission. */
@@ -100,7 +109,7 @@ export function createGlinerRedactionRunner(config: Readonly<{ pythonExecutable:
         finally { clearTimeout(timer); signal?.removeEventListener('abort', cancel); }
     }
     function startWorker() {
-        const spawned = spawn('/usr/bin/sandbox-exec', ['-p', '(version 1)(allow default)(deny network*)', pythonExecutable, '-I', '-B', workerPath, modelDirectory], {
+        const spawned = spawn('/usr/bin/sandbox-exec', ['-p', glinerSandboxProfile(pythonExecutable), pythonExecutable, '-I', '-B', workerPath, modelDirectory], {
             env: { NODE_ENV: 'production', PATH: '/usr/bin:/bin', PYTHONUNBUFFERED: '1', HF_HUB_OFFLINE: '1', TRANSFORMERS_OFFLINE: '1', HF_HUB_DISABLE_IMPLICIT_TOKEN: '1', HF_HUB_DISABLE_TELEMETRY: '1', TOKENIZERS_PARALLELISM: 'false' },
             stdio: ['pipe', 'pipe', 'pipe'],
         });
