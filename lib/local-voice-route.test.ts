@@ -126,6 +126,7 @@ test('a visit goes through in order, reaches only its user and its subject, and 
     const session = await created.json() as { id: string; subject: string; state: string };
     assert.equal(session.subject, PATIENT_A);
     assert.equal(session.state, 'ready');
+    assert.equal((session as unknown as { nextSequence: number }).nextSequence, 0);
     assert.deepEqual((fake.state.session as unknown as { vocabulary: string[] }).vocabulary, ['Ramipril']);
     const started = await as(USER_A, () => item.GET(page(`/api/local-voice/${session.id}?subject=${PATIENT_A}`), params(session.id)));
     assert.equal((await started.json() as { state: string }).state, 'preparing');
@@ -139,7 +140,7 @@ test('a visit goes through in order, reaches only its user and its subject, and 
     assert.equal((await send(2, 300)).status, 202);
     const repeated = await send(1, 200);
     assert.equal(repeated.status, 202);
-    assert.deepEqual(await repeated.json(), { sequence: 1, repeated: true });
+    assert.deepEqual(await repeated.json(), { sequence: 1, repeated: true, expected: 3 });
     assert.deepEqual(fake.state.blocks.map((item) => new Int16Array(item.buffer, item.byteOffset, item.byteLength / 2)[0]), [100, 200, 300]);
     assert.equal((await send(3, 400, PATIENT_B)).status, 404);
     assert.equal((await send(3, 400, PATIENT_A, USER_B)).status, 404);

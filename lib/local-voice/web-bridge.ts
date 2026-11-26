@@ -7,7 +7,8 @@ export type LocalVoiceForeign =
     | { kind: 'patient'; subject: string; patientId: string }
     | { kind: 'first-visit'; subject: string }
     | { kind: 'other-user' };
-export type LocalVoicePageSnapshot = Pick<LocalVoiceSnapshot, 'id' | 'subject' | 'mode' | 'state' | 'fault' | 'visible' | 'elapsedMs' | 'limitReached' | 'allowed' | 'live' | 'review'>;
+export type LocalVoicePageSnapshot = Pick<LocalVoiceSnapshot, 'id' | 'subject' | 'mode' | 'state' | 'fault' | 'visible' | 'elapsedMs' | 'limitReached' | 'allowed' | 'live' | 'review'>
+    & { nextSequence: number };
 export type LocalVoiceReply = { status: number; body: unknown };
 
 type Client = ReturnType<typeof localVoiceClient>;
@@ -28,9 +29,9 @@ function foreignOf(owner: Owner | undefined, user: string, subject: string): Loc
     return patient ? { kind: 'patient', subject, patientId: patient[1] } : { kind: 'first-visit', subject };
 }
 
-function pageSnapshot(snapshot: LocalVoiceSnapshot): LocalVoicePageSnapshot {
+function pageSnapshot(snapshot: LocalVoiceSnapshot, nextSequence: number): LocalVoicePageSnapshot {
     const { id, subject, mode, state, fault, visible, elapsedMs, limitReached, allowed, live, review } = snapshot;
-    return { id, subject, mode, state, fault, visible, elapsedMs, limitReached, allowed, live, review };
+    return { id, subject, mode, state, fault, visible, elapsedMs, limitReached, allowed, live, review, nextSequence };
 }
 
 function vocabularyOf(value: unknown): string[] {
@@ -67,7 +68,7 @@ export function createLocalVoiceBridge({ endpoint = localVoiceEndpointFromEnv, p
         return owner && owner.user === user && owner.subject === localVoiceSubject(subject) ? owner : null;
     };
     const matching = (owner: Owner, snapshot: LocalVoiceSnapshot): LocalVoiceReply => snapshot.subject === owner.subject
-        ? { status: 200, body: pageSnapshot(snapshot) }
+        ? { status: 200, body: pageSnapshot(snapshot, owner.next) }
         : { status: 409, body: { error: 'subject-mismatch' } };
 
     return {
@@ -134,7 +135,7 @@ export function createLocalVoiceBridge({ endpoint = localVoiceEndpointFromEnv, p
             const voice = connect();
             if (!voice) return { status: 503, body: { error: 'off' } };
             const run = owner.queue.then(async (): Promise<LocalVoiceReply> => {
-                if (seq < owner.next) return { status: 202, body: { sequence: seq, repeated: true } };
+                if (seq < owner.next) return { status: 202, body: { sequence: seq, repeated: true, expected: owner.next } };
                 if (seq > owner.next) return { status: 409, body: { error: 'out-of-order', expected: owner.next } };
                 await voice.audio(id as string, pcm);
                 owner.next += 1;
