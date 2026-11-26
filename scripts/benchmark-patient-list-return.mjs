@@ -1,537 +1,458 @@
 #!/usr/bin/env node
 
-import { spawn, spawnSync, execFileSync } from 'node:child_process';
-import fs from 'node:fs';
+import { execFileSync, spawn } from 'node:child_process';
+import { once } from 'node:events';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
-import { performance } from 'node:perf_hooks';
-import { fileURLToPath } from 'node:url';
-import Database from 'better-sqlite3';
-import { chromium } from '@playwright/test';
+import { setTimeout as sleep } from 'node:timers/promises';
+import { parseArgs } from 'node:util';
+import { chromium, expect } from '@playwright/test';
+import encryptedFields from '../lib/backup-encrypted-fields.json' with { type: 'json' };
+import { stopServer, trackClose } from '../visual-qualification/owned-server.mjs';
+import './register-strip-types-loader.mjs';
 
-const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const SEED_SCRIPT = path.join(ROOT_DIR, 'scripts/seed-performance-baseline.mjs');
-const RUN_STRIP_TYPES = path.join(ROOT_DIR, 'scripts/run-strip-types.mjs');
-const PIN = '314159';
+const { documentRequests } = await import('../e2e/fixtures/trusted-web-request.ts');
+const { isolatedChromeLaunch } = await import('../e2e/fixtures/secure-browser.ts');
+const { encryptData } = await import('../lib/security/security.ts');
+const { bootstrapUnlockedSession, onboardingPassphrase, unlockIfNeeded } = await import('../e2e/utils.ts');
+const { deriveUnlockMaterial, openUnlockWrapping } = await import('../lib/security/unlock-credential.ts');
 
-const THRESHOLDS = {
-  300: { medianMs: 150, worstMs: 350 },
-  3000: { medianMs: 300, worstMs: 600 },
-  tabScalingDeltaMs: 50,
-};
+if (process.versions.node.split('.')[0] !== '24') throw new Error('Use the supported Node 24 runtime');
 
-function parseArgs(argv) {
-  const args = {
-    volumes: [300, 3000],
-    tabCounts: [1, 3, 6],
-    runs: 20,
-    idleSeconds: 35,
-    bundleDir: path.join(ROOT_DIR, '.next/standalone'),
-    out: null,
-    assertThreshold: false,
-  };
-  for (let i = 0; i < argv.length; i += 1) {
-    const flag = argv[i];
-    const value = argv[i + 1];
-    if (flag === '--volumes') {
-      args.volumes = (value ?? '').split(',').map((v) => Number.parseInt(v, 10)).filter((v) => Number.isSafeInteger(v) && v > 0);
-      i += 1;
-    } else if (flag === '--tabs') {
-      args.tabCounts = (value ?? '').split(',').map((v) => Number.parseInt(v, 10)).filter((v) => Number.isSafeInteger(v) && v > 0);
-      i += 1;
-    } else if (flag === '--runs') {
-      args.runs = Number.parseInt(value ?? '', 10);
-      i += 1;
-    } else if (flag === '--idle-seconds') {
-      args.idleSeconds = Number.parseInt(value ?? '', 10);
-      i += 1;
-    } else if (flag === '--bundle-dir') {
-      args.bundleDir = path.resolve(value ?? '');
-      i += 1;
-    } else if (flag === '--out') {
-      args.out = path.resolve(value ?? '');
-      i += 1;
-    } else if (flag === '--assert-threshold') {
-      args.assertThreshold = true;
-    } else {
-      throw new Error(`Argomento non riconosciuto: ${flag}`);
-    }
-  }
-  return args;
+const root = path.resolve(import.meta.dirname, '..');
+const pin = '314159';
+const diagnosis = 'Diagnosi sintetica indice';
+const limits = { 300: [150, 350], 3000: [300, 600] };
+const tabDeltaLimit = 50;
+const rowSelector = '[data-testid="lume-patient-row"]';
+const tabSelector = 'nav[aria-label="Cartelle aperte"] a';
+const sheetSelector = '[data-testid="lume-scheda-header"]';
+const note = { type: 'note', title: 'Visita sintetica', content: 'Decorso sintetico. '.repeat(64) };
+const attachmentText = 'Synthetic patient attachment';
+const { values } = parseArgs({ options: {
+  volumes: { type: 'string', default: '300,3000' },
+  tabs: { type: 'string', default: '1,3,6' },
+  runs: { type: 'string', default: '20' },
+  'idle-runs': { type: 'string', default: '1' },
+  'idle-seconds': { type: 'string', default: '120' },
+  'bundle-dir': { type: 'string', default: path.join(root, '.next/standalone') },
+  out: { type: 'string' },
+  'server-profile': { type: 'boolean' },
+  'skip-write': { type: 'boolean' },
+  variants: { type: 'string', default: 'stock' },
+  'assert-threshold': { type: 'boolean' },
+} });
+
+function integers(value, minimum) {
+  const numbers = value.split(',').map(Number);
+  if (numbers.some(n => !Number.isSafeInteger(n) || n < minimum)) throw new Error('Invalid integer list: ' + value);
+  return numbers;
+}
+const volumes = integers(values.volumes, 6);
+const tabCounts = integers(values.tabs, 1);
+const variants = values.variants.split(',');
+if (variants.some(variant => !['stock', 'reuse'].includes(variant))) throw new Error('Invalid variant');
+const [runs] = integers(values.runs, 1);
+const [idleRuns] = integers(values['idle-runs'], 0);
+const [idleSeconds] = integers(values['idle-seconds'], 0);
+if (values['assert-threshold'] && (values['skip-write'] || variants.length !== 1 || variants[0] !== 'stock' || runs < 20 || volumes.some(volume => !limits[volume]))) {
+  throw new Error('Threshold verification needs at least 20 runs and a declared archive size');
 }
 
-function round(value) {
-  return Math.round(value * 100) / 100;
-}
-
-function stats(values) {
-  if (values.length === 0) return { count: 0, min: null, median: null, p95: null, max: null, mean: null };
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  const median = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-  const p95Index = Math.min(sorted.length - 1, Math.ceil(sorted.length * 0.95) - 1);
-  const mean = sorted.reduce((acc, v) => acc + v, 0) / sorted.length;
+function stats(samples) {
+  if (!samples.length) return null;
+  const sorted = [...samples].sort((a, b) => a - b);
   return {
-    count: sorted.length,
-    min: round(sorted[0]),
-    median: round(median),
-    p95: round(sorted[p95Index]),
-    max: round(sorted[sorted.length - 1]),
-    mean: round(mean),
+    n: sorted.length,
+    median: (sorted[Math.floor((sorted.length - 1) / 2)] + sorted[Math.floor(sorted.length / 2)]) / 2,
+    max: sorted.at(-1),
   };
 }
+const uptime = () => execFileSync('uptime', { encoding: 'utf8' }).trim();
+const patientName = index => 'Sintetico' + String(index).padStart(5, '0');
 
-function readUptime() {
-  try {
-    return execFileSync('uptime', { encoding: 'utf8' }).trim();
-  } catch {
-    return 'unavailable';
-  }
-}
-
-async function allocateFreePort() {
-  const server = net.createServer();
-  await new Promise((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', resolve);
-  });
-  const address = server.address();
-  const port = typeof address === 'object' && address ? address.port : 0;
-  await new Promise((resolve, reject) => server.close((err) => (err ? reject(err) : resolve())));
-  if (!port || port === 3000) throw new Error('Porta effimera non valida');
+async function freePort() {
+  const socket = net.createServer().listen(0, '127.0.0.1');
+  await once(socket, 'listening');
+  const { port } = socket.address();
+  await new Promise((resolve, reject) => socket.close(error => error ? reject(error) : resolve()));
+  if (port === 3000) throw new Error('Porta riservata');
   return port;
 }
 
-function seedArchive(dataDir, patients) {
-  const result = spawnSync(
-    process.execPath,
-    [
-      RUN_STRIP_TYPES,
-      SEED_SCRIPT,
-      '--data-dir',
-      dataDir,
-      '--patients',
-      String(patients),
-      '--entries-per-patient',
-      '8',
-      '--observations-per-patient',
-      '6',
-      '--documents-per-patient',
-      '2',
-      '--force',
-    ],
-    {
-      cwd: ROOT_DIR,
-      encoding: 'utf8',
-      env: { ...process.env, MEDIFLOW_DATA_DIR: dataDir, MEDIFLOW_STRIP_TYPES_NODE: process.execPath },
+async function start(dataDir, port) {
+  const bundle = path.resolve(values['bundle-dir']);
+  const contract = JSON.parse(await readFile(path.join(bundle, 'mediflow-runtime-contract.json'), 'utf8'));
+  const identity = JSON.parse(await readFile(path.join(bundle, 'mediflow-build-identity.json'), 'utf8'));
+  const serverArgs = values['server-profile'] ? ['--require', path.join(import.meta.dirname, 'benchmark-patient-list-server-probe.cjs')] : [];
+  return spawn(process.execPath, [...serverArgs, 'server.js'], {
+    cwd: bundle,
+    stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
+    env: { ...process.env, NODE_ENV: 'production', HOSTNAME: '127.0.0.1', PORT: String(port),
+      MEDIFLOW_APP_REVISION: identity.revision, MEDIFLOW_APP_SOURCE_FINGERPRINT: identity.sourceFingerprint,
+      MEDIFLOW_NEXT_DIST_DIR: contract.distDir, MEDIFLOW_DATA_DIR: dataDir, MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1' },
+  });
+}
+
+async function waitForServer(child, origin) {
+  for (let attempt = 0; attempt < 100; attempt++) {
+    if (child.exitCode !== null) throw new Error('Server exited: ' + child.exitCode);
+    if ((await fetch(origin + '/api/system/revision', { signal: AbortSignal.timeout(1000) }).catch(() => null))?.ok) return;
+    await sleep(200);
+  }
+  throw new Error('Production server did not become ready');
+}
+
+async function post(page, route, body) {
+  const response = await documentRequests(page).post(route, { data: body });
+  if (!response.ok()) throw new Error(route + ' ' + response.status() + ' ' + await response.text());
+  return response.json();
+}
+
+async function seal(key, table, body) {
+  for (const field of encryptedFields[table]) {
+    if (!body[field]) continue;
+    const { iv, data } = await encryptData(body[field], key);
+    body[field] = `ENC:${iv}:${data}`;
+  }
+  return body;
+}
+
+async function addNote(page, key, patientId) {
+  await post(page, '/api/entries', await seal(key, 'entries', { ...note, patientId, date: new Date().toISOString() }));
+}
+
+async function seed(page, count) {
+  const loginResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/api/auth/login' && response.ok());
+  await bootstrapUnlockedSession(page, pin);
+  const { encryptedMasterKey, salt } = await (await loginResponse).json();
+  const { kek } = await deriveUnlockMaterial(onboardingPassphrase(pin), Buffer.from(salt, 'base64'));
+  const key = await openUnlockWrapping(encryptedMasterKey, kek);
+  for (let n = 0; n < count; n++) {
+    const { id } = await post(page, '/api/patients', await seal(key, 'patients', {
+      firstName: 'Ada', lastName: patientName(n), taxCode: 'SYNTHETIC-RETURN-' + n,
+      birthDate: '1980-12-31', address: 'Indirizzo sintetico', phone: '0000000000',
+      notes: 'Profilo sintetico. '.repeat(32), diagnoses: [{ code: 'R69', description: diagnosis, date: '2026-10-01' }],
+    }));
+    await addNote(page, key, id);
+    await addNote(page, key, id);
+    await post(page, '/api/therapies', await seal(key, 'therapies', {
+      patientId: id, drugName: 'Terapia sintetica', dosage: 'Dose sintetica', status: 'active',
+      startDate: '2026-07-17T08:00:00.000Z', motivation: 'Motivazione sintetica',
+    }));
+    await post(page, '/api/attachments', await seal(key, 'attachments', {
+      id: crypto.randomUUID(), patientId: id, name: 'Documento sintetico.txt', type: 'text/plain',
+      size: attachmentText.length, path: 'uploads/synthetic.txt',
+      data: 'data:text/plain;base64,' + Buffer.from(attachmentText).toString('base64'),
+    }));
+    if (n % 4 === 0) {
+      await post(page, '/api/checkups', await seal(key, 'checkups', {
+        patientId: id, title: 'Richiamo sintetico', date: '2027-01-10T09:00:00.000Z', status: 'pending',
+        source: 'manual', notes: 'Nota sintetica del controllo',
+      }));
+    }
+    if ((n + 1) % 100 === 0) console.log(`Seed ${n + 1}/${count}`);
+  }
+  const patients = await documentRequests(page).get('/api/patients');
+  if (!patients.ok() || (await patients.json()).length !== count) throw new Error('Fixture list is incomplete');
+}
+
+function installProbe({ rowSelector, tabSelector, variant, diagnosis }) {
+  const network = [];
+  const tasks = [];
+  const unlockDerivations = [];
+  const server = performance.timeOrigin;
+  const subtle = Object.getPrototypeOf(crypto.subtle);
+  const decrypt = subtle.decrypt;
+  let sample;
+  let reusableFormatter;
+  Intl.DateTimeFormat = new Proxy(Intl.DateTimeFormat, {
+    construct(target, args, newTarget) {
+      const [locale, options] = args;
+      if (locale !== 'it-IT' || options?.day !== '2-digit' || options?.month !== 'short' ||
+          Object.keys(options).length !== 2) return Reflect.construct(target, args, newTarget);
+      const start = performance.now();
+      const formatter = variant === 'reuse'
+        ? (reusableFormatter ??= Reflect.construct(target, args, newTarget))
+        : Reflect.construct(target, args, newTarget);
+      if (sample?.start !== undefined && sample.end === undefined) {
+        sample.formatterCalls++;
+        sample.formatterMs += performance.now() - start;
+      }
+      return formatter;
     },
-  );
-  if (result.status !== 0) {
-    throw new Error(`Seed fallito (${result.status}): ${result.stderr}`);
-  }
-  const dbPath = path.join(dataDir, 'medical.db');
-  const db = new Database(dbPath);
-  try {
-    const insertTherapy = db.prepare(`
-      INSERT INTO therapies (
-        id, patient_id, drug_name, dosage, status, start_date, version, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, 'active', ?, 1, ?, ?)
-    `);
-    const now = Math.floor(Date.parse('2026-07-17T08:00:00.000Z') / 1000);
-    db.transaction(() => {
-      for (let i = 0; i < patients; i += 1) {
-        const pid = `perf-patient-${String(i).padStart(6, '0')}`;
-        insertTherapy.run(`${pid}-therapy-00`, pid, 'Ramipril 5 mg', '1 cp al mattino', now - 86400 * 30, now - 86400 * 30, now - 86400 * 30);
-        insertTherapy.run(`${pid}-therapy-01`, pid, 'Metformina 500 mg', '1 cp ai pasti', now - 86400 * 15, now - 86400 * 15, now - 86400 * 15);
-      }
-      db.prepare(`
-        INSERT OR REPLACE INTO settings (key, value)
-        VALUES ('work_profile_v1', ?)
-      `).run(JSON.stringify({ active: 'medicina_generale', updatedAt: '2026-07-17T08:00:00.000Z' }));
-    })();
-    db.exec('ANALYZE');
-    db.pragma('wal_checkpoint(TRUNCATE)');
-  } finally {
-    db.close();
-  }
-}
-
-function startProductionServer(bundleDir, port, dataDir) {
-  const contract = JSON.parse(fs.readFileSync(path.join(bundleDir, 'mediflow-runtime-contract.json'), 'utf8'));
-  const child = spawn(process.execPath, [path.join(bundleDir, 'server.js')], {
-    cwd: bundleDir,
-    env: {
-      ...process.env,
-      NODE_ENV: 'production',
-      HOSTNAME: '127.0.0.1',
-      PORT: String(port),
-      MEDIFLOW_NEXT_DIST_DIR: contract.distDir,
-      MEDIFLOW_DATA_DIR: dataDir,
-      MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1',
+  });
+  const observe = (type, callback) => {
+    if (!PerformanceObserver.supportedEntryTypes.includes(type)) return;
+    new PerformanceObserver(list => list.getEntries().forEach(callback)).observe({ type });
+  };
+  observe('resource', entry => {
+    const url = new URL(entry.name);
+    if (url.origin !== location.origin || !(url.pathname.startsWith('/api/') || url.searchParams.has('_rsc'))) return;
+    network.push({
+      path: url.pathname.replace(/\/patients\/[^/]+/, '/patients/:id'),
+      rsc: url.searchParams.has('_rsc'), start: entry.startTime, firstByte: entry.responseStart,
+      end: entry.responseEnd, bytes: entry.encodedBodySize, status: entry.responseStatus,
+    });
+  });
+  observe('longtask', entry => tasks.push({ start: entry.startTime, duration: entry.duration }));
+  subtle.decrypt = function (...args) {
+    const start = performance.now();
+    const measured = sample?.start !== undefined && sample.end === undefined ? sample : null;
+    const pending = decrypt.apply(this, args);
+    if (!measured) return pending;
+    measured.decryptCount++;
+    measured.decryptStart ??= start;
+    return pending.finally(() => { measured.decryptEnd = performance.now(); });
+  };
+  const deriveBits = subtle.deriveBits;
+  subtle.deriveBits = function (algorithm, ...args) {
+    const start = performance.now();
+    const pending = deriveBits.call(this, algorithm, ...args);
+    if (algorithm.name === 'PBKDF2') {
+      void pending.then(() => { unlockDerivations.push(performance.now() - start); }, () => {});
+    }
+    return pending;
+  };
+  window.__listProbe = {
+    unlock: () => [...unlockDerivations],
+    debug: () => ({ sample, timeOrigin: server, requests: network.slice(-8) }),
+    activity: start => ({
+      api: network.filter(entry => entry.start >= start),
+      tasks: tasks.filter(entry => entry.start >= start),
+    }),
+    arm: () => {
+      sample = { decryptCount: 0, formatterCalls: 0, formatterMs: 0 };
     },
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  let log = '';
-  child.stdout.on('data', (chunk) => { log += chunk.toString(); });
-  child.stderr.on('data', (chunk) => { log += chunk.toString(); });
-  return { child, getLog: () => log };
-}
-
-async function waitForServer(child, url) {
-  const deadline = Date.now() + 60_000;
-  while (Date.now() < deadline) {
-    if (child.exitCode !== null) throw new Error(`Server terminato con ${child.exitCode}`);
-    try {
-      const res = await fetch(`${url}/api/system/revision`, { cache: 'no-store' });
-      if (res.ok) return;
-    } catch {
-    }
-    await new Promise((r) => setTimeout(r, 150));
-  }
-  throw new Error(`Timeout server su ${url}`);
-}
-
-async function stopServer(child) {
-  if (!child || child.exitCode !== null) return;
-  child.kill('SIGTERM');
-  await Promise.race([
-    new Promise((resolve) => child.once('exit', resolve)),
-    new Promise((resolve) => setTimeout(resolve, 5000)),
-  ]);
-  if (child.exitCode === null) child.kill('SIGKILL');
-}
-
-async function unlockApp(page, url) {
-  await page.goto(`${url}/?area=incarico`, { waitUntil: 'domcontentloaded' });
-  const pinInput = page.locator('input[type="password"], input[inputmode="numeric"]').first();
-  await pinInput.waitFor({ state: 'visible', timeout: 20_000 });
-  await pinInput.fill(PIN);
-  const submit = page.getByRole('button', { name: /sblocca|accedi|entra/i }).first();
-  if (await submit.isVisible().catch(() => false)) {
-    await submit.click();
-  } else {
-    await pinInput.press('Enter');
-  }
-  await page.getByTestId('lume-patient-row').first().waitFor({ state: 'visible', timeout: 30_000 });
-}
-
-async function openPatientTabs(page, url, count) {
-  const openedIds = [];
-  for (let i = 0; i < count; i += 1) {
-    const pid = `perf-patient-${String(i).padStart(6, '0')}`;
-    openedIds.push(pid);
-    await page.goto(`${url}/patients/${pid}/modules`, { waitUntil: 'domcontentloaded' });
-    await page.getByTestId('lume-scheda-header').waitFor({ state: 'visible', timeout: 20_000 });
-  }
-  return openedIds;
-}
-
-async function measureSingleReturn(page, cdp, triggerClick) {
-  const requests = [];
-  const inFlight = new Set();
-  let clickTime = 0;
-  let patientsResponseEnd = null;
-  let checkupsResponseEnd = null;
-
-  const onRequest = (req) => {
-    if (!clickTime) return;
-    const u = new URL(req.url());
-    const isRelevant = u.pathname.startsWith('/api/') || u.searchParams.has('_rsc') || req.headers()['next-router-prefetch'] === '1' || req.headers()['rsc'] === '1';
-    if (!isRelevant) return;
-    inFlight.add(req);
-    requests.push({
-      req,
-      method: req.method(),
-      path: `${u.pathname}${u.search}`,
-      isPrefetch: req.headers()['next-router-prefetch'] === '1',
-      isRsc: u.searchParams.has('_rsc') || req.headers()['rsc'] === '1',
-      startedMs: performance.now() - clickTime,
-      finishedMs: null,
-      status: null,
-      bytes: 0,
-      serverMs: null,
-    });
+    take: () => sample?.end === undefined ? null : {
+      ...sample,
+      timestamp: server + sample.start,
+      ms: sample.end - sample.start,
+      network: network.filter(entry => entry.end >= sample.start - 1000 && entry.start <= sample.end)
+        .map(entry => ({ ...entry, start: entry.start - sample.start, firstByte: entry.firstByte - sample.start, end: entry.end - sample.start })),
+      tasks: tasks.filter(entry => entry.start + entry.duration >= sample.start && entry.start < sample.end),
+    },
   };
-
-  const onResponse = async (res) => {
-    const req = res.request();
-    const entry = requests.find((r) => r.req === req);
-    if (!entry) return;
-    entry.status = res.status();
-    try {
-      const buf = await res.body();
-      entry.bytes = buf.byteLength;
-    } catch {
-      entry.bytes = 0;
-    }
-    const now = performance.now() - clickTime;
-    entry.finishedMs = now;
-    entry.serverMs = round(now - entry.startedMs);
-    if (entry.path === '/api/patients' || entry.path.startsWith('/api/patients?')) {
-      patientsResponseEnd = now;
-    }
-    if (entry.path === '/api/checkups' || entry.path.startsWith('/api/checkups?')) {
-      checkupsResponseEnd = now;
-    }
-  };
-
-  const onDone = (req) => {
-    inFlight.delete(req);
-  };
-
-  page.on('request', onRequest);
-  page.on('response', onResponse);
-  page.on('requestfinished', onDone);
-  page.on('requestfailed', onDone);
-
-  await page.evaluate(() => {
-    window.__mfLongTasks = [];
-    if (window.__mfLongTaskObserver) window.__mfLongTaskObserver.disconnect();
-    window.__mfLongTaskObserver = new PerformanceObserver((list) => {
-      for (const entry of list.getEntries()) {
-        window.__mfLongTasks.push({ start: entry.startTime, duration: entry.duration });
-      }
-    });
-    try {
-      window.__mfLongTaskObserver.observe({ entryTypes: ['longtask'] });
-    } catch {
-    }
-  });
-
-  const beforeMetrics = await cdp.send('Performance.getMetrics');
-  const metricMap = (m) => Object.fromEntries(m.metrics.map((x) => [x.name, x.value]));
-  const mBefore = metricMap(beforeMetrics);
-
-  clickTime = performance.now();
-  await triggerClick();
-
-  await page.getByTestId('lume-patient-row').first().waitFor({ state: 'visible', timeout: 30_000 });
-  const listReadyMs = performance.now() - clickTime;
-
-  await page.locator('[data-worklist-todo="ready"]').first().waitFor({ state: 'visible', timeout: 30_000 });
-  const todosReadyMs = performance.now() - clickTime;
-
-  const idleDeadline = Date.now() + 10_000;
-  while (inFlight.size > 0 && Date.now() < idleDeadline) {
-    await new Promise((r) => setTimeout(r, 20));
-  }
-  const networkIdleMs = performance.now() - clickTime;
-
-  const afterMetrics = await cdp.send('Performance.getMetrics');
-  const mAfter = metricMap(afterMetrics);
-  const longTasks = await page.evaluate(() => {
-    if (window.__mfLongTaskObserver) window.__mfLongTaskObserver.disconnect();
-    return window.__mfLongTasks || [];
-  });
-
-  page.off('request', onRequest);
-  page.off('response', onResponse);
-  page.off('requestfinished', onDone);
-  page.off('requestfailed', onDone);
-
-  const cleanRequests = requests.map(({ req: _req, ...rest }) => ({
-    ...rest,
-    startedMs: round(rest.startedMs),
-    finishedMs: rest.finishedMs === null ? null : round(rest.finishedMs),
-  }));
-
-  return {
-    listReadyMs: round(listReadyMs),
-    todosReadyMs: round(todosReadyMs),
-    networkIdleMs: round(networkIdleMs),
-    patientsFetchEndMs: patientsResponseEnd === null ? null : round(patientsResponseEnd),
-    clientPostPatientsMs: patientsResponseEnd === null ? null : round(listReadyMs - patientsResponseEnd),
-    checkupsFetchEndMs: checkupsResponseEnd === null ? null : round(checkupsResponseEnd),
-    clientPostCheckupsMs: checkupsResponseEnd === null ? null : round(todosReadyMs - checkupsResponseEnd),
-    scriptDurationMs: round(((mAfter.ScriptDuration ?? 0) - (mBefore.ScriptDuration ?? 0)) * 1000),
-    layoutDurationMs: round(((mAfter.LayoutDuration ?? 0) - (mBefore.LayoutDuration ?? 0)) * 1000),
-    taskDurationMs: round(((mAfter.TaskDuration ?? 0) - (mBefore.TaskDuration ?? 0)) * 1000),
-    longTaskCount: longTasks.length,
-    longTaskTotalMs: round(longTasks.reduce((sum, t) => sum + t.duration, 0)),
-    requestCount: cleanRequests.length,
-    requests: cleanRequests,
-  };
-}
-
-async function runVolume(args, patientCount) {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), `mediflow-list-bench-${patientCount}-`));
-  const dataDir = path.join(tempRoot, 'data');
-  seedArchive(dataDir, patientCount);
-  const port = await allocateFreePort();
-  const url = `http://127.0.0.1:${port}`;
-  const { child } = startProductionServer(args.bundleDir, port, dataDir);
-  const volumeResult = { patients: patientCount, scenarios: {} };
-
-  const browser = await chromium.launch({
-    headless: true,
-    chromiumSandbox: true,
-    args: ['--proxy-server=http://127.0.0.1:1', `--proxy-bypass-list=<-loopback>;127.0.0.1:${port}`],
-  });
-
-  try {
-    await waitForServer(child, url);
-
-    for (const tabCount of args.tabCounts) {
-      const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-      const page = await context.newPage();
-      const cdp = await context.newCDPSession(page);
-      await cdp.send('Performance.enable');
-
-      await unlockApp(page, url);
-      const openedIds = await openPatientTabs(page, url, tabCount);
-      const lastPatientId = openedIds[openedIds.length - 1];
-      const clickBackToList = () => page.locator('header nav[aria-label="Cartelle aperte"] a').first().click();
-      const clickLastTab = () => page.locator(`header nav[aria-label="Cartelle aperte"] a[href="/patients/${lastPatientId}/modules"]`).first().click();
-
-      const uptimeBefore = readUptime();
-      const cold = await measureSingleReturn(page, cdp, clickBackToList);
-      const warmSamples = [];
-      for (let runIndex = 0; runIndex < args.runs; runIndex += 1) {
-        await clickLastTab();
-        await page.getByTestId('lume-scheda-header').waitFor({ state: 'visible', timeout: 20_000 });
-        const sample = await measureSingleReturn(page, cdp, clickBackToList);
-        warmSamples.push(sample);
-      }
-      const uptimeAfter = readUptime();
-
-      volumeResult.scenarios[`tabs_${tabCount}`] = {
-        tabs: tabCount,
-        uptimeBefore,
-        uptimeAfter,
-        cold,
-        warm: {
-          listReadyMs: stats(warmSamples.map((s) => s.listReadyMs)),
-          todosReadyMs: stats(warmSamples.map((s) => s.todosReadyMs)),
-          networkIdleMs: stats(warmSamples.map((s) => s.networkIdleMs)),
-          patientsFetchEndMs: stats(warmSamples.map((s) => s.patientsFetchEndMs).filter((v) => v !== null)),
-          clientPostPatientsMs: stats(warmSamples.map((s) => s.clientPostPatientsMs).filter((v) => v !== null)),
-          checkupsFetchEndMs: stats(warmSamples.map((s) => s.checkupsFetchEndMs).filter((v) => v !== null)),
-          clientPostCheckupsMs: stats(warmSamples.map((s) => s.clientPostCheckupsMs).filter((v) => v !== null)),
-          scriptDurationMs: stats(warmSamples.map((s) => s.scriptDurationMs)),
-          layoutDurationMs: stats(warmSamples.map((s) => s.layoutDurationMs)),
-          taskDurationMs: stats(warmSamples.map((s) => s.taskDurationMs)),
-          longTaskTotalMs: stats(warmSamples.map((s) => s.longTaskTotalMs)),
-          sampleRequestBreakdown: warmSamples[0]?.requests ?? [],
-          rawListReadyMs: warmSamples.map((s) => s.listReadyMs),
-          rawTodosReadyMs: warmSamples.map((s) => s.todosReadyMs),
-        },
-      };
-
-      if (tabCount === args.tabCounts[args.tabCounts.length - 1]) {
-        await clickLastTab();
-        await page.getByTestId('lume-scheda-header').waitFor({ state: 'visible', timeout: 20_000 });
-        await page.evaluate(async (pid) => {
-          const res = await fetch('/api/entries', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              patientId: pid,
-              type: 'note',
-              title: 'Nota sintetica post-scrittura',
-              content: 'Testo sintetico per misura ritorno elenco dopo scrittura.',
-              date: new Date().toISOString(),
-            }),
-          });
-          if (!res.ok) throw new Error(`POST /api/entries failed: ${res.status}`);
-        }, lastPatientId);
-        const postWrite = await measureSingleReturn(page, cdp, clickBackToList);
-        volumeResult.scenarios.post_write = { tabs: tabCount, uptime: readUptime(), sample: postWrite };
-
-        if (args.idleSeconds > 0) {
-          await clickLastTab();
-          await page.getByTestId('lume-scheda-header').waitFor({ state: 'visible', timeout: 20_000 });
-          await new Promise((r) => setTimeout(r, args.idleSeconds * 1000));
-          const postIdle = await measureSingleReturn(page, cdp, clickBackToList);
-          volumeResult.scenarios.post_idle = { tabs: tabCount, idleSeconds: args.idleSeconds, uptime: readUptime(), sample: postIdle };
+  document.addEventListener('click', event => {
+    if (!sample || sample.start !== undefined || !event.target.closest(tabSelector + ':first-child')) return;
+    sample.start = performance.now();
+    const measured = sample;
+    let confirmed = false;
+    function frame() {
+      if (sample !== measured) return;
+      const rows = document.querySelectorAll(rowSelector);
+      const search = document.querySelector('#ricerca-pazienti');
+      const eligible = search && !search.disabled &&
+        !document.querySelector('[aria-label="MediFlow lock screen"]');
+      if (eligible) {
+        const rowHit = Array.from(rows).some(row => {
+          if (!row.textContent.includes(diagnosis)) return false;
+          const box = row.getBoundingClientRect();
+          return row.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2));
+        });
+        if (rowHit) {
+          if (confirmed) {
+            sample.end = performance.now();
+            return;
+          }
+          confirmed = true;
+          requestAnimationFrame(frame);
+          return;
         }
       }
+      confirmed = false;
+      if (performance.now() - sample.start < 20000) requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }, true);
+}
 
-      await context.close();
+async function openTabs(page, count) {
+  const rows = page.locator(rowSelector);
+  await expect.poll(() => rows.count()).toBeGreaterThanOrEqual(count);
+  const patients = await rows.evaluateAll((rows, limit) =>
+    rows.slice(0, limit).map(row => ({ id: row.dataset.patientId, name: row.querySelector('strong').textContent })), count);
+  if (patients.length !== count) throw new Error('Too few patient rows to open ' + count + ' charts');
+  for (const [index, { id, name }] of patients.entries()) {
+    const row = page.locator(rowSelector + `[data-patient-id="${id}"]`);
+    await row.dblclick();
+    await expect(page.locator(sheetSelector)).toContainText(name);
+    await expect(page.locator(tabSelector + `[href="/patients/${id}/modules"]`)).toBeVisible();
+    if (index + 1 < count) await page.locator(tabSelector).first().click();
+  }
+  await expect(page.locator(tabSelector + '[href$="/modules"]')).toHaveCount(count);
+  return patients.at(-1);
+}
+
+async function measure(page, cdp, serverRequests) {
+  const prefetch = [];
+  const listener = request => {
+    if (request.headers()['next-router-prefetch'] === '1' || request.headers()['next-router-segment-prefetch']) {
+      prefetch.push(new URL(request.url()).pathname.replace(/\/patients\/[^/]+/, '/patients/:id'));
+    }
+  };
+  const getMetrics = async () => Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics.map(({ name, value }) => [name, value]));
+  page.on('request', listener);
+  try {
+    const before = await getMetrics();
+    await page.evaluate(() => window.__listProbe.arm());
+    await page.locator(tabSelector).first().click();
+    const handle = await page.waitForFunction(() => window.__listProbe?.take(), undefined, { timeout: 21000 });
+    const sample = await handle.jsonValue();
+    await handle.dispose();
+    const after = await getMetrics();
+    const metrics = Object.fromEntries(['ScriptDuration', 'LayoutDuration', 'RecalcStyleDuration', 'TaskDuration']
+      .map(name => [name, (after[name] - before[name]) * 1000]));
+    return {
+      ...sample, metrics, prefetch,
+      server: serverRequests.filter(request => request.timestamp <= sample.timestamp + sample.ms &&
+        request.timestamp + request.ms >= sample.timestamp - 1000),
+    };
+  } catch (error) {
+    console.error(await page.evaluate(({ rowSelector, tabSelector }) => ({
+      href: location.pathname + location.search,
+      tab: document.querySelector(tabSelector)?.getAttribute('href'),
+      rows: [...document.querySelectorAll(rowSelector)].slice(0, 4).map(row => {
+        const box = row.getBoundingClientRect();
+        const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+        return { text: row.textContent, box: box.toJSON(), receivesPointer: row.contains(hit), hit: hit?.className };
+      }),
+      search: document.querySelector('#ricerca-pazienti')?.outerHTML,
+      probe: window.__listProbe?.debug(),
+    }), { rowSelector, tabSelector }).catch(() => null));
+    throw error;
+  } finally {
+    page.off('request', listener);
+  }
+}
+
+async function runVolume(count) {
+  const data = await mkdtemp(path.join(os.tmpdir(), 'mediflow-wul970-'));
+  let server;
+  let closed;
+  let browser;
+  try {
+    const port = await freePort();
+    const origin = 'http://127.0.0.1:' + port;
+    server = await start(data, port);
+    closed = trackClose(server);
+    const serverRequests = [];
+    server.on('message', request => {
+      serverRequests.push(request);
+      if (serverRequests.length > 2000) serverRequests.shift();
+    });
+    await waitForServer(server, origin);
+    const revision = await (await fetch(origin + '/api/system/revision')).json();
+    const scenarios = [];
+    report.volumes.push({ count, revision, scenarios });
+    browser = await chromium.launch(isolatedChromeLaunch(origin));
+    const newContext = () => browser.newContext({ baseURL: origin, viewport: { width: 1440, height: 960 } });
+    const setup = await newContext();
+    await seed(await setup.newPage(), count);
+    await setup.close();
+
+    for (const variant of variants) for (const tabs of tabCounts) {
+      const series = { tabs, variant, startLoad: uptime(), warm: [], cold: [], postWrite: [], idle: [], idleActivity: [], unlockMs: [], unlockDerivations: [] };
+      for (let iteration = 0; iteration < runs; iteration++) {
+        const ctx = await newContext();
+        try {
+          await ctx.addInitScript(installProbe, { rowSelector, tabSelector, variant, diagnosis });
+          const page = await ctx.newPage();
+          const cdp = await ctx.newCDPSession(page);
+          await cdp.send('Performance.enable');
+          await page.goto('/?area=incarico');
+          await page.getByRole('heading', { name: 'Sblocca MediFlow', exact: true }).waitFor();
+          const unlockStart = performance.now();
+          await unlockIfNeeded(page, pin);
+          series.unlockMs.push(performance.now() - unlockStart);
+          series.unlockDerivations.push(await page.evaluate(() => window.__listProbe.unlock()));
+          await page.locator(rowSelector).first().waitFor();
+          const { id, name } = await openTabs(page, tabs);
+          const last = page.locator(tabSelector + `[href="/patients/${id}/modules"]`);
+          const reopen = async () => {
+            await last.click();
+            await expect(page.locator(sheetSelector)).toContainText(name);
+          };
+          series.cold.push(await measure(page, cdp, serverRequests));
+          await reopen();
+          series.warm.push(await measure(page, cdp, serverRequests));
+          if (!values['skip-write']) {
+            await reopen();
+            await page.getByRole('link', { name: 'Nuova voce', exact: true }).click();
+            await page.getByRole('textbox', { name: 'Resoconto clinico', exact: true }).fill('Resoconto sintetico per il banco di misura.');
+            await page.getByRole('button', { name: 'Rivedi', exact: true }).click();
+            await page.getByRole('button', { name: 'Conferma e registra', exact: true }).click();
+            await expect(page.getByRole('region', { name: 'Esito della registrazione' })).toContainText('Registrata alle');
+            series.postWrite.push(await measure(page, cdp, serverRequests));
+          }
+          if (iteration < idleRuns && idleSeconds) {
+            await reopen();
+            const startLoad = uptime();
+            const idleStart = await page.evaluate(() => performance.now());
+            await sleep(idleSeconds * 1000);
+            const activity = await page.evaluate(start => window.__listProbe.activity(start), idleStart);
+            series.idle.push(await measure(page, cdp, serverRequests));
+            series.idleActivity.push({ startLoad, endLoad: uptime(), ...activity });
+          }
+        } finally {
+          await ctx.close();
+        }
+        if ((iteration + 1) % 5 === 0) console.log(`Cohort ${count}/${tabs}/${variant}: ${iteration + 1}/${runs}`);
+      }
+      series.endLoad = uptime();
+      const context = await newContext();
+      try {
+        const page = await context.newPage();
+        await page.goto('/?area=incarico');
+        await page.getByRole('heading', { name: 'Sblocca MediFlow', exact: true }).waitFor();
+        await unlockIfNeeded(page, pin);
+        const search = page.locator('#ricerca-pazienti');
+        await search.fill(patientName(Math.floor(count / 2)));
+        await expect(page.locator(rowSelector)).toHaveCount(1);
+        await expect(page.locator(rowSelector)).toContainText(patientName(Math.floor(count / 2)));
+      } finally {
+        await context.close();
+      }
+      for (const stage of ['cold', 'warm', 'postWrite', 'idle']) {
+        const result = stats(series[stage].map(sample => sample.ms));
+        if (result) console.log(`| ${count} | ${tabs} | ${variant}/${stage} | ${result.n} | ${result.median.toFixed(1)} | ${result.max.toFixed(1)} |`);
+      }
+      scenarios.push(series);
+      if (values.out) await writeFile(values.out, JSON.stringify(report, null, 2) + '\n');
     }
   } finally {
-    await browser.close();
-    await stopServer(child);
-    fs.rmSync(tempRoot, { recursive: true, force: true });
-  }
-
-  return volumeResult;
-}
-
-function printSummary(report) {
-  console.log('\nVolume | Scenario | List mediana (ms) | List peggiore (ms) | Todos mediana (ms) | Todos peggiore (ms) | Script med (ms) | Fetch /patients (ms) | Client post-fetch (ms)');
-  console.log('--- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---:');
-  for (const vol of report.volumes) {
-    for (const [name, sc] of Object.entries(vol.scenarios)) {
-      if (sc.warm) {
-        console.log(
-          `${vol.patients} | ${name} (cold) | ${sc.cold.listReadyMs} | ${sc.cold.listReadyMs} | ${sc.cold.todosReadyMs} | ${sc.cold.todosReadyMs} | ${sc.cold.scriptDurationMs} | ${sc.cold.patientsFetchEndMs ?? '-'} | ${sc.cold.clientPostPatientsMs ?? '-'}`,
-        );
-        console.log(
-          `${vol.patients} | ${name} (warm n=${sc.warm.listReadyMs.count}) | ${sc.warm.listReadyMs.median} | ${sc.warm.listReadyMs.max} | ${sc.warm.todosReadyMs.median} | ${sc.warm.todosReadyMs.max} | ${sc.warm.scriptDurationMs.median} | ${sc.warm.patientsFetchEndMs.median ?? '-'} | ${sc.warm.clientPostPatientsMs.median ?? '-'}`,
-        );
-      } else if (sc.sample) {
-        const s = sc.sample;
-        console.log(
-          `${vol.patients} | ${name} | ${s.listReadyMs} | ${s.listReadyMs} | ${s.todosReadyMs} | ${s.todosReadyMs} | ${s.scriptDurationMs} | ${s.patientsFetchEndMs ?? '-'} | ${s.clientPostPatientsMs ?? '-'}`,
-        );
-      }
+    try {
+      await browser?.close();
+    } finally {
+      if (server) await stopServer(server, closed);
+      await rm(data, { recursive: true, force: true });
     }
   }
 }
 
-async function main() {
-  const args = parseArgs(process.argv.slice(2));
-  const report = {
-    schemaVersion: 'mediflow.patient_list_return_benchmark.v1',
-    measuredAt: new Date().toISOString(),
-    gitHead: execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: ROOT_DIR, encoding: 'utf8' }).trim(),
-    thresholds: THRESHOLDS,
-    environment: {
-      node: process.version,
-      platform: `${os.platform()} ${os.release()} ${os.arch()}`,
-      cpu: os.cpus()[0]?.model ?? null,
-      logicalCores: os.cpus().length,
-      memoryGiB: round(os.totalmem() / 1024 ** 3),
-    },
-    volumes: [],
-  };
-
-  for (const volume of args.volumes) {
-    report.volumes.push(await runVolume(args, volume));
-  }
-
-  printSummary(report);
-
-  if (args.out) {
-    fs.mkdirSync(path.dirname(args.out), { recursive: true });
-    fs.writeFileSync(args.out, `${JSON.stringify(report, null, 2)}\n`);
-    console.log(`\nReport salvato in ${args.out}`);
-  }
-
-  if (args.assertThreshold) {
-    const violations = [];
-    for (const vol of report.volumes) {
-      const limit = THRESHOLDS[vol.patients];
-      if (!limit) continue;
-      for (const [name, sc] of Object.entries(vol.scenarios)) {
-        if (!sc.warm) continue;
-        if (sc.warm.listReadyMs.median > limit.medianMs) {
-          violations.push(`${vol.patients} ${name}: listReadyMs mediana ${sc.warm.listReadyMs.median} ms > ${limit.medianMs} ms`);
-        }
-        if (sc.warm.listReadyMs.max > limit.worstMs) {
-          violations.push(`${vol.patients} ${name}: listReadyMs peggiore ${sc.warm.listReadyMs.max} ms > ${limit.worstMs} ms`);
+const report = { limits, tabDeltaLimit, serverProfile: Boolean(values['server-profile']), postWrite: !values['skip-write'], idleRuns, idleSeconds, node: process.version, machine: os.cpus()[0]?.model, volumes: [] };
+console.log('| Pazienti | Cartelle | Scenario | n | Mediana (ms) | Peggiore (ms) |');
+console.log('| ---: | ---: | --- | ---: | ---: | ---: |');
+for (const count of volumes) await runVolume(count);
+if (values['assert-threshold']) {
+  for (const { count, scenarios } of report.volumes) {
+    const [medianLimit, maxLimit] = limits[count];
+    const warmByTabs = new Map();
+    for (const { tabs, cold, warm, postWrite } of scenarios) {
+      warmByTabs.set(tabs, stats(warm.map(sample => sample.ms)).median);
+      for (const [stage, samples] of Object.entries({ cold, warm, postWrite })) {
+        const { median, max } = stats(samples.map(sample => sample.ms));
+        if (median > medianLimit || max > maxLimit) {
+          console.error(`Soglia superata: ${count}/${tabs}/${stage}, ${median} ms mediana, ${max} ms massimo`);
+          process.exitCode = 1;
         }
       }
     }
-    if (violations.length > 0) {
-      console.error('\nSOGLIA SUPERATA:\n' + violations.join('\n'));
+    if (warmByTabs.get(6) - warmByTabs.get(1) > tabDeltaLimit) {
+      console.error(`Soglia di scala superata con ${count} pazienti`);
       process.exitCode = 1;
     }
   }
 }
-
-main().catch((error) => {
-  console.error(`[benchmark-patient-list-return] ${error instanceof Error ? error.stack : String(error)}`);
-  process.exitCode = 1;
-});
