@@ -1,7 +1,7 @@
 # ADR 0204: Servizio locale della voce
 
 Date: 2026-11-26
-Status: Proposed
+Status: Accepted (decisione di Leonardo del 26/11/2026)
 
 Refs: WUL-828
 Attua: [ADR 0200](./0200-web-standard-launcher-e-ritiro-app-desktop.md), passo 2 del piano di ritiro.
@@ -74,6 +74,11 @@ Con il modello assente il servizio parte e risponde `model: "missing"`; la creaz
 ### Dove sta il binario e chi lo compila
 
 Il launcher cerca `native/local-voice/target/release/mediflow-voice` nella cartella di MediFlow, oppure il percorso in `MEDIFLOW_LOCAL_VOICE_BINARY`; i modelli in `MEDIFLOW_LOCAL_VOICE_MODELS`, se impostato. Oggi nessuno lo compila in automatico: la preparazione della versione del launcher costruisce solo il Web, e la compilazione chiede Rust e `cmake`. In un'installazione vera il binario c'è solo se qualcuno ha eseguito `cargo build --release --locked -p mediflow-voice` in `native/local-voice`; altrimenti la riga del launcher dice «Non installata su questo Mac.». Passo minimo proposto, non costruito: un binario per macOS arm64 compilato dalla CI `local-voice.yml`, firmato, allegato alla release, con lo SHA-256 fissato nel repository come i prebuild di `scripts/windows-launcher-bootstrap/`; il launcher lo scarica o lo verifica nella preparazione della versione e rifiuta un binario con impronta diversa.
+
+## Decisioni di Leonardo del 26/11/2026
+
+- **Comando in testata.** Quando il launcher ha configurato il servizio, la testata della scheda ha quattro comandi: Prescrivi, Registra la visita, Nuova voce (l'unico principale) e Azioni. Senza il servizio restano tre e «Registra la visita» non compare. Il layout della scheda lo sa dal server, senza richieste al servizio; lo stato vero si legge solo aprendo la registrazione. Le prove della testata fissano entrambi gli stati (WUL-966).
+- **Trascrizione della prima visita in scheda.** Alla prima visita il testo rivisto, con il PIN della creazione, diventa il primo documento della scheda (`prima-visita-AAAA-MM-GG.pdf`). È la fonte delle proposte d'anagrafica: ogni dato mostra il passaggio da cui viene. L'audio non si conserva.
 
 ## Conseguenze
 
