@@ -1,6 +1,6 @@
 import { expect, type Locator } from '@playwright/test';
 
-export const voiceServiceDeclared = () => Boolean(process.env.MEDIFLOW_LOCAL_VOICE_URL && process.env.MEDIFLOW_LOCAL_VOICE_SECRET);
+export const voiceServiceDeclared = () => process.env.E2E_LOCAL_VOICE_CONFIGURED === '1';
 
 export const headerCommandNames = (voice: boolean) => voice
     ? ['Prescrivi', 'Registra la visita', 'Nuova voce', 'Azioni']
