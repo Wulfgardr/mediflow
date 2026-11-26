@@ -182,6 +182,13 @@ test('a therapy from a prescription without a stated status asks the physician, 
     const proposal = visit.locator('article').filter({ has: page.getByRole('heading', { name: 'Terapia proposta', exact: true }) });
     await expect(proposal.getByText('Il documento non indica lo stato della terapia: sceglilo prima di tenerla.', { exact: true })).toBeVisible({ timeout: 30000 });
     await expect(proposal.getByText(/status|Campo obbligatorio|non valido/u)).toHaveCount(0);
+    await expect(proposal.getByText('Manca lo stato', { exact: true })).toBeVisible();
+    await expect(proposal.getByRole('heading', { name: 'Terapia proposta', exact: true })).toBeVisible();
+    await expect(proposal.getByText('FARMACO SINTETICO 150MG', { exact: true }).first()).toBeVisible();
+    await expect(proposal.getByText('23/11/2026', { exact: true })).toBeVisible();
+    await expect(proposal.getByText('Non indicata nel documento', { exact: true })).toHaveCount(1);
+    await expect(proposal.getByRole('button', { name: 'Apri Documento del 23/11/2026', exact: true })).toBeVisible();
+    await expect(proposal.getByText(/[0-9a-f]{64}/u)).toHaveCount(0);
     const keep = proposal.getByRole('button', { name: 'Tieni', exact: true });
     await expect(keep).toBeDisabled();
     await expect(visit.getByRole('button', { name: 'Applica la visita', exact: true })).toBeDisabled();
@@ -193,6 +200,7 @@ test('a therapy from a prescription without a stated status asks the physician, 
             Array<{ id: string; patientId: string; drug: string; status: string; dosage: string }>;
         await proposal.getByRole('radio', { name: 'In corso', exact: true }).check();
         await expect(keep).toBeEnabled();
+        await expect(keep).toHaveClass(/mf-button-primary/u);
         await shot('7-ricetta-stato-scelto');
         await keep.click();
         await expect(visit.getByRole('region', { name: 'Voci decise' }).getByText('In scheda', { exact: true })).toHaveCount(1);

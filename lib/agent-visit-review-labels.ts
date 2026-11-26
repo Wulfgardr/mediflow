@@ -34,7 +34,6 @@ export function agentReviewShownFields(kind: string, values: Record<string, stri
 }
 
 export function agentReviewDocumentLabel(fileName: string, date: string | null | undefined): string {
-    if (fileName === 'nota-visita.pdf') return 'Nota della visita';
     if (!HASH_FILE.test(fileName)) return fileName;
     return date ? `Documento del ${agentReviewDay(date)}` : 'Documento della visita';
 }

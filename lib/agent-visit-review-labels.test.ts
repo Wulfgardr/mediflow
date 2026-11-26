@@ -12,7 +12,7 @@ test('a proposal reads in the words of the chart: dates as day/month/year, a fil
     assert.equal(agentReviewDisplayValue('dosage', AGENT_DOSAGE_NOT_STATED), 'Non indicata nel documento');
     assert.equal(agentReviewDocumentLabel(hash, '2026-11-23'), 'Documento del 23/11/2026');
     assert.equal(agentReviewDocumentLabel(hash, null), 'Documento della visita');
-    assert.equal(agentReviewDocumentLabel('nota-visita.pdf', null), 'Nota della visita');
+    assert.equal(agentReviewDocumentLabel('nota-visita.pdf', null), 'nota-visita.pdf');
     assert.equal(agentReviewDocumentLabel('referto-sintetico.pdf', '2026-11-23'), 'referto-sintetico.pdf');
     assert.deepEqual(agentReviewShownFields('therapy', { drugName: 'Farmaco', dosage: 'x', status: '', subject: 'paziente', temporality: 'oggi', contextReview: '1' }),
         [['drugName', 'Farmaco'], ['dosage', 'x']]);
