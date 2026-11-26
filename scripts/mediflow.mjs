@@ -505,7 +505,7 @@ export async function main(args = process.argv.slice(2)) {
       if (voiceChild && voiceChild === child && voiceChild.connected) voiceChild.send({ type: LOCAL_VOICE_ENDPOINT_FRAME, url: endpoint?.url ?? null, secret: endpoint?.secret ?? null }, () => {});
     } }) : null;
   const refreshVoiceState = async endpoint => {
-    if (!endpoint) { state.voice = voice ? 'stopped' : 'absent'; return; }
+    if (!endpoint) { state.voice = voice ? 'stopped' : process.platform === 'darwin' ? 'absent' : 'unsupported'; return; }
     try { const { model } = await localVoiceClient(endpoint).status(); state.voice = ['ready', 'missing', 'incomplete'].includes(model) ? model : 'stopped'; }
     catch { state.voice = 'stopped'; }
   };
