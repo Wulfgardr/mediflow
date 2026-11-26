@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import http from 'node:http';
+import net from 'node:net';
 import https from 'node:https';
 import { join } from 'node:path';
 import tls from 'node:tls';
@@ -11,10 +12,24 @@ import { syntheticTaxCode } from '../lib/patient-identity.test-support.ts';
 import { pin, startDevicePairingFixture } from './fixtures/device-pairing-runtime.mjs';
 import { certificatePin } from './launcher-lan-proxy.mjs';
 
-let fixture;
+let fixture, lanReachable = false;
+
+async function selfReachable(address) {
+    const server = net.createServer(socket => socket.end('ok'));
+    await new Promise(resolve => server.listen(0, '0.0.0.0', resolve));
+    try {
+        return await new Promise(resolve => {
+            const socket = net.connect({ host: address, port: server.address().port, localAddress: address });
+            socket.setTimeout(2000, () => { socket.destroy(); resolve(false); });
+            socket.once('data', () => { socket.destroy(); resolve(true); });
+            socket.once('error', () => resolve(false));
+        });
+    } finally { await new Promise(resolve => server.close(resolve)); }
+}
 
 before(async () => {
     fixture = await startDevicePairingFixture({ launcher: true });
+    lanReachable = await selfReachable(fixture.peer);
     execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1', '-subj', '/CN=localhost',
         '-keyout', join(fixture.directory, 'impostor.key'), '-out', join(fixture.directory, 'impostor.crt')], { stdio: 'ignore' });
 });
@@ -39,7 +54,8 @@ async function settles(predicate) {
 function device(origin, fingerprint, path, { method = 'GET', headers = {}, body } = {}) {
     const target = new URL(origin);
     return new Promise((resolve, reject) => {
-        const socket = tls.connect({ host: target.hostname, port: Number(target.port), localAddress: fixture.peer, rejectUnauthorized: false, servername: 'localhost' });
+        const socket = tls.connect({ host: lanReachable ? target.hostname : '127.0.0.1', port: Number(target.port),
+            ...(lanReachable ? { localAddress: fixture.peer } : {}), rejectUnauthorized: false, servername: 'localhost' });
         socket.once('error', reject);
         socket.once('secureConnect', () => {
             const presented = socket.getPeerCertificate().fingerprint256?.replaceAll(':', '').toLowerCase();
@@ -84,7 +100,8 @@ async function pairDevice() {
     return { origin, fingerprint, paired, session: { ...paired, Cookie: cookie } };
 }
 
-test('a paired synthetic device opens a synthetic chart through the proxy the launcher started', async () => {
+test('a paired synthetic device opens a synthetic chart through the proxy the launcher started', async t => {
+    t.diagnostic(lanReachable ? `dispositivo sintetico dall'indirizzo di rete ${fixture.peer}` : `questo Mac non raggiunge il proprio indirizzo di rete ${fixture.peer}: dispositivo sintetico dal loopback, attraverso lo stesso proxy TLS`);
     const port = fixture.tlsPort;
     const started = await settles(lan => lan.state === 'on');
     assert.deepEqual(started.lan, { state: 'on', paired: false, port, reason: null });
