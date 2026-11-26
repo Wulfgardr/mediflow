@@ -10,10 +10,23 @@ const escape = value => String(value).replace(/[&<>"']/gu, c => ({ '&': '&amp;',
 const voiceDetail = { ready: 'Pronta.', missing: 'Manca il modello della voce.', incomplete: 'Il modello della voce è incompleto.',
   stopped: 'Non attiva. Riapri MediFlow per riprovare.', absent: 'Non installata su questo Mac.' };
 
-/** @param {{ voice?: string }} state @returns {Array<{ id: string, title: string, detail: string, ready: boolean }>} */
+/** @param {{ state: string, paired: boolean, port: number | null, reason: string | null }} lan */
+function lanDetail(lan, port) {
+  if (lan.state === 'on') return lan.paired ? 'Collegamento acceso.' : 'Acceso. Nessun dispositivo abbinato: «Collega un dispositivo» nelle Impostazioni.';
+  if (lan.state === 'off') return 'Spento. Si accende con «Abilita home-base» nelle Impostazioni.';
+  if (lan.reason === 'port') return `Non acceso: la porta ${port} è occupata.`;
+  if (lan.reason === 'certificate') return 'Non acceso: serve openssl per creare il certificato.';
+  return 'Si è arrestato. Riapri MediFlow per riprovare.';
+}
+
+/**
+ * @param {{ voice?: string, lan?: { state: string, paired: boolean, port: number | null, reason: string | null }, lanPort?: number }} state
+ * @returns {Array<{ id: string, title: string, detail: string, ready: boolean }>}
+ */
 export function launcherServices(state) {
   const rows = [];
   if (state.voice && voiceDetail[state.voice]) rows.push({ id: 'voice', title: 'Registrazione della visita', detail: voiceDetail[state.voice], ready: state.voice === 'ready' });
+  if (state.lan && state.lan.state !== 'unknown') rows.push({ id: 'lan', title: 'iPhone e iPad', detail: lanDetail(state.lan, state.lanPort), ready: state.lan.state === 'on' });
   return rows;
 }
 
