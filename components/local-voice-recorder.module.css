@@ -18,7 +18,7 @@
     font-size: 0.8125rem;
     font-weight: 600;
 }
-.clock { color: var(--lume-ink-muted); font-variant-numeric: tabular-nums; font-weight: 500; }
+.clock { color: var(--lume-ink-muted); font-variant-numeric: tabular-nums; font-weight: 400; }
 
 .mark {
     position: relative;
@@ -45,7 +45,7 @@
     inset: -3px 0 0;
     text-align: center;
     font-size: 0.8125rem;
-    font-weight: 700;
+    font-weight: 600;
     line-height: 1;
 }
 .indicator > span:not(.mark) { color: var(--lume-ink); }
