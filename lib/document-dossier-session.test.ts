@@ -1084,3 +1084,25 @@ test('WUL-949 alla seconda importazione i documenti già nel dossier della sched
     const [plain] = await buildDossierInventory(ports, files, live);
     assert.deepEqual(plain.sources.map((item) => item.status), ['ready']);
 });
+
+test('WUL-949 si salta solo un originale con conservazione verificata e attuale; gli altri tornano alla rilettura', async () => {
+    for (const damage of ['pending_readback', 'mismatch', 'original_changed'] as const) {
+        const { files, ports, attachments } = fseFolder(CF_A, [['2025-01-10_LAB_Esami_Ente_0a1b2c3d.pdf', labText(CF_A)]]);
+        const [first] = await buildDossierInventory(ports, files, { ...live, declaredTaxCode: CF_A, skipImportedFor: 'pa' });
+        await acquireDossierGroup(ports, { group: first, patientId: 'pa', confirmed: true, ...live });
+        const stored = [...attachments.values()][0];
+        if (damage === 'original_changed') {
+            stored.bytes = enc.encode(labText(CF_A, 'Data prelievo: 12/12/2025'));
+            stored.meta.currentness = { ...stored.meta.currentness!, sourceRef: 'f'.repeat(64) };
+        } else {
+            const snapshot = JSON.parse(stored.meta.parseEvidenceArtifactSnapshot!);
+            snapshot.dossier.preservation = { reusedExisting: false, state: damage };
+            stored.meta.parseEvidenceArtifactSnapshot = JSON.stringify(snapshot);
+        }
+        const [again] = await buildDossierInventory(ports, files, { ...live, declaredTaxCode: CF_A, skipImportedFor: 'pa' });
+        assert.deepEqual(again.sources.map((item) => item.status), ['ready'], damage);
+        const [outcome] = await acquireDossierGroup(ports, { group: again, patientId: 'pa', confirmed: true, ...live });
+        if (damage === 'original_changed') assert.deepEqual([outcome.status, 'reason' in outcome && outcome.reason], ['failed', 'readback_mismatch'], damage);
+        else assert.deepEqual([outcome.status, 'verified' in outcome && outcome.verified], ['reused', true], damage);
+    }
+});
