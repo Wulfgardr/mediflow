@@ -6,6 +6,7 @@ import { sealAgentItemNode } from '../packages/agent-client/src/cassette-crypto'
 import { db, type Patient } from './db';
 import { agentItemAwaitsDecision, agentVisitAwaitsReview, inspectAgentVisit, prepareAgentApplication, prepareAgentItemDecision } from './agent-visit-review';
 import type { AgentItemKind } from './agent-cassette-crypto';
+import { decryptData } from './security/security';
 
 const cf = 'RSSMRA80A01F205X';
 const quote = 'LOINC 2345-7. Glucosio 100 mg/dL intervallo 70 110';
@@ -33,7 +34,11 @@ async function fixture(proposalInput: Proposal = { kind: 'observation', values: 
         byteLength: proposal.bytes.length, documentHash: null }));
     f.run(() => f.store.close(f.principal, visitId, receipt.revision));
     const row = (discardedItemIds: string[] = []) => ({ ...f.rows()[0], appliedItemIds: [], discardedItemIds });
-    return { row, pdfId, proposalId, close() { db.setKey(null); f.database.close(); } };
+    const opened = async (sealed: string | null | undefined) => {
+        const [, iv, data] = (sealed ?? '').split(':');
+        return decryptData(data!, iv!, f.masterKey) as Promise<Record<string, unknown>>;
+    };
+    return { row, pdfId, proposalId, opened, close() { db.setKey(null); f.database.close(); } };
 }
 
 test('one proposal of a visit is prepared alone, with the chart version the physician saw', async () => {
@@ -121,4 +126,50 @@ test('a diagnosis already in the chart is neither kept nor corrected in silence;
         assert.ok(await prepareAgentItemDecision(review, f.proposalId, 'discard', signal));
         assert.equal(agentVisitAwaitsReview(review), true);
     } finally { get.mock.restore(); f.close(); }
+});
+
+const recipeQuote = 'FARMACO SINTETICO 150MG 28 compresse';
+const recipeText = 'Paziente CF ' + cf + '\nData Prescrizione: 23/11/2026\nRp/\n' + recipeQuote + '\nConfezioni: 1';
+
+test('a therapy from a prescription that states no status asks the physician for it, and Tieni writes only the status chosen', async () => {
+    const f = await fixture({ kind: 'therapy', values: { drugName: 'FARMACO SINTETICO 150MG' }, quote: recipeQuote });
+    const query = mock.method(db.therapies, 'query', () => ({ toArray: async () => [] }));
+    const get = mock.method(db.patients, 'get', async () => patient());
+    try {
+        const signal = new AbortController().signal;
+        const review = await inspectAgentVisit(f.row(), [patient()], null, signal, pdfText(recipeText));
+        const shown = [...(review.itemBlockers.get(f.proposalId) ?? []), ...review.proposalBlockers];
+        assert.ok(!shown.some(message => /status|Campo obbligatorio|non valido/u.test(message)), shown.join(' | '));
+        assert.deepEqual(review.itemNeeds.get(f.proposalId), ['status']);
+        assert.equal(review.itemBlockers.has(f.proposalId), false);
+        assert.equal(agentItemAwaitsDecision(review, f.proposalId), true);
+        assert.equal(agentVisitAwaitsReview(review), false);
+        assert.equal(await prepareAgentApplication(review, signal), null);
+        assert.equal(await prepareAgentItemDecision(review, f.proposalId, 'keep', signal), null);
+        assert.equal(await prepareAgentItemDecision(review, f.proposalId, 'keep', signal, { status: 'attiva' }), null);
+        const kept = await prepareAgentItemDecision(review, f.proposalId, 'keep', signal, { status: 'active', dosage: '2 compresse', drugName: 'Altro' });
+        assert.ok(kept && kept.decision === 'keep' && kept.item.kind === 'therapy');
+        assert.equal(kept.item.values.status, 'active');
+        assert.equal(kept.item.values.dosage, 'non indicata nel documento');
+        assert.equal(kept.item.values.drugName, 'FARMACO SINTETICO 150MG');
+        assert.deepEqual(JSON.parse(String(await f.opened(kept.item.values.motivation))).physicianFields, ['status']);
+        assert.equal(new Date(kept.item.values.startDate).toISOString().slice(0, 10), '2026-11-23');
+    } finally { get.mock.restore(); query.mock.restore(); f.close(); }
+});
+
+test('a therapy whose source states the status is kept as deposited, without asking', async () => {
+    const quoteInUse = 'Prescrivo FARMACO SINTETICO 150MG una compressa al giorno';
+    const f = await fixture({ kind: 'therapy', values: { drugName: 'FARMACO SINTETICO 150MG', dosage: 'una compressa al giorno' }, quote: quoteInUse });
+    const query = mock.method(db.therapies, 'query', () => ({ toArray: async () => [] }));
+    const get = mock.method(db.patients, 'get', async () => patient());
+    try {
+        const signal = new AbortController().signal;
+        const review = await inspectAgentVisit(f.row(), [patient()], null, signal, pdfText('Paziente CF ' + cf + '\nData Prescrizione: 23/11/2026\n' + quoteInUse));
+        assert.equal(review.itemNeeds.has(f.proposalId), false);
+        assert.equal(agentVisitAwaitsReview(review), true);
+        const kept = await prepareAgentItemDecision(review, f.proposalId, 'keep', signal, { status: 'completed' });
+        assert.ok(kept && kept.decision === 'keep' && kept.item.kind === 'therapy');
+        assert.equal(kept.item.values.status, 'active');
+        assert.equal(JSON.parse(String(await f.opened(kept.item.values.motivation))).physicianFields, undefined);
+    } finally { get.mock.restore(); query.mock.restore(); f.close(); }
 });
