@@ -3,11 +3,12 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { mkdtempSync, openSync, closeSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { request as httpsRequest } from 'node:https';
 import { createServer } from 'node:net';
-import { networkInterfaces, tmpdir } from 'node:os';
+import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 
+import { readPairingAddress } from '../../lib/network-pairing-address.ts';
 import { generateMasterKey } from '../../lib/security/security.ts';
 import { createRecoveryWrapping, createUnlockWrapping, deriveUnlockMaterial } from '../../lib/security/unlock-credential.ts';
 import { loginWithWebAuthControl } from '../web-auth-control-test-client.mjs';
@@ -33,9 +34,7 @@ export async function startDevicePairingFixture({ source = root, launcher = fals
     const children = [];
     const tlsPort = await freePort();
     const httpPort = await freePort();
-    const peer = Object.entries(networkInterfaces()).sort(([a], [b]) => a.localeCompare(b))
-        .flatMap(([, addresses]) => addresses ?? []).find(address => address.family === 'IPv4'
-        && !address.internal && !address.address.startsWith('169.254.'))?.address;
+    const peer = await readPairingAddress('0.0.0.0');
     const httpOrigin = `http://127.0.0.1:${httpPort}`;
     const localApiToken = randomBytes(32).toString('hex');
     const env = { ...process.env, MEDIFLOW_DATA_DIR: directory, MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1',

@@ -1,11 +1,10 @@
 import 'server-only';
 import { X509Certificate } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import { hostname, networkInterfaces } from 'node:os';
+import { hostname } from 'node:os';
 import { connect } from 'node:tls';
-import { createSocket } from 'node:dgram';
 import { resolveDataPath } from './data-dir';
-import { choosePairingAddress } from './network-pairing-address';
+import { readPairingAddress } from './network-pairing-address';
 
 export type NetworkPairingEndpoint = { origin: string; fingerprint: string; computer: string };
 
@@ -23,19 +22,6 @@ function presentsCertificate(host: string, port: number, fingerprint: string): P
     });
 }
 
-function readDefaultRouteAddress(): Promise<string | undefined> {
-    return new Promise(resolve => {
-        const socket = createSocket('udp4');
-        const finish = (address?: string) => {
-            socket.removeAllListeners();
-            socket.close();
-            resolve(address);
-        };
-        socket.once('error', () => finish());
-        socket.connect(9, '192.0.2.1', () => finish(socket.address().address));
-    });
-}
-
 export async function readNetworkPairingEndpoint(displayName?: string): Promise<NetworkPairingEndpoint | null> {
     try {
         const descriptor = JSON.parse(await readFile(resolveDataPath('runtime-status.json'), 'utf8')) as Record<string, unknown>;
@@ -43,7 +29,7 @@ export async function readNetworkPairingEndpoint(displayName?: string): Promise<
         if (typeof port !== 'number' || !Number.isInteger(port) || port < 1 || port > 65535
             || typeof certPath !== 'string' || typeof bindHost !== 'string') return null;
 
-        const address = choosePairingAddress(networkInterfaces(), bindHost, await readDefaultRouteAddress());
+        const address = await readPairingAddress(bindHost);
         if (!address) return null;
 
         const certificate = new X509Certificate(await readFile(certPath));

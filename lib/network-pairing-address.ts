@@ -1,4 +1,5 @@
-import type { NetworkInterfaceInfo } from 'node:os';
+import { createSocket } from 'node:dgram';
+import { networkInterfaces, type NetworkInterfaceInfo } from 'node:os';
 
 const VIRTUAL_INTERFACE = /^(?:bridge|vmnet|vnic|vboxnet|utun|tun|tap|ipsec|ppp|gif|stf|awdl|llw|anpi|feth|docker|veth|zt|vEthernet)/iu;
 
@@ -17,4 +18,21 @@ export function choosePairingAddress(
             .map(entry => ({ name, address: entry.address })))
         .filter(({ address }) => anyHost || address === bindHost);
     return candidates.sort((a, b) => rank(a) - rank(b))[0]?.address ?? null;
+}
+
+function readDefaultRouteAddress(): Promise<string | undefined> {
+    return new Promise(resolve => {
+        const socket = createSocket('udp4');
+        const finish = (address?: string) => {
+            socket.removeAllListeners();
+            socket.close();
+            resolve(address);
+        };
+        socket.once('error', () => finish());
+        socket.connect(9, '192.0.2.1', () => finish(socket.address().address));
+    });
+}
+
+export async function readPairingAddress(bindHost: string): Promise<string | null> {
+    return choosePairingAddress(networkInterfaces(), bindHost, await readDefaultRouteAddress());
 }
