@@ -6,14 +6,21 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 const repository = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+function staticImportClosure(entry, seen = new Set()) {
+  if (seen.has(entry)) return seen;
+  seen.add(entry);
+  const text = fs.readFileSync(path.join(repository, entry), 'utf8');
+  for (const [, target] of text.matchAll(/^(?:import|export)\s[^;]*?\sfrom\s+['"](\.{1,2}\/[^'"]+)['"]/gmu)) {
+    staticImportClosure(path.posix.normalize(path.posix.join(path.posix.dirname(entry), target)), seen);
+  }
+  return seen;
+}
 function sourceFixture(t, dist = '.next') {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-build-input-')));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const put = (name, value) => { const file = path.join(root, name); fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, value); return file; };
-  for (const name of ['source-runtime.mjs', 'windows-runtime-job-deadlines.mjs', 'node-runtime-contract.mjs', 'generate-runtime-payload-ledger.mjs',
-    'launch-bundled-headless-supervisor.mjs', 'build-input-metadata.mjs', 'standalone-runtime-chunks.mjs']) {
-    const source = path.join(repository, 'scripts', name);
-    if (fs.existsSync(source)) put(`scripts/${name}`, fs.readFileSync(source));
+  for (const name of [...staticImportClosure('scripts/source-runtime.mjs'), 'scripts/standalone-runtime-chunks.mjs']) {
+    put(name, fs.readFileSync(path.join(repository, name)));
   }
   put('package.json', '{"name":"synthetic-build-input","engines":{"node":">=24 <25"}}\n');
   put('.nvmrc', '24\n'); put('.gitignore', 'node_modules/\n.next/\n.next-e2e/\nnested/\n');
