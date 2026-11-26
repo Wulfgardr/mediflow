@@ -65,8 +65,8 @@ function device(origin, fingerprint, path, { method = 'GET', headers = {}, body 
         socket.once('secureConnect', () => {
             const presented = socket.getPeerCertificate().fingerprint256?.replaceAll(':', '').toLowerCase();
             if (presented !== fingerprint) { socket.destroy(); reject(Object.assign(new Error('certificate not recognised'), { code: 'PIN_MISMATCH' })); return; }
-            const request = http.request({ createConnection: () => socket, method, path, host: target.host,
-                headers: { ...headers, ...(body ? { 'Content-Type': 'application/json' } : {}) } }, response => {
+            const request = http.request({ createConnection: () => socket, method, path,
+                headers: { Host: lanReachable ? target.host : `127.0.0.1:${target.port}`, ...headers, ...(body ? { 'Content-Type': 'application/json' } : {}) } }, response => {
                 let text = '';
                 response.on('data', chunk => { text += chunk; });
                 response.on('end', () => { socket.destroy(); resolve({ status: response.statusCode, text, headers: response.headers }); });
