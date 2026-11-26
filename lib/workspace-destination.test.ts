@@ -19,7 +19,7 @@ const routes: [string, string | null, string][] = [
   ['/', 'governance', '/settings'], ['/diary', null, '/?area=diario'],
   ['/settings', null, '/settings'], ['/settings/ai/modelli', null, '/settings'],
   ['/analytics', null, '/analytics'], ['/analytics/report', null, '/analytics'],
-  ['/scales', null, '/scales'], ['/scales/catalogo', null, '/scales'],
+  ['/scales', null, '/scales'], ['/scales/catalogo', null, '/scales'], ['/da-decidere', null, '/da-decidere'],
   ['/patients/synthetic-id/modules', null, '/?area=incarico'],
   ['/patients/synthetic-id/diary', 'governance', '/?area=incarico'],
 ];

@@ -40,13 +40,13 @@ export function readAgentCassetteIndex(database: Database.Database, actorRef: st
             (SELECT cursor.deposited_at, cursor.id FROM agent_cassettes AS cursor WHERE cursor.actor_ref=? AND cursor.id=?))
         AND NOT EXISTS (
             SELECT 1 FROM audit_events AS event
-            WHERE event.event_type='agent.visit.applied' AND event.actor_ref=cassette.actor_ref
+            WHERE event.actor_ref=cassette.actor_ref
             AND event.subject_type='agent_operation' AND event.subject_ref=cassette.id
             AND event.proposer_ref=cassette.agent_ref AND event.mandate_ref=cassette.mandate_ref
             AND event.outcome='success' AND event.source_surface='agent'
-            AND EXISTS (SELECT 1 FROM json_each(
+            AND (event.event_type='agent.visit.decided' OR (event.event_type='agent.visit.applied' AND EXISTS (SELECT 1 FROM json_each(
                 CASE WHEN json_valid(event.redacted_metadata) THEN event.redacted_metadata ELSE '{}' END, '$.flags'
-            ) WHERE value=?)
+            ) WHERE value=?)))
         ) ORDER BY cassette.deposited_at, cassette.id LIMIT ?`).all(actorRef, after, actorRef, after, AGENT_CASSETTE_COMPLETE, pageSize + 1) as AgentCassetteIndexEntry[];
     const visits = rows.slice(0, pageSize);
     return { visits, next: rows.length > pageSize ? visits.at(-1)!.id : null };
