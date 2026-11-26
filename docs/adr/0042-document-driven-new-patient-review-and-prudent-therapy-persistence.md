@@ -518,9 +518,14 @@ Regole:
   non entra con il gesto unico: resta da decidere, con il motivo accanto al
   campo. Serve perché le proposte vengono da più documenti, e uno può essere di
   un familiare senza codice fiscale.
-- Limite dichiarato: senza alcun codice fiscale nel lotto non c'è nulla con cui
-  confrontare la data, e il gesto unico porta nei campi anche dati presi da
-  documenti diversi che non si contraddicono.
+- Il gesto unico prende un dato solo da un documento della stessa persona:
+  uno che riporta il codice fiscale scelto, oppure cognome e nome uguali a
+  quelli scelti (decisione di Leonardo del 26/11/2026). Con un solo documento
+  che propone dati vale quel documento; una data che corrisponde al codice
+  fiscale scelto entra anche da un documento senza nome. Gli altri dati restano
+  fuori dai campi, con la nota «Da scegliere» accanto, e si prendono con un
+  clic per campo. Non bloccano la conferma: il campo resta vuoto finché il
+  medico non sceglie o scrive.
 - I campi restano modificabili; accanto a ogni campo che coincide con una
   proposta resta il nome del file da cui viene.
 - PIN, controllo dei duplicati, conferma del collegamento e blocchi del lotto
@@ -531,4 +536,6 @@ Prove: `lib/dossier-new-patient-entry.test.ts` (proposte dal lotto, valori
 concordi, valori discordi, documenti esclusi) ed `e2e/new-patient-from-documents.spec.ts`
 (un gesto riempie i campi, correzione di un campo, PIN e scheda creata; due
 cognomi diversi lasciano il campo da decidere; la data di nascita di un
-familiare senza codice fiscale resta da decidere; casi bloccati invariati).
+familiare senza codice fiscale resta da decidere; senza codice fiscale la data
+di un documento senza cognome e nome resta fuori e si prende con un clic; casi
+bloccati invariati).

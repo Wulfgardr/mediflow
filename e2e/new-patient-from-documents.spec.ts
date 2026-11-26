@@ -249,3 +249,34 @@ test('nuova scheda: la data di nascita di un familiare, senza codice fiscale, no
     await expect(create.getByRole('button', { name: 'Prosegui alla conferma' })).toBeDisabled();
     await captureOf(info, create.locator('form'), 'data-del-familiare.png');
 });
+
+test('nuova scheda: senza codice fiscale «Usa tutte le proposte» non prende la data da un documento senza lo stesso cognome e nome', async ({ page }, info) => {
+    test.setTimeout(240_000);
+    await bootstrapUnlockedSession(page, pin);
+    await openUnlockedDocument(page, '/patients/new', pin);
+    await dropFiles(dropZone(page), [
+        { name: 'lettera.pdf', bytes: await textPdf(['Lettera di dimissione sintetica', 'Cognome: Sintetica', 'Nome: Elena']) },
+        { name: 'familiare.pdf', bytes: await textPdf(['Referto sintetico di un familiare', 'Data di nascita: 15/06/1955']) },
+        { name: 'referto.pdf', bytes: await textPdf(['Referto sintetico', 'Cognome: Sintetica', 'Nome: Elena', 'Data prelievo: 10/01/2025']) },
+    ]);
+    const group = page.getByTestId('dossier-import').getByTestId('dossier-group');
+    await expect(group.getByTestId('dossier-source')).toHaveCount(3, { timeout: 120_000 });
+    const create = group.getByTestId('dossier-new-patient').getByTestId('patient-document-create');
+    await create.getByRole('button', { name: 'Avvia la revisione del documento' }).click();
+    await expect(create.getByRole('heading', { name: 'Revisione dei dati' })).toBeVisible({ timeout: 60_000 });
+    const proposals = create.getByTestId('patient-document-dossier-proposals');
+    await expect(proposals).toContainText('Data di nascita: 15/06/1955');
+
+    await create.getByRole('button', { name: 'Usa tutte le proposte' }).click();
+    await expect(create.getByLabel('Cognome', { exact: true })).toHaveValue('Sintetica');
+    await expect(create.getByLabel('Nome', { exact: true })).toHaveValue('Elena');
+    await expect(create.getByLabel('Data di nascita', { exact: true })).toHaveValue('');
+    await expect(create.locator('#patient-document-birthDate-source')).toHaveText('Da scegliere: familiare.pdf non riporta lo stesso cognome e nome.');
+    await expect(create.getByTestId('patient-document-undecided')).toHaveCount(0);
+    await captureOf(info, create.locator('form'), 'data-senza-codice-fiscale.png');
+
+    await proposals.getByRole('listitem').filter({ hasText: 'Data di nascita: 15/06/1955' }).getByRole('button', { name: 'Usa per data di nascita' }).click();
+    await expect(create.getByLabel('Data di nascita', { exact: true })).toHaveValue('1955-06-15');
+    await expect(create.locator('#patient-document-birthDate-source')).toHaveText('Fonte: familiare.pdf');
+    await captureOf(info, create.locator('form'), 'data-scelta-con-un-clic.png');
+});
