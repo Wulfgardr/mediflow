@@ -35,7 +35,9 @@ function knownValues(values: readonly (string | null)[]): string[] {
     }))];
 }
 
-function identityKnowledge(source: ProfileFields): NonNullable<RedactionSessionInput['knownIdentifiers']> {
+export type ProfileIdentity = Pick<ProfileFields, IdentityField>;
+
+export function identityKnowledge(source: ProfileIdentity): NonNullable<RedactionSessionInput['knownIdentifiers']> {
     const day = source.birthDate ? ISO_TIMESTAMP_DAY.exec(source.birthDate) : null;
     return Object.freeze({
         names: knownValues([source.firstName, source.lastName]),
