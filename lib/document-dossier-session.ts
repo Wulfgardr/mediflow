@@ -160,7 +160,7 @@ export async function buildDossierInventory(
     const preparedSources = new Map((options.prepared?.sources ?? []).map((source) => [source.sha256, source]));
     const physicianTaxCode = await ports.physicianTaxCode?.(signal) ?? null;
     const exemptionCodes = await ports.exemptionCodes(signal);
-    const imported = options.skipImportedFor ? recordsBySha(await ports.listAttachments(options.skipImportedFor, signal)) : new Map<string, DossierAttachmentMeta>();
+    const imported = options.skipImportedFor ? preservedBySha(await ports.listAttachments(options.skipImportedFor, signal)) : new Set<string>();
     assertLive(signal, isCurrent);
     const sources: DossierDraftSource[] = [];
     const firstBySha = new Map<string, string>();
@@ -327,6 +327,16 @@ export type DossierAcquireOutcome =
 
 function dataEqual(left: Uint8Array, right: Uint8Array): boolean {
     return left.byteLength === right.byteLength && left.every((byte, index) => byte === right[index]);
+}
+
+/** Impronte degli originali con conservazione verificata sulla fonte host attuale: solo questi si possono saltare. */
+function preservedBySha(attachments: readonly DossierAttachmentMeta[]): Set<string> {
+    const preserved = new Set<string>();
+    for (const attachment of attachments) {
+        const read = readDossierRecord(attachment.parseEvidenceArtifactSnapshot);
+        if (read.status === 'present' && preservationIsCurrent(read.record, attachment.currentness?.sourceRef)) preserved.add(read.record.source.sha256);
+    }
+    return preserved;
 }
 
 function recordsBySha(attachments: readonly DossierAttachmentMeta[]): Map<string, DossierAttachmentMeta> {
