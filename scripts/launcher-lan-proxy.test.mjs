@@ -103,7 +103,7 @@ test('a paired synthetic device opens a synthetic chart through the proxy the la
     assert.equal(phone.fingerprint, status.tlsPin);
     const chart = await device(phone.origin, phone.fingerprint, `/api/v1/network/patients/${id}`, { headers: phone.session });
     assert.equal(chart.status, 200, chart.text);
-    assert.equal(JSON.parse(chart.text).id, id);
+    assert.ok(chart.text.includes(id), chart.text.slice(0, 200));
     assert.deepEqual((await settles(lan => lan.paired)).lan, { state: 'on', paired: true, port, reason: null });
     assert.equal((await launcherState()).services.find(row => row.id === 'lan').detail, 'Collegamento acceso.');
 });

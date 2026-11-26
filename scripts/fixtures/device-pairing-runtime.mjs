@@ -1,6 +1,6 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { mkdirSync, mkdtempSync, openSync, closeSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, openSync, closeSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { request as httpsRequest } from 'node:https';
 import { createServer } from 'node:net';
 import { networkInterfaces, tmpdir } from 'node:os';
@@ -29,6 +29,7 @@ async function freePort() {
 
 export async function startDevicePairingFixture({ source = root, launcher = false } = {}) {
     const directory = launcher ? realpathSync(mkdtempSync(join(tmpdir(), 'mediflow-device-launcher-'))) : mkdtempSync(join(root, 'tmp-device-pairing-'));
+    const home = launcher ? realpathSync(mkdtempSync(join(tmpdir(), 'mediflow-device-home-'))) : null;
     const children = [];
     const tlsPort = await freePort();
     const httpPort = await freePort();
@@ -60,6 +61,7 @@ export async function startDevicePairingFixture({ source = root, launcher = fals
             clearTimeout(timer);
         }));
         rmSync(directory, { recursive: true, force: true });
+        if (home) rmSync(home, { recursive: true, force: true });
     }
 
     async function waitFor(child, predicate, name) {
@@ -72,10 +74,9 @@ export async function startDevicePairingFixture({ source = root, launcher = fals
 
     try {
         if (!peer) throw new Error('The test requires one non-loopback IPv4 interface');
-        if (launcher) mkdirSync(join(directory, 'home'));
         const server = launcher
             ? launch([resolve(source, 'scripts/mediflow.mjs'), '--scelta', 'web', '--senza-browser'], 'next.log', {
-                HOME: join(directory, 'home'), XDG_CONFIG_HOME: join(directory, 'home/config'), PORT: String(httpPort),
+                HOME: home, XDG_CONFIG_HOME: join(home, 'config'), PORT: String(httpPort),
                 MEDIFLOW_TLS_PORT: String(tlsPort), MEDIFLOW_LOCAL_VOICE_BINARY: join(directory, 'no-voice') })
             : launch([resolve(root, 'node_modules/next/dist/bin/next'), 'dev', '--webpack',
                 '--hostname', '127.0.0.1', '--port', String(httpPort)], 'next.log');
