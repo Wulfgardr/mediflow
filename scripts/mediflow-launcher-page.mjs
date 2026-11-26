@@ -60,9 +60,10 @@ footer{display:flex;justify-content:space-between;align-items:center;gap:12px;ma
 .link{font:600 13px/1 system-ui,-apple-system,'Segoe UI',sans-serif;color:var(--fresh);background:none;border:0;padding:8px 0;cursor:pointer}
 .folder{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .install{margin-top:16px}.install .link{font-size:14px}
-.services{margin-top:20px}.services li{display:flex;gap:14px;align-items:flex-start;padding:12px 4px}
+.services{margin-top:28px}.services h2{margin:0 0 6px;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.services li{display:flex;gap:14px;align-items:flex-start;padding:12px 4px}
 .services strong{display:block;font-weight:600}.services small{display:block;font-size:13px;color:var(--muted);margin-top:2px}
-.services li.ready .dot{border-color:var(--ink);background:var(--ink)}
+.services .dot{width:8px;height:8px;margin:7px 1px 0;border:0;background:var(--strong)}.services li.ready .dot{background:var(--fresh)}
 [hidden]{display:none!important}
 </style></head><body><main>
 <div class="mark"><span class="brand">MediFlow<b>.</b></span><span class="version">${escape(version)}</span></div>
@@ -82,7 +83,7 @@ ${development ? row('sviluppo', 'Modalità sviluppo', 'Questa cartella ha modifi
 <li data-step="pronto"><span class="dot" aria-hidden="true"></span>Pronto</li>
 </ol>
 <div id="install" class="install" hidden><button class="link" id="approve">Installa le dipendenze (npm ci)</button></div>
-<ul id="services" class="services" aria-label="Stato" hidden></ul>
+<section id="status-section" class="services" aria-labelledby="status-title" hidden><h2 id="status-title">Stato</h2><ul id="services"></ul></section>
 <footer><span class="folder" title="${escape(folder)}">${escape(folder)}</span><button class="link" id="stop">Arresta</button></footer>
 <noscript><p>Attiva JavaScript oppure riapri il lanciatore dal terminale con --senza-browser.</p></noscript>
 <script nonce="${nonce}">
@@ -105,7 +106,7 @@ else say(state.step==='errore'?state.message:'',state.step==='errore');
 document.querySelectorAll('[data-choice]').forEach(b=>b.disabled=!!state.busy);$('install').hidden=!state.needsInstall;
 const rows=(state.services||[]).map(item=>{const li=document.createElement('li'),dot=document.createElement('span'),text=document.createElement('span'),title=document.createElement('strong'),detail=document.createElement('small');
 li.dataset.service=item.id;li.className=item.ready?'ready':'';dot.className='dot';dot.setAttribute('aria-hidden','true');title.textContent=item.title;detail.textContent=item.detail;text.append(title,detail);li.append(dot,text);return li;});
-$('services').replaceChildren(...rows);$('services').hidden=!rows.length;}
+$('services').replaceChildren(...rows);$('status-section').hidden=!rows.length;}
 async function poll(){if(stopped)return;try{const r=await fetch(base+'/state');if(!r.ok)throw Error();const state=await r.json();render(state);if(state.ready&&state.url&&!choosing){location.replace(base+'/go');return;}}catch{say('Il lanciatore non risponde. Controlla il terminale.',true);}setTimeout(poll,500);}poll();
 </script></main></body></html>`;
 }
