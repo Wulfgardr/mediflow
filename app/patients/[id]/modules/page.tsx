@@ -20,7 +20,7 @@ import type { PatientInsightCardPreview } from '@/components/ai-patient-insight'
 import { AttentionGroup } from '@/components/attention-group';
 import { ClinicalRiverTimeline } from '@/components/clinical-river-timeline';
 import { PatientEntryComposer } from '@/components/patient-entry-composer';
-import { useLocalVoiceReady } from '@/components/local-voice-recorder';
+import { useLocalVoiceConfigured } from '@/components/local-voice-configured';
 import type { ClinicalEditorFocus } from '@/components/clinical-rich-text-editor';
 import { PatientSynopticSheet } from '@/components/patient-synoptic-sheet';
 import { PatientSheetSources, type SheetSource } from '@/components/patient-sheet-sources';
@@ -92,8 +92,7 @@ function navigateToObservationForm(): void {
 }
 
 function RecordVisitCommand({ patientId }: { patientId: string }) {
-    const ready = useLocalVoiceReady(`paziente:${patientId}`);
-    if (!ready) return null;
+    if (!useLocalVoiceConfigured()) return null;
     return <Link href={`/patients/${patientId}/modules?voce=nuova#registrazione`} className="mf-button-secondary"><Mic size={15} aria-hidden="true" />Registra la visita</Link>;
 }
 

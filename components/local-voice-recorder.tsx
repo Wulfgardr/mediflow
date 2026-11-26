@@ -55,7 +55,7 @@ export function LocalVoiceRecorderPanel({ subject, vocabulary, modes, title, tak
 }) {
     const ids = useId();
     const confirm = useConfirm();
-    const [view, recorder] = useLocalVoiceRecorder(subject, 'recording');
+    const [view, recorder] = useLocalVoiceRecorder(subject);
     const focusStart = useCallback((button: HTMLButtonElement | null) => {
         if (button && window.location.hash === '#registrazione') button.focus();
     }, []);
@@ -137,10 +137,4 @@ export function LocalVoiceRecorderPanel({ subject, vocabulary, modes, title, tak
             </div>
         </div> : null}
     </section>;
-}
-
-/** The secondary header command of a patient sheet: shown only where recording can work. */
-export function useLocalVoiceReady(subject: string) {
-    const [view] = useLocalVoiceRecorder(subject, 'availability');
-    return view.availability === 'ready';
 }

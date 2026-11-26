@@ -86,11 +86,14 @@ test('dalla scheda: registro una visita a due voci, pausa, ripresa, fine, rilegg
     await syntheticMicrophone(page, { tone: TONE_HZ });
     await bootstrapUnlockedSession(page, pin);
     const patientId = await syntheticPatient(page, 'Ascolto');
+    const voiceReads: string[] = [];
+    page.on('request', (request) => { if (new URL(request.url()).pathname.startsWith('/api/local-voice')) voiceReads.push(request.url()); });
     await openUnlockedDocument(page, `/patients/${patientId}/modules`, pin);
     const command = page.getByRole('link', { name: 'Registra la visita' });
     await expect(command).toBeVisible();
     await expect(page.locator('[data-lume-primary="true"], .mf-button-primary').filter({ visible: true })).toHaveCount(1);
     await capture(info, page, '1-scheda-con-registra.png');
+    expect(voiceReads).toEqual([]);
 
     await command.click();
     const recorder = page.getByTestId('local-voice-recorder');
@@ -186,8 +189,7 @@ test('servizio assente o modello mancante: la pagina lo dice e non offre di regi
     const patientId = await syntheticPatient(page, 'Silenzio');
     await openUnlockedDocument(page, `/patients/${patientId}/modules`, pin);
     await expect(page.getByRole('link', { name: 'Nuova voce' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Registra la visita' })).toHaveCount(0);
-    await openUnlockedDocument(page, `/patients/${patientId}/modules?voce=nuova`, pin);
+    await page.getByRole('link', { name: 'Registra la visita' }).click();
     const recorder = page.getByTestId('local-voice-recorder');
     await expect(recorder.getByTestId('local-voice-notice')).toHaveText('Il servizio della voce non è attivo su questo computer.');
     await expect(recorder.getByRole('button')).toHaveCount(0);
