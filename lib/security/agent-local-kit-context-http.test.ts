@@ -319,7 +319,7 @@ const kitPatient: Patient = {
     caregiver: 'Gualtiero Provasintetica',
     createdAt: new Date('2026-11-01T09:00:00Z'),
     updatedAt: new Date('2026-11-01T09:00:00Z'),
-    diagnoses: [{ description: 'Ipertensione, segnalata da Ermenegilda Sinteticoni', code: 'BA00', system: 'ICD-11' }],
+    diagnoses: [{ description: 'Ipertensione, segnalata da Ermenegilda Sinteticoni', code: 'BA00', system: 'ICD-11', date: new Date('2026-01-10T00:00:00Z') }],
     allergies: [{ substance: 'FANS', reaction: 'riferita al telefono 347 123 4567' }],
 };
 
@@ -340,7 +340,7 @@ async function exportThroughClient(patient: Patient) {
     const payload = await buildAgentPatientContextPayload({
         patient,
         entries,
-        therapies: [{ id: 'kt1', patientId: patient.id, drugName: 'Ramipril 5 mg', dosage: '1 cp, lo prepara Gualtiero Provasintetica', status: 'active', createdAt: now }],
+        therapies: [{ id: 'kt1', patientId: patient.id, drugName: 'Ramipril 5 mg', dosage: '1 cp, lo prepara Gualtiero Provasintetica', status: 'active', startDate: now, createdAt: now }],
         observations: [{ id: 'ko1', patientId: patient.id, codeSystem: 'LOINC', code: '29463-7', display: 'Peso misurato a Ermenegilda', unitSystem: 'UCUM', unitCode: 'kg', value: 70, observedAt: now, createdAt: now }],
         checkups: [{ id: 'kc1', patientId: patient.id, date: now, title: 'Chiamare Sinteticoni al 347 1234567', status: 'pending', createdAt: now }],
         exemptionCodes: ['031'],
