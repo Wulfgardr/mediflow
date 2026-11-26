@@ -668,7 +668,7 @@ export function verifyScrollbarSource(globalCss, sources) {
   if (rules.filter((rule) => rule.declarations.has('--lume-scrollbar-thumb')).length !== 2) {
     throw new Error('global CSS declares --lume-scrollbar-thumb outside :root and :root.dark');
   }
-  if (declared('*', 'scrollbar-width')[0] !== 'thin') throw new Error('global CSS requires * { scrollbar-width: thin }');
+  if (declared(':where(*)', 'scrollbar-width')[0] !== 'thin') throw new Error('global CSS requires :where(*) { scrollbar-width: thin }');
   const strays = sources.flatMap(({ relativePath, source }) => findScrollbarAppearance(relativePath, source));
   if (strays.length > 0) {
     const first = strays[0];

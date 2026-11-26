@@ -503,6 +503,6 @@ test('global scrollbar definition must keep the measured weights', () => {
     /--lume-scrollbar-thumb must be/);
   assert.throws(() => verifyScrollbarSource(globalCss.replace('scrollbar-color: var(--lume-scrollbar-thumb) transparent;', ''), []),
     /one :root scrollbar-color/);
-  assert.throws(() => verifyScrollbarSource(globalCss.replace('* { scrollbar-width: thin; }', ''), []),
+  assert.throws(() => verifyScrollbarSource(globalCss.replace(':where(*) { scrollbar-width: thin; }', ''), []),
     /scrollbar-width: thin/);
 });

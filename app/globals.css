@@ -175,7 +175,7 @@ input::placeholder, textarea::placeholder { color: var(--lume-ink-secondary); op
   scrollbar-color: var(--lume-scrollbar-thumb) transparent;
 }
 :root.dark { --lume-scrollbar-thumb: color-mix(in srgb, var(--lume-ink-muted) 54%, transparent); }
-* { scrollbar-width: thin; }
+:where(*) { scrollbar-width: thin; }
 
 /* Ensure selected text is readable in dark mode */
 ::selection {
