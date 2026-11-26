@@ -38,6 +38,7 @@ import {
 import { formatCountLabel } from '@/lib/format-count';
 import { documentClassLabel } from '@/lib/ai-labels';
 import { settleDossierSelection, stagedDossierSelection } from '@/lib/dossier-pending-selection';
+import { dossierFolderDeletionAdvice, dossierFolderSettlement } from '@/lib/dossier-folder-settlement';
 import { useTerritorialPacks } from '@/lib/territorial-pack-client';
 import FseFolderButton, { fseUnreadNotice, type FseFolderReady } from '@/components/fse-folder-button';
 import styles from './patient-bulk-import-panel.module.css';
@@ -364,6 +365,8 @@ function ActiveDossierImport({ initialPatientId, entry }: { initialPatientId: st
         if (op.isCurrent()) setView(next);
     };
 
+    const deletionAdvice = groups.some((group) => group.declaredTaxCode)
+        ? dossierFolderDeletionAdvice(dossierFolderSettlement(groups, outcomes, folderUnread)) : null;
     const fsePatient = initialPatientId ? patients.find((patient) => patient.id === initialPatientId) ?? null : null;
     const content = (
             <div className={newPatient ? styles.embeddedPanel : styles.panel} data-testid="dossier-import" aria-busy={busy ? 'true' : 'false'}>
@@ -480,9 +483,6 @@ function ActiveDossierImport({ initialPatientId, entry }: { initialPatientId: st
                                             </tr>;
                                         })}</tbody>
                                     </table>
-                                    {group.declaredTaxCode && folderUnread === 0 && group.sources.every((source) => source.status === 'already_imported'
-                                        || (outcomes[source.key]?.status === 'stored' || outcomes[source.key]?.status === 'reused') && (outcomes[source.key] as { verified?: boolean }).verified)
-                                        ? <p role="status" data-testid="fse-cleanup">Tutti i documenti della cartella sono in MediFlow. Puoi cancellare la cartella dai Download.</p> : null}
                                     <p className={identity.blocking ? styles.notice : undefined} data-testid="dossier-identity" role={identity.blocking ? 'alert' : undefined}>
                                         {identity.message}
                                         {identity.missingPhysicianTaxCode ? <> <Link href="/settings/profilo" data-testid="dossier-profile-link">Apri Profilo</Link></> : null}
@@ -527,6 +527,7 @@ function ActiveDossierImport({ initialPatientId, entry }: { initialPatientId: st
                                 </article>
                             );
                         })}
+                        {deletionAdvice ? <p role="status" data-testid="fse-cleanup">{deletionAdvice}</p> : null}
                     </section>
                 ) : null}
                 {newPatient && !view ? null : <section className={styles.section} aria-labelledby={`${ids}-dossier`}>
