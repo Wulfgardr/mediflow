@@ -365,8 +365,9 @@ il 26 novembre con la 0.40.18.
 
 ### Decisione
 
-- Sono ammesse le versioni `0.40.N` con N da 16 in su, nella forma esatta:
-  senza zeri iniziali, senza anteprime né suffissi build. Restano negate con `provider_version_unsupported` le 0.40 dalla 0.40.7
+- Sono ammesse le versioni `0.40.N` con N da 16 in su, senza zeri iniziali,
+  anteprime o suffissi build. Restano negate con
+  `provider_version_unsupported` le versioni dalla 0.40.7
   alla 0.40.15, la 0.41.0 e successive, `0.40.18-rc0`, `0.40.18+build`,
   `0.40.016`.
 - Per queste versioni le risposte di `/api/tags`, `/api/show` e `/api/ps`
@@ -385,7 +386,7 @@ il 26 novembre con la 0.40.18.
 - Le versioni già osservate puntualmente, 0.32.x, 0.33.3, 0.34.2, 0.40.4,
   0.40.5 e 0.40.6, restano ammesse come prima, senza schema chiuso.
 - `SUPPORTED_OLLAMA_LOCALITY_VERSIONS` diventa
-  `0.32.x, 0.33.3, 0.34.2, 0.40.4, 0.40.5, 0.40.6, 0.40.16 e successive 0.40`:
+  `0.32.x, 0.33.3, 0.34.2, 0.40.4, 0.40.5, 0.40.6, dalla 0.40.16 in poi nella serie 0.40`:
   è il testo che il medico legge accanto alla versione trovata.
 
 ### Da dove viene l'elenco
@@ -459,14 +460,14 @@ richiesto.
   restano i controlli dei marker e del nome del modello.
 - Un valore nuovo in un campo noto passa, salvo `capabilities`.
 
-Il preavviso sulle release nuove di Ollama è un workflow settimanale separato:
-segnala, non ammette.
+Un workflow settimanale segnala le release nuove di Ollama.
+L’ammissione delle versioni resta governata da questa decisione.
 
 ### Perché l'intervallo si ferma alle patch della 0.40
 
 Fra 0.40.16 e 0.40.18 le strutture delle tre risposte non sono cambiate; fra
-0.40.6 e 0.40.16 si sono aggiunti solo `template_source` e `voices`. La verifica copre le risposte della 0.40. L’intervallo si ferma prima
-della 0.41 perché il cambio di versione minore può cambiare il
+0.40.6 e 0.40.16 si sono aggiunti solo `template_source` e `voices`. La verifica copre le risposte
+della 0.40. L’intervallo si ferma prima della 0.41 perché il cambio di versione minore può cambiare il
 contratto delle API o l’instradamento. La 0.41 torna quindi a richiedere
 un'osservazione sul runtime vero, con la procedura delle sezioni 0.40.16 e
 0.40.18 e un elenco ricavato dal suo sorgente.
@@ -474,9 +475,9 @@ un'osservazione sul runtime vero, con la procedura delle sezioni 0.40.16 e
 ### Come si ammette un campo nuovo
 
 Si legge nel sorgente upstream che cosa significa il campo e se partecipa
-all'instradamento, si aggiunge una riga allo schema e si registra la risposta
-reale della versione in `lib/ai-providers/fixtures/ollama/`. Se il campo riguarda un instradamento remoto, si aggiunge anche
-una regola che neghi quel percorso e un caso di prova.
+all'instradamento. Si aggiunge il campo allo schema e si registra la risposta
+reale in `lib/ai-providers/fixtures/ollama/`. Se il campo indica un
+instradamento remoto, si aggiungono un controllo che lo neghi e il relativo test.
 
 ### Prove
 
@@ -487,9 +488,10 @@ una regola che neghi quel percorso e un caso di prova.
   sbagliato di `details` e `messages`. Tutte negate con
   `provider_field_unknown` e il percorso esatto; nessun precaricamento quando
   il campo è in tags o show.
-- 0.40.17, 0.40.19, 0.40.25, 0.40.180 e 0.40.16000 con lo schema noto passano; con un
-  campo nuovo no. 0.40.7, 0.40.15, 0.41.0, `0.40.18-rc0`, `0.40.18+build`,
-  `0.40.016`, versioni con una nuova riga finale e `1.40.18` restano negate prima di leggere tags.
+- 0.40.17, 0.40.19, 0.40.25, 0.40.180 e 0.40.16000 passano con lo schema
+  noto. Un campo nuovo nega l’attestazione anche su queste versioni. 0.40.7, 0.40.15, 0.41.0, `0.40.18-rc0`, `0.40.18+build`,
+  `0.40.016`, versioni con una nuova riga finale
+  e `1.40.18` restano negate prima di leggere tags.
 - Le versioni osservate puntualmente restano ammesse anche con un campo in
   più, come prima; i test esistenti dei marker remoti restano verdi con le
   stesse attese.

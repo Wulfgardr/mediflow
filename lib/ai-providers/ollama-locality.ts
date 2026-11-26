@@ -19,7 +19,7 @@ export const OLLAMA_LOCAL_MODEL_REFERENCE_MAX_UTF8_BYTES = 674;
 // Versioni osservate per il confine locale: ADR 0136, WUL-694, WUL-602 e WUL-840.
 const OBSERVED_OLLAMA_LOCALITY_VERSION = /^(?:0\.32\.\d+(?:[-+].+)?|0\.33\.3|0\.34\.2|0\.40\.4|0\.40\.5|0\.40\.6)$/;
 const CLOSED_SCHEMA_OLLAMA_VERSION = /^0\.40\.(?:1[6-9]|[2-9]\d|[1-9]\d{2,})(?![\s\S])/;
-export const SUPPORTED_OLLAMA_LOCALITY_VERSIONS = '0.32.x, 0.33.3, 0.34.2, 0.40.4, 0.40.5, 0.40.6, 0.40.16 e successive 0.40';
+export const SUPPORTED_OLLAMA_LOCALITY_VERSIONS = '0.32.x, 0.33.3, 0.34.2, 0.40.4, 0.40.5, 0.40.6, dalla 0.40.16 in poi nella serie 0.40';
 export type OllamaVersionMismatch = Readonly<{ serverVersion: string; supportedVersions: string }>;
 export type OllamaUnknownField = Readonly<{ serverVersion: string; endpoint: OllamaSchemaEndpoint; field: string }>;
 type OllamaLocalityRule = 'observed_version' | 'closed_schema';
