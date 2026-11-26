@@ -58,6 +58,15 @@ per voce anche per le visite.
 7. **Solo su una scheda esistente.** La decisione voce per voce vale quando la
    visita ha una scheda attiva riconosciuta. Una visita che crea la scheda
    (prima visita) si applica ancora per intero.
+9. **Lo stato di una terapia non si inventa** (scelta di Leonardo del
+   26/11/2026). Se il documento non dice se una terapia proposta è in corso,
+   sospesa o conclusa, la voce lo chiede al medico, senza scelta preimpostata.
+   Lo stato scelto vale per «Tieni» e anche per «Applica la visita», compresa
+   la prima visita; la provenienza sigillata della terapia lo segna con
+   `physicianFields`. Finché manca, la visita non si applica, non entra in
+   «Applica tutte le visite senza dubbi» e la conferma con Touch ID non parte,
+   perché la finestra nativa non mostra i campi della terapia. I controlli del
+   server non cambiano: la scelta entra nella preparazione nel browser.
 8. **La conferma con Touch ID non parte** su una visita già decisa in parte:
    la si finisce dal Web. Il percorso nativo (`lib/agent-visit-confirmation*`,
    `native/AgentVisitConfirmation/`) non cambia.
