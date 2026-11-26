@@ -192,6 +192,10 @@ export async function startSourceRuntime(mode, root = ROOT) {
         process.on('message', receive);
       });
     }
+    if (process.connected) {
+      const { installLocalVoiceEndpoint } = await import('./local-voice-web-endpoint.mjs');
+      installLocalVoiceEndpoint(process);
+    }
     if (process.connected && process.env.MEDIFLOW_PLUGIN_LOCAL_UI === '1') {
       const { installLocalUiWebNavigation } = await import('./local-ui-web-navigation.mjs');
       const { openUrl } = await import('./launcher-helpers.mjs');

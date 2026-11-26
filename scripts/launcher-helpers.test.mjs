@@ -1615,6 +1615,12 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                 }
             };
             cp.spawn = (executable, argv, options) => {
+                if (executable === '/usr/bin/sandbox-exec' && process.env.MEDIFLOW_LOCAL_VOICE_BINARY && argv.at(-1) === process.env.MEDIFLOW_LOCAL_VOICE_BINARY) {
+                    const service = spawn(executable, argv, options);
+                    record({type:'voice-created',pid:service.pid});
+                    service.once('exit',()=>record({type:'voice-exit',pid:service.pid}));
+                    return service;
+                }
                 if (${Boolean(lifecycle?.job)} && argv.includes(${JSON.stringify(path.join(source,'scripts/windows-runtime-job-helper.mjs'))})) {
                     const helper = spawn(executable, argv, options);
                     record({type:'job-helper-created',pid:helper.pid});
@@ -1849,13 +1855,15 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                 return result;
             }});`);
     }
-    for (const name of ['local-ui-navigation-deadline.mjs', 'mediflow.mjs', 'windows-system-command.mjs', 'mediflow-launcher-page.mjs', 'launcher-state.mjs', 'runtime-leases.mjs', 'windows-runtime-job-deadlines.mjs', 'windows-runtime-job.mjs', 'windows-runtime-job-helper.mjs', 'local-ui-web-identity.mjs', 'local-ui-pairing-transport.mjs', 'local-voice-service.mjs']) {
+    for (const name of ['local-ui-navigation-deadline.mjs', 'mediflow.mjs', 'windows-system-command.mjs', 'mediflow-launcher-page.mjs', 'launcher-state.mjs', 'runtime-leases.mjs', 'windows-runtime-job-deadlines.mjs', 'windows-runtime-job.mjs', 'windows-runtime-job-helper.mjs', 'local-ui-web-identity.mjs', 'local-ui-pairing-transport.mjs', 'local-voice-service.mjs', 'local-voice-web-endpoint.mjs']) {
         const rawBytes = readFileSync(path.join(repoRoot, 'scripts', name), 'utf8');
         const bytes = name === 'mediflow.mjs' && !lifecycle?.job
             ? rawBytes.replaceAll("choice === 'web' && process.platform === 'win32'", 'false') : lifecycle?.job === 'simulated' && name === 'mediflow.mjs'
                 ? rawBytes.replaceAll("choice === 'web' && process.platform === 'win32'", "choice === 'web'") : rawBytes;
         writeFileSync(path.join(source, 'scripts', name), name === 'mediflow.mjs' ? bytes.replace('const startOptionalOllama = () => {', 'const startOptionalOllama = () => { process.stderr.write(\"FIXTURE_OLLAMA_START\\n\"); return;') : bytes);
     }
+    mkdirSync(path.join(source, 'lib/local-voice'), { recursive: true });
+    writeFileSync(path.join(source, 'lib/local-voice/client.mjs'), readFileSync(path.join(repoRoot, 'lib/local-voice/client.mjs')));
     mkdirSync(path.join(source, 'scripts/windows-launcher-bootstrap'), { recursive: true });
     writeFileSync(path.join(source, 'scripts/windows-launcher-bootstrap/index.mjs'),
         'export {loadSystemDirectoryBinding} from ' + JSON.stringify(new URL('./windows-launcher-bootstrap/index.mjs',import.meta.url).href) + ';');
@@ -1878,6 +1886,8 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
         import crypto from 'node:crypto';
         import { webIdentityProof } from ${JSON.stringify(new URL('./local-ui-web-identity.mjs', import.meta.url).href)};
         import { installLocalUiWebNavigation } from ${JSON.stringify(new URL('./local-ui-web-navigation.mjs', import.meta.url).href)};
+        import { installLocalVoiceEndpoint } from ${JSON.stringify(new URL('./local-voice-web-endpoint.mjs', import.meta.url).href)};
+        import { localVoiceClient, localVoiceEndpointFromEnv } from ${JSON.stringify(new URL('../lib/local-voice/client.mjs', import.meta.url).href)};
         export const verifySourceRuntime = () => ({ identity: ${lifecycle?.preparationGate ? `fs.existsSync(${JSON.stringify(startupGate)}) ? ${JSON.stringify(identity)} :` : ''} ${JSON.stringify(lifecycle?.preparationFailure || lifecycle?.preparationGate ? {...identity,revision:'bbbbbbbbbbbb'} : identity)} });
         if (process.argv[1].endsWith('source-runtime.mjs')) {
             if (process.env.MEDIFLOW_WEB_OWNER_GATE) await new Promise(resolve => {
@@ -1906,6 +1916,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
             let live = true;
             const pairing = () => globalThis[Symbol.for('mediflow.local-ui.pairing.v1')];
             installLocalUiWebNavigation(process, 'http://127.0.0.1:' + process.env.PORT, () => {});
+            installLocalVoiceEndpoint(process);
             const server = http.createServer(async (_req, res) => {
                 if (_req.url === '/fixture-pairing') { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(pairing().snapshot())); return; }
                 if (_req.url === '/fixture-decision') { let body = ''; for await (const part of _req) body += part;
@@ -1913,6 +1924,11 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                     res.end(JSON.stringify({ok})); return; }
                 if (_req.url === '/fixture-lock') { live = false; pairing().snapshot(); res.end('{}'); return; }
                 if (_req.url === '/fixture-env') { res.end(JSON.stringify(process.env)); return; }
+                if (_req.url === '/fixture-voice') {
+                    const endpoint = localVoiceEndpointFromEnv();
+                    const status = endpoint ? await localVoiceClient(endpoint).status().catch(error => ({ error: error.code })) : null;
+                    res.end(JSON.stringify({ url: endpoint?.url ?? null, available: status?.model === 'ready', status })); return;
+                }
                 if (${JSON.stringify(webIdentity)} && _req.url === '/api/plugin-local-ui/identity') {
                     let challenge = ''; for await (const part of _req) challenge += part;
                     const proof = ${JSON.stringify(webIdentity)} === 'invalid-delayed' ? '0'.repeat(64) : webIdentityProof(process.env.MEDIFLOW_LOCAL_UI_WEB_SECRET, challenge);
@@ -3560,4 +3576,118 @@ test('ordinary launcher refuses stop while version preparation owns live descend
     assert.equal(existsSync(path.join(archiveLock,'active')),false);
     assert.match(f.output(),/MediFlow arrestato\./u);
     assert.doesNotMatch(f.output(),/Arresto non verificato/u);
+});
+
+function fakeVoiceBinary(t) {
+    const directory = realpathSync(mkdtempSync(path.join(tmpdir(), 'mediflow-fake-voice-')));
+    t.after(() => rmSync(directory, { recursive: true, force: true }));
+    const binary = path.join(directory, 'mediflow-voice');
+    writeFileSync(binary, `#!${process.execPath}
+const crypto = require('node:crypto'), http = require('node:http');
+const key = Buffer.from(process.env.MEDIFLOW_LOCAL_VOICE_SECRET, 'hex');
+const mac = message => crypto.createHmac('sha256', key).update(message).digest('hex');
+const server = http.createServer((request, response) => {
+  const [time, nonce, signature] = String(request.headers['x-mediflow-voice-auth']).split('.');
+  const valid = signature === mac('mediflow.local-voice.v1:request:' + request.method + ' ' + request.url + ':' + time + ':' + nonce);
+  const status = valid && request.url === '/v1/status' ? 200 : 401;
+  response.writeHead(status, { 'content-type': 'application/json', 'x-mediflow-voice-proof': mac('mediflow.local-voice.v1:response:' + nonce + ':' + status) });
+  response.end(JSON.stringify(status === 200 ? { service: 'mediflow-voice', model: 'ready', session: null } : { error: 'auth' }));
+});
+server.listen(0, '127.0.0.1', () => process.stdout.write('MEDIFLOW_LOCAL_VOICE_READY ' + JSON.stringify({ port: server.address().port }) + '\\n'));
+process.stdin.on('end', () => process.exit(0));
+process.stdin.resume();
+`, { mode: 0o755 });
+    return binary;
+}
+
+function processesRunning(binary) {
+    return execFileSync('/bin/ps', ['-A', '-o', 'pid=,command='], { encoding: 'utf8' }).split('\n')
+        .filter(line => line.includes(binary)).map(line => ({ pid: Number(line.trim().split(/\s+/u)[0]), command: line.trim() }));
+}
+
+async function launcherVoice(f) {
+    const receipt = JSON.parse(readFileSync(launcherReceiptFile(f.stateFiles.lockDirectory)));
+    const state = await (await fetch(new URL('state', receipt.choiceUrl))).json();
+    const web = await (await fetch(state.url + '/fixture-voice')).json();
+    return { state, web };
+}
+
+async function voiceSettles(f, predicate, timeoutMs = 10_000) {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+        const observed = await launcherVoice(f);
+        if (predicate(observed)) return observed;
+        assert.ok(Date.now() < deadline, JSON.stringify(observed) + f.output());
+        await new Promise(resolve => setTimeout(resolve, 50));
+    }
+}
+
+const voiceSkip = process.platform === 'darwin' ? false : 'il servizio della voce parte solo su macOS';
+
+test('launcher starts the voice service, the Web receives its address and secret, and a fallen service is never reused', { skip: voiceSkip, timeout: 60_000 }, async t => {
+    const binary = fakeVoiceBinary(t);
+    const f = await ordinaryLauncherFixture(t, 'web', [], true, true, { MEDIFLOW_LOCAL_VOICE_BINARY: binary });
+    await f.until(() => f.output().includes('Pronto:'));
+    const first = await voiceSettles(f, ({ state }) => state.voice === 'ready');
+    assert.match(first.web.url, /^http:\/\/127\.0\.0\.1:\d+$/u);
+    assert.equal(first.web.available, true, JSON.stringify(first));
+    const environment = await (await fetch(first.state.url + '/fixture-env')).json();
+    assert.equal(environment.MEDIFLOW_LOCAL_VOICE_URL, first.web.url);
+    assert.match(environment.MEDIFLOW_LOCAL_VOICE_SECRET, /^[a-f0-9]{64}$/u);
+    const secret = environment.MEDIFLOW_LOCAL_VOICE_SECRET;
+    assert.ok(!f.output().includes(secret), 'secret in the launcher log');
+    assert.ok(!execFileSync('/bin/ps', ['-A', '-o', 'args='], { encoding: 'utf8' }).includes(secret), 'secret in a process argument');
+
+    const seen = new Set([first.web.url]);
+    for (let fall = 1; fall <= 3; fall++) {
+        const [service] = processesRunning(binary);
+        assert.ok(service, 'voice service not running');
+        process.kill(service.pid, 'SIGKILL');
+        const after = await voiceSettles(f, ({ web }) => web.url !== null && !seen.has(web.url) && web.available);
+        seen.add(after.web.url);
+        assert.equal(after.state.voice, 'ready');
+    }
+    const [last] = processesRunning(binary);
+    process.kill(last.pid, 'SIGKILL');
+    const gone = await voiceSettles(f, ({ web, state }) => web.url === null && state.voice === 'stopped');
+    assert.equal(gone.web.available, false);
+    assert.deepEqual(processesRunning(binary), []);
+    assert.match(f.output(), /registrazione locale non disponibile/u);
+    assert.ok(!f.output().includes(secret));
+});
+
+test('launcher stops the voice service with MediFlow', { skip: voiceSkip, timeout: 60_000 }, async t => {
+    const binary = fakeVoiceBinary(t);
+    const f = await ordinaryLauncherFixture(t, 'web', [], true, true, { MEDIFLOW_LOCAL_VOICE_BINARY: binary });
+    await f.until(() => f.output().includes('Pronto:'));
+    await voiceSettles(f, ({ web }) => web.available);
+    assert.equal(processesRunning(binary).length, 1);
+    await f.cleanup();
+    assert.match(f.output(), /MediFlow arrestato/u);
+    assert.deepEqual(processesRunning(binary), []);
+});
+
+test('without the voice binary the Web gets no voice address, even one inherited from the shell', { timeout: 60_000 }, async t => {
+    const f = await ordinaryLauncherFixture(t, 'web', [], true, true, { MEDIFLOW_LOCAL_VOICE_BINARY: path.join(tmpdir(), `mediflow-voice-absent-${crypto.randomUUID()}`),
+        MEDIFLOW_LOCAL_VOICE_URL: 'http://127.0.0.1:4100', MEDIFLOW_LOCAL_VOICE_SECRET: 'a'.repeat(64) });
+    await f.until(() => f.output().includes('Pronto:'));
+    const { state, web } = await launcherVoice(f);
+    assert.deepEqual(web, { url: null, available: false, status: null });
+    assert.equal(state.voice, process.platform === 'darwin' ? 'absent' : 'unsupported');
+});
+
+test('launcher with the real voice binary and the installed model', { skip: voiceSkip || (process.env.MEDIFLOW_LOCAL_VOICE_REAL_BINARY ? false : 'MEDIFLOW_LOCAL_VOICE_REAL_BINARY non impostato'), timeout: 120_000 }, async t => {
+    const binary = process.env.MEDIFLOW_LOCAL_VOICE_REAL_BINARY;
+    const f = await ordinaryLauncherFixture(t, 'web', [], true, true, { MEDIFLOW_LOCAL_VOICE_BINARY: binary });
+    await f.until(() => f.output().includes('Pronto:'), 60_000);
+    const ready = await voiceSettles(f, ({ state }) => state.voice !== 'absent', 60_000);
+    assert.equal(ready.state.voice, 'ready', JSON.stringify(ready));
+    assert.equal(ready.web.status.model, 'ready');
+    assert.equal(ready.web.available, true);
+    const [service] = processesRunning(binary);
+    process.kill(service.pid, 'SIGKILL');
+    const after = await voiceSettles(f, ({ web }) => web.url !== ready.web.url && web.available, 60_000);
+    assert.equal(after.web.status.model, 'ready');
+    await f.cleanup();
+    assert.deepEqual(processesRunning(binary), []);
 });
