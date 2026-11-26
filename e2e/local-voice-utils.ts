@@ -1,14 +1,17 @@
 import type { Page } from '@playwright/test';
 
-export type SyntheticSound = { tone: number } | { pcm16k: string };
+export type SyntheticSound = ({ tone: number } | { pcm16k: string }) & { openingMs?: number };
 
 /** The page microphone becomes a synthetic source: a tone, or 16 kHz PCM spoken by `say`. */
 export async function syntheticMicrophone(page: Page, sound: SyntheticSound) {
     await page.addInitScript((input) => {
         const devices = navigator.mediaDevices;
         const original = devices.getUserMedia.bind(devices);
+        const tracks: MediaStreamTrack[] = [];
+        (window as unknown as { mediflowSyntheticTracks: MediaStreamTrack[] }).mediflowSyntheticTracks = tracks;
         devices.getUserMedia = async (constraints) => {
             if (!constraints?.audio) return original(constraints);
+            if (input.openingMs) await new Promise((resolve) => setTimeout(resolve, input.openingMs));
             const context = new AudioContext();
             const output = context.createMediaStreamDestination();
             if ('tone' in input) {
@@ -31,6 +34,7 @@ export async function syntheticMicrophone(page: Page, sound: SyntheticSound) {
             }
             await context.resume();
             const [track] = output.stream.getAudioTracks();
+            tracks.push(track);
             const stop = track.stop.bind(track);
             track.stop = () => { stop(); void context.close(); };
             return output.stream;
@@ -45,4 +49,9 @@ export async function syntheticPatient(page: Page, lastName: string): Promise<st
         if (response.status !== 201) throw new Error(`Synthetic patient: ${response.status}`);
         return (await response.json() as { id: string }).id;
     }, lastName);
+}
+
+export async function liveSyntheticTracks(page: Page): Promise<number> {
+    return page.evaluate(() => ((window as unknown as { mediflowSyntheticTracks?: MediaStreamTrack[] }).mediflowSyntheticTracks ?? [])
+        .filter((track) => track.readyState === 'live').length);
 }
