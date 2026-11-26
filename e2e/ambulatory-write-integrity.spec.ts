@@ -289,9 +289,17 @@ test('a sede is deleted only after its plan and the PIN, and a sede with patient
         await expect(dialog).toContainText('Nessun paziente e nessun reparto collegato.');
         await page.screenshot({ path: testInfo.outputPath('delete-confirmation.png') });
         await dialog.getByLabel('PIN di conferma').fill(pin);
+        let releaseExecute = () => {};
+        const held = new Promise<void>(resolve => { releaseExecute = resolve; });
+        await page.route('**/api/ambulatories/commands/execute', async route => { await held; await route.continue(); });
         const executed = page.waitForResponse(r => new URL(r.url()).pathname === '/api/ambulatories/commands/execute');
         await dialog.getByRole('button', { name: 'Elimina', exact: true }).click();
+        await expect(dialog.getByRole('button', { name: 'Annulla', exact: true })).toBeDisabled();
+        await page.keyboard.press('Escape');
+        await expect(dialog, 'the dialog stays open while the command is being executed').toBeVisible({ timeout: 3000 });
+        releaseExecute();
         expect((await executed).status()).toBe(200);
+        await page.unroute('**/api/ambulatories/commands/execute');
         await expect(dialog).toHaveCount(0);
         await expect(page.getByTestId('settings-ambulatories-section').getByRole('status').filter({ hasText: 'Ambulatorio eliminato.' })).toBeVisible();
         await expect(rowOf(`Sede vuota ${stamp}`)).toHaveCount(0);

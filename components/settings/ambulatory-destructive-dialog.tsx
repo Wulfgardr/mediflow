@@ -65,7 +65,9 @@ export function AmbulatoryDestructiveDialog({ plan: initialPlan, onClose, onAppl
         }
     };
 
-    return <Modal open onClose={onClose} accent="critical"
+    const dismiss = () => { if (!sending) onClose(); };
+
+    return <Modal open onClose={dismiss} accent="critical"
         title={clear ? `Svuotare «${plan.target.name}»?` : `Eliminare la sede «${plan.target.name}»?`}>
         <form onSubmit={submit} className="grid gap-4" aria-busy={sending}>
             {refreshed && <p role="status" className="text-sm font-semibold text-[color:var(--lume-ink)]">Controlla di nuovo i dati e conferma.</p>}
@@ -77,7 +79,7 @@ export function AmbulatoryDestructiveDialog({ plan: initialPlan, onClose, onAppl
             </label>
             {error && <p role="alert" className="text-sm text-[color:var(--lume-signal-critical)]">{error}</p>}
             <div className="flex flex-wrap justify-end gap-3">
-                <Button variant="secondary" onClick={onClose} disabled={sending}>Annulla</Button>
+                <Button variant="secondary" onClick={dismiss} disabled={sending}>Annulla</Button>
                 <Button variant="destructive" confirmation type="submit" disabled={sending || pin.length === 0}>{clear ? 'Svuota' : 'Elimina'}</Button>
             </div>
         </form>
