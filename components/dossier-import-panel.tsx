@@ -391,7 +391,7 @@ function ActiveDossierImport({ initialPatientId, entry }: { initialPatientId: st
                     </div> : null}
                     <FirstVisitRecorder onSource={(file) => {
                         setBackupChoice({ kind: 'pending' });
-                        void readFiles([inputFile(file)], null);
+                        void readFiles([{ ...inputFile(file), origin: 'visit-transcript' }], null);
                     }} />
                 </>
                 : <section className={styles.section} aria-labelledby={`${ids}-pick`}>

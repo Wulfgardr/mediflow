@@ -88,7 +88,7 @@ test('servizio vero: prima visita detta, proposte d’anagrafica dalla trascrizi
     test.setTimeout(600_000);
     const visit = spoken([
         ['M', 'Buongiorno, è la prima volta da me. Mi dice cognome e nome?'],
-        ['P', 'Cognome: Bianchi. Nome: Anna. Sono nata il 12 marzo 1951.'],
+        ['P', 'Mi chiamo Anna Bianchi. Sono nata il 12 marzo 1951.'],
         ['M', 'Grazie. Che farmaci prende?'],
         ['P', 'Prendo la metformina mille milligrammi due volte al giorno.'],
     ]);
@@ -109,6 +109,8 @@ test('servizio vero: prima visita detta, proposte d’anagrafica dalla trascrizi
         await expect(create.getByRole('heading', { name: 'Revisione dei dati' })).toBeVisible({ timeout: 60_000 });
         const proposals = await create.getByTestId('patient-document-dossier-proposals').innerText().catch(() => '');
         await info.attach('proposte.txt', { body: proposals, contentType: 'text/plain' });
+        expect(proposals).toContain('Bianchi');
+        expect(proposals).toContain('Anna');
         await capture(info, page, 'vero-5-proposte.png');
     }
 });
