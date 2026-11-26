@@ -17,7 +17,7 @@ import { createRuntimeLeases, acquireRuntimeLease, recordChildOwner, verifyChild
 import { prepareLauncherState, localUiArchiveLock } from './launcher-state.mjs';
 import { verifyOwnedWeb } from './local-ui-web-identity.mjs';
 import { localVoiceBinary, superviseLocalVoiceService } from './local-voice-service.mjs';
-import { LOCAL_VOICE_ENDPOINT_FRAME } from './local-voice-web-endpoint.mjs';
+import { LOCAL_VOICE_ENDPOINT_FRAME, LOCAL_VOICE_ENDPOINT_REQUEST } from './local-voice-web-endpoint.mjs';
 import { localVoiceClient } from '../lib/local-voice/client.mjs';
 import { pairingDirectory, readPairingRequests, bridgeExistingLocalUi, frames, writeFrame } from './local-ui-pairing-transport.mjs';
 
@@ -502,12 +502,19 @@ export async function main(args = process.argv.slice(2)) {
   const voice = process.platform === 'darwin' && fs.existsSync(voiceBinary) ? superviseLocalVoiceService({ binary: voiceBinary, models: process.env.MEDIFLOW_LOCAL_VOICE_MODELS || undefined, log,
     publish: endpoint => {
       void refreshVoiceState(endpoint);
-      if (voiceChild && voiceChild === child && voiceChild.connected) voiceChild.send({ type: LOCAL_VOICE_ENDPOINT_FRAME, url: endpoint?.url ?? null, secret: endpoint?.secret ?? null }, () => {});
+      sendVoiceEndpoint(endpoint);
     } }) : null;
+  const sendVoiceEndpoint = endpoint => {
+    if (voiceChild && voiceChild === child && voiceChild.connected) voiceChild.send({ type: LOCAL_VOICE_ENDPOINT_FRAME, url: endpoint?.url ?? null, secret: endpoint?.secret ?? null }, () => {});
+  };
+  let voiceStateGeneration = 0;
   const refreshVoiceState = async endpoint => {
+    const generation = ++voiceStateGeneration;
     if (!endpoint) { state.voice = voice ? 'stopped' : process.platform === 'darwin' ? 'absent' : 'unsupported'; return; }
-    try { const { model } = await localVoiceClient(endpoint).status(); state.voice = ['ready', 'missing', 'incomplete'].includes(model) ? model : 'stopped'; }
-    catch { state.voice = 'stopped'; }
+    let next;
+    try { const { model } = await localVoiceClient(endpoint).status(); next = ['ready', 'missing', 'incomplete'].includes(model) ? model : 'stopped'; }
+    catch { next = 'stopped'; }
+    if (generation === voiceStateGeneration) state.voice = next;
   };
   const localVoiceEnv = async () => {
     const endpoint = await voice?.ensure() ?? null;
@@ -780,10 +787,6 @@ export async function main(args = process.argv.slice(2)) {
         ? run(process.execPath, [path.join(ROOT, 'node_modules/next/dist/bin/next'), 'dev', '--hostname', '127.0.0.1', '--port', String(port)], true, env)
         : run(process.execPath, [path.join(ROOT, 'scripts/source-runtime.mjs'), choice === 'agenti' ? 'headless' : 'web'], true, env);
       voiceChild = choice === 'web' ? owned : null;
-      if (voiceChild && (voice?.current()?.url ?? undefined) !== voiceEnv.MEDIFLOW_LOCAL_VOICE_URL) {
-        const endpoint = voice?.current() ?? null;
-        voiceChild.send({ type: LOCAL_VOICE_ENDPOINT_FRAME, url: endpoint?.url ?? null, secret: endpoint?.secret ?? null }, () => {});
-      }
       if (choice === 'web') {
         /** @type {RuntimeCustody} */
         const runtime = process.platform === 'win32' ? { kind: 'windows-job', web: childOwner.token }
@@ -799,6 +802,7 @@ export async function main(args = process.argv.slice(2)) {
       }
       if (choice === 'web') owned.send({ type: 'mediflow-web-owner-start', nonce: env.MEDIFLOW_WEB_OWNER_GATE });
       owned.on('message', frame => {
+        if (frame?.type === LOCAL_VOICE_ENDPOINT_REQUEST) { if (owned === voiceChild) sendVoiceEndpoint(voice?.current() ?? null); return; }
         if (frame?.type === 'mediflow-ui-lease' && owned === child && leases) {
           const accepted = leases.uiLease(frame.id, frame.expiresAt);
           if (owned.connected) owned.send({ type: 'mediflow-ui-lease-result', requestId: frame.requestId, accepted }, () => {});

@@ -1890,6 +1890,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
         import { localVoiceClient, localVoiceEndpointFromEnv } from ${JSON.stringify(new URL('../lib/local-voice/client.mjs', import.meta.url).href)};
         export const verifySourceRuntime = () => ({ identity: ${lifecycle?.preparationGate ? `fs.existsSync(${JSON.stringify(startupGate)}) ? ${JSON.stringify(identity)} :` : ''} ${JSON.stringify(lifecycle?.preparationFailure || lifecycle?.preparationGate ? {...identity,revision:'bbbbbbbbbbbb'} : identity)} });
         if (process.argv[1].endsWith('source-runtime.mjs')) {
+            if (process.connected) installLocalVoiceEndpoint(process);
             if (process.env.MEDIFLOW_WEB_OWNER_GATE) await new Promise(resolve => {
                 const receive = frame => { if (frame.type === 'mediflow-web-owner-start' && frame.nonce === process.env.MEDIFLOW_WEB_OWNER_GATE) { process.off('message',receive); resolve(); } };
                 process.on('message',receive);
@@ -1916,7 +1917,6 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
             let live = true;
             const pairing = () => globalThis[Symbol.for('mediflow.local-ui.pairing.v1')];
             installLocalUiWebNavigation(process, 'http://127.0.0.1:' + process.env.PORT, () => {});
-            installLocalVoiceEndpoint(process);
             const server = http.createServer(async (_req, res) => {
                 if (_req.url === '/fixture-pairing') { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(pairing().snapshot())); return; }
                 if (_req.url === '/fixture-decision') { let body = ''; for await (const part of _req) body += part;
@@ -1946,7 +1946,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
             server.listen(Number(process.env.PORT), '127.0.0.1', () => {
                 process.stderr.write('MEDIFLOW_HEADLESS_WEB_READY ' + JSON.stringify({ url: 'http://127.0.0.1:' + server.address().port }) + '\\n');
             });
-            process.on('message', frame => process.stderr.write('FIXTURE_NAVIGATION ' + JSON.stringify(frame) + '\\n'));
+            process.on('message', frame => { if (frame?.type !== 'mediflow-local-voice-endpoint') process.stderr.write('FIXTURE_NAVIGATION ' + JSON.stringify(frame) + '\\n'); });
             const closeRuntime = () => { server.close(); process.disconnect?.(); };
             process.on('SIGTERM', closeRuntime);
             ${lifecycle?.stopExitGate ? `
@@ -3644,9 +3644,8 @@ test('launcher starts the voice service, the Web receives its address and secret
         const [service] = processesRunning(binary);
         assert.ok(service, 'voice service not running');
         process.kill(service.pid, 'SIGKILL');
-        const after = await voiceSettles(f, ({ web }) => web.url !== null && !seen.has(web.url) && web.available);
+        const after = await voiceSettles(f, ({ web, state }) => web.url !== null && !seen.has(web.url) && web.available && state.voice === 'ready');
         seen.add(after.web.url);
-        assert.equal(after.state.voice, 'ready');
     }
     const [last] = processesRunning(binary);
     process.kill(last.pid, 'SIGKILL');

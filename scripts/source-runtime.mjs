@@ -8,6 +8,7 @@ import { generatePayloadLedger, verifyPayloadLedger } from './generate-runtime-p
 import { physicalFiles, physicalRecord } from './launch-bundled-headless-supervisor.mjs';
 import { assertBuildInputMetadata } from './build-input-metadata.mjs';
 import { WINDOWS_JOB_STARTUP_TIMEOUT_MS } from './windows-runtime-job-deadlines.mjs';
+import { installLocalVoiceEndpoint } from './local-voice-web-endpoint.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const ledgerPath = web => path.join(path.dirname(web), 'runtime-payload-ledger.json');
@@ -180,6 +181,7 @@ export async function startSourceRuntime(mode, root = ROOT) {
     MEDIFLOW_APP_FINGERPRINT: identity.sourceFingerprint });
   process.chdir(web);
   if (mode === 'web') {
+    if (process.connected) installLocalVoiceEndpoint(process);
     if (process.env.MEDIFLOW_WEB_OWNER_GATE) {
       if (!process.connected) throw new Error('Web owner required');
       await new Promise((resolve, reject) => {
@@ -191,10 +193,6 @@ export async function startSourceRuntime(mode, root = ROOT) {
         };
         process.on('message', receive);
       });
-    }
-    if (process.connected) {
-      const { installLocalVoiceEndpoint } = await import('./local-voice-web-endpoint.mjs');
-      installLocalVoiceEndpoint(process);
     }
     if (process.connected && process.env.MEDIFLOW_PLUGIN_LOCAL_UI === '1') {
       const { installLocalUiWebNavigation } = await import('./local-ui-web-navigation.mjs');
