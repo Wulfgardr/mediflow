@@ -46,13 +46,28 @@ release](https://github.com/Wulfgardr/mediflow/releases) raccoglie i pacchetti p
 
 - Con il consenso del medico, la chat esterna riceve il profilo
   pseudonimizzato nei limiti del mandato. Le note, le trascrizioni e i PDF forniti dall’agente
-  attendono il medico in **In arrivo**. Il medico esamina i contenuti prima
+  attendono il medico in **Da decidere**. Il medico esamina i contenuti prima
   che entrino nella cartella. [Profilo](https://github.com/Wulfgardr/mediflow/pull/1055) · [Revisione](https://github.com/Wulfgardr/mediflow/pull/1056)
 - Il mandato di un agente dura fino a 24 ore. Lo interrompono «Blocca»,
   la revoca in Impostazioni → Agenti o la scadenza. «Esci», il blocco per
   inattività, la chiusura del browser e il riavvio non lo interrompono: l’agente
   continua a depositare in **In arrivo** fino alla scadenza
   ([ADR 0190](./docs/adr/0190-mandato-agenti-e-cassetta-della-visita.md)).
+- **Da decidere** riunisce le visite depositate dagli agenti (filtro Visite,
+  l'ex «In arrivo») e la revisione Dossier (filtro Documenti). Ogni voce di
+  una visita si decide da sola con **Tieni**, **Correggi** o **Scarta**, con
+  il passaggio della fonte accanto. «Applica la visita» resta per la visita
+  intera. Se Correggi cambia il farmaco o il principio attivo, i codici AIC e
+  ATC depositati non entrano in scheda; una diagnosi o un'esenzione già in
+  scheda mostra «Già in scheda.». Una prima visita si applica ancora per
+  intero ([ADR 0202](./docs/adr/0202-da-decidere-e-decisione-voce-per-voce.md)).
+- Il riquadro di conferma con Touch ID si apre solo se il codice fiscale
+  della scheda e l'elenco delle voci coincidono con il piano che verrà
+  scritto. Una voce in più, in meno o diversa, o la scheda di un altro
+  paziente, chiudono il riquadro senza firma e senza scrittura. Su una visita
+  già decisa in parte la conferma non parte e la visita si finisce dal Web
+  ([ADR 0191](./docs/adr/0191-conferma-da-chat-e-cassetta-senza-finestra.md),
+  [#1115](https://github.com/Wulfgardr/mediflow/pull/1115)).
 - Mini offre l'anteprima del cambio di stato di un controllo tramite lo
   stesso servizio di MCP. La conferma resta nel Web e l'agente non acquisisce
   permessi di scrittura
@@ -74,6 +89,13 @@ release](https://github.com/Wulfgardr/mediflow/releases) raccoglie i pacchetti p
   più vecchio si ferma se il backup contiene visite in arrivo che non si possono
   attribuire con certezza. Resta disponibile il recupero completo cifrato
   ([sicurezza](./SECURITY.md#cancellazione-del-paziente-ed-eliminazione-dei-dati)).
+- Dal Web una sede si elimina o si svuota da Impostazioni → Ambulatori,
+  menu «Azioni». Il dialogo mostra prima che cosa succede (quanti pazienti
+  vanno nel Cestino, quanti restano nelle altre sedi) e chiede il PIN di
+  conferma. Una sede con pazienti o reparti collegati non si elimina. Se nel
+  frattempo i dati cambiano, il dialogo mostra il piano nuovo e chiede di
+  confermare di nuovo
+  ([ADR 0201](./docs/adr/0201-sedi-dal-web-comando-confermato.md)).
 
 ### Limiti dichiarati
 
@@ -94,6 +116,30 @@ release](https://github.com/Wulfgardr/mediflow/releases) raccoglie i pacchetti p
   intero», anche nei grafici: MediFlow non riscrive i valori già salvati.
 - Nella nuova scheda dai documenti una foto singola segue ancora il percorso
   precedente e non porta dati clinici; i dati arrivano dai PDF.
+- «Usa tutte le proposte» confronta la data di nascita con il codice fiscale
+  proposto. Se nessun documento riporta un codice fiscale, il gesto può
+  unire dati di documenti diversi che non si contraddicono. La data scritta a
+  mano o presa con un clic sul singolo campo non viene confrontata con il
+  codice fiscale.
+- Documenti dal Fascicolo: MediFlow importa la cartella scaricata
+  dall'estensione separata di Chrome e non parla con il portale SISS. Non sono
+  verificati il registro degli accessi visibile al paziente, le condizioni
+  d'uso del portale per lo scarico in blocco e la registrazione presso ARIA
+  richiesta dal canale ufficiale
+  ([ADR 0205](./docs/adr/0205-documenti-dal-fascicolo.md)).
+- La registrazione della visita funziona solo su macOS. Il programma della
+  voce non è ancora compreso nell'installazione: il launcher avvia la voce
+  solo se trova il programma compilato, e il modello si installa ancora da
+  GPUI ([ADR 0204](./docs/adr/0204-servizio-locale-della-voce.md), Proposed).
+  Alla prima visita mancano i farmaci del paziente che orientano il
+  riconoscimento, quindi i nomi dei farmaci sono meno affidabili.
+- In «Da decidere» i controlli sul farmaco corretto e sulla diagnosi già in
+  scheda avvengono nella pagina sbloccata, perché il server riceve i valori
+  cifrati. Una voce scartata non si riprende dall'interfaccia: il medico la
+  inserisce a mano nella scheda
+  ([ADR 0202](./docs/adr/0202-da-decidere-e-decisione-voce-per-voce.md)).
+- Eliminare una sede dal Web richiede ora il ruolo di amministratore, come
+  già lo svuotamento.
 
 ### Profilo paziente
 
@@ -111,6 +157,37 @@ release](https://github.com/Wulfgardr/mediflow/releases) raccoglie i pacchetti p
   cifratura, audit, permessi o wire API; non si dichiara idempotenza durevole
   né una scrittura migrata a Rust
   ([ADR 0147](./docs/adr/0147-canonical-patient-profile-update-dispatch.md)).
+- Un D-dimero senza l'indicazione FEU o DDU si registra come FEU e
+  confluisce nel suo andamento; quello in DDU resta in una serie a parte.
+  La glicata in mmol/mol si legge dai referti e ha una serie propria,
+  distinta da quella in percentuale. I valori già registrati non vengono
+  riscritti ([#1125](https://github.com/Wulfgardr/mediflow/pull/1125)).
+- Nella Nuova scheda l'anagrafica proposta dai documenti trascinati indica
+  accanto a ogni campo il file da cui viene. «Usa tutte le proposte» riempie i
+  campi con un gesto e ogni campo resta modificabile. Se due documenti
+  propongono valori diversi, o la data di nascita non corrisponde al codice
+  fiscale proposto, il campo resta da decidere e la conferma si sblocca solo
+  dopo la scelta del medico. PIN e controllo dei duplicati restano come prima
+  ([#1127](https://github.com/Wulfgardr/mediflow/pull/1127)).
+- Con il modulo Lombardia, «Documenti dal Fascicolo» importa la cartella
+  `FSE_<codice fiscale>` scaricata dall'estensione di Chrome: dalla scheda,
+  dall'import Dossier, dalla Nuova scheda e dal filtro Documenti di «Da
+  decidere». Se il codice fiscale della cartella è diverso da quello della
+  scheda, MediFlow si ferma prima di leggere i file. Categoria e data vengono
+  dal nome del file, i documenti già importati si saltano e il resto entra in
+  revisione. Quando ogni file è in MediFlow, riletto identico, MediFlow
+  propone di cancellare la cartella dai Download; i file li cancella il medico
+  ([ADR 0205](./docs/adr/0205-documenti-dal-fascicolo.md)).
+- Sul Mac, con il servizio della voce avviato dal launcher, **Registra la
+  visita** nella testata della scheda apre la nuova voce con la registrazione
+  in cima. Dopo pausa, ripresa e fine il testo attribuito a medico e paziente
+  si rivede, con i suggerimenti sui farmaci del paziente, e **Porta nella
+  nota** lo mette nel resoconto. Nella Nuova scheda **Registra la prima
+  visita** e poi «Usa per la nuova scheda» trasformano il testo rivisto in un
+  PDF da cui partono le proposte dell'anagrafica. Prima di questi gesti audio
+  e testo restano in memoria
+  ([ADR 0204](./docs/adr/0204-servizio-locale-della-voce.md),
+  [#1134](https://github.com/Wulfgardr/mediflow/pull/1134)).
 
 ### Repertori
 
@@ -198,6 +275,10 @@ nel browser, avviata dal launcher; i client Swift restano per iPhone e iPad
   la composizione Punto d'inchiostro su Web e Mac, con fonti leggibili e
   identificativi consultabili
   ([#535](https://github.com/Wulfgardr/mediflow/pull/535)).
+- Nelle pagine secondarie (Nuova scheda, Importa elenco, Dossier, Modifica
+  dati, Scale, Scale del paziente e Analisi) il ritorno è il percorso in
+  alto, come nella vista paziente, al posto del «Torna a…» sopra il titolo
+  ([#1132](https://github.com/Wulfgardr/mediflow/pull/1132)).
 
 ### Sviluppo assistito
 
