@@ -428,14 +428,11 @@ const REVIEW_DIARY_STATE: Kree8DiaryClientState = {
   patientCount: new Set(REVIEW_DIARY_ENTRIES.map((entry) => entry.patientId)).size,
 };
 
-function formatPatientDate(value: string | Date | null | undefined): string {
+function formatPatientDate(value: string | Date | null | undefined, formatter: Intl.DateTimeFormat): string {
   if (!value) return 'n/d';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'n/d';
-  return new Intl.DateTimeFormat('it-IT', {
-    day: '2-digit',
-    month: 'short',
-  }).format(date);
+  return formatter.format(date);
 }
 
 function calculatePatientAge(value: string | Date | null | undefined): string {
@@ -619,14 +616,14 @@ function patientMatchesSearch(patient: Kree8Patient, query: string): boolean {
   return searchable.includes(query);
 }
 
-function mapPatientForKree8(patient: Kree8PatientSource): Kree8Patient {
+function mapPatientForKree8(patient: Kree8PatientSource, dateFormatter: Intl.DateTimeFormat): Kree8Patient {
   const firstName = patient.firstName?.trim() || '';
   const lastName = patient.lastName?.trim() || '';
   const name = [lastName, firstName].filter(Boolean).join(' ') || 'Paziente senza nome';
   const diagnoses = parseDiagnosisLabels(patient.diagnoses);
   const isArchived = Boolean(patient.isArchived);
   const isAdi = Boolean(patient.isAdi);
-  const lastTouch = formatPatientDate(patient.updatedAt ?? patient.createdAt);
+  const lastTouch = formatPatientDate(patient.updatedAt ?? patient.createdAt, dateFormatter);
   const summary = buildPatientPreviewSummary(patient, isArchived, isAdi);
 
   return {
@@ -648,6 +645,12 @@ function mapPatientForKree8(patient: Kree8PatientSource): Kree8Patient {
     summary,
     raw: patient,
   };
+}
+
+function mapPatientsForKree8(patients: readonly Kree8PatientSource[]): Kree8Patient[] {
+  if (patients.length === 0) return [];
+  const dateFormatter = new Intl.DateTimeFormat('it-IT', { day: '2-digit', month: 'short' });
+  return patients.map(patient => mapPatientForKree8(patient, dateFormatter));
 }
 
 function compactClinicalText(value: string | null | undefined): string {
@@ -953,7 +956,7 @@ export {
   REVIEW_DIARY_STATE,
   normalizeClinicalSearch,
   patientMatchesSearch,
-  mapPatientForKree8,
+  mapPatientsForKree8,
   buildGlobalDiaryState,
   classNames,
   PillBadge,
