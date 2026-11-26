@@ -19,7 +19,8 @@ const cookieState = { cookies: new Map<string, string>() };
 const cleanup = installNetworkPatientCookieFixture(process.env.MEDIFLOW_DATA_DIR, cookieState);
 const { dbServer, openDbServer } = load('../../lib/db-server.ts') as typeof import('../../lib/db-server');
 const { settings } = load('../../lib/schema.ts') as typeof import('../../lib/schema');
-const host = load('../../lib/ambulatory-write.ts') as typeof import('../../lib/ambulatory-write');
+const host = { ...load('../../lib/ambulatory-write.ts') as typeof import('../../lib/ambulatory-write'),
+    ...load('../../lib/ambulatory-host-destructive-test-fixture.ts') as typeof import('../../lib/ambulatory-host-destructive-test-fixture') };
 const paired = load('../../lib/network-ambulatory-write.ts') as typeof import('../../lib/network-ambulatory-write');
 const { prepareNetworkPatientCommitGuard } = load('../../lib/network-patient-commit-authority.ts') as typeof import('../../lib/network-patient-commit-authority');
 openDbServer();

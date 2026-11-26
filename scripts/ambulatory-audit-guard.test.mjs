@@ -9,8 +9,6 @@ const clear = fs.readFileSync('lib/test-container-clear.ts', 'utf8');
 const cases = [
     ['POST', 'host', 'create', 'app/api/ambulatories/route.ts'],
     ['PUT', 'host', 'update', 'app/api/ambulatories/[id]/route.ts'],
-    ['DELETE', 'host', 'delete', 'app/api/ambulatories/[id]/route.ts'],
-    ['POST', 'host', 'clear', 'app/api/ambulatories/clear/route.ts'],
     ['POST', 'network', 'create', 'app/api/v1/network/ambulatories/route.ts'],
     ['PUT', 'network', 'update', 'app/api/v1/network/ambulatories/[id]/route.ts'],
 ];
@@ -73,19 +71,46 @@ for (const [handler, mode, operation, route] of cases) {
     });
 }
 
-for (const operation of ['clear', 'delete']) {
-    test(`named ${operation} Tx core cannot change binding, duplicate dispatch or become async`, () => {
-        const spec = ambulatoryAuditContract(operation === 'clear' ? 'POST' : 'DELETE', 'host', operation);
-        const routeSource = fs.readFileSync(operation === 'clear' ? 'app/api/ambulatories/clear/route.ts' : 'app/api/ambulatories/[id]/route.ts', 'utf8');
-        const name = `${operation}AmbulatoryInTransaction`;
-        const id = operation === 'clear' ? 'ambulatoryId' : 'id';
-        const call = `${name}(tx, context, ${id}, parsedVersion, surface, authorizeCommit)`;
-        const check = source => validateRequiredAmbulatoryAudit({ spec, routeSource, coreSource: source, clearSource: clear });
-        assert.deepEqual(check(core), []);
-        for (const mutant of [core.replace(call, call.replace('tx, context', 'dbServer, context')),
-            core.replace(call, call.replace('parsedVersion, surface', '0, surface')),
-            core.replace(call, `(${call}, ${call})`), core.replace(`export function ${name}`, `export async function ${name}`),
-            core.replace(call, `other${name}(tx, context, ${id}, parsedVersion, surface, authorizeCommit)`),
-        ]) { assert.notEqual(mutant, core); assert.notDeepEqual(check(mutant), []); }
-    });
+const DESTRUCTIVE_CORE_CALLERS = new Set([
+    'lib/security/ambulatory-destructive-service.ts',
+    'lib/security/web-ambulatory-destructive-service.ts',
+    'lib/ambulatory-host-destructive-test-fixture.ts',
+]);
+function productSources(directory) {
+    return fs.readdirSync(directory, { recursive: true, withFileTypes: true })
+        .filter(entry => entry.isFile() && /\.(ts|tsx|mjs)$/u.test(entry.name) && !/\.test\.|\.spec\./u.test(entry.name))
+        .map(entry => `${entry.parentPath}/${entry.name}`.replace(/^\.\//u, ''));
 }
+export function destructiveAmbulatoryCoreViolations(files, readSource = file => fs.readFileSync(file, 'utf8')) {
+    return files.filter(file => file !== 'lib/ambulatory-write.ts' && !DESTRUCTIVE_CORE_CALLERS.has(file)
+        && /\b(?:delete|clear)AmbulatoryInTransaction\b/u.test(readSource(file)));
+}
+
+test('ADR 0201: only the two confirmed commands reach the ambulatory delete and clear Tx cores', () => {
+    const files = [...productSources('app'), ...productSources('lib'), ...productSources('components')];
+    assert.deepEqual(destructiveAmbulatoryCoreViolations(files), []);
+    assert.deepEqual(destructiveAmbulatoryCoreViolations(['app/api/ambulatories/clear/route.ts'],
+        () => "import { clearAmbulatoryInTransaction } from '@/lib/ambulatory-write';"), ['app/api/ambulatories/clear/route.ts']);
+    assert.equal(/export (?:async )?function (?:deleteAmbulatory|clearAmbulatory)\b/u.test(core), false);
+});
+
+export function ambulatoryTableDestructiveCalls(files, readSource = file => fs.readFileSync(file, 'utf8')) {
+    return files.filter(file => /\bambulatories\s*\.\s*(?:delete|bulkDelete|clear)\s*\(/u.test(readSource(file)));
+}
+
+test('ADR 0201: product code never deletes or clears sedi through the generic db table', () => {
+    const files = [...productSources('app'), ...productSources('lib'), ...productSources('components'), ...productSources('hooks')];
+    assert.deepEqual(ambulatoryTableDestructiveCalls(files), []);
+    assert.deepEqual(ambulatoryTableDestructiveCalls(['app/settings/ambulatories/page.tsx'],
+        () => 'await db.ambulatories.delete(id, { version });'), ['app/settings/ambulatories/page.tsx']);
+    assert.deepEqual(ambulatoryTableDestructiveCalls(['lib/x.ts'], () => 'await db.ambulatories.update(id, body);'), []);
+});
+
+test('ADR 0201: no host route deletes or clears a sede outside the confirmed command', () => {
+    assert.equal(/export (?:async )?function DELETE\b/u.test(fs.readFileSync('app/api/ambulatories/[id]/route.ts', 'utf8')), false);
+    assert.equal(fs.existsSync('app/api/ambulatories/clear/route.ts'), false);
+    for (const route of ['prepare', 'execute']) {
+        const source = fs.readFileSync(`app/api/ambulatories/commands/${route}/route.ts`, 'utf8');
+        assert.match(source, new RegExp(`webAmbulatoryDestructiveHttp\\(request, '${route}'\\)`, 'u'));
+    }
+});

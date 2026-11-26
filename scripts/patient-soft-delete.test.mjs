@@ -301,18 +301,16 @@ test('primary patient list reads exclude soft-deleted patients', () => {
     }
 });
 
-test('ambulatories/clear is membership-based, soft-deletes and stays test-only', () => {
-    const routeSource = read('app/api/ambulatories/clear/route.ts');
+test('ambulatory clear is membership-based, soft-deletes and stays test-only', () => {
+    const webService = read('lib/security/web-ambulatory-destructive-service.ts');
     const writeFile = checkedSource(read('lib/ambulatory-write.ts'));
-    const wrapper = exportedFunction(writeFile, 'clearAmbulatory');
     const core = exportedFunction(writeFile, 'clearAmbulatoryInTransaction');
-    const clearServiceSource = `${wrapper.getText()}\n${core.getText()}`;
+    const clearServiceSource = `${webService}\n${core.getText()}`;
 
-    assertSyntax(tryStatements(wrapper)[0],
-        "return dbServer.transaction((tx): AmbulatoryMutationResponse => clearAmbulatoryInTransaction(tx, context, ambulatoryId, parsedVersion, surface, authorizeCommit), { behavior: 'immediate' });",
-        'clear wrapper must invoke the exact clear core in its synchronous IMMEDIATE transaction');
-
-    assert.match(routeSource, /clearAmbulatory\(\{ request, session \}, ambulatoryId, body\.version\)/, 'clear route must delegate to the ambulatory write service');
+    assert.match(read('app/api/ambulatories/commands/execute/route.ts'), /webAmbulatoryDestructiveHttp\(request, 'execute'\)/, 'the Web clear goes through the confirmed command');
+    assert.match(webService, /clearAmbulatoryInTransaction\(tx, context, binding\.ambulatoryId, binding\.expectedVersion, 'host', undefined\)/,
+        'the confirmed command must invoke the exact clear core inside its transaction');
+    assert.match(webService, /\}, \{ behavior: 'immediate' \}\);\n        \},\n    \};/, 'the confirmed command commits in one IMMEDIATE transaction');
     assert.doesNotMatch(clearServiceSource, /\.delete\(patients\)/, 'clear must never hard-delete patients');
     assert.doesNotMatch(clearServiceSource, /patients\.ambulatoryId/, 'clear must not select patients via the stale legacy column (WUL-300)');
     assert.match(clearServiceSource, /clearTestContainerByMembership\(/, 'clear service must go through the membership-based helper');
