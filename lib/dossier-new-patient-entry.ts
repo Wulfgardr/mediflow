@@ -22,7 +22,7 @@ function identityEvidence(source: DossierDraftSource): number {
 }
 
 export type IdentityField = DossierIdentityProposal['field'];
-export type SourcedIdentityProposal = DossierIdentityProposal & Readonly<{ sourceName: string }>;
+export type SourcedIdentityProposal = DossierIdentityProposal & Readonly<{ sourceName: string; sourceKeys: readonly string[] }>;
 export const IDENTITY_FIELDS: readonly IdentityField[] = ['taxCode', 'lastName', 'firstName', 'birthDate'];
 
 function sourceIdentityProposals(source: DossierDraftSource): DossierIdentityProposal[] {
@@ -44,19 +44,20 @@ export function sameIdentityValue(a: string, b: string): boolean {
 export function groupIdentityProposals(group: DossierDraftGroup, firstSourceKey: string): SourcedIdentityProposal[] {
     const sources = group.sources.filter((source) => source.status === 'ready');
     const ordered = [...sources.filter((source) => source.key === firstSourceKey), ...sources.filter((source) => source.key !== firstSourceKey)];
-    const proposals: SourcedIdentityProposal[] = [];
+    const proposals: (DossierIdentityProposal & { sourceName: string; sourceKeys: string[] })[] = [];
     for (const source of ordered) {
         for (const proposal of sourceIdentityProposals(source)) {
-            if (proposals.some((kept) => kept.field === proposal.field && sameIdentityValue(kept.value, proposal.value))) continue;
-            proposals.push({ ...proposal, sourceName: source.fileName });
+            const kept = proposals.find((item) => item.field === proposal.field && sameIdentityValue(item.value, proposal.value));
+            if (!kept) proposals.push({ ...proposal, sourceName: source.fileName, sourceKeys: [source.key] });
+            else if (!kept.sourceKeys.includes(source.key)) kept.sourceKeys.push(source.key);
         }
     }
     return proposals.sort((a, b) => IDENTITY_FIELDS.indexOf(a.field) - IDENTITY_FIELDS.indexOf(b.field));
 }
 
-export type AllIdentityProposals = Readonly<{ values: Partial<Record<IdentityField, string>>; undecided: IdentityField[] }>;
+export type AllIdentityProposals = Readonly<{ values: Partial<Record<IdentityField, string>>; undecided: IdentityField[]; leftOut: IdentityField[] }>;
 
-export function allIdentityProposals(proposals: readonly DossierIdentityProposal[]): AllIdentityProposals {
+export function allIdentityProposals(proposals: readonly SourcedIdentityProposal[]): AllIdentityProposals {
     const values: Partial<Record<IdentityField, string>> = {};
     const undecided: IdentityField[] = [];
     for (const field of IDENTITY_FIELDS) {
@@ -69,7 +70,17 @@ export function allIdentityProposals(proposals: readonly DossierIdentityProposal
         delete values.birthDate;
         undecided.push('birthDate');
     }
-    return { values, undecided };
+    const backers = (field: IdentityField) => {
+        const value = values[field];
+        return value === undefined ? [] : proposals.find((proposal) => proposal.field === field && sameIdentityValue(proposal.value, value))?.sourceKeys ?? [];
+    };
+    const samePerson = new Set([...backers('taxCode'), ...backers('lastName').filter((key) => backers('firstName').includes(key))]);
+    const singleSource = new Set(proposals.flatMap((proposal) => proposal.sourceKeys)).size === 1;
+    const leftOut = IDENTITY_FIELDS.filter((field) => values[field] !== undefined && !singleSource
+        && !backers(field).some((key) => samePerson.has(key))
+        && !(field === 'birthDate' && values.taxCode && birthDateMatchesTaxCode(values.taxCode, values.birthDate!)));
+    for (const field of leftOut) delete values[field];
+    return { values, undecided, leftOut };
 }
 
 export type UndecidedReason = 'different-values' | 'birth-date-not-in-tax-code';
