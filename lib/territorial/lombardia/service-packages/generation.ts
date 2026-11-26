@@ -152,6 +152,27 @@ function icd11CodeMatches(patientCode: string, triggerCode: string): boolean {
     ));
 }
 
+export function isApprovedServicePackage(pkg: ServicePackage): pkg is ApprovedServicePackage {
+    return pkg.approval.status === 'approved';
+}
+
+export function listApprovedServicePackages(
+    packages: readonly ServicePackage[],
+): readonly ApprovedServicePackage[] {
+    return packages.filter(isApprovedServicePackage);
+}
+
+export function selectApprovedServicePackagesForDiagnoses(
+    packages: readonly ServicePackage[],
+    patientIcd11Codes: readonly string[],
+): readonly ApprovedServicePackage[] {
+    return listApprovedServicePackages(packages).filter((pkg) => (
+        pkg.activation.icd11Codes.some((trigger) => (
+            patientIcd11Codes.some((patientCode) => icd11CodeMatches(patientCode, trigger))
+        ))
+    ));
+}
+
 export function resolveMatchingComplicationModules(
     pkg: ServicePackage,
     patientIcd11Codes: readonly string[],

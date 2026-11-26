@@ -24,7 +24,7 @@ function allegato8(exemption: '013' | '023'): DocumentSource {
     };
 }
 
-const NOMENCLATORE_2025: DocumentSource = {
+export const NOMENCLATORE_2025: DocumentSource = {
     kind: 'documento',
     document: 'Nomenclatore regionale tariffario della specialistica ambulatoriale, Allegato 3 della DGR n. XII/4956 del 08/09/2025',
     sectionOrTable: 'Riga del codice, in vigore dal 01/10/2025',
@@ -188,9 +188,19 @@ const BASE_ITEMS: readonly ServicePackageItem[] = [
         exemptionCode: '013',
         appropriatenessConditions: [
             'Ogni 12 mesi con retinopatia non proliferante lieve, ogni 6-12 mesi se moderata',
-            'In alternativa: prima visita oculistica 95.02',
+            'In alternativa: visita oculistica di controllo 89.01.D o prima visita oculistica 95.02',
         ],
-        sources: [SID_RETINOPATHY, allegato8('013'), physicianDecision('Fotografia del fundus 95.11 ogni 24 mesi, preferita alla prima visita oculistica 95.02')],
+        sources: [
+            SID_RETINOPATHY,
+            allegato8('013'),
+            physicianDecision('Fotografia del fundus 95.11 ogni 24 mesi, preferita alla prima visita oculistica 95.02'),
+            {
+                kind: 'decisione_del_medico',
+                decidedBy: PACKAGE_APPROVER,
+                decidedAt: '2026-11-26',
+                decision: 'Resta la fotografia del fundus 95.11, con visita oculistica di controllo 89.01.D indicata fra le alternative',
+            },
+        ],
     },
     {
         id: 'dm2-elettrocardiogramma',
