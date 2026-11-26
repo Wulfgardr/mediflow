@@ -194,15 +194,13 @@ test('Il riepilogo rende la sintesi, i dati mancanti e la ricevuta della propost
   await expect(page.getByTestId('patient-insight-review-proposal')).toContainText(MODEL);
 });
 
-for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '390', '320', 'zoom-200', 'zoom-400']) {
-  test(`Quadro paziente composizione ${theme} ${size}`, async ({ page, baseURL }) => {
-    test.setTimeout(120_000);
+async function composeQuadro(fixturePage: Page | undefined, baseURL: string, theme: string, size: string): Promise<void> {
     const baseline = process.env.PATIENT_INSIGHT_BASELINE === '1';
-    const zoom = size.startsWith('zoom-') ? await openBrowserZoomFixture(baseURL!) : undefined;
+    const zoom = fixturePage ? undefined : await openBrowserZoomFixture(baseURL);
+    const page = zoom ? zoom.page : fixturePage!;
     const release = Promise.withResolvers<void>(), entered = Promise.withResolvers<void>();
     let fail = false;
     try {
-      if (zoom) page = zoom.page;
       await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
       await setAiLaneKillSwitch(page, 'aiPatientInsightKillSwitch', 'enabled');
       const patientId = await createSyntheticPatient(page);
@@ -263,7 +261,12 @@ for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '3
         zoom: zoom ? { mechanism: 'chrome.tabs.setZoom/getZoom', factor: size === 'zoom-200' ? 2 : 4,
           physicalWidth: 1440, innerWidth: await page.evaluate(() => innerWidth) } : null }), contentType: 'application/json' });
     } finally { release.resolve(); await zoom?.close(); }
-  });
+}
+
+for (const theme of ['giorno', 'grafite']) for (const size of ['1440', '768', '390', '320', 'zoom-200', 'zoom-400']) {
+  test(`Quadro paziente composizione ${theme} ${size}`, size.startsWith('zoom-')
+    ? async ({ baseURL }) => { test.setTimeout(120_000); await composeQuadro(undefined, baseURL!, theme, size); }
+    : async ({ page, baseURL }) => { test.setTimeout(120_000); await composeQuadro(page, baseURL!, theme, size); });
 }
 
 for (const width of [1440, 390]) test(`copy del Quadro paziente ${width}`, async ({ page }) => {
