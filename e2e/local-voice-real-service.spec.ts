@@ -75,7 +75,7 @@ test('servizio vero: visita a due voci sintetiche dalla scheda, testo attribuito
     expect(text).toMatch(/^Medico: /mu);
     expect(text).toMatch(/^Paziente: /mu);
     expect(text.toLowerCase()).toContain('pressione');
-    expect(text.toLowerCase()).toContain('ramipril');
+    expect(text.toLowerCase()).toContain('capogir');
     await page.getByTestId('local-voice-take').click();
     await expect(page.getByRole('textbox', { name: 'Resoconto clinico', exact: true })).toContainText('pressione');
     await page.getByRole('button', { name: 'Rivedi', exact: true }).click();
