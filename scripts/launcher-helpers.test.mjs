@@ -3681,7 +3681,8 @@ test('without the voice binary the Web gets no voice address, even one inherited
 
 test('launcher with the real voice binary and the installed model', { skip: voiceSkip || (process.env.MEDIFLOW_LOCAL_VOICE_REAL_BINARY ? false : 'MEDIFLOW_LOCAL_VOICE_REAL_BINARY non impostato'), timeout: 120_000 }, async t => {
     const binary = process.env.MEDIFLOW_LOCAL_VOICE_REAL_BINARY;
-    const f = await ordinaryLauncherFixture(t, 'web', [], true, true, { MEDIFLOW_LOCAL_VOICE_BINARY: binary });
+    const models = process.env.MEDIFLOW_LOCAL_VOICE_MODELS || path.join(process.env.HOME, 'Library/Application Support/MediFlow GPUI/modelli-voce');
+    const f = await ordinaryLauncherFixture(t, 'web', [], true, true, { MEDIFLOW_LOCAL_VOICE_BINARY: binary, MEDIFLOW_LOCAL_VOICE_MODELS: models });
     await f.until(() => f.output().includes('Pronto:'), 60_000);
     const ready = await voiceSettles(f, ({ state }) => state.voice !== 'absent', 60_000);
     assert.equal(ready.state.voice, 'ready', JSON.stringify(ready));

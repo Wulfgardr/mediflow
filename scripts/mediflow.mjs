@@ -499,7 +499,7 @@ export async function main(args = process.argv.slice(2)) {
   let terminal = null, useTerminal = false, webSecret = null, instance = null;
   let voiceChild = null;
   const voiceBinary = localVoiceBinary(ROOT);
-  const voice = process.platform === 'darwin' && fs.existsSync(voiceBinary) ? superviseLocalVoiceService({ binary: voiceBinary, log,
+  const voice = process.platform === 'darwin' && fs.existsSync(voiceBinary) ? superviseLocalVoiceService({ binary: voiceBinary, models: process.env.MEDIFLOW_LOCAL_VOICE_MODELS || undefined, log,
     publish: endpoint => {
       void refreshVoiceState(endpoint);
       if (voiceChild && voiceChild === child && voiceChild.connected) voiceChild.send({ type: LOCAL_VOICE_ENDPOINT_FRAME, url: endpoint?.url ?? null, secret: endpoint?.secret ?? null }, () => {});

@@ -59,14 +59,14 @@ export async function startLocalVoiceService({ binary, models, secret = crypto.r
 /**
  * Keeps one service alive for the launcher. `publish` receives the current endpoint, or null as soon as the
  * service is gone, so the Web never keeps an address nobody answers on.
- * @param {{ binary: string, publish: (endpoint: { url: string, secret: string } | null) => void, log?: (message: string) => void,
+ * @param {{ binary: string, models?: string, publish: (endpoint: { url: string, secret: string } | null) => void, log?: (message: string) => void,
  *   restarts?: number, start?: typeof startLocalVoiceService }} options
  */
-export function superviseLocalVoiceService({ binary, publish, log = () => {}, restarts = 3, start = startLocalVoiceService }) {
+export function superviseLocalVoiceService({ binary, models, publish, log = () => {}, restarts = 3, start = startLocalVoiceService }) {
   let service = null, starting = null, stopped = false, left = restarts;
   const launch = () => starting ||= (async () => {
     try {
-      const started = await start({ binary });
+      const started = await start({ binary, models });
       if (stopped) { await started.stop(); return null; }
       service = started;
       void started.exited.then(() => {
