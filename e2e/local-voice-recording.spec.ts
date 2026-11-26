@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 
 import { expect, test } from './fixtures/isolated-runtime';
 import { bootstrapUnlockedSession, openUnlockedDocument } from './utils';
-import { syntheticMicrophone, syntheticPatient } from './local-voice-utils';
+import { liveSyntheticTracks, syntheticMicrophone, syntheticPatient } from './local-voice-utils';
 import { startFakeLocalVoice } from '../lib/local-voice/fake-service.test-support';
 import { randomSyntheticTaxCode } from '../lib/patient-identity.test-support';
 import { taxCodeBirthDetails } from '../lib/patient-identity';
@@ -252,4 +252,55 @@ test('il testo di un altro paziente o di un’altra prima visita non viene prepa
     await other.getByRole('button', { name: 'Scarta', exact: true }).last().click();
     await expect.poll(() => service().state.session).toBeNull();
     await expect(elsewhere.getByRole('button', { name: 'Ascolta la visita' })).toBeVisible();
+});
+
+test('pausa, ricarico e riprendo: tutto l’audio dopo la ripresa arriva al servizio', async ({ page }, info) => {
+    test.setTimeout(120_000);
+    await startService();
+    await syntheticMicrophone(page, { tone: TONE_HZ });
+    await bootstrapUnlockedSession(page, pin);
+    const patientId = await syntheticPatient(page, 'Ripresa');
+    await openUnlockedDocument(page, `/patients/${patientId}/modules?voce=nuova`, pin);
+    const recorder = page.getByTestId('local-voice-recorder');
+    await recorder.getByRole('button', { name: 'Ascolta la visita' }).click();
+    await expect.poll(() => service().state.blocks.length, { timeout: 15_000 }).toBeGreaterThanOrEqual(4);
+    await recorder.getByRole('button', { name: 'Pausa' }).click();
+    await expect(recorder.getByTestId('local-voice-indicator')).toContainText('In pausa');
+    const beforePause = service().state.blocks.length;
+
+    await openUnlockedDocument(page, `/patients/${patientId}/modules?voce=nuova`, pin);
+    await expect(recorder.getByTestId('local-voice-indicator')).toContainText('In pausa');
+    const sent: Array<{ sequence: number; repeated: boolean }> = [];
+    page.on('response', async (response) => {
+        if (!response.url().includes('/audio?') || response.status() !== 202) return;
+        const body = await response.json().catch(() => null) as { sequence?: number; repeated?: boolean } | null;
+        if (body && typeof body.sequence === 'number') sent.push({ sequence: body.sequence, repeated: body.repeated === true });
+    });
+    await recorder.getByRole('button', { name: 'Riprendi' }).click();
+    await expect(recorder.getByTestId('local-voice-indicator')).toContainText('In registrazione', { timeout: 15_000 });
+    await expect.poll(() => service().state.blocks.length, { timeout: 15_000 }).toBeGreaterThanOrEqual(beforePause + 5);
+    await recorder.getByRole('button', { name: 'Pausa' }).click();
+    await expect(recorder.getByTestId('local-voice-indicator')).toContainText('In pausa');
+    await expect.poll(() => sent.length).toBe(service().state.blocks.length - beforePause);
+    expect(sent.filter((item) => item.repeated)).toEqual([]);
+    expect(sent[0].sequence).toBe(beforePause);
+    await capture(info, page, '13-ripresa-dopo-il-ricarico.png');
+});
+
+test('lascio la nuova voce mentre il microfono si apre: nessun microfono resta aperto e nessuna sessione nasce', async ({ page }, info) => {
+    test.setTimeout(120_000);
+    await startService();
+    await syntheticMicrophone(page, { tone: TONE_HZ, openingMs: 2_500 });
+    await bootstrapUnlockedSession(page, pin);
+    const patientId = await syntheticPatient(page, 'Uscita');
+    await openUnlockedDocument(page, `/patients/${patientId}/modules?voce=nuova`, pin);
+    await page.getByTestId('local-voice-recorder').getByRole('button', { name: 'Ascolta la visita' }).click();
+    await page.getByRole('link', { name: 'Chiudi la voce' }).click();
+    await expect(page.getByTestId('local-voice-recorder')).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Registra la visita' })).toBeVisible();
+    await page.waitForTimeout(4_000);
+    expect(await liveSyntheticTracks(page)).toBe(0);
+    expect(service().state.requests.filter((item) => item.path === '/v1/sessions')).toEqual([]);
+    expect(service().state.session).toBeNull();
+    await capture(info, page, '14-uscita-durante-l-apertura.png');
 });
