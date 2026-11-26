@@ -39,11 +39,15 @@ async function capture(info: TestInfo, page: Page, name: string) {
     await info.attach(name, { path: target, contentType: 'image/png' });
 }
 
-async function recordAll(page: Page, seconds: number) {
+async function recordAll(page: Page, info: TestInfo, seconds: number) {
     const recorder = page.getByTestId('local-voice-recorder');
+    const clicked = Date.now();
     await recorder.getByRole('button', { name: 'Ascolta la visita' }).click();
-    await expect(recorder.getByTestId('local-voice-indicator')).toContainText('In registrazione', { timeout: 60_000 });
-    await page.waitForTimeout(seconds * 1000 + 2_500);
+    await expect(recorder.getByText('Avvio della trascrizione…')).toBeVisible({ timeout: 10_000 });
+    await expect(recorder.getByTestId('local-voice-indicator')).toContainText('In registrazione', { timeout: 240_000 });
+    const loading = (Date.now() - clicked) / 1000;
+    await info.attach('avvio-secondi.txt', { body: String(loading), contentType: 'text/plain' });
+    await page.waitForTimeout(Math.max(0, seconds - loading) * 1000 + 3_000);
     await recorder.getByRole('button', { name: 'Termina' }).click();
     const review = recorder.getByTestId('local-voice-review');
     await expect(review).toBeVisible({ timeout: 150_000 });
@@ -51,7 +55,7 @@ async function recordAll(page: Page, seconds: number) {
 }
 
 test('servizio vero: visita a due voci sintetiche dalla scheda, testo attribuito nella nota', async ({ page }, info) => {
-    test.setTimeout(420_000);
+    test.setTimeout(600_000);
     const visit = spoken([
         ['M', 'Buongiorno, come è andata la pressione questo mese?'],
         ['P', 'Abbastanza bene, dottore. Prendo il ramipril cinque milligrammi ogni mattina.'],
@@ -64,7 +68,7 @@ test('servizio vero: visita a due voci sintetiche dalla scheda, testo attribuito
     const patientId = await syntheticPatient(page, 'Ascolto');
     await openUnlockedDocument(page, `/patients/${patientId}/modules`, pin);
     await page.getByRole('link', { name: 'Registra la visita' }).click();
-    const review = await recordAll(page, visit.seconds);
+    const review = await recordAll(page, info, visit.seconds);
     const text = await review.inputValue();
     await info.attach('trascrizione-visita.txt', { body: text, contentType: 'text/plain' });
     await capture(info, page, 'vero-1-testo-da-rivedere.png');
@@ -81,7 +85,7 @@ test('servizio vero: visita a due voci sintetiche dalla scheda, testo attribuito
 });
 
 test('servizio vero: prima visita detta, proposte d’anagrafica dalla trascrizione', async ({ page }, info) => {
-    test.setTimeout(420_000);
+    test.setTimeout(600_000);
     const visit = spoken([
         ['M', 'Buongiorno, è la prima volta da me. Mi dice cognome e nome?'],
         ['P', 'Cognome: Bianchi. Nome: Anna. Sono nata il 12 marzo 1951.'],
@@ -91,7 +95,7 @@ test('servizio vero: prima visita detta, proposte d’anagrafica dalla trascrizi
     await syntheticMicrophone(page, { pcm16k: visit.pcm16k });
     await bootstrapUnlockedSession(page, pin);
     await openUnlockedDocument(page, '/patients/new', pin);
-    const review = await recordAll(page, visit.seconds);
+    const review = await recordAll(page, info, visit.seconds);
     const text = await review.inputValue();
     await info.attach('trascrizione-prima-visita.txt', { body: text, contentType: 'text/plain' });
     await capture(info, page, 'vero-3-prima-visita-da-rivedere.png');
