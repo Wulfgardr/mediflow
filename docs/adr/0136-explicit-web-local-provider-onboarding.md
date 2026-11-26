@@ -375,9 +375,9 @@ il 26 novembre con la 0.40.18.
   (`lib/ai-providers/ollama-response-schema.ts`). Un campo fuori elenco nega
   l'attestazione con il codice `provider_field_unknown`, distinto da
   `provider_version_unsupported`. Il dettaglio porta versione, endpoint e
-  percorso del campo (per esempio `models[].details.routing` o
-  `capabilities[]=cloud`), ripulito e limitato a 120 caratteri; la risposta
-  HTTP è 409 come per la versione. Un campo nuovo in tags o show ferma
+  percorso del campo, per esempio `models[].details.routing` o
+  `capabilities[]=cloud`. Il percorso è ripulito e limitato a 120 caratteri.
+  La risposta HTTP è 409 come per la versione fuori intervallo. Un campo nuovo in tags o show ferma
   l'attestazione prima del precaricamento.
 - I controlli di prima restano tutti, in aggiunta: loopback, modello nei tags
   con digest, marker remoti in tags, show, precaricamento e processi, digest
@@ -455,9 +455,8 @@ richiesto.
   modello locale, `OLLAMA_NO_CLOUD` non più rispettato, una telemetria che
   porta il testo. È il rischio dichiarato e accettato con questa decisione.
 - La rete in uscita del daemon, che MediFlow non vede, come prima.
-- Le risposte di precaricamento e di chat non passano dallo schema chiuso:
-  portano statistiche che cambiano più spesso e arrivano dopo l'attestazione;
-  restano i controlli dei marker e del nome del modello.
+- Le risposte di precaricamento e di chat restano fuori dai tre schemi chiusi.
+  MediFlow continua a verificarne i marker remoti e il nome del modello.
 - Un valore nuovo in un campo noto passa, salvo `capabilities`.
 
 Un workflow settimanale segnala le release nuove di Ollama.
@@ -465,8 +464,8 @@ L’ammissione delle versioni resta governata da questa decisione.
 
 ### Perché l'intervallo si ferma alle patch della 0.40
 
-Fra 0.40.16 e 0.40.18 le strutture delle tre risposte non sono cambiate; fra
-0.40.6 e 0.40.16 si sono aggiunti solo `template_source` e `voices`. La verifica copre le risposte
+Le strutture delle tre risposte sono le stesse in 0.40.16 e 0.40.18.
+Fra 0.40.6 e 0.40.16 si sono aggiunti `template_source` e `voices`. La verifica copre le risposte
 della 0.40. L’intervallo si ferma prima della 0.41 perché il cambio di versione minore può cambiare il
 contratto delle API o l’instradamento. La 0.41 torna quindi a richiedere
 un'osservazione sul runtime vero, con la procedura delle sezioni 0.40.16 e
@@ -486,14 +485,13 @@ instradamento remoto, si aggiungono un controllo che lo neghi e il relativo test
 - Per ciascuna delle due versioni, 22 iniezioni: campo nuovo a ogni
   livello chiuso delle tre risposte, valore nuovo di `capabilities`, tipo
   sbagliato di `details` e `messages`. Tutte negate con
-  `provider_field_unknown` e il percorso esatto; nessun precaricamento quando
-  il campo è in tags o show.
+  `provider_field_unknown` e il percorso del campo. Tags e show fermano
+  l’attestazione prima del precaricamento.
 - 0.40.17, 0.40.19, 0.40.25, 0.40.180 e 0.40.16000 passano con lo schema
   noto. Un campo nuovo nega l’attestazione anche su queste versioni. 0.40.7, 0.40.15, 0.41.0, `0.40.18-rc0`, `0.40.18+build`,
   `0.40.016`, versioni con una nuova riga finale
   e `1.40.18` restano negate prima di leggere tags.
 - Le versioni osservate puntualmente restano ammesse anche con un campo in
-  più, come prima; i test esistenti dei marker remoti restano verdi con le
-  stesse attese.
+  più, come prima. I test dei marker remoti passano con le attese esistenti.
 - Il codice nuovo arriva alla rotta di onboarding, alla vista e al pannello
   montato con un testo diverso da quello della versione.
