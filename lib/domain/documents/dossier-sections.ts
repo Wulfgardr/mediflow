@@ -244,12 +244,52 @@ const NAME_TOKEN = String.raw`(?!${LABEL_WORD})[A-ZÀ-Ý][A-Za-zÀ-ÿ'’]+(?:\s
 const SURNAME = new RegExp(String.raw`\b[Cc]ognome\s*[:.]\s*(${NAME_TOKEN})`, 'u');
 const GIVEN = new RegExp(String.raw`(?<![Cc]og)\b[Nn]ome\s*[:.]\s*(${NAME_TOKEN})`, 'u');
 const BIRTH = /\b(?:nat[oa]\s+il|data\s+di\s+nascita\s*[:.]?)\s*(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})/iu;
+const MONTHS = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
+const SPOKEN_BIRTH = new RegExp(String.raw`\b(?:nat[oa]\s+il|data\s+di\s+nascita\s*[:.]?)\s*(\d{1,2})°?\s+(${MONTHS.join('|')})\s+(\d{4})`, 'iu');
+
+function birthMatch(text: string): [string, string, string, string] | null {
+    const numeric = BIRTH.exec(text);
+    if (numeric) return [numeric[0], numeric[1], numeric[2], numeric[3]];
+    const spoken = SPOKEN_BIRTH.exec(text);
+    return spoken ? [spoken[0], spoken[1], String(MONTHS.indexOf(spoken[2].toLowerCase()) + 1), spoken[3]] : null;
+}
+
+const SPOKEN_CUE = String.raw`(?:\s*[:,]\s*|\s+(?:è|fa)\s+|\s+)`;
+const SPOKEN_SURNAME = new RegExp(String.raw`\b[Cc]ognome${SPOKEN_CUE}(${NAME_TOKEN})`, 'u');
+const SPOKEN_GIVEN = new RegExp(String.raw`(?<![Cc]og)\b[Nn]ome${SPOKEN_CUE}(${NAME_TOKEN})`, 'u');
+const NAME_WORD = String.raw`(?!${LABEL_WORD})[A-ZÀ-Ý][A-Za-zÀ-ÿ'’]+`;
+const SPOKEN_CALLED = new RegExp(String.raw`\b[MmSs]i\s+chiam[oa]\s+(${NAME_WORD})((?:\s+${NAME_WORD}){0,2})`, 'u');
+const RELATIVE = /\b(?:moglie|marit[oi]|figli[oae]?|madre|padre|mamma|papà|genitori|fratell[oi]|sorell[ae]|nonn[oai]|zi[oa]|nipot[ei]|cugin[oai]|compagn[oa]|fidanzat[oa]|suocer[oa]|cognat[oa]|genero|nuora|badante|vicin[oa]|amic[oa]|parente)\b/iu;
+
+/**
+ * Forme parlate dell'anagrafica, solo per la trascrizione di una visita: «Cognome Bianchi», «di nome Anna»,
+ * «mi chiamo Anna Bianchi». Una frase che nomina un familiare non propone nulla per il paziente.
+ */
+export function proposeSpokenIdentityFields(text: string, patientTaxCode: string | null): DossierIdentityProposal[] {
+    const proposals = proposeIdentityFields(text, patientTaxCode);
+    const offer = (field: DossierIdentityProposal['field'], value: string, excerpt: string) => {
+        if (!proposals.some((proposal) => proposal.field === field)) proposals.push({ field, value: value.trim(), excerpt: excerpt.trim() });
+    };
+    for (const sentence of text.split(/[.!?;\n]+/u)) {
+        if (RELATIVE.test(sentence)) continue;
+        const surname = SPOKEN_SURNAME.exec(sentence);
+        if (surname) offer('lastName', surname[1], surname[0]);
+        const given = SPOKEN_GIVEN.exec(sentence);
+        if (given) offer('firstName', given[1], given[0]);
+        const called = SPOKEN_CALLED.exec(sentence);
+        if (called) {
+            offer('firstName', called[1], called[0]);
+            if (called[2].trim()) offer('lastName', called[2], called[0]);
+        }
+    }
+    return proposals;
+}
 
 /** Proposte d'anagrafica da etichette esplicite: il medico le inserisce solo con un gesto. */
 export function proposeIdentityFields(text: string, patientTaxCode: string | null): DossierIdentityProposal[] {
     const proposals: DossierIdentityProposal[] = [];
     if (patientTaxCode) proposals.push({ field: 'taxCode', value: patientTaxCode, excerpt: `Codice fiscale paziente nel documento: ${patientTaxCode}` });
-    const surname = SURNAME.exec(text); const given = GIVEN.exec(text); const birth = BIRTH.exec(text);
+    const surname = SURNAME.exec(text); const given = GIVEN.exec(text); const birth = birthMatch(text);
     if (surname) proposals.push({ field: 'lastName', value: surname[1].trim(), excerpt: surname[0].trim() });
     if (given) proposals.push({ field: 'firstName', value: given[1].trim(), excerpt: given[0].trim() });
     if (birth) {

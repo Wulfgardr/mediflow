@@ -16,6 +16,7 @@ import { Kree8WorkspaceShell } from '@/components/kree8/kree8-workspace-shell';
 import PrivacyBlur from '@/components/privacy-blur';
 import { useSecurity } from '@/components/security-provider';
 import PatientDocumentCreate from '@/components/patient-document-create';
+import { FirstVisitRecorder } from '@/components/first-visit-recorder';
 import { DossierBackupProposal, dossierBackupProposed, dossierWritablePatientCount, type DossierBackupChoice } from '@/components/dossier-backup-proposal';
 import { dossierCreationSource } from '@/lib/dossier-backup-gate';
 import { dossierCreationCandidates, groupIdentityProposals, loneDocumentImage, newPatientDossierStart } from '@/lib/dossier-new-patient-entry';
@@ -388,6 +389,10 @@ function ActiveDossierImport({ initialPatientId, entry }: { initialPatientId: st
                     {lombardy ? <div className={styles.actions}>
                         <FseFolderButton patient={null} disabled={Boolean(busy)} onReady={(reading) => readFseFolder(reading, null)} />
                     </div> : null}
+                    <FirstVisitRecorder onSource={(file) => {
+                        setBackupChoice({ kind: 'pending' });
+                        void readFiles([{ ...inputFile(file), origin: 'visit-transcript' }], null);
+                    }} />
                 </>
                 : <section className={styles.section} aria-labelledby={`${ids}-pick`}>
                     <h2 id={`${ids}-pick`}>1. Scegli la cartella</h2>

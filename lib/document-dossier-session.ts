@@ -97,6 +97,8 @@ export interface DossierSourceHints {
 export interface DossierInputFile {
     name: string; size: number; type: string; relativePath: string; lastModified: number;
     hints?: DossierSourceHints;
+    /** Set only by the first-visit recorder: the text is a reviewed visit transcript, read with the spoken identity forms. */
+    origin?: 'visit-transcript';
     read(): Promise<Uint8Array>;
 }
 

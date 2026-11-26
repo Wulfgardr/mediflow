@@ -31,6 +31,7 @@ import type { VisitMedicationCandidate, VisitSessionEvent, VisitSessionState } f
 /* WUL-676: one clinical form, with a prototype presentation. */
 import { useRuntimeTwinDesign, useRuntimeTwinPendingForm } from '@/components/runtime-twin-design';
 import PrivacyBlur from '@/components/privacy-blur';
+import { LocalVoiceRecorderPanel } from '@/components/local-voice-recorder';
 import composerStyles from './patient-entry-composer.module.css';
 
 /* WUL-420 */
@@ -339,19 +340,29 @@ export function PatientEntryComposer({ embedded = false, sheetSource, focusRef }
         }
     };
 
-    /* WUL-420 */
-    const insertReviewedDraft = () => {
-        if (!dictatedDraft.trim() || !isDictatedDraftReviewed) return;
-
+    const appendReviewedText = (text: string) => {
         setEditState('dirty');
-        const draftHtml = formatVisitDraftAsClinicalHtml(dictatedDraft);
+        const draftHtml = formatVisitDraftAsClinicalHtml(text);
         setContent((currentContent) => {
             const normalizedCurrentContent = sanitizeClinicalRichTextHtml(currentContent);
             if (isClinicalRichTextBlank(normalizedCurrentContent)) return draftHtml;
             return `${normalizedCurrentContent}<p><strong>Bozza dettata rivista</strong></p>${draftHtml}`;
         });
+    };
+
+    const insertReviewedDraft = () => {
+        if (!dictatedDraft.trim() || !isDictatedDraftReviewed) return;
+        appendReviewedText(dictatedDraft);
         setIsDictatedDraftReviewed(false);
     };
+
+    const voiceVocabulary = useMemo(() => (activeTherapies.data ?? []).flatMap((therapy) => [therapy.drugName, therapy.activePrinciple ?? ''])
+        .filter((name) => name && !isEncryptedFieldValue(name)), [activeTherapies.data]);
+    const voiceRecorder = <LocalVoiceRecorderPanel key="voice" subject={`paziente:${id}`} vocabulary={voiceVocabulary} modes={['visit', 'dictation']}
+        title="Registrazione" takeLabel="Porta nella nota" onTake={(text) => {
+            appendReviewedText(text);
+            requestAnimationFrame(() => editorFocus.current?.resume());
+        }} />;
 
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
@@ -980,7 +991,7 @@ export function PatientEntryComposer({ embedded = false, sheetSource, focusRef }
 
     const fields = <>
         {metadataFields}
-        {proposal ? [clinicalEditor, attachmentPicker, visitSession] : [visitSession, clinicalEditor, attachmentPicker]}
+        {proposal ? [voiceRecorder, clinicalEditor, attachmentPicker, visitSession] : [visitSession, voiceRecorder, clinicalEditor, attachmentPicker]}
     </>;
 
     const documentSummaryRows = patientAttachments.length ? (

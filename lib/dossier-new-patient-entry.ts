@@ -1,5 +1,5 @@
 import { evaluateDraftGroupIdentity, type DossierDraftGroup, type DossierDraftSource, type DossierPatient } from './document-dossier-session';
-import { proposeIdentityFields, type DossierIdentityProposal } from './domain/documents/dossier-sections';
+import { proposeIdentityFields, proposeSpokenIdentityFields, type DossierIdentityProposal } from './domain/documents/dossier-sections';
 import { birthDateMatchesTaxCode } from './patient-identity';
 
 export const PATIENT_DOCUMENT_CREATE_MAX_BYTES = 10 * 1024 * 1024;
@@ -12,8 +12,13 @@ export function dossierPatientCode(source: DossierDraftSource): string | null {
     return source.taxCodes.find((code) => code.role === 'patient_cf' && code.checksumValid)?.value ?? null;
 }
 
+function textIdentityProposals(source: DossierDraftSource): DossierIdentityProposal[] {
+    const read = source.file.origin === 'visit-transcript' ? proposeSpokenIdentityFields : proposeIdentityFields;
+    return read(source.text ?? '', dossierPatientCode(source));
+}
+
 function identityEvidence(source: DossierDraftSource): number {
-    return proposeIdentityFields(source.text ?? '', dossierPatientCode(source)).length;
+    return textIdentityProposals(source).length;
 }
 
 export type IdentityField = DossierIdentityProposal['field'];
@@ -21,7 +26,7 @@ export type SourcedIdentityProposal = DossierIdentityProposal & Readonly<{ sourc
 export const IDENTITY_FIELDS: readonly IdentityField[] = ['taxCode', 'lastName', 'firstName', 'birthDate'];
 
 function sourceIdentityProposals(source: DossierDraftSource): DossierIdentityProposal[] {
-    const found = proposeIdentityFields(source.text ?? '', dossierPatientCode(source));
+    const found = textIdentityProposals(source);
     const patient = source.prepared?.patient;
     if (!patient) return found;
     const have = new Set(found.map((proposal) => proposal.field));
