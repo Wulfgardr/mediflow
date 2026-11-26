@@ -130,7 +130,7 @@ release](https://github.com/Wulfgardr/mediflow/releases) raccoglie i pacchetti p
 - La registrazione della visita funziona solo su macOS. Il programma della
   voce non è ancora compreso nell'installazione: il launcher avvia la voce
   solo se trova il programma compilato, e il modello si installa ancora da
-  GPUI ([ADR 0204](./docs/adr/0204-servizio-locale-della-voce.md), Proposed).
+  GPUI ([ADR 0204](./docs/adr/0204-servizio-locale-della-voce.md)).
   Alla prima visita mancano i farmaci del paziente che orientano il
   riconoscimento, quindi i nomi dei farmaci sono meno affidabili.
 - In «Da decidere» i controlli sul farmaco corretto e sulla diagnosi già in
