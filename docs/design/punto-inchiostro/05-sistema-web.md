@@ -28,7 +28,7 @@ I riferimenti esterni sono nella collezione Mobbin «MediFlow · sistema Web»
 | --- | --- | --- |
 | Il percorso sta nella striscia in alto. I comandi della vista stanno sulla stessa riga, a destra | A 1440 e a 1280 px il bordo superiore dei comandi è alla stessa altezza in ogni vista | Vista paziente: comandi a 25 px dal bordo della finestra |
 | Il titolo sta sotto, a sinistra, nel ruolo `record-person` | 28 px, peso 600 | Vista paziente: nome del paziente |
-| «Torna a…» è un collegamento nella striscia del percorso, non un pulsante nella testata | Testo 13 px | Vista paziente: il percorso «Pazienti · …» riporta all'elenco |
+| Il ritorno è il percorso in alto, non un pulsante «Torna a…» nella pagina | Un livello per ogni pagina madre che il percorso non nomina già: elenco, scheda aperta, poi la pagina madre (per esempio «Pazienti · Rossi Mario · Scale cliniche»). Il percorso non ripete il titolo | Vista paziente: il percorso «Pazienti · …» riporta all'elenco |
 
 ## Campi, sezioni, stati
 
@@ -43,7 +43,9 @@ I riferimenti esterni sono nella collezione Mobbin «MediFlow · sistema Web»
 
 - `e2e/lume-sistema-web.spec.ts` misura nel browser, a 1440 × 900 e a
   1280 × 720, altezza, raggio e corpo dei comandi, la posizione dei comandi
-  della testata e il numero di principali in ogni vista.
+  della testata e il numero di principali in ogni vista. Nelle pagine
+  secondarie controlla anche che il ritorno stia nel percorso e non nella
+  pagina.
 - `npm run check:button-system` impedisce nuove occorrenze delle classi di
   pulsante storiche.
 - Le catture prima e dopo stanno nella PR di ogni area.

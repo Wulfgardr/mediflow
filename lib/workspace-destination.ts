@@ -14,3 +14,10 @@ export function currentWorkspaceDestination(pathname: string, area: string | nul
   if (within('/patients')) return '/?area=incarico';
   return workspaceDestinationHrefs.find(href => !href.includes('?') && within(href)) ?? null;
 }
+
+const patientCollectionRoutes = new Set(['import', 'new']);
+
+export function openPatientRecordId(pathname: string): string | null {
+  const id = pathname.match(/^\/patients\/([^/?#]+)\//)?.[1] ?? null;
+  return id && !patientCollectionRoutes.has(id) ? id : null;
+}

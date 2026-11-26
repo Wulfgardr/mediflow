@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { currentWorkspaceDestination, workspaceDestinationHrefs } from './workspace-destination';
+import { currentWorkspaceDestination, openPatientRecordId, workspaceDestinationHrefs } from './workspace-destination';
 
 for (const prefix of ['/settings', '/analytics', '/scales', '/patients']) {
   for (const suffix of ['-x', '-x/', '-x?next=/settings', '-x#settings']) {
@@ -34,4 +34,15 @@ for (const [route, area, expected] of routes) {
       assert.equal(currentWorkspaceDestination(falsePrefix + suffix, area), null);
     });
   }
+}
+
+const recordRoutes: [string, string | null][] = [
+  ['/patients/synthetic-id/modules', 'synthetic-id'], ['/patients/synthetic-id/edit', 'synthetic-id'],
+  ['/patients/synthetic-id/scales/mmse', 'synthetic-id'], ['/patients/import/dossier', null],
+  ['/patients/import', null], ['/patients/new', null], ['/patients/new/', null], ['/patients', null],
+];
+for (const [route, expected] of recordRoutes) {
+  test(`open record for ${route} is ${expected}`, () => {
+    assert.equal(openPatientRecordId(route), expected);
+  });
 }

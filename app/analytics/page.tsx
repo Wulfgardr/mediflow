@@ -151,12 +151,7 @@ export default function AnalyticsPage() {
         return (
             <Kree8WorkspaceShell
                 variant="overview"
-                eyebrow="Analisi"
                 title="Analisi"
-                subtitle="Popolazione registrata e audit operativo, senza dati fuori dal dispositivo."
-                backHref="/?area=incarico"
-                backLabel="Torna ai pazienti"
-                statusLabel={readFailed ? 'Schede non leggibili' : 'Sto leggendo dal Mac...'}
                 navItems={navItems}
             >
                 {readFailed ? <ViewState state="error" title="Schede non leggibili"
@@ -171,12 +166,7 @@ export default function AnalyticsPage() {
     return (
         <Kree8WorkspaceShell
             variant="overview"
-            eyebrow="Analisi"
             title="Analisi"
-            subtitle=""
-            backHref="/?area=incarico"
-            backLabel="Torna ai pazienti"
-            statusLabel={populationSummary}
             navItems={navItems}
         >
             <div className={styles.content}>
