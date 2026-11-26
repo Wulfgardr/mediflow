@@ -688,7 +688,7 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
                 showToast('Impossibile inviare il contesto a Codex.', 'error');
                 return;
             }
-            showToast('Contesto pronto in Codex per 24 ore.', 'success');
+            showToast('Contesto pronto in Codex per 24 ore. Nelle note restano i nomi di chi non è in anagrafica.', 'success');
         } catch {
             showToast('Impossibile inviare il contesto a Codex.', 'error');
         }
