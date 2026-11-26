@@ -366,8 +366,7 @@ il 26 novembre con la 0.40.18.
 ### Decisione
 
 - Sono ammesse le versioni `0.40.N` con N da 16 in su, nella forma esatta:
-  da due a quattro cifre, senza zeri iniziali, senza anteprime né suffissi
-  build. Restano negate con `provider_version_unsupported` le 0.40 dalla 0.40.7
+  senza zeri iniziali, senza anteprime né suffissi build. Restano negate con `provider_version_unsupported` le 0.40 dalla 0.40.7
   alla 0.40.15, la 0.41.0 e successive, `0.40.18-rc0`, `0.40.18+build`,
   `0.40.016`.
 - Per queste versioni le risposte di `/api/tags`, `/api/show` e `/api/ps`
@@ -411,53 +410,42 @@ comprende nulla che non sia in quelle strutture, con un'eccezione:
 remoti. Restano ammessi nello schema perché il controllo dei marker li neghi
 come `model_not_local`, come prima.
 
-La lane O aveva osservato che con questa regola la 0.40.16 sarebbe stata
-negata per `template_source`. Verificato sul sorgente: `template_source`
-manca in `ShowResponse` della 0.40.6 e c'è nella 0.40.16, insieme a `voices`.
-Quindi l'osservazione vale per un elenco ricavato dalla 0.40.6: in quel caso
-la 0.40.16 sarebbe stata negata, giustamente, e la sua ammissione sarebbe
-stata una riga, dopo aver letto che il campo dice da dove viene il template
-del modello. L'elenco ricavato da 0.40.16 e 0.40.18 contiene
-`template_source` perché lo dichiarano entrambe; la risposta reale della
-0.40.16 passa.
+Il campo `template_source` manca in 0.40.6. Compare in 0.40.16 e
+0.40.18 e indica da dove proviene il template del modello. L'elenco lo
+include perché entrambe le risposte osservate lo usano e il sorgente lo
+dichiara come testo, con valori come `renderer_parser`.
 
 ### Fino a che profondità guarda il controllo
 
-| Risposta | Chiuso | Aperto |
+| Risposta | Oggetti con chiavi chiuse | Mappe aperte |
 |---|---|---|
-| `/api/tags` | chiavi di primo livello; chiavi di ogni voce di `models`, non solo del modello chiesto; chiavi di `details`; valori di `capabilities` | valori scalari |
-| `/api/show` | chiavi di primo livello; chiavi di `details` e di `thinking`; valori di `capabilities`; chiavi di ogni voce di `messages`, `tensors`, `manifests` | `model_info`, `projector_info`, testi (`license`, `modelfile`, `template`, `parameters`, `system`, `template_source`, `renderer`, `parser`), `thinking.values` e `thinking.default`, contenuto dei messaggi |
-| `/api/ps` | chiavi di primo livello; chiavi di ogni voce di `models`; chiavi di `details` | valori scalari |
+| `/api/tags` | Radice, ogni voce di `models` e relativi `details` | |
+| `/api/show` | Radice, `details`, `thinking`, elementi di `messages`, `tensors` e `manifests`. In ogni messaggio il controllo scende in `tool_calls` e nella relativa `function`. | `model_info`, `projector_info` e argomenti delle chiamate a strumenti |
+| `/api/ps` | Radice, ogni voce di `models` e relativi `details` | |
 
-I valori ammessi di `capabilities` sono i dieci di `types/model/capability.go`:
-`completion`, `tools`, `insert`, `vision`, `embedding`, `thinking`, `image`,
-`audio`, `decision`, `speech`. Un oggetto o un elenco atteso che arriva con
-un altro tipo nega come campo sconosciuto (`details:non_object`,
-`messages:non_array`). I valori scalari non sono controllati nel tipo.
+Gli elenchi di valori scalari, come `details.families`, `thinking.values`
+e `voices`, rifiutano elementi con chiavi annidate. Nei campi scalari
+la presenza di un oggetto o elenco nega l'attestazione. I valori di
+`capabilities` sono quelli di `types/model/capability.go`: `completion`,
+`tools`, `insert`, `vision`, `embedding`, `thinking`, `image`, `audio`,
+`decision`, `speech`.
 
-`model_info` e `projector_info` restano aperti. Sono mappe libere anche in
-Ollama (`map[string]any`): contengono i metadati del file dei pesi GGUF o il
-`config.json` dei safetensors, con chiavi che dipendono dall'architettura, per
-esempio `qwen3_5_moe.block_count`. Non sono un canale per un instradamento
-remoto. In Ollama 0.40.18 la decisione di mandare una richiesta a un host
-remoto si prende in `server/routes.go` su `RemoteHost` e `RemoteModel` della
-configurazione del modello, e la stessa configurazione esce come
-`remote_host` e `remote_model` in tags e show, che MediFlow nega.
-`model_info` è solo una proiezione in uscita, che per un modello remoto Ollama
-riempie dalla stessa configurazione accanto a `remote_host`. MediFlow non ne
-legge nulla. In più l'attestazione chiede che dopo il precaricamento
-`/api/ps` mostri il modello con lo stesso digest dei tags, cioè pesi caricati
-in locale. Chiuderlo vorrebbe dire negare ogni nuova architettura di modello e
-tornare a rincorrere i modelli al posto delle versioni. I testi liberi restano
-aperti per lo stesso motivo: Ollama non li legge per instradare.
+`model_info` e `projector_info` contengono metadati GGUF o safetensors
+con chiavi definite dall'architettura del modello. Il codice osservato
+della 0.40.18 li restituisce in risposta. In `server/routes.go`
+l'instradamento remoto legge invece `RemoteHost` e `RemoteModel` dalla
+configurazione del modello, esposta in tags e show attraverso i marker
+che l'attestazione già nega. Gli argomenti delle chiamate a strumenti sono
+dati del messaggio con chiavi definite dallo strumento. L’attestazione ignora tutte e tre le mappe. Le richieste cliniche
+usano l’endpoint loopback attestato e un prompt costruito da MediFlow.
 
 ### Che cosa garantisce lo schema chiuso
 
 Una patch ammessa espone in tags, show e ps solo campi di cui è stato letto il
 significato nel sorgente delle versioni osservate, più i marker remoti noti.
-Qualunque campo nuovo in quelle risposte, compreso un nuovo marker di
-instradamento, ferma l'attestazione con un codice che lo nomina, invece di
-passare inosservato accanto ai controlli dei marker noti.
+Ogni campo nuovo nelle parti chiuse ferma l’attestazione e viene
+indicato nel dettaglio, anche se appartiene a un modello diverso da quello
+richiesto.
 
 ### Che cosa resta scoperto
 
@@ -477,10 +465,9 @@ segnala, non ammette.
 ### Perché l'intervallo si ferma alle patch della 0.40
 
 Fra 0.40.16 e 0.40.18 le strutture delle tre risposte non sono cambiate; fra
-0.40.6 e 0.40.16 si sono aggiunti solo `template_source` e `voices`. Una
-versione minore, come la 0.41.0, è il punto in cui Ollama raccoglie i
-cambiamenti più ampi di API e di servizi cloud, e lo schema ricavato dalla 0.40
-non dice nulla del suo comportamento. La 0.41 torna quindi a richiedere
+0.40.6 e 0.40.16 si sono aggiunti solo `template_source` e `voices`. La verifica copre le risposte della 0.40. L’intervallo si ferma prima
+della 0.41 perché il cambio di versione minore può cambiare il
+contratto delle API o l’instradamento. La 0.41 torna quindi a richiedere
 un'osservazione sul runtime vero, con la procedura delle sezioni 0.40.16 e
 0.40.18 e un elenco ricavato dal suo sorgente.
 
@@ -488,22 +475,21 @@ un'osservazione sul runtime vero, con la procedura delle sezioni 0.40.16 e
 
 Si legge nel sorgente upstream che cosa significa il campo e se partecipa
 all'instradamento, si aggiunge una riga allo schema e si registra la risposta
-reale della versione in `lib/ai-providers/fixtures/ollama/`. Se il campo
-riguarda un instradamento remoto, diventa un marker e non una riga dello
-schema.
+reale della versione in `lib/ai-providers/fixtures/ollama/`. Se il campo riguarda un instradamento remoto, si aggiunge anche
+una regola che neghi quel percorso e un caso di prova.
 
 ### Prove
 
 - Le risposte reali registrate di 0.40.16 e 0.40.18 attestano il modello
   locale (`ollama-locality-closed-schema.test.ts`).
-- Per ciascuna delle due versioni, sedici iniezioni: campo nuovo a ogni
+- Per ciascuna delle due versioni, 22 iniezioni: campo nuovo a ogni
   livello chiuso delle tre risposte, valore nuovo di `capabilities`, tipo
   sbagliato di `details` e `messages`. Tutte negate con
   `provider_field_unknown` e il percorso esatto; nessun precaricamento quando
   il campo è in tags o show.
-- 0.40.17, 0.40.19, 0.40.25 e 0.40.180 con lo schema noto passano; con un
+- 0.40.17, 0.40.19, 0.40.25, 0.40.180 e 0.40.16000 con lo schema noto passano; con un
   campo nuovo no. 0.40.7, 0.40.15, 0.41.0, `0.40.18-rc0`, `0.40.18+build`,
-  `0.40.016`, `0.40.16000`, `1.40.18` restano negate prima di leggere tags.
+  `0.40.016`, versioni con una nuova riga finale e `1.40.18` restano negate prima di leggere tags.
 - Le versioni osservate puntualmente restano ammesse anche con un campo in
   più, come prima; i test esistenti dei marker remoti restano verdi con le
   stesse attese.

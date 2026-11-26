@@ -47,6 +47,8 @@ for (const [version, responses] of Object.entries(REAL)) test(`le risposte reali
 type Injection = Readonly<{ endpoint: OllamaSchemaEndpoint; field: string; inject(responses: Record<OllamaSchemaEndpoint, Json>): void }>;
 const first = (value: unknown) => (value as Json[])[0];
 const INJECTIONS: readonly Injection[] = [
+    { endpoint: 'tags', field: '""', inject: (r) => { r.tags[''] = 'remote'; } },
+    { endpoint: 'tags', field: 'models[].name:non_scalar', inject: (r) => { first(r.tags.models).name = { routing: 'remote' }; } },
     { endpoint: 'tags', field: 'routing', inject: (r) => { r.tags.routing = 'remote'; } },
     { endpoint: 'tags', field: 'models[].routing', inject: (r) => { first(r.tags.models).routing = 'remote'; } },
     { endpoint: 'tags', field: 'models[].details.routing', inject: (r) => { (first(r.tags.models).details as Json).routing = 'remote'; } },
@@ -57,6 +59,10 @@ const INJECTIONS: readonly Injection[] = [
     { endpoint: 'show', field: 'thinking.routing', inject: (r) => { (r.show.thinking as Json).routing = 'remote'; } },
     { endpoint: 'show', field: 'capabilities[]=cloud', inject: (r) => { (r.show.capabilities as string[]).push('cloud'); } },
     { endpoint: 'show', field: 'messages[].routing', inject: (r) => { r.show.messages = [{ role: 'system', content: 'synthetic', routing: 'remote' }]; } },
+    { endpoint: 'show', field: 'thinking.values[]:non_scalar', inject: (r) => { (r.show.thinking as Json).values = [{ routing: 'remote' }]; } },
+    { endpoint: 'show', field: 'capabilities[]:non_string', inject: (r) => { r.show.capabilities = [{ toString: 'remote' }]; } },
+    { endpoint: 'show', field: 'messages[].tool_calls[].routing', inject: (r) => { r.show.messages = [{ tool_calls: [{ routing: 'remote' }] }]; } },
+    { endpoint: 'show', field: 'messages[].tool_calls[].function.routing', inject: (r) => { r.show.messages = [{ tool_calls: [{ function: { routing: 'remote' } }] }]; } },
     { endpoint: 'show', field: 'tensors[].routing', inject: (r) => { r.show.tensors = [{ name: 'synthetic', type: 'F16', shape: [1], routing: 'remote' }]; } },
     { endpoint: 'show', field: 'manifests[].routing', inject: (r) => { r.show.manifests = [{ digest: 'sha256:synthetic', runner: 'mlx', routing: 'remote' }]; } },
     { endpoint: 'show', field: 'messages:non_array', inject: (r) => { r.show.messages = { role: 'system' }; } },
@@ -88,7 +94,7 @@ test('i marker remoti noti restano negati come modello non locale anche con lo s
         (error) => error instanceof OllamaLocalityError && error.code === 'model_not_local');
 });
 
-for (const version of ['0.40.17', '0.40.19', '0.40.25', '0.40.180']) test(`la patch futura ${version} con lo schema noto passa, con un campo nuovo no`, async (t) => {
+for (const version of ['0.40.17', '0.40.19', '0.40.25', '0.40.180', '0.40.16000']) test(`la patch futura ${version} con lo schema noto passa, con un campo nuovo no`, async (t) => {
     serve(t, version, REAL['0.40.18']);
     assert.equal((await attestLocalOllamaModel('http://127.0.0.1:11434', MODEL)).serverVersion, version);
     t.mock.restoreAll();
@@ -97,7 +103,7 @@ for (const version of ['0.40.17', '0.40.19', '0.40.25', '0.40.180']) test(`la pa
     await assert.rejects(attestLocalOllamaModel('http://127.0.0.1:11434', MODEL), deniedFor(version, 'show', 'cloud_route'));
 });
 
-for (const version of ['0.40.15', '0.40.7', '0.41.0', '0.40.18-rc0', '0.40.18+build', '0.40.016', '0.40.16000', '1.40.18', '0.40.']) test(`la versione fuori intervallo ${version} resta negata prima delle risposte`, async (t) => {
+for (const version of ['0.40.15', '0.40.7', '0.41.0', '0.40.18-rc0', '0.40.18+build', '0.40.016', '0.40.18\n', '1.40.18', '0.40.']) test(`la versione fuori intervallo ${version} resta negata prima delle risposte`, async (t) => {
     const calls = serve(t, version, REAL['0.40.18']);
     await assert.rejects(attestLocalOllamaModel('http://127.0.0.1:11434', MODEL), (error) => {
         assert.ok(error instanceof OllamaLocalityError);

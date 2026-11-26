@@ -4,6 +4,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { buildSync } from 'esbuild';
 import { chromium, expect } from '@playwright/test';
+import { secureLaunch } from '../../e2e/fixtures/secure-browser';
 import { buildFunctionStatus } from '../../lib/function-status';
 
 function syntheticFunctions() {
@@ -53,7 +54,7 @@ test('mounted panel: inert initial read, single explicit click, refresh, recover
     const address = server.address(); assert.ok(address && typeof address !== 'string');
     let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
     try {
-        browser = await chromium.launch({ headless: true });
+        browser = await chromium.launch(secureLaunch({ headless: true }));
         const page = await browser.newPage();
         await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
         await page.goto(`http://127.0.0.1:${address.port}`);
@@ -84,7 +85,7 @@ test('mounted panel: inert initial read, single explicit click, refresh, recover
         fail = 'field';
         await page.getByRole('button', { name: 'Riprendi dalla lettura dello stato' }).click();
         await page.getByRole('button', { name: 'Verifica e recupera locale' }).click();
-        await expect(page.getByRole('status')).toHaveText('Ollama 0.40.25 risponde con un campo che MediFlow non conosce: cloud_route in /api/show. Le funzioni locali restano spente finché un aggiornamento di MediFlow non lo ammette.');
+        await expect(page.getByRole('status')).toHaveText('Ollama 0.40.25 ha restituito il campo sconosciuto «cloud_route» in /api/show. Le funzioni locali restano spente.');
         fail = false; status = { ...status, state: 'revoked', canActivate: false };
         await page.getByRole('button', { name: 'Riprendi dalla lettura dello stato' }).click();
         await expect(page.getByRole('status')).toContainText('non può riattivarlo');
@@ -128,7 +129,7 @@ test('mounted guide: cancel, explicit read-only resume, new confirmation, confli
     const address = server.address(); assert.ok(address && typeof address !== 'string');
     let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
     try {
-        browser = await chromium.launch({ headless: true });
+        browser = await chromium.launch(secureLaunch({ headless: true }));
         const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
         const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
         let interrupted = 0; page.on('requestfailed', request => {

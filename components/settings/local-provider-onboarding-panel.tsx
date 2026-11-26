@@ -19,7 +19,7 @@ const messages: Record<string, string> = {
     provider_unreachable: 'Ollama non è raggiungibile. Apri Ollama, controlla il collegamento, poi rileggi lo stato prima di riprovare.',
     provider_unready: 'Ollama risponde, ma non è pronto per la verifica locale. Controlla il servizio e rileggi lo stato prima di riprovare.',
     provider_version_unsupported: 'La versione di Ollama non è ammessa. Aggiorna MediFlow o installa una versione di Ollama ammessa.',
-    provider_field_unknown: 'Ollama risponde con un campo che MediFlow non conosce. Le funzioni locali restano spente finché un aggiornamento di MediFlow non lo ammette.',
+    provider_field_unknown: 'Ollama ha restituito un campo sconosciuto a MediFlow. Le funzioni locali restano spente.',
     model_absent_or_not_local: 'Il modello salvato è assente o non verificabile come locale. Scegli un modello già installato, salva e rileggi lo stato.',
     locality_denied: 'La configurazione non identifica un modello locale consentito. Controlla il collegamento Ollama salvato.',
     verification_interrupted: 'Verifica interrotta o scaduta. Controlla che Ollama sia pronto e rileggi lo stato prima di una nuova verifica.',
@@ -81,7 +81,7 @@ export function LocalProviderOnboardingPanel({ configurationRevision = 0 }: { co
         <p role="status" aria-live="polite" aria-atomic="true">{view.messageCode === 'provider_version_unsupported' && view.versionMismatch
             ? `Versione di Ollama trovata: ${view.versionMismatch.serverVersion}. Versioni ammesse: ${view.versionMismatch.supportedVersions}. Aggiorna MediFlow o installa una versione di Ollama ammessa.`
             : view.messageCode === 'provider_field_unknown' && view.unknownField
-                ? `Ollama ${view.unknownField.serverVersion} risponde con un campo che MediFlow non conosce: ${view.unknownField.field} in /api/${view.unknownField.endpoint}. Le funzioni locali restano spente finché un aggiornamento di MediFlow non lo ammette.`
+                ? `Ollama ${view.unknownField.serverVersion} ha restituito il campo sconosciuto «${view.unknownField.field}» in /api/${view.unknownField.endpoint}. Le funzioni locali restano spente.`
                 : explain(view.messageCode)}</p>
         <div className="flex flex-wrap gap-3">
             <button type="button" className={SETTINGS_SECONDARY_BUTTON_CLASS} disabled={!canActivate}
