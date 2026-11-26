@@ -153,8 +153,15 @@ export default function DossierImportPanel({ initialPatientId }: { initialPatien
     return <ActiveDossierImport key={user.id} initialPatientId={initialPatientId} entry={FOLDER_ENTRY} />;
 }
 
-type DossierEntry = { kind: 'folder' } | { kind: 'new-patient'; onActiveChange: (active: boolean) => void };
-const FOLDER_ENTRY: DossierEntry = { kind: 'folder' };
+type DossierEntry = { kind: 'folder'; framed: boolean } | { kind: 'new-patient'; onActiveChange: (active: boolean) => void };
+const FOLDER_ENTRY: DossierEntry = { kind: 'folder', framed: true };
+const EMBEDDED_FOLDER_ENTRY: DossierEntry = { kind: 'folder', framed: false };
+
+export function DossierFolderReview({ initialPatientId }: { initialPatientId: string | null }) {
+    const { isAuthenticated, isLocked, user, authRecoveryState } = useSecurity();
+    if (!isAuthenticated || isLocked || !user?.id || authRecoveryState !== 'ready') return <p role="status" className={styles.muted}>Sblocca MediFlow per leggere una cartella.</p>;
+    return <ActiveDossierImport key={user.id} initialPatientId={initialPatientId} entry={EMBEDDED_FOLDER_ENTRY} />;
+}
 
 export function DossierNewPatientImport({ onActiveChange }: { onActiveChange: (active: boolean) => void }) {
     const { isAuthenticated, isLocked, user, authRecoveryState } = useSecurity();
@@ -505,7 +512,7 @@ function ActiveDossierImport({ initialPatientId, entry }: { initialPatientId: st
                 </section>}
             </div>
     );
-    if (newPatient) return content;
+    if (entry.kind === 'new-patient' || !entry.framed) return content;
     return (
         <Kree8WorkspaceShell eyebrow="Pazienti" title="Importa documenti"
             subtitle="Collega i documenti di una cartella alle schede, conservando originali, testo e provenienza."
