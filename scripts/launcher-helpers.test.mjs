@@ -539,6 +539,7 @@ import http from 'node:http';
 import https from 'node:https';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
+import net from 'node:net';
 import { atomicJson, buildDecision, claimLauncher, releaseLauncher, findExistingInstance, needsTextMenu, parseArguments, requireFreePort, selectChoice, stopOwnedChild, textualChoice } from './mediflow.mjs';
 import { createChoiceServer } from './mediflow-launcher-page.mjs';
 import { navigateOwnedLocalUiRuntime } from './local-ui-runtime.mjs';
@@ -3797,4 +3798,37 @@ test('launcher keeps the iPhone proxy on only while the Web is in home-base mode
     for (const pid of created) assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' }, `proxy ${pid} still running`);
     assert.equal(existsSync(path.join(f.data, 'runtime-status.json')), false);
     assert.equal(existsSync(path.join(f.data, 'local-api-tls-proxy.pid')), false);
+});
+
+test('the iPhone proxy ends and frees its port when the launcher that started it is killed', { skip: spawnSync('openssl', ['version'], { windowsHide: true }).error ? 'openssl non disponibile' : false, timeout: 60_000 }, async t => {
+    const data = mkdtempSync(path.join(tmpdir(), 'mediflow-lan-orphan-'));
+    t.after(() => rmSync(data, { recursive: true, force: true }));
+    const parent = spawn(process.execPath, ['--input-type=module', '-e', `
+        const { startLanProxy } = await import(${JSON.stringify(pathToFileURL(path.join(repoRoot, 'scripts/launcher-lan-proxy.mjs')).href)});
+        const proxy = await startLanProxy({ root: ${JSON.stringify(repoRoot)}, dataDir: ${JSON.stringify(data)}, target: 'http://127.0.0.1:9', port: 0, bindHost: '127.0.0.1' });
+        process.stdout.write(JSON.stringify({ pid: proxy.pid, port: proxy.port }) + '\\n');
+        setInterval(() => {}, 60_000);
+    `], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+    t.after(() => { if (parent.exitCode === null && parent.signalCode === null) parent.kill('SIGKILL'); });
+    let output = '', errors = '';
+    parent.stderr.on('data', chunk => { errors += chunk; });
+    const { pid, port } = await new Promise((resolve, reject) => {
+        parent.stdout.on('data', chunk => { output += chunk; if (output.includes('\n')) resolve(JSON.parse(output)); });
+        parent.once('exit', code => reject(new Error(`launcher exited ${code}: ${errors}`)));
+    });
+    t.after(() => { try { process.kill(pid, 'SIGKILL'); } catch {} });
+    const accepts = () => new Promise(resolve => {
+        const socket = net.connect({ host: '127.0.0.1', port });
+        socket.once('connect', () => { socket.destroy(); resolve(true); });
+        socket.once('error', () => resolve(false));
+    });
+    const alive = () => { try { process.kill(pid, 0); return true; } catch (error) { return error.code !== 'ESRCH'; } };
+    assert.equal(await accepts(), true);
+    const exited = once(parent, 'exit');
+    parent.kill('SIGKILL');
+    await exited;
+    const deadline = Date.now() + 15_000;
+    while ((alive() || await accepts()) && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 50));
+    assert.equal(alive(), false, `proxy ${pid} still running after its launcher was killed`);
+    assert.equal(await accepts(), false, `port ${port} still accepts connections`);
 });
