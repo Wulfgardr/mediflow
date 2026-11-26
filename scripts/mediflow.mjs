@@ -528,10 +528,9 @@ export async function main(args = process.argv.slice(2)) {
     catch { next = 'stopped'; }
     if (generation === voiceStateGeneration) state.voice = next;
   };
-  const localVoiceEnv = async () => {
+  const ensureLocalVoice = async () => {
     const endpoint = await voice?.ensure() ?? null;
     await refreshVoiceState(endpoint);
-    return { MEDIFLOW_LOCAL_VOICE_URL: endpoint?.url, MEDIFLOW_LOCAL_VOICE_SECRET: endpoint?.secret };
   };
   const lanPort = Number(process.env.MEDIFLOW_TLS_PORT || LAN_PROXY_DEFAULT_PORT);
   const lan = createLanProxyController({ root: ROOT, dataDir, port: lanPort, log,
@@ -794,9 +793,9 @@ export async function main(args = process.argv.slice(2)) {
       pairRequests.clear();
       instance = crypto.randomUUID();
       webSecret = choice === 'web' ? crypto.randomBytes(32).toString('hex') : null;
-      const voiceEnv = choice === 'agenti' ? { MEDIFLOW_LOCAL_VOICE_URL: undefined, MEDIFLOW_LOCAL_VOICE_SECRET: undefined } : await localVoiceEnv();
+      if (choice === 'web') await ensureLocalVoice();
       if (closing) return;
-      const env = { ...process.env, ...voiceEnv, ...(webSecret ? { MEDIFLOW_LOCAL_UI_WEB_SECRET: webSecret, MEDIFLOW_LOCAL_UI_INSTANCE: instance } : {}), HOSTNAME: '127.0.0.1', PORT: String(port),
+      const env = { ...process.env, MEDIFLOW_LOCAL_VOICE_URL: undefined, MEDIFLOW_LOCAL_VOICE_SECRET: undefined, ...(webSecret ? { MEDIFLOW_LOCAL_UI_WEB_SECRET: webSecret, MEDIFLOW_LOCAL_UI_INSTANCE: instance } : {}), HOSTNAME: '127.0.0.1', PORT: String(port),
         ...(choice === 'web' ? { MEDIFLOW_PLUGIN_LOCAL_UI: '1', MEDIFLOW_RUNTIME_UI_LEASE: pluginChannel ? '1' : '0' } : {}),
         ...(choice === 'web' ? { MEDIFLOW_WEB_OWNER_GATE: crypto.randomUUID() } : {}),
         MEDIFLOW_APP_REVISION: current.revision, MEDIFLOW_APP_BRANCH: current.branch,
