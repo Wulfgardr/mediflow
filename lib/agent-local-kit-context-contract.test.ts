@@ -7,7 +7,8 @@ import {
     sealAgentPatientContextEnvelope,
     sha256HexClient,
 } from './agent-local-kit-context-contract';
-import { buildAgentPatientContextPayload } from './agent-local-kit-context-client';
+import { agentPatientContextIdentity, buildAgentPatientContextPayload } from './agent-local-kit-context-client';
+import { pseudonymizeAgentPatientContext } from './agent-local-kit-context-pseudonymization';
 import type { Checkup, ClinicalEntry, Observation, Patient, Therapy } from './db';
 
 const SYNTHETIC_CF = 'RSSMRA80A01H501U';
@@ -54,7 +55,7 @@ test('parseAgentPatientContextInput rejects unknown keys, invalid hashes, and ov
     assert.equal(parseAgentPatientContextInput({ ...valid, recentNotes: Array.from({ length: 11 }, () => ({ date: '2026-10-01', text: 'x' })) }), null);
 });
 
-test('buildAgentPatientContextPayload hashes taxCode, omits direct identifiers, strips HTML, and returns null without taxCode', async () => {
+test('buildAgentPatientContextPayload hashes taxCode, strips HTML, and with the server pseudonymization releases no identity written in notes; null without taxCode', async () => {
     const now = new Date('2026-11-01T09:00:00Z');
     const patient: Patient = {
         id: 'pat-synth-1',
@@ -76,8 +77,8 @@ test('buildAgentPatientContextPayload hashes taxCode, omits direct identifiers, 
             patientId: patient.id,
             date: now,
             type: 'visit',
-            title: 'Visita controllo',
-            content: '<p><strong>S:</strong> benessere.</p><p><strong>P:</strong> proseguire terapia.</p>',
+            title: 'Visita controllo di NomeSintetico',
+            content: '<p><strong>S:</strong> benessere, CognomeSintetico NomeSintetico riferisce telefono 0000000000.</p><p><strong>P:</strong> proseguire terapia, CF rssmra80a01h501u, vive in Via Sintetica 1.</p>',
             createdAt: now,
             updatedAt: now,
         },
@@ -113,11 +114,11 @@ test('buildAgentPatientContextPayload hashes taxCode, omits direct identifiers, 
         exemptionCodes: ['031', '031', 'E01'],
     });
     assert.ok(payload);
-    const serialized = JSON.stringify(payload);
-    assert.equal(serialized.includes('NomeSintetico'), false);
-    assert.equal(serialized.includes('CognomeSintetico'), false);
-    assert.equal(serialized.includes(SYNTHETIC_CF), false);
-    assert.equal(serialized.includes('Via Sintetica'), false);
+    const released = pseudonymizeAgentPatientContext(payload, agentPatientContextIdentity(patient));
+    const serialized = JSON.stringify(released).toUpperCase();
+    for (const value of ['NomeSintetico', 'CognomeSintetico', SYNTHETIC_CF, 'Via Sintetica', '0000000000']) {
+        assert.equal(serialized.includes(value.toUpperCase()), false, value);
+    }
     assert.equal(payload.patient.cfHash, await sha256HexClient(SYNTHETIC_CF));
     assert.equal(payload.patient.taxCodeLast4, '501U');
     assert.equal(payload.patient.birthYear, 1980);
@@ -125,7 +126,8 @@ test('buildAgentPatientContextPayload hashes taxCode, omits direct identifiers, 
     assert.equal(payload.therapies[0]?.drugName, 'Ramipril 5 mg');
     assert.equal(payload.recentNotes.length, 1);
     assert.equal(payload.recentNotes[0]?.text.includes('<p>'), false);
-    assert.equal(payload.recentNotes[0]?.text.includes('benessere.'), true);
+    assert.equal(payload.recentNotes[0]?.text.includes('benessere,'), true);
+    assert.deepEqual({ ...released, recentNotes: [] }, { ...payload, recentNotes: [] });
     assert.deepEqual(payload.exemptions, [{ code: '031' }, { code: 'E01' }]);
     assert.deepEqual(payload.openCheckups, [{ title: 'Esami ematici', status: 'pending' }]);
 
