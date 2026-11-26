@@ -18,9 +18,11 @@ export async function openBrowserZoomFixture(baseURL: string) {
     }));
     const worker = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker');
     const page = context.pages()[0];
+    let closing: Promise<void> | undefined;
+    const closeOnce = () => closing ??= context.close().then(() => rm(root, { recursive: true, force: true }));
     page.on('crash', () => {
         test.info().annotations.push({ type: 'renderer-crash', description: `Zoom page renderer crashed at ${page.url()}` });
-        void context.close();
+        void closeOnce();
     });
     return { page, async setZoom(factor: number) {
         const actual = await worker.evaluate(async factor => {
@@ -35,8 +37,5 @@ export async function openBrowserZoomFixture(baseURL: string) {
         }, factor);
         expect(actual).toBeCloseTo(factor, 8);
         await expect.poll(() => page.evaluate(() => innerWidth)).toBe(Math.round(1440 / factor));
-    }, async close() {
-        await context.close();
-        await rm(root, { recursive: true, force: true });
-    } };
+    }, close: closeOnce };
 }
