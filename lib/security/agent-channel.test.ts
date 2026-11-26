@@ -85,8 +85,8 @@ const pendingCount = () => database.prepare("SELECT count(*) FROM agent_pairing_
 test('a web page in the doctor browser cannot create pairing requests through loopback', async () => {
     const before = pendingCount();
     const browserShapes: Record<string, string>[] = [
-        { 'Content-Type': 'text/plain;charset=UTF-8', Origin: 'https://pagina-estranea.example', 'Sec-Fetch-Site': 'cross-site', 'Sec-Fetch-Mode': 'no-cors' },
-        { 'Content-Type': 'application/json', Origin: 'https://pagina-estranea.example' },
+        { 'Content-Type': 'text/plain;charset=UTF-8', Origin: 'http://localhost:8080', 'Sec-Fetch-Site': 'cross-site', 'Sec-Fetch-Mode': 'no-cors' },
+        { 'Content-Type': 'application/json', Origin: 'http://localhost:8080' },
         { 'Content-Type': 'application/json', Origin: 'null' },
         { 'Content-Type': 'application/json', 'Sec-Fetch-Site': 'cross-site' },
         { 'Content-Type': 'application/json', 'Sec-Fetch-Site': 'same-site' },
