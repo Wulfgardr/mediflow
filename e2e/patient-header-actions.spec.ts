@@ -1,7 +1,7 @@
 import {expect,test} from '@playwright/test';
 import { bootstrapUnlockedSession, openPatientSection, openUnlockedDocument } from './utils';
 
-for (const width of [1440, 390]) for (const theme of ['giorno', 'grafite']) test(`patient header opens prescriptions, exposes its actions and hands priority to a form ${theme} ${width}`,async({page})=>{
+for (const width of [1440, 390]) for (const theme of ['giorno', 'grafite']) test(`patient header opens prescriptions, exposes its actions and hands priority to a form ${theme} ${width}`,async({page},testInfo)=>{
  await page.setViewportSize({width,height:960});
  await bootstrapUnlockedSession(page,process.env.E2E_PIN||'1234');
  const id=await page.evaluate(async()=>{
@@ -53,6 +53,15 @@ for (const width of [1440, 390]) for (const theme of ['giorno', 'grafite']) test
  await checkPanel('Accesso assistente');
  await expect(page.getByLabel('Dati consentiti')).toHaveValue('none');
  await expect(page.getByRole('button',{name:'Conferma e attiva assistente',exact:true})).toBeVisible();
+ const assistant = page.getByRole('dialog', { name: 'Accesso assistente', exact: true });
+ const allowedData = assistant.getByLabel('Dati consentiti');
+ const noteDisclosure = assistant.getByText('La chat collegata può leggere nelle note i nomi di chi non è in anagrafica.', { exact: true });
+ await expect(noteDisclosure).toBeHidden();
+ for (const projection of ['profile', 'notes']) {
+  await allowedData.selectOption(projection);
+  if (projection === 'profile') await assistant.screenshot({ path: testInfo.outputPath('consenso-chat.png'), animations: 'disabled' });
+  await expect(noteDisclosure).toBeVisible();
+ }
  await page.keyboard.press('Escape');await expect(trigger).toBeFocused();
  await trigger.click();await menu.getByRole('menuitem',{name:'Gestisci checkup',exact:true}).click();
  await checkPanel('Gestisci checkup');
