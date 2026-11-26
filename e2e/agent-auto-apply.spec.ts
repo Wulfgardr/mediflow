@@ -124,7 +124,7 @@ for (const reviewed of process.env.MEDIFLOW_VISIT_MAC_TRIAL ? [false] : [false, 
         }
         return result;
     };
-    const incomingLink = page.getByRole('complementary', { name: 'MediFlow', exact: true }).getByRole('link', { name: 'In arrivo', exact: true });
+    const incomingLink = page.getByRole('complementary', { name: 'MediFlow', exact: true }).getByRole('link', { name: 'Da decidere', exact: true });
     await incomingLink.click();
     await expect(page.getByRole('region', { name: 'Visita ' + visitId })).toBeVisible({ timeout: 30000 });
     await page.getByRole('main').getByRole('link', { name: 'Agenti', exact: true }).click();
@@ -411,7 +411,7 @@ test('a kit visit creates the missing chart at review while mismatched and mixed
     }
     const wrong = await deposit(['Paziente CF: ' + anotherCf], false);
     const mixed = await deposit(['Paziente CF: ' + fiscalCode, 'Paziente CF: ' + anotherCf], false);
-    await page.getByRole('complementary', { name: 'MediFlow', exact: true }).getByRole('link', { name: 'In arrivo' }).click();
+    await page.getByRole('complementary', { name: 'MediFlow', exact: true }).getByRole('link', { name: 'Da decidere' }).click();
     const region = (id: string) => page.getByRole('region', { name: 'Visita ' + id });
     const apply = (id: string) => region(id).getByRole('button', { name: 'Applica la visita', exact: true });
     for (const id of [wrong, mixed]) {

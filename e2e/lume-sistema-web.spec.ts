@@ -6,7 +6,7 @@ const VIEWPORTS = [
   { name: '1280x720', width: 1280, height: 720 },
 ] as const;
 
-const HEADER_PAGES = ['/?area=incarico', '/?area=turno', '/?area=diario', '/?area=repertori', '/in-arrivo'];
+const HEADER_PAGES = ['/?area=incarico', '/?area=turno', '/?area=diario', '/?area=repertori', '/da-decidere'];
 
 type Geometry = {
   crumbVisible: boolean;
