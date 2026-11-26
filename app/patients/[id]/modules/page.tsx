@@ -12,7 +12,7 @@ import { useRuntimeTwinDesign, useRuntimeTwinFolder } from '@/components/runtime
 import { useEntryDraftOnOpen } from '@/lib/hooks/effects/use-entry-draft-on-open';
 import { useParams, useSearchParams } from 'next/navigation';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, ArrowLeft, ChevronRight, ClipboardPenLine, Clock3, FileText as DraftIcon, FolderOpen, HeartPulse, History, Plus, Sparkles, UserRound } from 'lucide-react';
+import { Activity, ArrowLeft, ChevronRight, ClipboardPenLine, Clock3, FileText as DraftIcon, FolderOpen, HeartPulse, History, Mic, Plus, Sparkles, UserRound } from 'lucide-react';
 
 import { PluginLocalUiNavigation, PluginPrescribingGuide } from '@/components/plugin-local-ui-navigation';
 import { PatientClinicalSupport, PatientProposalsSummary } from '@/components/patient-clinical-support';
@@ -20,6 +20,7 @@ import type { PatientInsightCardPreview } from '@/components/ai-patient-insight'
 import { AttentionGroup } from '@/components/attention-group';
 import { ClinicalRiverTimeline } from '@/components/clinical-river-timeline';
 import { PatientEntryComposer } from '@/components/patient-entry-composer';
+import { useLocalVoiceConfigured } from '@/components/local-voice-configured';
 import type { ClinicalEditorFocus } from '@/components/clinical-rich-text-editor';
 import { PatientSynopticSheet } from '@/components/patient-synoptic-sheet';
 import { PatientSheetSources, type SheetSource } from '@/components/patient-sheet-sources';
@@ -88,6 +89,11 @@ function buildObservationRequestId(loop: OpenLoop): string {
 function navigateToObservationForm(): void {
     window.location.assign('#parametri');
     requestAnimationFrame(() => document.getElementById('parametri')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+}
+
+function RecordVisitCommand({ patientId }: { patientId: string }) {
+    if (!useLocalVoiceConfigured()) return null;
+    return <Link href={`/patients/${patientId}/modules?voce=nuova#registrazione`} className="mf-button-secondary"><Mic size={15} aria-hidden="true" />Registra la visita</Link>;
 }
 
 function DraftReturn({ patientId }: { patientId: string }) {
@@ -711,10 +717,10 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
                 identifierAbsent: !patient.taxCode,
             }}
             recordVisit={{ id, reference: visitReference?.latest ?? undefined, today: comparisonReadAt, proposals: Number(hasInsightProposal) }}
-            prescriptionAction={!writing ? <PatientSheetMenu label="Prescrivi" trigger={props => <button {...props} className="mf-button-secondary"><ClipboardPenLine size={15} aria-hidden />Prescrivi</button>}>
+            prescriptionAction={!writing ? <><PatientSheetMenu label="Prescrivi" trigger={props => <button {...props} className="mf-button-secondary"><ClipboardPenLine size={15} aria-hidden />Prescrivi</button>}>
                 <a href="#prestazioni" role="menuitem" tabIndex={-1} className="mf-popover-row">Prescrizione di una prestazione</a>
                 {workspaceNavGroups.some(group => group.items.some(item => item.href === '#protesica')) ? <a href="#protesica" role="menuitem" tabIndex={-1} className="mf-popover-row">Prescrizione protesica</a> : null}
-            </PatientSheetMenu> : undefined}
+            </PatientSheetMenu><RecordVisitCommand patientId={id} /></> : undefined}
             navGroups={workspaceNavGroups}
             primaryAction={writing ? undefined : { href: `/patients/${id}/modules?voce=nuova`, label: 'Nuova voce', icon: Plus }}
             headerActions={(

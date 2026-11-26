@@ -541,6 +541,13 @@ test('identity proposals only from explicit labels; birth date validated', async
     assert.deepEqual(proposeIdentityFields('Assistito: Mario Rossi, nato il 01/01/1950', null).map((item) => [item.field, item.value]), [['birthDate', '1950-01-01']]);
 });
 
+test('a birth date said in words is proposed like a written one, and an impossible day is not', async () => {
+    const { proposeIdentityFields } = await import('./dossier-sections');
+    const spoken = proposeIdentityFields('Paziente: sono nata il 12 marzo 1951 a Milano.', null);
+    assert.deepEqual(spoken.map((item) => [item.field, item.value, item.excerpt]), [['birthDate', '1951-03-12', 'nata il 12 marzo 1951']]);
+    assert.deepEqual(proposeIdentityFields('nato il 31 febbraio 1950', null), []);
+});
+
 test('lab table rows merged into one paragraph are rebuilt conservatively and marked; evidence offsets stay exact', () => {
     const text = 'Referto sintetico\n\nCreatinina 0,9 mg/dL 0,6-1,2 Sodio 150 mmol/L 135-145 H Potassio 4,1 mmol/L 3,5-5,1';
     const observations = candidates(text, '2025-01-10').filter((fact) => fact.kind === 'observation');
