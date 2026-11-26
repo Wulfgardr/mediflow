@@ -83,6 +83,7 @@ export class LocalVoiceRecorder {
     async refresh(): Promise<void> {
         let reply: Reply;
         try { reply = await call('GET', `/api/local-voice?${this.query()}`); } catch { this.set({ phase: 'unavailable', notice: 'off' }); return; }
+        if (this.disposed) return;
         const availability = reply.body?.availability as LocalVoiceAvailability | undefined;
         if (reply.status !== 200 || !availability) { this.set({ phase: 'unavailable', notice: 'off' }); return; }
         const current = reply.body?.session as { id: string | null; own: boolean; foreign?: LocalVoiceForeign } | null;
@@ -107,9 +108,14 @@ export class LocalVoiceRecorder {
                 const block = this.blocks[0];
                 let reply: Reply;
                 try { reply = await call('POST', `${this.path('/audio')}?${this.query()}&seq=${this.sequence}`, undefined, block); } catch { reply = { status: 0, body: { error: 'off' } }; }
-                if (reply.status === 202) {
+                const expected = typeof reply.body?.expected === 'number' ? reply.body.expected : null;
+                if (reply.status === 202 && reply.body?.repeated !== true) {
                     this.blocks.shift()?.fill(0);
                     this.sequence += 1;
+                    continue;
+                }
+                if ((reply.status === 202 || reply.body?.error === 'out-of-order') && expected !== null && expected !== this.sequence) {
+                    this.sequence = expected;
                     continue;
                 }
                 this.sending = false;
@@ -131,7 +137,12 @@ export class LocalVoiceRecorder {
 
     private async openMicrophone(): Promise<boolean> {
         try {
-            this.microphone = await openMicrophone(this.enqueue);
+            const microphone = await openMicrophone(this.enqueue);
+            if (this.disposed) {
+                await microphone.close();
+                return false;
+            }
+            this.microphone = microphone;
             return true;
         } catch (error) {
             this.set({ notice: error instanceof MicrophoneUnavailable && error.reason === 'permission-denied' ? 'permission-denied' : 'no-microphone' });
@@ -176,6 +187,7 @@ export class LocalVoiceRecorder {
         }
         this.set({ phase: this.view.review ? 'review' : 'live', snapshot: view, notice: fault ?? (this.view.notice === 'stop-retry' || this.view.notice === 'draining' ? this.view.notice : null) });
         if (LISTENING.has(snapshot.state) && this.microphone && !this.sending && this.view.pending === null) {
+            this.sequence = snapshot.nextSequence;
             this.sending = true;
             void this.pump();
         }
@@ -193,6 +205,12 @@ export class LocalVoiceRecorder {
         if (!await this.openMicrophone()) { this.set({ phase: 'idle', pending: null }); return; }
         let reply: Reply;
         try { reply = await call('POST', '/api/local-voice', { subject: this.subject, mode, vocabulary }); } catch { reply = { status: 0, body: { error: 'off' } }; }
+        if (this.disposed) {
+            if (reply.status === 200 && typeof reply.body?.id === 'string') {
+                await call('DELETE', `/api/local-voice/${reply.body.id}?${this.query()}`).catch(() => undefined);
+            }
+            return;
+        }
         if (reply.status !== 200 || typeof reply.body?.id !== 'string') {
             await this.closeMicrophone(false);
             this.blocks.forEach((item) => item.fill(0));
@@ -203,7 +221,6 @@ export class LocalVoiceRecorder {
             return;
         }
         this.session = reply.body.id;
-        this.sequence = 0;
         this.set({ pending: null });
         await this.apply(reply);
     }
@@ -307,9 +324,9 @@ export class LocalVoiceRecorder {
     }
 
     dispose() {
+        this.disposed = true;
         void this.forget();
         this.view = { ...INITIAL, phase: 'unavailable' };
-        this.disposed = true;
         this.listeners.clear();
     }
 }
