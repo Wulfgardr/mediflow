@@ -68,13 +68,13 @@ Una sezione corta nella pagina di avvio. Entra una riga solo se cambia quello ch
 | Motori locali | Pronti oppure non pronti, con il motivo (Ollama spento, modello mancante, versione non ammessa) | `GET /api/ai/fabric/status` con il token locale (`buildFabricStatusSnapshot`, ciclo di vita di Ollama) |
 | iPhone e iPad | Collegamento acceso o spento; almeno un dispositivo abbinato oppure nessuno | `GET /api/system/network-overview` con il token locale (`session.operatingMode`, `hasPairedClients`); proxy da `runtime-status.json` e `local-api-tls-proxy.pid` |
 | Aggiornamento | Versione installata e, se dichiarata, versione disponibile | `lib/update-awareness.ts`: versione del pacchetto e manifesto locale (`MEDIFLOW_UPDATE_MANIFEST_PATH`) |
+| Registrazione della visita | Pronta, modello mancante o incompleto, non attiva, non installata (solo macOS) | Servizio della voce avviato e sorvegliato dal launcher (ADR 0204), `GET /v1/status` campo `model` |
 
 Proposte, fuori dalla specifica finché manca la fonte:
 
 - **iPhone raggiungibile adesso.** `lastSeenAt` dei dispositivi abbinati non viene mai scritto e `network-overview` restituisce `lastContactAt: null`. Serve prima che il server registri l'ultimo contatto.
 - **Ultima copia di sicurezza.** Esito e ora dell'ultima copia pianificata esistono (`run.lastRunAt`, `run.lastRunStatus` in `lib/backup-scheduler.ts`), ma `GET /api/system/backup-scheduler` chiede la sessione del medico. Serve una lettura con il token locale limitata a ora ed esito.
 - **Aggiornamento disponibile dalla rete.** Oggi esiste solo il manifesto locale; un controllo remoto richiede una decisione su fonte, firma e consenso alla rete.
-- **Servizio locale della voce.** La riga entra quando il servizio estratto da GPUI esiste e dichiara il proprio stato.
 
 ## Abbinamento remoto: adozione selettiva dei pattern di T3 Code
 
