@@ -46,7 +46,7 @@ export async function startLanProxy({ root, dataDir, target, port = LAN_PROXY_DE
   const child = spawn(process.execPath, [path.join(root, 'scripts/local-api-tls-proxy.mjs')], {
     cwd: root, stdio: ['ignore', 'pipe', 'pipe'],
     env: { PATH: process.env.PATH ?? '', ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
-      MEDIFLOW_TLS_CERT_PATH: certPath, MEDIFLOW_TLS_KEY_PATH: keyPath, MEDIFLOW_TLS_PORT: String(port),
+      MEDIFLOW_DATA_DIR: dataDir, MEDIFLOW_TLS_CERT_PATH: certPath, MEDIFLOW_TLS_KEY_PATH: keyPath, MEDIFLOW_TLS_PORT: String(port),
       MEDIFLOW_TLS_BIND_HOST: bindHost, MEDIFLOW_TLS_NETWORK_MODE: 'network-home-base', MEDIFLOW_HTTP_TARGET: targetUrl.origin } });
   const exited = new Promise(resolve => child.once('exit', code => resolve(code)));
   let stderr = '';
