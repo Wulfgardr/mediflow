@@ -16,6 +16,7 @@ import { containWindowsWeb } from './windows-runtime-job.mjs';
 import { createRuntimeLeases, acquireRuntimeLease, recordChildOwner, verifyChildOwner, runtimeProcessIdentity } from './runtime-leases.mjs';
 import { prepareLauncherState, localUiArchiveLock } from './launcher-state.mjs';
 import { verifyOwnedWeb } from './local-ui-web-identity.mjs';
+import { localVoiceBinary, startLocalVoiceService } from './local-voice-service.mjs';
 import { pairingDirectory, readPairingRequests, bridgeExistingLocalUi, frames, writeFrame } from './local-ui-pairing-transport.mjs';
 
 import { localUiNavigationDeadline } from './local-ui-navigation-deadline.mjs';
@@ -494,6 +495,22 @@ export async function main(args = process.argv.slice(2)) {
   let state = { busy: false, ready: false, url: null, message: 'Scegli come aprire MediFlow.', needsInstall: false };
   let child = null, chooser = null, closing = false, installApproval = null, failedBuild = null, generation = 0;
   let terminal = null, useTerminal = false, webSecret = null, instance = null;
+  let voice = null;
+  const localVoiceEnv = async () => {
+    const binary = localVoiceBinary(ROOT);
+    if (process.platform !== 'darwin' || !fs.existsSync(binary)) return {};
+    if (!voice) {
+      try {
+        const started = await startLocalVoiceService({ binary });
+        voice = started;
+        void started.exited.then(() => { if (voice === started) voice = null; });
+      } catch (error) {
+        log(`Voce locale non avviata: ${error.message}`);
+        return {};
+      }
+    }
+    return { MEDIFLOW_LOCAL_VOICE_URL: voice.url, MEDIFLOW_LOCAL_VOICE_SECRET: voice.secret };
+  };
   const pairRequests = new Map();
   const ipcStopChildren = new WeakSet();
   let childOwner = null, leases = null, webJob = null, webJobPending = null, preparing = false;
@@ -571,6 +588,7 @@ export async function main(args = process.argv.slice(2)) {
       try {
         if (stopError) throw stopError;
         await stopChild();
+        await voice?.stop();
         await chooser?.close();
         await leases?.close();
         releaseLauncher(ownership);
@@ -747,7 +765,9 @@ export async function main(args = process.argv.slice(2)) {
       pairRequests.clear();
       instance = crypto.randomUUID();
       webSecret = choice === 'web' ? crypto.randomBytes(32).toString('hex') : null;
-      const env = { ...process.env, ...(webSecret ? { MEDIFLOW_LOCAL_UI_WEB_SECRET: webSecret, MEDIFLOW_LOCAL_UI_INSTANCE: instance } : {}), HOSTNAME: '127.0.0.1', PORT: String(port),
+      const voiceEnv = choice === 'agenti' ? {} : await localVoiceEnv();
+      if (closing) return;
+      const env = { ...process.env, ...voiceEnv, ...(webSecret ? { MEDIFLOW_LOCAL_UI_WEB_SECRET: webSecret, MEDIFLOW_LOCAL_UI_INSTANCE: instance } : {}), HOSTNAME: '127.0.0.1', PORT: String(port),
         ...(choice === 'web' ? { MEDIFLOW_PLUGIN_LOCAL_UI: '1', MEDIFLOW_RUNTIME_UI_LEASE: pluginChannel ? '1' : '0' } : {}),
         ...(choice === 'web' ? { MEDIFLOW_WEB_OWNER_GATE: crypto.randomUUID() } : {}),
         MEDIFLOW_APP_REVISION: current.revision, MEDIFLOW_APP_BRANCH: current.branch,

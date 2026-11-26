@@ -8,11 +8,11 @@
 
 use zeroize::{Zeroize, Zeroizing};
 
-pub(crate) const SAMPLE_RATE: usize = 16_000;
+pub const SAMPLE_RATE: usize = 16_000;
 /// Un blocco di cattura: 0,5 s a 16 kHz.
-pub(crate) const BLOCK: usize = SAMPLE_RATE / 2;
+pub const BLOCK: usize = SAMPLE_RATE / 2;
 /// Finestra del rilevatore Silero a 16 kHz.
-pub(crate) const FRAME: usize = 512;
+pub const FRAME: usize = 512;
 /// Il rilevatore riparte da zero a ogni chiamata: gli si ripassa circa 1 s di
 /// audio precedente perché le probabilità dei campioni nuovi abbiano contesto.
 const CONTEXT_FRAMES: usize = 31;
@@ -25,27 +25,27 @@ const MIN_SPEECH_FRAMES: usize = 8;
 /// 0,2 s prima e dopo il parlato, come nel banco.
 const PAD: usize = SAMPLE_RATE / 5;
 /// Durata massima di una frase: oltre si chiude e se ne apre un'altra.
-pub(crate) const MAX_UTTERANCE: usize = 20 * SAMPLE_RATE;
+pub const MAX_UTTERANCE: usize = 20 * SAMPLE_RATE;
 /// Durata massima di una registrazione, in audio registrato (pause escluse):
 /// a 60 minuti si ferma da sola. Il testo resta limitato quanto l'audio, che
 /// non si conserva oltre la frase aperta.
-pub(crate) const MAX_RECORDING: usize = 60 * 60 * SAMPLE_RATE;
+pub const MAX_RECORDING: usize = 60 * 60 * SAMPLE_RATE;
 /// Testo massimo di una registrazione. Sulle visite sintetiche whisper
 /// scrive da 240 a 680 caratteri al minuto; un parlato fitto e continuo arriva
 /// verso i 1.150. Con 80.000 caratteri in 60 minuti il limite che conta resta
 /// la durata (ADR 0113, aggiornamento del 12 novembre 2026).
-pub(crate) const MAX_TRANSCRIPT_CHARS: usize = 80_000;
+pub const MAX_TRANSCRIPT_CHARS: usize = 80_000;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct EngineFailure;
+pub struct EngineFailure;
 
 /// Probabilità di voce per ogni finestra da `FRAME` campioni.
-pub(crate) trait SpeechDetector {
+pub trait SpeechDetector {
     fn probabilities(&mut self, samples: &[f32]) -> Result<Vec<f32>, EngineFailure>;
 }
 
 /// Trascrizione di una frase intera.
-pub(crate) trait Decoder {
+pub trait Decoder {
     fn decode(&mut self, audio: &[f32]) -> Result<Zeroizing<String>, EngineFailure>;
 }
 
@@ -58,7 +58,7 @@ struct Utterance {
 }
 
 /// Rilevatore di frasi: riceve blocchi e restituisce le frasi chiuse.
-pub(crate) struct Listener<V> {
+pub struct Listener<V> {
     detector: V,
     pending: Zeroizing<Vec<f32>>,
     history: Zeroizing<Vec<f32>>,
@@ -67,10 +67,10 @@ pub(crate) struct Listener<V> {
 }
 
 /// Frase chiusa: audio e posizione nella dettatura, in campioni.
-pub(crate) struct Closed {
-    pub(crate) audio: Zeroizing<Vec<f32>>,
-    pub(crate) start: usize,
-    pub(crate) end: usize,
+pub struct Closed {
+    pub audio: Zeroizing<Vec<f32>>,
+    pub start: usize,
+    pub end: usize,
 }
 
 fn keep_tail(buffer: &mut Vec<f32>, keep: usize) {
@@ -83,7 +83,7 @@ fn keep_tail(buffer: &mut Vec<f32>, keep: usize) {
 }
 
 impl<V: SpeechDetector> Listener<V> {
-    pub(crate) fn new(detector: V) -> Self {
+    pub fn new(detector: V) -> Self {
         Self {
             detector,
             pending: Zeroizing::new(Vec::with_capacity(BLOCK + FRAME)),
@@ -94,7 +94,7 @@ impl<V: SpeechDetector> Listener<V> {
     }
 
     /// Accoda un blocco e restituisce le frasi che il rilevatore ha chiuso.
-    pub(crate) fn push(&mut self, block: &[f32]) -> Result<Vec<Closed>, EngineFailure> {
+    pub fn push(&mut self, block: &[f32]) -> Result<Vec<Closed>, EngineFailure> {
         let mut closed = Vec::new();
         for chunk in block.chunks(BLOCK) {
             self.pending.extend_from_slice(chunk);
@@ -186,17 +186,17 @@ impl<V: SpeechDetector> Listener<V> {
     }
 
     /// Campioni passati dal rilevatore dall'inizio della dettatura.
-    pub(crate) fn consumed(&self) -> usize {
+    pub fn consumed(&self) -> usize {
         self.consumed
     }
 
     /// Campioni arrivati e non ancora passati al rilevatore (meno di una finestra).
-    pub(crate) fn pending_samples(&self) -> usize {
+    pub fn pending_samples(&self) -> usize {
         self.pending.len()
     }
 
     /// Audio della frase in corso, se contiene abbastanza voce da decodificare.
-    pub(crate) fn open_audio(&self) -> Option<&[f32]> {
+    pub fn open_audio(&self) -> Option<&[f32]> {
         self.utterance
             .as_ref()
             .filter(|u| u.speech_frames >= MIN_SPEECH_FRAMES)
@@ -204,7 +204,7 @@ impl<V: SpeechDetector> Listener<V> {
     }
 
     /// Chiude la frase in corso alla fine della dettatura.
-    pub(crate) fn finish(&mut self) -> Option<Closed> {
+    pub fn finish(&mut self) -> Option<Closed> {
         let cut = self
             .utterance
             .as_ref()
@@ -215,7 +215,7 @@ impl<V: SpeechDetector> Listener<V> {
     }
 
     /// Azzera ogni campione trattenuto.
-    pub(crate) fn wipe(&mut self) {
+    pub fn wipe(&mut self) {
         if let Some(mut utterance) = self.utterance.take() {
             utterance.audio.zeroize();
         }
@@ -224,8 +224,8 @@ impl<V: SpeechDetector> Listener<V> {
     }
 
     /// Campioni ancora in memoria (frase aperta, contesto e resto).
-    #[cfg(test)]
-    pub(crate) fn retained_samples(&self) -> usize {
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn retained_samples(&self) -> usize {
         self.pending.len()
             + self.history.len()
             + self.utterance.as_ref().map_or(0, |u| u.audio.len())
@@ -253,13 +253,13 @@ fn same_word(a: &str, b: &str) -> bool {
 /// di parole che due parziali consecutivi confermano. Il prefisso confermato
 /// non arretra; il definitivo lo sostituisce alla chiusura della frase.
 #[derive(Default)]
-pub(crate) struct Agreement {
+pub struct Agreement {
     previous: Zeroizing<String>,
     stable: Zeroizing<String>,
 }
 
 impl Agreement {
-    pub(crate) fn observe(&mut self, partial: &str) {
+    pub fn observe(&mut self, partial: &str) {
         let previous = words(&self.previous);
         let current = words(partial);
         let stable = words(&self.stable);
@@ -279,12 +279,12 @@ impl Agreement {
         }
         self.previous = Zeroizing::new(partial.to_owned());
     }
-    pub(crate) fn stable(&self) -> &str {
+    pub fn stable(&self) -> &str {
         &self.stable
     }
     /// Ultimo parziale oltre il prefisso confermato: si mostra subito, in un
     /// tono più chiaro, e può ancora cambiare.
-    pub(crate) fn provisional(&self) -> Zeroizing<String> {
+    pub fn provisional(&self) -> Zeroizing<String> {
         let confirmed = words(&self.stable).len();
         Zeroizing::new(
             words(&self.previous)
@@ -293,7 +293,7 @@ impl Agreement {
                 .unwrap_or_default(),
         )
     }
-    pub(crate) fn reset(&mut self) {
+    pub fn reset(&mut self) {
         self.previous.zeroize();
         self.stable.zeroize();
     }
@@ -302,16 +302,16 @@ impl Agreement {
 /// Frase definitiva con la sua posizione nella registrazione, in campioni
 /// di audio registrato (le pause non contano).
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct Segment {
-    pub(crate) start: usize,
-    pub(crate) end: usize,
-    pub(crate) text: Zeroizing<String>,
+pub struct Segment {
+    pub start: usize,
+    pub end: usize,
+    pub text: Zeroizing<String>,
     /// Impronta della voce, solo nell'ascolto della visita a due voci.
-    pub(crate) voice: Option<super::voices::VoicePrint>,
+    pub voice: Option<crate::voices::VoicePrint>,
 }
 
 /// Dettatura completa: frasi definitive accumulate e testo stabile da mostrare.
-pub(crate) struct Dictation<V, D> {
+pub struct Dictation<V, D> {
     listener: Listener<V>,
     decoder: D,
     finals: Zeroizing<String>,
@@ -326,18 +326,18 @@ pub(crate) struct Dictation<V, D> {
     /// Ascolto della visita: ogni frase definitiva riceve l'impronta della voce.
     two_voices: bool,
     /// Per le prove e le misure: millisecondi di calcolo di ogni impronta.
-    #[cfg(test)]
-    pub(crate) print_ms: Vec<f64>,
+    #[cfg(any(test, feature = "test-support"))]
+    pub print_ms: Vec<f64>,
     agreement: Agreement,
     /// Ultimo istante della griglia da 0,5 s in cui si è decodificato un parziale.
     partial_tick: usize,
     /// Per le prove: inizio, fine (in campioni) e parole di ogni definitivo.
-    #[cfg(test)]
-    pub(crate) windows: Vec<(usize, usize, usize)>,
+    #[cfg(any(test, feature = "test-support"))]
+    pub windows: Vec<(usize, usize, usize)>,
 }
 
 impl<V: SpeechDetector, D: Decoder> Dictation<V, D> {
-    pub(crate) fn new(detector: V, decoder: D) -> Self {
+    pub fn new(detector: V, decoder: D) -> Self {
         Self {
             listener: Listener::new(detector),
             decoder,
@@ -348,11 +348,11 @@ impl<V: SpeechDetector, D: Decoder> Dictation<V, D> {
             max_recording: MAX_RECORDING,
             max_transcript_chars: MAX_TRANSCRIPT_CHARS,
             two_voices: false,
-            #[cfg(test)]
+            #[cfg(any(test, feature = "test-support"))]
             print_ms: Vec::new(),
             agreement: Agreement::default(),
             partial_tick: 0,
-            #[cfg(test)]
+            #[cfg(any(test, feature = "test-support"))]
             windows: Vec::new(),
         }
     }
@@ -362,7 +362,7 @@ impl<V: SpeechDetector, D: Decoder> Dictation<V, D> {
         let text = self.decoder.decode(&closed.audio)?;
         let text = text.trim();
         self.finals_count += 1;
-        #[cfg(test)]
+        #[cfg(any(test, feature = "test-support"))]
         self.windows
             .push((closed.start, closed.end, text.split_whitespace().count()));
         if !text.is_empty() {
@@ -372,13 +372,13 @@ impl<V: SpeechDetector, D: Decoder> Dictation<V, D> {
             }
             self.finals.push_str(text);
             self.finals_chars += text.chars().count();
-            #[cfg(test)]
+            #[cfg(any(test, feature = "test-support"))]
             let started = std::time::Instant::now();
             let voice = self
                 .two_voices
-                .then(|| super::voices::voice_print(&closed.audio))
+                .then(|| crate::voices::voice_print(&closed.audio))
                 .flatten();
-            #[cfg(test)]
+            #[cfg(any(test, feature = "test-support"))]
             if self.two_voices {
                 self.print_ms.push(started.elapsed().as_secs_f64() * 1000.0);
             }
@@ -396,7 +396,7 @@ impl<V: SpeechDetector, D: Decoder> Dictation<V, D> {
     /// guarda tutti, finestra per finestra, e una frase chiusa diventa subito
     /// definitiva. La frase aperta si ridecodifica sulla griglia da 0,5 s: un
     /// solo parziale, sull'audio più recente (i parziali vecchi si saltano).
-    pub(crate) fn feed(&mut self, samples: &[f32]) -> Result<(), EngineFailure> {
+    pub fn feed(&mut self, samples: &[f32]) -> Result<(), EngineFailure> {
         for audio in self.listener.push(samples)? {
             self.append_final(audio)?;
         }
@@ -413,7 +413,7 @@ impl<V: SpeechDetector, D: Decoder> Dictation<V, D> {
     }
 
     /// Fine della dettatura: l'ultima frase diventa definitiva.
-    pub(crate) fn finish(&mut self) -> Result<(), EngineFailure> {
+    pub fn finish(&mut self) -> Result<(), EngineFailure> {
         let closed = self.listener.finish();
         let result = closed.map_or(Ok(()), |audio| self.append_final(audio));
         self.agreement.reset();
@@ -422,7 +422,7 @@ impl<V: SpeechDetector, D: Decoder> Dictation<V, D> {
 
     /// Testo confermato da mostrare mentre si parla: frasi definitive più il
     /// prefisso confermato della frase in corso. Non si trasferisce.
-    pub(crate) fn confirmed_text(&self) -> Zeroizing<String> {
+    pub fn confirmed_text(&self) -> Zeroizing<String> {
         let mut text = Zeroizing::new(self.finals.as_str().to_owned());
         let stable = self.agreement.stable();
         if !stable.is_empty() {
@@ -436,40 +436,40 @@ impl<V: SpeechDetector, D: Decoder> Dictation<V, D> {
 
     /// Testo provvisorio della frase in corso: non si trasferisce e non entra
     /// in Review, se non come parte del definitivo della frase.
-    pub(crate) fn provisional_text(&self) -> Zeroizing<String> {
+    pub fn provisional_text(&self) -> Zeroizing<String> {
         self.agreement.provisional()
     }
 
     /// Lunghezza del prefisso confermato della frase in corso.
-    pub(crate) fn open_confirmed_len(&self) -> usize {
+    pub fn open_confirmed_len(&self) -> usize {
         self.agreement.stable().len()
     }
 
     /// Testo definitivo, da consegnare solo allo stato Review.
-    pub(crate) fn transcript(&self) -> &str {
+    pub fn transcript(&self) -> &str {
         &self.finals
     }
 
     /// Frasi definitive con i loro tempi, nell'ordine in cui sono state dette.
-    pub(crate) fn segments(&self) -> &[Segment] {
+    pub fn segments(&self) -> &[Segment] {
         &self.segments
     }
 
     /// Per le prove: una durata massima più corta.
-    #[cfg(test)]
-    pub(crate) fn with_max_recording(mut self, samples: usize) -> Self {
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn with_max_recording(mut self, samples: usize) -> Self {
         self.max_recording = samples;
         self
     }
 
     /// Ascolto della visita a due voci: impronta della voce per ogni frase.
-    pub(crate) fn set_two_voices(&mut self, two_voices: bool) {
+    pub fn set_two_voices(&mut self, two_voices: bool) {
         self.two_voices = two_voices;
     }
 
     /// Campioni che si possono ancora registrare prima della durata massima;
     /// zero anche quando il testo ha raggiunto la lunghezza massima.
-    pub(crate) fn room(&self) -> usize {
+    pub fn room(&self) -> usize {
         if self.finals_chars >= self.max_transcript_chars {
             return 0;
         }
@@ -477,18 +477,18 @@ impl<V: SpeechDetector, D: Decoder> Dictation<V, D> {
     }
 
     /// Per le prove: una lunghezza massima del testo più corta.
-    #[cfg(test)]
-    pub(crate) fn with_max_transcript_chars(mut self, chars: usize) -> Self {
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn with_max_transcript_chars(mut self, chars: usize) -> Self {
         self.max_transcript_chars = chars;
         self
     }
 
     /// Audio registrato finora, in campioni.
-    pub(crate) fn recorded_samples(&self) -> usize {
+    pub fn recorded_samples(&self) -> usize {
         self.listener.consumed() + self.listener.pending_samples()
     }
 
-    pub(crate) fn wipe(&mut self) {
+    pub fn wipe(&mut self) {
         self.listener.wipe();
         self.agreement.reset();
         self.finals.zeroize();
@@ -499,24 +499,24 @@ impl<V: SpeechDetector, D: Decoder> Dictation<V, D> {
         self.segments.clear();
     }
 
-    #[cfg(test)]
-    pub(crate) fn retained_samples(&self) -> usize {
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn retained_samples(&self) -> usize {
         self.listener.retained_samples()
     }
 
     /// Frasi definitive prodotte finora.
-    pub(crate) fn finals_count(&self) -> usize {
+    pub fn finals_count(&self) -> usize {
         self.finals_count
     }
 }
 
-#[cfg(test)]
-pub(crate) mod tests {
+#[cfg(any(test, feature = "test-support"))]
+pub mod tests {
     use super::*;
     use std::sync::{Arc, Mutex};
 
     /// Rilevatore finto: voce dove l'ampiezza della finestra supera 0,05.
-    pub(crate) struct LoudnessDetector;
+    pub struct LoudnessDetector;
     impl SpeechDetector for LoudnessDetector {
         fn probabilities(&mut self, samples: &[f32]) -> Result<Vec<f32>, EngineFailure> {
             Ok(samples
@@ -535,8 +535,8 @@ pub(crate) mod tests {
     /// Decodificatore finto: una parola per ogni 0,5 s di audio, numerata;
     /// il parziale cambia l'ultima parola come fa whisper.
     #[derive(Clone, Default)]
-    pub(crate) struct CountingDecoder {
-        pub(crate) calls: Arc<Mutex<Vec<usize>>>,
+    pub struct CountingDecoder {
+        pub calls: Arc<Mutex<Vec<usize>>>,
     }
     impl Decoder for CountingDecoder {
         fn decode(&mut self, audio: &[f32]) -> Result<Zeroizing<String>, EngineFailure> {
@@ -550,15 +550,16 @@ pub(crate) mod tests {
         }
     }
 
-    pub(crate) fn tone(seconds: f32) -> Vec<f32> {
+    pub fn tone(seconds: f32) -> Vec<f32> {
         (0..(seconds * SAMPLE_RATE as f32) as usize)
             .map(|i| 0.3 * (i as f32 * 0.07).sin().signum())
             .collect()
     }
-    pub(crate) fn silence(seconds: f32) -> Vec<f32> {
+    pub fn silence(seconds: f32) -> Vec<f32> {
         vec![0.0; (seconds * SAMPLE_RATE as f32) as usize]
     }
 
+    #[cfg(test)]
     fn run(
         audio: &[f32],
     ) -> (
@@ -598,10 +599,12 @@ pub(crate) mod tests {
         assert_eq!(text.matches("parola").count(), 4 + 2, "{text}");
     }
 
+    #[cfg(test)]
     /// Rilevatore che restituisce una sequenza fissa di probabilità, una per
     /// chiamata: il test spinge una finestra alla volta e il contesto
     /// ripassato in testa riceve zeri.
     struct Scripted(Vec<f32>, usize);
+    #[cfg(test)]
     impl SpeechDetector for Scripted {
         fn probabilities(&mut self, samples: &[f32]) -> Result<Vec<f32>, EngineFailure> {
             let mut out = vec![0.0; samples.len() / FRAME - 1];

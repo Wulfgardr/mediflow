@@ -4,10 +4,10 @@ use unicode_normalization::{UnicodeNormalization, char::is_combining_mark};
 use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct Suggestion {
-    pub(crate) range: Range<usize>,
-    pub(crate) original: String,
-    pub(crate) replacement: String,
+pub struct Suggestion {
+    pub range: Range<usize>,
+    pub original: String,
+    pub replacement: String,
 }
 
 fn normalized(word: &str) -> String {
@@ -52,10 +52,7 @@ fn distance(left: &str, right: &str, limit: usize) -> Option<usize> {
     (row[right.len()] <= limit).then_some(row[right.len()])
 }
 
-pub(crate) fn suggestions<'a>(
-    text: &str,
-    names: impl IntoIterator<Item = &'a str>,
-) -> Vec<Suggestion> {
+pub fn suggestions<'a>(text: &str, names: impl IntoIterator<Item = &'a str>) -> Vec<Suggestion> {
     let mut vocabulary = std::collections::BTreeMap::new();
     for name in names {
         for word in name.unicode_words() {
