@@ -6,7 +6,7 @@
       "mode": "local",
       "kind": "strip-test",
       "files": ["scripts/network-pairing-offers.test.mjs"],
-      "prerequisites": "Node 24, npm ci and prepare:dependencies, OpenSSL, an explicit synthetic MEDIFLOW_DATA_DIR and a non-loopback IPv4 interface. The test starts its own server and TLS proxy."
+      "prerequisites": "Node 24, npm ci, prepare:dependencies, npm run build (falls back to next dev if unbuilt), OpenSSL, an explicit synthetic MEDIFLOW_DATA_DIR and a non-loopback IPv4 interface. Executed in web-core.yml."
     },
     {
       "id": "launcher-lan-proxy",

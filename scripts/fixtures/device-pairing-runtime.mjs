@@ -1,6 +1,6 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { mkdtempSync, openSync, closeSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, openSync, closeSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { request as httpsRequest } from 'node:https';
 import { createServer } from 'node:net';
 import { networkInterfaces, tmpdir } from 'node:os';
@@ -74,11 +74,13 @@ export async function startDevicePairingFixture({ source = root, launcher = fals
 
     try {
         if (!peer) throw new Error('The test requires one non-loopback IPv4 interface');
+        const productionBuildReady = existsSync(join(source, '.next/BUILD_ID'));
         const server = launcher
             ? launch([resolve(source, 'scripts/mediflow.mjs'), '--scelta', 'web', '--senza-browser'], 'next.log', {
                 HOME: home, XDG_CONFIG_HOME: join(home, 'config'), PORT: String(httpPort),
                 MEDIFLOW_TLS_PORT: String(tlsPort), MEDIFLOW_LOCAL_VOICE_BINARY: join(directory, 'no-voice') })
-            : launch([resolve(root, 'node_modules/next/dist/bin/next'), 'dev', '--webpack',
+            : launch([resolve(root, 'node_modules/next/dist/bin/next'),
+                ...(productionBuildReady ? ['start'] : ['dev', '--webpack']),
                 '--hostname', '127.0.0.1', '--port', String(httpPort)], 'next.log');
         await waitFor(server, async () => {
             try { return (await fetch(httpOrigin + '/api/auth/check')).ok; } catch { return false; }

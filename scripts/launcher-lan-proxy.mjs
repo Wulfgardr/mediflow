@@ -21,6 +21,7 @@ export function lanCertificate(dataDir, { run = execFileSync } = {}) {
   const certPath = path.join(directory, 'local-api.crt'), keyPath = path.join(directory, 'local-api.key');
   if (!fs.existsSync(certPath) || !fs.existsSync(keyPath)) {
     fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
+    if (process.platform !== 'win32') fs.chmodSync(directory, 0o700);
     try {
       run('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '825', '-subj', '/CN=MediFlow',
         '-addext', 'subjectAltName=DNS:localhost,IP:127.0.0.1', '-keyout', keyPath, '-out', certPath], { stdio: 'ignore' });
@@ -29,7 +30,10 @@ export function lanCertificate(dataDir, { run = execFileSync } = {}) {
       throw Object.assign(new Error('openssl non disponibile'), { code: 'LAN_PROXY_CERTIFICATE' });
     }
   }
-  if (process.platform !== 'win32') fs.chmodSync(keyPath, 0o600);
+  if (process.platform !== 'win32') {
+    fs.chmodSync(directory, 0o700);
+    fs.chmodSync(keyPath, 0o600);
+  }
   return { certPath, keyPath, pin: certificatePin(certPath) };
 }
 
@@ -91,6 +95,49 @@ export async function startLanProxy({ root, dataDir, target, port = LAN_PROXY_DE
   return { port: listening, pin, pid: /** @type {number} */ (child.pid), exited, stop };
 }
 
+function isOrphanLanProxyProcess(pid) {
+  if (!Number.isSafeInteger(pid) || pid < 1 || pid === process.pid) return false;
+  try { process.kill(pid, 0); } catch (error) { if (error.code === 'ESRCH') return false; }
+  if (process.platform === 'win32') return false;
+  try {
+    const args = execFileSync('/bin/ps', ['-o', 'args=', '-p', String(pid)], { encoding: 'utf8', timeout: 2000 });
+    return /scripts\/local-api-tls-proxy\.mjs/u.test(args);
+  } catch {
+    return false;
+  }
+}
+
+export async function stopOrphanLanProxy(dataDir, activePid = null) {
+  const pidFile = path.join(dataDir, 'local-api-tls-proxy.pid');
+  const statusFile = path.join(dataDir, 'runtime-status.json');
+  let rawPid = null;
+  try { rawPid = fs.readFileSync(pidFile, 'utf8').trim(); } catch { rawPid = null; }
+  const pid = rawPid && /^\d+$/u.test(rawPid) ? Number(rawPid) : null;
+  if (pid && pid === activePid) return false;
+  let stopped = false;
+  if (pid && isOrphanLanProxyProcess(pid)) {
+    try { process.kill(pid, 'SIGTERM'); } catch {}
+    const deadline = Date.now() + 3000;
+    while (Date.now() < deadline) {
+      try { process.kill(pid, 0); } catch (error) { if (error.code === 'ESRCH') { stopped = true; break; } }
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    if (!stopped) {
+      try { process.kill(pid, 'SIGKILL'); stopped = true; } catch {}
+    }
+  }
+  if (pid && pid !== activePid) {
+    fs.rmSync(pidFile, { force: true });
+    fs.rmSync(statusFile, { force: true });
+  } else if (!activePid && fs.existsSync(statusFile)) {
+    try {
+      const descriptor = JSON.parse(fs.readFileSync(statusFile, 'utf8'));
+      if (descriptor?.owner === 'launcher') fs.rmSync(statusFile, { force: true });
+    } catch {}
+  }
+  return stopped;
+}
+
 /**
  * The launcher keeps the LAN proxy on exactly while the Web is in home-base mode: the Web setting stays the
  * single switch, and the proxy never listens on the network while the archive is local-only.
@@ -98,7 +145,7 @@ export async function startLanProxy({ root, dataDir, target, port = LAN_PROXY_DE
  *   log?: (message: string) => void, start?: typeof startLanProxy, attempts?: number }} options
  */
 export function createLanProxyController({ root, dataDir, port = LAN_PROXY_DEFAULT_PORT, readOverview, log = () => {}, start = startLanProxy, attempts = 3 }) {
-  let proxy = null, target = null, busy = null, failures = 0;
+  let proxy = null, target = null, busy = null, pending = false, failures = 0;
   /** @type {{ state: 'off' | 'on' | 'error' | 'unknown', paired: boolean, port: number | null, reason: string | null }} */
   let status = { state: 'unknown', paired: false, port: null, reason: null };
   const halt = async () => { const current = proxy; proxy = null; await current?.stop(); };
@@ -108,10 +155,12 @@ export function createLanProxyController({ root, dataDir, port = LAN_PROXY_DEFAU
     const wanted = !!target && overview?.operatingMode === 'network-home-base';
     if (!wanted) {
       await halt();
+      await stopOrphanLanProxy(dataDir, null);
       status = { state: overview ? 'off' : 'unknown', paired: false, port: null, reason: null };
       return;
     }
     if (!proxy && failures < attempts) {
+      await stopOrphanLanProxy(dataDir, null);
       try {
         const started = await start({ root, dataDir, target, port });
         proxy = started;
@@ -132,11 +181,20 @@ export function createLanProxyController({ root, dataDir, port = LAN_PROXY_DEFAU
     }
     status = proxy ? { state: 'on', paired: overview.hasPairedClients, port: proxy.port, reason: null } : { ...status, paired: overview.hasPairedClients };
   };
-  const run = () => busy ||= sync().finally(() => { busy = null; });
+  const run = () => {
+    if (busy) { pending = true; return busy; }
+    busy = (async () => {
+      do {
+        pending = false;
+        await sync();
+      } while (pending);
+    })().finally(() => { busy = null; });
+    return busy;
+  };
   return {
     follow: async url => { target = url; failures = 0; await run(); },
     refresh: run,
-    detach: async () => { target = null; await busy; await halt(); status = { state: 'unknown', paired: false, port: null, reason: null }; },
+    detach: async () => { target = null; pending = false; await busy; await halt(); await stopOrphanLanProxy(dataDir, null); status = { state: 'unknown', paired: false, port: null, reason: null }; },
     status: () => status,
     pid: () => proxy?.pid ?? null,
   };

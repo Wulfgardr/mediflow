@@ -25,6 +25,9 @@ export const NETWORK_SETTINGS_KEYS = [
     'clinicName',
 ] as const;
 export const NETWORK_PAIRING_INTENT_TTL_MINUTES = 10;
+export const MAX_PAIRING_APP_VERSION_LENGTH = 64;
+export const MAX_PAIRING_REQUESTED_CAPABILITIES = 32;
+export const MAX_PAIRING_CAPABILITY_LENGTH = 128;
 export const NETWORK_FSE_VALIDATE_CAPABILITY = 'network.fse.validate';
 
 type NetworkSettingsSnapshot = Partial<Record<(typeof NETWORK_SETTINGS_KEYS)[number], string>>;
@@ -506,16 +509,28 @@ function validatePairingIntentRequest(
     if (appVersion !== undefined && appVersion !== null && typeof appVersion !== 'string') {
         return invalidPairingIntent('appVersion must be a string when provided.');
     }
+    const normalizedAppVersion = typeof appVersion === 'string' ? appVersion.trim() : '';
+    if (normalizedAppVersion.length > MAX_PAIRING_APP_VERSION_LENGTH) {
+        return invalidPairingIntent(`appVersion must be ${MAX_PAIRING_APP_VERSION_LENGTH} characters or fewer.`);
+    }
 
     const requestedCapabilities = candidate.requestedCapabilities;
     if (requestedCapabilities !== undefined && !Array.isArray(requestedCapabilities)) {
         return invalidPairingIntent('requestedCapabilities must be an array of strings when provided.');
     }
+    if (Array.isArray(requestedCapabilities)) {
+        if (requestedCapabilities.length > MAX_PAIRING_REQUESTED_CAPABILITIES) {
+            return invalidPairingIntent(`requestedCapabilities must contain ${MAX_PAIRING_REQUESTED_CAPABILITIES} entries or fewer.`);
+        }
+        for (const item of requestedCapabilities) {
+            if (typeof item !== 'string' || item.trim().length > MAX_PAIRING_CAPABILITY_LENGTH) {
+                return invalidPairingIntent(`Each requested capability must be a string of ${MAX_PAIRING_CAPABILITY_LENGTH} characters or fewer.`);
+            }
+        }
+    }
 
     const normalizedCapabilities = Array.isArray(requestedCapabilities)
-        ? dedupeCapabilities(
-            requestedCapabilities.filter((item): item is string => typeof item === 'string')
-        )
+        ? dedupeCapabilities(requestedCapabilities as string[])
         : [];
 
     return {
@@ -523,7 +538,7 @@ function validatePairingIntentRequest(
         value: {
             deviceName,
             clientPlatform: clientPlatform as NetworkPairingIntentRequest['clientPlatform'],
-            appVersion: typeof appVersion === 'string' ? appVersion.trim() || null : null,
+            appVersion: normalizedAppVersion || null,
             requestedCapabilities: normalizedCapabilities,
         },
     };
