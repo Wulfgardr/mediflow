@@ -1029,7 +1029,8 @@ export const DOSSIER_REQUIRED_FIELDS: Record<DossierFactKind, readonly string[]>
 const DATE_FIELDS = new Set(['date', 'startDate', 'endDate', 'observedAt', 'prescribedAt']);
 
 /** Motivi che impediscono di applicare un fatto accettato. Vuoto = applicabile. */
-export function dossierFactBlockers(fact: DossierFact, context: { exemptionCodes?: ReadonlySet<string> } = {}): string[] {
+export function dossierFactBlockers(fact: DossierFact, context: { exemptionCodes?: ReadonlySet<string>; askPhysician?: readonly string[] } = {}): string[] {
+    const asked = new Set(context.askPhysician ?? []);
     const blockers: string[] = [];
     if (structuredContextApplies(fact.kind) && fact.values.subject === 'familiare') {
         blockers.push('Il dato riguarda un familiare.');
@@ -1039,6 +1040,7 @@ export function dossierFactBlockers(fact: DossierFact, context: { exemptionCodes
     if (fact.negated) blockers.push('Il testo nega questa informazione: correggi il fatto o rifiutalo.');
     for (const field of DOSSIER_REQUIRED_FIELDS[fact.kind]) {
         if (field === 'text' && fact.values.textSource === 'document') continue;
+        if (asked.has(field)) continue;
         const value = (fact.values[field] ?? '').trim();
         if (!value) blockers.push(DATE_FIELDS.has(field) ? 'Data mancante nel documento: inseriscila solo se nota.' : `Campo obbligatorio mancante: ${field}.`);
     }
@@ -1052,7 +1054,7 @@ export function dossierFactBlockers(fact: DossierFact, context: { exemptionCodes
     if (fact.kind === 'exemption' && context.exemptionCodes && !context.exemptionCodes.has((fact.values.code ?? '').toUpperCase())) {
         blockers.push('Codice di esenzione assente dal catalogo locale.');
     }
-    if (fact.kind === 'therapy' && !['active', 'suspended', 'completed'].includes(fact.values.status ?? '')) {
+    if (fact.kind === 'therapy' && !asked.has('status') && !['active', 'suspended', 'completed'].includes(fact.values.status ?? '')) {
         blockers.push('Stato della terapia non valido.');
     }
     if (fact.kind === 'reported_scale' && !/^-?\d+(?:[.,]\d+)?$/u.test((fact.values.scaleTotal ?? '').trim())) {

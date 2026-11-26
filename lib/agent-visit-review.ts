@@ -17,7 +17,11 @@ import { agentVisitPdfText, type AgentVisitPdf } from './agent-visit-pdf-text';
 export type AgentVisitDocument = AgentVisitPdf & { id: string; name: string; hash: string };
 export type AgentVisitReview = { visit: Omit<OpenedAgentVisit, 'cassette'> & { cassette: AgentCassetteIndexEntry }; patient: Patient | null; newPatient: NewAgentPatient | null;
     documents: AgentVisitDocument[]; appliedItemIds: string[]; discardedItemIds: string[]; correctedItemIds: string[]; currentSummary: Map<string, string>; blockers: string[]; proposalBlockers: string[];
-    itemBlockers: Map<string, string[]>; inRecordItemIds: string[] };
+    itemBlockers: Map<string, string[]>; itemNeeds: Map<string, AgentPhysicianField[]>; inRecordItemIds: string[] };
+export const AGENT_THERAPY_STATUSES = ['active', 'suspended', 'completed'] as const;
+const AGENT_PHYSICIAN_FIELD_VALUES = { status: AGENT_THERAPY_STATUSES } as const;
+export type AgentPhysicianField = keyof typeof AGENT_PHYSICIAN_FIELD_VALUES;
+export const AGENT_THERAPY_STATUS_NEEDED = 'Il documento non indica lo stato della terapia: sceglilo prima di tenerla.';
 type ReviewItem = AgentVisitReview['visit']['items'][number];
 export const agentItemDecided = (review: Pick<AgentVisitReview, 'appliedItemIds' | 'discardedItemIds'>, itemId: string) =>
     review.appliedItemIds.includes(itemId) || review.discardedItemIds.includes(itemId);
@@ -93,6 +97,7 @@ export async function inspectAgentVisit(row: IncomingAgentCassette, patients: Pa
     }
     const discardedItemIds = row.discardedItemIds ?? [];
     const itemBlockers = new Map<string, string[]>();
+    const itemNeeds = new Map<string, AgentPhysicianField[]>();
     for (const item of visit.items) {
         if (item.kind === 'note' || item.kind === 'transcription' || item.kind === 'pdf') continue;
         if (row.appliedItemIds.includes(item.id) || discardedItemIds.includes(item.id)) continue;
@@ -102,6 +107,10 @@ export async function inspectAgentVisit(row: IncomingAgentCassette, patients: Pa
         const found = fact ? fact.blockers : ['Fonte da verificare per ' + (proposalLabels[item.kind] ?? 'questa proposta') + '.'];
         if (fact) item.value.values = fact.values;
         if (found.length) itemBlockers.set(item.id, found);
+        if (fact && fact.askPhysician.length) {
+            itemNeeds.set(item.id, fact.askPhysician.filter((field): field is AgentPhysicianField => field in AGENT_PHYSICIAN_FIELD_VALUES));
+            proposalBlockers.push(AGENT_THERAPY_STATUS_NEEDED);
+        }
         proposalBlockers.push(...found);
     }
     const currentSummary = new Map<string, string>();
@@ -125,7 +134,7 @@ export async function inspectAgentVisit(row: IncomingAgentCassette, patients: Pa
             currentSummary.set(item.id, before.join('; ') || 'Non presente');
         }
     }
-    return { visit, patient, newPatient, documents: [...documents.values()], appliedItemIds: row.appliedItemIds, discardedItemIds, correctedItemIds: row.correctedItemIds ?? [], currentSummary, blockers, proposalBlockers, itemBlockers, inRecordItemIds };
+    return { visit, patient, newPatient, documents: [...documents.values()], appliedItemIds: row.appliedItemIds, discardedItemIds, correctedItemIds: row.correctedItemIds ?? [], currentSummary, blockers, proposalBlockers, itemBlockers, itemNeeds, inRecordItemIds };
 }
 export async function reopenReviewedAgentItems(review: AgentVisitReview, row: IncomingAgentCassette): Promise<AgentVisitReview['visit']['items'] | null> {
     const visit = await openAgentVisit(row);
@@ -186,8 +195,9 @@ function withProposedProfile(patient: Patient | null | undefined, items: ReviewI
     return { diagnoses, exemptions };
 }
 
-async function prepareAgentItem(review: AgentVisitReview, item: ReviewItem, profile: ProposedProfile, corrected = false): Promise<unknown> {
-    const provenance = { visitId: review.visit.cassette.id, source: item.value.source, quote: item.value.quote, ...(corrected ? { corrected: true } : {}) };
+async function prepareAgentItem(review: AgentVisitReview, item: ReviewItem, profile: ProposedProfile, corrected = false, physicianFields: readonly AgentPhysicianField[] = []): Promise<unknown> {
+    const provenance = { visitId: review.visit.cassette.id, source: item.value.source, quote: item.value.quote, ...(corrected ? { corrected: true } : {}),
+        ...(physicianFields.length ? { physicianFields } : {}) };
     const base = { id: item.id, kind: item.kind };
     switch (item.kind) {
         case 'note': case 'transcription': {
@@ -264,6 +274,15 @@ export function agentItemAlreadyInRecord(patient: Pick<Patient, 'diagnoses' | 'e
     const proposed = withProposedProfile(patient as Patient, [item]);
     return proposed.diagnoses.length === (patient.diagnoses ?? []).length && proposed.exemptions.length === (patient.exemptions ?? []).length;
 }
+function suppliedPhysicianValues(needs: readonly AgentPhysicianField[], correction: Record<string, string>): Record<string, string> | null {
+    const supplied: Record<string, string> = {};
+    for (const field of needs) {
+        const value = (correction[field] ?? '').trim();
+        if (!(AGENT_PHYSICIAN_FIELD_VALUES[field] as readonly string[]).includes(value)) return null;
+        supplied[field] = value;
+    }
+    return supplied;
+}
 export const AGENT_ITEM_IN_RECORD = 'Questa voce è già in scheda: scarta la proposta o modifica la voce dalla scheda.';
 
 export async function prepareAgentItemDecision(review: AgentVisitReview, itemId: string, decision: 'keep' | 'correct' | 'discard',
@@ -280,10 +299,14 @@ export async function prepareAgentItemDecision(review: AgentVisitReview, itemId:
     if (patient.version !== review.patient!.version) throw new Error('La scheda è cambiata. Rileggi la voce prima di decidere.');
     const allowed: readonly string[] = agentItemCorrectable(original.kind) ? AGENT_CORRECTABLE_FIELDS[original.kind] : [];
     const changed = Object.fromEntries(Object.entries(correction).filter(([field]) => allowed.includes(field)).map(([field, value]) => [field, value.trim()]));
-    const item = decision === 'correct' ? { ...original, value: { ...original.value, values: correctedValues(original, changed) } } : original;
+    const needs = decision === 'keep' ? review.itemNeeds.get(itemId) ?? [] : [];
+    const supplied = suppliedPhysicianValues(needs, correction);
+    if (!supplied) return null;
+    const item = decision === 'correct' ? { ...original, value: { ...original.value, values: correctedValues(original, changed) } }
+        : needs.length ? { ...original, value: { ...original.value, values: { ...values(original), ...supplied } } } : original;
     if (agentItemAlreadyInRecord(patient, item)) throw new Error(AGENT_ITEM_IN_RECORD);
     const profile = withProposedProfile(patient, [item]);
-    const prepared = await prepareAgentItem(review, item, profile, decision === 'correct');
+    const prepared = await prepareAgentItem(review, item, profile, decision === 'correct', needs);
     signal.throwIfAborted();
     return agentItemDecisionSchema.parse({ ...target, decision, patientId: patient.id, expectedVersion: patient.version, item: prepared });
 }

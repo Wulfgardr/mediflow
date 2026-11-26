@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { CircleDashed, FileText, Inbox, NotebookPen } from 'lucide-react';
 import { taxCodeBirthDetails } from '@/lib/patient-identity';
 import { applyReviewedAgentVisits, decideAgentVisitItem, readIncomingAgentPdf } from '@/lib/agent-incoming';
-import { AGENT_CORRECTABLE_FIELDS, agentCorrectionDropsDrugCodes, agentItemAwaitsDecision, agentItemCorrectable, agentVisitAwaitsReview, type AgentVisitReview } from '@/lib/agent-visit-review';
+import { AGENT_CORRECTABLE_FIELDS, AGENT_THERAPY_STATUSES, AGENT_THERAPY_STATUS_NEEDED, agentCorrectionDropsDrugCodes, agentItemAwaitsDecision, agentItemCorrectable, agentVisitAwaitsReview, type AgentVisitReview } from '@/lib/agent-visit-review';
 import type { AgentItemDecision } from '@/lib/agent-visit-application-contract';
 import { agentReviewFieldLabels as fieldLabels, agentReviewFieldValues as fieldValues, agentReviewItemLabels } from '@/lib/agent-visit-review-labels';
 import surface from '@/components/record-surface.module.css';
@@ -17,7 +17,6 @@ type VisitItem = AgentVisitReview['visit']['items'][number];
 type Snapshot = { visits: AgentVisitReview[]; busy: boolean; applicationError: { visitId: string | null; itemId?: string; message: string } | null };
 
 const SOAP_LABELS: Record<string, string> = { S: 'Soggettivo', O: 'Obiettivo', A: 'Valutazione', P: 'Piano' };
-const THERAPY_STATUS = ['active', 'suspended', 'completed'] as const;
 const DATE_FIELDS = new Set(['startDate', 'endDate', 'observedAt', 'date']);
 
 function parseSoapSections(text: string): Array<{ key: string; label: string; body: string }> | null {
@@ -79,8 +78,9 @@ function CorrectionForm({ item, busy, onCancel, onSave }: { item: VisitItem; bus
         {fields.map(field => <label key={field} className={css.correctionField}>
             <span>{fieldLabels[field] ?? field}</span>
             {field === 'status' && item.kind === 'therapy'
-                ? <select name={field} defaultValue={values[field] ?? ''} className="mf-input">
-                    {THERAPY_STATUS.map(status => <option key={status} value={status}>{fieldValues.status?.[status] ?? status}</option>)}
+                ? <select name={field} defaultValue={values[field] ?? ''} className="mf-input" required>
+                    {values[field] ? null : <option value="" disabled>Scegli</option>}
+                    {AGENT_THERAPY_STATUSES.map(status => <option key={status} value={status}>{fieldValues.status?.[status] ?? status}</option>)}
                 </select>
                 : <input name={field} type={DATE_FIELDS.has(field) ? 'date' : 'text'} className="mf-input"
                     defaultValue={DATE_FIELDS.has(field) ? (values[field] ?? '').slice(0, 10) : values[field] ?? ''} />}
@@ -93,10 +93,20 @@ function CorrectionForm({ item, busy, onCancel, onSave }: { item: VisitItem; bus
     </form>;
 }
 
-function ItemGestures({ review, item, busy, onDecide, onCorrect }: { review: AgentVisitReview; item: VisitItem; busy: boolean;
+function StatusChoice({ item, chosen, busy, onChoose }: { item: VisitItem; chosen: string | undefined; busy: boolean; onChoose: (status: string) => void }) {
+    return <fieldset className={css.correctionField} aria-label={'Stato di ' + proposalHeadline(item)}>
+        <legend>{fieldLabels.status}</legend>
+        {AGENT_THERAPY_STATUSES.map(status => <label key={status}>
+            <input type="radio" name={'stato-' + item.id} value={status} checked={chosen === status} disabled={busy} onChange={() => onChoose(status)} />
+            {' '}{fieldValues.status?.[status] ?? status}
+        </label>)}
+    </fieldset>;
+}
+
+function ItemGestures({ review, item, busy, missing, onDecide, onCorrect }: { review: AgentVisitReview; item: VisitItem; busy: boolean; missing: boolean;
     onDecide: (decision: AgentItemDecision) => void; onCorrect: () => void }) {
     if (!agentItemAwaitsDecision(review, item.id)) return null;
-    const blocked = Boolean(review.itemBlockers.get(item.id)?.length) || review.inRecordItemIds.includes(item.id);
+    const blocked = Boolean(review.itemBlockers.get(item.id)?.length) || review.inRecordItemIds.includes(item.id) || missing;
     return <div className={css.itemActions} role="group" aria-label={'Decidi ' + proposalHeadline(item)}>
         <Button variant="text" disabled={busy} onClick={() => onDecide('discard')}>Scarta</Button>
         {agentItemCorrectable(item.kind) ? <Button variant="secondary" disabled={busy} onClick={onCorrect}>Correggi</Button> : null}
@@ -109,6 +119,7 @@ export function VisitQueue({ visits, busy, applicationError }: Snapshot) {
     const [openingPdf, setOpeningPdf] = useState(false);
     const [pdfError, setPdfError] = useState<string | null>(null);
     const [correcting, setCorrecting] = useState<string | null>(null);
+    const [chosenStatus, setChosenStatus] = useState<Record<string, string>>({});
     const showPdf = async (visitId: string, revision: number, itemId: string) => {
         setOpeningPdf(true);
         setPdfError(null);
@@ -169,11 +180,15 @@ export function VisitQueue({ visits, busy, applicationError }: Snapshot) {
                 pdfItems.length > 0 ? `${pdfItems.length} PDF` : null,
                 proposals.length > 0 ? (proposals.length === 1 ? '1 proposta' : `${proposals.length} proposte`) : null,
             ].filter(Boolean).join(' · ');
-            const gestures = (item: VisitItem) => <>
-                {itemError?.itemId === item.id ? <p role="alert" className={css.itemAlert}>{itemError.message}</p> : null}
-                <ItemGestures review={review} item={item} busy={busy} onCorrect={() => setCorrecting(item.id)}
-                    onDecide={decision => { void decide(visit.cassette.id, item.id, decision); }} />
-            </>;
+            const gestures = (item: VisitItem) => {
+                const asksStatus = review.itemNeeds.get(item.id)?.includes('status') ?? false;
+                const status = chosenStatus[item.id];
+                return <>
+                    {itemError?.itemId === item.id ? <p role="alert" className={css.itemAlert}>{itemError.message}</p> : null}
+                    <ItemGestures review={review} item={item} busy={busy} missing={asksStatus && !status} onCorrect={() => setCorrecting(item.id)}
+                        onDecide={decision => { void decide(visit.cassette.id, item.id, decision, decision === 'keep' && asksStatus && status ? { status } : undefined); }} />
+                </>;
+            };
 
             return <section key={visit.cassette.id} className={surface.tray} data-record-tray="in-arrivo" aria-label={'Visita ' + visit.cassette.id}>
                 <h2 className={surface.zoneTitle}>
@@ -280,6 +295,11 @@ export function VisitQueue({ visits, busy, applicationError }: Snapshot) {
                                         </aside>
                                     </div>
                                     {itemBlockers.map(message => <p key={message} className={css.itemBlocker}>{message}</p>)}
+                                    {review.itemNeeds.get(item.id)?.includes('status') && correcting !== item.id ? <>
+                                        <p className={css.itemBlocker}>{AGENT_THERAPY_STATUS_NEEDED}</p>
+                                        {agentItemAwaitsDecision(review, item.id) ? <StatusChoice item={item} chosen={chosenStatus[item.id]} busy={busy}
+                                            onChoose={status => setChosenStatus(current => ({ ...current, [item.id]: status }))} /> : null}
+                                    </> : null}
                                     {review.inRecordItemIds.includes(item.id) ? <p className={css.itemInRecord}>Già in scheda.</p> : null}
                                     {correcting === item.id ? null : gestures(item)}
                                 </article>;
