@@ -7,7 +7,8 @@ import { taxCodeBirthDetails } from '@/lib/patient-identity';
 import { applyReviewedAgentVisits, decideAgentVisitItem, readIncomingAgentPdf } from '@/lib/agent-incoming';
 import { AGENT_CORRECTABLE_FIELDS, AGENT_THERAPY_STATUSES, AGENT_THERAPY_STATUS_NEEDED, agentCorrectionDropsDrugCodes, agentItemAwaitsDecision, agentItemCorrectable, agentVisitAwaitsReview, type AgentVisitReview } from '@/lib/agent-visit-review';
 import type { AgentItemDecision } from '@/lib/agent-visit-application-contract';
-import { agentReviewFieldLabels as fieldLabels, agentReviewFieldValues as fieldValues, agentReviewItemLabels } from '@/lib/agent-visit-review-labels';
+import { AGENT_DOSAGE_NOT_STATED, agentReviewDisplayValue, agentReviewDocumentLabel, agentReviewFieldLabels as fieldLabels, agentReviewFieldValues as fieldValues,
+    agentReviewItemLabels, agentReviewShownFields } from '@/lib/agent-visit-review-labels';
 import surface from '@/components/record-surface.module.css';
 import DocumentViewer from '@/components/document-viewer';
 import { Button } from '@/components/ui/button';
@@ -43,12 +44,12 @@ function itemValues(item: VisitItem): Record<string, string> {
 
 function proposalHeadline(item: VisitItem): string {
     const values = itemValues(item);
-    if (item.kind === 'therapy' && values.drugName) return values.dosage ? `${values.drugName} · ${values.dosage}` : values.drugName;
+    if (item.kind === 'therapy' && values.drugName) return values.dosage && values.dosage !== AGENT_DOSAGE_NOT_STATED ? `${values.drugName} · ${values.dosage}` : values.drugName;
     if (item.kind === 'service' && values.serviceName) return values.serviceName;
     if (item.kind === 'diagnosis' && values.description) return values.code ? `${values.code} · ${values.description}` : values.description;
     if (item.kind === 'exemption' && values.code) return `Esenzione ${values.code}`;
     if (item.kind === 'observation' && values.display) return [values.display, [values.value, values.unitCode].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
-    if (item.kind === 'pdf' && typeof item.value.name === 'string') return item.value.name;
+    if (item.kind === 'pdf' && typeof item.value.name === 'string') return agentReviewDocumentLabel(item.value.name, null);
     return agentReviewItemLabels[item.kind];
 }
 
@@ -56,9 +57,23 @@ function formatDepositTime(timestamp: number): string {
     return new Date(timestamp).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' });
 }
 
-function sourceFileName(item: VisitItem): string | null {
+function itemSource(item: VisitItem): { fileName: string; label: string } | null {
     const source = item.value.source;
-    return source && typeof source === 'object' && 'fileName' in source ? String(source.fileName) : null;
+    if (!source || typeof source !== 'object' || !('fileName' in source)) return null;
+    const fileName = String(source.fileName);
+    const values = itemValues(item);
+    const date = 'documentDate' in source && typeof source.documentDate === 'string' && source.documentDate ? source.documentDate
+        : values.startDate || values.prescribedAt || values.observedAt || values.date;
+    return { fileName, label: agentReviewDocumentLabel(fileName, date) };
+}
+
+function documentLabels(items: VisitItem[]): Map<string, string> {
+    const labels = new Map<string, string>();
+    for (const item of items) {
+        const source = itemSource(item);
+        if (source && !labels.has(source.fileName)) labels.set(source.fileName, source.label);
+    }
+    return labels;
 }
 
 function CorrectionForm({ item, busy, onCancel, onSave }: { item: VisitItem; busy: boolean; onCancel: () => void; onSave: (values: Record<string, string>) => void }) {
@@ -94,11 +109,11 @@ function CorrectionForm({ item, busy, onCancel, onSave }: { item: VisitItem; bus
 }
 
 function StatusChoice({ item, chosen, busy, onChoose }: { item: VisitItem; chosen: string | undefined; busy: boolean; onChoose: (status: string) => void }) {
-    return <fieldset className={css.correctionField} aria-label={'Stato di ' + proposalHeadline(item)}>
+    return <fieldset className={css.statusChoice} aria-label={'Stato di ' + proposalHeadline(item)}>
         <legend>{fieldLabels.status}</legend>
         {AGENT_THERAPY_STATUSES.map(status => <label key={status}>
             <input type="radio" name={'stato-' + item.id} value={status} checked={chosen === status} disabled={busy} onChange={() => onChoose(status)} />
-            {' '}{fieldValues.status?.[status] ?? status}
+            {fieldValues.status?.[status] ?? status}
         </label>)}
     </fieldset>;
 }
@@ -110,7 +125,7 @@ function ItemGestures({ review, item, busy, missing, onDecide, onCorrect }: { re
     return <div className={css.itemActions} role="group" aria-label={'Decidi ' + proposalHeadline(item)}>
         <Button variant="text" disabled={busy} onClick={() => onDecide('discard')}>Scarta</Button>
         {agentItemCorrectable(item.kind) ? <Button variant="secondary" disabled={busy} onClick={onCorrect}>Correggi</Button> : null}
-        <Button variant="secondary" disabled={busy || blocked} onClick={() => onDecide('keep')}>Tieni</Button>
+        <Button variant={blocked ? 'secondary' : 'primary'} disabled={busy || blocked} onClick={() => onDecide('keep')}>Tieni</Button>
     </div>;
 }
 
@@ -157,6 +172,10 @@ export function VisitQueue({ visits, busy, applicationError }: Snapshot) {
             const pdfItems = visit.items.filter(item => item.kind === 'pdf');
             const pendingPdfs = pending.filter(item => item.kind === 'pdf');
             const pdfByName = new Map(pdfItems.filter(item => typeof item.value.name === 'string').map(item => [String(item.value.name), item.id]));
+            const pdfLabels = documentLabels(visit.items);
+            const pdfLabel = (name: string) => pdfLabels.get(name) ?? agentReviewDocumentLabel(name, null);
+            const gesturesUnavailable = review.newPatient ? 'Prima visita: le voci entrano tutte insieme con «Applica la visita».'
+                : review.blockers.length ? 'Risolvi prima i dubbi della visita, qui sopra.' : null;
             const notes = pending.filter(item => item.kind === 'note');
             const transcriptions = pending.filter(item => item.kind === 'transcription');
             const proposals = pending.filter(item => item.kind !== 'pdf' && item.kind !== 'note' && item.kind !== 'transcription');
@@ -203,6 +222,11 @@ export function VisitQueue({ visits, busy, applicationError }: Snapshot) {
                         <Link href={`/patients/${review.patient.id}/modules`} className={surface.islandAction}>Apri scheda</Link>
                     ) : null}
                 </div>
+                {actionMessages.length > 0 && (
+                    <div id={actionMessagesId} className={`${surface.island} ${css.blockers}`}>
+                        {actionMessages.map((message, index) => <p role="alert" key={index}>{message}</p>)}
+                    </div>
+                )}
 
                 {pdfItems.length > 0 && (
                     <section className={surface.island} aria-label="PDF della visita">
@@ -215,7 +239,7 @@ export function VisitQueue({ visits, busy, applicationError }: Snapshot) {
                             {pdfItems.map(item => typeof item.value.name === 'string' && (
                                 <button key={item.id} type="button" className="mf-button-secondary" disabled={openingPdf}
                                     onClick={() => { void showPdf(visit.cassette.id, visit.cassette.revision, item.id); }}>
-                                    {item.value.name}
+                                    {pdfLabel(item.value.name)}
                                 </button>
                             ))}
                         </div>
@@ -255,14 +279,20 @@ export function VisitQueue({ visits, busy, applicationError }: Snapshot) {
                         <p className={css.groupLabel}>Proposte da confermare <span>{proposals.length}</span></p>
                         <div className={css.proposals}>
                             {proposals.map(item => {
-                                const fileName = sourceFileName(item);
-                                const sourcePdfId = fileName ? pdfByName.get(fileName) : undefined;
+                                const source = itemSource(item);
+                                const sourcePdfId = source ? pdfByName.get(source.fileName) : undefined;
                                 const currentInRecord = review.currentSummary.get(item.id);
                                 const itemBlockers = review.itemBlockers.get(item.id) ?? [];
+                                const asksStatus = review.itemNeeds.get(item.id)?.includes('status') ?? false;
+                                const inRecord = review.inRecordItemIds.includes(item.id);
+                                const state = inRecord ? { label: 'Già in scheda', pill: surface.pillNeutral }
+                                    : itemBlockers.length ? { label: 'Da verificare', pill: surface.pillWarning }
+                                    : asksStatus ? { label: 'Manca lo stato', pill: surface.pillWarning } : null;
                                 return <article key={item.id} className={`${surface.islandProposal} ${css.proposal}`}>
-                                    <div className={surface.islandHeader}>
+                                    <div className={`${surface.islandHeader} ${css.proposalHeader}`}>
                                         <span className={surface.islandIcon} aria-hidden="true"><CircleDashed size={15} /></span>
                                         <h3>{agentReviewItemLabels[item.kind]}</h3>
+                                        {state ? <span className={state.pill}>{state.label}</span> : null}
                                     </div>
                                     <div className={css.proposalBody}>
                                         <div className={css.proposalFacts}>
@@ -271,25 +301,27 @@ export function VisitQueue({ visits, busy, applicationError }: Snapshot) {
                                             {correcting === item.id ? (
                                                 <CorrectionForm item={item} busy={busy} onCancel={() => setCorrecting(null)}
                                                     onSave={values => { void decide(visit.cassette.id, item.id, 'correct', values); }} />
-                                            ) : typeof item.value.values === 'object' && item.value.values !== null && (
+                                            ) : (
                                                 <dl className={css.fields}>
-                                                    {Object.entries(item.value.values).map(([field, value]) => (
+                                                    {agentReviewShownFields(item.kind, itemValues(item)).map(([field, value]) => (
                                                         <div key={field}>
-                                                            <dt>{fieldLabels[field] ?? 'Dato'}</dt>
-                                                            <dd>{fieldValues[field]?.[String(value)] ?? String(value)}</dd>
+                                                            <dt>{fieldLabels[field] ?? field}</dt>
+                                                            <dd className={field === 'dosage' && value === AGENT_DOSAGE_NOT_STATED ? css.notStated : undefined}>
+                                                                {agentReviewDisplayValue(field, value)}
+                                                            </dd>
                                                         </div>
                                                     ))}
                                                 </dl>
                                             )}
                                         </div>
                                         <aside className={css.proposalSource} aria-label="Fonte">
-                                            {fileName ? (
+                                            {source ? (
                                                 sourcePdfId ? (
-                                                    <button type="button" aria-label={`Apri ${fileName}`} className={`${surface.islandAction} ${css.sourceLink}`} disabled={openingPdf}
+                                                    <button type="button" aria-label={`Apri ${source.label}`} className={`${surface.islandAction} ${css.sourceLink}`} disabled={openingPdf}
                                                         onClick={() => { void showPdf(visit.cassette.id, visit.cassette.revision, sourcePdfId); }}>
-                                                        {fileName}
+                                                        {source.label}
                                                     </button>
-                                                ) : <span className={css.sourceName}>{fileName}</span>
+                                                ) : <span className={css.sourceName}>{source.label}</span>
                                             ) : null}
                                             {typeof item.value.quote === 'string' && <blockquote className={css.quote}>{item.value.quote}</blockquote>}
                                         </aside>
@@ -300,8 +332,8 @@ export function VisitQueue({ visits, busy, applicationError }: Snapshot) {
                                         {agentItemAwaitsDecision(review, item.id) ? <StatusChoice item={item} chosen={chosenStatus[item.id]} busy={busy}
                                             onChoose={status => setChosenStatus(current => ({ ...current, [item.id]: status }))} /> : null}
                                     </> : null}
-                                    {review.inRecordItemIds.includes(item.id) ? <p className={css.itemInRecord}>Già in scheda.</p> : null}
                                     {correcting === item.id ? null : gestures(item)}
+                                    {gesturesUnavailable && !agentItemAwaitsDecision(review, item.id) ? <p className={css.itemInRecord}>{gesturesUnavailable}</p> : null}
                                 </article>;
                             })}
                         </div>
@@ -341,11 +373,6 @@ export function VisitQueue({ visits, busy, applicationError }: Snapshot) {
                         Applicando questa visita crei anche la scheda del paziente.
                         {birth && ` Sesso nel CF: ${birth.sex}.`}
                     </p>}
-                    {actionMessages.length > 0 && (
-                        <div id={actionMessagesId} className={`${surface.island} ${css.blockers}`}>
-                            {actionMessages.map((message, index) => <p role="alert" key={index}>{message}</p>)}
-                        </div>
-                    )}
                     <div className={css.visitFooter}>
                         <span>
                             {pending.length === 1 ? '1 elemento in attesa di conferma' : `${pending.length} elementi in attesa di conferma`}

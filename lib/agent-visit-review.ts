@@ -104,7 +104,7 @@ export async function inspectAgentVisit(row: IncomingAgentCassette, patients: Pa
         const source = documents.get(sourceHash(item));
         const kind = item.kind === 'service' ? 'service_prescription' : item.kind;
         const fact = source && reviewAgentFact(kind, values(item), source.text, text(item.value.quote));
-        const found = fact ? fact.blockers : ['Fonte da verificare per ' + (proposalLabels[item.kind] ?? 'questa proposta') + '.'];
+        const found = fact ? fact.blockers : ['Il passaggio citato non si trova nel PDF: ' + (agentItemCorrectable(item.kind) ? 'correggi ' + (proposalLabels[item.kind] ?? 'la proposta') + ' o scartala.' : 'scarta ' + (proposalLabels[item.kind] ?? 'la proposta') + '.')];
         if (fact) item.value.values = fact.values;
         if (found.length) itemBlockers.set(item.id, found);
         if (fact && fact.askPhysician.length) {

@@ -3,6 +3,7 @@ import { dossierFactBlockers } from './domain/documents/dossier-import';
 import { preparedTokens, verifyPreparedFields } from './domain/documents/dossier-prepared';
 import { catalogObservationCode } from './domain/documents/dossier-sections';
 import { SERVICE_PRESCRIPTION_CATEGORIES } from './prescription-domain';
+import { agentReviewFieldLabels } from './agent-visit-review-labels';
 
 type Kind = 'therapy' | 'diagnosis' | 'observation' | 'exemption' | 'service_prescription';
 const therapyInUse = /\b(?:prescriv\w*|prescritt\w*|assume|inizia|prosegue|in\s+terapia)\b/iu;
@@ -49,6 +50,9 @@ export function reviewAgentFact(kind: Kind, input: Record<string, string>, pdfTe
     const written = (value: string | undefined) => Boolean(value && normalized(quote).includes(normalized(value)));
     const context = matches.map(match => clinicalFactContext(kind, values, source, match.index, match.index + match[0].length));
     const blockers: string[] = [];
+    const fix = kind === 'therapy' || kind === 'observation' || kind === 'diagnosis' ? 'correggi la voce o scartala' : 'scarta la voce e inseriscila dalla scheda';
+    const label = (field: string) => '«' + (agentReviewFieldLabels[field] ?? field) + '»';
+    const phrase = { missing: (field: string) => `Manca ${label(field)}: ${fix}.`, invalidDate: (field: string) => `Data ${label(field)} non valida: ${fix}.` };
     const date = documentDate(source);
     if (kind !== 'exemption') {
         const key = factDateFields[kind];
@@ -93,13 +97,13 @@ export function reviewAgentFact(kind: Kind, input: Record<string, string>, pdfTe
     }
     const verified = verifyPreparedFields(kind, values, preparedTokens(matches[0][0]).map(token => token.text));
     if (verified.check !== 'ok' || verified.drop.length || values.subject && values.subject !== 'paziente') {
-        blockers.push('Valori o soggetto della proposta da verificare sulla fonte.');
+        blockers.push(`Valori o persona diversi dal passaggio citato: ${fix}.`);
     }
     if (kind === 'therapy') values.dosage ||= 'non indicata nel documento';
     const askPhysician = kind === 'therapy' && !values.status ? ['status'] : [];
     for (const evidence of context) {
         const contextualValues = { ...values, contextReview: contextReview(evidence, kind === 'therapy' && isHistoricalTherapy(values.status)) };
-        blockers.push(...dossierFactBlockers({ factId: '', kind, values: contextualValues, negated: evidence.negated, origin: 'prepared', evidence: null, decision: 'pending' }, { askPhysician }));
+        blockers.push(...dossierFactBlockers({ factId: '', kind, values: contextualValues, negated: evidence.negated, origin: 'prepared', evidence: null, decision: 'pending' }, { askPhysician, phrase }));
     }
     return { values, blockers: [...new Set(blockers)], askPhysician };
 }

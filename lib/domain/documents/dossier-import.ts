@@ -1029,7 +1029,8 @@ export const DOSSIER_REQUIRED_FIELDS: Record<DossierFactKind, readonly string[]>
 const DATE_FIELDS = new Set(['date', 'startDate', 'endDate', 'observedAt', 'prescribedAt']);
 
 /** Motivi che impediscono di applicare un fatto accettato. Vuoto = applicabile. */
-export function dossierFactBlockers(fact: DossierFact, context: { exemptionCodes?: ReadonlySet<string>; askPhysician?: readonly string[] } = {}): string[] {
+export function dossierFactBlockers(fact: DossierFact, context: { exemptionCodes?: ReadonlySet<string>; askPhysician?: readonly string[];
+    phrase?: { missing: (field: string) => string; invalidDate: (field: string) => string } } = {}): string[] {
     const asked = new Set(context.askPhysician ?? []);
     const blockers: string[] = [];
     if (structuredContextApplies(fact.kind) && fact.values.subject === 'familiare') {
@@ -1042,11 +1043,12 @@ export function dossierFactBlockers(fact: DossierFact, context: { exemptionCodes
         if (field === 'text' && fact.values.textSource === 'document') continue;
         if (asked.has(field)) continue;
         const value = (fact.values[field] ?? '').trim();
-        if (!value) blockers.push(DATE_FIELDS.has(field) ? 'Data mancante nel documento: inseriscila solo se nota.' : `Campo obbligatorio mancante: ${field}.`);
+        if (!value) blockers.push(DATE_FIELDS.has(field) ? 'Data mancante nel documento: inseriscila solo se nota.'
+            : context.phrase?.missing(field) ?? `Campo obbligatorio mancante: ${field}.`);
     }
     for (const field of DATE_FIELDS) {
         const value = (fact.values[field] ?? '').trim();
-        if (value && !validIsoDate(value)) blockers.push(`Data non valida: ${field}.`);
+        if (value && !validIsoDate(value)) blockers.push(context.phrase?.invalidDate(field) ?? `Data non valida: ${field}.`);
     }
     if (fact.kind === 'diagnosis' && fact.values.code && !['ICD-9', 'ICD-10', 'ICD-11'].includes(fact.values.system ?? '')) {
         blockers.push('Un codice di diagnosi richiede il sistema di codifica.');

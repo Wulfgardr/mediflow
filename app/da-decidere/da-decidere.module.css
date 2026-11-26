@@ -153,6 +153,47 @@
 
 .proposal { gap: 10px; }
 
+.proposalHeader > :last-child:not(h3) { margin-inline-start: auto; }
+
+.fields dd.notStated { color: var(--lume-ink-muted); }
+
+.statusChoice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.statusChoice > legend {
+  float: left;
+  margin-inline-end: 4px;
+  color: var(--lume-ink-muted);
+  font: var(--type-record-label);
+}
+
+.statusChoice > label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--lume-record-island-rule);
+  border-radius: 10px;
+  color: var(--lume-ink);
+  font: var(--type-body);
+  cursor: pointer;
+}
+
+.statusChoice > label:has(input:checked) {
+  border-color: var(--lume-ink);
+  background: var(--lume-record-compact-island);
+}
+
+.statusChoice > label:has(input:focus-visible) { outline: 2px solid var(--lume-ink); outline-offset: 2px; }
+
 .proposalBody {
   display: grid;
   grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
@@ -242,4 +283,5 @@
 
 @media (pointer: coarse) {
   .transcript > summary { min-height: 44px; }
+  .statusChoice > label { min-height: 44px; }
 }
