@@ -114,7 +114,7 @@ export class LocalVoiceRecorder {
                 this.sending = false;
                 this.blocks.forEach((item) => item.fill(0));
                 this.blocks = [];
-                if (reply.status === 503 || reply.status === 409) this.set({ notice: noticeOf(reply) === 'failed' ? null : noticeOf(reply) });
+                this.set({ notice: noticeOf(reply) });
             }
         });
         return this.pumping;
