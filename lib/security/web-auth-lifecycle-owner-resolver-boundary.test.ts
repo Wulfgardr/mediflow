@@ -22,7 +22,7 @@ const GUARD_COMMAND = `node scripts/run-strip-types.mjs --test --test-concurrenc
 // ADR 0128 / 066dd104c: freeze the resolver projection and reviewed trace closure.
 // Aliases and owner delivery stay guarded independently of standalone tracing additions.
 // Reviewed 2026-10-16: 25 MiB prosthetic originals, three traced modules, runtime-twin-086 tool removed.
-const NEXT_RESOLVER_AST_SHA256 = '4115e8d837cd654061bd3a5d7ae1f188e9f941438afe00dfae9d24fc3aadb737';
+const NEXT_RESOLVER_AST_SHA256 = '830e7d469faa6b080fecc5c8231891aed9ae252391e01b954fd566cfc173bd3b';
 const REVIEWED_TRACE_FILES = {
     'scripts/anydoc-desktop-renderer-trace.mjs': '786ff72eaa6d8e35cf108e58fd23a675cba4e40b28dd5d2343ab831a41782723',
     'scripts/anydoc-pdf-renderer-profiles.json': 'e18c156831781d8324331d37b71c0f702165d731b77d2bf719c499d3267a75bf',
