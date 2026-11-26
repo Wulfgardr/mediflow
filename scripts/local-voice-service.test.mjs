@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import http from 'node:http';
 import net from 'node:net';
 import os from 'node:os';
@@ -8,7 +8,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { localVoiceClient, localVoiceEndpoint, localVoiceRequest, signLocalVoiceRequest } from '../lib/local-voice/client.mjs';
-import { LOCAL_VOICE_SANDBOX_PROFILE, localVoiceBinary, localVoiceLaunch, startLocalVoiceService } from './local-voice-service.mjs';
+import { localVoiceBinary, localVoiceLaunch, localVoiceSandboxProfile, startLocalVoiceService } from './local-voice-service.mjs';
 import { MODEL_FILES, TURNS, listenThroughService, synthesizeVisit, wordErrorRate } from './prove-ascolto-visita.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -45,7 +45,7 @@ test('endpoint configuration accepts only a loopback URL and a 64 hex secret', (
   }
   assert.equal(localVoiceEndpoint('http://127.0.0.1:4100', 'A'.repeat(64)), null);
   assert.equal(localVoiceEndpoint('http://127.0.0.1:4100', 'a'.repeat(63)), null);
-  assert.deepEqual(localVoiceLaunch('/x/mediflow-voice', 'darwin'), { command: '/usr/bin/sandbox-exec', args: ['-p', LOCAL_VOICE_SANDBOX_PROFILE, '/x/mediflow-voice'] });
+  assert.deepEqual(localVoiceLaunch('/x/mediflow-voice', 'darwin'), { command: '/usr/bin/sandbox-exec', args: ['-p', localVoiceSandboxProfile(['/x/mediflow-voice']), '/x/mediflow-voice'] });
 });
 
 function impostor(mode) {
@@ -93,10 +93,32 @@ test('the sandbox profile of the service refuses outgoing connections, even to t
   try {
     const open = spawnSync(process.execPath, ['-e', probe], { encoding: 'utf8' });
     assert.equal(open.stdout.trim(), 'connected');
-    const confined = spawnSync('/usr/bin/sandbox-exec', ['-p', LOCAL_VOICE_SANDBOX_PROFILE, process.execPath, '-e', probe], { encoding: 'utf8' });
+    const { command, args } = localVoiceLaunch(realpathSync(process.execPath), 'darwin');
+    const confined = spawnSync(command, [...args, '-e', probe], { encoding: 'utf8' });
     assert.equal(confined.stdout.trim(), 'EPERM', confined.stderr);
   } finally {
     server.close();
+  }
+});
+
+test('the sandbox of the service starts no other program, neither directly nor through LaunchServices', { skip: process.platform !== 'darwin' && 'richiede macOS' }, async () => {
+  const work = realpathSync(mkdtempSync(path.join(os.tmpdir(), 'voce-fuga-')));
+  const marker = path.join(work, 'fuori-dal-sandbox.txt');
+  const app = path.join(work, 'Fuga.app');
+  mkdirSync(path.join(app, 'Contents/MacOS'), { recursive: true });
+  writeFileSync(path.join(app, 'Contents/Info.plist'), '<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict>'
+    + '<key>CFBundleExecutable</key><string>fuga</string><key>CFBundleIdentifier</key><string>dev.mediflow.test.fuga</string>'
+    + '<key>LSBackgroundOnly</key><true/></dict></plist>');
+  writeFileSync(path.join(app, 'Contents/MacOS/fuga'), `#!/bin/sh\n/usr/bin/touch '${marker}'\n`, { mode: 0o755 });
+  try {
+    const opener = localVoiceLaunch('/usr/bin/open', 'darwin');
+    spawnSync(opener.command, [...opener.args, '-g', '-j', app], { encoding: 'utf8' });
+    const shell = localVoiceLaunch('/bin/sh', 'darwin');
+    spawnSync(shell.command, [...shell.args, '-c', `exec /usr/bin/touch '${marker}'`], { encoding: 'utf8' });
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    assert.equal(existsSync(marker), false, 'a program started from the sandbox wrote outside it');
+  } finally {
+    rmSync(work, { recursive: true, force: true });
   }
 });
 
@@ -141,6 +163,20 @@ test('the service listens only on the loopback, opens no connection and answers 
     rmSync(models, { recursive: true, force: true });
   }
   assert.equal(await service.exited, 0);
+});
+
+test('another process of the same user cannot read the service secret from the process table', { skip: noBinary }, async () => {
+  const models = mkdtempSync(path.join(os.tmpdir(), 'voce-vuota-'));
+  const service = await startLocalVoiceService({ binary, models });
+  try {
+    assert.equal((await localVoiceClient(service).status()).service, 'mediflow-voice');
+    const table = spawnSync('/bin/ps', ['-E', '-ww', '-A', '-o', 'pid=,command='], { encoding: 'utf8' }).stdout;
+    assert.ok(table.split('\n').some(line => line.trim().startsWith(`${service.pid} `)), 'service missing from the process table');
+    assert.equal(table.includes(service.secret), false, 'secret readable with ps -E');
+  } finally {
+    await service.stop();
+    rmSync(models, { recursive: true, force: true });
+  }
 });
 
 test('synthetic visit audio streamed to the service comes back as text attributed to doctor and patient', { skip: noModel, timeout: 15 * 60_000 }, async () => {
