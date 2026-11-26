@@ -3695,3 +3695,47 @@ test('launcher with the real voice binary and the installed model', { skip: voic
     await f.cleanup();
     assert.deepEqual(processesRunning(binary), []);
 });
+
+test('a voice service that falls or restarts while the Web starts never leaves the Web on the dead address', () => {
+    const sourceRuntimeUrl = new URL('./source-runtime.mjs', import.meta.url).href;
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', `
+      import assert from 'node:assert/strict';
+      import { registerHooks } from 'node:module';
+      globalThis.fixture = {
+        verifySourceRuntime:()=>({web:'/synthetic',identity:{revision:'synthetic',branch:'synthetic',worktreeHash:'clean',sourceFingerprint:'synthetic'}}),
+        createRequire:()=>()=>{globalThis.serverStarted=true;}
+      };
+      registerHooks({load(url,context,next){ const result=next(url,context); if(url === ${JSON.stringify(sourceRuntimeUrl)}) {
+        result.source=String(result.source)
+          .replace("import { createRequire } from 'node:module';", 'const {createRequire} = globalThis.fixture;')
+          .replace('const { web, identity } = verifySourceRuntime(root);', 'const { web, identity } = globalThis.fixture.verifySourceRuntime(root);');
+      } return result; }});
+      const {startSourceRuntime}=await import(${JSON.stringify(sourceRuntimeUrl)});
+      const sent=[];
+      Object.defineProperty(process,'connected',{value:true});
+      process.send=(frame,callback)=>{sent.push(frame);callback?.();return true;};
+      process.chdir=()=>{};
+      const dead={url:'http://127.0.0.1:4101',secret:'a'.repeat(64)}, live={url:'http://127.0.0.1:4102',secret:'b'.repeat(64)};
+      const frame=endpoint=>({type:'mediflow-local-voice-endpoint',url:endpoint?.url??null,secret:endpoint?.secret??null});
+      const start=async()=>{
+        Object.assign(process.env,{MEDIFLOW_WEB_OWNER_GATE:'synthetic',MEDIFLOW_LOCAL_VOICE_URL:dead.url,MEDIFLOW_LOCAL_VOICE_SECRET:dead.secret});
+        globalThis.serverStarted=undefined;sent.length=0;
+        return startSourceRuntime('web');
+      };
+      let runtime=start();
+      process.emit('message',frame(live));
+      process.emit('message',{type:'mediflow-web-owner-start',nonce:'synthetic'});
+      await runtime;
+      assert.equal(globalThis.serverStarted,true);
+      assert.equal(process.env.MEDIFLOW_LOCAL_VOICE_URL,live.url,'update sent during the owner gate was lost');
+      runtime=start();
+      assert.deepEqual(sent,[{type:'mediflow-local-voice-endpoint-request'}],'the Web never asked for the current address');
+      process.emit('message',frame(null));
+      process.emit('message',{type:'mediflow-web-owner-start',nonce:'synthetic'});
+      await runtime;
+      assert.equal(process.env.MEDIFLOW_LOCAL_VOICE_URL,undefined,'the Web kept the address of a fallen service');
+      assert.deepEqual(process.listeners('message').map(listener=>listener.name),['localVoiceEndpointFrame']);
+      console.log('ok');
+    `], {encoding:'utf8',timeout:10000});
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+});
