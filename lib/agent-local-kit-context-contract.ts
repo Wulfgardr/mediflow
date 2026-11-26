@@ -220,6 +220,49 @@ export function parseAgentPatientContextInput(value: unknown): AgentPatientConte
     return parsed;
 }
 
+export type AgentPatientContextIdentity = {
+    firstName: string;
+    lastName: string;
+    taxCode: string;
+    birthDate: string | null;
+    address: string | null;
+    phone: string | null;
+    caregiver: string | null;
+};
+
+export type AgentPatientContextRequest = {
+    context: AgentPatientContextInput;
+    identity: AgentPatientContextIdentity;
+};
+
+const IDENTITY_KEYS = 'address,birthDate,caregiver,firstName,lastName,phone,taxCode';
+const IDENTITY_VALUE_LIMIT = 256;
+
+const identityValue = (value: unknown): string | null | undefined => {
+    if (value === null) return null;
+    if (typeof value !== 'string' || value.length > IDENTITY_VALUE_LIMIT) return undefined;
+    return value;
+};
+
+function parseAgentPatientContextIdentity(value: unknown): AgentPatientContextIdentity | null {
+    if (!isRecord(value) || Object.keys(value).sort().join(',') !== IDENTITY_KEYS) return null;
+    const fields = Object.fromEntries(Object.entries(value).map(([key, item]) => [key, identityValue(item)]));
+    if (Object.values(fields).some(item => item === undefined)) return null;
+    if (typeof fields.firstName !== 'string' || typeof fields.lastName !== 'string' || typeof fields.taxCode !== 'string') return null;
+    return fields as AgentPatientContextIdentity;
+}
+
+export function parseAgentPatientContextRequest(value: unknown): AgentPatientContextRequest | null {
+    if (!isRecord(value) || Object.keys(value).sort().join(',') !== 'context,identity') return null;
+    const context = parseAgentPatientContextInput(value.context);
+    const identity = parseAgentPatientContextIdentity(value.identity);
+    return context && identity ? { context, identity } : null;
+}
+
+export function normalizeAgentPatientTaxCode(value: string): string {
+    return value.replace(/\s+/gu, '').toUpperCase();
+}
+
 export function sealAgentPatientContextEnvelope(input: AgentPatientContextInput, nowMs = Date.now()): AgentPatientContextEnvelope {
     return {
         schema: AGENT_PATIENT_CONTEXT_SCHEMA,

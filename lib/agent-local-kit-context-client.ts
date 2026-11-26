@@ -3,9 +3,12 @@ import { clinicalRichTextToPlainText } from './clinical-rich-text';
 import { patientAllergiesSchema } from './patient-allergies';
 import { clientArchiveGeneration } from './security/client-auth-api';
 import {
+    normalizeAgentPatientTaxCode,
     parseAgentPatientContextInput,
     sha256HexClient,
+    type AgentPatientContextIdentity,
     type AgentPatientContextInput,
+    type AgentPatientContextRequest,
 } from './agent-local-kit-context-contract';
 
 function toIsoDate(value: Date | string | null | undefined): string | undefined {
@@ -35,7 +38,7 @@ export async function buildAgentPatientContextPayload(input: {
     checkups: readonly Checkup[];
     exemptionCodes: readonly string[];
 }): Promise<AgentPatientContextInput | null> {
-    const normalizedTaxCode = (input.patient.taxCode ?? '').replace(/\s+/gu, '').toUpperCase();
+    const normalizedTaxCode = normalizeAgentPatientTaxCode(input.patient.taxCode ?? '');
     if (normalizedTaxCode.length < 4) return null;
 
     const cfHash = await sha256HexClient(normalizedTaxCode);
@@ -140,16 +143,35 @@ export async function buildAgentPatientContextPayload(input: {
     });
 }
 
+function optionalIdentity(value: string | null | undefined): string | null {
+    return value?.trim() ? value.trim() : null;
+}
+
+export function agentPatientContextIdentity(patient: Patient): AgentPatientContextIdentity {
+    const birthDate = patient.birthDate ? new Date(patient.birthDate) : null;
+    return {
+        firstName: patient.firstName ?? '',
+        lastName: patient.lastName ?? '',
+        taxCode: patient.taxCode ?? '',
+        birthDate: birthDate && !Number.isNaN(birthDate.getTime()) ? birthDate.toISOString() : null,
+        address: optionalIdentity(patient.address),
+        phone: optionalIdentity(patient.phone),
+        caregiver: optionalIdentity(patient.caregiver),
+    };
+}
+
 export async function sendPatientContextToLocalKit(
     payload: AgentPatientContextInput,
+    patient: Patient,
 ): Promise<{ ok: true; expiresAt: number } | { ok: false; code: string }> {
+    const request: AgentPatientContextRequest = { context: payload, identity: agentPatientContextIdentity(patient) };
     const response = await fetch('/api/agent-mandates/local-kit/context', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'x-mediflow-archive-generation': clientArchiveGeneration(),
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(request),
     });
     if (!response.ok) {
         try {
