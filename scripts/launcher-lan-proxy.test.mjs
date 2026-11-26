@@ -4,39 +4,37 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import http from 'node:http';
 import https from 'node:https';
-import { createServer } from 'node:net';
 import { join } from 'node:path';
 import tls from 'node:tls';
 import { after, before, test } from 'node:test';
-import { fileURLToPath } from 'node:url';
 import { syntheticTaxCode } from '../lib/patient-identity.test-support.ts';
 import { pin, startDevicePairingFixture } from './fixtures/device-pairing-runtime.mjs';
-import { certificatePin, createLanProxyController, readNetworkOverview } from './launcher-lan-proxy.mjs';
+import { certificatePin } from './launcher-lan-proxy.mjs';
 
-const root = fileURLToPath(new URL('..', import.meta.url));
-let fixture, lan, port;
-
-async function freePort() {
-    const server = createServer();
-    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-    const { port: value } = server.address();
-    await new Promise(resolve => server.close(resolve));
-    return value;
-}
+let fixture;
 
 before(async () => {
-    fixture = await startDevicePairingFixture({ proxy: false });
+    fixture = await startDevicePairingFixture({ launcher: true });
     execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1', '-subj', '/CN=localhost',
         '-keyout', join(fixture.directory, 'impostor.key'), '-out', join(fixture.directory, 'impostor.crt')], { stdio: 'ignore' });
-    port = await freePort();
-    lan = createLanProxyController({ root, dataDir: fixture.directory, port,
-        readOverview: target => readNetworkOverview(target, fixture.directory, { MEDIFLOW_LOCAL_API_TOKEN: fixture.localApiToken }) });
-    await lan.follow(fixture.httpOrigin);
 });
 after(async () => {
-    await lan?.detach();
     await fixture?.close();
 });
+
+async function launcherState() {
+    const chooser = readFileSync(join(fixture.directory, 'next.log'), 'utf8').match(/^Avvio: (http:\/\/127\.0\.0\.1:\d+\/[a-f0-9]+\/)$/mu)[1];
+    return (await fetch(new URL('state', chooser))).json();
+}
+
+async function settles(predicate) {
+    for (let attempt = 0; attempt < 200; attempt++) {
+        const state = await launcherState();
+        if (predicate(state.lan)) return state;
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    assert.fail(JSON.stringify(await launcherState()));
+}
 
 function device(origin, fingerprint, path, { method = 'GET', headers = {}, body } = {}) {
     const target = new URL(origin);
@@ -86,23 +84,18 @@ async function pairDevice() {
     return { origin, fingerprint, paired, session: { ...paired, Cookie: cookie } };
 }
 
-async function settles(predicate) {
-    for (let attempt = 0; attempt < 100; attempt++) {
-        await lan.refresh();
-        if (predicate(lan.status())) return lan.status();
-        await new Promise(resolve => setTimeout(resolve, 50));
-    }
-    assert.fail(JSON.stringify(lan.status()));
-}
-
 test('a paired synthetic device opens a synthetic chart through the proxy the launcher started', async () => {
-    assert.deepEqual(lan.status(), { state: 'on', paired: false, port, reason: null });
+    const port = fixture.tlsPort;
+    const started = await settles(lan => lan.state === 'on');
+    assert.deepEqual(started.lan, { state: 'on', paired: false, port, reason: null });
     const status = JSON.parse(readFileSync(join(fixture.directory, 'runtime-status.json'), 'utf8'));
     assert.equal(status.port, port);
     assert.equal(status.bindHost, '0.0.0.0');
     assert.equal(status.tlsPin, certificatePin(join(fixture.directory, 'certs/local-api.crt')));
-    assert.equal(readFileSync(join(fixture.directory, 'local-api-tls-proxy.pid'), 'utf8').trim(), String(lan.pid()));
-    assert.ok(!execFileSync('/bin/ps', ['-o', 'args=', '-p', String(lan.pid())], { encoding: 'utf8' }).includes(fixture.localApiToken));
+    const proxyPid = readFileSync(join(fixture.directory, 'local-api-tls-proxy.pid'), 'utf8').trim();
+    const args = execFileSync('/bin/ps', ['-o', 'args=', '-p', proxyPid], { encoding: 'utf8' });
+    assert.match(args, /scripts\/local-api-tls-proxy\.mjs/u);
+    assert.ok(!args.includes(fixture.localApiToken) && !args.includes('local-api.key'));
 
     const id = await syntheticChart();
     const phone = await pairDevice();
@@ -111,7 +104,8 @@ test('a paired synthetic device opens a synthetic chart through the proxy the la
     const chart = await device(phone.origin, phone.fingerprint, `/api/v1/network/patients/${id}`, { headers: phone.session });
     assert.equal(chart.status, 200, chart.text);
     assert.equal(JSON.parse(chart.text).id, id);
-    assert.deepEqual(await settles(value => value.paired), { state: 'on', paired: true, port, reason: null });
+    assert.deepEqual((await settles(lan => lan.paired)).lan, { state: 'on', paired: true, port, reason: null });
+    assert.equal((await launcherState()).services.find(row => row.id === 'lan').detail, 'Collegamento acceso.');
 });
 
 test('an unpaired device, an unrecognised certificate and a stopped proxy read nothing', async () => {
@@ -138,16 +132,18 @@ test('an unpaired device, an unrecognised certificate and a stopped proxy read n
 
     const local = await fetch(fixture.httpOrigin + '/api/settings/network.mode', { method: 'PUT', headers: fixture.webHeaders, body: JSON.stringify({ value: 'local-only' }) });
     assert.equal(local.status, 200);
-    assert.deepEqual(await settles(value => value.state === 'off'), { state: 'off', paired: false, port: null, reason: null });
+    assert.deepEqual((await settles(lan => lan.state === 'off')).lan, { state: 'off', paired: false, port: null, reason: null });
     assert.equal(existsSync(join(fixture.directory, 'runtime-status.json')), false);
     assert.equal(existsSync(join(fixture.directory, 'local-api-tls-proxy.pid')), false);
     await assert.rejects(device(phone.origin, phone.fingerprint, `/api/v1/network/patients/${id}`, { headers: phone.session }), { code: 'ECONNREFUSED' });
 
     const home = await fetch(fixture.httpOrigin + '/api/settings/network.mode', { method: 'PUT', headers: fixture.webHeaders, body: JSON.stringify({ value: 'network-home-base' }) });
     assert.equal(home.status, 200);
-    await settles(value => value.state === 'on');
+    await settles(lan => lan.state === 'on');
     assert.equal((await device(phone.origin, phone.fingerprint, `/api/v1/network/patients/${id}`, { headers: phone.session })).status, 200);
-    await lan.detach();
+    fixture.launcher.kill('SIGTERM');
+    await new Promise(resolve => fixture.launcher.once('exit', resolve));
+    assert.match(readFileSync(join(fixture.directory, 'next.log'), 'utf8'), /MediFlow arrestato/u);
     assert.equal(existsSync(join(fixture.directory, 'runtime-status.json')), false);
     await assert.rejects(device(phone.origin, phone.fingerprint, `/api/v1/network/patients/${id}`, { headers: phone.session }), { code: 'ECONNREFUSED' });
 });
