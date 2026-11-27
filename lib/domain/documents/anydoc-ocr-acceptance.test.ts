@@ -73,7 +73,13 @@ function substituteRecognition(start: () => { script?: string; missing?: boolean
     mock.method(childProcess, 'spawn', (command: string, args: string[], options: childProcess.SpawnOptions) => {
         if (command !== '/usr/bin/sandbox-exec' || args[2] !== '/usr/bin/xcrun') return originalSpawn(command, args, options);
         calls += 1;
-        assert.deepEqual(args.slice(0, 4), ['-p', '(version 1) (allow default) (deny network*)', '/usr/bin/xcrun', 'swift']);
+        assert.equal(args[0], '-p');
+        assert.match(args[1] ?? '', /\(deny network\*\)/u);
+        assert.match(args[1] ?? '', /\(deny file-write\*\)/u);
+        assert.match(args[1] ?? '', /\(deny process-exec\)/u);
+        assert.match(args[1] ?? '', /\(deny lsopen\)/u);
+        assert.match(args[1] ?? '', /\(deny appleevent-send\)/u);
+        assert.deepEqual(args.slice(2, 4), ['/usr/bin/xcrun', 'swift']);
         assert.equal(options.detached, true);
         temporaryRoots.push(options.env!.TMPDIR!);
         const replacement = start();

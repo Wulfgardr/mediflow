@@ -200,6 +200,7 @@ test('fails closed with sanitized io_failure for missing, symlinked, and tampere
         for (const relativePath of [
             'package.json',
             'scripts/document-child-launcher.mjs',
+            'scripts/seatbelt-profile.mjs',
             'scripts/document-windows-sandbox.mjs',
             ...(process.platform === 'win32' ? ['scripts/document-windows-sandbox/launcher-x64.exe'] : []),
             'scripts/document-child-network-guard.mjs',
