@@ -4,7 +4,7 @@ import { useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { CircleDashed, FileText, Inbox, NotebookPen } from 'lucide-react';
 import { applyReviewedAgentVisitAndCreatePatient, applyReviewedAgentVisits, canDiscardIncomingAgentVisit, decideAgentVisitItem, discardIncomingAgentVisit, readIncomingAgentPdf, stageNewAgentVisitItem, type agentIncomingSnapshot } from '@/lib/agent-incoming';
-import { AGENT_CORRECTABLE_FIELDS, AGENT_THERAPY_STATUSES, AGENT_THERAPY_STATUS_NEEDED, agentCorrectionDropsDrugCodes, agentItemAwaitsDecision, agentItemCanWrite, agentItemCorrectable, agentVisitAwaitsReview, newAgentPatientBlock, agentVisitItemsBlock, type AgentPatientIdentity, type AgentVisitReview, type DraftAgentItemDecision } from '@/lib/agent-visit-review';
+import { AGENT_CORRECTABLE_FIELDS, AGENT_THERAPY_STATUSES, AGENT_THERAPY_STATUS_NEEDED, agentCorrectionDropsDrugCodes, agentItemAwaitsDecision, agentItemCanWrite, agentItemDiscardAdmitted, agentItemCorrectable, agentVisitAwaitsReview, newAgentPatientBlock, agentVisitItemsBlock, type AgentPatientIdentity, type AgentVisitReview, type DraftAgentItemDecision } from '@/lib/agent-visit-review';
 import type { AgentCassetteIndexEntry, AgentItemDecision } from '@/lib/agent-visit-application-contract';
 import { agentReviewFieldLabels as fieldLabels, agentReviewFieldValues as fieldValues, agentReviewItemLabels } from '@/lib/agent-visit-review-labels';
 import surface from '@/components/record-surface.module.css';
@@ -115,7 +115,7 @@ function ItemGestures({ review, item, busy, missing, draft, onDecide, onCorrect,
         <Button variant="text" disabled={busy} onClick={onUndo}>Annulla scelta</Button>
     </div>;
     const canWrite = agentItemCanWrite(review);
-    const canDiscard = canDiscardIncomingAgentVisit(review.visit.cassette) && Boolean(review.newPatient || review.patient);
+    const canDiscard = canDiscardIncomingAgentVisit(review.visit.cassette) && agentItemDiscardAdmitted(review);
     const cannotKeep = Boolean(review.itemBlockers.get(item.id)?.length) || review.inRecordItemIds.includes(item.id) || missing;
     return <div className={css.itemActions} role="group" aria-label={'Decidi ' + proposalHeadline(item)}>
         <Button variant="text" disabled={busy || !canDiscard} onClick={() => onDecide('discard')}>Scarta</Button>

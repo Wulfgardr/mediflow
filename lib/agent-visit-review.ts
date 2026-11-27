@@ -6,7 +6,7 @@ import { cassetteItems } from './agent-cassette-contract';
 import { agentBytes } from './agent-cassette-crypto';
 import { openAgentVisit, type OpenedAgentVisit } from './agent-cassette-client';
 import { newAgentPatientSchema, reviewedAgentApplicationSchema, agentItemDecisionSchema, agentStructuredKind, type ReviewedAgentApplicationInput, type AgentCassetteIndexEntry, type IncomingAgentCassette, type NewAgentPatient,
-    type AgentItemDecisionInput, type AgentItemDecision } from './agent-visit-application-contract';
+    type AgentItemDecisionInput, type AgentItemDecision, type AgentCassetteReviewBlock } from './agent-visit-application-contract';
 import { collectDossierTaxCodes, excludedProfessionalCode } from './domain/documents/dossier-import';
 import { reviewAgentFact } from './agent-visit-facts';
 import { servicePrescriptionCreateSchema } from './api-schemas/prescriptions';
@@ -17,7 +17,7 @@ import { agentVisitPdfText, type AgentVisitPdf } from './agent-visit-pdf-text';
 export type AgentVisitDocument = AgentVisitPdf & { id: string; name: string; hash: string };
 export type AgentVisitReview = { visit: Omit<OpenedAgentVisit, 'cassette'> & { cassette: AgentCassetteIndexEntry }; patient: Patient | null; newPatient: NewAgentPatientReview | null;
     documents: AgentVisitDocument[]; appliedItemIds: string[]; discardedItemIds: string[]; correctedItemIds: string[]; currentSummary: Map<string, string>; blockers: string[]; proposalBlockers: string[];
-    itemBlockers: Map<string, string[]>; itemNeeds: Map<string, AgentPhysicianField[]>; inRecordItemIds: string[] };
+    itemBlockers: Map<string, string[]>; itemNeeds: Map<string, AgentPhysicianField[]>; inRecordItemIds: string[]; reviewBlock?: AgentCassetteReviewBlock };
 type PdfIdentity = { name: string; codes: string[] };
 export type AgentPatientIdentity = Pick<NewAgentPatient, 'taxCode' | 'firstName' | 'lastName'>;
 type NewAgentPatientReview = {
@@ -183,7 +183,7 @@ export async function inspectAgentVisit(row: IncomingAgentCassette, patients: Pa
             currentSummary.set(item.id, before.join('; ') || 'Non presente');
         }
     }
-    return { visit, patient, newPatient, documents: [...documents.values()], appliedItemIds: row.appliedItemIds, discardedItemIds, correctedItemIds: row.correctedItemIds ?? [], currentSummary, blockers, proposalBlockers, itemBlockers, itemNeeds, inRecordItemIds };
+    return { visit, patient, newPatient, documents: [...documents.values()], appliedItemIds: row.appliedItemIds, discardedItemIds, correctedItemIds: row.correctedItemIds ?? [], currentSummary, blockers, proposalBlockers, itemBlockers, itemNeeds, inRecordItemIds, ...(row.reviewBlock ? { reviewBlock: row.reviewBlock } : {}) };
 }
 export async function reopenReviewedAgentItems(review: AgentVisitReview, row: IncomingAgentCassette): Promise<AgentVisitReview['visit']['items'] | null> {
     const visit = await openAgentVisit(row);
@@ -230,6 +230,10 @@ export function agentItemAwaitsDecision(review: AgentVisitReview, itemId: string
 
 export function agentItemCanWrite(review: AgentVisitReview): boolean {
     return !review.blockers.length && Boolean(review.newPatient || review.patient?.version);
+}
+
+export function agentItemDiscardAdmitted(review: AgentVisitReview): boolean {
+    return !review.reviewBlock && Boolean(review.newPatient || review.patient);
 }
 
 export async function prepareAgentApplication(review: AgentVisitReview, signal: AbortSignal, identity?: AgentPatientIdentity,
