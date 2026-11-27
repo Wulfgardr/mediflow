@@ -15,12 +15,17 @@ import {
     readNomenclatoreTable,
 } from '../../../../scripts/lombardia-reference-tables';
 import {
+    ALL_LOMBARDIA_SERVICE_PACKAGES,
     DIABETES_T2_PACKAGE,
+    DRAFT_SET_MINIMI_PACKAGES,
     formatServicePackageApproval,
     generatePackageServiceRequests,
+    listApprovedServicePackages,
     resolveMatchingComplicationModules,
+    selectApprovedServicePackagesForDiagnoses,
     validateServicePackage,
     type ApprovedServicePackage,
+    type DraftServicePackageItem,
     type GeneratedServiceRequest,
     type PatientServiceHistoryEntry,
     type RegionalExemptionCoverageEntry,
@@ -46,7 +51,7 @@ const CORE_ONLY: TerritorialPackCapability = {
 
 const NEW_ITEMS_OF_25_NOVEMBER = ['dm2-visita-endocrinologica', 'dm2-glicemia', 'dm2-esame-urine'];
 
-function allItems(pkg: ServicePackage): ServicePackageItem[] {
+function allItems(pkg: ServicePackage): (ServicePackageItem | DraftServicePackageItem)[] {
     return [...pkg.baseItems, ...pkg.complicationModules.flatMap((module) => module.items)];
 }
 
@@ -140,11 +145,11 @@ test('ogni voce cita un documento con sezione, data e indirizzo, oppure una deci
         for (const source of item.sources) {
             if (source.kind === 'documento') {
                 assert.match(source.publishedAt, /^\d{4}-\d{2}-\d{2}$/u);
-                assert.match(source.url, /^https:\/\//u);
+                assert.match(source.url ?? '', /^https:\/\//u);
                 assert.ok(source.sectionOrTable.length > 0);
             } else {
                 assert.equal(source.kind, 'decisione_del_medico');
-                assert.equal(source.decidedAt, '2026-11-25');
+                assert.match(source.decidedAt, /^\d{4}-\d{2}-\d{2}$/u);
                 assert.ok(source.decision.length > 0);
             }
         }
@@ -400,4 +405,105 @@ test('con il modulo renale l’albuminuria di 8 mesi fa torna da richiedere', ()
     assert.equal(requestsByCode(generate({ patientIcd11Codes: ['5A11'], history })).has('90.33.4'), false);
     const renal = requestsByCode(generate({ patientIcd11Codes: ['5A11', 'GB61.Z'], history })).get('90.33.4');
     assert.equal(renal?.reason.label, 'Scaduta da 2 mesi');
+});
+
+test('la voce del fundus nel pacchetto diabete resta 95.11 e nomina anche 89.01.D come alternativa', () => {
+    const fundus = DIABETES_T2_PACKAGE.baseItems.find((item) => item.id === 'dm2-fotografia-fundus');
+    assert.ok(fundus);
+    assert.equal(fundus.serviceCode, '95.11');
+    assert.equal(fundus.periodicityMonths, 24);
+    assert.ok(fundus.appropriatenessConditions.some((condition) => condition.includes('89.01.D') && condition.includes('95.02')));
+    const generated = requestsByCode(generate({ patientIcd11Codes: ['5A11'], patientExemptionCodes: ['013'] })).get('95.11');
+    assert.ok(generated?.appropriatenessConditions.some((condition) => condition.includes('89.01.D')));
+});
+
+test('tutti i 23 pacchetti in bozza dei set minimi superano la validazione e citano fonte, codici e ICD-11 validi', () => {
+    assert.equal(DRAFT_SET_MINIMI_PACKAGES.length, 23);
+    assert.equal(ALL_LOMBARDIA_SERVICE_PACKAGES.length, 24);
+    const nomenclatore = new Set(readNomenclatoreTable().map((row) => row.code));
+    const { entries } = parseWhoTabulation(readFileSync('assets/reference-data/icd11/catalog.zip'));
+    const icd11Codes = new Set(entries.map((entry) => entry.code));
+    const seenPackageIds = new Set<string>();
+
+    for (const pkg of DRAFT_SET_MINIMI_PACKAGES) {
+        assert.equal(pkg.approval.status, 'draft_pending_approval', pkg.id);
+        assert.equal(formatServicePackageApproval(pkg.approval), 'Bozza da approvare', pkg.id);
+        assert.equal(seenPackageIds.has(pkg.id), false, `ID duplicato: ${pkg.id}`);
+        seenPackageIds.add(pkg.id);
+
+        const validation = validateServicePackage(pkg, CATALOG);
+        assert.equal(validation.ok, true, `${pkg.id}: ${JSON.stringify(validation)}`);
+
+        for (const icd of pkg.activation.icd11Codes) {
+            assert.ok(icd11Codes.has(icd), `${pkg.id}: codice ICD-11 ${icd} assente dal catalogo`);
+        }
+
+        for (const item of allItems(pkg)) {
+            assert.ok(nomenclatore.has(item.serviceCode), `${pkg.id}/${item.id}: codice ${item.serviceCode} assente dal nomenclatore`);
+            assert.ok(item.sources.some((source) => source.kind === 'documento'), `${pkg.id}/${item.id}: fonte documentale assente`);
+            for (const source of item.sources) {
+                assert.equal(source.kind, 'documento', `${pkg.id}/${item.id}: una bozza non inventa decisioni del medico`);
+                assert.match(source.publishedAt, /^\d{4}-\d{2}-\d{2}$/u);
+                assert.ok(source.sectionOrTable.length > 0);
+            }
+        }
+    }
+});
+
+test('un documento pubblicato senza indirizzo e un pacchetto approvato senza cadenza sono rifiutati', () => {
+    const [visit, ...rest] = DIABETES_T2_PACKAGE.baseItems;
+    const publishedWithoutUrl = {
+        kind: 'documento',
+        document: 'Documento pubblicato senza URL',
+        sectionOrTable: 'Pagina 1',
+        publishedAt: '2026-10-30',
+        status: 'vigente',
+    };
+    const withoutUrlResult = validateServicePackage(
+        { ...DIABETES_T2_PACKAGE, baseItems: [{ ...visit, sources: [publishedWithoutUrl] }, ...rest] },
+        CATALOG,
+    );
+    assert.equal(withoutUrlResult.ok, false);
+
+    const approvedWithNullPeriodicity = {
+        ...DIABETES_T2_PACKAGE,
+        baseItems: [{ ...visit, periodicityMonths: null }, ...rest],
+    };
+    const nullPeriodicityResult = validateServicePackage(approvedWithNullPeriodicity, CATALOG);
+    assert.equal(nullPeriodicityResult.ok, false);
+});
+
+test('un pacchetto in bozza non viene mai proposto al medico in visita finché non è approvato', () => {
+    const approved = listApprovedServicePackages(ALL_LOMBARDIA_SERVICE_PACKAGES);
+    assert.deepEqual(approved.map((pkg) => pkg.id), [DIABETES_T2_PACKAGE.id]);
+
+    assert.deepEqual(
+        selectApprovedServicePackagesForDiagnoses(ALL_LOMBARDIA_SERVICE_PACKAGES, ['5A11']).map((pkg) => pkg.id),
+        [DIABETES_T2_PACKAGE.id],
+    );
+
+    const baseInput = {
+        territorialCapability: LOMBARDIA,
+        catalog: CATALOG,
+        activeModuleIds: [],
+        history: [],
+        asOf: '2026-11-26',
+    };
+
+    for (const draft of DRAFT_SET_MINIMI_PACKAGES) {
+        const selected = selectApprovedServicePackagesForDiagnoses(
+            ALL_LOMBARDIA_SERVICE_PACKAGES,
+            draft.activation.icd11Codes,
+        );
+        assert.deepEqual(selected, [], `La bozza ${draft.id} non deve essere proposta in visita`);
+
+        const outcome = generatePackageServiceRequests({
+            ...baseInput,
+            package: draft as unknown as ApprovedServicePackage,
+        });
+        assert.equal(outcome.ok, false, `La bozza ${draft.id} non deve generare prestazioni`);
+        if (!outcome.ok) {
+            assert.equal(outcome.errorCode, 'PACKAGE_NOT_APPROVED');
+        }
+    }
 });
