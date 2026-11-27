@@ -49,6 +49,14 @@ canale loopback, senza fidarsi di indirizzi dichiarati dal chiamante. Il
 proxy LAN non le inoltra. CLI e futuro MCP usano lo stesso contratto, senza
 accesso diretto a SQLite, cookie, PIN o master key.
 
+La richiesta di collegamento (`/api/agent/v1/pairings`) rifiuta anche ciò che
+arriva da un browser: un'intestazione `Origin`, un `Sec-Fetch-Site` diverso da
+`none` o `same-origin`, e per la `POST` un corpo che non è `application/json`.
+Così una pagina web aperta nel browser del medico non può creare richieste
+verso il loopback. Le richieste in attesa sono al più otto; oltre, la rotta
+risponde 429 finché una non scade (cinque minuti) o viene decisa. Prova:
+`lib/security/agent-channel.test.ts`.
+
 ### Rinnovo allo sblocco
 
 Il medico può scegliere «Rinnova allo sblocco» quando approva il codice di

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { chmodSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -77,4 +77,48 @@ test('remote proxy policy denies all agent and mandate routes including encoded 
         '/api/agent-mandates/pairings', '/api/%61gent/v1/context', '/api/agent/v1/context?loopback=1']) {
         for (const method of ['GET', 'POST', 'PUT', 'DELETE']) assert.equal(allowsNetworkIngress(method, path), false);
     }
+});
+
+const pairingBody = JSON.stringify({ name: 'Synthetic browser probe', operations: ['visita.apri'] });
+const pendingCount = () => database.prepare("SELECT count(*) FROM agent_pairing_requests WHERE status='pending' AND expires_at>?").pluck().get(Date.now()) as number;
+
+test('a web page in the doctor browser cannot create pairing requests through loopback', async () => {
+    const before = pendingCount();
+    const browserShapes: Record<string, string>[] = [
+        { 'Content-Type': 'text/plain;charset=UTF-8', Origin: 'http://localhost:8080', 'Sec-Fetch-Site': 'cross-site', 'Sec-Fetch-Mode': 'no-cors' },
+        { 'Content-Type': 'application/json', Origin: 'http://localhost:8080' },
+        { 'Content-Type': 'application/json', Origin: 'null' },
+        { 'Content-Type': 'application/json', 'Sec-Fetch-Site': 'cross-site' },
+        { 'Content-Type': 'application/json', 'Sec-Fetch-Site': 'same-site' },
+        { 'Content-Type': 'text/plain;charset=UTF-8' },
+    ];
+    for (const headers of browserShapes) {
+        const response = await fetch(origin + '/api/agent/v1/pairings', { method: 'POST', headers, body: pairingBody });
+        assert.equal(response.status, 403, JSON.stringify(headers));
+    }
+    assert.equal(pendingCount(), before);
+});
+
+test('the shared agent client used by the kit and the plugin still pairs', async () => {
+    const { requestAgentPairing, completeAgentPairing } = await import('../../packages/agent-client/src/visit-client.ts');
+    const state = mkdtempSync(join(tmpdir(), 'mediflow-agent-client-'));
+    chmodSync(state, 0o700);
+    try {
+        const pairing = await requestAgentPairing(state, origin, 'Synthetic kit client', ['visita.apri']);
+        const fresh = mandates.create({ id: randomUUID(), durationMs: 43200000, operations: ['visita.apri'], provider: 'local', allowsClinicalEgress: false,
+            publicKey: 'B' + 'A'.repeat(86) + '=', wrappedPrivateKey: 'ENC:' + 'A'.repeat(16) + ':' + 'A'.repeat(64) }, actor, generation);
+        pairings.approve(pairing.requestId, pairing.code, fresh.id, actor, generation);
+        assert.equal((await completeAgentPairing(state, pairing.requestId)).status, 'approved');
+    } finally { rmSync(state, { recursive: true, force: true }); }
+});
+
+test('pending pairing requests are capped so a local flood cannot fill the Agents page', async () => {
+    const statuses: number[] = [];
+    for (let index = 0; index < 40; index += 1) {
+        const response = await fetch(origin + '/api/agent/v1/pairings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: pairingBody });
+        statuses.push(response.status);
+    }
+    assert.ok(statuses.includes(429), statuses.join(','));
+    assert.ok(pendingCount() <= 16, String(pendingCount()));
+    assert.equal(pairings.pending().length, pendingCount());
 });
