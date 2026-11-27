@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repository": "https://github.com/Wulfgardr/mediflow",
-  "sourceCommit": "90fa7771fc0822475611c9affb9c22e212939399",
+  "sourceCommit": "0acc91a3ee1f2fe1a15eb13c2414b49de00739e1",
   "scope": "Due esempi del codice: lettura headless delle attività e conferma Web di una transizione checkup.",
   "limits": [
     "Mappa curata di relazioni nel sorgente, non tracciamento del runtime.",

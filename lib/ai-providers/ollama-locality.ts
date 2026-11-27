@@ -15,8 +15,8 @@ export const OLLAMA_METADATA_TIMEOUT_MS = 5_000;
 export const OLLAMA_PRELOAD_TIMEOUT_MS = 60_000;
 export const OLLAMA_LOCAL_MODEL_REFERENCE_MAX_UTF8_BYTES = 674;
 // Versioni osservate per il confine locale: ADR 0136, WUL-694, WUL-602 e WUL-840.
-const SUPPORTED_OLLAMA_LOCALITY_VERSION = /^(?:0\.32\.\d+(?:[-+].+)?|0\.33\.3|0\.34\.2|0\.40\.4|0\.40\.5|0\.40\.6|0\.40\.16)$/;
-export const SUPPORTED_OLLAMA_LOCALITY_VERSIONS = '0.32.x, 0.33.3, 0.34.2, 0.40.4, 0.40.5, 0.40.6, 0.40.16';
+const SUPPORTED_OLLAMA_LOCALITY_VERSION = /^(?:0\.32\.\d+(?:[-+].+)?|0\.33\.3|0\.34\.2|0\.40\.4|0\.40\.5|0\.40\.6|0\.40\.16|0\.40\.18)$/;
+export const SUPPORTED_OLLAMA_LOCALITY_VERSIONS = '0.32.x, 0.33.3, 0.34.2, 0.40.4, 0.40.5, 0.40.6, 0.40.16, 0.40.18';
 export type OllamaVersionMismatch = Readonly<{ serverVersion: string; supportedVersions: string }>;
 
 export class OllamaLocalityError extends Error {

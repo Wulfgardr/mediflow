@@ -8,7 +8,8 @@ import { schemaSnapshot, schemaDifferences } from '../lib/sqlite-schema-shape.ts
 import { initializerProgram, readPinnedSource, replayInitializers } from './historical-schema-initializers.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
-const manifest = JSON.parse(fs.readFileSync(path.join(root, 'scripts/fixtures/schema-convergence/provenance.json'), 'utf8'));
+const manifestPath = 'scripts/fixtures/schema-convergence/provenance.json';
+const manifest = JSON.parse(fs.readFileSync(path.join(root, manifestPath), 'utf8'));
 if (process.versions.node.split('.')[0] !== '24') throw new Error('Node 24 required');
 const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' });
 const args = process.argv.slice(2);
@@ -16,15 +17,18 @@ if (args.length > 1 || (args.length && !args[0].startsWith('--families='))) thro
 const requested = args.length ? args[0].slice('--families='.length).split(',') : manifest.families.map(family => family.tags[0].tag);
 if (new Set(requested).size !== requested.length || requested.some(tag => !manifest.families.some(family => family.tags[0].tag === tag))) throw new Error('Unknown or duplicate family');
 const families = manifest.families.filter(family => requested.includes(family.tags[0].tag));
-const programs = families.map(family => initializerProgram(root, family));
 // Validate every source before any database is created: provenance drift is fatal.
 for (const family of families) {
-  for (const { commit } of family.tags) {
+  for (const { commit, tag } of family.tags) {
+    const ancestry = spawnSync('git', ['merge-base', '--is-ancestor', commit, 'HEAD'], { cwd: root });
+    if (ancestry.error) throw ancestry.error;
+    if (ancestry.status !== 0) throw new Error(`${manifestPath}: ${tag} pins ${commit}, which is not an ancestor of HEAD. Update this commit to the matching schema source in the current history.`);
     readPinnedSource(root, commit, family.provisioningSource);
     for (const source of family.runtimeSources) readPinnedSource(root, commit, source);
     for (const blob of family.sqlSources) readPinnedSource(root, commit, { ...manifest.sourcesByBlob[blob], blob });
   }
 }
+const programs = families.map(family => initializerProgram(root, family));
 const workspace = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-historical-sql-baselines-')));
 function snapshot(file) {
   const db = new Database(file, { readonly: true, fileMustExist: true });

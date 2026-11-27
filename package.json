@@ -68,6 +68,8 @@
     "test:test-fake-schema-ratchet": "node --test scripts/check-test-fake-schema-ratchet.test.mjs",
     "check:ci-guards-wired": "node scripts/check-ci-guards-wired.mjs",
     "test:ci-guards-wired": "node --test scripts/check-ci-guards-wired.test.mjs",
+    "check:public-sanitization": "node scripts/check-public-sanitization.mjs",
+    "test:public-sanitization": "node --test scripts/check-public-sanitization.test.mjs",
     "generate:loinc-lab-catalog": "node scripts/run-strip-types.mjs scripts/generate-loinc-lab-catalog.ts",
     "generate:dossier-conformance": "node scripts/generate-dossier-conformance.mjs && node scripts/run-strip-types.mjs scripts/prepare-dossier-banco-cases.ts && node scripts/run-strip-types.mjs scripts/update-dossier-conformance.ts",
     "check:dossier-conformance-corpus": "node scripts/check-dossier-conformance-corpus.mjs",

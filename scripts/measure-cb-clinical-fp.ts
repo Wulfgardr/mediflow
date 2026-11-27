@@ -9,7 +9,7 @@ import { createRedactionSession } from '../lib/ai-redaction-session';
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const BASE = '56f9dd5cdd4cec86d98347736f8d2e6d7170cf4b';
 const BASELINE_FILE = 'docs/quality/cb-clinical-fp-20261113-before.json';
-const BASELINE_SHA256 = '824aa322d17436a44ecd312bc147cfe1e50b4dffa131061335bf1fc69c2495fd';
+const BASELINE_SHA256 = '7510a693eebe46650f6d11b39e8e1b39a7a7e6797687ed40fa9e6de83f491552';
 const sha = (value: string | Buffer) => createHash('sha256').update(value).digest('hex');
 type Range = { start: number; end: number };
 type Entry = { id: string; text: string; sourceRefs?: unknown[]; expectedIdentifiers?: (Range & { text: string })[] };
