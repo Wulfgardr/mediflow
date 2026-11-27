@@ -30,7 +30,7 @@ test('v1 keeps omitted history distinct from an explicitly included empty snapsh
 });
 
 import { execFileSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -39,6 +39,7 @@ import Database from 'better-sqlite3';
 import { backupArtifactInputChecksum, stableStringify } from './backup-artifact';
 import { runBackupRestorePreflight } from './backup-restore-preflight';
 import { canonicalizeBackupAuditRows, type BackupAuditRow } from './backup-audit';
+import { recordWebAgentLifecycle } from './test-fixtures/web-agent-lifecycle';
 import { serializeBackupArtifact as serializeScheduledBackupArtifact } from '../scripts/run-scheduled-backup.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
@@ -130,6 +131,90 @@ function restore(dataDir: string, artifactPath: string, mode: string) {
         appendOnly: boolean;
     };
 }
+
+const webFullBackupScript = [
+    "import {createRequire} from 'node:module';",
+    "import {issueSyntheticWebSession} from './lib/security/web-auth-lifecycle-owner-test-fixture.ts';",
+    "const actor = process.env.SYNTHETIC_BACKUP_ACTOR;",
+    "const session = issueSyntheticWebSession({id:actor,username:actor,role:'admin'}, 'backup-agent-lifecycle');",
+    "const load = createRequire(import.meta.url);",
+    "Object.assign(load('./lib/security/server-auth'), {requireSession:async () => session});",
+    "const {GET} = await import('./app/api/system/backup-restore/route.ts');",
+    "const response = await GET();",
+    "console.log(JSON.stringify({status:response.status, body:await response.json()}));",
+].join('\n');
+
+for (const producer of ['Web full backup', 'Scheduled backup'] as const) {
+    test(`${producer} restores the original Web agent lifecycle rows`, async () => {
+        const work = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-backup-agent-lifecycle-'));
+        const sourceDir = path.join(work, 'source'), targetDir = path.join(work, 'target');
+        try {
+            prepare(sourceDir);
+            const source = new Database(path.join(sourceDir, 'medical.db'));
+            try {
+                const actor = randomUUID();
+                source.prepare('INSERT INTO users (id, username, role, password_hash, encrypted_master_key, salt) VALUES (?,?,?,?,?,?)')
+                    .run(actor, actor, 'admin', 'synthetic', 'synthetic', 'synthetic');
+                recordWebAgentLifecycle(source, actor);
+                const lifecycle = source.prepare("SELECT * FROM audit_events WHERE source_surface='web' AND subject_type='agent_operation' ORDER BY event_type, event_id");
+                const expected = lifecycle.all() as { event_id: string; event_type: string }[];
+                assert.deepEqual(expected.map(row => row.event_type), [
+                    'agent.client.registered', 'agent.client.revoked', 'agent.mandate.created', 'agent.mandate.created', 'agent.mandate.renewed',
+                ]);
+
+                let artifactPath: string;
+                if (producer === 'Web full backup') {
+                    const response = JSON.parse(evalNode(sourceDir, webFullBackupScript, { SYNTHETIC_BACKUP_ACTOR: actor }));
+                    assert.equal(response.status, 200, JSON.stringify(response.body));
+                    artifactPath = path.join(work, 'full.mediflow');
+                    fs.writeFileSync(artifactPath, JSON.stringify(response.body));
+                } else {
+                    source.prepare('INSERT INTO settings VALUES (?,?)').run('backupScheduler', JSON.stringify({ config: { enabled: true } }));
+                    const exported = JSON.parse(runNode(sourceDir, ['scripts/run-scheduled-backup.mjs'], {
+                        MEDIFLOW_BACKUP_FORCE: '0', MEDIFLOW_BACKUP_DEST_DIR: path.join(work, 'backups'),
+                    })) as { ok: boolean; artifactPath: string };
+                    assert.equal(exported.ok, true);
+                    artifactPath = exported.artifactPath;
+                }
+
+                prepare(targetDir);
+                const restored = restore(targetDir, artifactPath, 'agent-lifecycle');
+                assert.equal(restored.error, null);
+                const eventIds = new Set(expected.map(row => row.event_id));
+                const recovered = (restored.after.audit_events as typeof expected)
+                    .filter(row => eventIds.has(row.event_id)).sort((a, b) => a.event_type.localeCompare(b.event_type) || a.event_id.localeCompare(b.event_id));
+                assert.deepEqual(recovered, expected);
+                assert.deepEqual(lifecycle.all(), expected);
+            } finally { source.close(); }
+        } finally { fs.rmSync(work, { recursive: true, force: true }); }
+    });
+}
+
+test('portable backup producers and parser reject incoherent agent audit provenance', async () => {
+    const lifecycle = {
+        ...originalAudit, eventType: 'agent.mandate.renewed', sourceSurface: 'web', subjectType: 'agent_operation',
+        subjectRef: 'synthetic-agent', proposerRef: 'synthetic-agent', mandateRef: 'synthetic-mandate', modelProvider: 'local',
+    };
+    const raw = JSON.parse(await serializeBackupArtifact({ ...createEmptyDataset(), auditEvents: [originalAudit] }));
+    for (const row of [
+        { ...lifecycle, sourceSurface: 'agent', mandateRef: null },
+        { ...lifecycle, proposerRef: null },
+        { ...lifecycle, mandateRef: null },
+        { ...lifecycle, modelProvider: 'unknown' },
+        { ...lifecycle, actorType: 'system' },
+        { ...lifecycle, subjectType: 'patient' },
+        { ...lifecycle, subjectRef: 'synthetic-other-agent' },
+        { ...lifecycle, outcome: 'denied' },
+        { ...lifecycle, sourceSurface: 'api' },
+        { ...lifecycle, eventType: 'patient.updated' },
+    ]) {
+        await assert.rejects(() => createBackupArtifact({ ...createEmptyDataset(), auditEvents: [row] }), /audit snapshot is invalid/i);
+        await assert.rejects(() => serializeScheduledBackupArtifact({ ...createEmptyDataset(), auditEvents: [row] }), /audit snapshot is invalid/i);
+        raw.payload.auditEvents = [row];
+        raw.manifest.checksum = checksum(raw.payload);
+        await assert.rejects(() => parseBackupArtifact(raw), /audit.*invalid/i);
+    }
+});
 
 test('rejects duplicate IDs, lossy seconds and incomplete or non-data audit records', async () => {
     for (const rows of [

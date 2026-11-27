@@ -248,12 +248,12 @@ test('an observation code absent from its cited source remains a proposal with a
     } finally { query.mock.restore(); f.close(); }
 });
 
-test('WUL-925: REDACTED with specialist CF in header, footer, or signature passes without profile physician CF, while unlabeled CF blocks', async () => {
+test('WUL-925: RefertoSpecialistico with specialist CF in header, footer, or signature passes without profile physician CF, while unlabeled CF blocks', async () => {
     const specialistCf = 'MEDPRS00A01A000W';
     const reports = [
         `ASST Sintetica - U.O. Cardiologia - Medico refertante: Dott. Luca Bianchi - C.F.: ${specialistCf}\nAssistito: Mario Rossi\nCodice fiscale assistito: ${cfA}`,
-        `REDACTED\nAssistito codice fiscale ${cfA}\nIl medico\nDott. Luca Bianchi\nC.F.: ${specialistCf}`,
-        `REDACTED\nPaziente codice fiscale ${cfA}\nFirmato digitalmente da: BIANCHI LUCA (CF: ${specialistCf})`,
+        `RefertoSpecialistico\nAssistito codice fiscale ${cfA}\nIl medico\nDott. Luca Bianchi\nC.F.: ${specialistCf}`,
+        `RefertoSpecialistico\nPaziente codice fiscale ${cfA}\nFirmato digitalmente da: BIANCHI LUCA (CF: ${specialistCf})`,
     ];
     for (const text of reports) {
         const f = await fixture(cfA);

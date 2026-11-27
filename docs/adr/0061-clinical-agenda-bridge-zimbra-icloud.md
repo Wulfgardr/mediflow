@@ -12,7 +12,7 @@ La nuova root Kree8 rende l'agenda clinica una superficie primaria, ma il
 contenuto e ancora prevalentemente sintetico. Leonardo ha gia un
 `zimbra-mail-assistant` locale con lettura calendario Carbonio/Zimbra e bridge
 iCloud/EventKit; il valore prodotto e far emergere in MediFlow gli appuntamenti
-clinici o REDACTED-correlati, senza importare tutto il calendario personale e senza
+clinici o di presidio, senza importare tutto il calendario personale e senza
 scansionare automaticamente tutta la posta.
 
 Serve quindi una integrazione che sia utile subito ma rispettosa dei confini:
@@ -24,7 +24,7 @@ schede paziente e non leggere payload email/allegati in modo opaco.
 1. Importare direttamente tutti gli eventi iCloud/Zimbra nella agenda MediFlow.
 2. Lasciare Zimbra/iCloud fuori da MediFlow e usare solo export manuali `.ics`.
 3. Leggere solo cache evento locali gia materializzate dal mail assistant,
-   classificare candidati clinici/REDACTED e mostrarli come preview da rivedere.
+   classificare candidati clinici e mostrarli come preview da rivedere.
 
 ## Trade-off
 
@@ -69,8 +69,8 @@ fuori da questo passaggio.
 
 1. Aggiungere un helper server-only per normalizzare eventi iCloud/Zimbra da
    cache JSONL locali.
-2. Classificare candidati clinici/REDACTED con punteggio deterministico e motivi
-   leggibili.
+2. Classificare candidati clinici con punteggio deterministico e motivi
+   leggibili (eventuali segnali di presidio locale vanno caricati da configurazione locale fuori Git).
 3. Esporre una route read-only session-protected per la cockpit Kree8.
 4. Mostrare nella agenda live una preview compatta di candidati esterni, sempre
    distinta dagli eventi confermati.
