@@ -188,6 +188,7 @@ test('a therapy from a prescription without a stated status asks the physician, 
     await expect(proposal.getByText('23/11/2026', { exact: true })).toBeVisible();
     await expect(proposal.getByText('Non indicata nel documento', { exact: true })).toHaveCount(1);
     await expect(proposal.getByRole('button', { name: 'Apri Documento del 23/11/2026', exact: true })).toBeVisible();
+    await expect(visit.getByRole('group', { name: 'Decidi Documento del 23/11/2026', exact: true })).toBeVisible();
     await expect(proposal.getByText(/[0-9a-f]{64}/u)).toHaveCount(0);
     const keep = proposal.getByRole('button', { name: 'Tieni', exact: true });
     await expect(keep).toBeDisabled();

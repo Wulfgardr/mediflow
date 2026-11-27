@@ -42,14 +42,14 @@ function itemValues(item: VisitItem): Record<string, string> {
     return raw && typeof raw === 'object' ? Object.fromEntries(Object.entries(raw).map(([field, value]) => [field, String(value ?? '')])) : {};
 }
 
-function proposalHeadline(item: VisitItem): string {
+function proposalHeadline(item: VisitItem, pdfLabels: ReadonlyMap<string, string> = new Map()): string {
     const values = itemValues(item);
     if (item.kind === 'therapy' && values.drugName) return values.dosage && values.dosage !== AGENT_DOSAGE_NOT_STATED ? `${values.drugName} · ${values.dosage}` : values.drugName;
     if (item.kind === 'service' && values.serviceName) return values.serviceName;
     if (item.kind === 'diagnosis' && values.description) return values.code ? `${values.code} · ${values.description}` : values.description;
     if (item.kind === 'exemption' && values.code) return `Esenzione ${values.code}`;
     if (item.kind === 'observation' && values.display) return [values.display, [values.value, values.unitCode].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
-    if (item.kind === 'pdf' && typeof item.value.name === 'string') return agentReviewDocumentLabel(item.value.name, null);
+    if (item.kind === 'pdf' && typeof item.value.name === 'string') return pdfLabels.get(item.value.name) ?? agentReviewDocumentLabel(item.value.name, null);
     return agentReviewItemLabels[item.kind];
 }
 
@@ -57,21 +57,31 @@ function formatDepositTime(timestamp: number): string {
     return new Date(timestamp).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' });
 }
 
-function itemSource(item: VisitItem): { fileName: string; label: string } | null {
+function itemSource(item: VisitItem): { fileName: string; date: string | undefined } | null {
     const source = item.value.source;
     if (!source || typeof source !== 'object' || !('fileName' in source)) return null;
-    const fileName = String(source.fileName);
     const values = itemValues(item);
     const date = 'documentDate' in source && typeof source.documentDate === 'string' && source.documentDate ? source.documentDate
         : values.startDate || values.prescribedAt || values.observedAt || values.date;
-    return { fileName, label: agentReviewDocumentLabel(fileName, date) };
+    return { fileName: String(source.fileName), date };
 }
 
 function documentLabels(items: VisitItem[]): Map<string, string> {
-    const labels = new Map<string, string>();
+    const dates = new Map<string, string | undefined>();
+    for (const item of items) {
+        if (item.kind === 'pdf' && typeof item.value.name === 'string' && !dates.has(item.value.name)) dates.set(item.value.name, undefined);
+    }
     for (const item of items) {
         const source = itemSource(item);
-        if (source && !labels.has(source.fileName)) labels.set(source.fileName, source.label);
+        if (source && !dates.get(source.fileName)) dates.set(source.fileName, source.date);
+    }
+    const labels = new Map<string, string>();
+    const used = new Map<string, number>();
+    for (const [fileName, date] of dates) {
+        const label = agentReviewDocumentLabel(fileName, date);
+        const count = (used.get(label) ?? 0) + 1;
+        used.set(label, count);
+        labels.set(fileName, count === 1 ? label : `${label} (${count})`);
     }
     return labels;
 }
@@ -120,8 +130,8 @@ function StatusChoice({ item, chosen, busy, onChoose }: { item: VisitItem; chose
 
 const draftLabels = { keep: 'Da tenere', correct: 'Correzione da salvare', discard: 'Da scartare' };
 
-function ItemGestures({ review, item, busy, missing, draft, onDecide, onCorrect, onUndo }: {
-    review: AgentVisitReview; item: VisitItem; busy: boolean; missing: boolean; draft?: DraftAgentItemDecision;
+function ItemGestures({ review, item, label, busy, missing, draft, onDecide, onCorrect, onUndo }: {
+    review: AgentVisitReview; item: VisitItem; label: string; busy: boolean; missing: boolean; draft?: DraftAgentItemDecision;
     onDecide: (decision: AgentItemDecision) => void; onCorrect: () => void; onUndo: () => void;
 }) {
     if (!agentItemAwaitsDecision(review, item.id)) return null;
@@ -132,7 +142,7 @@ function ItemGestures({ review, item, busy, missing, draft, onDecide, onCorrect,
     const canWrite = agentItemCanWrite(review);
     const canDiscard = canDiscardIncomingAgentVisit(review.visit.cassette) && agentItemDiscardAdmitted(review);
     const cannotKeep = Boolean(review.itemBlockers.get(item.id)?.length) || review.inRecordItemIds.includes(item.id) || missing;
-    return <div className={css.itemActions} role="group" aria-label={'Decidi ' + proposalHeadline(item)}>
+    return <div className={css.itemActions} role="group" aria-label={'Decidi ' + label}>
         <Button variant="text" disabled={busy || !canDiscard} onClick={() => onDecide('discard')}>Scarta</Button>
         {agentItemCorrectable(item.kind) ? <Button variant="secondary" disabled={busy || !canWrite} onClick={onCorrect}>Correggi</Button> : null}
         <Button variant={!canWrite || cannotKeep ? 'secondary' : 'primary'} disabled={busy || !canWrite || cannotKeep} onClick={() => onDecide('keep')}>Tieni</Button>
@@ -225,6 +235,7 @@ export function VisitQueue({ visits, unreadableVisits, busy, applicationErrors, 
             const pdfByName = new Map(pdfItems.filter(item => typeof item.value.name === 'string').map(item => [String(item.value.name), item.id]));
             const pdfLabels = documentLabels(visit.items);
             const pdfLabel = (name: string) => pdfLabels.get(name) ?? agentReviewDocumentLabel(name, null);
+            const headline = (item: VisitItem) => proposalHeadline(item, pdfLabels);
             const notes = pending.filter(item => item.kind === 'note');
             const transcriptions = pending.filter(item => item.kind === 'transcription');
             const proposals = pending.filter(item => item.kind !== 'pdf' && item.kind !== 'note' && item.kind !== 'transcription');
@@ -270,7 +281,7 @@ export function VisitQueue({ visits, unreadableVisits, busy, applicationErrors, 
                 const status = chosenStatus[statusKey(item.id)];
                 return <>
                     {itemError?.itemId === item.id ? <p role="alert" className={css.itemAlert}>{itemError.message}</p> : null}
-                    <ItemGestures review={review} item={item} busy={busy} missing={asksStatus && !status} draft={decisions[item.id]}
+                    <ItemGestures review={review} item={item} label={headline(item)} busy={busy} missing={asksStatus && !status} draft={decisions[item.id]}
                         onCorrect={() => setCorrecting(item.id)}
                         onUndo={() => stageNewAgentVisitItem(visit.cassette.id, visit.cassette.revision, item.id, null)}
                         onDecide={decision => { void decide(review, item.id, decision, decision === 'keep' && asksStatus && status ? { status } : undefined); }} />
@@ -313,7 +324,7 @@ export function VisitQueue({ visits, unreadableVisits, busy, applicationErrors, 
                             ))}
                         </div>
                         {pendingPdfs.map(item => agentItemAwaitsDecision(review, item.id) ? <div key={item.id} className={css.pdfDecision}>
-                            <span>{proposalHeadline(item)}</span>
+                            <span>{headline(item)}</span>
                             {gestures(item)}
                         </div> : null)}
                     </section>
@@ -351,6 +362,7 @@ export function VisitQueue({ visits, unreadableVisits, busy, applicationErrors, 
                             {proposals.map(item => {
                                 const source = itemSource(item);
                                 const sourcePdfId = source ? pdfByName.get(source.fileName) : undefined;
+                                const sourceLabel = source ? pdfLabel(source.fileName) : null;
                                 const currentInRecord = review.currentSummary.get(item.id);
                                 const itemBlockers = review.itemBlockers.get(item.id) ?? [];
                                 const decision = decisions[item.id];
@@ -394,11 +406,11 @@ export function VisitQueue({ visits, unreadableVisits, busy, applicationErrors, 
                                         <aside className={css.proposalSource} aria-label="Fonte">
                                             {source ? (
                                                 sourcePdfId ? (
-                                                    <button type="button" aria-label={`Apri ${source.label}`} className={`${surface.islandAction} ${css.sourceLink}`} disabled={openingPdf}
+                                                    <button type="button" aria-label={`Apri ${sourceLabel}`} className={`${surface.islandAction} ${css.sourceLink}`} disabled={openingPdf}
                                                         onClick={() => { void showPdf(visit.cassette.id, visit.cassette.revision, sourcePdfId); }}>
-                                                        {source.label}
+                                                        {sourceLabel}
                                                     </button>
-                                                ) : <span className={css.sourceName}>{source.label}</span>
+                                                ) : <span className={css.sourceName}>{sourceLabel}</span>
                                             ) : null}
                                             {typeof item.value.quote === 'string' && <blockquote className={css.quote}>{item.value.quote}</blockquote>}
                                         </aside>
@@ -436,7 +448,7 @@ export function VisitQueue({ visits, unreadableVisits, busy, applicationErrors, 
                             {decided.map(item => <li key={item.id}>
                                 {review.correctedItemIds.includes(item.id)
                                     ? <><span>{agentReviewItemLabels[item.kind]}</span><span className={surface.pillSuccess}>Corretta in scheda</span></>
-                                    : <><span>{agentReviewItemLabels[item.kind]} · {proposalHeadline(item)}</span>
+                                    : <><span>{agentReviewItemLabels[item.kind]} · {headline(item)}</span>
                                         {review.discardedItemIds.includes(item.id)
                                             ? <span className={surface.pillNeutral}>Scartata</span>
                                             : <span className={surface.pillSuccess}>In scheda</span>}</>}
