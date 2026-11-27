@@ -609,6 +609,15 @@
       "prerequisites": "Real desktop OCR assets/OS required; preserves test concurrency=1 and all opt-ins. No OCR qualification claimed."
     },
     {
+      "id": "scripts/benchmark-patient-list-return.mjs",
+      "mode": "local",
+      "kind": "node-script",
+      "files": [
+        "scripts/benchmark-patient-list-return.mjs"
+      ],
+      "prerequisites": "Node 24, installed Chrome and a standalone production build. The benchmark owns its synthetic archives and loopback servers. Run under the shared build lock on the development Mac."
+    },
+    {
       "id": "scripts/benchmark-document-router.ts",
       "mode": "local",
       "kind": "strip-self",

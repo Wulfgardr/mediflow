@@ -53,7 +53,7 @@ import {
   Toolbar,
   buildGlobalDiaryState,
   classNames,
-  mapPatientForKree8,
+  mapPatientsForKree8,
   railAreaIsSelected,
 } from './cockpit-shared';
 import type {
@@ -462,7 +462,7 @@ export function Kree8ClinicalCockpit({
       && patientState.patients.every(patient => currentRows.has(patient.raw));
     return projectionCurrent ? patientState : { status: 'loading', patients: [] };
   })();
-  const mappedPatients = useMemo(() => (livePatientRows ?? []).map(mapPatientForKree8), [livePatientRows]);
+  const mappedPatients = useMemo(() => mapPatientsForKree8(livePatientRows ?? []), [livePatientRows]);
   const agendaLoading = livePatientLoading || checkupLoading;
   const agendaError = Boolean(livePatientError || checkupError);
   const agendaHasSnapshot = Boolean(livePatientRows && liveCheckupRows
@@ -555,13 +555,13 @@ export function Kree8ClinicalCockpit({
     /* WUL-UIUX: ordina per aggiornamento piu recente (updatedAt, poi
        createdAt) cosi la lista pazienti non esce in ordine di inserimento
        IndexedDB e lo scanning "recenti" e possibile. */
-    const patients = [...(livePatientRows ?? [])]
+    const recentFirst = [...(livePatientRows ?? [])]
       .sort((left, right) => {
         const leftTime = new Date(left.updatedAt ?? left.createdAt ?? 0).getTime();
         const rightTime = new Date(right.updatedAt ?? right.createdAt ?? 0).getTime();
         return rightTime - leftTime;
-      })
-      .map(mapPatientForKree8);
+      });
+    const patients = mapPatientsForKree8(recentFirst);
     setPatientState({ status: 'ready', patients });
     setSelectedPatientId((current) => {
       if (current && patients.some((patient) => patient.id === current)) return current;
