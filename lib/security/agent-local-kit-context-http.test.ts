@@ -13,6 +13,9 @@ import { createAgentLocalKitStore } from '../agent-local-kit-store';
 import { installLoopbackIngress } from './loopback-ingress.mjs';
 import { AGENT_OPERATIONS } from '../agent-mandate-contract';
 import { sha256HexClient } from '../agent-local-kit-context-contract';
+import { buildAgentPatientContextPayload, sendPatientContextToLocalKit } from '../agent-local-kit-context-client';
+import { observeArchiveGeneration } from './client-auth-api';
+import type { Patient } from '../db';
 import { LOCAL_KIT_CONTEXT_DIR_NAME } from './agent-local-kit-files';
 
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-agent-local-kit-ctx-http-'));
@@ -131,6 +134,17 @@ async function sampleContextPayload(taxCode = 'RSSMRA80A01H501U') {
     };
 }
 
+function syntheticIdentity(taxCode: string) {
+    return {
+        firstName: 'NomeSintetico', lastName: 'CognomeSintetico', taxCode,
+        birthDate: '1980-01-01T00:00:00.000Z', address: 'Via Sintetica 1', phone: '0000000000', caregiver: null,
+    };
+}
+
+async function contextRequest(taxCode = 'RSSMRA80A01H501U') {
+    return { context: await sampleContextPayload(taxCode), identity: syntheticIdentity(taxCode) };
+}
+
 async function connectKit() {
     const pair = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
     const raw = new Uint8Array(await crypto.subtle.exportKey('raw', pair.publicKey));
@@ -164,12 +178,13 @@ test.after(async () => {
 });
 
 test('blocks unauthenticated, cross-origin, bearer, and disconnected exports without writing files', async () => {
-    const payload = await sampleContextPayload();
+    const request = await contextRequest();
+    const payload = request.context;
 
     current = null;
     try {
         assert.equal((await fetch(`${origin}/context`)).status, 401);
-        assert.equal((await fetch(`${origin}/context`, { method: 'POST', headers: mutationHeaders(), body: JSON.stringify(payload) })).status, 403);
+        assert.equal((await fetch(`${origin}/context`, { method: 'POST', headers: mutationHeaders(), body: JSON.stringify(request) })).status, 403);
     } finally {
         current = context.session;
     }
@@ -177,19 +192,19 @@ test('blocks unauthenticated, cross-origin, bearer, and disconnected exports wit
     assert.equal((await fetch(`${origin}/context`, {
         method: 'POST',
         headers: mutationHeaders({ Authorization: 'Bearer mfa_should_never_be_accepted' }),
-        body: JSON.stringify(payload),
+        body: JSON.stringify(request),
     })).status, 403);
 
     assert.equal((await fetch(`${origin}/context`, {
         method: 'POST',
         headers: mutationHeaders({ 'x-mediflow-archive-generation': 'stale-generation' }),
-        body: JSON.stringify(payload),
+        body: JSON.stringify(request),
     })).status, 403);
 
     const disconnectedRes = await fetch(`${origin}/context`, {
         method: 'POST',
         headers: mutationHeaders(),
-        body: JSON.stringify(payload),
+        body: JSON.stringify(request),
     });
     assert.equal(disconnectedRes.status, 403);
     assert.equal((await disconnectedRes.json()).code, 'LOCAL_KIT_INACTIVE');
@@ -198,13 +213,14 @@ test('blocks unauthenticated, cross-origin, bearer, and disconnected exports wit
 
 test('exports audited patient context when kit is active, rolls back file on audit failure, hides cfHash on GET, and clears on DELETE', async () => {
     await connectKit();
-    const payload = await sampleContextPayload();
+    const request = await contextRequest();
+    const payload = request.context;
 
     failAuditOnce = true;
     const failedAuditRes = await fetch(`${origin}/context`, {
         method: 'POST',
         headers: mutationHeaders(),
-        body: JSON.stringify(payload),
+        body: JSON.stringify(request),
     });
     assert.equal(failedAuditRes.status, 503);
     assert.equal(fs.existsSync(path.join(kitDir, LOCAL_KIT_CONTEXT_DIR_NAME, `${payload.patient.cfHash}.json`)), false);
@@ -212,7 +228,7 @@ test('exports audited patient context when kit is active, rolls back file on aud
     const exportRes = await fetch(`${origin}/context`, {
         method: 'POST',
         headers: mutationHeaders(),
-        body: JSON.stringify(payload),
+        body: JSON.stringify(request),
     });
     assert.equal(exportRes.status, 201);
     const exportedText = await exportRes.text();
@@ -255,8 +271,9 @@ test('exports audited patient context when kit is active, rolls back file on aud
 });
 
 test('revalidates kit authorization after awaiting POST body if disconnected mid-flight', async () => {
-    const payload = await sampleContextPayload('VRDLGI75B12F205X');
-    const encoded = new TextEncoder().encode(JSON.stringify(payload));
+    const request = await contextRequest('VRDLGI75B12F205X');
+    const payload = request.context;
+    const encoded = new TextEncoder().encode(JSON.stringify(request));
     const mid = Math.floor(encoded.length / 2);
     let releaseSecondHalf!: () => void;
     const secondHalfReady = new Promise<void>(resolve => { releaseSecondHalf = resolve; });
@@ -288,4 +305,95 @@ test('revalidates kit authorization after awaiting POST body if disconnected mid
     assert.equal(response.status, 403);
     assert.equal((await response.json()).code, 'LOCAL_KIT_INACTIVE');
     assert.equal(fs.existsSync(path.join(kitDir, LOCAL_KIT_CONTEXT_DIR_NAME, `${payload.patient.cfHash}.json`)), false);
+});
+
+const KIT_PATIENT_TAX_CODE = 'SNTRMN80A41F205X';
+const kitPatient: Patient = {
+    id: 'pat-kit-identity',
+    firstName: 'Ermenegilda',
+    lastName: 'Sinteticoni',
+    taxCode: KIT_PATIENT_TAX_CODE,
+    birthDate: new Date('1980-01-01T00:00:00Z'),
+    address: 'Via dei Tigli Sintetici 12',
+    phone: '3471234567',
+    caregiver: 'Gualtiero Provasintetica',
+    createdAt: new Date('2026-11-01T09:00:00Z'),
+    updatedAt: new Date('2026-11-01T09:00:00Z'),
+    diagnoses: [{ description: 'Ipertensione, segnalata da Ermenegilda Sinteticoni', code: 'BA00', system: 'ICD-11', date: new Date('2026-01-10T00:00:00Z') }],
+    allergies: [{ substance: 'FANS', reaction: 'riferita al telefono 347 123 4567' }],
+};
+
+const identityValues = [kitPatient.firstName, kitPatient.lastName, KIT_PATIENT_TAX_CODE, kitPatient.address, kitPatient.phone, kitPatient.caregiver!];
+const compact = (value: string) => value.toLowerCase().replace(/[\s,.\-+/]/gu, '');
+
+async function exportThroughClient(patient: Patient) {
+    const now = new Date('2026-11-01T09:00:00Z');
+    const entries = [
+        { id: 'k1', patientId: patient.id, date: now, type: 'visit' as const, title: 'Visita con ERMENEGILDA SINTETICONI',
+            content: '<p>ermenegilda  sinteticoni, nata il 01/01/1980, CF snt rmn 80a41 f205x, '
+                + 'accompagnata da gualtiero provasintetica e dalla vicina TerzaPersonaSintetica. Recapito +39 347-1234567, '
+                + 'abita in via dei tigli sintetici, 12. Ricovero dal 12/10/2026, ramipril sospeso.</p>',
+            createdAt: now, updatedAt: now },
+        { id: 'k2', patientId: patient.id, date: now, type: 'note' as const, title: 'Telefonata',
+            content: 'Sinteticoni Ermenegilda richiama al 3471234567. Ritira i farmaci gualtiero  provasintetica, consegna in via dei tigli  sintetici 12.', createdAt: now, updatedAt: now },
+    ];
+    const payload = await buildAgentPatientContextPayload({
+        patient,
+        entries,
+        therapies: [{ id: 'kt1', patientId: patient.id, drugName: 'Ramipril 5 mg', dosage: '1 cp, lo prepara Gualtiero Provasintetica', status: 'active', startDate: now, createdAt: now }],
+        observations: [{ id: 'ko1', patientId: patient.id, codeSystem: 'LOINC', code: '29463-7', display: 'Peso misurato a Ermenegilda', unitSystem: 'UCUM', unitCode: 'kg', value: 70, observedAt: now, createdAt: now }],
+        checkups: [{ id: 'kc1', patientId: patient.id, date: now, title: 'Chiamare Sinteticoni al 347 1234567', status: 'pending', createdAt: now }],
+        exemptionCodes: ['031'],
+    });
+    assert.ok(payload);
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = ((input: string | URL | Request, init?: RequestInit) => {
+        assert.equal(input, '/api/agent-mandates/local-kit/context');
+        const headers = new Headers(init?.headers);
+        headers.set('Origin', origin);
+        headers.set('Sec-Fetch-Site', 'same-origin');
+        return realFetch(`${origin}/context`, { ...init, headers });
+    }) as typeof fetch;
+    try {
+        return { payload, result: await sendPatientContextToLocalKit(payload, patient) };
+    } finally {
+        globalThis.fetch = realFetch;
+    }
+}
+
+test('Invia a Codex: identity written in notes and free-text fields never reaches the kit file', async () => {
+    await connectKit();
+    observeArchiveGeneration(readSqliteArchiveGeneration(database));
+    const { payload, result } = await exportThroughClient(kitPatient);
+    assert.equal(result.ok, true);
+
+    const contextFile = path.join(kitDir, LOCAL_KIT_CONTEXT_DIR_NAME, `${payload.patient.cfHash}.json`);
+    const bytes = fs.readFileSync(contextFile, 'utf8');
+    const leaked = identityValues.filter(value => bytes.toLowerCase().includes(value.toLowerCase()) || compact(bytes).includes(compact(value)));
+    assert.deepEqual(leaked, []);
+    assert.equal(/01\/01\/1980/u.test(bytes), false);
+
+    const onDisk = JSON.parse(bytes);
+    assert.equal(onDisk.schema, 'mediflow.agent_patient_context.v1');
+    assert.deepEqual(Object.keys(onDisk).sort(), ['allergies', 'diagnoses', 'exemptions', 'expiresAt', 'exportedAt', 'observations', 'openCheckups', 'patient', 'recentNotes', 'schema', 'therapies']);
+    assert.equal(onDisk.patient.cfHash, await sha256HexClient(KIT_PATIENT_TAX_CODE));
+    assert.equal(onDisk.patient.taxCodeLast4, '205X');
+    assert.match(onDisk.recentNotes[0].text, /\[\[MF_PAZ[0-9]+_[a-z2-7]{8}\]\]/u);
+    assert.match(onDisk.recentNotes[0].text, /Ricovero dal 12\/10\/2026, ramipril sospeso\./u);
+    assert.equal(onDisk.diagnoses[0].code, 'BA00');
+    assert.equal(onDisk.observations[0].code, '29463-7');
+    assert.deepEqual(onDisk.exemptions, [{ code: '031' }]);
+    assert.equal(bytes.includes('TerzaPersonaSintetica'), true, 'ADR 0197: a third party outside the registry is a declared limit');
+    fs.rmSync(contextFile);
+});
+
+test('Invia a Codex: a context whose identity does not match its cfHash is refused and nothing is written', async () => {
+    await connectKit();
+    const request = await contextRequest('VRDLGI75B12F205X');
+    const mismatched = { ...request, identity: { ...request.identity, taxCode: 'RSSMRA80A01H501U' } };
+    const response = await fetch(`${origin}/context`, { method: 'POST', headers: mutationHeaders(), body: JSON.stringify(mismatched) });
+    assert.equal(response.status, 400);
+    const bare = await fetch(`${origin}/context`, { method: 'POST', headers: mutationHeaders(), body: JSON.stringify(request.context) });
+    assert.equal(bare.status, 400);
+    assert.equal(fs.existsSync(path.join(kitDir, LOCAL_KIT_CONTEXT_DIR_NAME, `${request.context.patient.cfHash}.json`)), false);
 });

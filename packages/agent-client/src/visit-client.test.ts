@@ -522,7 +522,7 @@ test('Ambulatorio admits only a verified visit and retries the same encrypted de
     };
     const quote = 'Assume Paracetamolo 500 mg al bisogno.';
     await pdf('sintetico.pdf', ['Codice fiscale paziente: ' + cf, 'CODICE FISCALE DEL MEDICO: ' + physician, 'Documento sintetico consentito']);
-    const dettato = 'Visita sintetica senza codice fiscale. ' + quote;
+    const dettato = 'Visita sintetica di Ada Sintetica senza codice fiscale. ' + quote;
     try {
         assert.equal(spawnSync('pdftotext', ['-v']).status, 0, 'Install poppler-utils for the Ambulatorio acceptance test');
         const acquired = await send('mediflow_acquisisci_visita', { dettato, inizio: new Date(Date.now() - 60000).toISOString() });
@@ -547,7 +547,7 @@ test('Ambulatorio admits only a verified visit and retries the same encrypted de
         assert.deepEqual(await send('mediflow_deposita_visita', { visitId }), { error: 'DOSSIER_NON_VERIFICATO' });
         assert.deepEqual(await send('mediflow_prepara_dossier', { visitId, scheda, fatti: [{ ...therapy, quote: 'Citazione inventata per la prova.' }] }), { error: 'CITAZIONE_NON_PRESENTE' });
         assert.equal(f.rows().length, 0);
-        const dossier = await send('mediflow_prepara_dossier', { visitId, scheda, fatti: [therapy] });
+        const dossier = await send('mediflow_prepara_dossier', { visitId, scheda, fatti: [therapy], identita: { nome: 'Ada', cognome: 'Sintetica' } });
         assert.equal(dossier.stato, 'verificato', JSON.stringify(dossier));
         assert.equal(dossier.rifiutati, 0);
         f.drop();
@@ -560,6 +560,13 @@ test('Ambulatorio admits only a verified visit and retries the same encrypted de
         assert.deepEqual(await send('mediflow_deposita_visita', { visitId }), receipt);
         assert.equal(f.rows().length, 1);
         assert.equal(receipt.itemCount, 6);
+        const row = f.rows()[0]!;
+        const [, iv, encoded] = row.wrappedPrivateKey.split(':');
+        const key = await crypto.subtle.importKey('pkcs8', agentBytes(await decryptData(encoded!, iv!, f.masterKey) as string),
+            { name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveBits']);
+        const anchor = await openAgentItem(key, { mandateRef: row.mandateRef, visitId: row.id, itemId: row.id, kind: 'anchor' }, JSON.parse(row.anchorCiphertext));
+        assert.deepEqual(JSON.parse(new TextDecoder().decode(anchor)), { fiscalCode: cf, firstName: 'Ada', lastName: 'Sintetica' });
+        assert.ok(f.bodies.every(body => !body.includes('Ada Sintetica') && !body.includes('"firstName"')));
         saveAgentRegistration(f.credentials, { agentRef: f.principal.agentRef, origin: f.origin, token: f.longToken });
         fs.unlinkSync(path.join(f.credentials, f.principal.agentRef + '.json'));
         const opened = await send('mediflow_apri_conferma_visita', { visitId });
