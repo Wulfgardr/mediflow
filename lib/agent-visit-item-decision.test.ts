@@ -174,12 +174,16 @@ test('a denied, expired or stale request writes nothing', async () => {
     ];
     for (const [input, session] of refused) assert.throws(() => decideAgentVisitItem(request, session, input));
     assert.deepEqual(fullSnapshot(), before);
+    const expired = { ...fixture.session, expiresAt: Date.now() - 1 };
+    assert.throws(() => decideAgentVisitItem(request, expired, f.keep('therapy')));
+    assert.throws(() => decideAgentVisitItem(request, expired, f.discard('therapy')));
+    assert.deepEqual(fullSnapshot(), before);
     f.mandates.revoke(f.mandate.id, fixture.session.userId, f.mandate.archiveGeneration);
-    const revoked = fullSnapshot();
-    assert.throws(() => decideAgentVisitItem(request, fixture.session, f.keep('therapy')));
-    assert.throws(() => decideAgentVisitItem(request, fixture.session, f.discard('therapy')));
-    assert.deepEqual(fullSnapshot(), revoked);
-    assert.deepEqual(agentAppliedItemIds(f.id), []);
+    const input = f.keep('therapy');
+    const receipt = decideAgentVisitItem(request, fixture.session, input);
+    assert.equal(receipt.status, 'decided');
+    assert.equal(decideAgentVisitItem(request, fixture.session, input).eventId, receipt.eventId);
+    assert.deepEqual(agentAppliedItemIds(f.id), [f.byKind('therapy').id]);
     assert.deepEqual(agentDiscardedItemIds(f.id), []);
 });
 

@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import type Database from 'better-sqlite3';
-import type { AgentPrincipal } from './agent-pairing-store';
+import { validAgentOperations, type AgentPrincipal } from './agent-pairing-store';
 import type { AgentOperation } from './agent-mandate-contract';
 import { createAgentMandateStore } from './agent-mandate-store';
+import { createAgentRegistrationStore } from './agent-registration-store';
 import { AGENT_ITEM_OPERATION, cassetteItems, validAgentCassetteItem, type AgentCassette } from './agent-cassette-contract';
 import { isAgentId, validAgentEnvelope } from './agent-cassette-crypto';
-import type { AgentCassetteIndexEntry, AgentCassetteIndexPage } from './agent-visit-application-contract';
+import type { AgentCassetteIndexEntry, AgentCassetteIndexPage, AgentCassetteReviewBlock } from './agent-visit-application-contract';
 
 export const AGENT_CASSETTE_COMPLETE = 'cassette_complete';
 const correctionOpened = 'agent.cassette.correction.opened';
@@ -30,6 +31,30 @@ function pendingCassetteVisibility() {
 export function readAgentCassette(database: Database.Database, id: string, actorRef: string): AgentCassette | undefined {
     return database.prepare(`SELECT ${projection} FROM agent_cassettes AS cassette
         WHERE id=? AND actor_ref=? AND ${pendingCassetteVisibility()}`).get(id, actorRef) as AgentCassette | undefined;
+}
+export function agentCassetteReviewBlock(database: Database.Database, cassette: AgentCassette): AgentCassetteReviewBlock | undefined {
+    if (cassette.status !== 'closed') return;
+    const mandate = createAgentMandateStore(database).read(cassette.mandateRef);
+    const closed = database.prepare(`SELECT occurred_at AS at FROM audit_events
+        WHERE event_type='agent.cassette.closed' AND subject_type='agent_operation' AND subject_ref=?
+        AND actor_ref=? AND proposer_ref=? AND mandate_ref=? AND model_provider=? AND outcome='success' AND source_surface='agent'`)
+        .get(cassette.id, cassette.actorRef, cassette.agentRef, cassette.mandateRef, cassette.modelProvider) as { at: number } | undefined;
+    if (!mandate || !closed || mandate.actorRef !== cassette.actorRef || mandate.archiveGeneration !== cassette.archiveGeneration
+        || mandate.provider !== cassette.modelProvider || Number(mandate.allowsClinicalEgress) !== cassette.allowsClinicalEgress
+        || mandate.publicKey !== cassette.publicKey || mandate.wrappedPrivateKey !== cassette.wrappedPrivateKey
+        || cassette.depositedAt < mandate.createdAt || cassette.modifiedAt < cassette.depositedAt || closed.at < cassette.modifiedAt
+        || cassette.modifiedAt >= mandate.expiresAt
+        || (mandate.revokedAt !== null && cassette.modifiedAt > mandate.revokedAt)) return 'deposit_unverified';
+    const legacy = database.prepare('SELECT revoked_at AS revokedAt,expires_at AS expiresAt,operations FROM agent_clients WHERE id=? AND mandate_ref=?')
+        .get(cassette.agentRef, cassette.mandateRef) as { revokedAt: number | null; expiresAt: number; operations: string } | undefined;
+    const client = legacy ?? createAgentRegistrationStore(database).registrationForCassette(cassette.agentRef, cassette.mandateRef);
+    if (!client || (legacy && legacy.expiresAt <= cassette.modifiedAt)) return 'deposit_unverified';
+    if (client.revokedAt !== null) return 'agent_revoked';
+    const operations: unknown = JSON.parse(client.operations);
+    const required = ['visita.apri', 'visita.chiudi', ...cassetteItems(cassette).map(item => AGENT_ITEM_OPERATION[item.kind])] as const;
+    if (!validAgentOperations(operations) || !required.every(operation => operations.includes(operation) && mandate.operations.includes(operation))) {
+        return 'deposit_unverified';
+    }
 }
 export function readAgentCassetteIndex(database: Database.Database, actorRef: string, after: string | null): AgentCassetteIndexPage {
     const pageSize = 64;

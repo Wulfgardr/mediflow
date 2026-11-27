@@ -4,8 +4,9 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 import Database from 'better-sqlite3';
-import { agentVisitPassphrase, createSyntheticAgentMandate } from './agent-visit-utils';
-import { completeAgentPairing, prepareAndDepositAgentVisit, requestAgentPairing } from '../packages/agent-client/src/visit-client';
+import { agentVisitPassphrase, agentVisitPin, createSyntheticAgentMandate } from './agent-visit-utils';
+import { completeAgentPairing, loadAgentVisitContext, prepareAndDepositAgentVisit, requestAgentPairing, retrieveAgentMandate } from '../packages/agent-client/src/visit-client';
+import { sealAgentItemNode } from '../packages/agent-client/src/cassette-crypto';
 import { documentRequests } from './fixtures/trusted-web-request';
 
 const fiscalCode = 'RSSMRA80A01F205X';
@@ -34,7 +35,7 @@ async function pairKitAndCreatePatient(page: Page, isolatedRuntime: Runtime, inf
     return { credentials, agentRef: access.agentRef, patient };
 }
 
-function syntheticSources(directory: string) {
+function syntheticSources(directory: string, patient: { taxCode: string; firstName?: string; lastName?: string } = { taxCode: fiscalCode }) {
     return async (lines: string[], documentDate: string | null, facts: unknown[], isNote = false) => {
         const pdf = await PDFDocument.create(), font = await pdf.embedFont(StandardFonts.Helvetica), sheet = pdf.addPage();
         lines.forEach((line, index) => sheet.drawText(line, { x: 40, y: 780 - index * 24, font, size: 11 }));
@@ -42,7 +43,7 @@ function syntheticSources(directory: string) {
         const sha256 = createHash('sha256').update(bytes).digest('hex');
         const fileName = isNote ? 'nota-visita.pdf' : sha256 + '.pdf';
         writeFileSync(path.join(directory, fileName), bytes);
-        return { sha256, fileName, patient: { taxCode: fiscalCode }, documentDate,
+        return { sha256, fileName, patient, documentDate,
             documentType: isNote ? 'visita_specialistica' : 'altro', facts,
             coverage: { pages: null, unreadablePages: [], complete: false, note: 'Originale da rivedere dal medico' } };
     };
@@ -207,5 +208,125 @@ test('a therapy from a prescription without a stated status asks the physician, 
         await visit.getByRole('button', { name: 'Applica la visita', exact: true }).click();
         await expect(visit).toHaveCount(0);
         expect(therapies()).toHaveLength(1);
+    } finally { database.close(); }
+});
+
+
+test('WUL-973: Da decidere keeps closed deposits after lock and renewal, including a legacy transcription without a PDF', async ({ page, isolatedRuntime }, info) => {
+    test.setTimeout(150000);
+    await createSyntheticAgentMandate(page);
+    const credentials = info.outputPath('private-agent');
+    mkdirSync(credentials, { mode: 0o700 });
+    const name = 'Kit sintetico WUL-973';
+    const pairing = await requestAgentPairing(credentials, isolatedRuntime.url, name);
+    await page.getByRole('button', { name: 'Aggiorna', exact: true }).click();
+    await page.getByLabel('Rinnova allo sblocco', { exact: true }).check();
+    await page.getByLabel('PIN per ' + name, { exact: true }).fill(agentVisitPin);
+    await page.getByRole('button', { name: 'Approva ' + pairing.code, exact: true }).click();
+    const access = await completeAgentPairing(credentials, pairing.requestId);
+    if (access.status !== 'registered') throw new Error('Synthetic agent registration unavailable');
+
+    const lockAndUnlock = async () => {
+        const locked = page.waitForResponse(response => response.url().endsWith('/api/auth/lock'));
+        await page.getByRole('button', { name: 'Blocca', exact: true }).first().click();
+        expect((await locked).ok()).toBe(true);
+        await page.getByLabel('Passphrase', { exact: true }).fill(agentVisitPassphrase);
+        const renewed = page.waitForResponse(response => response.url().endsWith('/api/agent-mandates/unlock'));
+        await page.getByRole('button', { name: 'Sblocca', exact: true }).click();
+        expect((await renewed).status()).toBe(204);
+        await expect(page.getByRole('navigation', { name: 'Navigazione principale', exact: true })).toBeVisible();
+    };
+    await lockAndUnlock();
+    const mandateA = await retrieveAgentMandate(credentials, access.agentRef);
+    const context = await loadAgentVisitContext(credentials, access.agentRef);
+    const legacyId = randomUUID(), openId = randomUUID(), preparedId = randomUUID();
+    const anotherCf = 'RSSMRA85T10A562S';
+    const call = async (data: object) => {
+        const response = await fetch(isolatedRuntime.url + '/api/agent/v1/visits', {
+            method: 'POST', headers: { Authorization: 'Bearer ' + context.access.token, 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+        expect(response.ok).toBe(true);
+        return (await response.json()).receipt as { revision: number; status: string };
+    };
+    const seal = (visitId: string, itemId: string, kind: 'anchor' | 'transcription', value: object) => {
+        const bytes = new TextEncoder().encode(JSON.stringify(value));
+        return { envelope: sealAgentItemNode(context.publicKey, { mandateRef: mandateA.mandateRef, visitId, itemId, kind }, bytes), byteLength: bytes.byteLength };
+    };
+    const open = (visitId: string) => call({ operation: 'visita.apri', visitId,
+        anchor: seal(visitId, visitId, 'anchor', { fiscalCode: anotherCf }).envelope });
+    const started = await open(legacyId);
+    const transcriptId = randomUUID();
+    const added = await call({ operation: 'visita.trascrizione', visitId: legacyId, expectedRevision: started.revision, item: {
+        id: transcriptId, kind: 'transcription', ...seal(legacyId, transcriptId, 'transcription', { text: 'Trascrizione sintetica' }), documentHash: null,
+    } });
+    expect((await call({ operation: 'visita.chiudi', visitId: legacyId, expectedRevision: added.revision })).status).toBe('closed');
+    expect((await open(openId)).status).toBe('open');
+
+    const directory = info.outputPath('prepared');
+    mkdirSync(directory, { mode: 0o700 });
+    const note = 'Nota sintetica della visita.';
+    const pdf = await syntheticSources(directory, { taxCode: fiscalCode, firstName: 'Ada', lastName: 'Sintetica' })(
+        ['Paziente CF ' + fiscalCode, note], '2026-11-27', [{ kind: 'document_entry', values: { text: note }, quote: note }], true);
+    const extraction = path.join(directory, 'prepared.json');
+    writeFileSync(extraction, JSON.stringify({ schema: 'mediflow.dossier_prepared_extraction.v1',
+        preparedAt: new Date().toISOString(), preparedBy: 'Ambulatorio Codex', sources: [pdf] }));
+    const receipt = await prepareAndDepositAgentVisit(credentials, access.agentRef, extraction, fiscalCode, undefined, preparedId);
+    expect(receipt).toMatchObject({ status: 'closed', mandateRef: mandateA.mandateRef });
+
+    await lockAndUnlock();
+    const mandateB = await retrieveAgentMandate(credentials, access.agentRef);
+    expect(mandateB.mandateRef).not.toBe(mandateA.mandateRef);
+    const database = new Database(path.join(isolatedRuntime.dataDirectory, 'medical.db'), { readonly: true, fileMustExist: true });
+    try {
+        expect(database.prepare('SELECT revoked_at FROM agent_mandates WHERE id=?').pluck().get(mandateA.mandateRef)).toEqual(expect.any(Number));
+        await page.getByRole('button', { name: 'Riduci navigazione', exact: true }).click();
+        await page.setViewportSize({ width: 440, height: 850 });
+        const nav = page.getByRole('navigation', { name: 'Navigazione principale', exact: true });
+        const more = nav.locator('summary').filter({ hasText: 'Altro' });
+        await expect.soft(more.locator('small')).toBeVisible({ timeout: 5000 });
+        await expect.soft(more.locator('small')).toHaveText('3', { timeout: 10000 });
+        await more.click();
+        const incoming = nav.getByRole('link', { name: /^Da decidere/u });
+        await expect.soft(incoming.locator('small')).toHaveText('3', { timeout: 3000 });
+        await expect.soft(incoming.locator('small')).toBeVisible({ timeout: 3000 });
+        await incoming.click();
+        const region = (id: string) => page.getByRole('region', { name: 'Visita ' + id });
+        const apply = (id: string) => region(id).getByRole('button', { name: /applica la visita/iu });
+        const newName = (id: string) => region(id).getByLabel('Nome', { exact: true });
+        const lastName = (id: string) => region(id).getByLabel('Cognome', { exact: true });
+        await expect.soft(region(openId).getByRole('alert')).toHaveText('Il deposito della visita non è concluso.', { timeout: 3000 });
+        await expect(region(openId).getByRole('button', { name: /applica la visita/iu })).toHaveCount(0);
+        await expect.soft(newName(legacyId)).toHaveValue('', { timeout: 3000 });
+        await expect.soft(newName(preparedId)).toHaveValue('Ada', { timeout: 3000 });
+        await expect.soft(lastName(preparedId)).toHaveValue('Sintetica', { timeout: 3000 });
+        if (await newName(legacyId).isVisible()) {
+            await expect(apply(legacyId)).toBeDisabled();
+            await newName(legacyId).fill('Lia');
+            await lastName(legacyId).fill('Sintetica');
+            const cf = region(legacyId).getByLabel('Codice fiscale', { exact: true });
+            await expect(cf).toHaveValue(anotherCf);
+            await cf.fill('ERRATO');
+            await expect(apply(legacyId)).toBeDisabled();
+            await expect(region(legacyId).getByText('Controlla il codice fiscale della visita.', { exact: true })).toBeVisible();
+            await cf.fill('BNCLGU78C15H501Y');
+        }
+        if (await newName(preparedId).isVisible()) await newName(preparedId).fill('Ada Maria');
+        await page.screenshot({ path: info.outputPath('prima-della-conferma.png'), fullPage: true });
+        for (const id of [legacyId, preparedId]) {
+            await expect.soft(apply(id)).toBeEnabled({ timeout: 3000 });
+            if (await apply(id).isEnabled()) await apply(id).click();
+            await expect.soft(region(id)).toHaveCount(0, { timeout: 5000 });
+        }
+        const patient = database.prepare('SELECT first_name, last_name, tax_code FROM patients WHERE id=?');
+        expect.soft(patient.get(legacyId)).toEqual({ first_name: 'Lia', last_name: 'Sintetica', tax_code: 'BNCLGU78C15H501Y' });
+        expect.soft(patient.get(preparedId)).toEqual({ first_name: 'Ada Maria', last_name: 'Sintetica', tax_code: fiscalCode });
+        const entries = database.prepare('SELECT count(*) FROM entries WHERE patient_id=?').pluck();
+        expect.soft(entries.get(legacyId)).toBe(1);
+        expect.soft(entries.get(preparedId)).toBe(1);
+        const applied = database.prepare("SELECT mandate_ref AS mandate, proposer_ref AS proposer FROM audit_events WHERE event_type='agent.visit.applied' AND subject_ref=?");
+        for (const id of [legacyId, preparedId]) expect.soft(applied.all(id)).toEqual([{ mandate: mandateA.mandateRef, proposer: access.agentRef }]);
+        await expect.soft(more.locator('small')).toHaveText('1');
+        await page.screenshot({ path: info.outputPath('dopo-la-conferma.png'), fullPage: true });
     } finally { database.close(); }
 });
