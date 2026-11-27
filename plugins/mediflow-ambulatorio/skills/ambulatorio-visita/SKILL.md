@@ -23,7 +23,7 @@ Usa solo il dettato della chat e i testi dei PDF inclusi in `pdf_accettati`. Det
 
 ## Scheda e Dossier
 
-Con CF stabilito prepara una scheda Markdown per `mediflow_prepara_dossier`. Usa `## Nota clinica` con quattro righe o paragrafi che iniziano con `S:`, `O:`, `A:`, `P:`. Mantieni la nota sotto 12.000 caratteri.
+Con CF stabilito prepara una scheda Markdown per `mediflow_prepara_dossier`. Usa `## Nota clinica` con quattro righe o paragrafi che iniziano con `S:`, `O:`, `A:`, `P:`. Mantieni la nota sotto 12.000 caratteri. Passa `identita.nome` e `identita.cognome` solo quando il dettato o un PDF accettato indicano questi dati per il paziente della visita. Ometti i campi mancanti o discordanti. MediFlow li propone al medico quando la visita richiede una nuova scheda.
 
 - S descrive sintomi e storia riferiti, indicando chi parla quando riconoscibile.
 - O riporta rilievi osservati e dati documentati, con fonte.
