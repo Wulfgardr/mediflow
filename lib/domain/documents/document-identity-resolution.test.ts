@@ -355,7 +355,7 @@ test('guardrails coerce link_existing_patient identity without patientId into re
     assert.equal(guarded.writePlan.forbiddenActions[0].blockedReason, 'ambiguous_identity');
 });
 
-test('WUL-925: REDACTED distinguishes patient CF from specialist CF in header, footer, and digital signature', () => {
+test('WUL-925: RefertoSpecialistico distinguishes patient CF from specialist CF in header, footer, and digital signature', () => {
     const headerReport = [
         'Regione Lombardia - Sistema Socio Sanitario',
         `ASST Sintetica - U.O. Cardiologia - Medico refertante: Dott. Luca Bianchi - C.F.: ${SYNTHETIC_PRESCRIBER_CF}`,
@@ -369,7 +369,7 @@ test('WUL-925: REDACTED distinguishes patient CF from specialist CF in header, f
         `Dirigente medico: Dott.ssa Elena Verdi - Codice fiscale: ${SYNTHETIC_PRESCRIBER_CF}`,
     ].join('\n');
     const signatureReport = [
-        'REDACTED',
+        'RefertoSpecialistico',
         `Paziente: Mario Rossi - C.F. paziente: ${SYNTHETIC_PATIENT_CF}`,
         'Esito nella norma.',
         `Firmato digitalmente da: BIANCHI LUCA (CF: ${SYNTHETIC_PRESCRIBER_CF})`,
@@ -410,7 +410,7 @@ test('WUL-925: two explicit patient CFs stay in review and unlabeled CF stays un
     assert.equal(buildDocumentDecisionIdentityFromTaxCodes(twoPatients, 'link_existing_patient', 'p1').action, 'review_identity');
 
     const unlabeled = resolveDocumentTaxCodeRoles({
-        text: `REDACTED\nAssistito codice fiscale ${SYNTHETIC_PATIENT_CF}\n${SYNTHETIC_OPERATOR_CF}`,
+        text: `RefertoSpecialistico\nAssistito codice fiscale ${SYNTHETIC_PATIENT_CF}\n${SYNTHETIC_OPERATOR_CF}`,
     });
     assert.deepEqual(
         unlabeled.taxCodes.map((entry) => [entry.value, entry.role]),

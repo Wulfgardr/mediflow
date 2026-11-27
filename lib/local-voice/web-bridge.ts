@@ -64,6 +64,7 @@ export function createLocalVoiceBridge({ endpoint = localVoiceEndpointFromEnv, p
     endpoint?: () => LocalVoiceEndpoint | null; platform?: NodeJS.Platform; client?: (endpoint: LocalVoiceEndpoint) => Client;
 } = {}) {
     const owners = new Map<string, Owner>();
+    let creationQueue: Promise<unknown> = Promise.resolve();
     const connect = () => {
         const target = endpoint();
         return target ? client(target) : null;
@@ -99,14 +100,10 @@ export function createLocalVoiceBridge({ endpoint = localVoiceEndpointFromEnv, p
             const subject = localVoiceSubject(input.subject);
             const mode: LocalVoiceMode | null = input.mode === 'visit' || input.mode === 'dictation' ? input.mode : null;
             if (!subject || !mode) return { status: 400, body: { error: 'request' } };
-            const voice = connect();
-            if (!voice) return { status: 503, body: { error: 'off' } };
-            try {
-                const request: { mode: LocalVoiceMode; subject: string; vocabulary: string[] } = {
-                    mode,
-                    subject,
-                    vocabulary: vocabularyOf(input.vocabulary),
-                };
+            const request = { mode, subject, vocabulary: vocabularyOf(input.vocabulary) } as const;
+            const registered = creationQueue.then(async () => {
+                const voice = connect();
+                if (!voice) throw new LocalVoiceError('off', 503);
                 const created = await voice.create(request).catch(async (error: unknown) => {
                     const orphan = orphanOf(error);
                     if (!orphan || owners.has(orphan)) throw error;
@@ -115,11 +112,16 @@ export function createLocalVoiceBridge({ endpoint = localVoiceEndpointFromEnv, p
                 });
                 if (created.subject !== subject) {
                     await voice.discard(created.id).catch(() => undefined);
-                    return { status: 409, body: { error: 'subject-mismatch' } };
+                    throw new LocalVoiceError('subject-mismatch', 409);
                 }
                 const owner: Owner = { user, subject, next: 0, queue: Promise.resolve() };
                 owners.set(created.id, owner);
-                return matching(owner, await voice.command(created.id, 'start'));
+                return { voice, id: created.id, owner };
+            });
+            creationQueue = registered.catch(() => undefined);
+            try {
+                const { voice, id, owner } = await registered;
+                return matching(owner, await voice.command(id, 'start'));
             } catch (error) { return failure(error); }
         },
 

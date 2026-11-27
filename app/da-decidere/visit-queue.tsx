@@ -3,10 +3,9 @@
 import { useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { CircleDashed, FileText, Inbox, NotebookPen } from 'lucide-react';
-import { taxCodeBirthDetails } from '@/lib/patient-identity';
-import { applyReviewedAgentVisits, decideAgentVisitItem, readIncomingAgentPdf } from '@/lib/agent-incoming';
-import { AGENT_CORRECTABLE_FIELDS, AGENT_THERAPY_STATUSES, AGENT_THERAPY_STATUS_NEEDED, agentCorrectionDropsDrugCodes, agentItemAwaitsDecision, agentItemCorrectable, agentVisitAwaitsReview, type AgentVisitReview } from '@/lib/agent-visit-review';
-import type { AgentItemDecision } from '@/lib/agent-visit-application-contract';
+import { applyReviewedAgentVisitAndCreatePatient, applyReviewedAgentVisits, decideAgentVisitItem, readIncomingAgentPdf } from '@/lib/agent-incoming';
+import { AGENT_CORRECTABLE_FIELDS, AGENT_THERAPY_STATUSES, AGENT_THERAPY_STATUS_NEEDED, agentCorrectionDropsDrugCodes, agentItemAwaitsDecision, agentItemCorrectable, agentVisitAwaitsReview, newAgentPatientBlock, type AgentPatientIdentity, type AgentVisitReview } from '@/lib/agent-visit-review';
+import type { AgentCassetteIndexEntry, AgentItemDecision } from '@/lib/agent-visit-application-contract';
 import { agentReviewFieldLabels as fieldLabels, agentReviewFieldValues as fieldValues, agentReviewItemLabels } from '@/lib/agent-visit-review-labels';
 import surface from '@/components/record-surface.module.css';
 import DocumentViewer from '@/components/document-viewer';
@@ -14,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import css from './da-decidere.module.css';
 
 type VisitItem = AgentVisitReview['visit']['items'][number];
-type Snapshot = { visits: AgentVisitReview[]; busy: boolean; applicationError: { visitId: string | null; itemId?: string; message: string } | null };
+type Snapshot = { visits: AgentVisitReview[]; unreadableVisits: AgentCassetteIndexEntry[]; busy: boolean; applicationError: { visitId: string | null; itemId?: string; message: string } | null };
 
 const SOAP_LABELS: Record<string, string> = { S: 'Soggettivo', O: 'Obiettivo', A: 'Valutazione', P: 'Piano' };
 const DATE_FIELDS = new Set(['startDate', 'endDate', 'observedAt', 'date']);
@@ -114,7 +113,24 @@ function ItemGestures({ review, item, busy, missing, onDecide, onCorrect }: { re
     </div>;
 }
 
-export function VisitQueue({ visits, busy, applicationError }: Snapshot) {
+function NewPatientFields({ identity, onChange, disabled }: {
+    identity: AgentPatientIdentity; onChange(identity: AgentPatientIdentity): void; disabled: boolean;
+}) {
+    return <fieldset className={`${surface.island} ${css.newPatient}`} disabled={disabled}>
+        <legend>Nuova scheda</legend>
+        <label>Codice fiscale
+            <input className="mf-input" value={identity.taxCode} maxLength={16} onChange={event => onChange({ ...identity, taxCode: event.target.value })} />
+        </label>
+        <label>Nome
+            <input className="mf-input" value={identity.firstName} maxLength={120} onChange={event => onChange({ ...identity, firstName: event.target.value })} />
+        </label>
+        <label>Cognome
+            <input className="mf-input" value={identity.lastName} maxLength={120} onChange={event => onChange({ ...identity, lastName: event.target.value })} />
+        </label>
+    </fieldset>;
+}
+
+export function VisitQueue({ visits, unreadableVisits, busy, applicationError }: Snapshot) {
     const [pdf, setPdf] = useState<{ base64: string; name: string } | null>(null);
     const [openingPdf, setOpeningPdf] = useState(false);
     const [pdfError, setPdfError] = useState<string | null>(null);
@@ -131,14 +147,14 @@ export function VisitQueue({ visits, busy, applicationError }: Snapshot) {
     const decide = async (visitId: string, itemId: string, decision: AgentItemDecision, correction?: Record<string, string>) => {
         if (await decideAgentVisitItem(visitId, itemId, decision, correction)) setCorrecting(null);
     };
-    const applicable = visits.filter(agentVisitAwaitsReview);
+    const [identities, setIdentities] = useState<Record<string, AgentPatientIdentity>>({});
     const generalApplicationError = applicationError && !visits.some(({ visit }) => visit.cassette.id === applicationError.visitId)
         ? applicationError.message : null;
 
     return <>
         {generalApplicationError && <p role="alert" className={css.alert}>{generalApplicationError}</p>}
         {pdfError && <p role="alert" className={css.alert}>{pdfError}</p>}
-        {!visits.length && !busy && (
+        {!visits.length && !unreadableVisits.length && !busy && (
             <section className={surface.tray} data-record-tray="in-arrivo" aria-labelledby="da-decidere-vuoto">
                 <div className={`${surface.island} ${css.empty}`}>
                     <div className={surface.islandHeader}>
@@ -149,6 +165,12 @@ export function VisitQueue({ visits, busy, applicationError }: Snapshot) {
                 </div>
             </section>
         )}
+        {unreadableVisits.map(({ id, depositedAt }) => (
+            <section key={id} className={surface.tray} aria-label={'Visita ' + id}>
+                <h2 className={surface.zoneTitle}>Visita depositata {formatDepositTime(depositedAt)}</h2>
+                <p role="alert" className={css.alert}>Non è stato possibile leggere la visita. Premi Aggiorna per riprovare.</p>
+            </section>
+        ))}
         {visits.map(review => {
             const { visit } = review;
             const decidedIds = new Set([...review.appliedItemIds, ...review.discardedItemIds]);
@@ -163,16 +185,19 @@ export function VisitQueue({ visits, busy, applicationError }: Snapshot) {
             const itemError = applicationError?.visitId === visit.cassette.id && applicationError.itemId ? applicationError : null;
             const visitError = applicationError?.visitId === visit.cassette.id && !applicationError.itemId ? applicationError.message : null;
             const itemsBlocked = !review.blockers.length && review.proposalBlockers.length > 0;
-            const actionMessages = [...review.blockers, ...(itemsBlocked ? ['Decidi prima le voci segnate.'] : []), ...(visitError ? [visitError] : [])];
+            const identityKey = visit.cassette.id + ':' + visit.cassette.revision;
+            const identity = review.newPatient && (identities[identityKey] ?? review.newPatient.proposed);
+            const identityBlock = review.newPatient && identity ? newAgentPatientBlock(review.newPatient, identity) : undefined;
+            const actionMessages = [...review.blockers, ...(identityBlock ? [identityBlock] : []),
+                ...(itemsBlocked ? [identity ? 'Controlla le voci segnate prima di creare la scheda.' : 'Decidi prima le voci segnate.'] : []), ...(visitError ? [visitError] : [])];
             const actionMessagesId = `visita-${visit.cassette.id}-esito`;
-            const isApplicable = applicable.includes(review);
+            const isApplicable = agentVisitAwaitsReview(review, identity ?? undefined);
             const fiscalCode = typeof visit.anchor.fiscalCode === 'string' ? visit.anchor.fiscalCode : null;
-            const birth = review.newPatient && taxCodeBirthDetails(review.newPatient.taxCode);
             const hasPatientName = Boolean(review.patient && (review.patient.firstName || review.patient.lastName));
             const status = visit.cassette.status !== 'closed'
                 ? { label: 'Deposito in corso', pill: surface.pillNeutral }
                 : isApplicable
-                ? { label: decided.length ? 'Decisa in parte' : 'Pronta da applicare', pill: surface.pillSuccess }
+                ? { label: decided.length ? 'Decisa in parte' : identity ? 'Da confermare' : 'Pronta da applicare', pill: surface.pillSuccess }
                 : { label: 'Da verificare', pill: surface.pillWarning };
             const contents = [
                 notes.length > 0 ? 'Nota' : null,
@@ -180,6 +205,8 @@ export function VisitQueue({ visits, busy, applicationError }: Snapshot) {
                 pdfItems.length > 0 ? `${pdfItems.length} PDF` : null,
                 proposals.length > 0 ? (proposals.length === 1 ? '1 proposta' : `${proposals.length} proposte`) : null,
             ].filter(Boolean).join(' · ');
+            const itemMessages = (item: VisitItem) => (review.itemBlockers.get(item.id) ?? [])
+                .map(message => <p key={message} className={css.itemBlocker}>{message}</p>);
             const gestures = (item: VisitItem) => {
                 const asksStatus = review.itemNeeds.get(item.id)?.includes('status') ?? false;
                 const status = chosenStatus[item.id];
@@ -246,6 +273,7 @@ export function VisitQueue({ visits, busy, applicationError }: Snapshot) {
                         ) : (
                             <p className={css.prose}>{noteText}</p>
                         )}
+                        {itemMessages(item)}
                         {gestures(item)}
                     </article>;
                 })}
@@ -316,6 +344,7 @@ export function VisitQueue({ visits, busy, applicationError }: Snapshot) {
                             {agentReviewItemLabels[item.kind]} ({lineCount} {lineCount === 1 ? 'riga' : 'righe'})
                         </summary>
                         <p className={css.prose}>{transcriptText}</p>
+                        {itemMessages(item)}
                         {gestures(item)}
                     </details>;
                 })}
@@ -337,25 +366,29 @@ export function VisitQueue({ visits, busy, applicationError }: Snapshot) {
                 )}
 
                 <footer className={css.visitFooterBlock}>
-                    {isApplicable && review.newPatient && <p className="[font:var(--type-meta)]">
-                        Applicando questa visita crei anche la scheda del paziente.
-                        {birth && ` Sesso nel CF: ${birth.sex}.`}
-                    </p>}
+                    {identity && <NewPatientFields identity={identity} disabled={busy}
+                        onChange={value => setIdentities(current => ({ ...current, [identityKey]: value }))} />}
                     {actionMessages.length > 0 && (
                         <div id={actionMessagesId} className={`${surface.island} ${css.blockers}`}>
                             {actionMessages.map((message, index) => <p role="alert" key={index}>{message}</p>)}
                         </div>
                     )}
-                    <div className={css.visitFooter}>
+                    {visit.cassette.status === 'closed' && <div className={css.visitFooter}>
                         <span>
                             {pending.length === 1 ? '1 elemento in attesa di conferma' : `${pending.length} elementi in attesa di conferma`}
                         </span>
                         <button type="button" className={isApplicable ? 'mf-button-primary' : 'mf-button-secondary'} disabled={busy || !isApplicable}
                             aria-describedby={actionMessages.length > 0 ? actionMessagesId : undefined}
-                            onClick={() => { void applyReviewedAgentVisits([visit.cassette.id]); }}>
-                            Applica la visita
+                            onClick={() => {
+                                if (identity) {
+                                    void applyReviewedAgentVisitAndCreatePatient({ visitId: visit.cassette.id, revision: visit.cassette.revision, identity });
+                                } else {
+                                    void applyReviewedAgentVisits([visit.cassette.id]);
+                                }
+                            }}>
+                            {identity ? 'Crea scheda e applica la visita' : 'Applica la visita'}
                         </button>
-                    </div>
+                    </div>}
                 </footer>
             </section>;
         })}
