@@ -1,14 +1,53 @@
 #!/usr/bin/env node
 
 import { execFileSync } from 'node:child_process';
-import { readdirSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { homedir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const TAX_CODE = /\b[A-Z]{6}[0-9LMNPQRSTUV]{2}[A-Z][0-9LMNPQRSTUV]{2}[A-Z][0-9LMNPQRSTUV]{3}[A-Z]\b/iu;
 const DATE_PATTERN = /\b\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}\b/u;
 const HEADER_NOISE = /^(?:esame|analita|parametro|risultato|valore|unita|unità|intervallo|range|valori? di riferimento|metodo|materiale|campione|paziente|assistit[oa]|cognome|nome|data|codice|referto)\b/iu;
-const FACILITY_KEYWORD = /\b(?:ASST|ATS|IRCCS|Ospedale|Policlinico|Centro\s+Diagnostico|CDI|Synlab|Cerba|Bianalisi|Lifebrain|Humanitas|San\s+Raffaele|Auxologico|Santagostino|Laboratorio\s+(?:Analisi|Clinico|di\s+Analisi))\b/iu;
+const BASE_FACILITY_KEYWORDS = [
+    String.raw`ASST`,
+    String.raw`ATS`,
+    String.raw`IRCCS`,
+    String.raw`Ospedale`,
+    String.raw`Policlinico`,
+    String.raw`Centro\s+Diagnostico`,
+    String.raw`Clinica`,
+    String.raw`Istituto`,
+    String.raw`Laboratorio\s+(?:Analisi|Clinico|di\s+Analisi)`,
+];
+
+function escapeRegexLiteral(value) {
+    return value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&').replace(/\s+/gu, '\\s+');
+}
+
+function loadExtraFacilityKeywords() {
+    const extra = [];
+    const fromEnv = process.env.MEDIFLOW_LOCAL_FACILITY_KEYWORDS?.trim();
+    if (fromEnv) {
+        for (const item of fromEnv.split(',')) {
+            if (item.trim()) extra.push(escapeRegexLiteral(item.trim()));
+        }
+    }
+    const localFile = process.env.MEDIFLOW_LOCAL_FACILITY_KEYWORDS_FILE?.trim()
+        || path.join(homedir(), '.mediflow', 'local-facility-keywords.txt');
+    if (existsSync(localFile)) {
+        for (const line of readFileSync(localFile, 'utf8').split(/\r?\n/u)) {
+            const trimmed = line.trim();
+            if (trimmed && !trimmed.startsWith('#')) extra.push(escapeRegexLiteral(trimmed));
+        }
+    }
+    return extra;
+}
+
+function buildFacilityKeywordRegex() {
+    const terms = [...BASE_FACILITY_KEYWORDS, ...loadExtraFacilityKeywords()];
+    return new RegExp(String.raw`\b(?:${terms.join('|')})\b`, 'iu');
+}
 const FACILITY_STOP = /^(?:paziente|assistit[oa]|sig(?:\.|ra|nor[ae]?)?|nome|cognome|nat[oa]|cf|c\.f\.|codice|data|via|viale|piazza|corso|tel|fax|dott|dr|prof|referto|pag|richiedente|medico|sesso|et[aà])\b/iu;
 const FACILITY_WORD = /^[\p{Lu}][\p{L}'’]*$/u;
 const UNKNOWN_LABORATORY = 'Laboratorio non identificato';
@@ -96,8 +135,9 @@ function joinRowCells(cells) {
 }
 
 export function detectLaboratory(text) {
+    const facilityKeyword = buildFacilityKeywordRegex();
     for (const line of text.split(/\r?\n/u).slice(0, 25)) {
-        const match = FACILITY_KEYWORD.exec(line);
+        const match = facilityKeyword.exec(line);
         if (!match) continue;
         const words = [match[0].replace(/\s+/gu, ' ')];
         const sameColumn = line.slice(match.index + match[0].length).replace(/^ /u, '').split(/\s{2,}|\t/u)[0];

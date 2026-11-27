@@ -745,7 +745,7 @@ test('WUL-924: promemoria con CF paziente e prescrittore senza CF medico spiega 
     assert.doesNotMatch(mixedInOnePdf.message, /Manca il tuo codice fiscale nel Profilo/u);
 });
 
-test('WUL-925: three synthetic RefertoCittadino reports with specialist CF in header, footer, and signature match the patient', async () => {
+test('WUL-925: three synthetic RefertoSpecialistico reports with specialist CF in header, footer, and signature match the patient', async () => {
     const { isValidItalianTaxCodeChecksum } = await import('./document-identity-resolution');
     const CF_SPEC = 'MEDPRS00A01A000W';
     const CF_SPEC_2 = 'OPRTST00A01A000K';
@@ -770,7 +770,7 @@ test('WUL-925: three synthetic RefertoCittadino reports with specialist CF in he
     ].join('\n');
     const footerReferto = [
         'Regione Lombardia - Fascicolo Sanitario',
-        'RefertoCittadino',
+        'RefertoSpecialistico',
         'Assistito: Mario Rossi',
         `C.F. assistito: ${CF_A}`,
         'Data referto: 14/11/2026',
@@ -781,7 +781,7 @@ test('WUL-925: three synthetic RefertoCittadino reports with specialist CF in he
         `C.F.: ${CF_SPEC_2}`,
     ].join('\n');
     const signatureReferto = [
-        'RefertoCittadino - Fascicolo Sanitario Lombardia',
+        'RefertoSpecialistico - Fascicolo Sanitario Lombardia',
         'ASST Sintetica Sud - Ambulatorio Pneumologia',
         `Paziente: Mario Rossi - Codice fiscale paziente: ${CF_A}`,
         'Data referto: 18/11/2026',

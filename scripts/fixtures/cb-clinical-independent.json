@@ -900,7 +900,7 @@
     },
     {
       "id": "repo-0078",
-      "text": "RefertoCittadino.pdf: epistassi risolta in PS, confermata necessita di rivalutare la ripresa dell'anticoagulante; mantenere follow-up diabetologico e ADI domiciliare.",
+      "text": "RefertoSpecialistico.pdf: epistassi risolta in PS, confermata necessita di rivalutare la ripresa dell'anticoagulante; mantenere follow-up diabetologico e ADI domiciliare.",
       "sourceRefs": [
         {
           "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",

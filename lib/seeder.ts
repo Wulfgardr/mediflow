@@ -141,7 +141,7 @@ async function generatePDF(type: string, patientName: string, date: Date): Promi
     // Header
     doc.setFontSize(22);
     doc.setTextColor(40, 40, 100);
-    doc.text("Ospedale San Raffaele - Milano", 20, 20);
+    doc.text("Struttura Sanitaria Sintetica", 20, 20);
 
     doc.setFontSize(12);
     doc.setTextColor(100);

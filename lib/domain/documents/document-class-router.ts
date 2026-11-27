@@ -81,7 +81,6 @@ const FILENAME_CLASS_MAP: Record<string, { classification: DocumentDecisionClass
     certificato_malattia: { classification: 'administrative', confident: true },
     certificato_medico_introduttivo: { classification: 'administrative', confident: true },
     invalidita_civile: { classification: 'administrative', confident: true },
-    refertocittadino: { classification: 'specialist_report', confident: false },
     modulo: { classification: 'unknown', confident: false },
 };
 

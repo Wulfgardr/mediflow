@@ -17,11 +17,11 @@ async function makeAssistantFixture(lines: string[]) {
     return root;
 }
 
-test('clinical agenda bridge keeps only clinical or FBF candidates from local event caches', async () => {
+test('clinical agenda bridge keeps clinical and local-overlay candidates from local event caches', async () => {
     const root = await makeAssistantFixture([
         JSON.stringify({
             id: 'event-1',
-            title: 'Ambulatorio FBF - follow-up cardiometabolico',
+            title: 'Ambulatorio Struttura Alfa - follow-up cardiometabolico',
             start_iso: '2026-05-18T08:30:00+02:00',
             end_iso: '2026-05-18T09:00:00+02:00',
             location: 'Ambulatorio locale',
@@ -40,6 +40,11 @@ test('clinical agenda bridge keeps only clinical or FBF candidates from local ev
             calendar_title: 'Lavoro sanitario',
         }),
     ]);
+    await writeFile(
+        path.join(root, 'data', 'clinical_agenda_local_signals.json'),
+        JSON.stringify([{ tokens: ['struttura alfa'], weight: 4, reason: 'Presidio locale configurato', anchor: true }]),
+        'utf8',
+    );
 
     const result = await loadClinicalAgendaCandidates({
         assistantDir: root,
@@ -53,11 +58,11 @@ test('clinical agenda bridge keeps only clinical or FBF candidates from local ev
     assert.deepEqual(
         result.candidates.map((candidate) => candidate.title),
         [
-            'Ambulatorio FBF - follow-up cardiometabolico',
+            'Ambulatorio Struttura Alfa - follow-up cardiometabolico',
             'Riunione equipe distretto PAI',
         ],
     );
-    assert.ok(result.candidates[0].reasons.includes('FBF/Fatebenefratelli'));
+    assert.ok(result.candidates[0].reasons.includes('Presidio locale configurato'));
     assert.equal(result.candidates[0].reviewState, 'candidate');
 });
 
