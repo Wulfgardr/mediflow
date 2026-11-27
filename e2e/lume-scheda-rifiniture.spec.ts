@@ -146,6 +146,15 @@ test('scheda paziente: schede aperte, testata, diario e sezioni restano nel sist
     });
     expect(frame.radius, 'il riquadro del diario ha angoli arrotondati').toBeGreaterThanOrEqual(8);
     expect(frame.inset, 'il titolo del diario non tocca il bordo').toBeGreaterThanOrEqual(16);
+    const nestedFrames = await diary.evaluate(node => {
+        const frames: string[] = [];
+        for (let current = node.parentElement; current && !current.matches('[data-record-tray="diario"]'); current = current.parentElement) {
+            const style = getComputedStyle(current);
+            if (style.backgroundColor !== 'rgba(0, 0, 0, 0)' || style.boxShadow !== 'none' || style.borderTopWidth !== '0px') frames.push(current.className);
+        }
+        return frames;
+    });
+    expect(nestedFrames, 'fra il vassoio e il riquadro del diario non ci sono altre cornici').toEqual([]);
 
     await openPatientSection(page, 'terapie');
     const glyph = await page.locator('#terapie').evaluate(node => {

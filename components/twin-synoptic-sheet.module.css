@@ -332,6 +332,7 @@
     .overview .activity > .comparison { background: var(--lume-record-change); }
     .overview .support:has([data-has-proposals='true']) { background: transparent; }
     .overview .context > .contextRows, .overview .middle > .activity { gap: var(--record-tray-inset); }
+    :global([data-record-tray='diario']) .overview .middle { padding: 0; background: none; box-shadow: none; }
     :global([data-folder-section='quadro']) :is(.overview > .middle, .overview > .side) {
         max-height: max(320px, calc(100dvh - 212px));
         overflow-y: auto;

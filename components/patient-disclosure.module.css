@@ -117,6 +117,9 @@
 }
 
 .folderTray :global([data-section-header] > .mf-button-text) { color: var(--lume-accent); }
+.folderTray.folderTray :global([data-folder-pane][data-folder-active='true'] .mf-button-text) { padding-inline: 0; }
+.folderTray.folderTray :global([data-folder-pane][data-folder-active='true'] .mf-button-text:hover) { background-color: transparent; text-decoration: underline; text-underline-offset: 3px; }
+.folderTray.folderTray :global([data-folder-pane][data-folder-active='true'] .mf-button-text + .mf-button-text) { margin-inline-start: 16px; }
 .folderTray :global(form) :is(input:not([type='checkbox'], [type='radio'], [type='range'], [type='file']), select, textarea):not([aria-invalid='true']) {
     border-color: var(--lume-ink-muted);
     border-radius: 10px;

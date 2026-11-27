@@ -166,7 +166,9 @@
   .workspace[data-patient-record='true'] .workspaceBar,
   .workspace[data-unified-shell='true']:has([data-page-frame], [data-runtime-settings]) .workspaceBar { position: absolute; z-index: 3; top: 0; left: 0; max-width: calc(100% - 335px); width: max-content; }
   .workspace[data-unified-shell='true']:has([data-page-frame], [data-runtime-settings]) .workspaceBar { z-index: 1001; }
-  .workspace[data-patient-record='true'] .recordWhen { display: inline; color: var(--record-hint); }
+  .workspace[data-patient-record='true']:has([data-testid='lume-scheda-header'] [role='toolbar'] > :nth-child(4)) .workspaceBar { max-width: calc(100% - 510px); }
+  .workspace[data-unified-shell='true'] .workspaceBar .recordTab > a:first-child { max-width: 176px; }
+  .workspace[data-patient-record='true'] .recordWhen { color: var(--record-hint); }
   .workspace[data-patient-record='true'] .workarea[data-scrolled-record='true'] .workspaceBar { width: 100%; max-width: none; z-index: 6; }
   .workspace[data-patient-record='true'] .workarea[data-scrolled-record='true'] .patientNavigation { top: 36px; }
   .workspace[data-patient-record='true'] .patientNavigation {
@@ -199,3 +201,4 @@
   .workspace[data-unified-shell='true'] .railTools svg { width: 14px; height: 14px; }
   .workspace[data-rail-open='false'] .railTools, .workspace[data-rail-open='false'] .account { flex-direction: column; }
 }
+@media (min-width: 1441px) { .workspace[data-patient-record='true'] .recordWhen { display: inline; } }
