@@ -89,12 +89,14 @@ test('pythonExecutablesForSandbox resolves pip sh-wrapped entry points with spac
     const target = path.join(quotedDir, 'python-target');
     fs.writeFileSync(target, 'synthetic', { mode: 0o755 });
     const entry = path.join(quotedDir, 'pip');
+    const shellAlias = path.join(directory, 'sh');
+    fs.symlinkSync('/bin/sh', shellAlias);
     const escaped = target.replaceAll("'", "'\\''");
-    fs.writeFileSync(entry, `#!/bin/sh\n'''exec' '${escaped}' "$0" "$@"\n`, { mode: 0o755 });
-    const resolved = pythonExecutablesForSandbox(entry);
-    assert.ok(resolved.includes(entry));
-    assert.ok(resolved.includes('/bin/sh'));
-    assert.ok(resolved.includes(target));
+    for (const shell of ['/bin/sh', shellAlias]) {
+      fs.writeFileSync(entry, `#!${shell}\n'''exec' '${escaped}' "$0" "$@"\n`, { mode: 0o755 });
+      const resolved = pythonExecutablesForSandbox(entry);
+      assert.deepEqual(resolved.toSorted(), [entry, fs.realpathSync(shell), target].toSorted());
+    }
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
