@@ -60,18 +60,34 @@ per voce anche per le visite.
    in scheda» e il medico la scarta o modifica la voce dalla scheda. Una
    correzione che cambia il codice entra come diagnosi nuova. La visita
    intera non cambia: la voce mostra già «In scheda: …» prima di applicare.
-7. **Solo su una scheda esistente.** La decisione voce per voce vale quando la
-   visita ha una scheda attiva riconosciuta. Una visita che crea la scheda
-   (prima visita) si applica ancora per intero.
+7. **Decisioni nella prima visita (WUL-976).** Tieni, Correggi e Scarta
+   restano in sospeso nel browser fino a «Crea scheda e applica la visita».
+   Il server controlla che ogni voce depositata sia tenuta, corretta o
+   scartata. Crea la scheda, scrive le voci tenute e registra tutte le
+   decisioni nella stessa transazione.
 8. **La conferma con Touch ID non parte** su una visita già decisa in parte:
-   la si finisce dal Web. Il percorso nativo (`lib/agent-visit-confirmation*`,
-   `native/AgentVisitConfirmation/`) non cambia.
+   la si finisce dal Web.
+9. **Stato della terapia.** Quando il documento non indica se la terapia è
+   in corso, sospesa o conclusa, il medico sceglie lo stato. La scelta vale
+   anche per l’applicazione della singola visita, compresa la prima, e
+   compare in `physicianFields` nella provenienza sigillata. La coda in
+   blocco e Touch ID lasciano la scelta al medico nella visita.
+10. **Scarto della visita (WUL-976).** Dopo la conferma la visita esce dalla
+    coda. Il registro conserva lo scarto della visita e quello delle voci
+    ancora in attesa. Le voci già in scheda restano salvate. La sessione e la
+    revisione devono essere correnti. La cassetta deve appartenere alla
+    sessione per utente e archivio. Il gesto scrive solo audit ed è
+    disponibile anche se il deposito è ancora in corso o bloccato.
+11. **Applicazione in blocco (WUL-976).** «Applica tutte le visite senza
+    dubbi» mostra l’avanzamento, quante visite ha applicato e quante restano,
+    raggruppate per motivo.
 
 ### Stati di una voce
 
 | Stato | Da dove | Effetto | Audit |
 | --- | --- | --- | --- |
 | da decidere | deposito della cassetta | nessuno | `agent.item.deposited` |
+| in sospeso | decisione nella prima visita | resta nel browser fino alla creazione della scheda | all’applicazione |
 | tenuta | Tieni, oppure visita intera | scritta in scheda con la fonte | scrittore + `agent.item.applied` |
 | corretta | Correggi | scritta con il valore del medico | scrittore + `agent.item.applied` con `corrected` |
 | scartata | Scarta | nessun dato clinico | `agent.item.discarded` |
@@ -86,10 +102,11 @@ Gli stati tenuta, corretta e scartata sono finali.
 | decisa in parte | almeno una voce decisa, almeno una da decidere | «Visite», con le voci decise segnate |
 | applicata | ogni voce tenuta o corretta | esce dalla coda; `agent.visit.applied` con `cassette_complete` |
 | decisa | ogni voce decisa, almeno una scartata | esce dalla coda; `agent.visit.decided`, **mai** `cassette_complete` |
+| scartata | conferma di «Scarta la visita» | esce dalla coda, `agent.visit.discarded` |
 
 ### Che cosa controlla il server a ogni gesto
 
-Nella stessa transazione `immediate`, prima di scrivere:
+Nella stessa transazione `immediate`, prima di applicare la visita o decidere una singola voce:
 
 - sessione Web dell'amministratore, generazione dell'archivio della cassetta,
   chiusura auditata sotto un mandato autorizzato al deposito e operazioni

@@ -1,6 +1,6 @@
 import { readAuthenticatedWebSession } from '@/lib/security/server-auth';
 import { hasAttestedLoopbackIngress } from '@/lib/security/loopback-ingress.mjs';
-import { decideAgentVisitItem, AgentApplicationDenied } from '@/lib/agent-visit-application';
+import { decideAgentVisitItem, discardAgentVisit, AgentApplicationDenied } from '@/lib/agent-visit-application';
 import { isTrustedWebMutationRequest } from '@/lib/security/request-transport';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { readNativeNetworkJson } from '@/lib/native-network-json-body';
@@ -23,6 +23,9 @@ export async function POST(request: Request): Promise<Response> {
         const body = await readNativeNetworkJson(request, 34 * 1024 * 1024, { signal: request.signal, deadline: performance.now() + 15000 });
         const current = await readAuthenticatedWebSession();
         if (current?.id !== session.id || current.userId !== session.userId) return denied(403);
-        return Response.json(decideAgentVisitItem(request, current, body), { headers: { 'Cache-Control': 'no-store' } });
+        const receipt = body && typeof body === 'object' && 'decision' in body && body.decision === 'discard_visit'
+            ? discardAgentVisit(current, body)
+            : decideAgentVisitItem(request, current, body);
+        return Response.json(receipt, { headers: { 'Cache-Control': 'no-store' } });
     } catch (error) { return denied(error instanceof AgentApplicationDenied ? error.status : 409); }
 }

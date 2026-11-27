@@ -98,6 +98,7 @@ export const AUDIT_EVENT_TYPES = [
     'agent.visit.applied',
     'agent.item.discarded',
     'agent.visit.decided',
+    'agent.visit.discarded',
     'agent.visit.confirmation.denied',
     'agent.client.approved',
     'agent.mandate.created',

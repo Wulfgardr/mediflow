@@ -32,6 +32,15 @@ export function readAgentCassette(database: Database.Database, id: string, actor
     return database.prepare(`SELECT ${projection} FROM agent_cassettes AS cassette
         WHERE id=? AND actor_ref=? AND ${pendingCassetteVisibility()}`).get(id, actorRef) as AgentCassette | undefined;
 }
+const visitDiscarded = 'agent.visit.discarded';
+
+export function agentCassetteDiscardReceipt(database: Database.Database, cassette: AgentCassette): { eventId: string } | undefined {
+    return database.prepare(`SELECT event_id AS eventId FROM audit_events
+        WHERE event_type=? AND subject_type='agent_operation' AND subject_ref=?
+        AND actor_ref=? AND proposer_ref=? AND mandate_ref=? AND outcome='success' AND source_surface='agent'`)
+        .get(visitDiscarded, cassette.id, cassette.actorRef, cassette.agentRef, cassette.mandateRef) as { eventId: string } | undefined;
+}
+
 export function agentCassetteReviewBlock(database: Database.Database, cassette: AgentCassette): AgentCassetteReviewBlock | undefined {
     if (cassette.status !== 'closed') return;
     const mandate = createAgentMandateStore(database).read(cassette.mandateRef);
@@ -69,7 +78,7 @@ export function readAgentCassetteIndex(database: Database.Database, actorRef: st
             AND event.subject_type='agent_operation' AND event.subject_ref=cassette.id
             AND event.proposer_ref=cassette.agent_ref AND event.mandate_ref=cassette.mandate_ref
             AND event.outcome='success' AND event.source_surface='agent'
-            AND (event.event_type='agent.visit.decided' OR (event.event_type='agent.visit.applied' AND EXISTS (SELECT 1 FROM json_each(
+            AND (event.event_type IN ('agent.visit.decided','${visitDiscarded}') OR (event.event_type='agent.visit.applied' AND EXISTS (SELECT 1 FROM json_each(
                 CASE WHEN json_valid(event.redacted_metadata) THEN event.redacted_metadata ELSE '{}' END, '$.flags'
             ) WHERE value=?)))
         ) ORDER BY cassette.deposited_at, cassette.id LIMIT ?`).all(actorRef, after, actorRef, after, AGENT_CASSETTE_COMPLETE, pageSize + 1) as AgentCassetteIndexEntry[];
@@ -105,7 +114,7 @@ export function createAgentCassetteStore(database: Database.Database, now = Date
         const applied = database.prepare(`SELECT 1 FROM audit_events
             WHERE event_type='agent.item.applied' AND request_id=? AND actor_ref=? AND proposer_ref=?
             AND outcome='success' AND source_surface='agent'`).get(id, principal.actorRef, principal.agentRef);
-        if (previous.status !== 'closed' || applied) throw new AgentCassetteDenied(409);
+        if (previous.status !== 'closed' || applied || agentCassetteDiscardReceipt(database, previous)) throw new AgentCassetteDenied(409);
     }
     function audit(principal: AgentPrincipal, event: string, id: string, relatedVisitId: string | null = null) {
         const time = now();
@@ -120,7 +129,7 @@ export function createAgentCassetteStore(database: Database.Database, now = Date
             if (replaces !== undefined && (!isAgentId(replaces) || replaces === id)) throw new AgentCassetteDenied(400);
             if (database.prepare('SELECT 1 FROM agent_cassettes WHERE id=?').get(id)) {
                 const existing = read(id, principal);
-                if (existing.anchorCiphertext !== JSON.stringify(anchor) || predecessor(existing) !== replaces) throw new AgentCassetteDenied(409);
+                if (agentCassetteDiscardReceipt(database, existing) || existing.anchorCiphertext !== JSON.stringify(anchor) || predecessor(existing) !== replaces) throw new AgentCassetteDenied(409);
                 return receipt(existing);
             }
             if (replaces !== undefined) {
@@ -139,7 +148,9 @@ export function createAgentCassetteStore(database: Database.Database, now = Date
         add(principal: AgentPrincipal, id: string, expectedRevision: number, item: unknown) {
             if (!validAgentCassetteItem(item)) throw new AgentCassetteDenied(400);
             admit(principal, AGENT_ITEM_OPERATION[item.kind]);
-            const current = read(id, principal), items = cassetteItems(current), existing = items.find(value => value.id === item.id);
+            const current = read(id, principal);
+            if (agentCassetteDiscardReceipt(database, current)) throw new AgentCassetteDenied(409);
+            const items = cassetteItems(current), existing = items.find(value => value.id === item.id);
             if (existing) {
                 if (JSON.stringify(existing) !== JSON.stringify(item)) throw new AgentCassetteDenied(409);
                 return receipt(current);
@@ -154,6 +165,7 @@ export function createAgentCassetteStore(database: Database.Database, now = Date
         close(principal: AgentPrincipal, id: string, expectedRevision: number) {
             admit(principal, 'visita.chiudi'); const current = read(id, principal);
             if (!Number.isSafeInteger(expectedRevision)) throw new AgentCassetteDenied(400);
+            if (agentCassetteDiscardReceipt(database, current)) throw new AgentCassetteDenied(409);
             if (current.status === 'closed' && current.revision === expectedRevision + 1) return receipt(current);
             if (current.status !== 'open' || current.revision !== expectedRevision || !cassetteItems(current).length) throw new AgentCassetteDenied(409);
             const replaces = predecessor(current);
