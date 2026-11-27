@@ -11,36 +11,52 @@ const EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.mjs', '.cjs']);
 const SOLE_WRITER_FILE = 'lib/network-home-base-server.ts';
 const PAIRING_MODEL_FILE = 'lib/network-pairing-model.ts';
 const PAIRING_KEY_IDENT = 'NETWORK_PAIRING_STATE_KEY';
+const PAIRING_INTENTS_KEY_IDENT = 'NETWORK_PAIRING_INTENTS_KEY';
 const DEFAULT_PAIRING_KEY_LITERAL = 'network.pairing.state';
+const DEFAULT_PAIRING_INTENTS_KEY_LITERAL = 'network.pairing.intents';
+const PROTECTED_PAIRING_KEYS = [
+    { ident: PAIRING_KEY_IDENT, defaultLiteral: DEFAULT_PAIRING_KEY_LITERAL },
+    { ident: PAIRING_INTENTS_KEY_IDENT, defaultLiteral: DEFAULT_PAIRING_INTENTS_KEY_LITERAL },
+];
 const WRITE_METHODS = new Set(['insert', 'update', 'delete']);
 const SKIP_DIRS = new Set(['node_modules', '.next', 'dist', 'artifacts', 'target']);
 
-export function resolvePairingKeyLiteral(root = ROOT_DIR) {
+export function resolvePairingKeyLiterals(root = ROOT_DIR) {
     const modelPath = path.join(root, PAIRING_MODEL_FILE);
-    if (!fs.existsSync(modelPath)) return DEFAULT_PAIRING_KEY_LITERAL;
+    if (!fs.existsSync(modelPath)) {
+        return PROTECTED_PAIRING_KEYS.map(({ ident, defaultLiteral }) => ({ ident, literal: defaultLiteral }));
+    }
     const ast = parseFile(PAIRING_MODEL_FILE, fs.readFileSync(modelPath, 'utf8'));
-    let literal = null;
+    const resolved = new Map();
     function visit(node) {
         if (
             ts.isVariableDeclaration(node)
             && ts.isIdentifier(node.name)
-            && node.name.text === PAIRING_KEY_IDENT
+            && PROTECTED_PAIRING_KEYS.some(({ ident }) => ident === node.name.text)
             && node.initializer
             && ts.isStringLiteralLike(node.initializer)
         ) {
-            literal = node.initializer.text;
+            resolved.set(node.name.text, node.initializer.text);
         }
         ts.forEachChild(node, visit);
     }
     visit(ast);
-    if (!literal) {
-        throw new Error(`Could not resolve string literal ${PAIRING_KEY_IDENT} in ${PAIRING_MODEL_FILE}.`);
-    }
-    return literal;
+    return PROTECTED_PAIRING_KEYS.map(({ ident }) => {
+        const literal = resolved.get(ident);
+        if (!literal) {
+            throw new Error(`Could not resolve string literal ${ident} in ${PAIRING_MODEL_FILE}.`);
+        }
+        return { ident, literal };
+    });
+}
+
+export function resolvePairingKeyLiteral(root = ROOT_DIR) {
+    return resolvePairingKeyLiterals(root).find(({ ident }) => ident === PAIRING_KEY_IDENT).literal;
 }
 
 export const FIX_GUIDANCE =
-    `Route all ${PAIRING_KEY_IDENT} writes through mutateNetworkPairingState() in ${SOLE_WRITER_FILE} `
+    `Route all ${PAIRING_KEY_IDENT} and ${PAIRING_INTENTS_KEY_IDENT} writes through ${SOLE_WRITER_FILE} `
+    + '(mutateNetworkPairingState() / postNetworkPairingIntent()) '
     + 'to preserve compare-and-swap isolation and archive-generation fencing.';
 
 function collectProductionFiles(root) {
@@ -80,9 +96,19 @@ function referencesSettingsTable(node) {
     return false;
 }
 
-export function inspectPairingStateSource(file, source, pairingKeyLiteral = DEFAULT_PAIRING_KEY_LITERAL) {
+export function inspectPairingStateSource(
+    file,
+    source,
+    pairingKeys = PROTECTED_PAIRING_KEYS.map(({ ident, defaultLiteral }) => ({ ident, literal: defaultLiteral })),
+) {
+    const normalizedKeys = typeof pairingKeys === 'string'
+        ? [
+            { ident: PAIRING_KEY_IDENT, literal: pairingKeys },
+            { ident: PAIRING_INTENTS_KEY_IDENT, literal: DEFAULT_PAIRING_INTENTS_KEY_LITERAL },
+        ]
+        : pairingKeys;
     const ast = parseFile(file, source);
-    let mentionsPairingKey = false;
+    const mentionedKeys = new Set();
     let writesSettingsTable = false;
     let hasRawSettingsSql = false;
     let hasMutateFn = false;
@@ -90,8 +116,16 @@ export function inspectPairingStateSource(file, source, pairingKeyLiteral = DEFA
     let hasGenerationFence = false;
 
     function visit(node) {
-        if (ts.isIdentifier(node) && node.text === PAIRING_KEY_IDENT) mentionsPairingKey = true;
-        if (ts.isStringLiteralLike(node) && node.text.includes(pairingKeyLiteral)) mentionsPairingKey = true;
+        if (ts.isIdentifier(node)) {
+            for (const key of normalizedKeys) {
+                if (node.text === key.ident) mentionedKeys.add(key.ident);
+            }
+        }
+        if (ts.isStringLiteralLike(node)) {
+            for (const key of normalizedKeys) {
+                if (node.text.includes(key.literal)) mentionedKeys.add(key.ident);
+            }
+        }
 
         if (ts.isFunctionDeclaration(node) && node.name?.text === 'mutateNetworkPairingState') {
             hasMutateFn = true;
@@ -127,21 +161,22 @@ export function inspectPairingStateSource(file, source, pairingKeyLiteral = DEFA
         return findings;
     }
 
-    if (mentionsPairingKey && (writesSettingsTable || hasRawSettingsSql)) {
-        findings.push(`${file}: direct write to ${PAIRING_KEY_IDENT} detected outside ${SOLE_WRITER_FILE}. ${FIX_GUIDANCE}`);
+    if (mentionedKeys.size > 0 && (writesSettingsTable || hasRawSettingsSql)) {
+        const keyNames = [...mentionedKeys].sort().join(', ');
+        findings.push(`${file}: direct write to ${keyNames} detected outside ${SOLE_WRITER_FILE}. ${FIX_GUIDANCE}`);
     }
     return findings;
 }
 
 export function checkPairingStateWriters(root) {
-    const pairingKeyLiteral = resolvePairingKeyLiteral(root);
+    const pairingKeys = resolvePairingKeyLiterals(root);
     const files = collectProductionFiles(root);
     const findings = [];
     let checkedSoleWriter = false;
     for (const file of files) {
         const source = fs.readFileSync(path.join(root, file), 'utf8');
         if (file === SOLE_WRITER_FILE) checkedSoleWriter = true;
-        findings.push(...inspectPairingStateSource(file, source, pairingKeyLiteral));
+        findings.push(...inspectPairingStateSource(file, source, pairingKeys));
     }
     if (!checkedSoleWriter) {
         findings.push(`Missing canonical pairing-state writer module: ${SOLE_WRITER_FILE}.`);

@@ -33,7 +33,7 @@ export function DevicePairingPanel({ networkEnabled, clients, onClientsChange }:
 }) {
     const [confirmingOffer, setConfirmingOffer] = useState(false);
     const [revokeId, setRevokeId] = useState<string | null>(null);
-    const [offer, setOffer] = useState<(DevicePairingOffer & { image: string }) | null>(null);
+    const [offer, setOffer] = useState<(DevicePairingOffer & { image: string; address: string }) | null>(null);
     const [pending, setPending] = useState(false);
     const [message, setMessage] = useState('');
 
@@ -54,7 +54,8 @@ export function DevicePairingPanel({ networkEnabled, clients, onClientsChange }:
                 return;
             }
             const [created, { encodeQR }] = await Promise.all([response.json() as Promise<DevicePairingOffer>, import('qr')]);
-            const next = { ...created, image: encodeQR(created.link, 'data-url', { border: 4, scale: 4 }) };
+            const next = { ...created, image: encodeQR(created.link, 'data-url', { border: 4, scale: 4 }),
+                address: new URL(new URL(created.link).searchParams.get('origin') ?? '').hostname };
             setOffer(next);
             setConfirmingOffer(false);
             window.setTimeout(() => setOffer(current => current === next ? null : current),
@@ -116,6 +117,7 @@ export function DevicePairingPanel({ networkEnabled, clients, onClientsChange }:
                     <Image src={offer.image} alt="QR per collegare un dispositivo MediFlow"
                         width={232} height={232} unoptimized className="[image-rendering:pixelated]" />
                     <p>Inquadra il QR con l’iPhone entro cinque minuti.</p>
+                    <p>Indirizzo del computer: <span className="lume-code">{offer.address}</span></p>
                     <details>
                         <summary>Impronta del computer</summary>
                         <p className="lume-code">{new URL(offer.link).searchParams.get('fingerprint')?.match(/.{4}/gu)?.join(' ')}</p>

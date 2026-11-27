@@ -30,10 +30,13 @@ import {
 import {
     addPendingPairingIntent,
     confirmPendingPairingIntent,
+    NETWORK_PAIRING_INTENTS_KEY,
     NETWORK_PAIRING_STATE_KEY,
     parseNetworkPairingState,
+    parsePendingPairingIntents,
     removePairedClient,
     serializeNetworkPairingState,
+    serializePendingPairingIntents,
     type NetworkPairingState,
     type RemovePairedClientResult,
 } from '@/lib/network-pairing-model';
@@ -206,6 +209,48 @@ export async function mutateNetworkPairingState<T>(
     return { conflict: true };
 }
 
+function loadSettingValueSync(key: string): string | null {
+    const row = dbServer
+        .select({ value: settings.value })
+        .from(settings)
+        .where(eq(settings.key, key))
+        .get();
+
+    return row?.value ?? null;
+}
+
+function pendingIntentsForGeneration(rawValue: string | null, generation: string): NetworkPairingIntentResponse[] {
+    try {
+        const stored = rawValue === null ? null : JSON.parse(rawValue);
+        if (stored?.archiveGeneration === generation && currentArchiveGeneration() === generation) {
+            return parsePendingPairingIntents(rawValue);
+        }
+    } catch {
+        return [];
+    }
+    return [];
+}
+
+function savePendingIntentsSync(intents: NetworkPairingIntentResponse[], generation: string): void {
+    const serialized = JSON.stringify({
+        ...JSON.parse(serializePendingPairingIntents(intents)),
+        archiveGeneration: generation,
+    });
+    dbServer
+        .insert(settings)
+        .values({ key: NETWORK_PAIRING_INTENTS_KEY, value: serialized })
+        .onConflictDoUpdate({ target: settings.key, set: { value: serialized } })
+        .run();
+}
+
+function mergePendingIntents(
+    dedicated: NetworkPairingIntentResponse[],
+    legacy: NetworkPairingIntentResponse[],
+): NetworkPairingIntentResponse[] {
+    const seen = new Set(dedicated.map((item) => item.intentId));
+    return [...dedicated, ...legacy.filter((item) => !seen.has(item.intentId))];
+}
+
 export async function postNetworkPairingIntent(payload: unknown): Promise<PairingIntentDraftResult> {
     const snapshot = await loadNetworkSettingsSnapshot();
     const nodeId = await ensureNetworkNodeId(snapshot);
@@ -220,33 +265,24 @@ export async function postNetworkPairingIntent(payload: unknown): Promise<Pairin
         snapshot,
         payload,
     });
-    if (result.ok) {
-        const persisted = await mutateNetworkPairingState<PairingIntentDraftResult>((state) => {
-            const admission = addPendingPairingIntent(state, result.value);
-            return admission.ok
-                ? { write: true, nextState: admission.nextState, result }
-                : { write: false, result: admission };
-        });
-        if (persisted.conflict) {
-            return {
-                ok: false,
-                status: 409,
-                value: {
-                    error: 'Conflict',
-                    code: 'PAIRING_STATE_CONFLICT',
-                    message: 'Pairing state changed, retry.',
-                },
-            };
-        }
-        return persisted.result;
-    }
+    if (!result.ok) return result;
 
-    return result;
+    const generation = currentArchiveGeneration();
+    return runDbServerImmediateTransaction<PairingIntentDraftResult>(() => {
+        assertArchiveGeneration(dbServer, generation);
+        const existing = pendingIntentsForGeneration(loadSettingValueSync(NETWORK_PAIRING_INTENTS_KEY), generation);
+        const admission = addPendingPairingIntent({ intents: existing, clients: [] }, result.value);
+        if (!admission.ok) return admission;
+        savePendingIntentsSync(admission.nextState.intents, generation);
+        return result;
+    });
 }
 
 export async function listNetworkPairingIntents(): Promise<NetworkPairingIntentResponse[]> {
-    const pairingState = await loadNetworkPairingState();
-    return pairingState.intents;
+    const generation = currentArchiveGeneration();
+    const dedicated = pendingIntentsForGeneration(await loadSettingValue(NETWORK_PAIRING_INTENTS_KEY), generation);
+    const legacy = (await loadNetworkPairingState()).intents;
+    return mergePendingIntents(dedicated, legacy);
 }
 
 export async function confirmNetworkPairingIntent(intentId: string): Promise<{
@@ -265,12 +301,29 @@ export async function confirmNetworkPairingIntent(intentId: string): Promise<{
         };
     }
 
+    const generation = currentArchiveGeneration();
     const persisted = await mutateNetworkPairingState<ReturnType<typeof confirmPendingPairingIntent>>((state) => {
-        const result = confirmPendingPairingIntent({ state, intentId });
-        return result.ok
-            ? { write: true, nextState: result.nextState, result }
-            : { write: false, result };
-    });
+        const dedicated = pendingIntentsForGeneration(loadSettingValueSync(NETWORK_PAIRING_INTENTS_KEY), generation);
+        const combinedIntents = mergePendingIntents(dedicated, state.intents);
+        const result = confirmPendingPairingIntent({
+            state: { intents: combinedIntents, clients: state.clients },
+            intentId,
+        });
+        if (!result.ok) return { write: false, result };
+        const nextLegacyIntents = state.intents.filter((item) => item.intentId !== intentId);
+        return {
+            write: true,
+            nextState: { intents: nextLegacyIntents, clients: result.nextState.clients },
+            result,
+            commit(archiveGeneration) {
+                const currentDedicated = pendingIntentsForGeneration(loadSettingValueSync(NETWORK_PAIRING_INTENTS_KEY), archiveGeneration);
+                const nextDedicated = currentDedicated.filter((item) => item.intentId !== intentId);
+                if (nextDedicated.length !== currentDedicated.length) {
+                    savePendingIntentsSync(nextDedicated, archiveGeneration);
+                }
+            },
+        };
+    }, generation);
     if (persisted.conflict) {
         return {
             status: 409,

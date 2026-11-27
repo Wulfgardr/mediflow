@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import http from 'node:http';
 import net from 'node:net';
 import https from 'node:https';
+import os from 'node:os';
 import { join } from 'node:path';
 import tls from 'node:tls';
 import { after, before, test } from 'node:test';
@@ -60,7 +61,7 @@ function device(origin, fingerprint, path, { method = 'GET', headers = {}, body 
     const target = new URL(origin);
     return new Promise((resolve, reject) => {
         const socket = tls.connect({ host: lanReachable ? target.hostname : '127.0.0.1', port: Number(target.port),
-            ...(lanReachable ? { localAddress: fixture.peer } : {}), rejectUnauthorized: false, servername: 'localhost' });
+            ...(process.platform !== 'win32' ? { localAddress: fixture.peer } : {}), rejectUnauthorized: false, servername: 'localhost' });
         socket.once('error', reject);
         socket.once('secureConnect', () => {
             const presented = socket.getPeerCertificate().fingerprint256?.replaceAll(':', '').toLowerCase();
@@ -112,7 +113,8 @@ test('a paired synthetic device opens a synthetic chart through the proxy the la
     assert.deepEqual(started.lan, { state: 'on', paired: false, port, reason: null });
     const status = JSON.parse(readFileSync(join(fixture.directory, 'runtime-status.json'), 'utf8'));
     assert.equal(status.port, port);
-    assert.equal(status.bindHost, '0.0.0.0');
+    assert.equal(status.bindHost, fixture.peer);
+    assert.equal(status.loopbackProbe, true);
     assert.equal(status.tlsPin, certificatePin(join(fixture.directory, 'certs/local-api.crt')));
     const proxyPid = readFileSync(join(fixture.directory, 'local-api-tls-proxy.pid'), 'utf8').trim();
     const args = execFileSync('/bin/ps', ['-o', 'args=', '-p', proxyPid], { encoding: 'utf8' });
@@ -141,6 +143,27 @@ test('an unpaired device, an unrecognised certificate and a stopped proxy read n
     }
     const listed = await device(phone.origin, phone.fingerprint, '/api/v1/network/patients', {});
     assert.equal(listed.status, 401);
+    const forbiddenNames = ['MediFlow Prova', 'Operatore sintetico', os.hostname()];
+    for (const [method, route, body] of [
+        ['POST', '/api/v1/network/pairing-intents', JSON.stringify({ deviceName: 'Sconosciuto', clientPlatform: 'ios' })],
+        ['GET', '/api/v1/network/node', undefined],
+        ['GET', '/api/v1/network/capabilities', undefined],
+        ['POST', '/api/v1/network/pairing-offers/redeem', JSON.stringify({ offerId: randomUUID(), secret: 'invalid', clientPlatform: 'ios', deviceName: 'Sconosciuto' })],
+        ['GET', '/api/auth/check', undefined],
+    ]) {
+        const res = await device(phone.origin, phone.fingerprint, route, { method, body });
+        if (route === '/api/v1/network/pairing-intents') assert.equal(res.status, 403);
+        if (route === '/api/v1/network/node' || route === '/api/v1/network/capabilities' || route === '/api/auth/check') {
+            assert.equal(res.status, 401);
+            assert.ok(!res.text.includes('archiveGeneration') && !res.text.includes('salt'));
+        }
+        for (const name of forbiddenNames) {
+            assert.ok(!res.text.includes(name), `${method} ${route} leaked ${name}: ${res.text}`);
+        }
+    }
+    const pairedCheck = await device(phone.origin, phone.fingerprint, '/api/auth/check', { headers: phone.paired });
+    assert.equal(pairedCheck.status, 200, pairedCheck.text);
+    assert.ok(pairedCheck.text.includes('archiveGeneration'));
 
     const received = [];
     const impostor = https.createServer({ key: readFileSync(join(fixture.directory, 'impostor.key')), cert: readFileSync(join(fixture.directory, 'impostor.crt')) },

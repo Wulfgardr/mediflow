@@ -92,6 +92,7 @@ export const SETTINGS_WRITE_REGISTRY: Record<string, SettingsKeyPolicy> = {
     // here so an accidental HTTP write is denied rather than silently allowed. ---
     'network.nodeId': { write: [], note: 'server-managed node id (lib/network-home-base-server.ts)' },
     'network.pairing.state': { write: [], note: 'server-managed pairing state (lib/network-home-base-server.ts)' },
+    'network.pairing.intents': { write: [], note: 'server-managed pairing intents (lib/network-home-base-server.ts)' },
     [PAIRING_OFFERS_KEY]: { write: [], note: 'server-managed one-time pairing offers' },
 
     // --- Backup scheduler: has its own admin route (app/api/system/backup-scheduler).

@@ -154,7 +154,8 @@ public actor HomeBasePatientsClient {
             .appendingPathComponent("login")
         let checkURL = try configuration.serverURL().appendingPathComponent("api/auth/check")
         let (checkData, _) = try await send(to: checkURL,
-            headers: ["Cache-Control": "no-store"], includesSourceSurface: false)
+            headers: pairedLoginHeaders(credentials: credentials).merging(["Cache-Control": "no-store"]) { _, new in new },
+            includesSourceSurface: false)
         if let failure = try? JSONDecoder().decode(AuthHealthFailure.self, from: checkData), failure.status == "error" {
             throw HomeBaseClientError.httpStatus(503, failure.publicMessage)
         }

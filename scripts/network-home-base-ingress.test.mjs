@@ -47,6 +47,7 @@ async function login(remote) {
         return { response: { status: result.response.status }, headers: result.webHeaders };
     }
     const check = await call('/api/auth/check', { remote });
+    if (check.status === 401) return { response: check, headers: {} };
     assert.equal(check.status, 200);
     const control = cookie(check, 'mediflow_auth_control');
     const response = await call('/api/auth/login', { remote, method: 'POST', headers: { Cookie: control,
@@ -56,7 +57,7 @@ async function login(remote) {
 
 test('a genuine non-loopback socket peer cannot issue or consume Web sessions through TLS or Next', async () => {
     const remote = await login(true);
-    assert.equal(remote.response.status, before ? 200 : 403);
+    assert.equal(remote.response.status, before ? 200 : 401);
     const active = before ? remote : await login(false);
     assert.equal(active.response.status, 200);
     const headers = active.headers;
@@ -66,8 +67,9 @@ test('a genuine non-loopback socket peer cannot issue or consume Web sessions th
     }
     if (!before) {
         assert.equal((await call('/api/auth/login', { direct: true, method: 'POST', body: {} })).status, 403);
-        const intent = await call('/api/v1/network/pairing-intents', { method: 'POST', body: { deviceName: 'Synthetic TLS peer', clientPlatform: 'ipados', appVersion: 'test', requestedCapabilities: ['network.replica.readonly-patients'] } });
-        assert.equal(intent.status, 201, 'Network route must survive the allowlist');
+        assert.equal((await call('/api/v1/network/pairing-intents', { method: 'POST', body: { deviceName: 'Synthetic TLS peer', clientPlatform: 'ipados', appVersion: 'test', requestedCapabilities: ['network.replica.readonly-patients'] } })).status, 403);
+        const intent = await call('/api/v1/network/pairing-intents', { method: 'POST', direct: true, remote: false, body: { deviceName: 'Synthetic TLS peer', clientPlatform: 'ipados', appVersion: 'test', requestedCapabilities: ['network.replica.readonly-patients'] } });
+        assert.equal(intent.status, 201);
         const pairing = await call(`/api/v1/network/pairing-intents/${intent.json.intentId}/confirm`, { method: 'POST', direct: true, remote: false, headers: local });
         assert.equal(pairing.status, 201);
         const pairedHeaders = { 'x-mediflow-paired-client-id': pairing.json.pairedClient.clientId, 'x-mediflow-paired-client-token': pairing.json.pairedClientToken };

@@ -1,13 +1,14 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { mkdtempSync, openSync, closeSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, openSync, closeSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { request as httpsRequest } from 'node:https';
 import { createServer } from 'node:net';
-import { networkInterfaces, tmpdir } from 'node:os';
+import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 
+import { readPairingAddress } from '../../lib/network-pairing-address.ts';
 import { generateMasterKey } from '../../lib/security/security.ts';
 import { createRecoveryWrapping, createUnlockWrapping, deriveUnlockMaterial } from '../../lib/security/unlock-credential.ts';
 import { loginWithWebAuthControl } from '../web-auth-control-test-client.mjs';
@@ -33,9 +34,7 @@ export async function startDevicePairingFixture({ source = root, launcher = fals
     const children = [];
     const tlsPort = await freePort();
     const httpPort = await freePort();
-    const peer = Object.entries(networkInterfaces()).sort(([a], [b]) => a.localeCompare(b))
-        .flatMap(([, addresses]) => addresses ?? []).find(address => address.family === 'IPv4'
-        && !address.internal && !address.address.startsWith('169.254.'))?.address;
+    const peer = await readPairingAddress('0.0.0.0');
     const httpOrigin = `http://127.0.0.1:${httpPort}`;
     const localApiToken = randomBytes(32).toString('hex');
     const env = { ...process.env, MEDIFLOW_DATA_DIR: directory, MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1',
@@ -78,11 +77,13 @@ export async function startDevicePairingFixture({ source = root, launcher = fals
 
     try {
         if (!peer) throw new Error('The test requires one non-loopback IPv4 interface');
+        const productionBuildReady = existsSync(join(source, '.next/BUILD_ID'));
         const server = launcher
             ? launch([resolve(source, 'scripts/mediflow.mjs'), '--scelta', 'web', '--senza-browser'], 'next.log', {
                 HOME: home, XDG_CONFIG_HOME: join(home, 'config'), PORT: String(httpPort),
                 MEDIFLOW_TLS_PORT: String(tlsPort), MEDIFLOW_LOCAL_VOICE_BINARY: join(directory, 'no-voice') })
-            : launch([resolve(root, 'node_modules/next/dist/bin/next'), 'dev', '--webpack',
+            : launch([resolve(root, 'node_modules/next/dist/bin/next'),
+                ...(productionBuildReady ? ['start'] : ['dev', '--webpack']),
                 '--hostname', '127.0.0.1', '--port', String(httpPort)], 'next.log');
         await waitFor(server, async () => {
             try { return (await fetch(httpOrigin + '/api/auth/check')).ok; } catch { return false; }
@@ -117,10 +118,10 @@ export async function startDevicePairingFixture({ source = root, launcher = fals
         execFileSync('openssl', ['req', '-newkey', 'rsa:2048', '-x509', '-nodes', '-days', '1',
             '-keyout', keyPath, '-out', certPath, '-subj', '/CN=localhost',
             '-addext', 'subjectAltName=DNS:localhost'], { stdio: 'ignore' });
-        writeFileSync(join(directory, 'runtime-status.json'), JSON.stringify({ bindHost: '0.0.0.0', port: tlsPort, certPath }));
+        writeFileSync(join(directory, 'runtime-status.json'), JSON.stringify({ bindHost: peer, loopbackProbe: true, port: tlsPort, certPath }));
         const proxy = launch([resolve(source, 'scripts/local-api-tls-proxy.mjs')], 'proxy.log', {
             MEDIFLOW_TLS_CERT_PATH: certPath, MEDIFLOW_TLS_KEY_PATH: keyPath,
-            MEDIFLOW_TLS_BIND_HOST: '0.0.0.0', MEDIFLOW_TLS_PORT: String(tlsPort),
+            MEDIFLOW_TLS_BIND_HOST: peer, MEDIFLOW_TLS_LOOPBACK_PROBE: '1', MEDIFLOW_TLS_PORT: String(tlsPort),
             MEDIFLOW_TLS_NETWORK_MODE: 'network-home-base', MEDIFLOW_HTTP_TARGET: httpOrigin,
         });
         function lan(path, { method = 'GET', headers = {}, body } = {}) {
@@ -139,7 +140,10 @@ export async function startDevicePairingFixture({ source = root, launcher = fals
             });
         }
         await waitFor(proxy, async () => {
-            try { return (await lan('/api/auth/check')).status === 200; } catch { return false; }
+            try {
+                const status = (await lan('/api/auth/check')).status;
+                return status === 200 || status === 401;
+            } catch { return false; }
         }, 'TLS proxy');
 
         async function signIn() {

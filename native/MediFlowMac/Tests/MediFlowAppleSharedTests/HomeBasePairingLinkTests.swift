@@ -110,4 +110,54 @@ final class HomeBasePairingLinkTests: XCTestCase {
         XCTAssertEqual(model.password, "")
         XCTAssertNil(model.clinicalWorkspaceConnection)
     }
+
+    @MainActor
+    func testFirstQRRedemptionCallsOnlyRedeemAndNeverAuthCheck() async throws {
+        let offer = try XCTUnwrap(HomeBasePairingLink.parse(XCTUnwrap(URL(string: validLink))))
+        let clientID = "7d7c2b91-56ea-4a1a-a5f0-6c449db7f031"
+        let clientToken = String(repeating: "z", count: 32)
+        var requestedPaths: [String] = []
+        PairingLinkMockURLProtocol.handler = { request in
+            requestedPaths.append(request.url?.path ?? "")
+            let response = HTTPURLResponse(url: request.url!, statusCode: 201, httpVersion: nil, headerFields: nil)!
+            let body = try JSONSerialization.data(withJSONObject: [
+                "clientId": clientID,
+                "pairedClientToken": clientToken,
+            ])
+            return (response, body)
+        }
+        defer { PairingLinkMockURLProtocol.handler = nil }
+
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [PairingLinkMockURLProtocol.self]
+        let connection = try await offer.redeem(sessionConfiguration: config)
+        XCTAssertEqual(requestedPaths, ["/api/v1/network/pairing-offers/redeem"])
+        XCTAssertFalse(requestedPaths.contains("/api/auth/check"))
+        XCTAssertEqual(connection.credentials.clientId, clientID)
+        XCTAssertEqual(connection.credentials.clientToken, clientToken)
+    }
+}
+
+private final class PairingLinkMockURLProtocol: URLProtocol {
+    nonisolated(unsafe) static var handler: ((URLRequest) throws -> (HTTPURLResponse, Data))?
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        guard let handler = Self.handler else {
+            client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
+            return
+        }
+        do {
+            let (response, data) = try handler(request)
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: data)
+            client?.urlProtocolDidFinishLoading(self)
+        } catch {
+            client?.urlProtocol(self, didFailWithError: error)
+        }
+    }
+
+    override func stopLoading() {}
 }

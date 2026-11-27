@@ -1,6 +1,7 @@
 import { logServerError } from '@/lib/server-error-log';
 import { presentedWebSessionProof, webSessionProofBindings } from '@/lib/security/web-session-proof';
-import { hasAttestedLoopbackIngress } from '@/lib/security/loopback-ingress.mjs';
+import { hasAttestedLoopbackIngress, requireAttestedTlsProxyContext } from '@/lib/security/loopback-ingress.mjs';
+import { authenticateNetworkPairedClient } from '@/lib/network-home-base-server';
 import { NextResponse } from 'next/server';
 import { requiresLocalUiDocumentLease } from '@/lib/security/plugin-local-ui-runtime';
 import fs from 'fs';
@@ -94,9 +95,18 @@ function finalizeControlResponse(
 }
 
 export async function GET(request: Request) {
+    const local = hasAttestedLoopbackIngress(request);
+    if (!local && requireAttestedTlsProxyContext(request)) {
+        const pairedClient = await authenticateNetworkPairedClient(request);
+        if (!pairedClient) {
+            return NextResponse.json(
+                { error: 'Unauthorized', code: 'PAIRING_AUTH_REQUIRED', message: 'Paired device credentials required.' },
+                { status: 401, headers: { 'Cache-Control': 'no-store' } },
+            );
+        }
+    }
     const presentedControlId = webAuthControlIdFromRequest(request);
     const proof = presentedWebSessionProof(request.headers);
-    const local = hasAttestedLoopbackIngress(request);
     const exposeControl = local && proof !== null;
     const controlAllowed = exposeControl && presentedControlId !== null
         && webSessionProofBindings.controlAvailable(presentedControlId, proof);
