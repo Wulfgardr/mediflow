@@ -112,6 +112,7 @@ export default function PatientDocumentCreate({ onActiveChange, dossier, onDocum
     const [fields, setFields] = useState<Fields>(EMPTY);
     const [separate, setSeparate] = useState(false);
     const [undecided, setUndecided] = useState<readonly IdentityField[]>([]);
+    const [leftOut, setLeftOut] = useState<readonly IdentityField[]>([]);
     const [pin, setPin] = useState('');
     const [dragging, setDragging] = useState(false);
     const [pinSubmitError, setPinSubmitError] = useState<string | null>(null);
@@ -132,7 +133,7 @@ export default function PatientDocumentCreate({ onActiveChange, dossier, onDocum
         work.current.controller.abort();
         work.current.original?.fill(0);
         work.current = { epoch: work.current.epoch + 1, controller: new AbortController(), original: null };
-        setFields(EMPTY); setSeparate(false); setUndecided([]); setPin(''); setPinSubmitError(null);
+        setFields(EMPTY); setSeparate(false); setUndecided([]); setLeftOut([]); setPin(''); setPinSubmitError(null);
         return work.current;
     }, []);
     const current = (token: { epoch: number }) => work.current.epoch === token.epoch && !work.current.controller.signal.aborted;
@@ -249,6 +250,7 @@ export default function PatientDocumentCreate({ onActiveChange, dossier, onDocum
         setFields((value) => ({ ...value, ...changes }));
         const touched = touchedFields(changes);
         setUndecided((value) => value.filter((field) => !touched.includes(field)));
+        setLeftOut((value) => value.filter((field) => !touched.includes(field)));
         if (phase.kind === 'review' && phase.duplicate) {
             setSeparate(false);
             setPhase({ ...phase, duplicate: null });
@@ -319,15 +321,18 @@ export default function PatientDocumentCreate({ onActiveChange, dossier, onDocum
     const sourceLine = (source: Source) => `${source.fileName}, ${(source.size / 1024).toLocaleString('it-IT', { maximumFractionDigits: 0 })} KiB${source.converted
         ? `, immagine allegata come PDF di una pagina${source.reduction < 1 ? `, ridotta al ${Math.round(source.reduction * 100)}% per l’estrazione locale` : ''}` : ''}`;
     function applyAllProposals(proposals: readonly SourcedIdentityProposal[]) {
-        const { values, undecided: open } = allIdentityProposals(proposals);
+        const { values, undecided: open, leftOut: apart } = allIdentityProposals(proposals);
         changeFields(Object.assign({}, ...Object.entries(values).map(([field, value]) => proposalChanges(field as IdentityField, value))));
         setUndecided(open);
+        setLeftOut(apart);
     }
 
     function fieldNote(field: IdentityField) {
         if (!dossier) return null;
         const id = `patient-document-${field}-source`;
         if (undecided.includes(field)) return <p id={id} className="mf-field-helper" data-testid="patient-document-undecided">{UNDECIDED_NOTES[undecidedReason(dossier.proposals, field)]}</p>;
+        const apart = leftOut.includes(field) ? dossier.proposals.find((proposal) => proposal.field === field) : undefined;
+        if (apart) return <p id={id} className="mf-field-helper" data-testid="patient-document-left-out">Da scegliere: {apart.sourceName} non riporta lo stesso cognome e nome.</p>;
         const value = fieldValue(fields, field);
         const origin = value ? dossier.proposals.find((proposal) => proposal.field === field && sameIdentityValue(proposal.value, value)) : undefined;
         return origin ? <p id={id} className="mf-field-helper">Fonte: {origin.sourceName}</p> : null;
