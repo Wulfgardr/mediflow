@@ -324,10 +324,17 @@ for (const reviewed of process.env.MEDIFLOW_VISIT_MAC_TRIAL ? [false] : [false, 
             && response.request().method() === 'POST' && response.request().postDataJSON().visitId === concurrentId);
         await page.getByRole('button', { name: 'Applica tutte le visite senza dubbi', exact: true }).click();
         expect((await rejected).status()).toBe(409);
-        const applicationError = page.getByRole('alert').filter({ hasText: 'La visita non è stata applicata. Rileggi la cassetta.' });
+        const rejection = 'La visita non è stata applicata. Rileggi la cassetta.';
+        const applicationError = concurrentVisit.getByRole('alert').filter({ hasText: rejection });
         await expect(applicationError).toBeVisible();
-        await page.getByRole('button', { name: 'Aggiorna', exact: true }).click();
+        const summary = page.getByRole('status').filter({ hasText: '2 applicate, 2 restano' });
+        await expect(summary.getByText('1 · ' + rejection, { exact: true })).toBeVisible();
+        const refresh = page.getByRole('button', { name: 'Aggiorna', exact: true });
+        await refresh.click();
+        await expect(refresh).toBeEnabled();
         await expect(applicationError).toBeVisible();
+        await expect(concurrentVisit.getByRole('button', { name: 'Applica la visita', exact: true })).toHaveAccessibleDescription(rejection);
+        await expect(doubtfulVisit.getByText(rejection, { exact: true })).toHaveCount(0);
         await expect.poll(counts).toEqual([2, 4, 2, 2]);
         expect(batchOrder).toEqual([visitId, concurrentId, secondVisitId]);
         expect(plainBodies.map(body => JSON.parse(body).visitId)).toEqual(batchOrder);
@@ -346,6 +353,7 @@ for (const reviewed of process.env.MEDIFLOW_VISIT_MAC_TRIAL ? [false] : [false, 
         expect(applied.appliedItemIds).toHaveLength(7);
         const notApplied = await (await documentRequests(page).get('/api/agent-mandates/incoming?visit=' + doubtfulId)).json();
         expect(notApplied.appliedItemIds).toEqual([]);
+        await applicationError.scrollIntoViewIfNeeded();
         await page.screenshot({ path: info.outputPath('proposte-applicate-dopo-conferma.png'), fullPage: true });
     }
 });

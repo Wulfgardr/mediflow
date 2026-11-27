@@ -5,7 +5,7 @@ import { getEventListeners } from 'node:events';
 import { agentCassetteFixture } from './test-fixtures/agent-cassette';
 import { sealAgentItemNode } from '../packages/agent-client/src/cassette-crypto';
 import { db, type Patient } from './db';
-import { agentVisitAwaitsReview, inspectAgentVisit, prepareAgentApplication } from './agent-visit-review';
+import { agentItemDiscardAdmitted, agentVisitAwaitsReview, inspectAgentVisit, prepareAgentApplication } from './agent-visit-review';
 import type { AgentMandateInput } from './agent-mandate-contract';
 import type { AgentItemKind } from './agent-cassette-crypto';
 import { AGENT_ITEM_OPERATION } from './agent-cassette-contract';
@@ -267,5 +267,16 @@ test('WUL-925: RefertoSpecialistico with specialist CF in header, footer, or sig
     try {
         const blocked = await inspectAgentVisit(f.row, [patient(cfA), patient(cfB)], null, new AbortController().signal, pdfText(`Assistito codice fiscale ${cfA}\n${specialistCf}`));
         assert.ok(blocked.blockers.length > 0);
+    } finally { f.close(); }
+});
+
+test('an item of a visit from a revoked agent cannot be discarded one by one, like the server admission', async () => {
+    const f = await fixture();
+    try {
+        const signal = new AbortController().signal;
+        const open = await inspectAgentVisit(f.row, [patient(cfA)], null, signal, pdfText('Paziente CF ' + cfA));
+        assert.equal(agentItemDiscardAdmitted(open), true);
+        const revoked = await inspectAgentVisit({ ...f.row, reviewBlock: 'agent_revoked' }, [patient(cfA)], null, signal, pdfText('Paziente CF ' + cfA));
+        assert.equal(agentItemDiscardAdmitted(revoked), false);
     } finally { f.close(); }
 });

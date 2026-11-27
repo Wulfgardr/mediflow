@@ -43,7 +43,13 @@ const applicationFields = z.object({ visitId: id, phase: z.literal('review'), pa
 }).strict();
 const uniqueItems = (value: { items: Array<{ id: string }> }) => new Set(value.items.map(item => item.id)).size === value.items.length;
 export const agentApplicationSchema = applicationFields.refine(uniqueItems);
-export const reviewedAgentApplicationSchema = applicationFields.extend({ newPatient: newAgentPatientSchema.optional() }).refine(uniqueItems);
+export const AGENT_ITEM_DECISIONS = ['keep', 'correct', 'discard'] as const;
+export const reviewedAgentApplicationSchema = applicationFields.extend({
+    newPatient: newAgentPatientSchema.optional(),
+    decisions: z.array(z.object({ itemId: id, decision: z.enum(AGENT_ITEM_DECISIONS) }).strict()).min(1).max(128).optional(),
+}).refine(uniqueItems).refine(value => !value.decisions || (value.newPatient
+    && new Set(value.decisions.map(decision => decision.itemId)).size === value.decisions.length
+    && value.decisions.every(decision => (decision.decision !== 'discard') === value.items.some(item => item.id === decision.itemId))));
 export type ReviewedAgentApplicationInput = z.input<typeof reviewedAgentApplicationSchema>;
 export type AgentApplicationInput = z.input<typeof agentApplicationSchema>;
 export type AgentApplication = z.output<typeof agentApplicationSchema>;
@@ -51,8 +57,7 @@ export const agentStructuredKind = (kind: string) => !['note', 'transcription', 
 export const agentCassetteConfirmsNatively = (cassette: Pick<AgentCassette, 'modelProvider' | 'allowsClinicalEgress'>) =>
     clinicalContentAllowed(cassette.modelProvider, cassette.allowsClinicalEgress);
 export type AgentApplicationReceipt = { visitId: string; phase: 'review'; status: 'applied'; eventId: string; itemCount: number;
-    patientVersion: number; modelProvider: string; allowsClinicalEgress: boolean };
-export const AGENT_ITEM_DECISIONS = ['keep', 'correct', 'discard'] as const;
+    patientVersion: number; modelProvider: string; allowsClinicalEgress: boolean; discardedItemCount?: number };
 export type AgentItemDecision = typeof AGENT_ITEM_DECISIONS[number];
 const decisionTarget = { visitId: id, cassetteRevision: z.number().int().positive() };
 export const agentItemDecisionSchema = z.discriminatedUnion('decision', [
@@ -65,3 +70,6 @@ export type AgentItemDecisionInput = z.input<typeof agentItemDecisionSchema>;
 export type AgentVisitDecisionState = 'pending' | 'partial' | 'applied' | 'decided';
 export type AgentItemDecisionReceipt = { visitId: string; itemId: string; decision: AgentItemDecision; status: 'decided'; eventId: string;
     patientVersion: number | null; visitState: AgentVisitDecisionState };
+
+export const agentVisitDiscardSchema = z.object({ ...decisionTarget, decision: z.literal('discard_visit') }).strict();
+export type AgentVisitDiscardReceipt = { visitId: string; status: 'discarded'; eventId: string };

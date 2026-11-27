@@ -173,3 +173,28 @@ test('a therapy whose source states the status is kept as deposited, without ask
         assert.equal(JSON.parse(String(await f.opened(kept.item.values.motivation))).physicianFields, undefined);
     } finally { get.mock.restore(); query.mock.restore(); f.close(); }
 });
+
+test('the first visit uses only the chosen therapy status and still requires the PDF identity to match', async () => {
+    const f = await fixture({ kind: 'therapy', values: { drugName: 'FARMACO SINTETICO 150MG' }, quote: recipeQuote });
+    try {
+        const signal = new AbortController().signal;
+        const review = await inspectAgentVisit(f.row(), [], null, signal, pdfText(recipeText), 'synthetic-ambulatory');
+        assert.ok(review.newPatient);
+        const identity = { taxCode: cf, firstName: 'Ada', lastName: 'Sintetica' };
+        const choices = { [f.proposalId]: { status: 'suspended', drugName: 'Altro', dosage: '1 compressa' } };
+        assert.equal(await prepareAgentApplication(review, signal, identity), null);
+        assert.equal(await prepareAgentApplication(review, signal, identity, {}, { [f.proposalId]: { status: 'altro' } }), null);
+        const plan = await prepareAgentApplication(review, signal, identity, {}, choices);
+        assert.ok(plan?.newPatient);
+        const therapy = plan.items.find(item => item.id === f.proposalId);
+        assert.equal(therapy?.kind, 'therapy');
+        if (therapy?.kind !== 'therapy') assert.fail('Synthetic therapy missing');
+        assert.equal(therapy.values.status, 'suspended');
+        assert.equal(therapy.values.drugName, 'FARMACO SINTETICO 150MG');
+        assert.equal(therapy.values.dosage, 'non indicata nel documento');
+        assert.deepEqual(JSON.parse(String(await f.opened(therapy.values.motivation))).physicianFields, ['status']);
+        assert.equal(await prepareAgentApplication(review, signal, { ...identity, taxCode: 'RSSMRA85T10A562S' }, {
+            [f.proposalId]: { decision: 'correct', correction: { status: 'suspended' } },
+        }), null);
+    } finally { f.close(); }
+});

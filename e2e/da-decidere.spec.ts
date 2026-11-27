@@ -181,7 +181,7 @@ test('a therapy from a prescription without a stated status asks the physician, 
     await openDaDecidere(page, isolatedRuntime.url);
     const visit = page.getByRole('region', { name: 'Visita ' + visitId });
     const proposal = visit.locator('article').filter({ has: page.getByRole('heading', { name: 'Terapia proposta', exact: true }) });
-    await expect(proposal.getByText('Il documento non indica lo stato della terapia: sceglilo prima di tenerla.', { exact: true })).toBeVisible({ timeout: 30000 });
+    await expect(proposal.getByText('Il documento non indica lo stato della terapia.', { exact: true })).toBeVisible({ timeout: 30000 });
     await expect(proposal.getByText(/status|Campo obbligatorio|non valido/u)).toHaveCount(0);
     const keep = proposal.getByRole('button', { name: 'Tieni', exact: true });
     await expect(keep).toBeDisabled();
@@ -328,5 +328,177 @@ test('WUL-973: Da decidere keeps closed deposits after lock and renewal, includi
         for (const id of [legacyId, preparedId]) expect.soft(applied.all(id)).toEqual([{ mandate: mandateA.mandateRef, proposer: access.agentRef }]);
         await expect.soft(more.locator('small')).toHaveText('1');
         await page.screenshot({ path: info.outputPath('dopo-la-conferma.png'), fullPage: true });
+    } finally { database.close(); }
+});
+
+async function openVisitDecisionFixture(page: Page, runtime: Runtime, info: Info) {
+    const { credentials, agentRef, patient } = await pairKitAndCreatePatient(page, runtime, info);
+    const context = await loadAgentVisitContext(credentials, agentRef);
+    const { mandateRef, token } = context.access;
+    const call = async (body: object) => {
+        const response = await fetch(runtime.url + '/api/agent/v1/visits', {
+            method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        expect(response.ok).toBe(true);
+        return (await response.json()).receipt as { revision: number; status: string };
+    };
+    const operations = { note: 'visita.nota', transcription: 'visita.trascrizione', therapy: 'visita.proponi.terapia' };
+    const deposit = async (anchor: object, items: Array<[keyof typeof operations, object]>) => {
+        const visitId = randomUUID();
+        const seal = (itemId: string, kind: keyof typeof operations | 'anchor', value: object) => {
+            const bytes = new TextEncoder().encode(JSON.stringify(value));
+            return { envelope: sealAgentItemNode(context.publicKey, { mandateRef, visitId, itemId, kind }, bytes), byteLength: bytes.byteLength };
+        };
+        let receipt = await call({ operation: 'visita.apri', visitId, anchor: seal(visitId, 'anchor', anchor).envelope });
+        for (const [kind, value] of items) {
+            const id = randomUUID();
+            receipt = await call({ operation: operations[kind], visitId, expectedRevision: receipt.revision,
+                item: { id, kind, ...seal(id, kind, value), documentHash: null } });
+        }
+        receipt = await call({ operation: 'visita.chiudi', visitId, expectedRevision: receipt.revision });
+        expect(receipt.status).toBe('closed');
+        return visitId;
+    };
+    const ready = await deposit({ fiscalCode }, [['note', { text: 'Nota sintetica pronta.' }]]);
+    const newChart = await deposit({ fiscalCode: 'RSSMRA85T10A562S', firstName: 'Ada', lastName: 'Sintetica' },
+        [['note', { text: 'Nota sintetica da tenere.' }], ['transcription', { text: 'Trascrizione sintetica da scartare.' }]]);
+    const blocked = await deposit({ fiscalCode }, [['therapy', { values: { drugName: 'Farmaco sintetico', status: 'active' } }]]);
+    await openDaDecidere(page, runtime.url);
+    const visit = (id: string) => page.getByRole('region', { name: 'Visita ' + id });
+    for (const id of [ready, newChart, blocked]) await expect(visit(id)).toBeVisible({ timeout: 30000 });
+    return { visit, ready, newChart, blocked, patient };
+}
+
+async function captureVisitDecision(page: Page, info: Info, name: string) {
+    for (const colorScheme of ['light', 'dark'] as const) {
+        try {
+            await page.emulateMedia({ colorScheme });
+            await expect(page.locator('html')).toHaveClass(new RegExp('\\b' + colorScheme + '\\b'));
+            const filename = name + '-' + colorScheme + '.png';
+            await page.screenshot({ path: captures ? path.join(captures, filename) : info.outputPath(filename), fullPage: true });
+        } finally { await page.emulateMedia({ colorScheme: 'light' }); }
+    }
+}
+
+test('WUL-976: the batch reports progress, then the number and reasons for visits left in the queue', async ({ page, isolatedRuntime }, info) => {
+    test.setTimeout(150000);
+    const { visit, ready, newChart, blocked } = await openVisitDecisionFixture(page, isolatedRuntime, info);
+    await captureVisitDecision(page, info, 'wul-976-coda');
+    let release!: () => void, started!: () => void;
+    const held = new Promise<void>(resolve => { release = resolve; });
+    const submitting = new Promise<void>(resolve => { started = resolve; });
+    await page.route('**/api/agent-mandates/incoming', async route => {
+        if (route.request().method() === 'POST') {
+            started();
+            await held;
+        }
+        await route.continue();
+    });
+    await page.getByRole('button', { name: 'Applica tutte le visite senza dubbi', exact: true }).click();
+    try {
+        await submitting;
+        const progress = page.getByRole('progressbar', { name: 'Applicazione in corso. 0 su 1' });
+        await expect.soft(progress).toBeVisible({ timeout: 3000 });
+        if (await progress.isVisible()) await captureVisitDecision(page, info, 'wul-976-avanzamento');
+    } finally { release(); }
+    await expect(visit(ready)).toHaveCount(0);
+    await expect(visit(newChart)).toBeVisible();
+    await expect(visit(blocked)).toBeVisible();
+    const summary = page.getByRole('status').filter({ hasText: '1 applicata, 2 restano' });
+    await expect.soft(summary).toBeVisible({ timeout: 3000 });
+    await expect.soft(summary.getByText('Scheda da creare')).toBeVisible({ timeout: 3000 });
+    await expect.soft(summary.getByText('Manca una nota, una trascrizione o un PDF.')).toBeVisible({ timeout: 3000 });
+    if (await summary.isVisible()) await captureVisitDecision(page, info, 'wul-976-riepilogo');
+});
+
+test('WUL-976: a new chart saves pending choices atomically and omits the discarded item', async ({ page, isolatedRuntime }, info) => {
+    test.setTimeout(150000);
+    const { visit, newChart } = await openVisitDecisionFixture(page, isolatedRuntime, info);
+    const section = visit(newChart);
+    const note = section.locator('article').filter({ hasText: 'Nota sintetica da tenere.' });
+    const transcript = section.locator('details').filter({ hasText: 'Trascrizione sintetica da scartare.' });
+    await expect(note.getByRole('button', { name: 'Tieni', exact: true })).toBeVisible({ timeout: 3000 });
+    await transcript.locator('summary').click();
+    await transcript.getByRole('button', { name: 'Scarta', exact: true }).click();
+    await note.getByRole('button', { name: 'Tieni', exact: true }).click();
+    await expect(transcript.getByText('Da scartare', { exact: true })).toBeVisible();
+    const database = new Database(path.join(isolatedRuntime.dataDirectory, 'medical.db'), { readonly: true, fileMustExist: true });
+    try {
+        const audits = database.prepare("SELECT event_type AS type FROM audit_events WHERE request_id = ? AND event_type IN ('patient.created', 'agent.item.applied', 'agent.item.discarded')");
+        expect(audits.all(newChart)).toEqual([]);
+        await page.getByRole('button', { name: 'Aggiorna', exact: true }).click();
+        await expect(note.getByText('Da tenere', { exact: true })).toBeVisible();
+        await captureVisitDecision(page, info, 'wul-976-scelte-in-sospeso');
+        await section.getByRole('button', { name: 'Crea scheda e applica la visita', exact: true }).click();
+        await expect(section).toHaveCount(0);
+        expect(database.prepare('SELECT first_name AS name FROM patients WHERE id = ?').get(newChart)).toEqual({ name: 'Ada' });
+        expect(database.prepare('SELECT id FROM entries WHERE patient_id = ?').all(newChart)).toHaveLength(1);
+        expect(audits.all(newChart)).toEqual(expect.arrayContaining([
+            { type: 'patient.created' }, { type: 'agent.item.applied' }, { type: 'agent.item.discarded' },
+        ]));
+    } finally { database.close(); }
+});
+
+test('WUL-976: a blocked visit exposes item choices and a confirmed discard leaves an audit', async ({ page, isolatedRuntime }, info) => {
+    test.setTimeout(150000);
+    const { visit, blocked, patient } = await openVisitDecisionFixture(page, isolatedRuntime, info);
+    const section = visit(blocked);
+    const discardVisit = section.getByRole('button', { name: 'Scarta la visita', exact: true });
+    await expect.soft(section.getByRole('button', { name: 'Scarta', exact: true })).toBeEnabled({ timeout: 3000 });
+    await expect.soft(section.getByRole('button', { name: 'Tieni', exact: true })).toBeDisabled({ timeout: 3000 });
+    await expect(discardVisit).toBeEnabled({ timeout: 3000 });
+    await discardVisit.click();
+    const dialog = page.getByRole('dialog', { name: 'Scartare la visita?' });
+    await expect(dialog).toBeVisible();
+    await captureVisitDecision(page, info, 'wul-976-conferma-scarto');
+    await dialog.getByRole('button', { name: 'Annulla', exact: true }).click();
+    await expect(section).toBeVisible();
+    const database = new Database(path.join(isolatedRuntime.dataDirectory, 'medical.db'), { readonly: true, fileMustExist: true });
+    try {
+        const discards = database.prepare("SELECT actor_ref AS actor, proposer_ref AS proposer FROM audit_events WHERE event_type = 'agent.visit.discarded' AND subject_ref = ?");
+        expect(discards.all(blocked)).toEqual([]);
+        await discardVisit.click();
+        await dialog.getByRole('button', { name: 'Scarta la visita', exact: true }).click();
+        await expect(section).toHaveCount(0);
+        expect(discards.all(blocked)).toEqual([{ actor: expect.any(String), proposer: expect.any(String) }]);
+        expect(database.prepare('SELECT id FROM therapies WHERE patient_id = ?').all(patient.id)).toEqual([]);
+        await page.getByRole('button', { name: 'Aggiorna', exact: true }).click();
+        await expect(section).toHaveCount(0);
+    } finally { database.close(); }
+});
+
+test('WUL-976: a first visit applies the therapy status chosen before creating the chart', async ({ page, isolatedRuntime }, info) => {
+    test.setTimeout(150000);
+    const { credentials, agentRef } = await pairKitAndCreatePatient(page, isolatedRuntime, info);
+    const directory = info.outputPath('first-visit');
+    mkdirSync(directory, { mode: 0o700 });
+    const taxCode = 'RSSMRA85T10A562S';
+    const source = syntheticSources(directory, { taxCode, firstName: 'Ada', lastName: 'Sintetica' });
+    const drug = 'FARMACO SINTETICO 150MG 28 compresse';
+    const recipe = await source(['Paziente CF ' + taxCode, 'Data Prescrizione: 23/11/2026', 'Rp/', drug, 'Confezioni: 1'], null, [
+        { kind: 'therapy', values: { drugName: 'FARMACO SINTETICO 150MG' }, quote: drug },
+    ]);
+    const extraction = path.join(directory, 'estrazione-preparata.json');
+    writeFileSync(extraction, JSON.stringify({ schema: 'mediflow.dossier_prepared_extraction.v1',
+        preparedAt: new Date().toISOString(), preparedBy: 'Ambulatorio Codex', sources: [recipe] }));
+    const visitId = randomUUID();
+    expect((await prepareAndDepositAgentVisit(credentials, agentRef, extraction, taxCode, undefined, visitId)).status).toBe('closed');
+
+    await openDaDecidere(page, isolatedRuntime.url);
+    const visit = page.getByRole('region', { name: 'Visita ' + visitId });
+    const apply = visit.getByRole('button', { name: 'Crea scheda e applica la visita', exact: true });
+    await expect(apply).toBeDisabled();
+    await expect(visit.getByRole('button', { name: 'Tieni', exact: true }).first()).toBeVisible();
+    await visit.getByRole('radio', { name: 'Sospesa', exact: true }).check();
+    await expect(apply).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Applica tutte le visite senza dubbi', exact: true })).toBeDisabled();
+    await apply.click();
+    await expect(visit).toHaveCount(0);
+
+    const database = new Database(path.join(isolatedRuntime.dataDirectory, 'medical.db'), { readonly: true, fileMustExist: true });
+    try {
+        expect(database.prepare('SELECT status FROM therapies WHERE patient_id = ?').all(visitId)).toEqual([{ status: 'suspended' }]);
+        expect(database.prepare("SELECT 1 FROM audit_events WHERE event_type = 'patient.created' AND request_id = ?").all(visitId)).toHaveLength(1);
     } finally { database.close(); }
 });

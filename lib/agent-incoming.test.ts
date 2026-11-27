@@ -219,12 +219,12 @@ test('a chart unavailable at application leaves the visit untouched and the erro
         await refreshAgentIncoming(db.getSessionReadSignal(), contentReadPdf);
         assert.deepEqual(snapshot(), before);
         assert.deepEqual(posts, []);
-        assert.deepEqual(agentIncomingSnapshot().applicationError, {
-            visitId: ready.visitId, message: 'La visita non è stata applicata. Rileggi la cassetta.',
+        assert.deepEqual(agentIncomingSnapshot().applicationErrors.get(ready.visitId), {
+            message: 'La visita non è stata applicata. Rileggi la cassetta.',
         });
     } finally { patientAvailableForApplication = true; }
     await applyReviewedAgentVisits([ready.visitId]);
-    assert.equal(agentIncomingSnapshot().applicationError, null);
+    assert.equal(agentIncomingSnapshot().applicationErrors.has(ready.visitId), false);
     assert.deepEqual(agentAppliedItemIds(ready.visitId).sort(), [...ready.ids].sort());
 });
 

@@ -6,7 +6,7 @@ import { cassetteItems } from './agent-cassette-contract';
 import { agentBytes } from './agent-cassette-crypto';
 import { openAgentVisit, type OpenedAgentVisit } from './agent-cassette-client';
 import { newAgentPatientSchema, reviewedAgentApplicationSchema, agentItemDecisionSchema, agentStructuredKind, type ReviewedAgentApplicationInput, type AgentCassetteIndexEntry, type IncomingAgentCassette, type NewAgentPatient,
-    type AgentItemDecisionInput } from './agent-visit-application-contract';
+    type AgentItemDecisionInput, type AgentItemDecision, type AgentCassetteReviewBlock } from './agent-visit-application-contract';
 import { collectDossierTaxCodes, excludedProfessionalCode } from './domain/documents/dossier-import';
 import { reviewAgentFact } from './agent-visit-facts';
 import { servicePrescriptionCreateSchema } from './api-schemas/prescriptions';
@@ -17,7 +17,7 @@ import { agentVisitPdfText, type AgentVisitPdf } from './agent-visit-pdf-text';
 export type AgentVisitDocument = AgentVisitPdf & { id: string; name: string; hash: string };
 export type AgentVisitReview = { visit: Omit<OpenedAgentVisit, 'cassette'> & { cassette: AgentCassetteIndexEntry }; patient: Patient | null; newPatient: NewAgentPatientReview | null;
     documents: AgentVisitDocument[]; appliedItemIds: string[]; discardedItemIds: string[]; correctedItemIds: string[]; currentSummary: Map<string, string>; blockers: string[]; proposalBlockers: string[];
-    itemBlockers: Map<string, string[]>; itemNeeds: Map<string, AgentPhysicianField[]>; inRecordItemIds: string[] };
+    itemBlockers: Map<string, string[]>; itemNeeds: Map<string, AgentPhysicianField[]>; inRecordItemIds: string[]; reviewBlock?: AgentCassetteReviewBlock };
 type PdfIdentity = { name: string; codes: string[] };
 export type AgentPatientIdentity = Pick<NewAgentPatient, 'taxCode' | 'firstName' | 'lastName'>;
 type NewAgentPatientReview = {
@@ -47,7 +47,7 @@ export function newAgentPatientBlock(review: NewAgentPatientReview, identity: Ag
 export const AGENT_THERAPY_STATUSES = ['active', 'suspended', 'completed'] as const;
 const AGENT_PHYSICIAN_FIELD_VALUES = { status: AGENT_THERAPY_STATUSES } as const;
 export type AgentPhysicianField = keyof typeof AGENT_PHYSICIAN_FIELD_VALUES;
-export const AGENT_THERAPY_STATUS_NEEDED = 'Il documento non indica lo stato della terapia: sceglilo prima di tenerla.';
+export const AGENT_THERAPY_STATUS_NEEDED = 'Il documento non indica lo stato della terapia.';
 type ReviewItem = AgentVisitReview['visit']['items'][number];
 export const agentItemDecided = (review: Pick<AgentVisitReview, 'appliedItemIds' | 'discardedItemIds'>, itemId: string) =>
     review.appliedItemIds.includes(itemId) || review.discardedItemIds.includes(itemId);
@@ -183,7 +183,7 @@ export async function inspectAgentVisit(row: IncomingAgentCassette, patients: Pa
             currentSummary.set(item.id, before.join('; ') || 'Non presente');
         }
     }
-    return { visit, patient, newPatient, documents: [...documents.values()], appliedItemIds: row.appliedItemIds, discardedItemIds, correctedItemIds: row.correctedItemIds ?? [], currentSummary, blockers, proposalBlockers, itemBlockers, itemNeeds, inRecordItemIds };
+    return { visit, patient, newPatient, documents: [...documents.values()], appliedItemIds: row.appliedItemIds, discardedItemIds, correctedItemIds: row.correctedItemIds ?? [], currentSummary, blockers, proposalBlockers, itemBlockers, itemNeeds, inRecordItemIds, ...(row.reviewBlock ? { reviewBlock: row.reviewBlock } : {}) };
 }
 export async function reopenReviewedAgentItems(review: AgentVisitReview, row: IncomingAgentCassette): Promise<AgentVisitReview['visit']['items'] | null> {
     const visit = await openAgentVisit(row);
@@ -198,18 +198,47 @@ export async function reopenReviewedAgentItems(review: AgentVisitReview, row: In
     }
     return visit.items.map((item, index) => item.kind === 'pdf' ? item : review.visit.items[index]!);
 }
-export function agentVisitAwaitsReview(review: AgentVisitReview, identity?: AgentPatientIdentity): boolean {
-    const patientReady = review.newPatient ? identity && !newAgentPatientBlock(review.newPatient, identity) : !identity && review.patient?.version;
-    return review.visit.cassette.status === 'closed' && Boolean(patientReady) && !review.blockers.length && !review.proposalBlockers.length
-        && review.visit.items.some(item => !agentItemDecided(review, item.id));
-}
-export function agentItemAwaitsDecision(review: AgentVisitReview, itemId: string): boolean {
-    return review.visit.cassette.status === 'closed' && Boolean(review.patient?.version) && !review.newPatient && !review.blockers.length
-        && review.visit.items.some(item => item.id === itemId) && !agentItemDecided(review, itemId);
+export type DraftAgentItemDecision = { decision: AgentItemDecision; correction?: Record<string, string> };
+export type DraftAgentVisitDecisions = Partial<Record<string, DraftAgentItemDecision>>;
+
+export type AgentPhysicianChoices = Partial<Record<string, Record<string, string>>>;
+
+export function agentVisitItemsBlock(review: AgentVisitReview, drafts: DraftAgentVisitDecisions, choices: AgentPhysicianChoices): string | undefined {
+    const pendingDrafts = review.newPatient ? drafts : {};
+    const retained = review.visit.items.filter(item => !agentItemDecided(review, item.id) && pendingDrafts[item.id]?.decision !== 'discard');
+    if (review.newPatient && !retained.some(item => !agentStructuredKind(item.kind))) {
+        return 'Tieni una nota, una trascrizione o un PDF per creare la scheda.';
+    }
+    if (retained.some(item => {
+        const draft = pendingDrafts[item.id];
+        if (draft?.decision === 'correct') return false;
+        return review.itemBlockers.has(item.id)
+            || suppliedPhysicianValues(review.itemNeeds.get(item.id) ?? [], draft?.correction ?? choices[item.id] ?? {}) === null;
+    })) return 'Decidi prima le voci segnate.';
 }
 
-export async function prepareAgentApplication(review: AgentVisitReview, signal: AbortSignal, identity?: AgentPatientIdentity): Promise<ReviewedAgentApplicationInput | null> {
-    if (!agentVisitAwaitsReview(review, identity)) return null;
+export function agentVisitAwaitsReview(review: AgentVisitReview, identity?: AgentPatientIdentity, drafts: DraftAgentVisitDecisions = {},
+    choices: AgentPhysicianChoices = {}): boolean {
+    const patientReady = review.newPatient ? identity && !newAgentPatientBlock(review.newPatient, identity) : !identity && review.patient?.version;
+    return review.visit.cassette.status === 'closed' && Boolean(patientReady) && !review.blockers.length
+        && !agentVisitItemsBlock(review, drafts, choices) && review.visit.items.some(item => !agentItemDecided(review, item.id));
+}
+
+export function agentItemAwaitsDecision(review: AgentVisitReview, itemId: string): boolean {
+    return review.visit.cassette.status === 'closed' && review.visit.items.some(item => item.id === itemId) && !agentItemDecided(review, itemId);
+}
+
+export function agentItemCanWrite(review: AgentVisitReview): boolean {
+    return !review.blockers.length && Boolean(review.newPatient || review.patient?.version);
+}
+
+export function agentItemDiscardAdmitted(review: AgentVisitReview): boolean {
+    return !review.reviewBlock && Boolean(review.newPatient || review.patient);
+}
+
+export async function prepareAgentApplication(review: AgentVisitReview, signal: AbortSignal, identity?: AgentPatientIdentity,
+    drafts: DraftAgentVisitDecisions = {}, choices: AgentPhysicianChoices = {}): Promise<ReviewedAgentApplicationInput | null> {
+    if (!agentVisitAwaitsReview(review, identity, drafts, choices)) return null;
     const newPatient = identity && review.newPatient && newAgentPatientSchema.parse({
         ...identity, ambulatoryId: review.newPatient.ambulatoryId, birthDate: review.newPatient.birthDate,
     });
@@ -217,17 +246,27 @@ export async function prepareAgentApplication(review: AgentVisitReview, signal: 
     if (review.patient && (!patient || patient.deletedAt || patient.isArchived
         || patient.taxCode.trim().toUpperCase() !== review.visit.anchor.fiscalCode || !patient.version)) return null;
     if (patient && patient.version !== review.patient?.version) throw new Error('La scheda è cambiata. Rileggi le differenze prima di applicare la visita.');
-    const selected = review.visit.items.filter(item => !agentItemDecided(review, item.id));
-    const profile = withProposedProfile(patient, selected);
+    const selected: Array<{ item: ReviewItem; corrected: boolean; needs: readonly AgentPhysicianField[] }> = [];
+    const decisions: Array<{ itemId: string; decision: AgentItemDecision }> = [];
+    for (const item of review.visit.items.filter(item => !agentItemDecided(review, item.id))) {
+        const draft = newPatient ? drafts[item.id] : undefined;
+        if (draft) decisions.push({ itemId: item.id, decision: draft.decision });
+        if (draft?.decision === 'discard') continue;
+        const planned = agentItemForDecision(review, item, draft?.decision ?? 'keep', draft?.correction ?? choices[item.id] ?? {});
+        if (!planned) return null;
+        selected.push(planned);
+    }
+    const profile = withProposedProfile(patient, selected.map(({ item }) => item));
     const prepared: unknown[] = [];
-    for (const item of selected) {
+    for (const { item, corrected, needs } of selected) {
         signal.throwIfAborted();
-        prepared.push(await prepareAgentItem(review, item, profile));
+        prepared.push(await prepareAgentItem(review, item, profile, corrected, needs));
     }
     signal.throwIfAborted();
     return reviewedAgentApplicationSchema.parse({ visitId: review.visit.cassette.id, phase: 'review',
         patientId: patient?.id ?? review.visit.cassette.id, expectedVersion: patient?.version ?? 1,
         ...(newPatient ? { newPatient } : {}),
+        ...(decisions.length ? { decisions } : {}),
         cassetteRevision: review.visit.cassette.revision, items: prepared });
 }
 
@@ -343,28 +382,36 @@ function suppliedPhysicianValues(needs: readonly AgentPhysicianField[], correcti
 }
 export const AGENT_ITEM_IN_RECORD = 'Questa voce è già in scheda: scarta la proposta o modifica la voce dalla scheda.';
 
-export async function prepareAgentItemDecision(review: AgentVisitReview, itemId: string, decision: 'keep' | 'correct' | 'discard',
-    signal: AbortSignal, correction: Record<string, string> = {}): Promise<AgentItemDecisionInput | null> {
-    if (!agentItemAwaitsDecision(review, itemId)) return null;
-    const original = review.visit.items.find(item => item.id === itemId);
-    if (!original) return null;
-    const target = { visitId: review.visit.cassette.id, cassetteRevision: review.visit.cassette.revision };
-    if (decision === 'discard') return agentItemDecisionSchema.parse({ ...target, decision, itemId, kind: original.kind });
-    if (decision === 'keep' && review.itemBlockers.get(itemId)?.length) return null;
-    if (decision === 'correct' && !agentItemCorrectable(original.kind)) return null;
-    const patient = await db.patients.get(review.patient!.id, { signal });
-    if (!patient || patient.deletedAt || patient.isArchived || patient.taxCode.trim().toUpperCase() !== review.visit.anchor.fiscalCode || !patient.version) return null;
-    if (patient.version !== review.patient!.version) throw new Error('La scheda è cambiata. Rileggi la voce prima di decidere.');
-    const allowed: readonly string[] = agentItemCorrectable(original.kind) ? AGENT_CORRECTABLE_FIELDS[original.kind] : [];
+function agentItemForDecision(review: AgentVisitReview, original: ReviewItem, decision: 'keep' | 'correct', correction: Record<string, string>) {
+    if (decision === 'keep' && review.itemBlockers.get(original.id)?.length) return null;
+    const fields = agentItemCorrectable(original.kind) ? AGENT_CORRECTABLE_FIELDS[original.kind] : undefined;
+    if (decision === 'correct' && !fields) return null;
+    const allowed: readonly string[] = fields ?? [];
     const changed = Object.fromEntries(Object.entries(correction).filter(([field]) => allowed.includes(field)).map(([field, value]) => [field, value.trim()]));
-    const needs = decision === 'keep' ? review.itemNeeds.get(itemId) ?? [] : [];
+    const needs = review.itemNeeds.get(original.id) ?? [];
     const supplied = suppliedPhysicianValues(needs, correction);
     if (!supplied) return null;
     const item = decision === 'correct' ? { ...original, value: { ...original.value, values: correctedValues(original, changed) } }
         : needs.length ? { ...original, value: { ...original.value, values: { ...values(original), ...supplied } } } : original;
+    return { item, corrected: decision === 'correct', needs };
+}
+
+export async function prepareAgentItemDecision(review: AgentVisitReview, itemId: string, decision: AgentItemDecision,
+    signal: AbortSignal, correction: Record<string, string> = {}): Promise<AgentItemDecisionInput | null> {
+    const original = review.visit.items.find(item => item.id === itemId);
+    if (!original || !agentItemAwaitsDecision(review, itemId) || !review.patient) return null;
+    const target = { visitId: review.visit.cassette.id, cassetteRevision: review.visit.cassette.revision };
+    if (decision === 'discard') return agentItemDecisionSchema.parse({ ...target, decision, itemId, kind: original.kind });
+    if (!agentItemCanWrite(review)) return null;
+    const planned = agentItemForDecision(review, original, decision, correction);
+    if (!planned) return null;
+    const { item, corrected, needs } = planned;
+    const patient = await db.patients.get(review.patient.id, { signal });
+    if (!patient || patient.deletedAt || patient.isArchived || patient.taxCode.trim().toUpperCase() !== review.visit.anchor.fiscalCode || !patient.version) return null;
+    if (patient.version !== review.patient.version) throw new Error('La scheda è cambiata. Rileggi la voce prima di decidere.');
     if (agentItemAlreadyInRecord(patient, item)) throw new Error(AGENT_ITEM_IN_RECORD);
     const profile = withProposedProfile(patient, [item]);
-    const prepared = await prepareAgentItem(review, item, profile, decision === 'correct', needs);
+    const prepared = await prepareAgentItem(review, item, profile, corrected, needs);
     signal.throwIfAborted();
     return agentItemDecisionSchema.parse({ ...target, decision, patientId: patient.id, expectedVersion: patient.version, item: prepared });
 }
