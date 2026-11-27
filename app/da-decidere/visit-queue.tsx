@@ -141,7 +141,7 @@ function NewPatientFields({ identity, onChange, disabled }: {
     </fieldset>;
 }
 
-export function VisitQueue({ visits, unreadableVisits, busy, applicationError, drafts }: Snapshot) {
+export function VisitQueue({ visits, unreadableVisits, busy, applicationErrors, drafts }: Snapshot) {
     const confirm = useConfirm();
     const [pdf, setPdf] = useState<{ base64: string; name: string } | null>(null);
     const [openingPdf, setOpeningPdf] = useState(false);
@@ -174,11 +174,11 @@ export function VisitQueue({ visits, unreadableVisits, busy, applicationError, d
         if (confirmed) await discardIncomingAgentVisit(cassette);
     };
     const [identities, setIdentities] = useState<Record<string, AgentPatientIdentity>>({});
-    const generalApplicationError = applicationError && !visits.some(({ visit }) => visit.cassette.id === applicationError.visitId)
-        ? applicationError.message : null;
+    const listedIds = new Set([...visits.map(({ visit }) => visit.cassette.id), ...unreadableVisits.map(visit => visit.id)]);
 
     return <>
-        {generalApplicationError && <p role="alert" className={css.alert}>{generalApplicationError}</p>}
+        {Array.from(applicationErrors, ([id, { message }]) => listedIds.has(id) ? null :
+            <p key={id} role="alert" className={css.alert}>{message}</p>)}
         {pdfError && <p role="alert" className={css.alert}>{pdfError}</p>}
         {!visits.length && !unreadableVisits.length && !busy && (
             <section className={surface.tray} data-record-tray="in-arrivo" aria-labelledby="da-decidere-vuoto">
@@ -191,13 +191,15 @@ export function VisitQueue({ visits, unreadableVisits, busy, applicationError, d
                 </div>
             </section>
         )}
-        {unreadableVisits.map(cassette => (
-            <section key={cassette.id} className={surface.tray} aria-label={'Visita ' + cassette.id}>
+        {unreadableVisits.map(cassette => {
+            const applicationError = applicationErrors.get(cassette.id);
+            return <section key={cassette.id} className={surface.tray} aria-label={'Visita ' + cassette.id}>
                 <h2 className={surface.zoneTitle}>Visita depositata {formatDepositTime(cassette.depositedAt)}</h2>
+                {applicationError && <p role="alert" className={css.alert}>{applicationError.message}</p>}
                 <p role="alert" className={css.alert}>Non è stato possibile leggere la visita. Premi Aggiorna per riprovare.</p>
                 <Button variant="text" disabled={busy || !canDiscardIncomingAgentVisit(cassette)} onClick={() => { void discardVisit(cassette); }}>Scarta la visita</Button>
-            </section>
-        ))}
+            </section>;
+        })}
         {visits.map(review => {
             const { visit } = review;
             const decidedIds = new Set([...review.appliedItemIds, ...review.discardedItemIds]);
@@ -209,8 +211,10 @@ export function VisitQueue({ visits, unreadableVisits, busy, applicationError, d
             const notes = pending.filter(item => item.kind === 'note');
             const transcriptions = pending.filter(item => item.kind === 'transcription');
             const proposals = pending.filter(item => item.kind !== 'pdf' && item.kind !== 'note' && item.kind !== 'transcription');
-            const itemError = applicationError?.visitId === visit.cassette.id && applicationError.itemId ? applicationError : null;
-            const visitError = applicationError?.visitId === visit.cassette.id && !applicationError.itemId ? applicationError.message : null;
+            const applicationError = applicationErrors.get(visit.cassette.id);
+            const batchError = applicationError?.fromBatch ? applicationError.message : null;
+            const itemError = applicationError?.itemId ? applicationError : null;
+            const visitError = applicationError && !itemError && !batchError ? applicationError.message : null;
             const draft = drafts[visit.cassette.id];
             const decisions = draft?.revision === visit.cassette.revision ? draft.decisions : {};
             const identityKey = visit.cassette.id + ':' + visit.cassette.revision;
@@ -224,6 +228,8 @@ export function VisitQueue({ visits, unreadableVisits, busy, applicationError, d
             const actionMessages = [...review.blockers, ...(identityBlock ? [identityBlock] : []),
                 ...(itemBlock && !review.blockers.length ? [itemBlock] : []), ...(visitError ? [visitError] : [])];
             const actionMessagesId = `visita-${visit.cassette.id}-esito`;
+            const batchErrorId = `visita-${visit.cassette.id}-rifiutata`;
+            const actionDescriptions = [batchError ? batchErrorId : null, actionMessages.length > 0 ? actionMessagesId : null].filter(Boolean).join(' ');
             const isApplicable = agentVisitAwaitsReview(review, identity ?? undefined, decisions, physicianChoices);
             const fiscalCode = typeof visit.anchor.fiscalCode === 'string' ? visit.anchor.fiscalCode : null;
             const hasPatientName = Boolean(review.patient && (review.patient.firstName || review.patient.lastName));
@@ -265,6 +271,7 @@ export function VisitQueue({ visits, unreadableVisits, busy, applicationError, d
                         <Link href={`/patients/${review.patient.id}/modules`} className={surface.islandAction}>Apri scheda</Link>
                     ) : null}
                 </div>
+                {batchError && <p id={batchErrorId} role="alert" className={css.alert}>{batchError}</p>}
 
                 {pdfItems.length > 0 && (
                     <section className={surface.island} aria-label="PDF della visita">
@@ -419,7 +426,7 @@ export function VisitQueue({ visits, unreadableVisits, busy, applicationError, d
                         <Button variant="text" disabled={busy || !canDiscardIncomingAgentVisit(visit.cassette)}
                             onClick={() => { void discardVisit(visit.cassette, review.appliedItemIds.length > 0); }}>Scarta la visita</Button>
                         {visit.cassette.status === 'closed' && <button type="button" className={isApplicable ? 'mf-button-primary' : 'mf-button-secondary'} disabled={busy || !isApplicable}
-                            aria-describedby={actionMessages.length > 0 ? actionMessagesId : undefined}
+                            aria-describedby={actionDescriptions || undefined}
                             onClick={() => {
                                 if (identity) {
                                     void applyReviewedAgentVisitAndCreatePatient({ visitId: visit.cassette.id, revision: visit.cassette.revision, identity }, physicianChoices);

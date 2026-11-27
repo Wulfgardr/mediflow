@@ -17,7 +17,9 @@ type BatchResult = {
 };
 type BatchApplication = { processed: number; total: number; result?: never } | { result: BatchResult };
 type VisitDraft = { revision: number; decisions: DraftAgentVisitDecisions };
+type ApplicationError = { message: string; itemId?: string; fromBatch?: boolean };
 
+const noApplicationErrors: ReadonlyMap<string, ApplicationError> = new Map();
 const empty = {
     visits: [] as AgentVisitReview[],
     unreadableVisits: [] as AgentCassetteIndexEntry[],
@@ -25,7 +27,7 @@ const empty = {
     batch: null as BatchApplication | null,
     drafts: {} as Partial<Record<string, VisitDraft>>,
     error: null as string | null,
-    applicationError: null as { visitId: string | null; itemId?: string; message: string } | null,
+    applicationErrors: noApplicationErrors,
 };
 let snapshot = empty;
 const listeners = new Set<() => void>();
@@ -34,6 +36,17 @@ export const agentIncomingSnapshot = () => snapshot;
 export const agentIncomingServerSnapshot = () => empty;
 export function subscribeAgentIncoming(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; }
 function publish(value: typeof empty) { snapshot = value; publishAgentIncomingCount(value.visits.length + value.unreadableVisits.length); for (const listener of listeners) listener(); }
+
+function applicationErrorsWithout(visitIds: readonly string[]) {
+    const errors = new Map(snapshot.applicationErrors);
+    for (const id of visitIds) errors.delete(id);
+    return errors;
+}
+
+function publishApplicationError(visitId: string, error: ApplicationError) {
+    publish({ ...snapshot, applicationErrors: new Map(snapshot.applicationErrors).set(visitId, error) });
+}
+
 const inbox = '/api/agent-mandates/incoming';
 
 async function fetchIncoming<T>(query: string, signal: AbortSignal): Promise<T> {
@@ -126,7 +139,7 @@ export async function refreshAgentIncoming(signal = db.getSessionReadSignal(), r
             let page = await fetchIncoming<AgentCassetteIndexPage>('', signal);
             if (!page.visits.length) {
                 signal.throwIfAborted();
-                publish({ ...empty, applicationError: snapshot.applicationError, batch: snapshot.batch });
+                publish({ ...empty, applicationErrors: snapshot.applicationErrors, batch: snapshot.batch });
                 return;
             }
             const [patients, profileResponse, contextResponse] = await Promise.all([db.patients.toArray({ signal, rejectAuthUnavailable: true }),
@@ -221,7 +234,7 @@ async function applyReviews(ids: string[], { confirmation, batch = false, choice
     const failures = new Map<string, string>();
     let appliedCount = 0;
     const task = (async () => {
-        publish({ ...snapshot, busy: true, applicationError: null,
+        publish({ ...snapshot, busy: true, applicationErrors: applicationErrorsWithout(ids),
             batch: batch ? { processed: 0, total: ids.length } : snapshot.batch });
         const versions = new Map<string, { reviewed: number; committed: number }>();
         for (const [index, id] of ids.entries()) {
@@ -249,7 +262,7 @@ async function applyReviews(ids: string[], { confirmation, batch = false, choice
                     if (signal.aborted) return;
                     const message = error instanceof Error ? error.message : notApplied;
                     if (batch) failures.set(id, message);
-                    else publish({ ...snapshot, applicationError: { visitId: id, message } });
+                    publishApplicationError(id, batch ? { message, fromBatch: true } : { message });
                 }
             }
             if (batch) publish({ ...snapshot, batch: { processed: index + 1, total: ids.length } });
@@ -275,7 +288,7 @@ export function stageNewAgentVisitItem(visitId: string, revision: number, itemId
     if (decision) decisions[itemId] = decision;
     else delete decisions[itemId];
     publish({ ...snapshot, drafts: { ...snapshot.drafts, [visitId]: { revision, decisions } },
-        applicationError: snapshot.applicationError?.visitId === visitId ? null : snapshot.applicationError });
+        applicationErrors: applicationErrorsWithout([visitId]) });
     return true;
 }
 
@@ -286,7 +299,7 @@ export async function discardIncomingAgentVisit(cassette: AgentCassetteIndexEntr
     const { id: visitId, revision: cassetteRevision } = cassette;
     const message = 'La visita non è stata scartata. Aggiorna e riprova.';
     const task = (async () => {
-        publish({ ...snapshot, busy: true, applicationError: null });
+        publish({ ...snapshot, busy: true, applicationErrors: applicationErrorsWithout([visitId]) });
         try {
             const response = await fetch(inbox + '/items', { method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ visitId, cassetteRevision, decision: 'discard_visit' }), signal });
@@ -299,7 +312,7 @@ export async function discardIncomingAgentVisit(cassette: AgentCassetteIndexEntr
             publish({ ...snapshot, drafts, visits: snapshot.visits.filter(({ visit }) => visit.cassette.id !== visitId),
                 unreadableVisits: snapshot.unreadableVisits.filter(visit => visit.id !== visitId) });
         } catch {
-            if (!signal.aborted) publish({ ...snapshot, applicationError: { visitId, message } });
+            if (!signal.aborted) publishApplicationError(visitId, { message });
         }
     })();
     inFlight = task;
@@ -314,7 +327,7 @@ export async function decideAgentVisitItem(visitId: string, itemId: string, deci
     signal.throwIfAborted();
     let decided = false;
     const task = (async () => {
-        publish({ ...snapshot, busy: true, applicationError: null });
+        publish({ ...snapshot, busy: true, applicationErrors: applicationErrorsWithout([visitId]) });
         try {
             const review = snapshot.visits.find(value => value.visit.cassette.id === visitId);
             if (!review) throw new Error(notDecided);
@@ -335,7 +348,7 @@ export async function decideAgentVisitItem(visitId: string, itemId: string, deci
             publish({ ...snapshot, visits: snapshot.visits.map(value => value === review ? updated : value) });
             decided = true;
         } catch (error) {
-            if (!signal.aborted) publish({ ...snapshot, applicationError: { visitId, itemId, message: error instanceof Error ? error.message : notDecided } });
+            if (!signal.aborted) publishApplicationError(visitId, { itemId, message: error instanceof Error ? error.message : notDecided });
         } finally { if (!signal.aborted) publish({ ...snapshot, busy: false }); }
     })();
     inFlight = task;
