@@ -99,6 +99,10 @@ release](https://github.com/Wulfgardr/mediflow/releases) raccoglie i pacchetti p
 
 ### Limiti dichiarati
 
+- La chat collegata può leggere nelle note i nomi di chi non è in anagrafica.
+  MediFlow lo indica in «Accesso assistente» prima della conferma
+  ([ADR 0194](./docs/adr/0194-profilo-pseudonimizzato-per-la-chat-esterna.md)).
+
 - Quando un modello esterno riceve il profilo con i segnaposto al posto dei
   nomi, MediFlow controlla che ogni segnaposto della risposta appartenga alla
   richiesta. Non controlla se il modello ha scambiato due persone con lo stesso
