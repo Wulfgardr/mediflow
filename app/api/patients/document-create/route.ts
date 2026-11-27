@@ -6,7 +6,7 @@ import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request'
 import { webPatientDocumentScope, webPatientDocumentService } from '@/lib/web-patient-document-production';
 import { PatientDocumentDuplicateReviewRequired, type PatientDocumentCreateReview } from '@/lib/patient-document-create-command';
 import { PATIENT_IDENTIFIER_DUPLICATE, PatientIdentifierConflictError } from '@/lib/patient-identity';
-import { NativePatientDocumentExtractionFailed, PatientDocumentIntakeBusy } from '@/lib/native-patient-document';
+import { NativePatientDocumentExtractionFailed, PatientDocumentBatchRowRejected, PatientDocumentIntakeBusy } from '@/lib/native-patient-document';
 import { COMMAND_UUID } from '@/lib/therapy-status-command-contract';
 
 export const runtime = 'nodejs';
@@ -15,6 +15,7 @@ const BODY_LIMIT = 30 * 1024 * 1024;
 const reply = (value: unknown, status = 200) => Response.json(value, { status,
     headers: { 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' } });
 let active = 0;
+const validPin = (pin: unknown): pin is string => typeof pin === 'string' && /^[^\u0000-\u001f\u007f]{4,8}$/u.test(pin);
 
 /** Same closed operations as the native route, for the local Web session that creates patients. */
 export async function POST(request: Request): Promise<Response> {
@@ -38,18 +39,40 @@ export async function POST(request: Request): Promise<Response> {
         const input = body as Record<string, unknown>, keys = Object.keys(input).sort().join(',');
         const context = { session, ambulatoryId, request };
         if (input.operation === 'stage' && keys === 'operation,source') return reply(await webPatientDocumentService.stage(context, input.source));
+        if (input.operation === 'batch-review' && keys === 'operation,rows') {
+            return reply(await webPatientDocumentService.batchReview(context, input.rows));
+        }
+        if (typeof input.batchId === 'string' && COMMAND_UUID.test(input.batchId)) {
+            if (input.operation === 'batch-confirm' && keys === 'batchId,fingerprint,operation,pin' && validPin(input.pin)) {
+                return reply(await webPatientDocumentService.batchConfirm(context, input.batchId, input.fingerprint, input.pin));
+            }
+            if (input.operation === 'batch-stage' && keys === 'batchId,operation,row,source') {
+                return reply(await webPatientDocumentService.batchStage(context, input.batchId, input.row, input.source));
+            }
+            if (input.operation === 'batch-close' && keys === 'batchId,operation') {
+                return reply(await webPatientDocumentService.batchClose(context, input.batchId));
+            }
+        }
         if (typeof input.commandId !== 'string' || !COMMAND_UUID.test(input.commandId)) return reply({ status: 'denied' }, 400);
+        if (input.operation === 'batch-execute' && keys === 'batchId,commandId,operation'
+            && typeof input.batchId === 'string' && COMMAND_UUID.test(input.batchId)) {
+            return reply(await webPatientDocumentService.batchExecute(context, input.batchId, input.commandId));
+        }
+        if (input.operation === 'batch-revoke' && keys === 'commandId,operation') {
+            return reply(await webPatientDocumentService.batchRevoke(context, input.commandId));
+        }
         if (input.operation === 'preview' && keys === 'commandId,operation,review,viewId' && typeof input.viewId === 'string') {
             return reply(await webPatientDocumentService.preview(context, input.commandId, input.viewId, input.review as PatientDocumentCreateReview));
         }
         if (input.operation === 'execute' && keys === 'commandId,operation,pin'
-            && typeof input.pin === 'string' && /^[^\u0000-\u001f\u007f]{4,8}$/u.test(input.pin)) {
+            && validPin(input.pin)) {
             return reply(await webPatientDocumentService.execute(context, input.commandId, input.pin));
         }
         if (input.operation === 'receipt' && keys === 'commandId,operation') return reply(await webPatientDocumentService.receipt(context, input.commandId));
         if (input.operation === 'revoke' && keys === 'commandId,operation') return reply(await webPatientDocumentService.revoke(context, input.commandId));
         return reply({ status: 'denied' }, 400);
     } catch (error) {
+        if (error instanceof PatientDocumentBatchRowRejected) return reply({ status: error.reason }, 422);
         if (error instanceof NativePatientDocumentExtractionFailed) return reply({ status: 'review-required', detail: error.detail }, 409);
         if (error instanceof PatientDocumentIntakeBusy) return reply({ status: error.reason === 'session' ? 'in-progress' : 'busy' }, error.reason === 'session' ? 409 : 503);
         if (error instanceof PatientIdentifierConflictError) return reply(PATIENT_IDENTIFIER_DUPLICATE, 409);

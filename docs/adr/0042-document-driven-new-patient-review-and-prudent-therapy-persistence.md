@@ -472,7 +472,7 @@ browser, per generazione d'archivio, prima della conferma: una risposta persa
 o un ricaricamento mostrano la lavorazione da verificare invece di offrire
 una seconda creazione. Senza riferimento conservato la conferma è bloccata.
 
-La revoca senza stato RAM resta riservata al nativo paired: per il Web una
+Per la creazione singola la revoca senza stato RAM resta riservata al nativo paired: per il Web una
 lavorazione non più in memoria e senza terminale durevole resta `unknown`.
 Lo stesso `unknown` arriva anche quando la lavorazione appartiene a un altro
 operatore o a un altro ambulatorio (`concealForeign`): la sessione corrente non
@@ -539,3 +539,33 @@ cognomi diversi lasciano il campo da decidere; la data di nascita di un
 familiare senza codice fiscale resta da decidere; senza codice fiscale la data
 di un documento senza cognome e nome resta fuori e si prende con un clic; casi
 bloccati invariati).
+
+## Conferma unica delle nuove schede nel Dossier (WUL-979)
+
+Dal lotto Dossier il medico apre la revisione delle schede proposte, corregge
+i campi ed esclude le righe che non vuole creare. Ogni riga indica il documento
+di origine. La pagina esclude i gruppi con identità mista o con un documento
+di origine da attribuire. Prima del PIN mostra l’elenco che verrà inviato.
+
+La route Web `POST /api/patients/document-create` usa `batch-review` per
+registrare in memoria la sequenza di impronte delle righe. Ogni impronta
+SHA-256 include nome, cognome, codice fiscale, data di nascita, nome del
+documento ed impronta dei byte. `batch-confirm` verifica il PIN con il controllo
+ordinario delle credenziali e richiede l’impronta di quella revisione. La
+conferma dura al massimo 15 minuti dalla revisione, per la stessa sessione,
+generazione d’archivio ed ambulatorio. Una nuova revisione sostituisce la
+precedente. Il PIN resta nella sola richiesta di conferma.
+
+`batch-stage` consuma una riga approvata, ricontrolla i byte del PDF, la validità
+del codice fiscale e la coerenza della nascita. `batch-execute` consuma il
+comando preparato per la riga. La scrittura riusa la transazione del comando
+singolo per anagrafica, appartenenza all’ambulatorio, allegato ed audit. Il
+controllo dei doppioni si ripete in transazione. La pagina rilegge l’allegato
+ed espone l’esito di ciascuna riga. `batch-close` ritira la conferma del lotto.
+
+Prima di inviare la scrittura il browser registra un riferimento opaco per
+riga, nello spazio dell’archivio e dell’ambulatorio. Se perde la risposta,
+può rileggere il terminale con `receipt` oppure ritirare quella specifica
+lavorazione con `batch-revoke`. Per il ritiro dopo un riavvio fa fede
+l’evento di emissione della riga, con operatore, archivio ed ambulatorio. La
+perdita della risposta di una riga lascia eseguire le successive.
