@@ -713,6 +713,7 @@ function schedulerFixture() {
     return { ...f, destinationDir };
 }
 
+const schedulerReleaseFile = 'complete-backup';
 const schedulerWorker = `
     import fs from 'node:fs';
     import path from 'node:path';
@@ -724,13 +725,24 @@ import { pathToFileURL } from 'node:url';
     Database.prototype.prepare = function(...args) { if (this.name === target) seen.add(this); return prepare.apply(this, args); };
     Database.prototype.close = function(...args) { const result = close.apply(this, args); if (this.name === target) closed.add(this); return result; };
     if (process.env.SCHEDULER_BARRIER === '1') {
-        const digest = globalThis.crypto.subtle.digest.bind(globalThis.crypto.subtle);
-        globalThis.crypto.subtle.digest = async (...args) => {
-            const go = new Promise(resolve => process.once('message', resolve));
-            process.send('SERIALIZING'); await go;
-            [...seen][0].prepare('INSERT INTO synthetic_values VALUES (1, ?)').run('scheduler-finished-before-snapshot');
-            if (process.env.SCHEDULER_FAIL === '1') throw new Error('synthetic serialization failure');
-            return digest(...args);
+        let backupFd = null;
+        const open = fs.openSync, sync = fs.fsyncSync;
+        fs.openSync = function(file, ...args) {
+            const fd = open.call(this, file, ...args);
+            if (String(file).endsWith('.mediflow.tmp')) backupFd = fd;
+            return fd;
+        };
+        fs.fsyncSync = function(fd) {
+            if (fd === backupFd) {
+                backupFd = null;
+                process.send('BACKUP_WRITTEN');
+                const release = path.join(process.env.MEDIFLOW_DATA_DIR, '${schedulerReleaseFile}');
+                const waiter = new Int32Array(new SharedArrayBuffer(4));
+                while (!fs.existsSync(release)) Atomics.wait(waiter, 0, 0, 5);
+                [...seen][0].prepare('INSERT INTO synthetic_values VALUES (1, ?)').run('scheduler-finished-before-snapshot');
+                if (process.env.SCHEDULER_FAIL === '1') throw new Error('synthetic backup sync failure');
+            }
+            return sync.call(this, fd);
         };
     }
     process.argv[1] = path.resolve('scripts/run-scheduled-backup.mjs');
@@ -747,15 +759,13 @@ for (const fail of [false, true]) {
         const f = schedulerFixture();
         const w = schedulerChild(f.dir, true, fail);
         try {
-            assert.equal(await message(w.worker), 'SERIALIZING');
+            assert.equal(await message(w.worker), 'BACKUP_WRITTEN');
             let snapshotStarted = false;
-            // Release and observe the owned writer in the existing drain phase.
-            // Polling the gate first can spend the budget while the test still
-            // withholds COMPLETE, and leaves maintenance rejection unobserved.
             await runWithSqliteMaintenance(f.target, { timeoutMs: 5000, drain: async () => {
                 assert.equal(fs.existsSync(path.join(store(f.target), 'intent.json')), true);
                 assert.equal(snapshotStarted, false);
-                w.worker.send('COMPLETE');
+                assert.deepEqual(fs.readdirSync(f.destinationDir).filter(name => name.endsWith('.mediflow')), []);
+                fs.writeFileSync(path.join(f.dir, schedulerReleaseFile), '');
                 assert.equal(await w.terminal, fail ? 1 : 0, w.output());
             } }, async () => {
                 snapshotStarted = true;
@@ -817,12 +827,12 @@ test('scheduler drain timeout never snapshots and leaves the target unchanged un
     const f = schedulerFixture();
     const w = schedulerChild(f.dir, true);
     try {
-        assert.equal(await message(w.worker), 'SERIALIZING');
+        assert.equal(await message(w.worker), 'BACKUP_WRITTEN');
         const before = fs.readFileSync(f.target);
         await assert.rejects(runWithSqliteMaintenance(f.target, { timeoutMs: 20 }, () => assert.fail('no snapshot')), /drain_timeout/);
         assert.deepEqual(fs.readFileSync(f.target), before);
         assert.equal(fs.existsSync(path.join(store(f.target), 'intent.json')), false);
-        w.worker.send('COMPLETE');
+        fs.writeFileSync(path.join(f.dir, schedulerReleaseFile), '');
         assert.equal(await w.terminal, 0, w.output());
         await runWithSqliteMaintenance(f.target, {}, () => {});
     } finally {

@@ -37,7 +37,6 @@ export const allowedGenericLoaderExpressions: ReadonlySet<string> = new Set([
 const allowedUnsafeLoaderExpressions: ReadonlySet<string> = new Set([
     fingerprint('scripts/document-evidence-backfill-live-db.ts', 'unsafe:require', 'CallExpression', 'VariableStatement', "require('better-sqlite3')"),
     fingerprint('scripts/treatment-reasoning-live-db-smoke.ts', 'unsafe:require', 'CallExpression', 'VariableStatement', "require('better-sqlite3')"),
-    fingerprint('lib/backup-restore-preflight.ts', 'unsafe:require', 'CallExpression', 'ReturnStatement', "require('./data-dir')"),
 ]);
 const allowedProtectedLoaderExpressions: ReadonlyMap<string, number> = new Map([
     [protectedFingerprint('lib/security/server-session', 'lib/security/server-session.test.ts', 'loader-resolve', 'CallExpression', 'VariableStatement', "nodeRequire.resolve('./server-session.ts')"), 30],
