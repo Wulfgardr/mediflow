@@ -30,7 +30,12 @@ per voce anche per le visite.
    quando esisteranno.
 2. **La visita intera non cambia.** «Applica la visita», «Applica tutte le
    visite senza dubbi» e la conferma nativa con Touch ID (ADR 0191) scrivono
-   in una transazione tutte le voci ancora da decidere, come prima. Il punto 4
+   in una transazione tutte le voci ancora da decidere, come prima.
+   Quando occorre una scheda nuova, il medico conferma e può correggere
+   codice fiscale, nome e cognome nella singola visita. La scheda e le voci
+   entrano nella stessa transazione. Il client propone i nomi nell’àncora
+   cifrata quando l’estrazione li indica senza valori discordanti. Il medico
+   può compilare anche una visita depositata con il solo codice fiscale. Il punto 4
    dell'ADR 0195 resta vero per quel percorso: una richiesta che non comprende
    tutte le voci ancora da decidere è rifiutata.
 3. **Decisione voce per voce, su un percorso distinto.** Una voce di una
@@ -87,8 +92,12 @@ Gli stati tenuta, corretta e scartata sono finali.
 Nella stessa transazione `immediate`, prima di scrivere:
 
 - sessione Web dell'amministratore, generazione dell'archivio della cassetta,
-  mandato attivo e client non revocato, operazione della voce ammessa dal
-  mandato: come per la visita intera;
+  chiusura auditata sotto un mandato autorizzato al deposito e operazioni
+  comprese nel perimetro originario. Dopo la chiusura, scadenza e revoca
+  del mandato lasciano disponibile la revisione Web. La revoca della
+  registrazione o del client blocca la visita. I mandati non distinguono
+  una revoca per compromissione da una revoca ordinaria. La conferma
+  nativa continua a richiedere il mandato attivo oltre alla prova del gesto;
 - cassetta chiusa e alla revisione vista dal medico;
 - voce depositata in quella cassetta, con lo stesso tipo, e ancora da
   decidere;
@@ -111,8 +120,10 @@ TLC, con richieste duplicate, ritardate e concorrenti, visita intera inclusa:
 - `OneRecipient`: le voci di una visita finiscono in una sola scheda;
 - `AppliedMeansAllKept`: una visita risulta applicata solo se ogni voce è
   stata tenuta o corretta;
-- `DeniedChangesNothing`: dopo la revoca o la scadenza nessuna richiesta
-  cambia dati.
+- `DeniedChangesNothing`: una richiesta priva di autorità di revisione
+  non cambia dati. Nel modello, scadenza e revoca rappresentano la
+  perdita di tale autorità, per esempio alla scadenza della sessione o
+  alla revoca dell’agente.
 
 Togliere a turno ciascuna delle quattro guardie del server viola la regola
 corrispondente. Le prove sul codice stanno in
@@ -129,6 +140,10 @@ corrispondente. Le prove sul codice stanno in
   verificata nel browser sbloccato, come per la visita intera (ADR 0190). Il
   server impedisce che le voci successive della stessa visita vadano su una
   scheda diversa.
+- Si può applicare una nota o una trascrizione anche senza PDF. Quando
+  ci sono PDF, il browser verifica il codice fiscale confermato in ciascuno.
+  Per le proposte strutturate valgono ancora i controlli sulla fonte e il
+  riscontro con il PDF citato.
 - Una voce scartata non si riprende dall'interfaccia. Se serve, il medico la
   inserisce a mano nella scheda; il deposito resta nella cassetta.
 - Una ripetizione con un corpo diverso (per esempio una nuova cifratura dello

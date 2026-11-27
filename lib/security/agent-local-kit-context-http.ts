@@ -8,9 +8,13 @@ import { archiveGenerationForSession } from './archive-session-generation';
 import { readNativeNetworkJson } from '../native-network-json-body';
 import {
     AGENT_PATIENT_CONTEXT_MAX_BYTES,
-    parseAgentPatientContextInput,
+    normalizeAgentPatientTaxCode,
+    parseAgentPatientContextRequest,
     sealAgentPatientContextEnvelope,
+    sha256HexClient,
+    type AgentPatientContextRequest,
 } from '../agent-local-kit-context-contract';
+import { pseudonymizeAgentPatientContext } from '../agent-local-kit-context-pseudonymization';
 import {
     clearLocalKitPatientContexts,
     listLocalKitPatientContexts,
@@ -26,6 +30,12 @@ type Sources = {
 
 const reply = (value: unknown, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'no-store' } });
 const denied = (status = 403, code = 'AGENT_LOCAL_KIT_DENIED') => reply({ code, error: 'Contesto agente non disponibile.' }, status);
+
+async function identityMatchesContext({ context, identity }: AgentPatientContextRequest): Promise<boolean> {
+    const taxCode = normalizeAgentPatientTaxCode(identity.taxCode);
+    return taxCode.length >= 4 && taxCode.slice(-4) === context.patient.taxCodeLast4
+        && await sha256HexClient(taxCode) === context.patient.cfHash;
+}
 
 export function createAgentLocalKitContextHttp(sources: Sources) {
     async function admitted(request: Request, mutation: boolean, requireJsonBody = true): Promise<{ session: ServerSession; generation: string } | null> {
@@ -72,12 +82,13 @@ export function createAgentLocalKitContextHttp(sources: Sources) {
                 const store = sources.store();
                 const status = store.status(access.session.userId);
                 if (!status.connected || !status.active) return denied(403, 'LOCAL_KIT_INACTIVE');
-                const body = await readNativeNetworkJson(request, AGENT_PATIENT_CONTEXT_MAX_BYTES + 4096, {
+                const body = await readNativeNetworkJson(request, AGENT_PATIENT_CONTEXT_MAX_BYTES + 8192, {
                     signal: request.signal,
                     deadline: performance.now() + 2000,
                 });
-                const parsed = parseAgentPatientContextInput(body);
-                if (!parsed) return denied(400, 'INVALID_INPUT');
+                const parsed = parseAgentPatientContextRequest(body);
+                if (!parsed || !await identityMatchesContext(parsed)) return denied(400, 'INVALID_INPUT');
+                const released = pseudonymizeAgentPatientContext(parsed.context, parsed.identity);
                 const fresh = await admitted(request, true, true);
                 if (!fresh || fresh.session.id !== access.session.id
                     || fresh.session.userId !== access.session.userId
@@ -88,7 +99,7 @@ export function createAgentLocalKitContextHttp(sources: Sources) {
                 if (!freshStatus.connected || !freshStatus.active || freshStatus.kitPath !== status.kitPath) {
                     return denied(403, 'LOCAL_KIT_INACTIVE');
                 }
-                const envelope = sealAgentPatientContextEnvelope(parsed);
+                const envelope = sealAgentPatientContextEnvelope(released);
                 writeLocalKitPatientContext(freshStatus.kitPath, envelope);
                 try {
                     store.recordContextAudit(
