@@ -1,5 +1,6 @@
 import {expect,test} from '@playwright/test';
 import { bootstrapUnlockedSession, openPatientSection, openUnlockedDocument } from './utils';
+import { expectHeaderCommands, voiceServiceDeclared } from './patient-header-commands';
 
 for (const width of [1440, 390]) for (const theme of ['giorno', 'grafite']) test(`patient header opens prescriptions, exposes its actions and hands priority to a form ${theme} ${width}`,async({page})=>{
  await page.setViewportSize({width,height:960});
@@ -27,7 +28,7 @@ for (const width of [1440, 390]) for (const theme of ['giorno', 'grafite']) test
   }
  };
  await expect(header.getByRole('link',{name:'Nuova voce',exact:true})).toHaveAttribute('href',`/patients/${id}/modules?voce=nuova`);
- await expect(header.locator('a:visible,button:visible,summary:visible')).toHaveCount(3);
+ await expectHeaderCommands(header,voiceServiceDeclared());
  const prescribe = header.getByRole('button', { name: 'Prescrivi', exact: true });
  await prescribe.focus();
  await page.keyboard.press('Enter');
