@@ -5,6 +5,7 @@ import { isTrustedWebMutationRequest } from '@/lib/security/request-transport';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
 import { openDbServer } from '@/lib/db-server';
 import { createRecoverySnapshotStream, recoveryBackupCapacity } from '@/lib/recovery-backup-server';
+import { RECOVERY_SNAPSHOT_BYTES_HEADER } from '@/lib/recovery-backup-stream';
 import { RecoverySnapshotRefusedError, recoveryBackupRefusalResponse } from '@/lib/recovery-backup-refusal';
 import { logServerError } from '@/lib/server-error-log';
 import { WindowsPrivateDirectoryError } from '@/scripts/windows-private-directory.mjs';
@@ -39,7 +40,7 @@ export async function POST(request: Request) {
             },
         });
         return new Response(body, { headers: { 'Content-Type': 'application/octet-stream',
-            'Cache-Control': 'no-store', 'Content-Length': String(size), 'X-Content-Type-Options': 'nosniff' } });
+            'Cache-Control': 'no-store', [RECOVERY_SNAPSHOT_BYTES_HEADER]: String(size), 'X-Content-Type-Options': 'nosniff' } });
     } catch (error) {
         if (error instanceof WindowsPrivateDirectoryError) return Response.json({ error: error.userMessage, code: error.code },
             { status: 422, headers: { 'Cache-Control': 'no-store' } });

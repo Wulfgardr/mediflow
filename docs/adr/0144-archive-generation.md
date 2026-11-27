@@ -258,7 +258,8 @@ completa dei blocchi. Il tetto di 32 GiB limita l'uso della singola chiave a
 32.769 invocazioni. [NIST SP 800-38D](https://csrc.nist.gov/pubs/sp/800/38/d/final)
 
 Il server invia lo snapshot sotto la stessa autorità, a blocchi e con
-contropressione. La copia temporanea è privata e viene rimossa alla chiusura
+contropressione. L’intestazione HTTP `x-mediflow-snapshot-bytes` indica la
+misura dello snapshot, indipendentemente dal framing HTTP. La copia temporanea è privata e viene rimossa alla chiusura
 del flusso o all'annullamento. Nel browser il selettore di salvataggio apre
 una scrittura su disco che si conclude solo dopo l'ultimo tag. Il browser
 deve supportare il salvataggio a flusso. La verifica usa il file scelto

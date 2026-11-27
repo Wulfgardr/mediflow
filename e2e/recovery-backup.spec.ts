@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { RECOVERY_SNAPSHOT_BYTES_HEADER } from '../lib/recovery-backup-stream';
 import { saveRecoveryToTestDownload } from './fixtures/recovery-file-picker';
 import { test, expect } from './fixtures/isolated-runtime';
 import { bootstrapUnlockedSession } from './utils';
@@ -46,8 +47,14 @@ test('complete backup is encrypted in the browser and verification never claims 
     await expect(panel.getByRole('alert')).toContainText('Libera spazio prima di creare la copia.');
     const requested = page.waitForRequest(request =>
         new URL(request.url()).pathname === '/api/system/recovery-backup' && request.method() === 'POST');
+    const snapshot = page.waitForResponse(response => new URL(response.url()).pathname === '/api/system/recovery-backup'
+        && response.request().method() === 'POST');
     const downloadEvent = page.waitForEvent('download');
     await panel.getByRole('button', { name: 'Crea backup completo cifrato', exact: true }).click();
+    const raw = await snapshot;
+    expect(raw.status()).toBe(200);
+    expect(Number(await raw.headerValue(RECOVERY_SNAPSHOT_BYTES_HEADER))).toBeGreaterThan(0);
+    await expect(panel.getByRole('status')).toContainText('Backup creato');
     const download = await downloadEvent;
     const artifactPath = testInfo.outputPath('synthetic.mediflow-recovery'); await download.saveAs(artifactPath);
     const bytes = fs.readFileSync(artifactPath);

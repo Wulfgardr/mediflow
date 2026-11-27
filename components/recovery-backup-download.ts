@@ -26,6 +26,7 @@ export function recoveryBackupAllowed(unlockCredential: UnlockParameters['creden
 export function recoveryBackupFailure(error: unknown): string {
     if (error instanceof DOMException && error.name === 'AbortError') return 'Salvataggio annullato.';
     const reason = error instanceof Error && error.message ? error.message : 'Riprova.';
+    if (reason === 'RECOVERY_BACKUP_INVALID') return 'Backup non creato. La copia ricevuta è incompleta. Riprova.';
     return `Backup non creato. ${reason}`;
 }
 

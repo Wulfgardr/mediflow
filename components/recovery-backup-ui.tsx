@@ -22,7 +22,7 @@ function capacityStore() {
                     warning = result?.warning === 'archive_limit'
                         ? `L’archivio si avvicina al limite di ${MAX_STREAMED_RECOVERY_DATABASE_BYTES / (1024 ** 3)} GiB. Chiedi assistenza per conservarne una copia completa.`
                         : result?.warning === 'local_space'
-                            ? 'Lo spazio sul disco dell’archivio è quasi insufficiente per il backup. Libera spazio prima di creare la copia.'
+                            ? 'Lo spazio sul disco dell’archivio potrebbe non bastare. Libera spazio prima di creare la copia.'
                             : '';
                     listener();
                 }).catch(() => {});

@@ -16,7 +16,7 @@ import {
     validatePinChangeInput,
 } from '@/lib/security/pin-change';
 import { db } from '@/lib/db';
-import { encryptRecoveryBackupStream, readRecoveryBackup } from '@/lib/recovery-backup-stream';
+import { encryptRecoveryBackupStream, readRecoveryBackup, RECOVERY_SNAPSHOT_BYTES_HEADER } from '@/lib/recovery-backup-stream';
 import type { RecoveryBackupAction } from './recovery-backup-download';
 import { recoveryBackupRefusalMessage } from '@/lib/recovery-backup-refusal';
 import { OnboardingWizard, type SecuritySetup } from '@/components/onboarding-wizard';
@@ -794,7 +794,7 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
                 throw new Error(recoveryBackupRefusalMessage(response.status, problem?.code));
             }
             if (!response.body) throw new Error(recoveryBackupRefusalMessage(500, null));
-            const size = Number(response.headers.get('Content-Length'));
+            const size = Number(response.headers.get(RECOVERY_SNAPSHOT_BYTES_HEADER));
             await encryptRecoveryBackupStream(response.body, size, key, async chunk => {
                 requireCurrent();
                 await writer.write(chunk);

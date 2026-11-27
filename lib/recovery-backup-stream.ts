@@ -6,6 +6,7 @@ const WRAPPING_IV_END = 20;
 const WRAPPED_KEY_END = 68;
 const HEADER_BYTES = 76;
 const TAG_BYTES = 16;
+export const RECOVERY_SNAPSHOT_BYTES_HEADER = 'x-mediflow-snapshot-bytes';
 export const RECOVERY_BLOCK_BYTES = 1024 * 1024;
 export const MAX_STREAMED_RECOVERY_DATABASE_BYTES = 32 * 1024 * RECOVERY_BLOCK_BYTES;
 
