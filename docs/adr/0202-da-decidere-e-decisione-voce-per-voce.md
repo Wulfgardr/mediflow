@@ -30,7 +30,12 @@ per voce anche per le visite.
    quando esisteranno.
 2. **La visita intera non cambia.** «Applica la visita», «Applica tutte le
    visite senza dubbi» e la conferma nativa con Touch ID (ADR 0191) scrivono
-   in una transazione tutte le voci ancora da decidere, come prima. Il punto 4
+   in una transazione tutte le voci ancora da decidere, come prima.
+   Quando occorre una scheda nuova, il medico conferma e può correggere
+   codice fiscale, nome e cognome nella singola visita. La scheda e le voci
+   entrano nella stessa transazione. Il client propone i nomi nell’àncora
+   cifrata quando l’estrazione li indica senza valori discordanti. Il medico
+   può compilare anche una visita depositata con il solo codice fiscale. Il punto 4
    dell'ADR 0195 resta vero per quel percorso: una richiesta che non comprende
    tutte le voci ancora da decidere è rifiutata.
 3. **Decisione voce per voce, su un percorso distinto.** Una voce di una
@@ -55,18 +60,34 @@ per voce anche per le visite.
    in scheda» e il medico la scarta o modifica la voce dalla scheda. Una
    correzione che cambia il codice entra come diagnosi nuova. La visita
    intera non cambia: la voce mostra già «In scheda: …» prima di applicare.
-7. **Solo su una scheda esistente.** La decisione voce per voce vale quando la
-   visita ha una scheda attiva riconosciuta. Una visita che crea la scheda
-   (prima visita) si applica ancora per intero.
+7. **Decisioni nella prima visita (WUL-976).** Tieni, Correggi e Scarta
+   restano in sospeso nel browser fino a «Crea scheda e applica la visita».
+   Il server controlla che ogni voce depositata sia tenuta, corretta o
+   scartata. Crea la scheda, scrive le voci tenute e registra tutte le
+   decisioni nella stessa transazione.
 8. **La conferma con Touch ID non parte** su una visita già decisa in parte:
-   la si finisce dal Web. Il percorso nativo (`lib/agent-visit-confirmation*`,
-   `native/AgentVisitConfirmation/`) non cambia.
+   la si finisce dal Web.
+9. **Stato della terapia.** Quando il documento non indica se la terapia è
+   in corso, sospesa o conclusa, il medico sceglie lo stato. La scelta vale
+   anche per l’applicazione della singola visita, compresa la prima, e
+   compare in `physicianFields` nella provenienza sigillata. La coda in
+   blocco e Touch ID lasciano la scelta al medico nella visita.
+10. **Scarto della visita (WUL-976).** Dopo la conferma la visita esce dalla
+    coda. Il registro conserva lo scarto della visita e quello delle voci
+    ancora in attesa. Le voci già in scheda restano salvate. La sessione e la
+    revisione devono essere correnti. La cassetta deve appartenere alla
+    sessione per utente e archivio. Il gesto scrive solo audit ed è
+    disponibile anche se il deposito è ancora in corso o bloccato.
+11. **Applicazione in blocco (WUL-976).** «Applica tutte le visite senza
+    dubbi» mostra l’avanzamento, quante visite ha applicato e quante restano,
+    raggruppate per motivo.
 
 ### Stati di una voce
 
 | Stato | Da dove | Effetto | Audit |
 | --- | --- | --- | --- |
 | da decidere | deposito della cassetta | nessuno | `agent.item.deposited` |
+| in sospeso | decisione nella prima visita | resta nel browser fino alla creazione della scheda | all’applicazione |
 | tenuta | Tieni, oppure visita intera | scritta in scheda con la fonte | scrittore + `agent.item.applied` |
 | corretta | Correggi | scritta con il valore del medico | scrittore + `agent.item.applied` con `corrected` |
 | scartata | Scarta | nessun dato clinico | `agent.item.discarded` |
@@ -81,14 +102,19 @@ Gli stati tenuta, corretta e scartata sono finali.
 | decisa in parte | almeno una voce decisa, almeno una da decidere | «Visite», con le voci decise segnate |
 | applicata | ogni voce tenuta o corretta | esce dalla coda; `agent.visit.applied` con `cassette_complete` |
 | decisa | ogni voce decisa, almeno una scartata | esce dalla coda; `agent.visit.decided`, **mai** `cassette_complete` |
+| scartata | conferma di «Scarta la visita» | esce dalla coda, `agent.visit.discarded` |
 
 ### Che cosa controlla il server a ogni gesto
 
-Nella stessa transazione `immediate`, prima di scrivere:
+Nella stessa transazione `immediate`, prima di applicare la visita o decidere una singola voce:
 
 - sessione Web dell'amministratore, generazione dell'archivio della cassetta,
-  mandato attivo e client non revocato, operazione della voce ammessa dal
-  mandato: come per la visita intera;
+  chiusura auditata sotto un mandato autorizzato al deposito e operazioni
+  comprese nel perimetro originario. Dopo la chiusura, scadenza e revoca
+  del mandato lasciano disponibile la revisione Web. La revoca della
+  registrazione o del client blocca la visita. I mandati non distinguono
+  una revoca per compromissione da una revoca ordinaria. La conferma
+  nativa continua a richiedere il mandato attivo oltre alla prova del gesto;
 - cassetta chiusa e alla revisione vista dal medico;
 - voce depositata in quella cassetta, con lo stesso tipo, e ancora da
   decidere;
@@ -111,8 +137,10 @@ TLC, con richieste duplicate, ritardate e concorrenti, visita intera inclusa:
 - `OneRecipient`: le voci di una visita finiscono in una sola scheda;
 - `AppliedMeansAllKept`: una visita risulta applicata solo se ogni voce è
   stata tenuta o corretta;
-- `DeniedChangesNothing`: dopo la revoca o la scadenza nessuna richiesta
-  cambia dati.
+- `DeniedChangesNothing`: una richiesta priva di autorità di revisione
+  non cambia dati. Nel modello, scadenza e revoca rappresentano la
+  perdita di tale autorità, per esempio alla scadenza della sessione o
+  alla revoca dell’agente.
 
 Togliere a turno ciascuna delle quattro guardie del server viola la regola
 corrispondente. Le prove sul codice stanno in
@@ -129,6 +157,10 @@ corrispondente. Le prove sul codice stanno in
   verificata nel browser sbloccato, come per la visita intera (ADR 0190). Il
   server impedisce che le voci successive della stessa visita vadano su una
   scheda diversa.
+- Si può applicare una nota o una trascrizione anche senza PDF. Quando
+  ci sono PDF, il browser verifica il codice fiscale confermato in ciascuno.
+  Per le proposte strutturate valgono ancora i controlli sulla fonte e il
+  riscontro con il PDF citato.
 - Una voce scartata non si riprende dall'interfaccia. Se serve, il medico la
   inserisce a mano nella scheda; il deposito resta nella cassetta.
 - Una ripetizione con un corpo diverso (per esempio una nuova cifratura dello

@@ -16,7 +16,7 @@ import { containWindowsWeb } from './windows-runtime-job.mjs';
 import { createRuntimeLeases, acquireRuntimeLease, recordChildOwner, verifyChildOwner, runtimeProcessIdentity } from './runtime-leases.mjs';
 import { prepareLauncherState, localUiArchiveLock } from './launcher-state.mjs';
 import { verifyOwnedWeb } from './local-ui-web-identity.mjs';
-import { localVoiceBinary, superviseLocalVoiceService } from './local-voice-service.mjs';
+import { localVoiceBinary, pinnedLocalVoiceEntry, superviseLocalVoiceService, verifyLocalVoiceBinary } from './local-voice-service.mjs';
 import { LOCAL_VOICE_ENDPOINT_FRAME, LOCAL_VOICE_ENDPOINT_REQUEST } from './local-voice-web-endpoint.mjs';
 import { localVoiceClient } from '../lib/local-voice/client.mjs';
 import { LAN_PROXY_DEFAULT_PORT, createLanProxyController, readNetworkOverview } from './launcher-lan-proxy.mjs';
@@ -495,12 +495,23 @@ export async function main(args = process.argv.slice(2)) {
   if (!ownership.claimed) throw new Error('Un avvio di questa cartella è già in corso. Controlla il terminale e riprova.');
   const native = nativeApplication(ROOT);
   const dirty = identity.worktreeHash !== 'clean';
-  let state = { busy: false, ready: false, url: null, message: 'Scegli come aprire MediFlow.', needsInstall: false, voice: process.platform === 'darwin' ? 'absent' : 'unsupported' };
+  const voiceBinary = localVoiceBinary(ROOT);
+  const voicePinned = pinnedLocalVoiceEntry(ROOT, { platform: process.platform, arch: process.arch, version: identity.version });
+  const voiceCheck = verifyLocalVoiceBinary(voiceBinary, { root: ROOT, platform: process.platform, arch: process.arch, version: identity.version });
+  const initialVoiceState = voiceCheck.ok ? 'stopped'
+    : voiceCheck.reason === 'unsupported' ? 'unsupported'
+      : voiceCheck.reason === 'absent' ? 'absent'
+        : voiceCheck.reason === 'unpinned' ? 'unpinned' : 'untrusted';
+  let state = { busy: false, ready: false, url: null, message: 'Scegli come aprire MediFlow.', needsInstall: false, voice: initialVoiceState };
   let child = null, chooser = null, closing = false, installApproval = null, failedBuild = null, generation = 0;
   let terminal = null, useTerminal = false, webSecret = null, instance = null;
   let voiceChild = null;
-  const voiceBinary = localVoiceBinary(ROOT);
-  const voice = process.platform === 'darwin' && fs.existsSync(voiceBinary) ? superviseLocalVoiceService({ binary: voiceBinary, models: process.env.MEDIFLOW_LOCAL_VOICE_MODELS || undefined, log,
+  if (!voiceCheck.ok && ['mismatch', 'invalid', 'manifest-invalid', 'version-mismatch'].includes(voiceCheck.reason)) {
+    log(`Voce locale non avviata: verifica del programma fallita (${voiceCheck.reason}).`);
+  }
+  const voice = voiceCheck.ok && voicePinned.ok ? superviseLocalVoiceService({
+    binary: voiceBinary, expectedSha256: voicePinned.entry.sha256, expectedBytes: voicePinned.entry.bytes,
+    models: process.env.MEDIFLOW_LOCAL_VOICE_MODELS || undefined, log,
     publish: endpoint => {
       void refreshVoiceState(endpoint);
       sendVoiceEndpoint(endpoint);
@@ -511,16 +522,15 @@ export async function main(args = process.argv.slice(2)) {
   let voiceStateGeneration = 0;
   const refreshVoiceState = async endpoint => {
     const generation = ++voiceStateGeneration;
-    if (!endpoint) { state.voice = voice ? 'stopped' : process.platform === 'darwin' ? 'absent' : 'unsupported'; return; }
+    if (!endpoint) { state.voice = voice ? 'stopped' : initialVoiceState; return; }
     let next;
     try { const { model } = await localVoiceClient(endpoint).status(); next = ['ready', 'missing', 'incomplete'].includes(model) ? model : 'stopped'; }
     catch { next = 'stopped'; }
     if (generation === voiceStateGeneration) state.voice = next;
   };
-  const localVoiceEnv = async () => {
+  const ensureLocalVoice = async () => {
     const endpoint = await voice?.ensure() ?? null;
     await refreshVoiceState(endpoint);
-    return { MEDIFLOW_LOCAL_VOICE_URL: endpoint?.url, MEDIFLOW_LOCAL_VOICE_SECRET: endpoint?.secret };
   };
   const lanPort = Number(process.env.MEDIFLOW_TLS_PORT || LAN_PROXY_DEFAULT_PORT);
   const lan = createLanProxyController({ root: ROOT, dataDir, port: lanPort, log,
@@ -769,7 +779,7 @@ export async function main(args = process.argv.slice(2)) {
     update({ step: 'avvio', message: choice === 'agenti' ? 'Avvio dell’accesso per agenti. Collega un client al protocollo del terminale.' : 'Avvio di MediFlow.' });
     let target = null;
     if (choice === 'mac') {
-      const owned = run(native, [], false, { ...process.env, MEDIFLOW_NODE_BINARY: process.execPath,
+      const owned = run(native, [], false, { ...process.env, MEDIFLOW_LOCAL_VOICE_URL: undefined, MEDIFLOW_LOCAL_VOICE_SECRET: undefined, MEDIFLOW_NODE_BINARY: process.execPath,
         MEDIFLOW_APP_REVISION: current.revision, MEDIFLOW_APP_BRANCH: current.branch,
         MEDIFLOW_APP_WORKTREE_HASH: current.worktreeHash, MEDIFLOW_APP_SOURCE_FINGERPRINT: current.sourceFingerprint,
         MEDIFLOW_APP_FINGERPRINT: current.sourceFingerprint });
@@ -783,9 +793,9 @@ export async function main(args = process.argv.slice(2)) {
       pairRequests.clear();
       instance = crypto.randomUUID();
       webSecret = choice === 'web' ? crypto.randomBytes(32).toString('hex') : null;
-      const voiceEnv = choice === 'agenti' ? { MEDIFLOW_LOCAL_VOICE_URL: undefined, MEDIFLOW_LOCAL_VOICE_SECRET: undefined } : await localVoiceEnv();
+      if (choice === 'web') await ensureLocalVoice();
       if (closing) return;
-      const env = { ...process.env, ...voiceEnv, ...(webSecret ? { MEDIFLOW_LOCAL_UI_WEB_SECRET: webSecret, MEDIFLOW_LOCAL_UI_INSTANCE: instance } : {}), HOSTNAME: '127.0.0.1', PORT: String(port),
+      const env = { ...process.env, MEDIFLOW_LOCAL_VOICE_URL: undefined, MEDIFLOW_LOCAL_VOICE_SECRET: undefined, ...(webSecret ? { MEDIFLOW_LOCAL_UI_WEB_SECRET: webSecret, MEDIFLOW_LOCAL_UI_INSTANCE: instance } : {}), HOSTNAME: '127.0.0.1', PORT: String(port),
         ...(choice === 'web' ? { MEDIFLOW_PLUGIN_LOCAL_UI: '1', MEDIFLOW_RUNTIME_UI_LEASE: pluginChannel ? '1' : '0' } : {}),
         ...(choice === 'web' ? { MEDIFLOW_WEB_OWNER_GATE: crypto.randomUUID() } : {}),
         MEDIFLOW_APP_REVISION: current.revision, MEDIFLOW_APP_BRANCH: current.branch,
@@ -808,7 +818,10 @@ export async function main(args = process.argv.slice(2)) {
         void webJob.closed.then(() => finishGeneration(true), error => finishGeneration(true, error));
         bindRuntimeOwnership([ownership, archiveOwnership], { kind: 'windows-job', web: childOwner.token, guardian: webJob.owner });
       }
-      if (choice === 'web') owned.send({ type: 'mediflow-web-owner-start', nonce: env.MEDIFLOW_WEB_OWNER_GATE });
+      if (choice === 'web') {
+        sendVoiceEndpoint(voice?.current() ?? null);
+        owned.send({ type: 'mediflow-web-owner-start', nonce: env.MEDIFLOW_WEB_OWNER_GATE });
+      }
       owned.on('message', frame => {
         if (frame?.type === LOCAL_VOICE_ENDPOINT_REQUEST) { if (owned === voiceChild) sendVoiceEndpoint(voice?.current() ?? null); return; }
         if (frame?.type === 'mediflow-ui-lease' && owned === child && leases) {

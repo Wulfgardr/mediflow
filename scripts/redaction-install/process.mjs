@@ -4,6 +4,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { InstallError, demand, exactKeys, equal, record, strictJson } from './guards.mjs';
+import { pythonExecutablesForSandbox, seatbeltProfile } from '../seatbelt-profile.mjs';
 
 const INSPECT = fileURLToPath(new URL('./inspect_runtime.py', import.meta.url));
 export const SMOKE_TEXT = 'SYNTHETIC INSTALLER CHECK: Mario Rossi, Milano. Nessun dato clinico.';
@@ -21,12 +22,13 @@ export function safeEnvironment(work) {
   };
 }
 export function sandboxArguments(python, args, writable) {
-  // This does not alter the app's C2/runner sandbox or its policies. The extra
-  // write restriction applies ONLY to provisioning subprocesses.
-  const literal = value => JSON.stringify(value);
-  const policy = '(version 1)(allow default)(deny network*)(deny file-write*)'
-    + '(allow file-write* (literal "/dev/null")'
-    + (writable ? ` (subpath ${literal(writable)})` : '') + ')';
+  let writablePath = writable;
+  if (writable) {
+    try { writablePath = fs.realpathSync(writable); } catch {}
+  }
+  const rules = '(deny network*) (deny file-write*) (allow file-write* (literal "/dev/null")'
+    + (writablePath ? ` (subpath ${JSON.stringify(writablePath)})` : '') + ')';
+  const policy = seatbeltProfile({ rules, programs: pythonExecutablesForSandbox(python) });
   return ['-p', policy, python, ...args];
 }
 

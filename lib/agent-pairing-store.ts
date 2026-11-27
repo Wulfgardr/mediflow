@@ -9,6 +9,10 @@ export type AgentPairingRequest = { id: string; code: string; name: string; oper
     status: 'pending' | 'approved' | 'rejected'; mandateRef: string | null };
 export type AgentPrincipal = { agentRef: string; mandateRef: string; actorRef: string; name: string; operations: AgentOperation[];
     expiresAt: number; modelProvider: 'openai' | 'anthropic' | 'local'; allowsClinicalEgress: boolean; publicKey: string; archiveGeneration: string };
+export const AGENT_PAIRING_PENDING_LIMIT = 8;
+export class AgentPairingQueueFull extends Error {
+    constructor() { super('agent_pairing_queue_full'); }
+}
 const hash = (domain: string, value: string) => createHash('sha256').update(JSON.stringify([domain, value])).digest('hex');
 const equalHash = (left: string, right: string) => /^[a-f0-9]{64}$/u.test(left) && timingSafeEqual(Buffer.from(left, 'hex'), Buffer.from(right, 'hex'));
 const claimPattern = /^[A-Za-z0-9_-]{43}$/u;
@@ -36,11 +40,15 @@ export function createAgentPairingStore(database: Database.Database, now = Date.
                 || !validAgentOperations(operations)) throw new AgentMandateDenied();
             const id = randomUUID(), claim = randomBytes(32).toString('base64url');
             const code = randomBytes(5).toString('hex').slice(0, 8).toUpperCase();
-            const createdAt = now();
-            const inserted = database.prepare(`INSERT INTO agent_pairing_requests(id,code,name,operations,claim_hash,created_at,expires_at,status)
-                VALUES (?,?,?,?,?,?,?,'pending')`).run(id, code, name, JSON.stringify(operations), hash('mediflow.agent.claim.v1', claim), createdAt, createdAt + 300000);
-            if (inserted.changes !== 1) throw new AgentMandateDenied();
-            return { request: { id, code, name, operations, createdAt, expiresAt: createdAt + 300000, status: 'pending' as const, mandateRef: null }, claim };
+            return database.transaction(() => {
+                const createdAt = now();
+                const pending = database.prepare("SELECT count(*) FROM agent_pairing_requests WHERE status='pending' AND expires_at>?").pluck().get(createdAt) as number;
+                if (pending >= AGENT_PAIRING_PENDING_LIMIT) throw new AgentPairingQueueFull();
+                const inserted = database.prepare(`INSERT INTO agent_pairing_requests(id,code,name,operations,claim_hash,created_at,expires_at,status)
+                    VALUES (?,?,?,?,?,?,?,'pending')`).run(id, code, name, JSON.stringify(operations), hash('mediflow.agent.claim.v1', claim), createdAt, createdAt + 300000);
+                if (inserted.changes !== 1) throw new AgentMandateDenied();
+                return { request: { id, code, name, operations, createdAt, expiresAt: createdAt + 300000, status: 'pending' as const, mandateRef: null }, claim };
+            }).immediate();
         },
         pending() {
             return database.prepare(`SELECT ${requestProjection} FROM agent_pairing_requests WHERE status='pending' AND expires_at>? ORDER BY created_at`).all(now()).map(row => requestFrom(row)!);

@@ -1,0 +1,101 @@
+name: Release Ollama da osservare
+
+on:
+  schedule:
+    - cron: '23 7 * * 1'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+concurrency:
+  group: ollama-release-watch
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      OLLAMA_LAST_OBSERVED: v0.40.18
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Segnala le release stabili nuove
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          from urllib.parse import urlencode
+          from urllib.request import Request, urlopen
+
+          API = "https://api.github.com"
+          STABLE_TAG = re.compile(r"v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)")
+          TITLE_PREFIX = "Ollama da osservare · "
+
+          def version(tag):
+              match = STABLE_TAG.fullmatch(tag)
+              return tuple(map(int, match.groups())) if match else None
+
+          def request(path, token=None, issue=None):
+              headers = {"Accept": "application/vnd.github+json"}
+              if token:
+                  headers["Authorization"] = f"Bearer {token}"
+              data = None
+              if issue is not None:
+                  headers["Content-Type"] = "application/json"
+                  data = json.dumps(issue).encode()
+              with urlopen(Request(API + path, data=data, headers=headers), timeout=20) as response:
+                  return json.load(response), 'rel="next"' in response.headers.get("Link", "")
+
+          def pages(path, token=None, **filters):
+              page = 1
+              while True:
+                  query = urlencode(dict(filters, per_page=100, page=page))
+                  items, has_next = request(f"{path}?{query}", token)
+                  yield from items
+                  if not has_next:
+                      return
+                  page += 1
+
+          def announce(baseline, releases, repo, token):
+              observed = version(baseline)
+              if observed is None:
+                  raise ValueError("OLLAMA_LAST_OBSERVED deve essere un tag stabile")
+              pending = {}
+              for release in releases:
+                  tag = release["tag_name"]
+                  published = version(tag)
+                  if published is not None and published > observed and not release["draft"] and not release["prerelease"]:
+                      pending[published] = tag
+              if not pending:
+                  return
+              path = f"/repos/{repo}/issues"
+              existing = {
+                  issue["title"] for issue in pages(path, token, state="all", creator="github-actions[bot]")
+              }
+              for published in sorted(pending):
+                  tag = pending[published]
+                  title = TITLE_PREFIX + tag
+                  if title in existing:
+                      continue
+                  request(path, token, {
+                      "title": title,
+                      "body": (
+                          f"[Release stabile {tag}](https://github.com/ollama/ollama/releases/tag/{tag})\n\n"
+                          f"Ultima versione osservata da MediFlow: `{baseline}`. "
+                          "Verificare le risposte di tags, show e ps e l’instradamento locale "
+                          "prima di aggiornare OLLAMA_LAST_OBSERVED."
+                      ),
+                  })
+                  print(title)
+
+          if __name__ == "__main__":
+              announce(
+                  os.environ["OLLAMA_LAST_OBSERVED"],
+                  pages("/repos/ollama/ollama/releases"),
+                  os.environ["GITHUB_REPOSITORY"],
+                  os.environ["GH_TOKEN"],
+              )
+          PY

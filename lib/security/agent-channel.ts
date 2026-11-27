@@ -11,6 +11,13 @@ export class AgentChannelDenied extends Error {
 export function requireAgentLoopbackContext(request: Request): void {
     if (!hasAttestedLoopbackIngress(request)) throw new AgentChannelDenied(404);
 }
+const NON_BROWSER_FETCH_SITES = new Set(['none', 'same-origin']);
+
+export function requireNonBrowserAgentRequest(request: Request, jsonBody: boolean): void {
+    const site = request.headers.get('sec-fetch-site');
+    if (request.headers.has('origin') || (site !== null && !NON_BROWSER_FETCH_SITES.has(site.trim().toLowerCase()))
+        || (jsonBody && !/^application\/json(?:\s*;|$)/iu.test(request.headers.get('content-type') ?? ''))) throw new AgentChannelDenied(403);
+}
 export function withAuthenticatedAgentTransaction<T>(database: Database.Database, request: Request, operation: AgentOperation | null,
     consume: (principal: AgentPrincipal) => T): T {
     requireAgentLoopbackContext(request);

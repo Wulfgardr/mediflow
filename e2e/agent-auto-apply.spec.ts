@@ -300,7 +300,7 @@ for (const reviewed of process.env.MEDIFLOW_VISIT_MAC_TRIAL ? [false] : [false, 
         await expect(validVisit.getByRole('button', { name: 'Applica la visita', exact: true })).toBeEnabled();
         await expect(secondVisit.getByRole('button', { name: 'Applica la visita', exact: true })).toBeEnabled();
         await expect(concurrentVisit.getByRole('button', { name: 'Applica la visita', exact: true })).toBeEnabled();
-        const blockedApply = doubtfulVisit.getByRole('button', { name: 'Applica la visita', exact: true });
+        const blockedApply = doubtfulVisit.getByRole('button', { name: 'Crea scheda e applica la visita', exact: true });
         await expect(blockedApply).toBeDisabled();
         await expect(blockedApply).toHaveAccessibleDescription(/Identità da verificare nel PDF/);
         expect(await counts()).toEqual([0, 0, 0, 0]);
@@ -324,10 +324,17 @@ for (const reviewed of process.env.MEDIFLOW_VISIT_MAC_TRIAL ? [false] : [false, 
             && response.request().method() === 'POST' && response.request().postDataJSON().visitId === concurrentId);
         await page.getByRole('button', { name: 'Applica tutte le visite senza dubbi', exact: true }).click();
         expect((await rejected).status()).toBe(409);
-        const applicationError = page.getByRole('alert').filter({ hasText: 'La visita non è stata applicata. Rileggi la cassetta.' });
+        const rejection = 'La visita non è stata applicata. Rileggi la cassetta.';
+        const applicationError = concurrentVisit.getByRole('alert').filter({ hasText: rejection });
         await expect(applicationError).toBeVisible();
-        await page.getByRole('button', { name: 'Aggiorna', exact: true }).click();
+        const summary = page.getByRole('status').filter({ hasText: '2 applicate, 2 restano' });
+        await expect(summary.getByText('1 · ' + rejection, { exact: true })).toBeVisible();
+        const refresh = page.getByRole('button', { name: 'Aggiorna', exact: true });
+        await refresh.click();
+        await expect(refresh).toBeEnabled();
         await expect(applicationError).toBeVisible();
+        await expect(concurrentVisit.getByRole('button', { name: 'Applica la visita', exact: true })).toHaveAccessibleDescription(rejection);
+        await expect(doubtfulVisit.getByText(rejection, { exact: true })).toHaveCount(0);
         await expect.poll(counts).toEqual([2, 4, 2, 2]);
         expect(batchOrder).toEqual([visitId, concurrentId, secondVisitId]);
         expect(plainBodies.map(body => JSON.parse(body).visitId)).toEqual(batchOrder);
@@ -346,6 +353,7 @@ for (const reviewed of process.env.MEDIFLOW_VISIT_MAC_TRIAL ? [false] : [false, 
         expect(applied.appliedItemIds).toHaveLength(7);
         const notApplied = await (await documentRequests(page).get('/api/agent-mandates/incoming?visit=' + doubtfulId)).json();
         expect(notApplied.appliedItemIds).toEqual([]);
+        await applicationError.scrollIntoViewIfNeeded();
         await page.screenshot({ path: info.outputPath('proposte-applicate-dopo-conferma.png'), fullPage: true });
     }
 });
@@ -413,7 +421,7 @@ test('a kit visit creates the missing chart at review while mismatched and mixed
     const mixed = await deposit(['Paziente CF: ' + fiscalCode, 'Paziente CF: ' + anotherCf], false);
     await page.getByRole('complementary', { name: 'MediFlow', exact: true }).getByRole('link', { name: 'Da decidere' }).click();
     const region = (id: string) => page.getByRole('region', { name: 'Visita ' + id });
-    const apply = (id: string) => region(id).getByRole('button', { name: 'Applica la visita', exact: true });
+    const apply = (id: string) => region(id).getByRole('button', { name: 'Crea scheda e applica la visita', exact: true });
     for (const id of [wrong, mixed]) {
         await expect(region(id).getByText('Da verificare', { exact: true })).toBeVisible();
         await expect(apply(id)).toBeDisabled();
@@ -422,12 +430,14 @@ test('a kit visit creates the missing chart at review while mismatched and mixed
     try {
         const charts = () => database.prepare('SELECT id, tax_code, birth_date FROM patients WHERE tax_code = ?').all(fiscalCode);
         expect(charts()).toEqual([]);
+        await expect(apply(good)).toBeDisabled();
+        await region(good).getByLabel('Nome', { exact: true }).fill('Persona');
+        await region(good).getByLabel('Cognome', { exact: true }).fill('Sintetica');
         await expect(apply(good)).toBeEnabled();
-        await expect(region(good).getByText('Pronta da applicare', { exact: true })).toBeVisible();
         await page.screenshot({ path: info.outputPath('visite-sintetiche-prima.png'), fullPage: true });
-        await page.getByRole('button', { name: 'Applica tutte le visite senza dubbi', exact: true }).click();
+        await apply(good).click();
         await expect(region(good)).toHaveCount(0);
-        for (const id of [wrong, mixed]) await expect(apply(id)).toBeDisabled();
+        for (const id of [wrong, mixed]) await expect(region(id).getByRole('button', { name: 'Applica la visita', exact: true })).toBeDisabled();
         const [created] = charts() as Array<{ id: string }>;
         expect(charts()).toEqual([{ id: created.id, tax_code: fiscalCode, birth_date: Date.UTC(1980, 0, 1) / 1000 }]);
         const id = created.id;

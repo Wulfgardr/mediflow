@@ -1,9 +1,15 @@
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { stageWindowsDocumentChild } from './document-windows-sandbox.mjs';
+import { seatbeltProfile } from './seatbelt-profile.mjs';
 export const DOCUMENT_CHILD_HEAP_MB = 256;
 export const DOCUMENT_CHILD_DATA_BYTES = 1024 * 1024 * 1024;
 const documentEnvironment = Object.freeze({ NODE_ENV: 'production', NAPI_RS_ENFORCE_VERSION_CHECK: '1' });
+
+/** The document reader may run only its own Node executable. @param {string} executable */
+export function documentChildSandboxProfile(executable) {
+  return seatbeltProfile({ rules: '(deny network*) (deny file-write*) (deny process-fork)', programs: [executable] });
+}
 
 /** @param {string} root
  * @param {string} script
@@ -28,8 +34,7 @@ export function documentChildLaunch(root, script, { allowAddons = false, args = 
   if (windows) return { ...windows.launch(nodeArgs), env: windowsEnv };
   const executable = process.execPath;
   if (process.platform === 'darwin') {
-    const profile = '(version 1) (allow default) (deny network*) (deny file-write*) (deny process-fork)';
-    return { command: '/usr/bin/sandbox-exec', args: ['-p', profile, executable, ...nodeArgs], cleanup: undefined, env };
+    return { command: '/usr/bin/sandbox-exec', args: ['-p', documentChildSandboxProfile(executable), executable, ...nodeArgs], cleanup: undefined, env };
   }
   if (process.platform === 'linux') {
     const networkNamespace = process.arch === 'arm64'

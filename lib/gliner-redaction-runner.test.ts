@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
-import { createGlinerRedactionRunner, decodeGlinerEntities, GLINER_REDACTION_REVISION } from './gliner-redaction-runner';
+import { createGlinerRedactionRunner, decodeGlinerEntities, GLINER_REDACTION_REVISION, glinerSandboxProfile } from './gliner-redaction-runner';
 
 test('converts Unicode code points, preserving exact source text and canonical types', () => {
     const text = '😀 Maria Rossi';
@@ -95,4 +95,37 @@ test('canonical worker rejects a changed model before loading or inference', { s
     const runner = createGlinerRedactionRunner({ pythonExecutable: '/usr/bin/python3', workerPath: path.join(process.cwd(), 'scripts/gliner-redaction-worker.py'), modelDirectory: root });
     try { await assert.rejects(runner.extract('Sintetico'), /local_redaction_unavailable/); }
     finally { await runner.close(); rmSync(root, { recursive: true, force: true }); }
+});
+
+test('Mac runner denies file writes and launching other programs under its Seatbelt profile', { skip: process.platform !== 'darwin' }, async () => {
+    const scratch = realpathSync(mkdtempSync(path.join(os.tmpdir(), 'mediflow-gliner-escape-')));
+    const marker = path.join(scratch, 'written.txt');
+    const profile = glinerSandboxProfile('/usr/bin/python3');
+    assert.match(profile, /\(deny process-exec\)/u);
+    assert.match(profile, /\(deny lsopen\)/u);
+    assert.match(profile, /\(deny appleevent-send\)/u);
+    const owned = fixture(`import os, subprocess
+denied = 0
+try:
+ open(${JSON.stringify(marker)}, 'w').write('x')
+except PermissionError:
+ denied += 1
+for cmd in [['/usr/bin/open', '--help'], ['/bin/sh', '-c', 'exit 0']]:
+ try:
+  subprocess.run(cmd)
+ except PermissionError:
+  denied += 1
+if denied == 3:
+ print(json.dumps({'ready':'${GLINER_REDACTION_REVISION}'}), flush=True)
+else:
+ print(json.dumps({'error':'not_denied', 'denied': denied}), flush=True)
+request = json.loads(sys.stdin.readline())
+print(json.dumps({'id': request['id'], 'entities': {}}), flush=True)`);
+    try {
+        assert.deepEqual(await owned.runner.extract('Sintetico'), []);
+        assert.equal(existsSync(marker), false);
+    } finally {
+        await owned.cleanup();
+        rmSync(scratch, { recursive: true, force: true });
+    }
 });

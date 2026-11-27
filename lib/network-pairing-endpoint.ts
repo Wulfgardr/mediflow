@@ -1,9 +1,10 @@
 import 'server-only';
 import { X509Certificate } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import { hostname, networkInterfaces } from 'node:os';
+import { hostname } from 'node:os';
 import { connect } from 'node:tls';
 import { resolveDataPath } from './data-dir';
+import { readPairingAddress } from './network-pairing-address';
 
 export type NetworkPairingEndpoint = { origin: string; fingerprint: string; computer: string };
 
@@ -28,17 +29,16 @@ export async function readNetworkPairingEndpoint(displayName?: string): Promise<
         if (typeof port !== 'number' || !Number.isInteger(port) || port < 1 || port > 65535
             || typeof certPath !== 'string' || typeof bindHost !== 'string') return null;
 
-        const addresses = Object.entries(networkInterfaces()).sort(([a], [b]) => a.localeCompare(b))
-            .flatMap(([, entries]) => entries ?? [])
-            .filter(address => address.family === 'IPv4' && !address.internal && !address.address.startsWith('169.254.'))
-            .map(address => address.address)
-            .filter(address => bindHost === '0.0.0.0' || bindHost === '::' || bindHost === address);
-        if (!addresses.length) return null;
+        const address = await readPairingAddress(bindHost);
+        if (!address) return null;
 
         const certificate = new X509Certificate(await readFile(certPath));
         const fingerprint = certificate.fingerprint256.replaceAll(':', '').toLowerCase();
-        const address = addresses[0];
-        const probeHost = bindHost === '0.0.0.0' ? '127.0.0.1' : bindHost === '::' ? '::1' : address;
+        const probeHost = descriptor.loopbackProbe === true || bindHost === '0.0.0.0'
+            ? '127.0.0.1'
+            : bindHost === '::'
+                ? '::1'
+                : address;
         await presentsCertificate(probeHost, port, fingerprint);
         const computer = (displayName?.trim() || hostname()).replace(/[^\p{L}\p{N} ._-]/gu, '').slice(0, 63).trim() || 'MediFlow';
         return { origin: new URL(`https://${address}:${port}`).origin, fingerprint, computer };

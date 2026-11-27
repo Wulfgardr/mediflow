@@ -21,7 +21,7 @@ fixture.seedComposition();
 const { createAgentMandateStore } = await import('./agent-mandate-store.ts');
 const { createAgentPairingStore } = await import('./agent-pairing-store.ts');
 const { createAgentCassetteStore, readAgentCassette, readAgentCassetteIndex } = await import('./agent-cassette-store.ts');
-const { applyAgentVisit, agentAppliedItemIds, applyConfirmedAgentVisit, agentConfirmationPatientState, hasAgentVisitConfirmationReceipt } = await import('./agent-visit-application.ts');
+const { applyAgentVisit, agentAppliedItemIds, agentDiscardedItemIds, agentCorrectedItemIds, decideAgentVisitItem, discardAgentVisit, applyConfirmedAgentVisit, agentConfirmationPatientState, hasAgentVisitConfirmationReceipt } = await import('./agent-visit-application.ts');
 const { archiveGenerationForSession } = await import('./security/archive-session-generation.ts');
 const { readBackupAuditRows, canonicalizeBackupAuditRows } = await import('./backup-audit.ts');
 const database = dbServer.$client;
@@ -33,10 +33,11 @@ const snapshot = () => tables.map(table => database.prepare(`SELECT * FROM ${tab
 const version = () => (database.prepare('SELECT version FROM patients WHERE id=?').get(fixture.patientId) as { version: number }).version;
 test.after(() => { database.close(); rmSync(directory, { recursive: true, force: true }); });
 
-async function visit(provider: AgentMandateInput['provider'] = 'local', allowsClinicalEgress = false) {
+async function visit(provider: AgentMandateInput['provider'] = 'local', allowsClinicalEgress = false, content: 'all' | 'note' | 'transcription' | 'open' = 'all', depositTime = Date.now()) {
     const keys = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
     const publicKey = agentBase64(new Uint8Array(await crypto.subtle.exportKey('raw', keys.publicKey)));
-    const mandates = createAgentMandateStore(database), pairings = createAgentPairingStore(database), store = createAgentCassetteStore(database);
+    const now = () => depositTime;
+    const mandates = createAgentMandateStore(database, now), pairings = createAgentPairingStore(database, now), store = createAgentCassetteStore(database, now);
     const generation = archiveGenerationForSession(fixture.session)!;
     const mandate = mandates.create({ id: randomUUID(), durationMs: 43200000, operations: [...AGENT_OPERATIONS], provider, allowsClinicalEgress,
         publicKey, wrappedPrivateKey: 'ENC:' + 'A'.repeat(16) + ':' + 'A'.repeat(64) }, fixture.session.userId, generation);
@@ -51,7 +52,7 @@ async function visit(provider: AgentMandateInput['provider'] = 'local', allowsCl
     const file = await sealPatientDocumentFile(new TextEncoder().encode('%PDF-1.4\nSYNTHETIC_APPLICATION\n%%EOF'), key);
     file.fileKey.fill(0);
     const note = { title: await field('Nota sintetica'), content: await field('SYNTHETIC_APPLICATION'), metadata: await field({ synthetic: true }), date: '2026-11-17' };
-    const items: AgentApplicationInput['items'] = [
+    const allItems: AgentApplicationInput['items'] = [
         { id: randomUUID(), kind: 'note', values: note },
         { id: randomUUID(), kind: 'transcription', values: { ...note, title: await field('Trascrizione sintetica') } },
         { id: randomUUID(), kind: 'pdf', values: { name: await field('synthetic.pdf'), data: file.data, size: 45 } },
@@ -63,12 +64,14 @@ async function visit(provider: AgentMandateInput['provider'] = 'local', allowsCl
         { id: randomUUID(), kind: 'exemption', values: { exemptions: await field(['SYNTHETIC']) } },
         { id: randomUUID(), kind: 'observation', values: { codeSystem: 'LOINC', code: 'SYNTHETIC', display: 'Osservazione sintetica', unitSystem: 'UCUM', unitCode: '1', value: '1', observedAt: '2026-11-17', notes: await field('Fonte sintetica') } },
     ];
+    const items = content === 'all' ? allItems : allItems.filter(item => item.kind === (content === 'open' ? 'note' : content));
     const operations = { note: 'visita.nota', pdf: 'visita.allega', therapy: 'visita.proponi.terapia', service: 'visita.proponi.prestazione', diagnosis: 'visita.proponi.diagnosi', exemption: 'visita.proponi.esenzione', observation: 'visita.proponi.osservazione', transcription: 'visita.trascrizione' } as const;
     for (const item of items) receipt = database.transaction(() => store.add(principal, id, receipt.revision, {
         id: item.id, kind: item.kind, envelope: seal(item.id, item.kind), byteLength: new TextEncoder().encode(JSON.stringify({ text: 'SYNTHETIC_APPLICATION' })).length,
         documentHash: item.kind === 'pdf' ? 'a'.repeat(64) : null,
     })).immediate();
-    receipt = database.transaction(() => store.close(principal, id, receipt.revision)).immediate();
+    const close = () => database.transaction(() => store.close(principal, id, receipt.revision)).immediate();
+    if (content !== 'open') receipt = close();
     function prepareCorrection() {
         const replacement = randomUUID();
         const bytes = new TextEncoder().encode(JSON.stringify({ text: 'SYNTHETIC_APPLICATION_CORRECTION' }));
@@ -81,7 +84,7 @@ async function visit(provider: AgentMandateInput['provider'] = 'local', allowsCl
         })).immediate();
         return { replacement, close: () => database.transaction(() => store.close(principal, replacement, staged.revision)).immediate() };
     }
-    return { id, mandate, mandates, principal, operations, prepareCorrection,
+    return { id, mandate, mandates, principal, operations, prepareCorrection, close,
         whole(): AgentApplicationInput { return { visitId: id, phase: 'review', patientId: fixture.patientId, expectedVersion: version(), cassetteRevision: receipt.revision, items }; } };
 }
 
@@ -151,15 +154,40 @@ test('review before the corrected deposit closes prevents the replacement; revie
     assert.throws(() => applyAgentVisit(request, fixture.session, oldPlan), /AGENT_APPLICATION_DENIED/);
     assert.deepEqual(snapshot(), afterCorrection);
 });
-test('a stale patient revision or a revoked mandate applies nothing and leaves the cassette recoverable', async () => {
-    const f = await visit(), stale = { ...f.whole(), expectedVersion: version() - 1 }, before = snapshot();
-    assert.throws(() => applyAgentVisit(request, fixture.session, stale));
+test('a closed deposit survives expiry and revocation of its mandate with its original audit provenance', async () => {
+    const f = await visit('local', false, 'all', Date.now() - 86400000);
+    const stale = { ...f.whole(), expectedVersion: version() - 1 };
+    const before = snapshot();
+    assert.throws(() => applyAgentVisit(request, fixture.session, stale), /AGENT_APPLICATION_DENIED/);
     assert.deepEqual(snapshot(), before);
-    f.mandates.revoke(f.mandate.id, fixture.session.userId, f.mandate.archiveGeneration);
-    const revoked = snapshot();
-    assert.throws(() => applyAgentVisit(request, fixture.session, f.whole()));
-    assert.deepEqual(snapshot(), revoked);
-    assert.equal(agentAppliedItemIds(f.id).length, 0);
+    assert.ok(readAgentCassetteIndex(database, fixture.session.userId, null).visits.some(row => row.id === f.id));
+    createAgentMandateStore(database).revoke(f.mandate.id, fixture.session.userId, f.mandate.archiveGeneration);
+    const input = f.whole();
+    const receipt = applyAgentVisit(request, fixture.session, input);
+    assert.equal(receipt.status, 'applied');
+    const after = snapshot();
+    assert.deepEqual(database.prepare('SELECT actor_ref, proposer_ref, mandate_ref FROM audit_events WHERE event_id=?').get(receipt.eventId),
+        { actor_ref: fixture.session.userId, proposer_ref: f.principal.agentRef, mandate_ref: f.mandate.id });
+    assert.equal(applyAgentVisit(request, fixture.session, input).eventId, receipt.eventId);
+    assert.deepEqual(snapshot(), after);
+});
+
+test('application requires a closed audit receipt, a current admin session and a non-revoked agent', async () => {
+    const f = await visit();
+    const before = snapshot();
+    for (const session of [{ ...fixture.session, role: 'viewer' as const }, { ...fixture.session, expiresAt: Date.now() - 1 },
+        { ...fixture.session, id: 'synthetic-unbound-session' }]) {
+        assert.throws(() => applyAgentVisit(request, session, f.whole()), /AGENT_APPLICATION_DENIED/);
+    }
+    assert.deepEqual(snapshot(), before);
+    database.prepare('UPDATE agent_clients SET revoked_at=? WHERE id=?').run(Date.now(), f.principal.agentRef);
+    assert.throws(() => applyAgentVisit(request, fixture.session, f.whole()), /AGENT_APPLICATION_DENIED/);
+    const unaudited = await visit();
+    const otherId = randomUUID();
+    database.prepare('UPDATE agent_cassettes SET id=? WHERE id=?').run(otherId, unaudited.id);
+    const after = snapshot();
+    assert.throws(() => applyAgentVisit(request, fixture.session, { ...unaudited.whole(), visitId: otherId }), /AGENT_APPLICATION_DENIED/);
+    assert.deepEqual(snapshot(), after);
 });
 
 test('failure of every audit position rolls back the whole review and its consumption receipts', async () => {
@@ -225,16 +253,17 @@ test('native approval commits and audits exactly one plan, and a valid proof can
     assert.deepEqual(snapshot(), after);
 });
 
-test('a new chart, its membership and all visit items commit together within the reviewed ambulatory', async () => {
-    const f = await visit();
+test('a note-only visit and the named new chart commit together within the reviewed ambulatory', async () => {
+    const f = await visit('local', false, 'note');
     const ambulatoryId = 'synthetic-visit-clinic';
     const other = 'synthetic-other-clinic';
     database.prepare('INSERT INTO ambulatories (id, name) VALUES (?, ?)').run(ambulatoryId, 'Ambulatorio sintetico');
     database.prepare('INSERT INTO ambulatories (id, name) VALUES (?, ?)').run(other, 'Altro ambulatorio sintetico');
-    const newPatient = { ambulatoryId, taxCode: 'RSSMRA80A01F205X', birthDate: '1980-01-01' };
+    const newPatient = { ambulatoryId, taxCode: 'RSSMRA80A01F205X', firstName: 'Ada', lastName: 'Sintetica', birthDate: '1980-01-01' };
     const plan = { ...f.whole(), patientId: f.id, expectedVersion: 1, newPatient };
     const before = snapshot();
     for (const [input, scope] of [[plan, other], [{ ...plan, patientId: fixture.patientId }, ambulatoryId],
+        [{ ...plan, newPatient: { ...newPatient, firstName: '  ' } }, ambulatoryId],
         [{ ...plan, newPatient: { ...newPatient, birthDate: '1980-02-01' } }, ambulatoryId]] as const) {
         assert.throws(() => applyAgentVisit(request, fixture.session, input, scope), /AGENT_APPLICATION_DENIED/);
         assert.deepEqual(snapshot(), before);
@@ -250,12 +279,101 @@ test('a new chart, its membership and all visit items commit together within the
     const receipt = applyAgentVisit(request, fixture.session, plan, ambulatoryId);
     const updated = snapshot();
     assert.equal(receipt.status, 'applied');
-    assert.deepEqual(added(updated, before), [2, 2, 1, 1, 2, 1]);
+    assert.deepEqual(added(updated, before), [1, 0, 0, 0, 0, 0]);
+    assert.deepEqual(database.prepare('SELECT first_name, last_name, tax_code FROM patients WHERE id=?').get(f.id),
+        { first_name: newPatient.firstName, last_name: newPatient.lastName, tax_code: newPatient.taxCode });
     const membership = database.prepare('SELECT ambulatory_id AS id FROM patients_to_ambulatories WHERE patient_id = ?').all(f.id);
     assert.deepEqual(membership, [{ id: ambulatoryId }]);
     assert.equal(applyAgentVisit(request, fixture.session, plan, ambulatoryId).eventId, receipt.eventId);
-    const duplicate = await visit(), duplicatePlan = { ...duplicate.whole(), patientId: duplicate.id, expectedVersion: 1, newPatient };
+    const duplicate = await visit('local', false, 'transcription'), duplicatePlan = { ...duplicate.whole(), patientId: duplicate.id, expectedVersion: 1, newPatient };
     const beforeDuplicate = snapshot();
     assert.throws(() => applyAgentVisit(request, fixture.session, duplicatePlan, ambulatoryId), /AGENT_APPLICATION_DENIED/);
     assert.deepEqual(snapshot(), beforeDuplicate);
+    assert.equal(applyAgentVisit(request, fixture.session, { ...duplicatePlan, newPatient: { ...newPatient, taxCode: 'RSSMRA85T10A562S', birthDate: null } }, ambulatoryId).status, 'applied');
+});
+
+test('a new chart commits the retained and discarded decisions together, or rolls all of them back', async () => {
+    const f = await visit();
+    const ambulatoryId = 'synthetic-visit-decisions-clinic';
+    database.prepare('INSERT INTO ambulatories (id, name) VALUES (?, ?)').run(ambulatoryId, 'Ambulatorio sintetico');
+    const newPatient = { ambulatoryId, taxCode: 'RSSMRA90B02F839C', firstName: 'Ada', lastName: 'Sintetica', birthDate: null };
+    const whole = f.whole();
+    const items = whole.items.filter(item => item.kind === 'note' || item.kind === 'therapy');
+    const omitted = whole.items.filter(item => item.kind !== 'note' && item.kind !== 'therapy');
+    const decisions = whole.items.map(({ id, kind }) => ({ itemId: id, decision: kind === 'note' ? 'keep' : kind === 'therapy' ? 'correct' : 'discard' }));
+    const plan = { ...whole, patientId: f.id, expectedVersion: 1, newPatient, items, decisions };
+    const before = snapshot();
+    for (const denied of [
+        { ...plan, decisions: decisions.slice(1, -1) },
+        { ...plan, decisions: [...decisions, decisions[0]] },
+        { ...plan, decisions: [...decisions.slice(0, -1), { itemId: randomUUID(), decision: 'discard' }] },
+        { ...plan, items: items.filter(item => item.kind === 'therapy'), decisions: decisions.map(decision => decision.decision === 'keep'
+            ? { ...decision, decision: 'discard' } : decision) },
+        { ...whole, decisions: [{ itemId: whole.items[0]!.id, decision: 'correct' }] },
+    ]) {
+        assert.throws(() => applyAgentVisit(request, fixture.session, denied, ambulatoryId), /AGENT_APPLICATION_DENIED/);
+        assert.deepEqual(snapshot(), before);
+    }
+    const apply = () => applyAgentVisit(request, fixture.session, plan, ambulatoryId);
+    database.exec("CREATE TRIGGER synthetic_discard_audit_fault BEFORE INSERT ON audit_events WHEN NEW.event_type='agent.item.discarded' BEGIN SELECT RAISE(ABORT, 'SYNTHETIC_DISCARD_AUDIT_FAULT'); END");
+    try {
+        assert.throws(apply, /SYNTHETIC_DISCARD_AUDIT_FAULT/);
+        assert.deepEqual(snapshot(), before);
+    } finally { database.exec('DROP TRIGGER synthetic_discard_audit_fault'); }
+
+    const receipt = apply(), after = snapshot();
+    assert.equal(receipt.itemCount, 2);
+    assert.equal(receipt.discardedItemCount, omitted.length);
+    assert.deepEqual(added(after, before), [1, 0, 1, 0, 0, 0]);
+    assert.equal((after[6]?.length ?? 0) - (before[6]?.length ?? 0), 1);
+    assert.equal((after[8]?.length ?? 0) - (before[8]?.length ?? 0), 1);
+    assert.deepEqual(agentDiscardedItemIds(f.id).sort(), omitted.map(item => item.id).sort());
+    assert.deepEqual(agentCorrectedItemIds(f.id), [items[1]!.id]);
+    assert.equal(readAgentCassetteIndex(database, fixture.session.userId, null).visits.some(row => row.id === f.id), false);
+    assert.deepEqual(apply(), receipt);
+    assert.throws(() => discardAgentVisit(fixture.session, { visitId: f.id, cassetteRevision: whole.cassetteRevision, decision: 'discard_visit' }));
+    assert.deepEqual(snapshot(), after);
+});
+
+test('discarding a visit closes only its pending items and denies a later clinical write', async () => {
+    const f = await visit(), whole = f.whole();
+    const kept = whole.items[0]!;
+    decideAgentVisitItem(request, fixture.session, { visitId: f.id, cassetteRevision: whole.cassetteRevision, decision: 'keep',
+        item: kept, patientId: whole.patientId, expectedVersion: whole.expectedVersion });
+    const confirmed = { visitId: f.id, cassetteRevision: whole.cassetteRevision, decision: 'discard_visit' };
+    const before = snapshot();
+    assert.throws(() => discardAgentVisit(fixture.session, { ...confirmed, cassetteRevision: whole.cassetteRevision - 1 }), /AGENT_APPLICATION_DENIED/);
+    assert.throws(() => discardAgentVisit({ ...fixture.session, role: 'viewer' }, confirmed), /AGENT_APPLICATION_DENIED/);
+    assert.throws(() => discardAgentVisit({ ...fixture.session, userId: 'synthetic-other-actor' }, confirmed), /AGENT_APPLICATION_DENIED/);
+    assert.deepEqual(snapshot(), before);
+
+    database.exec("CREATE TRIGGER synthetic_visit_discard_fault BEFORE INSERT ON audit_events WHEN NEW.event_type='agent.visit.discarded' BEGIN SELECT RAISE(ABORT, 'SYNTHETIC_VISIT_DISCARD_FAULT'); END");
+    try {
+        assert.throws(() => discardAgentVisit(fixture.session, confirmed), /SYNTHETIC_VISIT_DISCARD_FAULT/);
+        assert.deepEqual(snapshot(), before);
+    } finally { database.exec('DROP TRIGGER synthetic_visit_discard_fault'); }
+
+    database.prepare('UPDATE agent_clients SET revoked_at=? WHERE id=?').run(Date.now(), f.principal.agentRef);
+    const receipt = discardAgentVisit(fixture.session, confirmed), after = snapshot();
+    assert.deepEqual(added(after, before), [0, 0, 0, 0, 0, 0]);
+    assert.deepEqual(after[6], before[6]);
+    assert.deepEqual(agentAppliedItemIds(f.id), [kept.id]);
+    assert.equal(agentDiscardedItemIds(f.id).length, whole.items.length - 1);
+    assert.deepEqual(database.prepare('SELECT event_type AS type, actor_ref AS actor, mandate_ref AS mandate FROM audit_events WHERE event_id=?')
+        .get(receipt.eventId), { type: 'agent.visit.discarded', actor: fixture.session.userId, mandate: f.mandate.id });
+    assert.equal(readAgentCassetteIndex(database, fixture.session.userId, null).visits.some(row => row.id === f.id), false);
+    assert.throws(() => applyAgentVisit(request, fixture.session, { ...whole, expectedVersion: version(), items: whole.items.slice(1) }), /AGENT_APPLICATION_DENIED/);
+    assert.deepEqual(discardAgentVisit(fixture.session, confirmed), receipt);
+    assert.deepEqual(snapshot(), after);
+});
+
+test('discard wins against a delayed close of the same open visit', async () => {
+    const f = await visit('local', false, 'open');
+    const { cassetteRevision } = f.whole();
+    const receipt = discardAgentVisit(fixture.session, { visitId: f.id, cassetteRevision, decision: 'discard_visit' });
+    const after = snapshot();
+    assert.throws(f.close, /AGENT_CASSETTE_DENIED/);
+    assert.deepEqual(snapshot(), after);
+    assert.equal(readAgentCassetteIndex(database, fixture.session.userId, null).visits.some(row => row.id === f.id), false);
+    assert.equal(discardAgentVisit(fixture.session, { visitId: f.id, cassetteRevision, decision: 'discard_visit' }).eventId, receipt.eventId);
 });

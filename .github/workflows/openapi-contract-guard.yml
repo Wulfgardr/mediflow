@@ -110,6 +110,26 @@ jobs:
         run: |
           npm run test:ci-guards-wired
           npm run check:ci-guards-wired
+      - name: Seatbelt profile guard and tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          npm run test:seatbelt-profiles
+          npm run check:seatbelt-profiles
+      - name: Public sanitization guard and tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          npm run test:public-sanitization
+          npm run check:public-sanitization
+      - name: Public sanitization guard on PR metadata and commits
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && github.event_name == 'pull_request' }}
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          printf '%s\n%s\n' "$PR_TITLE" "$PR_BODY" | node scripts/check-public-sanitization.mjs --stdin --label pull-request-metadata
+          git log --format='%B' "${BASE_SHA}..${HEAD_SHA}" | node scripts/check-public-sanitization.mjs --stdin --label pull-request-commits
       - name: Dossier conformance corpus drift guard and tests
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: |

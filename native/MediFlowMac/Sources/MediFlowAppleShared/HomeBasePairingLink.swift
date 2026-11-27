@@ -63,25 +63,26 @@ struct HomeBasePairingLink: Equatable, Sendable {
     }
 
     @MainActor
-    func redeem() async throws -> HomeBasePairingConnection {
+    func redeem(sessionConfiguration: URLSessionConfiguration? = nil) async throws -> HomeBasePairingConnection {
         #if os(macOS)
-        if let host = origin.host, !HomeBaseConnectionConfiguration.isLoopbackHost(host),
+        if sessionConfiguration == nil,
+           let host = origin.host, !HomeBaseConnectionConfiguration.isLoopbackHost(host),
            Host.current().addresses.contains(host),
            var local = URLComponents(url: origin, resolvingAgainstBaseURL: false) {
             local.host = "127.0.0.1"
             if let loopback = local.url {
                 do {
-                    return try await redeem(at: loopback)
+                    return try await redeem(at: loopback, sessionConfiguration: nil)
                 } catch let error as URLError where error.code == .cannotConnectToHost {
                 }
             }
         }
         #endif
-        return try await redeem(at: origin)
+        return try await redeem(at: origin, sessionConfiguration: sessionConfiguration)
     }
 
     @MainActor
-    private func redeem(at server: URL) async throws -> HomeBasePairingConnection {
+    private func redeem(at server: URL, sessionConfiguration: URLSessionConfiguration?) async throws -> HomeBasePairingConnection {
         #if os(iOS)
         let isPad = UIDevice.current.userInterfaceIdiom == .pad
         let platform = isPad ? "ipados" : "ios"
@@ -92,11 +93,14 @@ struct HomeBasePairingLink: Equatable, Sendable {
         #endif
         let payload = Claim(offerId: offerID, secret: secret, deviceName: deviceName, clientPlatform: platform)
         let delegate = HomeBaseTLSSessionDelegate(expectedPin: fingerprint, rejectsRedirects: true)
-        let configuration = URLSessionConfiguration.ephemeral
-        configuration.httpShouldSetCookies = false
-        configuration.urlCredentialStorage = nil
-        configuration.timeoutIntervalForRequest = 8
-        configuration.timeoutIntervalForResource = 12
+        let configuration = sessionConfiguration ?? {
+            let ephemeral = URLSessionConfiguration.ephemeral
+            ephemeral.httpShouldSetCookies = false
+            ephemeral.urlCredentialStorage = nil
+            ephemeral.timeoutIntervalForRequest = 8
+            ephemeral.timeoutIntervalForResource = 12
+            return ephemeral
+        }()
         let session = URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
         defer { session.invalidateAndCancel() }
 

@@ -6,9 +6,9 @@
   "applyPolicy": "none",
   "writesPerformed": 0,
   "sources": {
-    "adr0100": { "ref": "54b56c2bb4a9eb1bd76f198fc58457ebd7623e5b:docs/adr/0100-fabric-vs-headless-semantic-plane.md", "gitBlob": "e9abf64d566ff54d7d767f03580ea911bc6ef32e" },
-    "headlessInventory": { "ref": "a26141e406bd6a33e5c204b8a8d3c53a74176ab5:docs/capability-mapping/headless-plane-inventory.v1.json", "gitBlob": "8ef68abef78170a61d7b8b5b0e43267d0ac038e6", "expectedCount": 66 },
-    "fabricInventory": { "ref": "a26141e406bd6a33e5c204b8a8d3c53a74176ab5:docs/capability-mapping/fabric-plane-inventory.v1.json", "gitBlob": "13eaff27d01b8769320316f39181c83dfb924bab", "expectedCount": 16 }
+    "adr0100": { "ref": "b168baff06ba36c997966b5715a43d7efe356888:docs/adr/0100-fabric-vs-headless-semantic-plane.md", "gitBlob": "e9abf64d566ff54d7d767f03580ea911bc6ef32e" },
+    "headlessInventory": { "ref": "39b9c7a6ac0e0bd85dd38046f1e5b229ba81263b:docs/capability-mapping/headless-plane-inventory.v1.json", "gitBlob": "8ef68abef78170a61d7b8b5b0e43267d0ac038e6", "expectedCount": 66 },
+    "fabricInventory": { "ref": "39b9c7a6ac0e0bd85dd38046f1e5b229ba81263b:docs/capability-mapping/fabric-plane-inventory.v1.json", "gitBlob": "13eaff27d01b8769320316f39181c83dfb924bab", "expectedCount": 16 }
   },
   "intentAdapters": [
     { "kind": "chat", "role": "input_only", "authority": "none" },

@@ -122,8 +122,13 @@ riservata dei segnaposto fa fallire la lettura con `query_unavailable`.
 ## Limiti che restano
 
 - I nomi di terzi che non sono in anagrafica passano nei testi liberi, perché
-  qui non c'è il livello neurale. Passa anche una parte del nome del caregiver
-  quando il testo non lo riporta come nel campo.
+  qui non c'è il livello neurale. Il 26/11/2026 Leonardo ha accettato questo
+  limite per la 0.9.1. Il medico lo legge in Scheda paziente → Azioni →
+  Accesso assistente, quando sceglie «Solo note» o «Profilo completo e note»,
+  prima di premere «Conferma e attiva assistente». Il pannello è condiviso con
+  Mini. La frase riguarda la chat collegata.
+- Può passare anche una parte del nome del caregiver quando il testo non
+  lo riporta come nel campo.
 - L'età non esce: aggiungerla cambierebbe il contratto dei quindici campi. È il
   passo successivo, se la chat ne ha bisogno.
 - È pseudonimizzazione, non anonimizzazione: il contesto clinico può bastare a
@@ -143,5 +148,4 @@ riservata dei segnaposto fa fallire la lettura con `query_unavailable`.
 ## Fuori da questa decisione
 
 Il rimescolatore stesso, il canale degli agenti e la cassetta, la corsia
-ChatGPT, il worker GLiNER e lo schema del database. Il testo del consenso non
-cambia: non dice che escono dati identificativi e vale anche per Mini.
+ChatGPT, il worker GLiNER e lo schema del database.

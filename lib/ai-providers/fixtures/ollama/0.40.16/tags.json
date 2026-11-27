@@ -1,0 +1,26 @@
+{
+ "models": [
+  {
+   "name": "qwen3.5:35b-a3b",
+   "model": "qwen3.5:35b-a3b",
+   "modified_at": "2026-11-07T23:19:01.34+01:00",
+   "size": 21909194238,
+   "digest": "26025611beeb3fe9e4850b1fdae686bebba7cdfa7f13ddb04955f19872ee022a",
+   "details": {
+    "parent_model": "",
+    "format": "safetensors",
+    "family": "",
+    "families": null,
+    "parameter_size": "",
+    "quantization_level": "nvfp4",
+    "runner": "mlx"
+   },
+   "capabilities": [
+    "completion",
+    "vision",
+    "thinking",
+    "tools"
+   ]
+  }
+ ]
+}

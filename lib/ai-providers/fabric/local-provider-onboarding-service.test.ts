@@ -318,13 +318,31 @@ test('versione non ammessa conserva i dettagli e non ammette il provider', async
     await assert.rejects(f.service.activate((await f.service.inspect()).revision), error => {
         assert.ok(error instanceof LocalProviderOnboardingError);
         assert.equal(error.code, 'provider_version_unsupported');
-        assert.deepEqual(error.versionMismatch, { serverVersion: '0.41.0', supportedVersions: '0.32.x, 0.33.3, 0.34.2, 0.40.4, 0.40.5, 0.40.6, 0.40.16, 0.40.18' });
+        assert.deepEqual(error.versionMismatch, { serverVersion: '0.41.0', supportedVersions: '0.32.x, 0.33.3, 0.34.2, 0.40.4, 0.40.5, 0.40.6, dalla 0.40.16 in poi nella serie 0.40' });
         return true;
     });
     assert.deepEqual(paths, ['/api/version']);
     assert.equal(f.lifecycle.service.read().status, 'denied');
 });
 
+test('campo sconosciuto conserva il dettaglio e non ammette il provider', async context => {
+    const paths: string[] = [];
+    context.mock.method(globalThis, 'fetch', async (input: string | URL | Request) => {
+        const pathname = new URL(String(input)).pathname; paths.push(pathname);
+        if (pathname === '/api/version') return Response.json({ version: '0.40.25' });
+        return Response.json({ models: [{ name: 'synthetic-local', model: 'synthetic-local', size: 1, digest: 'a'.repeat(64), cloud_route: 'remote' }] });
+    });
+    const f = fixture(attestLocalOllamaModel);
+    await assert.rejects(f.service.activate((await f.service.inspect()).revision), error => {
+        assert.ok(error instanceof LocalProviderOnboardingError);
+        assert.equal(error.code, 'provider_field_unknown');
+        assert.equal(error.versionMismatch, undefined);
+        assert.deepEqual(error.unknownField, { serverVersion: '0.40.25', endpoint: 'tags', field: 'models[].cloud_route' });
+        return true;
+    });
+    assert.deepEqual(paths, ['/api/version', '/api/tags']);
+    assert.equal(f.lifecycle.service.read().status, 'denied');
+});
 
 test('cold verification may finish after thirty seconds while the same owner remains active', async context => {
     let now = 0; context.mock.method(performance, 'now', () => now);

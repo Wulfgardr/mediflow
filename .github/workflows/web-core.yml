@@ -112,6 +112,9 @@ jobs:
         run: npm run test:clinical-http
       - name: Owned synthetic HTTP contracts
         run: npm run test:owned-http
+      - name: Network pairing offers and LAN TLS ingress
+        timeout-minutes: 10
+        run: npm run test:network:pairing-offers
       - name: Owned standalone supervisor contract
         run: npm run test:owned-http-standalone
       - name: Portable synthetic recipes

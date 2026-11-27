@@ -10,7 +10,7 @@
 .workarea { min-width: 0; min-height: 0; display: flex; flex-direction: column; border-radius: 16px; background: var(--lume-surface-focal); overflow: hidden; box-shadow: 0 18px 44px -26px color-mix(in srgb, var(--lume-ink) 45%, transparent); }
 .workspaceBar { height: 48px; flex: 0 0 48px; display: flex; align-items: center; gap: 8px; padding: 0 14px; border-bottom: 1px solid var(--twin-border); }
 .iconButton { flex: none; width: var(--lume-control-height); height: var(--lume-control-height); display: grid; place-items: center; border-radius: var(--lume-radius-control); color: var(--lume-ink-muted); }
-.openRecords { display: flex; min-width: 0; gap: 4px; align-self: stretch; align-items: center; overflow-x: auto; flex: 1; scrollbar-width: thin; }
+.openRecords { display: flex; min-width: 0; gap: 4px; align-self: stretch; align-items: center; overflow-x: auto; flex: 1; }
 .directoryTab { display: inline-flex; align-items: center; min-height: var(--lume-control-height); min-width: var(--lume-control-height); padding: 8px 16px; font-size: 0.75rem; color: var(--lume-ink-muted); }
 .recordTab { display: flex; align-items: center; flex: none; gap: 2px; border-radius: var(--lume-radius-control); padding-right: 4px; color: var(--lume-ink-muted); }
 .recordTab > a:first-child { display: inline-flex; align-items: center; min-height: var(--lume-control-height); min-width: var(--lume-control-height); font-size: 0.75rem; padding: 8px 7px 8px 12px; max-width: 190px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -19,7 +19,7 @@
 .pageCrumb { display: inline-flex; align-items: center; flex: none; min-height: var(--lume-control-height); padding: 8px 12px; font-size: 0.75rem; color: var(--lume-ink-muted); white-space: nowrap; }
 /* preserve the shared toggle's touch target inside the 48px header. */
 .privacy { width: 44px !important; height: 44px !important; min-width: 44px !important; border-radius: var(--lume-radius-control) !important; border: 0 !important; padding: 0 !important; flex: none; }
-.page { position: relative; flex: 1; min-height: 0; overflow: auto; scrollbar-width: thin; }
+.page { position: relative; flex: 1; min-height: 0; overflow: auto; }
 .workspace :is(a, button, summary):focus-visible { outline: 2px solid var(--lume-accent); outline-offset: 2px; }
 .workspace :is(a, button) { cursor: pointer; }
 .workspace svg { flex: none; }
@@ -59,6 +59,8 @@
   .navigation > a, .mobileMore > summary { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 3px; min-height: 56px; padding: 6px 2px; font-size: 0.75rem; border-radius: 10px; color: var(--lume-ink-muted); cursor: pointer; }
   .mobileMore { display: block; }
   .mobileMore summary { list-style: none; }
+  .workspace[data-rail-open='false'] .mobileMore span { display: inline; }
+  .moreCount { margin-inline-start: 4px; color: var(--lume-ink); font: var(--type-meta); }
   .mobileMore summary::-webkit-details-marker { display: none; }
   .mobileMenu { position: absolute; z-index: 60; bottom: calc(64px + env(safe-area-inset-bottom)); left: 12px; right: 12px; padding: 8px; border: 1px solid var(--lume-rule-strong); border-radius: 12px; background: var(--lume-surface-focal); }
   .mobileMenu a, .mobileMenu button { display: flex; align-items: center; gap: 12px; min-height: 44px; width: 100%; padding: 10px 12px; font: 0.875rem var(--lume-font-sans); color: var(--lume-ink); }
@@ -105,7 +107,7 @@
     border: 1px solid var(--record-line);
     border-radius: 16px;
     background: var(--record-chrome);
-    overflow-y: auto; scrollbar-width: thin;
+    overflow-y: auto;
   }
   .workspace[data-unified-shell='true'] .brand { padding: 4px 10px 12px; gap: 9px; min-height: 38px; }
   .workspace[data-unified-shell='true'] .brand strong { font: var(--type-record-row); letter-spacing: -.02em; }

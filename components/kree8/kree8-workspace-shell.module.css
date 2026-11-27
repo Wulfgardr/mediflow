@@ -76,14 +76,6 @@
   background: var(--k8-canvas);
 }
 
-.canvas::-webkit-scrollbar { width: 10px; }
-.canvas::-webkit-scrollbar-track { background: transparent; }
-.canvas::-webkit-scrollbar-thumb {
-  border: 3px solid var(--k8-canvas);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--lume-ink-muted) 36%, transparent);
-}
-
 .chrome {
   flex: 0 0 auto;
   position: sticky;
@@ -297,9 +289,9 @@
   overflow-x: auto;
   padding: 2px 1px 4px;
   scroll-snap-type: x mandatory;
+  scrollbar-width: none;
 }
 
-.sectionRail::-webkit-scrollbar { display: none; }
 
 /* WUL-560 L7A: grouped disclosure is opt-in. Flat callers keep the
    exact unmapped rail until their own mapping packet supplies the closed tuple. */
@@ -820,7 +812,6 @@
   padding: 8px 12px 28px;
   border: 0;
   background: var(--lume-surface-field);
-  scrollbar-width: thin;
 }
 :global(html[data-runtime-twin-design='proposal']) .sectionGroup { border: 0; border-radius: 0; background: transparent; }
 :global(html[data-runtime-twin-design='proposal']) .sectionGroupItems { padding: 0; }
@@ -849,8 +840,6 @@
   border-left: 1px solid var(--k8-line-strong);
   background: var(--lume-surface-focal);
   scrollbar-gutter: stable;
-  scrollbar-color: var(--lume-ink-muted) transparent;
-  scrollbar-width: thin;
   scroll-behavior: smooth;
 }
 :global(html[data-runtime-twin-design='proposal']) .clinicalSurface { overflow: visible; border: 0; border-radius: 0; box-shadow: none; background: transparent; }

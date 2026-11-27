@@ -99,6 +99,10 @@ release](https://github.com/Wulfgardr/mediflow/releases) raccoglie i pacchetti p
 
 ### Limiti dichiarati
 
+- La chat collegata può leggere nelle note i nomi di chi non è in anagrafica.
+  MediFlow lo indica in «Accesso assistente» prima della conferma
+  ([ADR 0194](./docs/adr/0194-profilo-pseudonimizzato-per-la-chat-esterna.md)).
+
 - Quando un modello esterno riceve il profilo con i segnaposto al posto dei
   nomi, MediFlow controlla che ogni segnaposto della risposta appartenga alla
   richiesta. Non controlla se il modello ha scambiato due persone con lo stesso
@@ -116,11 +120,8 @@ release](https://github.com/Wulfgardr/mediflow/releases) raccoglie i pacchetti p
   intero», anche nei grafici: MediFlow non riscrive i valori già salvati.
 - Nella nuova scheda dai documenti una foto singola segue ancora il percorso
   precedente e non porta dati clinici; i dati arrivano dai PDF.
-- «Usa tutte le proposte» confronta la data di nascita con il codice fiscale
-  proposto. Se nessun documento riporta un codice fiscale, il gesto può
-  unire dati di documenti diversi che non si contraddicono. La data scritta a
-  mano o presa con un clic sul singolo campo non viene confrontata con il
-  codice fiscale.
+- La data di nascita scritta a mano o presa con un clic sul singolo campo
+  della nuova scheda non viene confrontata con il codice fiscale.
 - Documenti dal Fascicolo: MediFlow importa la cartella scaricata
   dall'estensione separata di Chrome e non parla con il portale SISS. Non sono
   verificati il registro degli accessi visibile al paziente, le condizioni
@@ -130,7 +131,7 @@ release](https://github.com/Wulfgardr/mediflow/releases) raccoglie i pacchetti p
 - La registrazione della visita funziona solo su macOS. Il programma della
   voce non è ancora compreso nell'installazione: il launcher avvia la voce
   solo se trova il programma compilato, e il modello si installa ancora da
-  GPUI ([ADR 0204](./docs/adr/0204-servizio-locale-della-voce.md), Proposed).
+  GPUI ([ADR 0204](./docs/adr/0204-servizio-locale-della-voce.md)).
   Alla prima visita mancano i farmaci del paziente che orientano il
   riconoscimento, quindi i nomi dei farmaci sono meno affidabili.
 - In «Da decidere» i controlli sul farmaco corretto e sulla diagnosi già in
@@ -167,8 +168,10 @@ release](https://github.com/Wulfgardr/mediflow/releases) raccoglie i pacchetti p
   campi con un gesto e ogni campo resta modificabile. Se due documenti
   propongono valori diversi, o la data di nascita non corrisponde al codice
   fiscale proposto, il campo resta da decidere e la conferma si sblocca solo
-  dopo la scelta del medico. PIN e controllo dei duplicati restano come prima
-  ([#1127](https://github.com/Wulfgardr/mediflow/pull/1127)).
+  dopo la scelta del medico. Il gesto prende un dato solo da un documento che
+  riporta lo stesso codice fiscale, oppure lo stesso cognome e nome; gli altri
+  si prendono con un clic per campo. PIN e controllo dei duplicati restano come
+  prima ([#1127](https://github.com/Wulfgardr/mediflow/pull/1127)).
 - Con il modulo Lombardia, «Documenti dal Fascicolo» importa la cartella
   `FSE_<codice fiscale>` scaricata dall'estensione di Chrome: dalla scheda,
   dall'import Dossier, dalla Nuova scheda e dal filtro Documenti di «Da

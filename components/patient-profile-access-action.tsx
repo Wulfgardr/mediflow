@@ -44,6 +44,7 @@ export function PatientProfileAccessAction({ patientId, ambulatoryId, embedded =
                     <option value="none">Nessun accesso aggiuntivo</option><option value="notes">Solo note</option><option value="profile">Profilo completo e note</option>
                 </select>
             </label>
+            {projection !== 'none' && <p>La chat collegata può leggere nelle note i nomi di chi non è in anagrafica.</p>}
             <button type="button" className={workspaceStyles.headerPrimaryAction} disabled={busy || active || !ambulatoryId} onClick={() => void activate()}>{busy ? 'Attivazione…' : 'Conferma e attiva assistente'}</button>
             <p role="status">{ambulatoryId ? message : 'Accesso non disponibile: manca l’ambulatorio del paziente.'}</p>
         </div>

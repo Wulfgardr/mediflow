@@ -1,6 +1,7 @@
 import {
     LOMBARDIA_SERVICE_CODE_SYSTEM,
     servicePackageSchema,
+    type DraftServicePackageItem,
     type LombardiaReferenceCatalog,
     type ServicePackage,
     type ServicePackageItem,
@@ -61,7 +62,12 @@ function checkServiceCode(index: CatalogIndex, serviceCode: string, path: string
     }
 }
 
-function checkItemExemption(index: CatalogIndex, item: ServicePackageItem, path: string, issues: ServicePackageValidationIssue[]): void {
+function checkItemExemption(
+    index: CatalogIndex,
+    item: ServicePackageItem | DraftServicePackageItem,
+    path: string,
+    issues: ServicePackageValidationIssue[],
+): void {
     if (item.exemptionCode === null) return;
     const exemption = normalizeCode(item.exemptionCode);
     const covered = index.exemptions.get(exemption);
@@ -80,7 +86,7 @@ function checkItemExemption(index: CatalogIndex, item: ServicePackageItem, path:
 }
 
 function validateItems(
-    items: readonly ServicePackageItem[],
+    items: readonly (ServicePackageItem | DraftServicePackageItem)[],
     basePath: string,
     index: CatalogIndex,
     seenIds: Set<string>,
@@ -120,7 +126,7 @@ export function validateServicePackage(
     const seenItemIds = new Set<string>();
     const seenModuleIds = new Set<string>();
 
-    if (!index.exemptions.has(normalizeCode(pkg.exemption.code))) {
+    if (pkg.exemption !== null && !index.exemptions.has(normalizeCode(pkg.exemption.code))) {
         issues.push({
             code: 'EXEMPTION_NOT_IN_CATALOG',
             path: 'exemption.code',

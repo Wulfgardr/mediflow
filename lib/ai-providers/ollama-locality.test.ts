@@ -111,7 +111,7 @@ test('rifiuta un modello remoto prima della chiamata show', async (t) => {
     assert.equal(urls.some((url) => url.endsWith('/api/show')), false);
 });
 
-for (const unqualified of ['0.33.0', '0.33.4', '0.34.0', '0.34.1', '0.34.3', '0.33.3-preview', '0.34.2-preview', '0.40.3', '0.40.7', '0.40.15', '0.40.17', '0.40.19', '0.40.180', '0.40.18-rc0', '0.40.18+build', '0.40.160', '0.40.16-rc0', '0.40.16+build', '0.40.60', '0.40.6-rc0', '0.40.6+build', '0.40.50', '0.40.5-rc0', '0.40.5+build', '0.40.4-preview', '0.40.4+build', '0.41.0', 'unknown']) test(`nega versione non qualificata ${unqualified}`, async (t) => {
+for (const unqualified of ['0.33.0', '0.33.4', '0.34.0', '0.34.1', '0.34.3', '0.33.3-preview', '0.34.2-preview', '0.40.3', '0.40.7', '0.40.15', '0.40.18-rc0', '0.40.18+build', '0.40.16-rc0', '0.40.16+build', '0.40.6-rc0', '0.40.6+build', '0.40.5-rc0', '0.40.5+build', '0.40.4-preview', '0.40.4+build', '0.41.0', 'unknown']) test(`nega versione non qualificata ${unqualified}`, async (t) => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = (async () => Response.json({ version: unqualified })) as typeof fetch;
     t.after(() => {
@@ -123,7 +123,7 @@ for (const unqualified of ['0.33.0', '0.33.4', '0.34.0', '0.34.1', '0.34.3', '0.
         (error) => {
             assert.ok(error instanceof OllamaLocalityError);
             assert.equal(error.code, 'provider_version_unsupported');
-            assert.deepEqual(error.versionMismatch, { serverVersion: unqualified, supportedVersions: '0.32.x, 0.33.3, 0.34.2, 0.40.4, 0.40.5, 0.40.6, 0.40.16, 0.40.18' });
+            assert.deepEqual(error.versionMismatch, { serverVersion: unqualified, supportedVersions: '0.32.x, 0.33.3, 0.34.2, 0.40.4, 0.40.5, 0.40.6, dalla 0.40.16 in poi nella serie 0.40' });
             return true;
         },
     );
@@ -159,7 +159,7 @@ for (const body of [{}, { version: null }, null, []]) test('risposta versione in
 });
 
 test('la risposta condivisa conserva HTTP 409 e dettagli solo per la versione non ammessa', async () => {
-    const versionMismatch = { serverVersion: '0.41.0', supportedVersions: '0.32.x, 0.33.3, 0.34.2, 0.40.4, 0.40.5, 0.40.6, 0.40.16, 0.40.18' };
+    const versionMismatch = { serverVersion: '0.41.0', supportedVersions: '0.32.x, 0.33.3, 0.34.2, 0.40.4, 0.40.5, 0.40.6, dalla 0.40.16 in poi nella serie 0.40' };
     const response = ollamaLocalityErrorResponse(new OllamaLocalityError('provider_version_unsupported', versionMismatch))!;
     assert.equal(response.status, 409);
     assert.deepEqual(await response.json(), { error: 'Ollama local-only policy blocked the request',

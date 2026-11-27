@@ -8,12 +8,16 @@ const navigationIntents = new Set(['search', 'identity', 'history', 'prescribing
 const escape = value => String(value).replace(/[&<>"']/gu, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 const voiceDetail = { ready: 'Pronta.', missing: 'Manca il modello della voce.', incomplete: 'Il modello della voce è incompleto.',
-  stopped: 'Non attiva. Riapri MediFlow per riprovare.', absent: 'Non installata su questo Mac.' };
+  stopped: 'Non attiva. Riapri MediFlow per riprovare.', absent: 'Non installata su questo Mac.',
+  untrusted: 'Non avviata: il programma della voce non corrisponde a questa versione.',
+  unpinned: 'Non disponibile per questa architettura.' };
 
 /** @param {{ state: string, paired: boolean, port: number | null, reason: string | null }} lan */
 function lanDetail(lan, port) {
   if (lan.state === 'on') return lan.paired ? 'Collegamento acceso.' : 'Acceso. Nessun dispositivo abbinato: «Collega un dispositivo» nelle Impostazioni.';
-  if (lan.state === 'off') return 'Spento. Si accende con «Abilita home-base» nelle Impostazioni.';
+  if (lan.state === 'off') return lan.reason === 'no-network'
+    ? 'Spento: nessuna rete disponibile.'
+    : 'Spento. Si accende con «Abilita home-base» nelle Impostazioni.';
   if (lan.reason === 'port') return `Non acceso: la porta ${port} è occupata.`;
   if (lan.reason === 'certificate') return 'Non acceso: serve openssl per creare il certificato.';
   return 'Si è arrestato. Riapri MediFlow per riprovare.';

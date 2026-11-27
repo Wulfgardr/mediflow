@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -12,6 +13,7 @@ import {
     ANYDOC_APPLE_VISION_OCR_INTERNAL_TEST_SEAM,
     ANYDOC_APPLE_VISION_OCR_SCRIPT_SHA256,
     ANYDOC_APPLE_VISION_OCR_TIMEOUT_MS,
+    appleVisionSandboxProfile,
     createAnyDocAppleVisionDocumentExtractorForTest,
     createAnyDocAppleVisionImageExtractorForTest,
     extractAnyDocAppleVisionImage,
@@ -236,4 +238,27 @@ test('resolves only the staged package script when a standalone chunk bakes a so
         fs.symlinkSync(path.join(bakedSourceRoot, 'scripts', 'apple-vision-ocr.swift'), path.join(bundledRoot, 'scripts', 'apple-vision-ocr.swift'));
         assert.equal(ANYDOC_APPLE_VISION_OCR_INTERNAL_TEST_SEAM.resolveOwnedScriptFromPackageRoot(bundledRoot), null);
     } finally { fs.rmSync(scope, { recursive: true, force: true }); }
+});
+
+test('Apple Vision Seatbelt profile denies external writes and launching other programs', {
+    skip: process.platform !== 'darwin',
+}, () => {
+    const scope = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-vision-sandbox-')));
+    const tmp = path.join(scope, 'owned-tmp');
+    const outsideMarker = path.join(scope, 'outside.txt');
+    fs.mkdirSync(tmp);
+    try {
+        const profile = appleVisionSandboxProfile(tmp);
+        assert.ok(profile);
+        assert.match(profile, /\(deny process-exec\)/u);
+        assert.match(profile, /\(deny lsopen\)/u);
+        assert.match(profile, /\(deny appleevent-send\)/u);
+        const deniedOpen = spawnSync('/usr/bin/sandbox-exec', ['-p', profile, '/usr/bin/open', '--help'], { encoding: 'utf8', timeout: 10_000 });
+        assert.notEqual(deniedOpen.status, 0);
+        const deniedShell = spawnSync('/usr/bin/sandbox-exec', ['-p', profile, '/bin/sh', '-c', `touch ${JSON.stringify(outsideMarker)}`], { encoding: 'utf8', timeout: 10_000 });
+        assert.notEqual(deniedShell.status, 0);
+        assert.equal(fs.existsSync(outsideMarker), false);
+    } finally {
+        fs.rmSync(scope, { recursive: true, force: true });
+    }
 });

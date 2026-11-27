@@ -8,6 +8,8 @@ export {
     complicationModuleSchema,
     documentSourceSchema,
     draftApprovalSchema,
+    draftComplicationModuleSchema,
+    draftServicePackageItemSchema,
     draftServicePackageSchema,
     formatServicePackageApproval,
     isValidIsoCalendarDate,
@@ -21,8 +23,10 @@ export {
     type ApprovedServicePackageApproval,
     type ComplicationModule,
     type DocumentSource,
+    type DraftComplicationModule,
     type DraftServicePackage,
     type DraftServicePackageApproval,
+    type DraftServicePackageItem,
     type ExemptionApplicationStatus,
     type GeneratedServiceRequest,
     type LombardiaReferenceCatalog,
@@ -53,10 +57,23 @@ export {
 
 export {
     generatePackageServiceRequests,
+    isApprovedServicePackage,
+    listApprovedServicePackages,
     resolveMatchingComplicationModules,
+    selectApprovedServicePackagesForDiagnoses,
     type GeneratePackageServiceRequestsInput,
     type ServicePackageGenerationErrorCode,
     type ServicePackageGenerationOutcome,
 } from './generation';
 
 export { DIABETES_T2_PACKAGE } from './diabetes-type2';
+export { DRAFT_SET_MINIMI_PACKAGES } from './set-minimi-drafts';
+
+import type { ServicePackage } from './contract';
+import { DIABETES_T2_PACKAGE } from './diabetes-type2';
+import { DRAFT_SET_MINIMI_PACKAGES } from './set-minimi-drafts';
+
+export const ALL_LOMBARDIA_SERVICE_PACKAGES: readonly ServicePackage[] = [
+    DIABETES_T2_PACKAGE,
+    ...DRAFT_SET_MINIMI_PACKAGES,
+];

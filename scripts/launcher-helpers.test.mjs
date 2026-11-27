@@ -1562,7 +1562,7 @@ function registerOrdinaryFixtureCleanup(t, cleanup) {
     cleanups.push(cleanup);
 }
 
-async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, webIdentity = true, overrides = {}, initialOwner = null, lifecycle = null) {
+async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, webIdentity = true, overrides = {}, initialOwner = null, lifecycle = null, voice = {}) {
     const directory = realpathSync(mkdtempSync(path.join(tmpdir(), 'mediflow-ordinary-launcher-~')));
     const source = path.join(directory, 'source'), home = path.join(directory, 'home'), data = path.join(directory, 'data');
     mkdirSync(path.join(source, 'scripts'), { recursive: true }); mkdirSync(home); mkdirSync(data);
@@ -1623,7 +1623,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                     proxy.once('exit',()=>record({type:'lan-proxy-exit',pid:proxy.pid}));
                     return proxy;
                 }
-                if (executable === '/usr/bin/sandbox-exec' && process.env.MEDIFLOW_LOCAL_VOICE_BINARY && argv.at(-1) === process.env.MEDIFLOW_LOCAL_VOICE_BINARY) {
+                if (executable === '/usr/bin/sandbox-exec' && argv.at(-1)?.endsWith('/mediflow-voice')) {
                     const service = spawn(executable, argv, options);
                     record({type:'voice-created',pid:service.pid});
                     service.once('exit',()=>record({type:'voice-exit',pid:service.pid}));
@@ -1870,8 +1870,17 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                 ? rawBytes.replaceAll("choice === 'web' && process.platform === 'win32'", "choice === 'web'") : rawBytes;
         writeFileSync(path.join(source, 'scripts', name), name === 'mediflow.mjs' ? bytes.replace('const startOptionalOllama = () => {', 'const startOptionalOllama = () => { process.stderr.write(\"FIXTURE_OLLAMA_START\\n\"); return;') : bytes);
     }
+    writeFileSync(path.join(source, 'scripts/local-voice-binary.json'), voice.manifest
+        ? JSON.stringify(voice.manifest, null, 2) + '\n'
+        : readFileSync(path.join(repoRoot, 'scripts/local-voice-binary.json')));
+    if (voice.installBytes !== undefined) {
+        const target = path.join(source, 'native/local-voice/target/release/mediflow-voice');
+        mkdirSync(path.dirname(target), { recursive: true });
+        writeFileSync(target, voice.installBytes, { mode: 0o755 });
+    }
     mkdirSync(path.join(source, 'lib/security'), { recursive: true });
     for (const name of ['network-ingress-policy.mjs', 'loopback-ingress.mjs']) writeFileSync(path.join(source, 'lib/security', name), readFileSync(path.join(repoRoot, 'lib/security', name)));
+    writeFileSync(path.join(source, 'lib/network-pairing-address.mjs'), readFileSync(path.join(repoRoot, 'lib/network-pairing-address.mjs')));
     writeFileSync(path.join(source, 'scripts/local-api-tls-proxy.mjs'), readFileSync(path.join(repoRoot, 'scripts/local-api-tls-proxy.mjs')));
     mkdirSync(path.join(source, 'lib/local-voice'), { recursive: true });
     writeFileSync(path.join(source, 'lib/local-voice/client.mjs'), readFileSync(path.join(repoRoot, 'lib/local-voice/client.mjs')));
@@ -3602,7 +3611,7 @@ function fakeVoiceBinary(t) {
     const binary = path.join(directory, 'mediflow-voice');
     writeFileSync(binary, `#!${process.execPath}
 const crypto = require('node:crypto'), http = require('node:http');
-const key = Buffer.from(process.env.MEDIFLOW_LOCAL_VOICE_SECRET, 'hex');
+let key = null, pending = '';
 const mac = message => crypto.createHmac('sha256', key).update(message).digest('hex');
 const server = http.createServer((request, response) => {
   const [time, nonce, signature] = String(request.headers['x-mediflow-voice-auth']).split('.');
@@ -3611,16 +3620,42 @@ const server = http.createServer((request, response) => {
   response.writeHead(status, { 'content-type': 'application/json', 'x-mediflow-voice-proof': mac('mediflow.local-voice.v1:response:' + nonce + ':' + status) });
   response.end(JSON.stringify(status === 200 ? { service: 'mediflow-voice', model: 'ready', session: null } : { error: 'auth' }));
 });
-server.listen(0, '127.0.0.1', () => process.stdout.write('MEDIFLOW_LOCAL_VOICE_READY ' + JSON.stringify({ port: server.address().port }) + '\\n'));
+process.stdin.on('data', chunk => {
+  if (key) return;
+  pending += chunk;
+  if (!pending.includes('\\n')) return;
+  key = Buffer.from(pending.slice(0, pending.indexOf('\\n')), 'hex');
+  server.listen(0, '127.0.0.1', () => process.stdout.write('MEDIFLOW_LOCAL_VOICE_READY ' + JSON.stringify({ port: server.address().port }) + '\\n'));
+});
 process.stdin.on('end', () => process.exit(0));
 process.stdin.resume();
 `, { mode: 0o755 });
     return binary;
 }
 
-function processesRunning(binary) {
-    return execFileSync('/bin/ps', ['-A', '-o', 'pid=,command='], { encoding: 'utf8' }).split('\n')
-        .filter(line => line.includes(binary)).map(line => ({ pid: Number(line.trim().split(/\s+/u)[0]), command: line.trim() }));
+function voiceManifestForBytes(bytes) {
+    const buffer = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes);
+    return {
+        schemaVersion: 1,
+        version: '0.9.1',
+        binary: 'mediflow-voice',
+        relativePath: 'native/local-voice/target/release/mediflow-voice',
+        platforms: {
+            [`${process.platform}-${process.arch}`]: {
+                sha256: crypto.createHash('sha256').update(buffer).digest('hex'),
+                bytes: buffer.length,
+            },
+        },
+    };
+}
+
+function voiceManifestForFile(file) {
+    return voiceManifestForBytes(readFileSync(file));
+}
+
+function liveVoicePids(f) {
+    const exited = new Set(f.observations().filter(event => event.type === 'voice-exit').map(event => event.pid));
+    return f.observations().filter(event => event.type === 'voice-created' && !exited.has(event.pid)).map(event => event.pid);
 }
 
 async function launcherVoice(f) {
@@ -3644,7 +3679,7 @@ const voiceSkip = process.platform === 'darwin' ? false : 'il servizio della voc
 
 test('launcher starts the voice service, the Web receives its address and secret, and a fallen service is never reused', { skip: voiceSkip, timeout: 60_000 }, async t => {
     const binary = fakeVoiceBinary(t);
-    const f = await ordinaryLauncherFixture(t, 'web', [], true, true, { MEDIFLOW_LOCAL_VOICE_BINARY: binary });
+    const f = await ordinaryLauncherFixture(t, 'web', [], true, true, { MEDIFLOW_LOCAL_VOICE_BINARY: binary }, null, null, { manifest: voiceManifestForFile(binary) });
     await f.until(() => f.output().includes('Pronto:'));
     const first = await voiceSettles(f, ({ state }) => state.voice === 'ready');
     assert.match(first.web.url, /^http:\/\/127\.0\.0\.1:\d+$/u);
@@ -3659,31 +3694,105 @@ test('launcher starts the voice service, the Web receives its address and secret
 
     const seen = new Set([first.web.url]);
     for (let fall = 1; fall <= 3; fall++) {
-        const [service] = processesRunning(binary);
-        assert.ok(service, 'voice service not running');
-        process.kill(service.pid, 'SIGKILL');
+        const [pid] = liveVoicePids(f);
+        assert.ok(pid, 'voice service not running');
+        process.kill(pid, 'SIGKILL');
         const after = await voiceSettles(f, ({ web, state }) => web.url !== null && !seen.has(web.url) && web.available && state.voice === 'ready');
         seen.add(after.web.url);
     }
-    const [last] = processesRunning(binary);
-    process.kill(last.pid, 'SIGKILL');
+    const [lastPid] = liveVoicePids(f);
+    process.kill(lastPid, 'SIGKILL');
     const gone = await voiceSettles(f, ({ web, state }) => web.url === null && state.voice === 'stopped');
     assert.equal(gone.web.available, false);
     assert.equal(gone.state.services[0].detail, 'Non attiva. Riapri MediFlow per riprovare.');
-    assert.deepEqual(processesRunning(binary), []);
+    assert.deepEqual(liveVoicePids(f), []);
     assert.match(f.output(), /registrazione locale non disponibile/u);
     assert.ok(!f.output().includes(secret));
 });
 
+test('another process of the same user finds the voice secret neither in the environment nor in the arguments of the service and of the Web runtime', { skip: voiceSkip, timeout: 60_000 }, async t => {
+    const binary = fakeVoiceBinary(t);
+    const f = await ordinaryLauncherFixture(t, 'web', [], true, true, { MEDIFLOW_LOCAL_VOICE_BINARY: binary }, null, null, { manifest: voiceManifestForFile(binary) });
+    await f.until(() => f.output().includes('Pronto:'));
+    const { state } = await voiceSettles(f, ({ web, state }) => web.available && state.voice === 'ready');
+    const environment = await (await fetch(state.url + '/fixture-env')).json();
+    const secret = environment.MEDIFLOW_LOCAL_VOICE_SECRET;
+    assert.match(secret, /^[a-f0-9]{64}$/u, 'the Web runtime did not receive the secret through the launcher channel');
+    const [voicePid] = liveVoicePids(f);
+    const webPids = f.observations().filter(event => event.type === 'child-runtime').map(event => event.pid);
+    const table = execFileSync('/bin/ps', ['-E', '-ww', '-A', '-o', 'pid=,command='], { encoding: 'utf8' }).split('\n');
+    const row = pid => table.find(line => line.trim().startsWith(`${pid} `));
+    assert.ok(row(voicePid), 'voice service missing from the process table');
+    assert.ok(webPids.some(pid => row(pid)), 'Web runtime missing from the process table');
+    assert.equal(row(voicePid).includes(secret), false, 'secret readable with ps -E in the voice service');
+    for (const pid of webPids) assert.equal(row(pid)?.includes(secret) ?? false, false, 'secret readable with ps -E in the Web runtime');
+    assert.equal(table.some(line => line.includes(secret)), false, 'secret readable with ps -E in some process');
+});
+
 test('launcher stops the voice service with MediFlow', { skip: voiceSkip, timeout: 60_000 }, async t => {
+    const binary = fakeVoiceBinary(t);
+    const f = await ordinaryLauncherFixture(t, 'web', [], true, true, { MEDIFLOW_LOCAL_VOICE_BINARY: binary }, null, null, { manifest: voiceManifestForFile(binary) });
+    await f.until(() => f.output().includes('Pronto:'));
+    await voiceSettles(f, ({ web }) => web.available);
+    assert.equal(liveVoicePids(f).length, 1);
+    await f.cleanup();
+    assert.match(f.output(), /MediFlow arrestato/u);
+    assert.deepEqual(liveVoicePids(f), []);
+});
+
+test('launcher starts a verified voice binary at the default repository path', { skip: voiceSkip, timeout: 60_000 }, async t => {
+    const binary = fakeVoiceBinary(t);
+    const bytes = readFileSync(binary);
+    const f = await ordinaryLauncherFixture(t, 'web', [], true, true, { MEDIFLOW_LOCAL_VOICE_BINARY: '' }, null, null, {
+        installBytes: bytes,
+        manifest: voiceManifestForBytes(bytes),
+    });
+    await f.until(() => f.output().includes('Pronto:'));
+    const ready = await voiceSettles(f, ({ state }) => state.voice === 'ready');
+    assert.equal(ready.web.available, true);
+    assert.deepEqual(ready.state.services, [{ id: 'voice', title: 'Registrazione della visita', detail: 'Pronta.', ready: true }]);
+    await f.cleanup();
+    assert.deepEqual(liveVoicePids(f), []);
+});
+
+test('launcher refuses a voice binary altered by one byte and explains why in the Status row', { skip: voiceSkip, timeout: 60_000 }, async t => {
+    const binary = fakeVoiceBinary(t);
+    const original = readFileSync(binary);
+    const altered = Buffer.from(original);
+    altered[altered.length - 1] ^= 0x01;
+    const f = await ordinaryLauncherFixture(t, 'web', [], true, true, { MEDIFLOW_LOCAL_VOICE_BINARY: '' }, null, null, {
+        installBytes: altered,
+        manifest: voiceManifestForBytes(original),
+    });
+    await f.until(() => f.output().includes('Pronto:'));
+    const { state, web } = await launcherVoice(f);
+    assert.deepEqual(web, { url: null, available: false, status: null });
+    assert.equal(state.voice, 'untrusted');
+    assert.deepEqual(state.services, [{
+        id: 'voice',
+        title: 'Registrazione della visita',
+        detail: 'Non avviata: il programma della voce non corrisponde a questa versione.',
+        ready: false,
+    }]);
+    assert.deepEqual(liveVoicePids(f), []);
+    assert.equal(f.observations().filter(event => event.type === 'voice-created').length, 0);
+});
+
+test('launcher refuses MEDIFLOW_LOCAL_VOICE_BINARY without a matching pinned SHA-256', { skip: voiceSkip, timeout: 60_000 }, async t => {
     const binary = fakeVoiceBinary(t);
     const f = await ordinaryLauncherFixture(t, 'web', [], true, true, { MEDIFLOW_LOCAL_VOICE_BINARY: binary });
     await f.until(() => f.output().includes('Pronto:'));
-    await voiceSettles(f, ({ web }) => web.available);
-    assert.equal(processesRunning(binary).length, 1);
-    await f.cleanup();
-    assert.match(f.output(), /MediFlow arrestato/u);
-    assert.deepEqual(processesRunning(binary), []);
+    const { state, web } = await launcherVoice(f);
+    assert.deepEqual(web, { url: null, available: false, status: null });
+    assert.equal(state.voice, 'untrusted');
+    assert.deepEqual(state.services, [{
+        id: 'voice',
+        title: 'Registrazione della visita',
+        detail: 'Non avviata: il programma della voce non corrisponde a questa versione.',
+        ready: false,
+    }]);
+    assert.deepEqual(liveVoicePids(f), []);
+    assert.equal(f.observations().filter(event => event.type === 'voice-created').length, 0);
 });
 
 test('without the voice binary the Web gets no voice address, even one inherited from the shell', { timeout: 60_000 }, async t => {
@@ -3699,18 +3808,18 @@ test('without the voice binary the Web gets no voice address, even one inherited
 test('launcher with the real voice binary and the installed model', { skip: voiceSkip || (process.env.MEDIFLOW_LOCAL_VOICE_REAL_BINARY ? false : 'MEDIFLOW_LOCAL_VOICE_REAL_BINARY non impostato'), timeout: 120_000 }, async t => {
     const binary = process.env.MEDIFLOW_LOCAL_VOICE_REAL_BINARY;
     const models = process.env.MEDIFLOW_LOCAL_VOICE_MODELS || path.join(process.env.HOME, 'Library/Application Support/MediFlow GPUI/modelli-voce');
-    const f = await ordinaryLauncherFixture(t, 'web', [], true, true, { MEDIFLOW_LOCAL_VOICE_BINARY: binary, MEDIFLOW_LOCAL_VOICE_MODELS: models });
+    const f = await ordinaryLauncherFixture(t, 'web', [], true, true, { MEDIFLOW_LOCAL_VOICE_BINARY: binary, MEDIFLOW_LOCAL_VOICE_MODELS: models }, null, null, { manifest: voiceManifestForFile(binary) });
     await f.until(() => f.output().includes('Pronto:'), 60_000);
     const ready = await voiceSettles(f, ({ state }) => state.voice !== 'absent', 60_000);
     assert.equal(ready.state.voice, 'ready', JSON.stringify(ready));
     assert.equal(ready.web.status.model, 'ready');
     assert.equal(ready.web.available, true);
-    const [service] = processesRunning(binary);
-    process.kill(service.pid, 'SIGKILL');
+    const [pid] = liveVoicePids(f);
+    process.kill(pid, 'SIGKILL');
     const after = await voiceSettles(f, ({ web }) => web.url !== ready.web.url && web.available, 60_000);
     assert.equal(after.web.status.model, 'ready');
     await f.cleanup();
-    assert.deepEqual(processesRunning(binary), []);
+    assert.deepEqual(liveVoicePids(f), []);
 });
 
 test('a voice service that falls or restarts while the Web starts never leaves the Web on the dead address', () => {
@@ -3774,9 +3883,12 @@ test('launcher keeps the iPhone proxy on only while the Web is in home-base mode
     const on = await settle(value => value.lan.state === 'on');
     assert.equal(on.lan.port, tlsPort);
     assert.equal(on.services.find(row => row.id === 'lan').detail, 'Acceso. Nessun dispositivo abbinato: «Collega un dispositivo» nelle Impostazioni.');
+    const { readPairingAddress } = await import('../lib/network-pairing-address.mjs');
+    const expectedBindHost = await readPairingAddress('0.0.0.0');
     const published = JSON.parse(readFileSync(path.join(f.data, 'runtime-status.json'), 'utf8'));
     assert.equal(published.port, tlsPort);
-    assert.equal(published.bindHost, '0.0.0.0');
+    assert.equal(published.bindHost, expectedBindHost);
+    assert.equal(published.loopbackProbe, true);
     const forwarded = await new Promise((resolve, reject) => {
         const request = https.request({ host: '127.0.0.1', port: tlsPort, path: '/api/auth/check', rejectUnauthorized: false }, response => {
             response.resume(); resolve({ status: response.statusCode, pin: response.socket.getPeerCertificate().fingerprint256.replaceAll(':', '').toLowerCase() });
@@ -3831,4 +3943,111 @@ test('the iPhone proxy ends and frees its port when the launcher that started it
     while ((alive() || await accepts()) && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 50));
     assert.equal(alive(), false, `proxy ${pid} still running after its launcher was killed`);
     assert.equal(await accepts(), false, `port ${port} still accepts connections`);
+});
+
+test('LAN proxy controller terminates an orphan proxy when archive is local-only and cleans stale files', { skip: process.platform === 'win32' || spawnSync('openssl', ['version'], { windowsHide: true }).error ? 'openssl non disponibile' : false, timeout: 30_000 }, async t => {
+    const { startLanProxy, createLanProxyController } = await import('./launcher-lan-proxy.mjs');
+    const data = mkdtempSync(path.join(tmpdir(), 'mediflow-lan-orphan-local-'));
+    t.after(() => rmSync(data, { recursive: true, force: true }));
+    const orphan = await startLanProxy({ root: repoRoot, dataDir: data, target: 'http://127.0.0.1:9', port: 0, bindHost: '127.0.0.1' });
+    t.after(async () => { await orphan.stop(); });
+    const controller = createLanProxyController({
+        root: repoRoot,
+        dataDir: data,
+        port: orphan.port,
+        readOverview: async () => ({ operatingMode: 'local-only', hasPairedClients: false }),
+    });
+    await controller.follow('http://127.0.0.1:9');
+    assert.deepEqual(controller.status(), { state: 'off', paired: false, port: null, reason: null });
+    assert.throws(() => process.kill(orphan.pid, 0), { code: 'ESRCH' });
+    assert.equal(existsSync(path.join(data, 'runtime-status.json')), false);
+    assert.equal(existsSync(path.join(data, 'local-api-tls-proxy.pid')), false);
+});
+
+test('LAN proxy controller re-syncs and stops the proxy if mode switches to local-only while busy', async () => {
+    const { createLanProxyController } = await import('./launcher-lan-proxy.mjs');
+    const data = mkdtempSync(path.join(tmpdir(), 'mediflow-lan-race-'));
+    try {
+        let mode = 'network-home-base';
+        let releaseStart;
+        const startGate = new Promise(resolve => { releaseStart = resolve; });
+        let stopCalled = 0;
+        const controller = createLanProxyController({
+            root: repoRoot,
+            dataDir: data,
+            port: 0,
+            readOverview: async () => ({ operatingMode: mode, hasPairedClients: false }),
+            start: async () => {
+                await startGate;
+                return { port: 43443, pin: 'a'.repeat(64), pid: 999999, exited: new Promise(() => {}), stop: async () => { stopCalled += 1; } };
+            },
+        });
+        const firstFollow = controller.follow('http://127.0.0.1:9');
+        await new Promise(resolve => setTimeout(resolve, 20));
+        mode = 'local-only';
+        const refreshDuringBusy = controller.refresh();
+        releaseStart();
+        await Promise.all([firstFollow, refreshDuringBusy]);
+        assert.deepEqual(controller.status(), { state: 'off', paired: false, port: null, reason: null });
+        assert.equal(controller.pid(), null);
+        assert.equal(stopCalled, 1);
+    } finally {
+        rmSync(data, { recursive: true, force: true });
+    }
+});
+
+test('LAN proxy controller moves listening address on network change and stays off with clean status when no network exists', async () => {
+    const { createLanProxyController } = await import('./launcher-lan-proxy.mjs');
+    const { launcherServices } = await import('./mediflow-launcher-page.mjs');
+    const data = mkdtempSync(path.join(tmpdir(), 'mediflow-lan-switch-'));
+    try {
+        let currentAddress = '172.20.10.3';
+        const startedHosts = [];
+        const stoppedHosts = [];
+        const controller = createLanProxyController({
+            root: repoRoot,
+            dataDir: data,
+            port: 3443,
+            readOverview: async () => ({ operatingMode: 'network-home-base', hasPairedClients: false }),
+            resolveBindHost: async () => currentAddress,
+            start: async ({ bindHost }) => {
+                startedHosts.push(bindHost);
+                return {
+                    port: 3443,
+                    bindHost,
+                    pin: 'a'.repeat(64),
+                    pid: 999000 + startedHosts.length,
+                    exited: new Promise(() => {}),
+                    stop: async () => { stoppedHosts.push(bindHost); },
+                };
+            },
+        });
+
+        await controller.follow('http://127.0.0.1:9');
+        assert.deepEqual(startedHosts, ['172.20.10.3']);
+        assert.deepEqual(stoppedHosts, []);
+        assert.deepEqual(controller.status(), { state: 'on', paired: false, port: 3443, reason: null });
+
+        currentAddress = '192.168.1.44';
+        await controller.refresh();
+        assert.deepEqual(startedHosts, ['172.20.10.3', '192.168.1.44']);
+        assert.deepEqual(stoppedHosts, ['172.20.10.3']);
+        assert.deepEqual(controller.status(), { state: 'on', paired: false, port: 3443, reason: null });
+
+        currentAddress = null;
+        await controller.refresh();
+        assert.deepEqual(stoppedHosts, ['172.20.10.3', '192.168.1.44']);
+        assert.deepEqual(controller.status(), { state: 'off', paired: false, port: null, reason: 'no-network' });
+        assert.deepEqual(
+            launcherServices({ lan: controller.status(), lanPort: 3443 }).find(row => row.id === 'lan'),
+            { id: 'lan', title: 'iPhone e iPad', detail: 'Spento: nessuna rete disponibile.', ready: false },
+        );
+
+        currentAddress = '10.0.0.15';
+        await controller.refresh();
+        assert.deepEqual(startedHosts, ['172.20.10.3', '192.168.1.44', '10.0.0.15']);
+        assert.deepEqual(controller.status(), { state: 'on', paired: false, port: 3443, reason: null });
+    } finally {
+        rmSync(data, { recursive: true, force: true });
+    }
 });

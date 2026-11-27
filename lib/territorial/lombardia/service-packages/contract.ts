@@ -7,7 +7,7 @@ import {
 export const LOMBARDIA_SERVICE_PACKAGE_SCHEMA = 'mediflow.lombardia.service-package.v1' as const;
 export const LOMBARDIA_SERVICE_CODE_SYSTEM = 'REGIONAL_PRESTAZIONI' as const;
 export const SERVICE_PACKAGE_PRIORITIES = ['U', 'B', 'D', 'P'] as const;
-export const SERVICE_PACKAGE_SOURCE_STATUSES = ['vigente', 'riferimento_clinico'] as const;
+export const SERVICE_PACKAGE_SOURCE_STATUSES = ['vigente', 'riferimento_clinico', 'documento_di_lavoro'] as const;
 
 export type ServicePrescriptionCategory = (typeof SERVICE_PRESCRIPTION_CATEGORIES)[number];
 export type ServicePrescriptionStatus = (typeof SERVICE_PRESCRIPTION_STATUSES)[number];
@@ -44,9 +44,17 @@ export const documentSourceSchema = z.object({
     sectionOrTable: nonEmptyText,
     publishedAt: isoCalendarDateSchema,
     version: nonEmptyText.optional(),
-    url: z.string().url(),
+    url: z.string().url().optional(),
     status: z.enum(SERVICE_PACKAGE_SOURCE_STATUSES),
-}).strict();
+}).strict().superRefine((source, ctx) => {
+    if (source.status !== 'documento_di_lavoro' && !source.url) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['url'],
+            message: 'Indirizzo obbligatorio per i documenti pubblicati',
+        });
+    }
+});
 
 export const physicianDecisionSourceSchema = z.object({
     kind: z.literal('decisione_del_medico'),
@@ -82,17 +90,26 @@ export const servicePackageApprovalSchema = z.discriminatedUnion('status', [
     approvedApprovalSchema,
 ]);
 
-export const servicePackageItemSchema = z.object({
+const servicePackageItemBaseFields = {
     id: nonEmptyText,
     serviceCode: nonEmptyText,
     serviceName: nonEmptyText,
     category: z.enum(SERVICE_PRESCRIPTION_CATEGORIES),
-    periodicityMonths: z.number().int().positive().max(120),
     clinicalQuestion: nonEmptyText,
     priority: z.enum(SERVICE_PACKAGE_PRIORITIES),
     exemptionCode: nonEmptyText.nullable(),
     appropriatenessConditions: z.array(nonEmptyText).readonly(),
     sources: itemSourcesSchema,
+};
+
+export const servicePackageItemSchema = z.object({
+    ...servicePackageItemBaseFields,
+    periodicityMonths: z.number().int().positive().max(120),
+}).strict();
+
+export const draftServicePackageItemSchema = z.object({
+    ...servicePackageItemBaseFields,
+    periodicityMonths: z.number().int().positive().max(120).nullable(),
 }).strict();
 
 export const complicationModuleSchema = z.object({
@@ -103,7 +120,21 @@ export const complicationModuleSchema = z.object({
     sources: z.array(servicePackageSourceSchema).min(1).readonly(),
 }).strict();
 
-const servicePackageBaseFields = {
+export const draftComplicationModuleSchema = z.object({
+    id: z.string().trim().min(1).max(64).regex(/^[a-z0-9-]+$/u),
+    title: nonEmptyText,
+    triggerIcd11Codes: z.array(icd11CodeSchema).min(1).readonly(),
+    items: z.array(draftServicePackageItemSchema).min(1).readonly(),
+    sources: z.array(servicePackageSourceSchema).min(1).readonly(),
+}).strict();
+
+const packageExemptionSchema = z.object({
+    code: nonEmptyText,
+    description: nonEmptyText,
+    applicableWhen: nonEmptyText.optional(),
+}).strict();
+
+const servicePackageSharedFields = {
     schemaVersion: z.literal(LOMBARDIA_SERVICE_PACKAGE_SCHEMA),
     id: z.string().trim().min(1).max(128).regex(/^[a-z0-9._-]+$/u),
     territory: z.literal('lom'),
@@ -113,23 +144,22 @@ const servicePackageBaseFields = {
         icd11Codes: z.array(icd11CodeSchema).min(1).readonly(),
         diagnosisLabel: nonEmptyText,
     }).strict(),
-    exemption: z.object({
-        code: nonEmptyText,
-        description: nonEmptyText,
-        applicableWhen: nonEmptyText.optional(),
-    }).strict(),
     sources: z.array(servicePackageSourceSchema).min(1).readonly(),
-    baseItems: z.array(servicePackageItemSchema).min(1).readonly(),
-    complicationModules: z.array(complicationModuleSchema).readonly(),
 };
 
 export const draftServicePackageSchema = z.object({
-    ...servicePackageBaseFields,
+    ...servicePackageSharedFields,
+    exemption: packageExemptionSchema.nullable(),
+    baseItems: z.array(draftServicePackageItemSchema).min(1).readonly(),
+    complicationModules: z.array(draftComplicationModuleSchema).readonly(),
     approval: draftApprovalSchema,
 }).strict();
 
 export const approvedServicePackageSchema = z.object({
-    ...servicePackageBaseFields,
+    ...servicePackageSharedFields,
+    exemption: packageExemptionSchema,
+    baseItems: z.array(servicePackageItemSchema).min(1).readonly(),
+    complicationModules: z.array(complicationModuleSchema).readonly(),
     approval: approvedApprovalSchema,
 }).strict();
 
@@ -145,7 +175,9 @@ export type DraftServicePackageApproval = z.infer<typeof draftApprovalSchema>;
 export type ApprovedServicePackageApproval = z.infer<typeof approvedApprovalSchema>;
 export type ServicePackageApproval = z.infer<typeof servicePackageApprovalSchema>;
 export type ServicePackageItem = z.infer<typeof servicePackageItemSchema>;
+export type DraftServicePackageItem = z.infer<typeof draftServicePackageItemSchema>;
 export type ComplicationModule = z.infer<typeof complicationModuleSchema>;
+export type DraftComplicationModule = z.infer<typeof draftComplicationModuleSchema>;
 export type DraftServicePackage = z.infer<typeof draftServicePackageSchema>;
 export type ApprovedServicePackage = z.infer<typeof approvedServicePackageSchema>;
 export type ServicePackage = DraftServicePackage | ApprovedServicePackage;

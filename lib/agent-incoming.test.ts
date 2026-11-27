@@ -219,12 +219,12 @@ test('a chart unavailable at application leaves the visit untouched and the erro
         await refreshAgentIncoming(db.getSessionReadSignal(), contentReadPdf);
         assert.deepEqual(snapshot(), before);
         assert.deepEqual(posts, []);
-        assert.deepEqual(agentIncomingSnapshot().applicationError, {
-            visitId: ready.visitId, message: 'La visita non è stata applicata. Rileggi la cassetta.',
+        assert.deepEqual(agentIncomingSnapshot().applicationErrors.get(ready.visitId), {
+            message: 'La visita non è stata applicata. Rileggi la cassetta.',
         });
     } finally { patientAvailableForApplication = true; }
     await applyReviewedAgentVisits([ready.visitId]);
-    assert.equal(agentIncomingSnapshot().applicationError, null);
+    assert.equal(agentIncomingSnapshot().applicationErrors.has(ready.visitId), false);
     assert.deepEqual(agentAppliedItemIds(ready.visitId).sort(), [...ready.ids].sort());
 });
 
@@ -449,20 +449,25 @@ test('L5: a cassette whose note, dictation and PDFs entered under the previous r
     assert.deepEqual(snapshot(), after);
 });
 
-test('L6: a note without any PDF, or a PDF whose text cannot be read, blocks the cassette and writes nothing', async () => {
+test('a note without any PDF waits for explicit review; an unreadable PDF still blocks the visit', async () => {
     posts.length = 0;
     const unreadable = syntheticPdf('SYNTHETIC_UNREADABLE_PDF');
     const readPdf = async (bytes: Uint8Array) => { const value = await contentReadPdf(bytes); if (value.text.includes('SYNTHETIC_UNREADABLE_PDF')) throw new Error('SYNTHETIC_PDF_TEXT_UNAVAILABLE'); return value; };
     const withoutPdf = await depositCassette('local', false, [{ kind: 'note', value: { text: soap, quote: soap.slice(0, 600) } }, { kind: 'transcription', value: { text: dictation } }]);
     const withUnreadable = await modelNoteVisit(undefined, undefined, [{ kind: 'pdf', value: { name: 'scansione.pdf' }, pdf: unreadable }]);
+    const blank = await depositCassette('local', false, [{ kind: 'note', value: { text: '<p><br /></p>' } }]);
     const before = snapshot();
     await refreshAgentIncoming(db.getSessionReadSignal(), readPdf);
     assert.equal(posts.length, 0);
     assert.deepEqual(snapshot(), before);
-    for (const visitId of [withoutPdf.visitId, withUnreadable.visitId]) {
-        const shown = shownVisit(visitId);
-        assert.ok(shown?.blockers.length);
-        assert.equal(agentVisitAwaitsReview(shown!), false);
-        assert.deepEqual(agentAppliedItemIds(visitId), []);
-    }
+    const blocked = shownVisit(withUnreadable.visitId);
+    assert.ok(blocked?.blockers.length);
+    assert.equal(agentVisitAwaitsReview(blocked!), false);
+    assert.equal(agentVisitAwaitsReview(shownVisit(withoutPdf.visitId)!), true);
+    assert.equal(agentVisitAwaitsReview(shownVisit(blank.visitId)!), false);
+    assert.deepEqual(shownVisit(blank.visitId)?.proposalBlockers, ['La nota è vuota.']);
+    await applyReviewedAgentVisits([withoutPdf.visitId]);
+    assert.equal(posts.length, 1);
+    assert.equal(agentAppliedItemIds(withoutPdf.visitId).length, 2);
+    assert.deepEqual(agentAppliedItemIds(withUnreadable.visitId), []);
 });

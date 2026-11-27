@@ -3,19 +3,19 @@
 import { useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { CircleDashed, FileText, Inbox, NotebookPen } from 'lucide-react';
-import { taxCodeBirthDetails } from '@/lib/patient-identity';
-import { applyReviewedAgentVisits, decideAgentVisitItem, readIncomingAgentPdf } from '@/lib/agent-incoming';
-import { AGENT_CORRECTABLE_FIELDS, AGENT_THERAPY_STATUSES, AGENT_THERAPY_STATUS_NEEDED, agentCorrectionDropsDrugCodes, agentItemAwaitsDecision, agentItemCorrectable, agentVisitAwaitsReview, type AgentVisitReview } from '@/lib/agent-visit-review';
-import type { AgentItemDecision } from '@/lib/agent-visit-application-contract';
+import { applyReviewedAgentVisitAndCreatePatient, applyReviewedAgentVisits, canDiscardIncomingAgentVisit, decideAgentVisitItem, discardIncomingAgentVisit, readIncomingAgentPdf, stageNewAgentVisitItem, type agentIncomingSnapshot } from '@/lib/agent-incoming';
+import { AGENT_CORRECTABLE_FIELDS, AGENT_THERAPY_STATUSES, AGENT_THERAPY_STATUS_NEEDED, agentCorrectionDropsDrugCodes, agentItemAwaitsDecision, agentItemCanWrite, agentItemDiscardAdmitted, agentItemCorrectable, agentVisitAwaitsReview, newAgentPatientBlock, agentVisitItemsBlock, type AgentPatientIdentity, type AgentVisitReview, type DraftAgentItemDecision } from '@/lib/agent-visit-review';
+import type { AgentCassetteIndexEntry, AgentItemDecision } from '@/lib/agent-visit-application-contract';
 import { AGENT_DOSAGE_NOT_STATED, agentReviewDisplayValue, agentReviewDocumentLabel, agentReviewFieldLabels as fieldLabels, agentReviewFieldValues as fieldValues,
     agentReviewItemLabels, agentReviewShownFields } from '@/lib/agent-visit-review-labels';
 import surface from '@/components/record-surface.module.css';
 import DocumentViewer from '@/components/document-viewer';
 import { Button } from '@/components/ui/button';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import css from './da-decidere.module.css';
 
 type VisitItem = AgentVisitReview['visit']['items'][number];
-type Snapshot = { visits: AgentVisitReview[]; busy: boolean; applicationError: { visitId: string | null; itemId?: string; message: string } | null };
+type Snapshot = ReturnType<typeof agentIncomingSnapshot>;
 
 const SOAP_LABELS: Record<string, string> = { S: 'Soggettivo', O: 'Obiettivo', A: 'Valutazione', P: 'Piano' };
 const DATE_FIELDS = new Set(['startDate', 'endDate', 'observedAt', 'date']);
@@ -118,18 +118,46 @@ function StatusChoice({ item, chosen, busy, onChoose }: { item: VisitItem; chose
     </fieldset>;
 }
 
-function ItemGestures({ review, item, busy, missing, onDecide, onCorrect }: { review: AgentVisitReview; item: VisitItem; busy: boolean; missing: boolean;
-    onDecide: (decision: AgentItemDecision) => void; onCorrect: () => void }) {
+const draftLabels = { keep: 'Da tenere', correct: 'Correzione da salvare', discard: 'Da scartare' };
+
+function ItemGestures({ review, item, busy, missing, draft, onDecide, onCorrect, onUndo }: {
+    review: AgentVisitReview; item: VisitItem; busy: boolean; missing: boolean; draft?: DraftAgentItemDecision;
+    onDecide: (decision: AgentItemDecision) => void; onCorrect: () => void; onUndo: () => void;
+}) {
     if (!agentItemAwaitsDecision(review, item.id)) return null;
-    const blocked = Boolean(review.itemBlockers.get(item.id)?.length) || review.inRecordItemIds.includes(item.id) || missing;
+    if (draft) return <div className={css.itemActions}>
+        <span className={surface.pillNeutral}>{draftLabels[draft.decision]}</span>
+        <Button variant="text" disabled={busy} onClick={onUndo}>Annulla scelta</Button>
+    </div>;
+    const canWrite = agentItemCanWrite(review);
+    const canDiscard = canDiscardIncomingAgentVisit(review.visit.cassette) && agentItemDiscardAdmitted(review);
+    const cannotKeep = Boolean(review.itemBlockers.get(item.id)?.length) || review.inRecordItemIds.includes(item.id) || missing;
     return <div className={css.itemActions} role="group" aria-label={'Decidi ' + proposalHeadline(item)}>
-        <Button variant="text" disabled={busy} onClick={() => onDecide('discard')}>Scarta</Button>
-        {agentItemCorrectable(item.kind) ? <Button variant="secondary" disabled={busy} onClick={onCorrect}>Correggi</Button> : null}
-        <Button variant={blocked ? 'secondary' : 'primary'} disabled={busy || blocked} onClick={() => onDecide('keep')}>Tieni</Button>
+        <Button variant="text" disabled={busy || !canDiscard} onClick={() => onDecide('discard')}>Scarta</Button>
+        {agentItemCorrectable(item.kind) ? <Button variant="secondary" disabled={busy || !canWrite} onClick={onCorrect}>Correggi</Button> : null}
+        <Button variant={!canWrite || cannotKeep ? 'secondary' : 'primary'} disabled={busy || !canWrite || cannotKeep} onClick={() => onDecide('keep')}>Tieni</Button>
     </div>;
 }
 
-export function VisitQueue({ visits, busy, applicationError }: Snapshot) {
+function NewPatientFields({ identity, onChange, disabled }: {
+    identity: AgentPatientIdentity; onChange(identity: AgentPatientIdentity): void; disabled: boolean;
+}) {
+    return <fieldset className={`${surface.island} ${css.newPatient}`} disabled={disabled}>
+        <legend>Nuova scheda</legend>
+        <label>Codice fiscale
+            <input className="mf-input" value={identity.taxCode} maxLength={16} onChange={event => onChange({ ...identity, taxCode: event.target.value })} />
+        </label>
+        <label>Nome
+            <input className="mf-input" value={identity.firstName} maxLength={120} onChange={event => onChange({ ...identity, firstName: event.target.value })} />
+        </label>
+        <label>Cognome
+            <input className="mf-input" value={identity.lastName} maxLength={120} onChange={event => onChange({ ...identity, lastName: event.target.value })} />
+        </label>
+    </fieldset>;
+}
+
+export function VisitQueue({ visits, unreadableVisits, busy, applicationErrors, drafts }: Snapshot) {
+    const confirm = useConfirm();
     const [pdf, setPdf] = useState<{ base64: string; name: string } | null>(null);
     const [openingPdf, setOpeningPdf] = useState(false);
     const [pdfError, setPdfError] = useState<string | null>(null);
@@ -143,17 +171,31 @@ export function VisitQueue({ visits, busy, applicationError }: Snapshot) {
             if (!(error instanceof DOMException && error.name === 'AbortError')) setPdfError(error instanceof Error ? error.message : 'PDF non disponibile.');
         } finally { setOpeningPdf(false); }
     };
-    const decide = async (visitId: string, itemId: string, decision: AgentItemDecision, correction?: Record<string, string>) => {
-        if (await decideAgentVisitItem(visitId, itemId, decision, correction)) setCorrecting(null);
+    const decide = async (review: AgentVisitReview, itemId: string, decision: AgentItemDecision, correction?: Record<string, string>) => {
+        const { id, revision } = review.visit.cassette;
+        const decided = review.newPatient ? stageNewAgentVisitItem(id, revision, itemId, { decision, correction })
+            : await decideAgentVisitItem(id, itemId, decision, correction);
+        if (decided) setCorrecting(null);
     };
-    const applicable = visits.filter(agentVisitAwaitsReview);
-    const generalApplicationError = applicationError && !visits.some(({ visit }) => visit.cassette.id === applicationError.visitId)
-        ? applicationError.message : null;
+    const discardVisit = async (cassette: AgentCassetteIndexEntry, partlyApplied = false) => {
+        const { confirmed } = await confirm({
+            title: 'Scartare la visita?',
+            message: partlyApplied
+                ? 'La visita uscirà dalla coda. Le voci già in scheda restano salvate.'
+                : 'La visita uscirà dalla coda e le sue voci saranno scartate.',
+            confirmLabel: 'Scarta la visita',
+            tone: 'danger',
+        });
+        if (confirmed) await discardIncomingAgentVisit(cassette);
+    };
+    const [identities, setIdentities] = useState<Record<string, AgentPatientIdentity>>({});
+    const listedIds = new Set([...visits.map(({ visit }) => visit.cassette.id), ...unreadableVisits.map(visit => visit.id)]);
 
     return <>
-        {generalApplicationError && <p role="alert" className={css.alert}>{generalApplicationError}</p>}
+        {Array.from(applicationErrors, ([id, { message }]) => listedIds.has(id) ? null :
+            <p key={id} role="alert" className={css.alert}>{message}</p>)}
         {pdfError && <p role="alert" className={css.alert}>{pdfError}</p>}
-        {!visits.length && !busy && (
+        {!visits.length && !unreadableVisits.length && !busy && (
             <section className={surface.tray} data-record-tray="in-arrivo" aria-labelledby="da-decidere-vuoto">
                 <div className={`${surface.island} ${css.empty}`}>
                     <div className={surface.islandHeader}>
@@ -164,6 +206,15 @@ export function VisitQueue({ visits, busy, applicationError }: Snapshot) {
                 </div>
             </section>
         )}
+        {unreadableVisits.map(cassette => {
+            const applicationError = applicationErrors.get(cassette.id);
+            return <section key={cassette.id} className={surface.tray} aria-label={'Visita ' + cassette.id}>
+                <h2 className={surface.zoneTitle}>Visita depositata {formatDepositTime(cassette.depositedAt)}</h2>
+                {applicationError && <p role="alert" className={css.alert}>{applicationError.message}</p>}
+                <p role="alert" className={css.alert}>Non è stato possibile leggere la visita. Premi Aggiorna per riprovare.</p>
+                <Button variant="text" disabled={busy || !canDiscardIncomingAgentVisit(cassette)} onClick={() => { void discardVisit(cassette); }}>Scarta la visita</Button>
+            </section>;
+        })}
         {visits.map(review => {
             const { visit } = review;
             const decidedIds = new Set([...review.appliedItemIds, ...review.discardedItemIds]);
@@ -174,24 +225,37 @@ export function VisitQueue({ visits, busy, applicationError }: Snapshot) {
             const pdfByName = new Map(pdfItems.filter(item => typeof item.value.name === 'string').map(item => [String(item.value.name), item.id]));
             const pdfLabels = documentLabels(visit.items);
             const pdfLabel = (name: string) => pdfLabels.get(name) ?? agentReviewDocumentLabel(name, null);
-            const gesturesUnavailable = review.newPatient ? 'Prima visita: le voci entrano tutte insieme con «Applica la visita».'
-                : review.blockers.length ? 'Risolvi prima i dubbi della visita, qui sopra.' : null;
             const notes = pending.filter(item => item.kind === 'note');
             const transcriptions = pending.filter(item => item.kind === 'transcription');
             const proposals = pending.filter(item => item.kind !== 'pdf' && item.kind !== 'note' && item.kind !== 'transcription');
-            const itemError = applicationError?.visitId === visit.cassette.id && applicationError.itemId ? applicationError : null;
-            const visitError = applicationError?.visitId === visit.cassette.id && !applicationError.itemId ? applicationError.message : null;
-            const itemsBlocked = !review.blockers.length && review.proposalBlockers.length > 0;
-            const actionMessages = [...review.blockers, ...(itemsBlocked ? ['Decidi prima le voci segnate.'] : []), ...(visitError ? [visitError] : [])];
+            const applicationError = applicationErrors.get(visit.cassette.id);
+            const batchError = applicationError?.fromBatch ? applicationError.message : null;
+            const itemError = applicationError?.itemId ? applicationError : null;
+            const visitError = applicationError && !itemError && !batchError ? applicationError.message : null;
+            const draft = drafts[visit.cassette.id];
+            const decisions = draft?.revision === visit.cassette.revision ? draft.decisions : {};
+            const identityKey = visit.cassette.id + ':' + visit.cassette.revision;
+            const identity = review.newPatient && (identities[identityKey] ?? review.newPatient.proposed);
+            const identityBlock = review.newPatient && identity ? newAgentPatientBlock(review.newPatient, identity) : undefined;
+            const statusKey = (itemId: string) => identityKey + ':' + itemId;
+            const physicianChoices = Object.fromEntries([...review.itemNeeds.keys()].map(itemId => [
+                itemId, { status: chosenStatus[statusKey(itemId)] ?? '' },
+            ]));
+            const itemBlock = agentVisitItemsBlock(review, decisions, physicianChoices);
+            const actionMessages = [...(identityBlock ? [identityBlock] : []),
+                ...(itemBlock && !review.blockers.length ? [itemBlock] : []), ...(visitError ? [visitError] : [])];
+            const visitBlockersId = `visita-${visit.cassette.id}-dubbi`;
             const actionMessagesId = `visita-${visit.cassette.id}-esito`;
-            const isApplicable = applicable.includes(review);
+            const batchErrorId = `visita-${visit.cassette.id}-rifiutata`;
+            const actionDescriptions = [batchError ? batchErrorId : null, review.blockers.length > 0 ? visitBlockersId : null,
+                actionMessages.length > 0 ? actionMessagesId : null].filter(Boolean).join(' ');
+            const isApplicable = agentVisitAwaitsReview(review, identity ?? undefined, decisions, physicianChoices);
             const fiscalCode = typeof visit.anchor.fiscalCode === 'string' ? visit.anchor.fiscalCode : null;
-            const birth = review.newPatient && taxCodeBirthDetails(review.newPatient.taxCode);
             const hasPatientName = Boolean(review.patient && (review.patient.firstName || review.patient.lastName));
             const status = visit.cassette.status !== 'closed'
                 ? { label: 'Deposito in corso', pill: surface.pillNeutral }
                 : isApplicable
-                ? { label: decided.length ? 'Decisa in parte' : 'Pronta da applicare', pill: surface.pillSuccess }
+                ? { label: decided.length ? 'Decisa in parte' : identity ? 'Da confermare' : 'Pronta da applicare', pill: surface.pillSuccess }
                 : { label: 'Da verificare', pill: surface.pillWarning };
             const contents = [
                 notes.length > 0 ? 'Nota' : null,
@@ -199,13 +263,17 @@ export function VisitQueue({ visits, busy, applicationError }: Snapshot) {
                 pdfItems.length > 0 ? `${pdfItems.length} PDF` : null,
                 proposals.length > 0 ? (proposals.length === 1 ? '1 proposta' : `${proposals.length} proposte`) : null,
             ].filter(Boolean).join(' · ');
+            const itemMessages = (item: VisitItem) => (review.itemBlockers.get(item.id) ?? [])
+                .map(message => <p key={message} className={css.itemBlocker}>{message}</p>);
             const gestures = (item: VisitItem) => {
                 const asksStatus = review.itemNeeds.get(item.id)?.includes('status') ?? false;
-                const status = chosenStatus[item.id];
+                const status = chosenStatus[statusKey(item.id)];
                 return <>
                     {itemError?.itemId === item.id ? <p role="alert" className={css.itemAlert}>{itemError.message}</p> : null}
-                    <ItemGestures review={review} item={item} busy={busy} missing={asksStatus && !status} onCorrect={() => setCorrecting(item.id)}
-                        onDecide={decision => { void decide(visit.cassette.id, item.id, decision, decision === 'keep' && asksStatus && status ? { status } : undefined); }} />
+                    <ItemGestures review={review} item={item} busy={busy} missing={asksStatus && !status} draft={decisions[item.id]}
+                        onCorrect={() => setCorrecting(item.id)}
+                        onUndo={() => stageNewAgentVisitItem(visit.cassette.id, visit.cassette.revision, item.id, null)}
+                        onDecide={decision => { void decide(review, item.id, decision, decision === 'keep' && asksStatus && status ? { status } : undefined); }} />
                 </>;
             };
 
@@ -222,9 +290,10 @@ export function VisitQueue({ visits, busy, applicationError }: Snapshot) {
                         <Link href={`/patients/${review.patient.id}/modules`} className={surface.islandAction}>Apri scheda</Link>
                     ) : null}
                 </div>
-                {actionMessages.length > 0 && (
-                    <div id={actionMessagesId} className={`${surface.island} ${css.blockers}`}>
-                        {actionMessages.map((message, index) => <p role="alert" key={index}>{message}</p>)}
+                {batchError && <p id={batchErrorId} role="alert" className={css.alert}>{batchError}</p>}
+                {review.blockers.length > 0 && (
+                    <div id={visitBlockersId} className={`${surface.island} ${css.blockers}`}>
+                        {review.blockers.map((message, index) => <p role="alert" key={index}>{message}</p>)}
                     </div>
                 )}
 
@@ -270,6 +339,7 @@ export function VisitQueue({ visits, busy, applicationError }: Snapshot) {
                         ) : (
                             <p className={css.prose}>{noteText}</p>
                         )}
+                        {itemMessages(item)}
                         {gestures(item)}
                     </article>;
                 })}
@@ -283,11 +353,18 @@ export function VisitQueue({ visits, busy, applicationError }: Snapshot) {
                                 const sourcePdfId = source ? pdfByName.get(source.fileName) : undefined;
                                 const currentInRecord = review.currentSummary.get(item.id);
                                 const itemBlockers = review.itemBlockers.get(item.id) ?? [];
-                                const asksStatus = review.itemNeeds.get(item.id)?.includes('status') ?? false;
-                                const inRecord = review.inRecordItemIds.includes(item.id);
-                                const state = inRecord ? { label: 'Già in scheda', pill: surface.pillNeutral }
+                                const decision = decisions[item.id];
+                                const shownValues = itemValues(item);
+                                if (decision?.correction) Object.assign(shownValues, decision.correction);
+                                if (decision?.correction && agentCorrectionDropsDrugCodes(item, decision.correction)) {
+                                    delete shownValues.aic;
+                                    delete shownValues.atc;
+                                }
+                                const asksStatus = !decision && (review.itemNeeds.get(item.id)?.includes('status') ?? false);
+                                const state = decision ? null
+                                    : review.inRecordItemIds.includes(item.id) ? { label: 'Già in scheda', pill: surface.pillNeutral }
                                     : itemBlockers.length ? { label: 'Da verificare', pill: surface.pillWarning }
-                                    : asksStatus ? { label: 'Manca lo stato', pill: surface.pillWarning } : null;
+                                    : asksStatus && !chosenStatus[statusKey(item.id)] ? { label: 'Manca lo stato', pill: surface.pillWarning } : null;
                                 return <article key={item.id} className={`${surface.islandProposal} ${css.proposal}`}>
                                     <div className={`${surface.islandHeader} ${css.proposalHeader}`}>
                                         <span className={surface.islandIcon} aria-hidden="true"><CircleDashed size={15} /></span>
@@ -300,10 +377,10 @@ export function VisitQueue({ visits, busy, applicationError }: Snapshot) {
                                             {currentInRecord !== undefined && <p className={css.current}>In scheda: {currentInRecord}</p>}
                                             {correcting === item.id ? (
                                                 <CorrectionForm item={item} busy={busy} onCancel={() => setCorrecting(null)}
-                                                    onSave={values => { void decide(visit.cassette.id, item.id, 'correct', values); }} />
+                                                    onSave={values => { void decide(review, item.id, 'correct', values); }} />
                                             ) : (
                                                 <dl className={css.fields}>
-                                                    {agentReviewShownFields(item.kind, itemValues(item)).map(([field, value]) => (
+                                                    {agentReviewShownFields(item.kind, shownValues).map(([field, value]) => (
                                                         <div key={field}>
                                                             <dt>{fieldLabels[field] ?? field}</dt>
                                                             <dd className={field === 'dosage' && value === AGENT_DOSAGE_NOT_STATED ? css.notStated : undefined}>
@@ -326,14 +403,13 @@ export function VisitQueue({ visits, busy, applicationError }: Snapshot) {
                                             {typeof item.value.quote === 'string' && <blockquote className={css.quote}>{item.value.quote}</blockquote>}
                                         </aside>
                                     </div>
-                                    {itemBlockers.map(message => <p key={message} className={css.itemBlocker}>{message}</p>)}
-                                    {review.itemNeeds.get(item.id)?.includes('status') && correcting !== item.id ? <>
+                                    {!decisions[item.id] && itemBlockers.map(message => <p key={message} className={css.itemBlocker}>{message}</p>)}
+                                    {review.itemNeeds.get(item.id)?.includes('status') && correcting !== item.id && !decisions[item.id] ? <>
                                         <p className={css.itemBlocker}>{AGENT_THERAPY_STATUS_NEEDED}</p>
-                                        {agentItemAwaitsDecision(review, item.id) ? <StatusChoice item={item} chosen={chosenStatus[item.id]} busy={busy}
-                                            onChoose={status => setChosenStatus(current => ({ ...current, [item.id]: status }))} /> : null}
+                                        {agentItemAwaitsDecision(review, item.id) ? <StatusChoice item={item} chosen={chosenStatus[statusKey(item.id)]} busy={busy}
+                                            onChoose={status => setChosenStatus(current => ({ ...current, [statusKey(item.id)]: status }))} /> : null}
                                     </> : null}
                                     {correcting === item.id ? null : gestures(item)}
-                                    {gesturesUnavailable && !agentItemAwaitsDecision(review, item.id) ? <p className={css.itemInRecord}>{gesturesUnavailable}</p> : null}
                                 </article>;
                             })}
                         </div>
@@ -348,6 +424,7 @@ export function VisitQueue({ visits, busy, applicationError }: Snapshot) {
                             {agentReviewItemLabels[item.kind]} ({lineCount} {lineCount === 1 ? 'riga' : 'righe'})
                         </summary>
                         <p className={css.prose}>{transcriptText}</p>
+                        {itemMessages(item)}
                         {gestures(item)}
                     </details>;
                 })}
@@ -369,19 +446,27 @@ export function VisitQueue({ visits, busy, applicationError }: Snapshot) {
                 )}
 
                 <footer className={css.visitFooterBlock}>
-                    {isApplicable && review.newPatient && <p className="[font:var(--type-meta)]">
-                        Applicando questa visita crei anche la scheda del paziente.
-                        {birth && ` Sesso nel CF: ${birth.sex}.`}
-                    </p>}
+                    {identity && <NewPatientFields identity={identity} disabled={busy}
+                        onChange={value => setIdentities(current => ({ ...current, [identityKey]: value }))} />}
+                    {actionMessages.length > 0 && (
+                        <div id={actionMessagesId} className={`${surface.island} ${css.blockers}`}>
+                            {actionMessages.map((message, index) => <p role="alert" key={index}>{message}</p>)}
+                        </div>
+                    )}
                     <div className={css.visitFooter}>
-                        <span>
-                            {pending.length === 1 ? '1 elemento in attesa di conferma' : `${pending.length} elementi in attesa di conferma`}
-                        </span>
-                        <button type="button" className={isApplicable ? 'mf-button-primary' : 'mf-button-secondary'} disabled={busy || !isApplicable}
-                            aria-describedby={actionMessages.length > 0 ? actionMessagesId : undefined}
-                            onClick={() => { void applyReviewedAgentVisits([visit.cassette.id]); }}>
-                            Applica la visita
-                        </button>
+                        <Button variant="text" disabled={busy || !canDiscardIncomingAgentVisit(visit.cassette)}
+                            onClick={() => { void discardVisit(visit.cassette, review.appliedItemIds.length > 0); }}>Scarta la visita</Button>
+                        {visit.cassette.status === 'closed' && <button type="button" className={isApplicable ? 'mf-button-primary' : 'mf-button-secondary'} disabled={busy || !isApplicable}
+                            aria-describedby={actionDescriptions || undefined}
+                            onClick={() => {
+                                if (identity) {
+                                    void applyReviewedAgentVisitAndCreatePatient({ visitId: visit.cassette.id, revision: visit.cassette.revision, identity }, physicianChoices);
+                                } else {
+                                    void applyReviewedAgentVisits([visit.cassette.id], physicianChoices);
+                                }
+                            }}>
+                            {identity ? 'Crea scheda e applica la visita' : 'Applica la visita'}
+                        </button>}
                     </div>
                 </footer>
             </section>;

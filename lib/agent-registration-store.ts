@@ -137,12 +137,10 @@ export function createAgentRegistrationStore(database: Database.Database, now = 
             try { return grant ? activePrincipal(grant) : null; }
             catch (error) { if (error instanceof AgentMandateDenied) return null; throw error; }
         },
-        operationsForCassette(agentRef: string, mandateRef: string): string | undefined {
-            if (!database.inTransaction) return undefined;
-            const grant = database.prepare(`SELECT pairing.operations ${grants}
-                WHERE grant.agent_ref=? AND grant.mandate_ref=? AND registration.revoked_at IS NULL`)
-                .get(agentRef, mandateRef) as { operations: string } | undefined;
-            return grant?.operations;
+        registrationForCassette(agentRef: string, mandateRef: string) {
+            return database.prepare(`SELECT pairing.operations, registration.revoked_at AS revokedAt ${grants}
+                WHERE grant.agent_ref=? AND grant.mandate_ref=?`)
+                .get(agentRef, mandateRef) as { operations: string; revokedAt: number | null } | undefined;
         },
         listOneOffMandates(actorRef: string): AgentMandate[] {
             const renewed = new Set(database.prepare('SELECT mandate_ref FROM agent_unlock_grants').pluck().all());

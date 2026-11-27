@@ -332,6 +332,8 @@ final class HomeBasePatientsClientTests: XCTestCase {
                 headerFields: path.hasSuffix("login") ? ["Set-Cookie": "mediflow_session=v3-session; Path=/; HttpOnly"] : nil)!
             if path == "/api/auth/check" {
                 XCTAssertNil(request.value(forHTTPHeaderField: "Cookie"))
+                XCTAssertEqual(request.value(forHTTPHeaderField: "X-MediFlow-Paired-Client-Id"), self.creds.clientId)
+                XCTAssertEqual(request.value(forHTTPHeaderField: "X-MediFlow-Paired-Client-Token"), self.creds.clientToken)
                 return (response, try JSONSerialization.data(withJSONObject: ["status": "ok", "isSetup": true,
                     "archiveGeneration": "synthetic-generation", "unlock": ["credential": "passphrase", "kdfVersion": 3, "salt": vector["salt"]!]]))
             }
@@ -562,7 +564,9 @@ final class HomeBasePatientsClientTests: XCTestCase {
     private func legacyUnlockCheck(_ request: URLRequest) throws -> (HTTPURLResponse, Data) {
         XCTAssertEqual(request.httpMethod, "GET")
         XCTAssertNil(request.value(forHTTPHeaderField: "Cookie"))
-        XCTAssertNil(request.value(forHTTPHeaderField: "x-mediflow-paired-client-token"))
+        XCTAssertNil(request.value(forHTTPHeaderField: "X-MediFlow-Source-Surface"))
+        XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-id"), "paired-client-1")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "x-mediflow-paired-client-token"), "paired-token-1")
         let response = HTTPURLResponse(url: try XCTUnwrap(request.url), statusCode: 200, httpVersion: nil, headerFields: nil)!
         return (response, Data(#"{"status":"ok","isSetup":true,"unlock":{"credential":"pin"}}"#.utf8))
     }
