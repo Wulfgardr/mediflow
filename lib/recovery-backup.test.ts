@@ -13,6 +13,7 @@ import { openVersionedSqliteDatabase, CURRENT_SQLITE_SCHEMA_VERSION } from './sq
 import { readTerritorialPacks, requireTerritorialPack, commitTerritorialPackTransition } from './territorial-pack-store';
 import { TERRITORIAL_PACK_SCHEMA } from './territorial-packs';
 import { readSqliteArchiveGeneration } from './archive-generation';
+import { recordWebAgentLifecycle } from './test-fixtures/web-agent-lifecycle';
 import { ACCOUNT_RESET_RECEIPT_PREFIX } from './backup-restore-receipt-contract';
 import { openAdmittedSqlite } from './sqlite-maintenance-admission.mjs';
 import { createRecoverySnapshot, restoreRecoveryBackup } from './recovery-backup-server';
@@ -128,6 +129,22 @@ test('an archive above the former 256 MiB limit encrypts and restores through th
             const [, iv, ciphertext] = encrypted.split(':');
             assert.equal(await decryptData(ciphertext, iv, f.key), 'nota clinica sintetica recuperabile');
             assert.equal(restored.pragma('integrity_check', { simple: true }), 'ok');
+        } finally { restored.close(); }
+    } finally { f.cleanup(); }
+});
+
+test('encrypted recovery backup restores the original Web agent lifecycle rows', async () => {
+    const f = await fixture();
+    try {
+        recordWebAgentLifecycle(f.db, actor);
+        const query = "SELECT * FROM audit_events WHERE source_surface='web' AND proposer_ref IS NOT NULL ORDER BY event_type";
+        const expected = f.db.prepare(query).all() as { event_type: string }[];
+        assert.deepEqual(expected.map(row => row.event_type), ['agent.client.registered', 'agent.client.revoked', 'agent.mandate.renewed']);
+        const artifact = await encryptRecoveryBackup(createRecoverySnapshot(f.db, actor), f.key);
+        await f.restore({ artifact });
+        const restored = openVersionedSqliteDatabase(f.destination);
+        try {
+            assert.deepEqual(restored.prepare(query).all(), expected);
         } finally { restored.close(); }
     } finally { f.cleanup(); }
 });
