@@ -5,7 +5,7 @@
       "tags": [
         {
           "tag": "v0.5.0",
-          "commit": "beedad764684b543c394da5b5ee3f859b56e0b98"
+          "commit": "238963cbad2578eb63f55e6f7ce98077c8809d8e"
         }
       ],
       "sqlSources": [
@@ -54,7 +54,7 @@
       "tags": [
         {
           "tag": "v0.6.0",
-          "commit": "751e55354de3ce53dc03f1fb44d8c1bc540e9e31"
+          "commit": "46181b1b40adb47af07fa2dd8dd6077bc6afbff3"
         }
       ],
       "sqlSources": [
@@ -110,7 +110,7 @@
       "tags": [
         {
           "tag": "v0.7.0",
-          "commit": "1804b698c14450422eea2934b686c1acac429fdc"
+          "commit": "411e2ab53798680c064cafa632e81f195a0846e4"
         }
       ],
       "sqlSources": [
@@ -169,7 +169,7 @@
       "tags": [
         {
           "tag": "v0.7.2",
-          "commit": "c704a6db8547d92631fe77c6a5396dc09d2dedcc"
+          "commit": "010b83e2d400100d55436b3b68533e7826b69c4e"
         }
       ],
       "sqlSources": [
@@ -242,7 +242,7 @@
       "tags": [
         {
           "tag": "v0.7.3",
-          "commit": "3d6ab8c076936fb9bfc3ac7c94a32bba1f1d744b"
+          "commit": "fd72340ad2aae19459a487004b92ce286ccbb20b"
         }
       ],
       "sqlSources": [
@@ -316,11 +316,11 @@
       "tags": [
         {
           "tag": "v0.8.0",
-          "commit": "0cef4f4ae41c2c04efd5e1343cf3049215f36c9e"
+          "commit": "bbb8888c8ac8bda94727278ab46412d74c407f2f"
         },
         {
           "tag": "v0.8.2",
-          "commit": "2cf432c854ef161eac32a713aa93e30920ef2b5d"
+          "commit": "ac8e652b2e03617f426d9d023dc25e48cce3d0e2"
         }
       ],
       "sqlSources": [
@@ -412,7 +412,7 @@
       "tags": [
         {
           "tag": "v0.8.6",
-          "commit": "46296266c0a8ff4d4ab19216af7e761cddec7d78"
+          "commit": "eb74e50f79891304e7ca940bd2a88737966b0489"
         }
       ],
       "sqlSources": [
