@@ -178,6 +178,7 @@ function startProxyFromEnv() {
     });
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+const entryPath = process.argv[1];
+if (entryPath && fs.existsSync(entryPath) && fs.realpathSync(entryPath) === fs.realpathSync(fileURLToPath(import.meta.url))) {
     startProxyFromEnv();
 }

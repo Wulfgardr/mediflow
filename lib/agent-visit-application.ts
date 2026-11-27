@@ -6,10 +6,9 @@ import { patients, auditEvents, therapies, observations, servicePrescriptions, a
 import { activePatients } from './patient-lifecycle';
 import { hasPatientIdentifierConflict } from './patient-identifier-conflict';
 import { birthDateMatchesTaxCode, isValidItalianTaxCode } from './patient-identity';
-import { createAgentRegistrationStore } from './agent-registration-store';
 import { createAgentMandateStore } from './agent-mandate-store';
-import { AGENT_CASSETTE_COMPLETE, readAgentCassette } from './agent-cassette-store';
-import { AGENT_ITEM_OPERATION, cassetteItems } from './agent-cassette-contract';
+import { AGENT_CASSETTE_COMPLETE, agentCassetteReviewBlock, readAgentCassette } from './agent-cassette-store';
+import { cassetteItems } from './agent-cassette-contract';
 import { agentApplicationSchema, agentItemDecisionSchema, reviewedAgentApplicationSchema, type AgentApplication, type AgentApplicationReceipt,
     type AgentItemDecisionReceipt, type AgentVisitDecisionState } from './agent-visit-application-contract';
 import type { AgentCassette } from './agent-cassette-contract';
@@ -73,27 +72,13 @@ function visitRecipients(visitId: string): string[] {
         eq(auditEvents.subjectType, 'patient'), eq(auditEvents.requestId, visitId), eq(auditEvents.outcome, 'success'))).all().flatMap(row => row.id ? [row.id] : []))];
 }
 function admittedCassette(session: ServerSession, visitId: string, revision: number) {
+    if (session.role !== 'admin' || session.authChannel !== 'web' || session.expiresAt <= Date.now()) throw new AgentApplicationDenied(403);
+    const generation = archiveGenerationForSession(session);
+    if (!generation || generation !== currentArchiveGeneration()) throw new AgentApplicationDenied(403);
     const cassette = readAgentCassette(dbServer.$client, visitId, session.userId);
     if (!cassette || cassette.status !== 'closed' || cassette.revision !== revision) throw new AgentApplicationDenied(409);
-    const generation = archiveGenerationForSession(session);
-    if (!generation || generation !== cassette.archiveGeneration) throw new AgentApplicationDenied(403);
+    if (generation !== cassette.archiveGeneration || agentCassetteReviewBlock(dbServer.$client, cassette)) throw new AgentApplicationDenied(403);
     return { cassette, generation };
-}
-function admittedClient(cassette: AgentCassette, session: ServerSession) {
-    const mandateStore = createAgentMandateStore(dbServer.$client);
-    const mandate = mandateStore.admit(cassette.mandateRef, 'visita.chiudi');
-    if (mandate.actorRef !== session.userId) throw new AgentApplicationDenied(403);
-    const client = dbServer.$client.prepare('SELECT revoked_at,expires_at,operations FROM agent_clients WHERE id=? AND mandate_ref=?')
-        .get(cassette.agentRef, cassette.mandateRef) as { revoked_at: number | null; expires_at: number; operations: string } | undefined;
-    const clientOperations = client
-        ? (client.revoked_at === null && client.expires_at > Date.now() ? client.operations : undefined)
-        : createAgentRegistrationStore(dbServer.$client).operationsForCassette(cassette.agentRef, cassette.mandateRef);
-    if (!clientOperations) throw new AgentApplicationDenied(403);
-    const operations: unknown = JSON.parse(clientOperations);
-    return (kind: AgentApplication['items'][number]['kind']) => {
-        mandateStore.admit(cassette.mandateRef, AGENT_ITEM_OPERATION[kind]);
-        if (!Array.isArray(operations) || !operations.includes(AGENT_ITEM_OPERATION[kind])) throw new AgentApplicationDenied(403);
-    };
 }
 type AgentItemWrite = { request: Request; session: ServerSession; patientId: string; audit: RequiredAuditContext;
     provenance: NonNullable<RequiredAuditContext['agentProvenance']> };
@@ -162,11 +147,11 @@ function commitAgentVisit(request: Request, session: ServerSession, value: unkno
         let receiptRequestId = input.phase + ':' + input.patientId;
         if (confirmation) {
             confirmation.assertLive();
+            createAgentMandateStore(dbServer.$client).admit(cassette.mandateRef, 'visita.chiudi');
             const { challenge, proof } = confirmation;
             const binding = challenge.binding;
             const policy = verifyVisitConfirmationProof(challenge, proof, input, Date.now());
-            if (!policy || generation !== currentArchiveGeneration() || generation !== binding.archiveGeneration
-                || session.role !== 'admin' || session.authChannel !== 'web' || session.expiresAt <= Date.now()
+            if (!policy || generation !== binding.archiveGeneration
                 || session.userId !== binding.actorRef || session.id !== binding.sessionId
                 || cassette.agentRef !== binding.agentRef || cassette.mandateRef !== binding.mandateRef
                 || agentConfirmationPatientState(input.patientId, input.expectedVersion) !== binding.patientState) throw new AgentApplicationDenied(403);
@@ -174,7 +159,6 @@ function commitAgentVisit(request: Request, session: ServerSession, value: unkno
             confirmationFlags.push(confirmationAuditFlag, 'device:' + challenge.deviceRef, 'policy:' + policy,
                 'revision:' + input.cassetteRevision, 'archive:' + confirmationDigest(generation), 'egress:' + (cassette.allowsClinicalEgress ? 'declared' : 'denied'));
         }
-        const admitItem = admittedClient(cassette, session);
         const deposited = cassetteItems(cassette);
         const prior = tx.select().from(auditEvents).where(and(eq(auditEvents.eventType, 'agent.visit.applied'),
             eq(auditEvents.subjectRef, cassette.id), eq(auditEvents.requestId, receiptRequestId), eq(auditEvents.outcome, 'success'), eq(auditEvents.sourceSurface, 'agent'))).all();
@@ -185,7 +169,6 @@ function commitAgentVisit(request: Request, session: ServerSession, value: unkno
         const selected = (replay ? deposited : pending).filter(item => input.items.some(prepared => prepared.id === item.id));
         if (selected.length !== input.items.length || selected.some(item => !input.items.some(prepared => prepared.id === item.id && prepared.kind === item.kind))
             || !replay && pending.some(item => !selected.includes(item))) throw new AgentApplicationDenied(409);
-        for (const item of selected) admitItem(item.kind);
         const provenance = { proposerRef: cassette.agentRef, mandateRef: cassette.mandateRef, modelProvider: cassette.modelProvider };
         if (replay) {
             if (confirmation) throw new AgentApplicationDenied(409);
@@ -199,18 +182,18 @@ function commitAgentVisit(request: Request, session: ServerSession, value: unkno
         const audit: RequiredAuditContext = { actorType: 'user', actorRef: session.userId, sourceSurface: 'agent', archiveGeneration: generation,
             agentProvenance: provenance, requestId: cassette.id, flags: [input.phase, ...confirmationFlags] };
         if (input.newPatient) {
-            const { taxCode, birthDate, ambulatoryId } = input.newPatient;
+            const { taxCode, firstName, lastName, birthDate, ambulatoryId } = input.newPatient;
             const target = selectedAmbulatoryId
                 ? tx.select({ id: ambulatories.id }).from(ambulatories).where(eq(ambulatories.id, selectedAmbulatoryId)).get()
                 : tx.select({ id: ambulatories.id }).from(ambulatories).where(eq(ambulatories.isDefault, true)).get();
             const id = input.patientId;
             if (selectedAmbulatoryId === undefined || target?.id !== ambulatoryId || id !== cassette.id || input.expectedVersion !== 1
-                || appliedIds.length || discardedIds.length || !selected.some(item => item.kind === 'pdf') || !isValidItalianTaxCode(taxCode)
+                || appliedIds.length || discardedIds.length || !selected.some(item => item.kind === 'pdf' || item.kind === 'note' || item.kind === 'transcription') || !isValidItalianTaxCode(taxCode)
                 || (birthDate && !birthDateMatchesTaxCode(taxCode, birthDate))
                 || tx.select({ id: patientRetiredIds.id }).from(patientRetiredIds).where(eq(patientRetiredIds.id, id)).get()
                 || tx.select({ id: patients.id }).from(patients).where(eq(patients.id, id)).get()
                 || hasPatientIdentifierConflict(tx, { id, ambulatoryId, taxCode, identifierType: 'cf' })) throw new AgentApplicationDenied(409);
-            tx.insert(patients).values({ id, firstName: '', lastName: '', taxCode, identifierType: 'cf', ambulatoryId,
+            tx.insert(patients).values({ id, firstName, lastName, taxCode, identifierType: 'cf', ambulatoryId,
                 birthDate: birthDate ? new Date(birthDate) : null, birthDatePrecision: birthDate ? 'exact' : 'unknown' }).run();
             tx.insert(patientsToAmbulatories).values({ patientId: id, ambulatoryId }).run();
             writeAuditEventInTransaction(tx, { ...audit, eventType: 'patient.created', outcome: 'success', subjectType: 'patient', subjectRef: id,
@@ -269,10 +252,8 @@ export function decideAgentVisitItem(request: Request, session: ServerSession, v
     const kind = input.decision === 'discard' ? input.kind : input.item.kind;
     return dbServer.transaction(tx => {
         const { cassette, generation } = admittedCassette(session, input.visitId, input.cassetteRevision);
-        const admitItem = admittedClient(cassette, session);
         const deposited = cassetteItems(cassette).find(item => item.id === itemId);
         if (!deposited || deposited.kind !== kind) throw new AgentApplicationDenied(409);
-        admitItem(kind);
         const provenance = { proposerRef: cassette.agentRef, mandateRef: cassette.mandateRef, modelProvider: cassette.modelProvider };
         const decided = tx.select().from(auditEvents).where(and(eq(auditEvents.subjectRef, itemId), eq(auditEvents.requestId, cassette.id),
             eq(auditEvents.subjectType, 'agent_operation'), eq(auditEvents.outcome, 'success'), eq(auditEvents.sourceSurface, 'agent'))).all()

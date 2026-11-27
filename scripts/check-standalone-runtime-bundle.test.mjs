@@ -370,9 +370,15 @@ test('standalone config traces the pinned Apple Vision canvas runtime', () => {
 });
 
 test('packaged TLS proxy starts outside the checkout and fails if its shared import is absent', async t => {
-  for (const omitted of [null, 'loopback-ingress.mjs', 'network-ingress-policy.mjs']) {
-    await t.test(omitted ? `missing ${omitted} rejects the bundle` : 'complete packaged layout forwards HTTPS', () => {
-      const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-tls-bundle-'));
+  const cases = [
+    { name: 'complete packaged layout forwards HTTPS' },
+    { name: 'packaged layout reached through a filesystem alias forwards HTTPS', alias: true },
+    { name: 'missing loopback-ingress.mjs rejects the bundle', omitted: 'loopback-ingress.mjs' },
+    { name: 'missing network-ingress-policy.mjs rejects the bundle', omitted: 'network-ingress-policy.mjs' },
+  ];
+  for (const { name, alias, omitted } of cases) {
+    await t.test(name, () => {
+      const directory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-tls-bundle-')));
       try {
         const resources = path.join(directory, 'MediFlow.app', 'Contents', 'Resources');
         const scripts = path.join(resources, 'scripts');
@@ -383,7 +389,9 @@ test('packaged TLS proxy starts outside the checkout and fails if its shared imp
           fs.mkdirSync(security, { recursive: true });
           fs.copyFileSync(path.join(root, 'lib/security', file), path.join(security, file));
         }
-        const result = spawnSync(node, [checker, '--tls-proxy-resources', resources], {
+        const input = alias ? path.join(directory, 'resources-alias') : resources;
+        if (alias) fs.symlinkSync(resources, input, process.platform === 'win32' ? 'junction' : 'dir');
+        const result = spawnSync(node, [checker, '--tls-proxy-resources', input], {
           cwd: directory, env: { ...process.env, NODE_OPTIONS: '' }, encoding: 'utf8', timeout: 25_000,
         });
         assert.equal(result.error, undefined);
