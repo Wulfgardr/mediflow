@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { openUnlockedDocument, bootstrapUnlockedSession, openPatientSection, assertNoHorizontalOverflow, assertNotClippedInViewport } from './utils';
 import { test as isolatedTest } from './fixtures/isolated-runtime';
 import { switchPreset } from './fixtures/territorial-preset';
+import { expectHeaderCommands, voiceServiceDeclared } from './patient-header-commands';
 
 type SchedaCase = { register: 'giorno' | 'grafite'; viewport: 'wide' | 'narrow'; width: number; height: number };
 const CASES: SchedaCase[] = [
@@ -130,7 +131,8 @@ async function expectPatientHeaderCommands(page: Page, header: Locator, patientI
   await expect(actions).toHaveClass(/mf-button-secondary/);
   await expect(actions).toHaveAttribute('aria-haspopup', 'menu');
   await expect(actions).toHaveAttribute('aria-expanded', 'false');
-  await expect(header.getByRole('link')).toHaveCount(1);
+  await expectHeaderCommands(header, voiceServiceDeclared());
+  await expect(header.getByRole('link')).toHaveCount(voiceServiceDeclared() ? 2 : 1);
   await expect(header.getByRole('button')).toHaveCount(2);
   await expect(header.getByRole('button', { name: 'Prescrivi', exact: true })).toHaveAttribute('aria-haspopup', 'menu');
   for (const [control, background] of [[primary, '--lume-accent'], [actions, '--lume-surface-field']] as const) {

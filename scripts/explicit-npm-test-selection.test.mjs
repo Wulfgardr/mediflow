@@ -254,6 +254,7 @@ test('required npm script bodies and CI bindings select the actual independent e
     'npm:test:attachment-currentness-writers': ['scripts/check-attachment-currentness-writers.test.mjs'],
     'npm:test:anydoc-local-only': ['scripts/check-anydoc-local-only.test.mjs'],
     'npm:test:ci-guards-wired': ['scripts/check-ci-guards-wired.test.mjs'],
+    'npm:test:seatbelt-profiles': ['scripts/check-seatbelt-profiles.test.mjs'],
     'npm:test:public-sanitization': ['scripts/check-public-sanitization.test.mjs'],
     'npm:test:dossier-conformance-corpus': ['scripts/check-dossier-conformance-corpus.test.mjs'],
   });

@@ -278,5 +278,10 @@
     "path": "e2e/local-voice-utils.ts",
     "reason": "WUL-966: microfono sintetico e paziente sintetico importati dalle spec della registrazione; nessun test autonomo.",
     "owner": "WUL-966"
+  },
+  {
+    "path": "e2e/patient-header-commands.ts",
+    "reason": "WUL-966: comandi attesi nella testata della scheda con e senza servizio della voce, importati dalle spec della testata; nessun test autonomo.",
+    "owner": "WUL-966"
   }
 ]

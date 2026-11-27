@@ -344,3 +344,154 @@ casi negativi nuovi passano. La prova riguarda solo questo binario e questo
 modello. Non promuove `available_unqualified`, non attribuisce causalità al
 digest e non qualifica UI, latenza, richieste parallele, qualità clinica o uso
 clinico.
+
+## Intervallo 0.40.x con schema chiuso, WUL-840, 26 novembre 2026
+
+Stato: Accepted, 26 novembre 2026, per decisione di Leonardo. Sostituisce,
+per le patch della 0.40 dalla 0.40.16 in su, l'ammissione puntuale delle due
+sezioni precedenti.
+
+### Che cosa garantiva la versione esatta
+
+Il controllo dei marker remoti è un elenco di campi noti: `remote_host`,
+`remote_model` e i nomi `:cloud`. Vale solo se la versione in uso non ha
+aggiunto altri modi di mandare una richiesta fuori dal Mac. La versione esatta
+era l'unico segnale che legava le risposte di Ollama a un comportamento già
+osservato sul runtime vero: significato dei campi, assenza di instradamenti
+remoti diversi da quelli noti, rispetto di `OLLAMA_NO_CLOUD`. Il prezzo è
+stato che ogni aggiornamento automatico di Ollama.app spegneva le funzioni
+locali fino a una nuova versione di MediFlow: il 13 novembre con la 0.40.16,
+il 26 novembre con la 0.40.18.
+
+### Decisione
+
+- Sono ammesse le versioni `0.40.N` con N da 16 in su, senza zeri iniziali,
+  anteprime o suffissi build. Restano negate con
+  `provider_version_unsupported` le versioni dalla 0.40.7
+  alla 0.40.15, la 0.41.0 e successive, `0.40.18-rc0`, `0.40.18+build`,
+  `0.40.016`.
+- Per queste versioni le risposte di `/api/tags`, `/api/show` e `/api/ps`
+  passano da un elenco chiuso di campi
+  (`lib/ai-providers/ollama-response-schema.ts`). Un campo fuori elenco nega
+  l'attestazione con il codice `provider_field_unknown`, distinto da
+  `provider_version_unsupported`. Il dettaglio porta versione, endpoint e
+  percorso del campo, per esempio `models[].details.routing` o
+  `capabilities[]=cloud`. Il percorso è ripulito e limitato a 120 caratteri.
+  La risposta HTTP è 409 come per la versione fuori intervallo. Un campo nuovo in tags o show ferma
+  l'attestazione prima del precaricamento.
+- I controlli di prima restano tutti, in aggiunta: loopback, modello nei tags
+  con digest, marker remoti in tags, show, precaricamento e processi, digest
+  dei processi uguale a quello installato. L'adapter ripete l'attestazione a
+  ogni operazione, quindi anche lo schema.
+- Le versioni già osservate puntualmente, 0.32.x, 0.33.3, 0.34.2, 0.40.4,
+  0.40.5 e 0.40.6, restano ammesse come prima, senza schema chiuso.
+- `SUPPORTED_OLLAMA_LOCALITY_VERSIONS` diventa
+  `0.32.x, 0.33.3, 0.34.2, 0.40.4, 0.40.5, 0.40.6, dalla 0.40.16 in poi nella serie 0.40`:
+  è il testo che il medico legge accanto alla versione trovata.
+
+### Da dove viene l'elenco
+
+L'elenco è ricavato dalle strutture con cui Ollama serializza le tre risposte:
+`ListResponse` e `ListModelResponse`, `ShowResponse`, `ProcessResponse` e
+`ProcessModelResponse`, `ModelDetails`, `Message`, `Tensor`,
+`ManifestSummary` in `api/types.go`, `Thinking` e `Capability` in
+`types/model/`. Sono identiche fra le etichette
+[v0.40.16](https://github.com/ollama/ollama/blob/v0.40.16/api/types.go) e
+[v0.40.18](https://github.com/ollama/ollama/blob/v0.40.18/api/types.go).
+Le risposte reali registrate, 0.40.16 il 13 novembre e 0.40.18 il 26 novembre
+con lo stesso modello `qwen3.5:35b-a3b`, stanno in
+`lib/ai-providers/fixtures/ollama/` e usano un sottoinsieme di quei campi.
+L'elenco comprende anche i campi dichiarati e non osservati con questo modello
+(`system`, `messages`, `projector_info`, `tensors`, `voices`, `manifests`,
+`context_length` ed `embedding_length` nei dettagli): esistono nel sorgente
+delle versioni ammesse e compaiono con altri modelli o con `verbose`. Non
+comprende nulla che non sia in quelle strutture, con un'eccezione:
+`remote_host` e `remote_model` nelle voci di `/api/ps`, che
+`ProcessModelResponse` non dichiara ma che MediFlow conosce come marker
+remoti. Restano ammessi nello schema perché il controllo dei marker li neghi
+come `model_not_local`, come prima.
+
+Il campo `template_source` manca in 0.40.6. Compare in 0.40.16 e
+0.40.18 e indica da dove proviene il template del modello. L'elenco lo
+include perché entrambe le risposte osservate lo usano e il sorgente lo
+dichiara come testo, con valori come `renderer_parser`.
+
+### Fino a che profondità guarda il controllo
+
+| Risposta | Oggetti con chiavi chiuse | Mappe aperte |
+|---|---|---|
+| `/api/tags` | Radice, ogni voce di `models` e relativi `details` | |
+| `/api/show` | Radice, `details`, `thinking`, elementi di `messages`, `tensors` e `manifests`. In ogni messaggio il controllo scende in `tool_calls` e nella relativa `function`. | `model_info`, `projector_info` e argomenti delle chiamate a strumenti |
+| `/api/ps` | Radice, ogni voce di `models` e relativi `details` | |
+
+Gli elenchi di valori scalari, come `details.families`, `thinking.values`
+e `voices`, rifiutano elementi con chiavi annidate. Nei campi scalari
+la presenza di un oggetto o elenco nega l'attestazione. I valori di
+`capabilities` sono quelli di `types/model/capability.go`: `completion`,
+`tools`, `insert`, `vision`, `embedding`, `thinking`, `image`, `audio`,
+`decision`, `speech`.
+
+`model_info` e `projector_info` contengono metadati GGUF o safetensors
+con chiavi definite dall'architettura del modello. Il codice osservato
+della 0.40.18 li restituisce in risposta. In `server/routes.go`
+l'instradamento remoto legge invece `RemoteHost` e `RemoteModel` dalla
+configurazione del modello, esposta in tags e show attraverso i marker
+che l'attestazione già nega. Gli argomenti delle chiamate a strumenti sono
+dati del messaggio con chiavi definite dallo strumento. L’attestazione ignora tutte e tre le mappe. Le richieste cliniche
+usano l’endpoint loopback attestato e un prompt costruito da MediFlow.
+
+### Che cosa garantisce lo schema chiuso
+
+Una patch ammessa espone in tags, show e ps solo campi di cui è stato letto il
+significato nel sorgente delle versioni osservate, più i marker remoti noti.
+Ogni campo nuovo nelle parti chiuse ferma l’attestazione e viene
+indicato nel dettaglio, anche se appartiene a un modello diverso da quello
+richiesto.
+
+### Che cosa resta scoperto
+
+- Un cambiamento che manda dati fuori senza aggiungere campi: un campo
+  esistente che cambia significato, un instradamento deciso dal server per un
+  modello locale, `OLLAMA_NO_CLOUD` non più rispettato, una telemetria che
+  porta il testo. È il rischio dichiarato e accettato con questa decisione.
+- La rete in uscita del daemon, che MediFlow non vede, come prima.
+- Le risposte di precaricamento e di chat restano fuori dai tre schemi chiusi.
+  MediFlow continua a verificarne i marker remoti e il nome del modello.
+- Un valore nuovo in un campo noto passa, salvo `capabilities`.
+
+Un workflow settimanale segnala le release nuove di Ollama.
+L’ammissione delle versioni resta governata da questa decisione.
+
+### Perché l'intervallo si ferma alle patch della 0.40
+
+Le strutture delle tre risposte sono le stesse in 0.40.16 e 0.40.18.
+Fra 0.40.6 e 0.40.16 si sono aggiunti `template_source` e `voices`. La verifica copre le risposte
+della 0.40. L’intervallo si ferma prima della 0.41 perché il cambio di versione minore può cambiare il
+contratto delle API o l’instradamento. La 0.41 torna quindi a richiedere
+un'osservazione sul runtime vero, con la procedura delle sezioni 0.40.16 e
+0.40.18 e un elenco ricavato dal suo sorgente.
+
+### Come si ammette un campo nuovo
+
+Si legge nel sorgente upstream che cosa significa il campo e se partecipa
+all'instradamento. Si aggiunge il campo allo schema e si registra la risposta
+reale in `lib/ai-providers/fixtures/ollama/`. Se il campo indica un
+instradamento remoto, si aggiungono un controllo che lo neghi e il relativo test.
+
+### Prove
+
+- Le risposte reali registrate di 0.40.16 e 0.40.18 attestano il modello
+  locale (`ollama-locality-closed-schema.test.ts`).
+- Per ciascuna delle due versioni, 22 iniezioni: campo nuovo a ogni
+  livello chiuso delle tre risposte, valore nuovo di `capabilities`, tipo
+  sbagliato di `details` e `messages`. Tutte negate con
+  `provider_field_unknown` e il percorso del campo. Tags e show fermano
+  l’attestazione prima del precaricamento.
+- 0.40.17, 0.40.19, 0.40.25, 0.40.180 e 0.40.16000 passano con lo schema
+  noto. Un campo nuovo nega l’attestazione anche su queste versioni. 0.40.7, 0.40.15, 0.41.0, `0.40.18-rc0`, `0.40.18+build`,
+  `0.40.016`, versioni con una nuova riga finale
+  e `1.40.18` restano negate prima di leggere tags.
+- Le versioni osservate puntualmente restano ammesse anche con un campo in
+  più, come prima. I test dei marker remoti passano con le attese esistenti.
+- Il codice nuovo arriva alla rotta di onboarding, alla vista e al pannello
+  montato con un testo diverso da quello della versione.

@@ -180,8 +180,6 @@ button.directoryAction {
   min-height: 240px;
   overflow: auto;
   overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: var(--lume-ink-muted) transparent;
 }
 
 .patientList { position: relative; width: 100%; }

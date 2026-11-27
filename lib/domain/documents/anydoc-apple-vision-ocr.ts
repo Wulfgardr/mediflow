@@ -1,9 +1,10 @@
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { lstatSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { types } from 'node:util';
+import { seatbeltProfile } from '../../../scripts/seatbelt-profile.mjs';
 
 export const ANYDOC_APPLE_VISION_OCR_SCHEMA_VERSION = 'mediflow.anydoc_apple_vision_ocr.v1' as const;
 export const ANYDOC_APPLE_VISION_OCR_SCRIPT_SHA256 = 'fb87dd9c0ca98a9ac68840c7c4c7517fec8199dbbd3dc1b3c93ad617d80dc314' as const;
@@ -17,7 +18,34 @@ const MAX_DOCUMENT_PAGES = 16;
 const MAX_OUTPUT_BYTES = 8 * 1024 * 1024;
 const MAX_PROCESS_OUTPUT_BYTES = MAX_OUTPUT_BYTES + 4096;
 const MAX_DIAGNOSTIC_BYTES = 16 * 1024;
-const SANDBOX_PROFILE = '(version 1) (allow default) (deny network*)';
+
+let cachedSwiftToolchainBin: string | null | undefined;
+function resolveSwiftToolchainBin(): string | null {
+    if (cachedSwiftToolchainBin !== undefined) return cachedSwiftToolchainBin;
+    try {
+        const swiftPath = execFileSync('/usr/bin/xcrun', ['--find', 'swift'], {
+            encoding: 'utf8',
+            env: { NODE_ENV: 'production', PATH: '/usr/bin:/bin', LC_ALL: 'C' },
+            timeout: 5_000,
+        }).trim();
+        cachedSwiftToolchainBin = path.isAbsolute(swiftPath) ? realpathSync(path.dirname(swiftPath)) : null;
+    } catch {
+        cachedSwiftToolchainBin = null;
+    }
+    return cachedSwiftToolchainBin;
+}
+
+/** Confines Apple Vision OCR to offline execution with writes limited to its owned temporary root. */
+export function appleVisionSandboxProfile(temporaryRoot: string, toolchainBin = resolveSwiftToolchainBin()): string | null {
+    if (!toolchainBin || !path.isAbsolute(temporaryRoot) || /[\x00-\x1f\x7f]/u.test(temporaryRoot)) return null;
+    let writableRoot: string;
+    try { writableRoot = realpathSync(temporaryRoot); } catch { writableRoot = temporaryRoot; }
+    return seatbeltProfile({
+        rules: `(deny network*) (deny file-write*) (allow file-write* (literal "/dev/null") (subpath ${JSON.stringify(writableRoot)}))`,
+        programs: ['/usr/bin/xcrun'],
+        programSubpaths: [toolchainBin],
+    });
+}
 
 export type AnyDocAppleVisionOcrFailureReason =
     | 'invalid_input' | 'engine_unavailable' | 'resource_limit' | 'timeout'
@@ -126,10 +154,13 @@ async function runOwnedScript(script: string, bytes: Buffer, temporaryRootOwner:
     if (typeof temporaryRoot !== 'string' || !path.isAbsolute(temporaryRoot) || temporaryRoot.length < 2
         || temporaryRoot.includes('\0')) { bytes.fill(0); return 'temporary_storage_unavailable'; }
     const startedAt = performance.now();
+    const sandboxProfile = appleVisionSandboxProfile(temporaryRoot);
     let result: OwnedProcessResult | AnyDocAppleVisionOcrFailureReason;
-    try {
+    if (!sandboxProfile) {
+        result = 'engine_unavailable';
+    } else try {
         result = await new Promise((resolve) => {
-            const child = spawn('/usr/bin/sandbox-exec', ['-p', SANDBOX_PROFILE, '/usr/bin/xcrun', 'swift', script], {
+            const child = spawn('/usr/bin/sandbox-exec', ['-p', sandboxProfile, '/usr/bin/xcrun', 'swift', script], {
                 cwd: path.dirname(script), env: { NODE_ENV: 'production', PATH: '/usr/bin:/bin', LC_ALL: 'C',
                     TMPDIR: `${temporaryRoot}${path.sep}` },
                 stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, detached: true,

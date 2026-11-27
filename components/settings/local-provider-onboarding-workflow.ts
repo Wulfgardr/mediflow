@@ -1,5 +1,5 @@
 import { parseFunctionStatus, type FunctionStatusSnapshot } from '../../lib/function-status';
-import type { OllamaVersionMismatch } from '../../lib/ai-providers/ollama-locality';
+import type { OllamaUnknownField, OllamaVersionMismatch } from '../../lib/ai-providers/ollama-locality';
 import type { LocalProviderOnboardingStatus } from '../../lib/ai-providers/fabric/local-provider-onboarding-service';
 
 export type LocalOnboardingPhase = 'reading_configuration' | 'ready' | 'verifying'
@@ -10,6 +10,7 @@ export type LocalOnboardingView = Readonly<{
     functions: FunctionStatusSnapshot | null;
     messageCode: string;
     versionMismatch?: OllamaVersionMismatch;
+    unknownField?: OllamaUnknownField;
     busy: boolean;
 }>;
 export const INITIAL_LOCAL_ONBOARDING_VIEW: LocalOnboardingView = Object.freeze({
@@ -25,7 +26,18 @@ const functionsEndpoint = '/api/system/function-status';
 const activatableStates = new Set(['missing', 'degraded', 'available_unqualified']);
 const terminalStates = new Set(['revoked', 'owner_locked', 'credential_mismatch', 'corrupt']);
 class WorkflowError extends Error {
-    constructor(readonly code: string, readonly versionMismatch?: OllamaVersionMismatch) { super(code); }
+    constructor(readonly code: string, readonly versionMismatch?: OllamaVersionMismatch,
+        readonly unknownField?: OllamaUnknownField) { super(code); }
+}
+
+function unknownFieldProjection(error: unknown, body: unknown): OllamaUnknownField | undefined {
+    if (error !== 'provider_field_unknown' || !body || typeof body !== 'object' || !('unknownField' in body)) return undefined;
+    const detail = body.unknownField;
+    return detail && typeof detail === 'object'
+        && 'serverVersion' in detail && typeof detail.serverVersion === 'string'
+        && 'endpoint' in detail && (detail.endpoint === 'tags' || detail.endpoint === 'show' || detail.endpoint === 'ps')
+        && 'field' in detail && typeof detail.field === 'string'
+        ? { serverVersion: detail.serverVersion, endpoint: detail.endpoint, field: detail.field } : undefined;
 }
 
 /** A display projection, never authority. Unknown/inconsistent snapshots deny actions. */
@@ -66,10 +78,10 @@ export function createLocalProviderOnboardingWorkflow(
         if (disposed) return;
         view = Object.freeze(next); changed(view);
     }
-    function fail(code: string, versionMismatch?: OllamaVersionMismatch) {
+    function fail(code: string, versionMismatch?: OllamaVersionMismatch, unknownField?: OllamaUnknownField) {
         publish({ phase: code === 'request_cancelled' || code === 'verification_interrupted' || code === 'request_timed_out'
             ? 'interrupted' : terminalStates.has(code) ? 'blocked' : 'failed',
-        status: null, functions: null, messageCode: code, versionMismatch, busy: false });
+        status: null, functions: null, messageCode: code, versionMismatch, unknownField, busy: false });
     }
     async function json(operation: Operation, url: string, init?: RequestInit): Promise<unknown> {
         assertCurrent(operation);
@@ -99,7 +111,8 @@ export function createLocalProviderOnboardingWorkflow(
                         && 'serverVersion' in detail && typeof detail.serverVersion === 'string'
                         && 'supportedVersions' in detail && typeof detail.supportedVersions === 'string'
                         ? { serverVersion: detail.serverVersion, supportedVersions: detail.supportedVersions } : undefined;
-                    throw new WorkflowError(typeof error === 'string' ? error : 'state_unavailable', versionMismatch);
+                    throw new WorkflowError(typeof error === 'string' ? error : 'state_unavailable', versionMismatch,
+                        unknownFieldProjection(error, body));
                 }
                 return body;
             })]);
@@ -162,7 +175,8 @@ export function createLocalProviderOnboardingWorkflow(
             // A detached operation has no UI authority, including in finally.
             if (!disposed && active === operation)
                 fail(error instanceof WorkflowError ? error.code : 'state_unavailable',
-                    error instanceof WorkflowError ? error.versionMismatch : undefined);
+                    error instanceof WorkflowError ? error.versionMismatch : undefined,
+                    error instanceof WorkflowError ? error.unknownField : undefined);
         } finally {
             if (active === operation) active = null;
             operation.controller.abort();

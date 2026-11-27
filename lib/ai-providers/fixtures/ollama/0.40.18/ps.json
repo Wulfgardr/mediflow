@@ -1,0 +1,22 @@
+{
+ "models": [
+  {
+   "name": "qwen3.5:35b-a3b",
+   "model": "qwen3.5:35b-a3b",
+   "size": 21904523632,
+   "digest": "26025611beeb3fe9e4850b1fdae686bebba7cdfa7f13ddb04955f19872ee022a",
+   "details": {
+    "parent_model": "",
+    "format": "safetensors",
+    "family": "",
+    "families": null,
+    "parameter_size": "",
+    "quantization_level": "nvfp4"
+   },
+   "expires_at": "2026-11-26T12:45:46.782587+01:00",
+   "size_vram": 21904523632,
+   "context_length": 32768,
+   "runner": "mlx"
+  }
+ ]
+}

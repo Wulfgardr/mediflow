@@ -1,4 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, writeFile, rm, copyFile, open } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
@@ -7,6 +8,7 @@ import { performance } from 'node:perf_hooks';
 import { acquireArtifacts, artifactDirectory, digest, lockPath, snapshotArtifacts } from './fhir-validator-artifacts.mjs';
 import { describeLockedArtifacts } from './verify-fhir-validator-cache.mjs';
 import { assertBaseProfiles, assessIssues, readOutcomes } from './fhir-r4-outcomes.mjs';
+import { javaExecutablesForSandbox, seatbeltProfile } from './seatbelt-profile.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const json = async file => JSON.parse(await readFile(file, 'utf8'));
@@ -38,8 +40,20 @@ export async function preparePackages(lock, home, snapshotDirectory) {
   await writeFile(path.join(cache, 'packages.ini'), '[cache]\nversion=4\n');
   return metadataReport;
 }
+/** Builds the offline macOS Seatbelt profile for the FHIR validator and its Java child. */
+export function fhirValidatorSandboxProfile(configFile) {
+  const programs = [process.execPath];
+  try {
+    const config = JSON.parse(readFileSync(configFile, 'utf8'));
+    if (typeof config?.javaExecutable === 'string' && path.isAbsolute(config.javaExecutable)) {
+      programs.push(...javaExecutablesForSandbox(config.javaExecutable));
+    }
+  } catch {}
+  return seatbeltProfile({ rules: '(deny network*)', programs });
+}
+
 export function isolatedInvocation(configFile) {
-  if (process.platform === 'darwin') return ['sandbox-exec', ['-p', '(version 1) (allow default) (deny network*)', process.execPath, path.join(root, 'scripts/fhir-validator-offline.mjs'), configFile]];
+  if (process.platform === 'darwin') return ['/usr/bin/sandbox-exec', ['-p', fhirValidatorSandboxProfile(configFile), process.execPath, path.join(root, 'scripts/fhir-validator-offline.mjs'), configFile]];
   if (process.platform === 'linux') return ['sudo', ['-n', 'unshare', '--net', '--', 'setpriv', '--reuid', String(process.getuid()), '--regid', String(process.getgid()), '--clear-groups', process.execPath, path.join(root, 'scripts/fhir-validator-offline.mjs'), configFile]];
   throw new Error('PROCESS_NETWORK_SANDBOX_UNSUPPORTED');
 }
