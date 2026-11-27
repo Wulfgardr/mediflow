@@ -23,11 +23,11 @@ test('rejects coverage, frozen-reference, and semantic-identity drift', () => {
   transport.rowPolicy.identityKind = 'aip_transport';
   assert.throws(() => validatePlaneInventories(fabric, transport), /semantic identity/);
   const aipAsSemantic = clone(headless);
-  aipAsSemantic.semanticSource.ref = 'b25ace437fda8d89b402c63cba2adb38295f188c:docs/capability-mapping/nodes/aip-inventory.v1.json';
+  aipAsSemantic.semanticSource.ref = '51055a0fdea231c40f91efe1590ef9e74d5c206b:docs/capability-mapping/nodes/aip-inventory.v1.json';
   aipAsSemantic.semanticSource.gitBlob = '3c455efc7194c2bffc32b3bc74933290c1522126';
   assert.throws(() => validatePlaneInventories(fabric, aipAsSemantic), /semantic source/);
   const surfaceAsSemantic = clone(headless);
-  surfaceAsSemantic.semanticSource.ref = 'b25ace437fda8d89b402c63cba2adb38295f188c:docs/capability-mapping/nodes/web-surfaces.v1.json';
+  surfaceAsSemantic.semanticSource.ref = '51055a0fdea231c40f91efe1590ef9e74d5c206b:docs/capability-mapping/nodes/web-surfaces.v1.json';
   surfaceAsSemantic.semanticSource.gitBlob = 'cd59f78a0c2bdadf4780604ef04c738c3eeb3cfe';
   assert.throws(() => validatePlaneInventories(fabric, surfaceAsSemantic), /semantic source/);
 });

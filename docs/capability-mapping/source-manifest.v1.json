@@ -6,15 +6,15 @@
   "applyPolicy": "none",
   "digestAlgorithm": "sha256(path + NUL + gitBlob + NUL + byteLength + LF)",
   "sources": [
-    { "sourceId": "baseline", "commit": "0d55c6d0f29a86c3333efc49bc0159563d9518b9", "status": "baseline_not_integrated" },
-    { "sourceId": "c0", "commit": "28a1a36b162f160e872ce5153cad03f38eacfd22", "status": "candidate_not_integrated" },
+    { "sourceId": "baseline", "commit": "3d8fbb97b3809ecf5b6d54ceade523801d78ef3f", "status": "baseline_not_integrated" },
+    { "sourceId": "c0", "commit": "1c2d08f840d165262f85dc9dcdedd86c06908502", "status": "candidate_not_integrated" },
     { "sourceId": "aip_mini", "commit": "1e35733c0218eae67a1d6e158085aab7340bc26b", "status": "candidate_not_integrated" },
     { "sourceId": "web", "commit": "93362ca505149f5d6c51502784395e65126921df", "status": "candidate_not_integrated" },
     { "sourceId": "keyboard", "commit": "5fbe5eaa16b6f79eb578644afe0131dd58544238", "status": "candidate_not_integrated" },
-    { "sourceId": "ios_runtime", "commit": "7bb2fe7d6931bdadb42d43c65b747ed1977f5722", "status": "candidate_not_integrated" },
-    { "sourceId": "ios_docs", "commit": "14d23caef5513a61dd10f16afcec41b1381179ef", "status": "candidate_not_integrated" },
-    { "sourceId": "macos", "commit": "7a8f12c8c94ed2110f4c2a4b8150fd3924cb18c4", "status": "candidate_not_integrated" },
-    { "sourceId": "macos_receipt", "commit": "fd442fda1fb1cc0f9f30d61b238ae5fdc51b0b18", "status": "candidate_not_integrated" }
+    { "sourceId": "ios_runtime", "commit": "7a1b64c1854facdf0e0b78fa273b77a99ce38415", "status": "candidate_not_integrated" },
+    { "sourceId": "ios_docs", "commit": "f4c204d30e2d788b0aa7d2c03b816460a0e46c76", "status": "candidate_not_integrated" },
+    { "sourceId": "macos", "commit": "7c62fcde3630561c4bcdd301f0ac305867380c3c", "status": "candidate_not_integrated" },
+    { "sourceId": "macos_receipt", "commit": "4a7cd2b47d9fcbf21257f029608682d97889ca14", "status": "candidate_not_integrated" }
   ],
   "sourceSets": [
     {
