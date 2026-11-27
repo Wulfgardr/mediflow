@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { launcherBrowserEnvironment, launcherSystemEnvironment } from './launcher-child-env.mjs';
 import { assertNodeRuntime, readNodeContract, verifyPinnedNativeBinding } from './node-runtime-contract.mjs';
 
 function cleanDiagnostic(value) {
@@ -29,7 +30,7 @@ export function inspectPort(port, options = {}) {
     const platform = options.platform || process.platform;
     const run = options.spawnSyncImpl || spawnSync;
     if (platform === 'win32') {
-        const result = run('netstat', ['-ano', '-p', 'tcp'], { encoding: 'utf8' });
+        const result = run('netstat', ['-ano', '-p', 'tcp'], { encoding: 'utf8', env: launcherSystemEnvironment() });
         if (result.error || result.status !== 0) {
             return {
                 state: 'unknown',
@@ -44,7 +45,7 @@ export function inspectPort(port, options = {}) {
         ) || { state: 'free', pid: '', reason: '' };
     }
 
-    const lsof = run('lsof', ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-Fp'], { encoding: 'utf8' });
+    const lsof = run('lsof', ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-Fp'], { encoding: 'utf8', env: launcherSystemEnvironment() });
     if (!lsof.error && lsof.status === 0) {
         const pid = (lsof.stdout || '').split(/\r?\n/).find((line) => /^p\d+$/.test(line))?.slice(1);
         return pid
@@ -56,7 +57,7 @@ export function inspectPort(port, options = {}) {
     }
 
     if (platform === 'linux') {
-        const ss = run('ss', ['-ltnpH', `sport = :${port}`], { encoding: 'utf8' });
+        const ss = run('ss', ['-ltnpH', `sport = :${port}`], { encoding: 'utf8', env: launcherSystemEnvironment() });
         if (!ss.error && ss.status === 0) {
             if (!(ss.stdout || '').trim()) return { state: 'free', pid: '', reason: '' };
             const pid = (ss.stdout || '').match(/pid=(\d+)/)?.[1] || '';
@@ -90,11 +91,11 @@ export function openUrl(url) {
     }
     let res;
     if (process.platform === 'darwin') {
-        res = spawnSync('open', [url], { stdio: 'ignore' });
+        res = spawnSync('open', [url], { stdio: 'ignore', env: launcherBrowserEnvironment() });
     } else if (process.platform === 'win32') {
-        res = spawnSync('cmd', ['/c', 'start', '', url], { stdio: 'ignore' });
+        res = spawnSync('cmd', ['/c', 'start', '', url], { stdio: 'ignore', env: launcherBrowserEnvironment() });
     } else {
-        res = spawnSync('xdg-open', [url], { stdio: 'ignore' });
+        res = spawnSync('xdg-open', [url], { stdio: 'ignore', env: launcherBrowserEnvironment() });
     }
     return res?.status ?? 1;
 }
@@ -119,7 +120,7 @@ export function hashWorktreeStatus(status) {
 }
 
 function readGitValue(args, cwd, fallback = 'unknown', whenEmpty = fallback) {
-    const result = spawnSync('git', args, { cwd, encoding: 'utf8' });
+    const result = spawnSync('git', args, { cwd, encoding: 'utf8', env: launcherSystemEnvironment() });
     if (result.status !== 0) return fallback;
     return result.stdout.trim() || whenEmpty;
 }

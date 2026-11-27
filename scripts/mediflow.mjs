@@ -15,6 +15,7 @@ import { createChoiceServer, launcherServices } from './mediflow-launcher-page.m
 import { containWindowsWeb } from './windows-runtime-job.mjs';
 import { createRuntimeLeases, acquireRuntimeLease, recordChildOwner, verifyChildOwner, runtimeProcessIdentity } from './runtime-leases.mjs';
 import { prepareLauncherState, localUiArchiveLock } from './launcher-state.mjs';
+import { launcherBuildEnvironment, launcherNativeEnvironment, launcherOllamaEnvironment, launcherRuntimeEnvironment, launcherSystemEnvironment } from './launcher-child-env.mjs';
 import { verifyOwnedWeb } from './local-ui-web-identity.mjs';
 import { localVoiceBinary, pinnedLocalVoiceEntry, superviseLocalVoiceService, verifyLocalVoiceBinary } from './local-voice-service.mjs';
 import { LOCAL_VOICE_ENDPOINT_FRAME, LOCAL_VOICE_ENDPOINT_REQUEST } from './local-voice-web-endpoint.mjs';
@@ -137,7 +138,7 @@ export function launcherProcessIdentity(pid) {
       value = windowsProcessCreationTimeTicks(pid);
     } else {
       const result = spawnSync('/bin/ps', ['-p', String(pid), '-o', 'lstart=', '-o', 'comm='],
-          { encoding: 'utf8', timeout: 3000, env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' } });
+          { encoding: 'utf8', timeout: 3000, env: { LC_ALL: 'C', TZ: 'UTC' } });
       if (result.status !== 0 || !result.stdout.trim()) return null;
       value = result.stdout.trim();
     }
@@ -401,7 +402,7 @@ export async function stopOwnedChild(child, graceMs = 8000, options = {}) {
           if (leaderTerminal()) throw new Error('Albero del processo già terminale non verificato.');
           if (ownerRecord) verifyChildOwner(ownerRecord);
           const result = spawnSync(windowsCommand, ['/pid', String(child.pid), '/T', '/F'],
-            { stdio: 'ignore', timeout: Math.max(1, deadline - Date.now()), windowsHide: true });
+            { stdio: 'ignore', timeout: Math.max(1, deadline - Date.now()), windowsHide: true, env: launcherSystemEnvironment() });
           if (result.error || result.status !== 0) throw result.error || new Error(`taskkill: ${result.status}`);
           if (Date.now() >= deadline) { expired(); return; }
           windowsTreeStopped = true;
@@ -559,7 +560,7 @@ export async function main(args = process.argv.slice(2)) {
     return terminal.question(prompt);
   };
   const update = patch => { Object.assign(state, patch); if (patch.message) log(patch.message); };
-  const run = (executable, argv, ipc = false, env = process.env) => {
+  const run = (executable, argv, ipc, env) => {
     child = spawn(executable, argv, { cwd: ROOT, env, detached: process.platform !== 'win32',
       stdio: ipc ? ['inherit', 'inherit', 'pipe', 'ipc'] : ['ignore', 2, 2] });
     const owned = child;
@@ -569,6 +570,7 @@ export async function main(args = process.argv.slice(2)) {
   };
   const runNpm = async command => {
     preparing = true;
+    const env = { ...launcherBuildEnvironment(), MEDIFLOW_DATA_DIR: dataDir };
     try {
       const owned = process.platform === 'win32'
         ? run(process.execPath, ['-e', `
@@ -577,8 +579,8 @@ export async function main(args = process.argv.slice(2)) {
               const child = spawn(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', ${JSON.stringify('npm ' + (command === 'ci' ? 'ci --ignore-scripts' : command === 'prepare:dependencies' ? 'run prepare:dependencies' : command))}], {stdio:'inherit'});
               child.once('error', () => process.exit(1));
               child.once('exit', code => process.exit(code ?? 1));
-            });`], true)
-        : run('npm', command === 'ci' ? ['ci', '--ignore-scripts'] : command === 'prepare:dependencies' ? ['run', command] : ['run', 'build']);
+            });`], true, env)
+        : run('npm', command === 'ci' ? ['ci', '--ignore-scripts'] : command === 'prepare:dependencies' ? ['run', command] : ['run', 'build'], false, env);
       const completed = new Promise((resolve, reject) => {
         owned.once('error', reject);
         owned.once('exit', (code, signal) => code === 0 ? resolve() : reject(new Error(`npm ${command} non completato (${signal || code}). Controlla i log e riprova.`)));
@@ -723,7 +725,7 @@ export async function main(args = process.argv.slice(2)) {
       if (!response.ok) throw new Error('not-ready');
     }).catch(() => {
       if (closing) return;
-      const service = spawn('ollama', ['serve'], { stdio: 'ignore', detached: true });
+      const service = spawn('ollama', ['serve'], { stdio: 'ignore', detached: true, env: launcherOllamaEnvironment() });
       service.on('error', () => {}); service.unref();
     });
   };
@@ -779,7 +781,7 @@ export async function main(args = process.argv.slice(2)) {
     update({ step: 'avvio', message: choice === 'agenti' ? 'Avvio dell’accesso per agenti. Collega un client al protocollo del terminale.' : 'Avvio di MediFlow.' });
     let target = null;
     if (choice === 'mac') {
-      const owned = run(native, [], false, { ...process.env, MEDIFLOW_LOCAL_VOICE_URL: undefined, MEDIFLOW_LOCAL_VOICE_SECRET: undefined, MEDIFLOW_NODE_BINARY: process.execPath,
+      const owned = run(native, [], false, { ...launcherNativeEnvironment(), MEDIFLOW_DATA_DIR: dataDir, MEDIFLOW_NODE_BINARY: process.execPath,
         MEDIFLOW_APP_REVISION: current.revision, MEDIFLOW_APP_BRANCH: current.branch,
         MEDIFLOW_APP_WORKTREE_HASH: current.worktreeHash, MEDIFLOW_APP_SOURCE_FINGERPRINT: current.sourceFingerprint,
         MEDIFLOW_APP_FINGERPRINT: current.sourceFingerprint });
@@ -795,9 +797,9 @@ export async function main(args = process.argv.slice(2)) {
       webSecret = choice === 'web' ? crypto.randomBytes(32).toString('hex') : null;
       if (choice === 'web') await ensureLocalVoice();
       if (closing) return;
-      const env = { ...process.env, MEDIFLOW_LOCAL_VOICE_URL: undefined, MEDIFLOW_LOCAL_VOICE_SECRET: undefined, ...(webSecret ? { MEDIFLOW_LOCAL_UI_WEB_SECRET: webSecret, MEDIFLOW_LOCAL_UI_INSTANCE: instance } : {}), HOSTNAME: '127.0.0.1', PORT: String(port),
-        ...(choice === 'web' ? { MEDIFLOW_PLUGIN_LOCAL_UI: '1', MEDIFLOW_RUNTIME_UI_LEASE: pluginChannel ? '1' : '0' } : {}),
-        ...(choice === 'web' ? { MEDIFLOW_WEB_OWNER_GATE: crypto.randomUUID() } : {}),
+      const env = { ...launcherRuntimeEnvironment(), MEDIFLOW_DATA_DIR: dataDir, HOSTNAME: '127.0.0.1', PORT: String(port),
+        ...(choice === 'web' ? { MEDIFLOW_PLUGIN_LOCAL_UI: '1', MEDIFLOW_RUNTIME_UI_LEASE: pluginChannel ? '1' : '0',
+          MEDIFLOW_LOCAL_UI_INSTANCE: instance, MEDIFLOW_WEB_OWNER_GATE: crypto.randomUUID() } : {}),
         MEDIFLOW_APP_REVISION: current.revision, MEDIFLOW_APP_BRANCH: current.branch,
         MEDIFLOW_APP_WORKTREE_HASH: current.worktreeHash, MEDIFLOW_APP_SOURCE_FINGERPRINT: current.sourceFingerprint,
         MEDIFLOW_APP_FINGERPRINT: current.sourceFingerprint };
@@ -820,7 +822,7 @@ export async function main(args = process.argv.slice(2)) {
       }
       if (choice === 'web') {
         sendVoiceEndpoint(voice?.current() ?? null);
-        owned.send({ type: 'mediflow-web-owner-start', nonce: env.MEDIFLOW_WEB_OWNER_GATE });
+        owned.send({ type: 'mediflow-web-owner-start', nonce: env.MEDIFLOW_WEB_OWNER_GATE, webIdentityKey: webSecret });
       }
       owned.on('message', frame => {
         if (frame?.type === LOCAL_VOICE_ENDPOINT_REQUEST) { if (owned === voiceChild) sendVoiceEndpoint(voice?.current() ?? null); return; }

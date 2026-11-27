@@ -14,7 +14,7 @@ export function runtimeProcessIdentity(pid) {
       return fs.readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim() + ':' + stat.slice(stat.lastIndexOf(')') + 2).trim().split(/\s+/u)[19];
     }
     const result = spawnSync('/bin/ps', ['-p', String(pid), '-o', 'lstart='],
-      { encoding: 'utf8', timeout: 3000, env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' } });
+      { encoding: 'utf8', timeout: 3000, env: { LC_ALL: 'C', TZ: 'UTC' } });
     return result.status === 0 && result.stdout.trim() || null;
   } catch { return null; }
 }

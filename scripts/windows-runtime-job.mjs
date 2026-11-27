@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
+import { launcherSystemEnvironment } from './launcher-child-env.mjs';
 import { processOwner, runtimeProcessIdentity, verifyChildOwner } from './runtime-leases.mjs';
 import { WINDOWS_JOB_PHASE_TIMEOUT_MS } from './windows-runtime-job-deadlines.mjs';
 
@@ -10,10 +11,8 @@ export async function containWindowsWeb(child, owner) {
   verifyChildOwner(owner);
   const script = fileURLToPath(new URL('./windows-runtime-job-helper.mjs', import.meta.url));
   if (!fs.lstatSync(script).isFile() || fs.lstatSync(script).isSymbolicLink()) throw new Error('Windows Job helper unavailable.');
-  const env = { ...process.env };
-  for (const name of ['NODE_OPTIONS', 'NODE_PATH', 'LD_PRELOAD', 'LD_LIBRARY_PATH', 'DYLD_INSERT_LIBRARIES', 'DYLD_LIBRARY_PATH']) delete env[name];
   const helper = spawn(process.execPath, [script, owner.file],
-    { env, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
+    { env: launcherSystemEnvironment(), windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
   let readyResolve, drainedResolve, failReady, failDrained, buffer = '', stderr = '', drained = false;
   const ready = new Promise((resolve, reject) => { readyResolve = resolve; failReady = reject; });
   const closed = new Promise((resolve, reject) => { drainedResolve = resolve; failDrained = reject; });

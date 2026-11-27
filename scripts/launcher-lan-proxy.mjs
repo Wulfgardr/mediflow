@@ -2,6 +2,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import { X509Certificate } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { launcherSystemEnvironment } from './launcher-child-env.mjs';
 import { readPairingAddress } from '../lib/network-pairing-address.mjs';
 
 export const LAN_PROXY_DEFAULT_PORT = 3443;
@@ -27,7 +28,7 @@ export function lanCertificate(dataDir, { run = execFileSync } = {}) {
     if (process.platform !== 'win32') fs.chmodSync(directory, 0o700);
     try {
       run('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '825', '-subj', '/CN=MediFlow',
-        '-addext', 'subjectAltName=DNS:localhost,IP:127.0.0.1', '-keyout', keyPath, '-out', certPath], { stdio: 'ignore' });
+        '-addext', 'subjectAltName=DNS:localhost,IP:127.0.0.1', '-keyout', keyPath, '-out', certPath], { stdio: 'ignore', env: launcherSystemEnvironment() });
     } catch {
       fs.rmSync(certPath, { force: true }); fs.rmSync(keyPath, { force: true });
       throw Object.assign(new Error('openssl non disponibile'), { code: 'LAN_PROXY_CERTIFICATE' });
@@ -238,15 +239,9 @@ export function createLanProxyController({
   };
 }
 
-/**
- * Reads the Web's network mode with the local administrative token (ADR 0200, «Stato»). Without the token the
- * Web creates it on the first unauthenticated request; the launcher asks only for an archive already set up,
- * so restoring into an empty data directory stays possible.
- * @param {string} url @param {string} dataDir @param {NodeJS.ProcessEnv} [env]
- */
-export async function readNetworkOverview(url, dataDir, env = process.env) {
+export async function readNetworkOverview(url, dataDir) {
   const file = path.join(dataDir, 'local-api-token');
-  const token = env.MEDIFLOW_LOCAL_API_TOKEN || (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim() : '');
+  const token = fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim() : '';
   if (!token) {
     const check = await fetch(new URL('/api/auth/check', url), { signal: AbortSignal.timeout(2000) }).then(response => response.json()).catch(() => null);
     if (check?.isSetup === true) await fetch(new URL('/api/system/network-overview', url), { signal: AbortSignal.timeout(2000) }).then(response => response.body?.cancel()).catch(() => {});

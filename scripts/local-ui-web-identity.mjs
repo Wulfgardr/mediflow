@@ -1,5 +1,17 @@
 import crypto from 'node:crypto';
 
+const webIdentityKey = Symbol.for('mediflow.local-ui.web-identity-key');
+
+export function installWebIdentityKey(key) {
+  if (typeof key !== 'string' || !/^[a-f0-9]{64}$/u.test(key)) return false;
+  Reflect.set(process, webIdentityKey, key);
+  return true;
+}
+
+export function ownedWebIdentityProof(challenge) {
+  return webIdentityProof(Reflect.get(process, webIdentityKey), challenge);
+}
+
 export function webIdentityProof(secret, challenge) {
   if (!/^[a-f0-9]{64}$/u.test(secret ?? '') || !/^[a-f0-9]{64}$/u.test(challenge ?? '')) return null;
   return crypto.createHmac('sha256', Buffer.from(secret, 'hex')).update(`mediflow.local-ui.web.v1:${challenge}`).digest('hex');

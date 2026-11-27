@@ -47,6 +47,7 @@
 /build
 native/**/.build/
 native/**/Build/
+/native/local-voice/target/
 
 # misc
 .DS_Store

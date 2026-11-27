@@ -1,7 +1,7 @@
 /* destructive auth tests own their process and initially empty data directory. */
 import { test as base, expect } from '@playwright/test';
 import { spawn, spawnSync } from 'node:child_process';
-import { createHash, randomUUID, randomBytes } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { createServer } from 'node:net';
 import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync, writeSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -81,7 +81,6 @@ export const test = base.extend<{ isolatedRuntime: IsolatedRuntime; initialRunti
       MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1', E2E_DISABLE_LEGACY_COPY: '1',
     };
     environment.MEDIFLOW_LOCAL_UI_INSTANCE = randomUUID();
-    environment.MEDIFLOW_LOCAL_UI_WEB_SECRET = randomBytes(32).toString('hex');
     environment.MEDIFLOW_PLUGIN_LOCAL_UI = pluginLocalUiRuntime ? '1' : '0';
     delete environment.MEDIFLOW_RUNTIME_TWIN;
     delete environment.NEXT_PUBLIC_MEDIFLOW_RUNTIME_TWIN;
