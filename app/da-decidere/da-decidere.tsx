@@ -22,10 +22,11 @@ function Filters({ view, visits }: { view: DaDecidereView; visits: number }) {
 
 function UnlockedDaDecidere({ view, patientId }: { view: DaDecidereView; patientId: string | null }) {
     const snapshot = useSyncExternalStore(subscribeAgentIncoming, agentIncomingSnapshot, agentIncomingServerSnapshot);
-    const { visits, busy, error } = snapshot;
-    const applicable = visits.filter(agentVisitAwaitsReview);
-    const blockedCount = visits.length - applicable.length;
-    const meta = view === 'visite' && visits.length > 0 ? <>
+    const { visits, unreadableVisits, busy, error } = snapshot;
+    const applicable = visits.filter(visit => agentVisitAwaitsReview(visit));
+    const total = visits.length + unreadableVisits.length;
+    const blockedCount = total - applicable.length;
+    const meta = view === 'visite' && total > 0 ? <>
         {applicable.length === 1 ? '1 visita pronta' : `${applicable.length} visite pronte`}
         {blockedCount > 0 ? ` · ${blockedCount === 1 ? '1 da verificare' : `${blockedCount} da verificare`}` : ''}
     </> : null;
@@ -41,7 +42,7 @@ function UnlockedDaDecidere({ view, patientId }: { view: DaDecidereView; patient
                 ) : null}
             </> : null}
         />
-        <Filters view={view} visits={visits.length} />
+        <Filters view={view} visits={total} />
         {view === 'visite' ? <>
             {error && <p role="alert" className={css.alert}>{error}</p>}
             <VisitQueue {...snapshot} />
