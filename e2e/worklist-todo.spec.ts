@@ -8,10 +8,14 @@ import { assertNoHorizontalOverflow, bootstrapUnlockedSession } from './utils';
 
 const directoryCommandSelector = '[data-patient-directory] > :is(header, [data-patient-directory-tools]) :is(a, button):not(.mf-composite-field .mf-button-icon)';
 
-test('Da fare: controlli confermati, letture negative, filtri e ritorno alla riga', async ({ baseURL }, info) => {
-  test.setTimeout(300_000);
+function assertOwnedWorklistArchive(baseURL: string | undefined): asserts baseURL is string {
   if (process.env.MF085_SYNTHETIC_E2E !== '1' || !process.env.MEDIFLOW_DATA_DIR || !baseURL
     || new URL(baseURL).hostname !== '127.0.0.1' || new URL(baseURL).port === '3000') throw Error('Owned synthetic archive required');
+}
+
+test('Da fare: controlli confermati, letture negative, filtri e ritorno alla riga', async ({ baseURL }, info) => {
+  test.setTimeout(300_000);
+  assertOwnedWorklistArchive(baseURL);
   const baseline = process.env.WORKLIST_TODO_BASELINE === '1';
   const directory = process.env.WORKLIST_TODO_SCREENSHOTS ? `${process.env.WORKLIST_TODO_SCREENSHOTS}/attempt-${info.retry}` : undefined;
   const zoom = await openBrowserZoomFixture(baseURL), page = zoom.page;
@@ -207,3 +211,45 @@ for (const width of [1280, 1440]) {
     }
   });
 }
+
+test('il ritorno all’elenco riusa il formattatore delle date fra i pazienti', async ({ page, baseURL }) => {
+  assertOwnedWorklistArchive(baseURL);
+  const fixture = await installWorklistTodoFixture(page, baseURL);
+  fixture.state.patients.push(...Array.from({ length: 120 }, (_, index) => ({
+    ...fixture.known,
+    id: `sintetico-${index}`,
+    lastName: `Inventata ${index}`,
+    taxCode: `SINTETICO${index}`,
+  })));
+  await page.addInitScript(() => {
+    let constructions = 0;
+    Object.defineProperty(window, 'patientDateFormatterConstructions', { get: () => constructions });
+    Intl.DateTimeFormat = new Proxy(Intl.DateTimeFormat, {
+      construct(target, args, newTarget) {
+        const [locale, options] = args;
+        if (locale === 'it-IT' && options?.day === '2-digit' && options?.month === 'short' && Object.keys(options).length === 2) {
+          constructions++;
+        }
+        return Reflect.construct(target, args, newTarget);
+      },
+    });
+  });
+  const formatterCount = () => page.evaluate(() => Number(Reflect.get(window, 'patientDateFormatterConstructions')));
+
+  try {
+    await page.setViewportSize({ width: 1440, height: 960 });
+    await bootstrapUnlockedSession(page, process.env.E2E_PIN || '1234');
+    await page.goto('/?area=incarico');
+    const results = page.getByTestId('lume-worklist').getByText('123 risultati', { exact: true });
+    await expect(results).toBeVisible();
+    await page.getByTestId('lume-patient-row').filter({ hasText: 'Inventata A' }).dblclick();
+    await expect(page.getByTestId('lume-scheda-header')).toContainText('Inventata A');
+    const before = await formatterCount();
+    await page.getByRole('navigation', { name: 'Cartelle aperte' }).getByRole('link', { name: 'Pazienti', exact: true }).click();
+    await expect(results).toBeVisible();
+    await expect(page.getByTestId('lume-patient-when').first()).toHaveText('20 ott');
+    expect(await formatterCount() - before).toBeLessThanOrEqual(8);
+  } finally {
+    await fixture.close();
+  }
+});
