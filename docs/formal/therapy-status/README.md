@@ -10,6 +10,20 @@ sono una prova TLA né un'estensione implicita degli invarianti legacy sottostan
 
 Il recovery cifrato supporta lo schema corrente 18 e i predecessori canonici 3, 4, 5, 6, 9, 10, 11, 12, 13, 14, 15, 16 e 17; le prove di compatibilità sono esterne a TLC, che non copre schema, migrazione, cifratura o ricevute. Restano aperte la verifica verticale Rust-host e quella della GUI.
 
+## Raccordo WUL-975. Lettura a flusso dei backup
+
+Il lettore portabile verifica formato, checksum e riferimenti prima di
+preparare il ripristino. La transazione IMMEDIATE legge da disco e
+inserisce un record alla volta. Conserva il controllo dell’impronta
+dell’archivio, il blocco dei comandi concorrenti e l’unione dei ledger
+con lo storico. Nel recupero cifrato, l’autenticazione dello snapshot
+completo precede la verifica dello schema e la sostituzione SQLite.
+I predecessori restano quelli ammessi dal contratto.
+
+Le transizioni e le assunzioni di concorrenza del modello terapia restano
+valide. La prova di cifratura e formato è separata da TLC, nei test
+`lib/recovery-backup-stream.test.ts` e `lib/backup-streaming-scale.test.ts`.
+
 ## Raccordo schema 18 del 22 novembre 2026
 
 Lo schema SQLite corrente passa da 17 a 18 in `lib/sqlite-schema-open.ts` per estendere da 12 a 24 ore il tetto del vincolo `CHECK` di `agent_mandates` (`lib/sqlite-agent-mandate-duration-upgrade.ts`, ADR 0190 e ADR 0196). La ricostruzione dei predecessori v13..v17 ripristina il vincolo storico a 12 ore e conserva invariate tutte le impronte precedenti; la versione 17 entra fra i predecessori canonici di `lib/recovery-backup-server.ts`. Transizioni, CAS, audit e ricevute del comando di stato terapia non cambiano.
