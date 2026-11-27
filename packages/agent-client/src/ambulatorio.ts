@@ -133,7 +133,10 @@ export function createAmbulatorioServer(home: string, value: unknown, plugin: st
     }));
     server.registerTool('mediflow_prepara_dossier', {
         description: 'Salva la scheda con nota S/O/A/P, genera il PDF della nota e verifica il Dossier con MediFlow. Accetta solo citazioni letterali.',
-        inputSchema: z.object({ ...visit, scheda: z.string().min(1).max(30000), fatti: z.array(fact).max(100) }).strict(), annotations: { ...annotations, idempotentHint: false },
+        inputSchema: z.object({
+            ...visit, scheda: z.string().min(1).max(30000), fatti: z.array(fact).max(100),
+            identita: z.object({ nome: z.string().trim().min(1).max(120).optional(), cognome: z.string().trim().min(1).max(120).optional() }).strict().optional(),
+        }).strict(), annotations: { ...annotations, idempotentHint: false },
     }, (args, { mcpReq }) => run(async () => {
         await active(mcpReq.signal);
         return worker('prepare', args, mcpReq.signal);

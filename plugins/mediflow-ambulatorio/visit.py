@@ -265,6 +265,8 @@ def build(folder, manifest, config, args):
         text_pdf(stage / NOTE_PDF, header + note, config)
         documents[NOTE_PDF] = source(stage / NOTE_PDF, cf, date, [
             dict(kind='document_entry', values=dict(text=note, date=date), quote=note[:600])])
+        identity = args.get('identita', {})
+        documents[NOTE_PDF]['patient'].update({field: identity[key] for key, field in [('nome', 'firstName'), ('cognome', 'lastName')] if key in identity})
         if any(fact['file'] == DICTATION_PDF for fact in facts):
             text_pdf(stage / DICTATION_PDF, header + transcript, config)
             documents[DICTATION_PDF] = source(stage / DICTATION_PDF, cf, date, [])
