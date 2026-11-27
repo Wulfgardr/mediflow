@@ -32,6 +32,7 @@ const browserNames = ['DISPLAY', 'WAYLAND_DISPLAY', 'DBUS_SESSION_BUS_ADDRESS', 
 const buildNames = [
   'CI', 'NEXT_TELEMETRY_DISABLED', 'MEDIFLOW_NEXT_DIST_DIR', 'MEDIFLOW_ENABLE_HSTS',
   'MEDIFLOW_E2E_DISABLE_LEGACY_COPY', 'E2E_DISABLE_LEGACY_COPY',
+  'MEDIFLOW_PDF_SMOKE_OUTPUT_DIR', 'MEDIFLOW_PDF_SMOKE_TIMINGS',
   'CC', 'CXX', 'AR', 'MAKE', 'SDKROOT', 'DEVELOPER_DIR', 'PYTHON', 'JAVA_HOME',
   'npm_config_cache', 'npm_config_userconfig', 'npm_config_registry', 'npm_config_cafile', 'npm_config_python',
 ];

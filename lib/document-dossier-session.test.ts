@@ -946,11 +946,11 @@ test('l’applicazione conserva la sospensione dichiarata e ferma una riattivazi
     assert.deepEqual(therapies, [['Ramipril', 'suspended'], ['Atenololo', 'completed']]);
 });
 
-test('WUL-925: three REDACTED PDFs with specialist CF in header, footer, and signature acquire cleanly on the patient', async () => {
+test('WUL-925: three RefertoSpecialistico PDFs with specialist CF in header, footer, and signature acquire cleanly on the patient', async () => {
     const CF_SPEC = 'MEDPRS00A01A000W';
     const headerPdf = `%PDF-1.4 sintetico\nASST Sintetica - U.O. Cardiologia - Medico refertante: Dott. Luca Bianchi - C.F.: ${CF_SPEC}\nAssistito: Mario Rossi\nCodice fiscale assistito: ${CF_A}\nData referto: 10/11/2026\nVisita cardiologica nei limiti.`;
-    const footerPdf = `%PDF-1.4 sintetico\nREDACTED\nAssistito: Mario Rossi\nC.F. assistito: ${CF_A}\nData referto: 12/11/2026\nEsame obiettivo regolare.\nIl medico\nDott. Luca Bianchi\nC.F.: ${CF_SPEC}`;
-    const signaturePdf = `%PDF-1.4 sintetico\nREDACTED\nPaziente: Mario Rossi\nCodice fiscale paziente: ${CF_A}\nData referto: 14/11/2026\nReferto regolare.\nFirmato digitalmente da: BIANCHI LUCA (CF: ${CF_SPEC})`;
+    const footerPdf = `%PDF-1.4 sintetico\nRefertoSpecialistico\nAssistito: Mario Rossi\nC.F. assistito: ${CF_A}\nData referto: 12/11/2026\nEsame obiettivo regolare.\nIl medico\nDott. Luca Bianchi\nC.F.: ${CF_SPEC}`;
+    const signaturePdf = `%PDF-1.4 sintetico\nRefertoSpecialistico\nPaziente: Mario Rossi\nCodice fiscale paziente: ${CF_A}\nData referto: 14/11/2026\nReferto regolare.\nFirmato digitalmente da: BIANCHI LUCA (CF: ${CF_SPEC})`;
     const { files, ports, attachments } = setup([
         ['Dossier/Rossi/referto-intestazione.pdf', headerPdf],
         ['Dossier/Rossi/referto-calce.pdf', footerPdf],
@@ -970,8 +970,8 @@ test('WUL-925: three REDACTED PDFs with specialist CF in header, footer, and sig
 test('WUL-925: one uncertain document does not block coherent ones and is never written without per-document confirmation', async () => {
     const CF_SPEC = 'MEDPRS00A01A000W';
     const CF_UNCERTAIN = 'OPRTST00A01A000K';
-    const coherentPdf = `%PDF-1.4 sintetico\nREDACTED\nAssistito: Mario Rossi\nCodice fiscale assistito: ${CF_A}\nData referto: 10/11/2026\nEsenzione 031\nFirmato digitalmente da: BIANCHI LUCA (CF: ${CF_SPEC})`;
-    const uncertainPdf = `%PDF-1.4 sintetico\nREDACTED\nAssistito: Mario Rossi\nCodice fiscale assistito: ${CF_A}\nData referto: 11/11/2026\nEsenzione 048\n${CF_UNCERTAIN}`;
+    const coherentPdf = `%PDF-1.4 sintetico\nRefertoSpecialistico\nAssistito: Mario Rossi\nCodice fiscale assistito: ${CF_A}\nData referto: 10/11/2026\nEsenzione 031\nFirmato digitalmente da: BIANCHI LUCA (CF: ${CF_SPEC})`;
+    const uncertainPdf = `%PDF-1.4 sintetico\nRefertoSpecialistico\nAssistito: Mario Rossi\nCodice fiscale assistito: ${CF_A}\nData referto: 11/11/2026\nEsenzione 048\n${CF_UNCERTAIN}`;
     const otherUnlabeledPdf = `%PDF-1.4 sintetico\nLettera senza intestazione\n${CF_B}\nData referto: 12/11/2026`;
     const { files, ports, attachments } = setup([
         ['Dossier/Rossi/coerente.pdf', coherentPdf],

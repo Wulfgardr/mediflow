@@ -22,6 +22,25 @@ initializeWindowsSystemCommand();
 
 const repoRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
+test('the launcher build receives the standalone PDF smoke inputs without passing them to the Web', () => {
+    const output = path.join(tmpdir(), 'synthetic document smoke');
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', `
+        import { launcherBuildEnvironment, launcherRuntimeEnvironment } from './scripts/launcher-child-env.mjs';
+        const build = launcherBuildEnvironment();
+        const web = launcherRuntimeEnvironment();
+        process.stdout.write(JSON.stringify({
+            output: build.MEDIFLOW_PDF_SMOKE_OUTPUT_DIR,
+            timings: build.MEDIFLOW_PDF_SMOKE_TIMINGS,
+            leaksToWeb: 'MEDIFLOW_PDF_SMOKE_OUTPUT_DIR' in web || 'MEDIFLOW_PDF_SMOKE_TIMINGS' in web,
+        }));
+    `], {
+        cwd: repoRoot, encoding: 'utf8',
+        env: { ...process.env, MEDIFLOW_PDF_SMOKE_OUTPUT_DIR: output, MEDIFLOW_PDF_SMOKE_TIMINGS: '1' },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(JSON.parse(result.stdout), { output, timings: '1', leaksToWeb: false });
+});
+
 function fixtureImportArguments(loader, options) {
     return ['--import', pathToFileURL(loader, options).href];
 }

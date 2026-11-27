@@ -203,9 +203,9 @@ export function RuntimeTwinWorkspace({ children }: { children: ReactNode }) {
             </Link>
           </div> : null}
           <details className={styles.mobileMore} onToggle={event => setMobileMoreOpen(event.currentTarget.open)} onKeyDown={event => { if (event.key === 'Escape') { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus(); } }}>
-            <summary aria-current={currentInMore && !mobileMoreOpen ? 'page' : undefined} aria-label={currentDestinationHref === '/settings' ? 'Altro · Impostazioni' : undefined}><MoreHorizontal size={20} aria-hidden /><span>Altro</span></summary>
+            <summary aria-current={currentInMore && !mobileMoreOpen ? 'page' : undefined} aria-label={['Altro', ...(incomingCount > 0 ? [`${incomingCount} in Da decidere`] : []), ...(currentDestinationHref === '/settings' ? ['Impostazioni'] : [])].join(' · ')}><MoreHorizontal size={20} aria-hidden /><span>Altro{incomingCount > 0 && <small className={styles.moreCount}>{incomingCount}</small>}</span></summary>
             <div className={styles.mobileMenu} onClick={event => { if (event.target instanceof Element && event.target.closest('a, button')) event.currentTarget.closest('details')?.removeAttribute('open'); }}>
-              {destinations.slice(3).map(({ href, label, icon: Icon }) => <Link href={href} key={href} aria-current={currentDestinationHref === href ? 'page' : undefined}><Icon size={18} aria-hidden /><span>{label}</span></Link>)}
+              {destinations.slice(3).map(({ href, label, icon: Icon }) => <Link href={href} key={href} aria-current={currentDestinationHref === href ? 'page' : undefined}><Icon size={18} aria-hidden /><span>{label}</span>{href === '/da-decidere' && incomingCount > 0 && <small>{incomingCount}</small>}</Link>)}
               {openCommands && <button type="button" onClick={event => {
                 event.currentTarget.closest('details')?.querySelector('summary')?.focus();
                 openCommands();
