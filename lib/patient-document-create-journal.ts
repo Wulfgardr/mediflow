@@ -2,13 +2,14 @@ import { COMMAND_UUID } from './therapy-status-command-contract';
 
 export type PatientDocumentCreateJournal = Readonly<{
     commandId: string; archiveGeneration: string; ambulatoryId: string;
-    patientId: string | null; sourceId: string | null; pairedClientId?: string;
+    patientId: string | null; sourceId: string | null; pairedClientId?: string; batch?: true;
 }>;
 export function parsePatientDocumentCreateJournal(value: unknown): PatientDocumentCreateJournal | null {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
     const row = value as PatientDocumentCreateJournal;
     const keys = ['commandId', 'archiveGeneration', 'ambulatoryId', 'patientId', 'sourceId'];
     if (row.pairedClientId !== undefined) keys.push('pairedClientId');
+    if (row.batch === true) keys.push('batch');
     if ((row.pairedClientId !== undefined && (typeof row.pairedClientId !== 'string' || !/^[!-~]{1,128}$/u.test(row.pairedClientId)))
         || Object.keys(row).length !== keys.length || !keys.every(key => Object.hasOwn(row, key))
         || ![row.commandId, row.archiveGeneration].every(id => typeof id === 'string' && COMMAND_UUID.test(id))
