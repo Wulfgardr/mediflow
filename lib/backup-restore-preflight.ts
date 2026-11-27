@@ -250,7 +250,7 @@ export async function withBackupRestoreRequest<T>(request: Request,
     try {
         restrictNewPrivateDirectory(root);
         const file = path.join(root, 'upload.json');
-        const handle = await fs.promises.open(file, 'wx+', 0o600);
+        const descriptor = fs.openSync(file, 'wx+', 0o600);
         try {
             if (process.platform !== 'win32') fs.unlinkSync(file);
             const reader = request.body.getReader();
@@ -262,14 +262,14 @@ export async function withBackupRestoreRequest<T>(request: Request,
                     if (chunk.done) break;
                     size += chunk.value.byteLength;
                     if (size > budget) invalidBackupRows();
-                    await handle.writeFile(chunk.value);
+                    fs.writeFileSync(descriptor, chunk.value);
                 }
             } finally {
                 await reader.cancel().catch(() => {});
                 reader.releaseLock();
             }
             request.signal.throwIfAborted();
-            return await apply(await runPreflight(() => readBackupRowsFile(handle.fd), defaultDeps));
-        } finally { await handle.close(); }
+            return await apply(await runPreflight(() => readBackupRowsFile(descriptor), defaultDeps));
+        } finally { fs.closeSync(descriptor); }
     } finally { fs.rmSync(root, { recursive: true, force: true }); }
 }

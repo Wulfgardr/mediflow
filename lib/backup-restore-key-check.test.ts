@@ -119,3 +119,28 @@ test('Web restore admits legacy history only with the same key and patient bindi
         assert.equal(requests, 1);
     } finally { db.setKey(null); }
 });
+
+test('a scheduled restore receives its receipt when completion retires the former client authority', async t => {
+    const { db, importRawDatabase, verifyRawDatabase } = await import('./db.ts');
+    const { createEmptyDataset, serializeBackupRows } = await import('./backup-artifact.ts');
+    const key = await generateMasterKey();
+    const payload = { ...createEmptyDataset(), patients: [{ id: 'synthetic-patient', notes: await seal(key) }] };
+    const file = new Blob([...serializeBackupRows(payload, new Date('2026-11-27T00:00:00Z'))]);
+    const snapshot = 'a'.repeat(64), checksum = 'b'.repeat(64);
+    t.mock.method(globalThis, 'fetch', async (url: string, request: RequestInit) => {
+        assert.equal(request.body, file);
+        if (url.endsWith('/verify')) {
+            assert.ok(request.signal && !request.signal.aborted);
+            return Response.json({ expectedSnapshot: snapshot, sourceChecksum: checksum });
+        }
+        db.setKey(null);
+        request.signal?.throwIfAborted();
+        return Response.json({ receipt: { excludedRetiredPatients: 1 } });
+    });
+    try {
+        db.setKey(key);
+        const verification = await verifyRawDatabase(file);
+        assert.deepEqual(await importRawDatabase({ id: 'synthetic-restore', source: file, verification }, { verifier: 'synthetic-proof' }),
+            { excludedRetiredPatients: 1 });
+    } finally { db.setKey(null); }
+});

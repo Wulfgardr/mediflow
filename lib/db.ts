@@ -1235,10 +1235,11 @@ async function postBackup(url: string, source: string | Blob, failure: string, h
     const body = typeof source === 'string' || streamLayout ? source : await source.text();
     const signal = streamLayout ? db.getSessionReadSignal() : undefined;
     await db.assertBackupReadable(body, signal);
+    signal?.throwIfAborted();
     const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(streamLayout ? { [BACKUP_ROWS_TRANSPORT_HEADER]: BACKUP_ROWS_TRANSPORT } : {}), ...headers },
-        body, signal,
+        body, signal: url === '/api/system/backup-restore/verify' ? signal : undefined,
     });
     if (response.ok) return response;
 
