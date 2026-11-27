@@ -2,7 +2,7 @@ import { syntheticTaxCode } from './patient-identity.test-support.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createRequire } from 'node:module';
-import { createCipheriv, randomBytes, randomUUID } from 'node:crypto';
+import { createCipheriv, createHash, randomBytes, randomUUID } from 'node:crypto';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -289,6 +289,148 @@ test('the route admits only an authenticated local Web admin with the current ar
     state.session = issueSyntheticWebSession({ id, username: id, role: 'user' }, randomUUID());
     assert.equal((await call({ operation: 'stage', source })).status, 403);
     dbServer.update(users).set({ role: 'admin' }).where(eq(users.id, id)).run();
+});
+
+const sha256 = (value: string | Uint8Array) => createHash('sha256').update(value).digest('hex');
+async function batchRow(seed: number, taxCode = syntheticTaxCode(seed), birthDate = '1980-01-01') {
+    const firstName = 'Sintetica', lastName = `Esempio ${seed}`;
+    const { source, bytes } = await documentSource(`Nome: ${firstName}
+Cognome: ${lastName}`);
+    const sourceName = 'esempio.pdf', sourceDigest = sha256(bytes);
+    return { source, row: { sourceName, sourceDigest, identity: { firstName, lastName, taxCode, birthDate } },
+        digest: sha256(JSON.stringify(['dossier-patient-v1', sourceName, sourceDigest, firstName, lastName, taxCode, birthDate])) };
+}
+type BatchRow = Awaited<ReturnType<typeof batchRow>>;
+
+async function batchReview(...rows: BatchRow[]) {
+    const digests = rows.map(row => row.digest);
+    const result = await call({ operation: 'batch-review', rows: digests });
+    assert.equal(result.status, 200);
+    assert.equal(result.body.fingerprint, sha256(JSON.stringify(['dossier-batch-v1', digests])));
+    assert.equal(typeof result.body.batchId, 'string');
+    return { batchId: result.body.batchId, fingerprint: result.body.fingerprint };
+}
+const batchConfirm = (review: Awaited<ReturnType<typeof batchReview>>, value = pin) =>
+    call({ operation: 'batch-confirm', ...review, pin: value });
+const batchStage = (batchId: unknown, { row, source }: BatchRow) =>
+    call({ operation: 'batch-stage', batchId, row, source });
+const batchExecute = (batchId: unknown, commandId: unknown) =>
+    call({ operation: 'batch-execute', batchId, commandId });
+const creationEvents = () => dbServer.$client.prepare("SELECT event_id FROM audit_events WHERE event_type = 'patient.created' ORDER BY rowid").all();
+
+test('Dossier batch PIN authorizes exactly the reviewed rows, source bytes, archive, session and scope', async () => {
+    const active = operator('batch-binding');
+    state.session = active;
+    const before = effects();
+    const first = await batchRow(101), second = await batchRow(102);
+    const reviewed = await batchReview(first);
+    assert.equal((await batchStage(reviewed.batchId, first)).status, 403);
+    assert.equal((await batchConfirm({ ...reviewed, fingerprint: second.digest })).status, 403);
+    assert.equal((await batchConfirm(reviewed)).status, 403);
+    const changed = await batchReview(first, second);
+    state.session = operator('batch-foreign');
+    assert.equal((await batchConfirm(changed)).status, 403);
+    state.session = active;
+    assert.equal((await batchConfirm(changed, wrongPin)).status, 403);
+    assert.equal((await batchStage(changed.batchId, first)).status, 403);
+    const confirmed = await batchReview(first, second);
+    assert.deepEqual(await batchConfirm(confirmed), { status: 200, body: { status: 'confirmed' } });
+    assert.equal((await batchConfirm(confirmed)).status, 403);
+    const corrected = { ...first, row: { ...first.row, identity: { ...first.row.identity, firstName: 'Corretta' } } };
+    assert.equal((await batchStage(confirmed.batchId, corrected)).status, 403);
+    assert.deepEqual(await batchStage(confirmed.batchId, { ...first, source: second.source }),
+        { status: 422, body: { status: 'source-changed' } });
+    assert.equal((await batchStage(confirmed.batchId, first)).status, 403);
+    const prepared = await batchStage(confirmed.batchId, second);
+    assert.equal(prepared.status, 200);
+    const otherScope = randomUUID();
+    dbServer.insert(ambulatories).values({ id: otherScope, name: 'Altro ambulatorio sintetico' }).run();
+    try {
+        cookies.cookies.set('ambulatory_id', otherScope);
+        assert.equal((await batchExecute(confirmed.batchId, prepared.body.commandId)).status, 403);
+    } finally { cookies.cookies.set('ambulatory_id', scope); }
+    assert.equal((await batchExecute(confirmed.batchId, prepared.body.commandId)).status, 403);
+    assert.deepEqual(effects(), before);
+});
+
+test('one Dossier batch PIN writes three independent patients, attachments and creation audits', async () => {
+    state.session = operator('batch-partial');
+    const rows = await Promise.all([111, 112, 113, 114, 115].map(async seed =>
+        await batchRow(seed, seed === 113 ? 'NON-VALIDO' : syntheticTaxCode(seed))));
+    const duplicate = rows[1].row.identity.taxCode;
+    const existing = await staged();
+    assert.equal((await call({ operation: 'preview', commandId: existing.view.commandId, viewId: existing.view.viewId,
+        review: { ...review(), taxCode: { action: 'correct', value: duplicate } } })).status, 200);
+    assert.equal((await call({ operation: 'execute', commandId: existing.view.commandId, pin })).status, 200);
+    const before = effects(), audited = creationEvents().length;
+    const confirmed = await batchReview(...rows);
+    assert.equal((await batchConfirm(confirmed)).status, 200);
+    const commands: unknown[] = [];
+    for (const [index, row] of rows.entries()) {
+        const prepared = await batchStage(confirmed.batchId, row);
+        if (index === 1) {
+            assert.equal(prepared.status, 409);
+            assert.equal(prepared.body.code, 'PATIENT_IDENTIFIER_DUPLICATE');
+        } else if (index === 2) {
+            assert.deepEqual(prepared, { status: 422, body: { status: 'invalid-tax-code' } });
+        } else {
+            assert.equal(prepared.status, 200);
+            const commandId = prepared.body.commandId;
+            assert.equal((await batchExecute(confirmed.batchId, commandId)).body.outcome, 'applied');
+            commands.push(commandId);
+            assert.equal((await batchExecute(confirmed.batchId, commandId)).status, 403);
+        }
+    }
+    assert.deepEqual(effects(), before.map(value => value + 3));
+    assert.deepEqual(creationEvents().slice(audited), commands.map(event_id => ({ event_id })));
+});
+
+test('the Dossier batch rejects birth dates that disagree with the tax code and documents with mixed identities', async () => {
+    state.session = operator('batch-identity');
+    const before = effects();
+    const wrongDate = await batchRow(121, syntheticTaxCode(121), '1980-01-02');
+    const mixed = await documentSource(`Codice fiscale paziente: ${syntheticTaxCode(122)}
+Codice fiscale paziente: ${syntheticTaxCode(123)}`);
+    const identity = { firstName: 'Ada', lastName: 'Sintetica', taxCode: syntheticTaxCode(122), birthDate: '1980-01-01' };
+    const sourceName = 'esempio.pdf', sourceDigest = sha256(mixed.bytes);
+    const mixedRow = { row: { identity, sourceDigest, sourceName }, source: mixed.source,
+        digest: sha256(JSON.stringify(['dossier-patient-v1', sourceName, sourceDigest, identity.firstName, identity.lastName, identity.taxCode, identity.birthDate])) };
+    const confirmed = await batchReview(wrongDate, mixedRow);
+    assert.equal((await batchConfirm(confirmed)).status, 200);
+    assert.deepEqual(await batchStage(confirmed.batchId, wrongDate), { status: 422, body: { status: 'invalid-birth-date' } });
+    assert.deepEqual(await batchStage(confirmed.batchId, mixedRow), { status: 422, body: { status: 'mixed-identity' } });
+    assert.deepEqual(effects(), before);
+});
+
+test('an uncertain Dossier row rolls back with its audit, leaves the next row writable and can be withdrawn', async () => {
+    const active = operator('batch-uncertain');
+    state.session = active;
+    const first = await batchRow(131), second = await batchRow(132);
+    const before = effects(), audited = creationEvents().length;
+    const approved = await batchReview(first, second);
+    assert.equal((await batchConfirm(approved)).status, 200);
+    const firstStage = await batchStage(approved.batchId, first);
+    assert.equal(firstStage.status, 200);
+    const commandId = firstStage.body.commandId;
+    dbServer.$client.exec(`CREATE TRIGGER synthetic_batch_audit_failure BEFORE INSERT ON audit_events
+        WHEN NEW.event_type = 'patient.created' AND NEW.request_id = '${commandId}'
+        BEGIN SELECT RAISE(ABORT, 'synthetic audit failure'); END`);
+    try {
+        assert.equal((await batchExecute(approved.batchId, commandId)).status, 403);
+        assert.deepEqual((await call({ operation: 'receipt', commandId })).body, { outcome: 'unknown' });
+        assert.deepEqual(effects(), before);
+        assert.equal(creationEvents().length, audited);
+        const secondStage = await batchStage(approved.batchId, second);
+        assert.equal(secondStage.status, 200);
+        assert.equal((await batchExecute(approved.batchId, secondStage.body.commandId)).body.outcome, 'applied');
+        assert.deepEqual(effects(), before.map(value => value + 1));
+        assert.deepEqual(creationEvents().slice(audited), [{ event_id: secondStage.body.commandId }]);
+        state.session = operator('batch-foreign-revoke');
+        assert.deepEqual((await call({ operation: 'batch-revoke', commandId })).body, { outcome: 'unknown' });
+        state.session = issueSyntheticWebSession({ id: active.userId, username: active.username, role: 'admin' }, randomUUID());
+        assert.deepEqual((await call({ operation: 'batch-revoke', commandId })).body, { outcome: 'retired' });
+        assert.equal((await batchExecute(approved.batchId, commandId)).status, 403);
+    } finally { dbServer.$client.exec('DROP TRIGGER synthetic_batch_audit_failure'); }
 });
 
 test.after(() => {

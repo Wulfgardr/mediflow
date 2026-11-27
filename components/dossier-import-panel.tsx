@@ -16,6 +16,9 @@ import { Kree8WorkspaceShell } from '@/components/kree8/kree8-workspace-shell';
 import PrivacyBlur from '@/components/privacy-blur';
 import { useSecurity } from '@/components/security-provider';
 import PatientDocumentCreate from '@/components/patient-document-create';
+import DossierBatchPatients from '@/components/dossier-batch-patients';
+import { dossierBatchProposals } from '@/lib/dossier-batch-patients';
+import { readDossierBatchScope } from '@/lib/dossier-batch-patient-client';
 import { FirstVisitRecorder } from '@/components/first-visit-recorder';
 import { DossierBackupProposal, dossierBackupProposed, dossierWritablePatientCount, type DossierBackupChoice } from '@/components/dossier-backup-proposal';
 import { dossierCreationSource } from '@/lib/dossier-backup-gate';
@@ -185,6 +188,9 @@ function ActiveDossierImport({ initialPatientId, entry }: { initialPatientId: st
     const [busy, setBusy] = useState<string | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
     const [patients, setPatients] = useState<DossierPatient[]>([]);
+    const [batchScope, setBatchScope] = useState<string | null>(null);
+    const [batchSelection, setBatchSelection] = useState(0);
+    const [batchRevision, setBatchRevision] = useState(0);
     const [groups, setGroups] = useState<DossierDraftGroup[]>([]);
     const [links, setLinks] = useState<Record<string, string>>({});
     const [confirmations, setConfirmations] = useState<Record<string, boolean>>({});
@@ -203,6 +209,7 @@ function ActiveDossierImport({ initialPatientId, entry }: { initialPatientId: st
     const [folderUnread, setFolderUnread] = useState(0);
     const [backupChoice, setBackupChoice] = useState<DossierBackupChoice>({ kind: 'pending' });
     const backupProposed = dossierBackupProposed(groups, backupChoice);
+    const batchProposals = useMemo(() => dossierBatchProposals(groups, patients, links), [groups, patients, links]);
     const { lombardy } = useTerritorialPacks();
 
     useEffect(() => () => { generation.current += 1; }, []);
@@ -224,7 +231,10 @@ function ActiveDossierImport({ initialPatientId, entry }: { initialPatientId: st
 
     const refreshPatients = useCallback(async () => {
         const signal = db.getSessionReadSignal();
-        try { setPatients(await ports.listPatients(signal)); } catch { if (!signal.aborted) setNotice('Elenco delle schede non disponibile. Riprova.'); }
+        try {
+            const [known, scope] = await Promise.all([ports.listPatients(signal), readDossierBatchScope()]);
+            if (!signal.aborted) { setPatients(known); setBatchScope(scope); setBatchRevision(value => value + 1); }
+        } catch { if (!signal.aborted) setNotice('Elenco delle schede non disponibile. Riprova.'); }
     }, [ports]);
     useEffect(() => { void refreshPatients(); }, [refreshPatients]);
 
@@ -263,6 +273,7 @@ function ActiveDossierImport({ initialPatientId, entry }: { initialPatientId: st
     };
 
     const readFiles = useCallback(async (files: readonly DossierInputFile[], extraction: PreparedExtraction | null, origin?: FolderOrigin): Promise<boolean> => {
+        setBatchSelection(current => current + 1);
         lastSelection.current = files;
         lastOrigin.current = origin;
         const op = operation();
@@ -311,12 +322,14 @@ function ActiveDossierImport({ initialPatientId, entry }: { initialPatientId: st
     const clearSelection = () => {
         operation();
         lastSelection.current = null;
+        setBatchSelection(current => current + 1);
         setGroups([]); setCreating(null); setOutcomes({}); setMeasured({}); setNotice(null); setConfirmations({}); setConfirmedUncertain({}); setLinks({});
         retireNewPatientDossier();
         newPatient?.onActiveChange(false);
     };
 
     const setExcluded = (groupKey: string, sourceKey: string, excluded: boolean) => {
+        setBatchRevision(value => value + 1);
         setGroups((current) => current.map((group) => group.key !== groupKey ? group : { ...group, sources: group.sources.map((source) =>
             source.key !== sourceKey || source.status === 'duplicate_in_selection' || source.status === 'unreadable' || source.status === 'unsupported_format' ? source
                 : { ...source, status: excluded ? 'excluded' : 'ready' }) }));
@@ -423,15 +436,22 @@ function ActiveDossierImport({ initialPatientId, entry }: { initialPatientId: st
                 </section>}
                 {busy ? <p role="status" aria-live="polite">{busy}</p> : null}
                 {notice ? <p className={styles.notice} role="alert">{notice}</p> : null}
+                {!groups.length && <DossierBatchPatients key={batchSelection} proposals={[]} scope={batchScope} revision={batchRevision}
+                    busy={Boolean(busy)} onBusy={setBusy} onCreated={refreshPatients} />}
                 {groups.length ? (
                     <section className={styles.section} aria-labelledby={`${ids}-groups`}>
                         <h2 id={`${ids}-groups`}>{newPatient ? 'Collega i documenti alla scheda' : '2. Collega le fonti alle schede'}</h2>
                         <p className={styles.muted}>Il nome della cartella non sceglie il paziente. Un codice fiscale valido è un indizio, non una prova: conferma tu ogni collegamento.</p>
                         <div className={styles.actions}>
-                            <button type="button" className="mf-button-secondary" onClick={() => { void refreshPatients(); }}>Aggiorna elenco schede</button>
+                            <button type="button" className="mf-button-secondary" disabled={Boolean(busy)} onClick={() => { void refreshPatients(); }}>Aggiorna elenco schede</button>
                         </div>
                         {backupProposed ? <DossierBackupProposal patients={dossierWritablePatientCount(groups)} disabled={Boolean(busy)} onChoice={setBackupChoice} />
                             : backupChoice.kind === 'made' ? <p role="status" data-testid="dossier-backup-made">Backup creato: {backupChoice.fileName}.</p> : null}
+                        {!backupProposed && !creating && <DossierBatchPatients key={batchSelection} proposals={batchProposals}
+                            scope={batchScope} revision={batchRevision} busy={Boolean(busy)} onBusy={setBusy} onCreated={async (created) => {
+                                setLinks(current => ({ ...current, ...created }));
+                                await refreshPatients();
+                            }} />}
                         {groups.map((group) => {
                             const linked = dossierGroupDestination(group, patients, links[group.key]);
                             const baseIdentity = evaluateDraftGroupIdentity(group, patients, linked || null);
@@ -503,6 +523,7 @@ function ActiveDossierImport({ initialPatientId, entry }: { initialPatientId: st
                                         <select id={`${ids}-${group.key}-patient`} value={linked} disabled={Boolean(busy)}
                                             onChange={(event) => {
                                                 const value = event.currentTarget.value;
+                                                setBatchRevision(revision => revision + 1);
                                                 setLinks((current) => ({ ...current, [group.key]: value }));
                                                 setConfirmations((current) => ({ ...current, [group.key]: false }));
                                                 setConfirmedUncertain((current) => ({ ...current, [group.key]: {} }));

@@ -50,6 +50,9 @@
 .table caption { text-align: start; padding-block: 8px 12px; color: var(--lume-ink-muted); }
 .table th, .table td { padding: 12px 8px; vertical-align: top; text-align: start; border-bottom: 1px solid var(--lume-rule); overflow-wrap: anywhere; }
 .table th:first-child, .table td:first-child { width: 64px; }
+.table.batchTable :is(th, td):first-child { width: 22%; }
+.table.batchTable :is(th, td):nth-child(4) { width: 22%; }
+.table.batchTable :is(th, td):nth-child(6) { width: 12%; }
 .table td p { font-size: 0.875rem; margin-top: 8px; }
 .table small { display: block; line-height: 1.5; }
 .table code { font: var(--type-code); white-space: normal; }

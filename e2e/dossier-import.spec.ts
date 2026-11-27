@@ -1,6 +1,7 @@
 /* WUL-804: dossier from a folder through the real local Web route, writers, extraction and OCR. Synthetic data only. */
 import { expect, test, type Page } from '@playwright/test';
 import { createHash } from 'node:crypto';
+import Database from 'better-sqlite3';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -8,7 +9,7 @@ import { PDFDocument, StandardFonts } from 'pdf-lib';
 
 import { bootstrapUnlockedSession, openUnlockedDocument, unlockIfNeeded } from './utils';
 import { test as isolatedTest } from './fixtures/isolated-runtime';
-import { randomSyntheticTaxCode as syntheticTaxCode } from '../lib/patient-identity.test-support.ts';
+import { randomSyntheticTaxCode as syntheticTaxCode, syntheticTaxCode as fixtureTaxCode } from '../lib/patient-identity.test-support.ts';
 
 const PIN = process.env.E2E_PIN || '1234';
 
@@ -58,6 +59,125 @@ isolatedTest('Dossier senza CF: crea dalla fonte e richiede la conferma al colle
     } finally {
         rmSync(root, { recursive: true, force: true });
     }
+});
+
+isolatedTest('Dossier: un PIN per cinque gruppi, tre schede e due rifiuti motivati', async ({ page, isolatedRuntime }, info) => {
+    isolatedTest.setTimeout(150_000);
+    const pin = '314159';
+    const root = mkdtempSync(path.join(tmpdir(), 'mediflow-dossier-batch-'));
+    const codes = [191, 192, 193, 194, 195].map(fixtureTaxCode);
+    const invalid = codes[2].slice(0, -1) + (codes[2].endsWith('A') ? 'B' : 'A');
+    try {
+        await bootstrapUnlockedSession(page, pin);
+        for (const [index, firstName] of ['Ada', 'Iris', 'Lia', 'Zoe', 'Eva'].entries()) {
+            const folder = path.join(root, `Gruppo-${index + 1}`);
+            mkdirSync(folder);
+            writeFileSync(path.join(folder, 'documento.pdf'), await textPdf([
+                'Documento sintetico', `Nome: ${firstName}`, 'Cognome: Esempio', 'Data di nascita: 01/01/1980',
+                `Codice fiscale paziente: ${index === 2 ? invalid : codes[index]}`,
+            ]));
+        }
+        await openUnlockedDocument(page, '/patients/import/dossier', pin);
+        const panel = page.getByTestId('dossier-import');
+        await panel.getByTestId('dossier-folder').setInputFiles(root);
+        const groups = panel.getByTestId('dossier-group');
+        await expect(groups).toHaveCount(5, { timeout: 60_000 });
+        for (const group of await groups.all()) await expect(group.getByLabel('Scheda di destinazione')).toHaveValue('');
+        await panel.getByRole('button', { name: 'Continua senza backup' }).click();
+        await createPatient(page, codes[1]);
+        const database = new Database(path.join(isolatedRuntime.dataDirectory, 'medical.db'), { readonly: true, fileMustExist: true });
+        try {
+            const audits = () => database.prepare("SELECT subject_ref, source_surface FROM audit_events WHERE event_type = 'patient.created' ORDER BY rowid").all();
+            const before = audits().length;
+            const batch = panel.getByTestId('dossier-batch');
+            await batch.getByRole('button', { name: 'Rivedi le nuove schede (5)' }).click();
+            const rows = batch.getByTestId('dossier-batch-row');
+            const first = rows.filter({ hasText: 'Gruppo-1/documento.pdf' });
+            await expect(first.getByLabel('Nome', { exact: true })).toHaveValue('Ada');
+            await expect(first.getByLabel('Codice fiscale')).toHaveValue(codes[0]);
+            await expect(first.getByLabel('Data di nascita')).toHaveValue('1980-01-01');
+            await first.getByLabel('Escludi').check();
+            await batch.getByRole('button', { name: 'Prosegui alla conferma (4)' }).click();
+            await batch.getByLabel('PIN di conferma').fill(pin);
+            await batch.getByRole('button', { name: 'Torna alla revisione' }).click();
+            await first.getByLabel('Escludi').uncheck();
+            await first.getByLabel('Nome', { exact: true }).fill('Aurora');
+            await batch.getByRole('button', { name: 'Prosegui alla conferma (5)' }).click();
+            await expect(batch.getByLabel('PIN di conferma')).toHaveValue('');
+            await expect(rows).toHaveCount(5);
+            await expect(first).toContainText('Aurora');
+            await info.attach('dossier-conferma', { body: await batch.screenshot(), contentType: 'image/png' });
+            const operations: string[] = [];
+            page.on('request', request => {
+                if (new URL(request.url()).pathname === '/api/patients/document-create') {
+                    operations.push((request.postDataJSON() as { operation: string }).operation);
+                }
+            });
+            await batch.getByLabel('PIN di conferma').fill(pin);
+            await batch.getByRole('button', { name: 'Conferma con PIN (5)' }).click();
+            const results = batch.getByTestId('dossier-batch-results');
+            await expect(results.getByRole('status')).toHaveText('Create 3, non create 2.', { timeout: 90_000 });
+            await expect(results).toContainText('Codice fiscale già presente nell’ambulatorio.');
+            await expect(results).toContainText('Codice fiscale non valido.');
+            await expect(results.getByRole('link', { name: 'Apri la scheda' })).toHaveCount(3);
+            expect(operations.filter(operation => operation === 'batch-confirm' || operation === 'execute')).toEqual(['batch-confirm']);
+            expect(operations.filter(operation => operation === 'batch-execute')).toHaveLength(3);
+            expect(audits().slice(before)).toHaveLength(3);
+            expect(database.prepare('SELECT first_name FROM patients WHERE tax_code = ?').get(codes[0])).toEqual({ first_name: 'Aurora' });
+            expect(database.prepare('SELECT COUNT(*) AS n FROM patients WHERE tax_code = ?').get(codes[1])).toEqual({ n: 1 });
+            expect(database.prepare('SELECT COUNT(*) AS n FROM patients WHERE tax_code = ?').get(invalid)).toEqual({ n: 0 });
+            const createdIds = (audits().slice(before) as { subject_ref: string; source_surface: string }[])
+                .map(event => {
+                    expect(event.source_surface).toBe('web');
+                    return event.subject_ref;
+                });
+            for (const patientId of createdIds) expect(await attachmentCount(page, patientId)).toBe(1);
+            await info.attach('dossier-esito', { body: await results.screenshot(), contentType: 'image/png' });
+        } finally { database.close(); }
+    } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+isolatedTest('Dossier: l’esito incerto di una riga lascia proseguire e si può ritirare dopo il reload', async ({ page }, info) => {
+    isolatedTest.setTimeout(120_000);
+    const pin = '314159';
+    const root = mkdtempSync(path.join(tmpdir(), 'mediflow-dossier-batch-receipt-'));
+    try {
+        await bootstrapUnlockedSession(page, pin);
+        for (const [index, firstName] of ['Elia', 'Nora'].entries()) {
+            const folder = path.join(root, `Gruppo-${index + 1}`);
+            mkdirSync(folder);
+            writeFileSync(path.join(folder, 'documento.pdf'), await textPdf([
+                'Documento sintetico', `Nome: ${firstName}`, 'Cognome: Prova', 'Data di nascita: 01/01/1980',
+                `Codice fiscale paziente: ${fixtureTaxCode(201 + index)}`,
+            ]));
+        }
+        await openUnlockedDocument(page, '/patients/import/dossier', pin);
+        const panel = page.getByTestId('dossier-import');
+        await panel.getByTestId('dossier-folder').setInputFiles(root);
+        const batch = panel.getByTestId('dossier-batch');
+        await batch.getByRole('button', { name: 'Rivedi le nuove schede (2)' }).click({ timeout: 60_000 });
+        await batch.getByRole('button', { name: 'Prosegui alla conferma (2)' }).click();
+        await batch.getByLabel('PIN di conferma').fill(pin);
+        let lost = false;
+        await page.route('**/api/patients/document-create', async route => {
+            if (!lost && (route.request().postDataJSON() as { operation: string }).operation === 'batch-execute') {
+                lost = true;
+                await route.abort('failed');
+            } else await route.continue();
+        });
+        await batch.getByRole('button', { name: 'Conferma con PIN (2)' }).click();
+        const results = batch.getByTestId('dossier-batch-results');
+        await expect(results.getByRole('status')).toHaveText('Create 1, non create 0, da verificare 1.', { timeout: 60_000 });
+        await expect(results.getByRole('button', { name: 'Rileggi esito' })).toBeVisible();
+        await info.attach('dossier-esito-incerto', { body: await results.screenshot(), contentType: 'image/png' });
+        await page.reload();
+        await unlockIfNeeded(page, pin);
+        await batch.getByRole('button', { name: 'Rileggi esito' }).click();
+        await expect(batch.getByText('Esito da verificare')).toBeVisible();
+        await batch.getByRole('button', { name: 'Ritira', exact: true }).click();
+        await expect(batch.getByText('Lavorazione ritirata.')).toBeVisible();
+        await expect(batch.getByRole('button', { name: 'Rileggi esito' })).toHaveCount(0);
+    } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 const CF_A = syntheticTaxCode();
