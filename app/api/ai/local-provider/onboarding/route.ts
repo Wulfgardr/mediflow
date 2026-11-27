@@ -9,7 +9,10 @@ function failure(error: unknown) {
     const code = error instanceof LocalProviderOnboardingError ? error.code : 'state_unavailable';
     const versionMismatch = error instanceof LocalProviderOnboardingError && code === 'provider_version_unsupported'
         ? error.versionMismatch : undefined;
-    return reply({ error: code, ...(versionMismatch ? { versionMismatch } : {}) }, code === 'owner_locked' ? 401
+    const unknownField = error instanceof LocalProviderOnboardingError && code === 'provider_field_unknown'
+        ? error.unknownField : undefined;
+    return reply({ error: code, ...(versionMismatch ? { versionMismatch } : {}), ...(unknownField ? { unknownField } : {}) },
+        code === 'owner_locked' ? 401
         : code === 'input_invalid' ? 400 : ['provider_unreachable', 'provider_unready'].includes(code) ? 503 : 409);
 }
 export async function GET(request: Request) {

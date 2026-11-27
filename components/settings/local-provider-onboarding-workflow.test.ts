@@ -267,6 +267,24 @@ test('versione non ammessa arriva alla vista e viene cancellata alla rilettura',
     assert.equal(f.posts().length, 1);
 });
 
+test('campo sconosciuto arriva alla vista distinto dalla versione e viene cancellato alla rilettura', async () => {
+    const f = fixture(); await f.controller.refresh();
+    const unknownField = { serverVersion: '0.40.25', endpoint: 'show', field: 'cloud_route' };
+    f.handle(call => call.init.method === 'POST'
+        ? Response.json({ error: 'provider_field_unknown', unknownField, versionMismatch: { serverVersion: '0.40.25', supportedVersions: 'x' } }, { status: 409 }) : undefined);
+    await f.controller.activate();
+    assert.equal(f.view().phase, 'failed');
+    assert.equal(f.view().messageCode, 'provider_field_unknown');
+    assert.deepEqual(f.view().unknownField, unknownField);
+    assert.equal(f.view().versionMismatch, undefined);
+    await f.controller.refresh();
+    assert.equal(f.view().unknownField, undefined);
+    f.handle(call => call.init.method === 'POST'
+        ? Response.json({ error: 'provider_field_unknown', unknownField: { ...unknownField, endpoint: 'generate' } }, { status: 409 }) : undefined);
+    await f.controller.activate();
+    assert.equal(f.view().messageCode, 'provider_field_unknown');
+    assert.equal(f.view().unknownField, undefined);
+});
 
 test('the page keeps one explicit verification pending beyond the former forty-second wait', async context => {
     context.mock.timers.enable({ apis: ['setTimeout'] });
