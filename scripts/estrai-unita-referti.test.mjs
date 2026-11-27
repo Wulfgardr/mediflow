@@ -43,8 +43,19 @@ test('the laboratory label comes only from the facility words in the same column
     assert.equal(detectLaboratory(ALFA.join('\n')), 'Laboratorio Analisi Alfa Milano');
     assert.equal(detectLaboratory(BETA.join('\n')), 'Centro Diagnostico Beta');
     assert.equal(detectLaboratory('Ospedale Paziente Rossi'), 'Ospedale');
-    assert.equal(detectLaboratory('REDACTED Sig. Rossi'), 'REDACTED');
+    assert.equal(detectLaboratory('Clinica Gamma Sig. Rossi'), 'Clinica Gamma');
     assert.equal(detectLaboratory('Referto senza intestazione\nGlicemia 90 mg/dL 70-99'), 'Laboratorio non identificato');
+});
+
+test('local facility keywords from environment extend laboratory detection without hardcoding private names', () => {
+    const previous = process.env.MEDIFLOW_LOCAL_FACILITY_KEYWORDS;
+    process.env.MEDIFLOW_LOCAL_FACILITY_KEYWORDS = 'AnalisiDelta';
+    try {
+        assert.equal(detectLaboratory('AnalisiDelta Sig. Rossi'), 'AnalisiDelta');
+    } finally {
+        if (previous === undefined) delete process.env.MEDIFLOW_LOCAL_FACILITY_KEYWORDS;
+        else process.env.MEDIFLOW_LOCAL_FACILITY_KEYWORDS = previous;
+    }
 });
 
 test('only (exam, unit as printed) pairs leave a report: no value, range, date, name or tax code', () => {

@@ -91,9 +91,15 @@ const SOURCES: SourceDefinition[] = [
     },
 ];
 
-const SIGNALS: { tokens: string[]; weight: number; reason: string; anchor?: boolean }[] = [
-    { tokens: ['REDACTED', 'REDACTED'], weight: 4, reason: 'REDACTED/REDACTED', anchor: true },
-    { tokens: ['asst', 'ospedale', 'presidio', 'REDACTED'], weight: 3, reason: 'contesto ospedaliero/ASST', anchor: true },
+type SignalRule = {
+    tokens: string[];
+    weight: number;
+    reason: string;
+    anchor?: boolean;
+};
+
+const SIGNALS: SignalRule[] = [
+    { tokens: ['asst', 'ospedale', 'presidio'], weight: 3, reason: 'contesto ospedaliero/ASST', anchor: true },
     { tokens: ['ambulatorio', 'ambulatoriale', 'domiciliare'], weight: 3, reason: 'attivita clinica programmata', anchor: true },
     { tokens: ['paziente', 'visita', 'controllo', 'follow up', 'follow-up'], weight: 2, reason: 'appuntamento paziente', anchor: true },
     { tokens: ['cml', 'commissione', 'medicina legale'], weight: 3, reason: 'commissione o medicina legale', anchor: true },
@@ -164,14 +170,44 @@ function isInsideWindow(start: Date, from: Date, to: Date): boolean {
     return value >= from.getTime() && value <= to.getTime();
 }
 
-function classifyEvent(searchText: string): Classification {
+async function loadLocalSignals(assistantDir: string): Promise<SignalRule[]> {
+    const candidates = [
+        process.env.MEDIFLOW_CLINICAL_AGENDA_LOCAL_SIGNALS_FILE?.trim(),
+        path.join(assistantDir, 'data', 'clinical_agenda_local_signals.json'),
+        path.join(homedir(), '.mediflow', 'local-agenda-signals.json'),
+    ].filter((value): value is string => Boolean(value));
+
+    const extra: SignalRule[] = [];
+    for (const filePath of candidates) {
+        try {
+            const parsed = JSON.parse(await readFile(filePath, 'utf8')) as unknown;
+            if (!Array.isArray(parsed)) continue;
+            for (const entry of parsed) {
+                if (!entry || typeof entry !== 'object') continue;
+                const record = entry as Record<string, unknown>;
+                const tokens = Array.isArray(record.tokens)
+                    ? record.tokens.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+                    : [];
+                const weight = typeof record.weight === 'number' && Number.isFinite(record.weight) ? record.weight : 0;
+                const reason = asString(record.reason);
+                if (tokens.length === 0 || weight <= 0 || !reason) continue;
+                extra.push({ tokens, weight, reason, anchor: Boolean(record.anchor) });
+            }
+        } catch {
+            continue;
+        }
+    }
+    return extra;
+}
+
+function classifyEvent(searchText: string, signals: SignalRule[]): Classification {
     const normalized = normalizeText(searchText);
     const reasons: string[] = [];
     const matchedSignals: string[] = [];
     let score = 0;
     let hasAnchor = false;
 
-    for (const signal of SIGNALS) {
+    for (const signal of signals) {
         const matched = signal.tokens.filter((token) => normalized.includes(normalizeText(token)));
         if (matched.length === 0) continue;
         score += signal.weight;
@@ -197,7 +233,7 @@ function classifyEvent(searchText: string): Classification {
     };
 }
 
-function normalizeRawEvent(raw: RawEvent, source: SourceDefinition): ClinicalAgendaCandidate | null {
+function normalizeRawEvent(raw: RawEvent, source: SourceDefinition, signals: SignalRule[]): ClinicalAgendaCandidate | null {
     const title = asString(raw.title) ?? asString(raw.subject);
     const start = parseDate(raw.start_iso);
     if (!title || !start) return null;
@@ -213,7 +249,7 @@ function normalizeRawEvent(raw: RawEvent, source: SourceDefinition): ClinicalAge
         calendarTitle,
         sourceTitle,
     ].filter(Boolean).join(' · ');
-    const classification = classifyEvent(searchText);
+    const classification = classifyEvent(searchText, signals);
 
     if (!classification.accepted) return null;
 
@@ -309,6 +345,9 @@ export async function loadClinicalAgendaCandidates(
         return emptyResult({ now, configuredByEnv, from, to, sourceStatuses });
     }
 
+    const localSignals = await loadLocalSignals(dir);
+    const activeSignals = localSignals.length > 0 ? [...localSignals, ...SIGNALS] : SIGNALS;
+
     for (const source of SOURCES) {
         const sourcePath = path.join(/* turbopackIgnore: true */ dir, source.relativePath);
         const status: ClinicalAgendaSourceStatus = {
@@ -351,7 +390,7 @@ export async function loadClinicalAgendaCandidates(
                     continue;
                 }
 
-                const candidate = normalizeRawEvent(row, source);
+                const candidate = normalizeRawEvent(row, source, activeSignals);
                 if (!candidate) {
                     status.ignored += 1;
                     ignored += 1;

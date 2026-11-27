@@ -5,13 +5,14 @@ a tre richieste in volo, che il server può ricevere più volte, in ritardo e in
 qualunque ordine: Tieni, Correggi e Scarta su una voce
 (`decideAgentVisitItem`) e l'applicazione della visita intera
 (`applyAgentVisit`), che si porta l'insieme delle voci viste dal medico. La
-revoca del mandato o la scadenza della sessione chiudono l'ammissione. Ogni
+revoca dell’agente o la scadenza della sessione chiudono l’ammissione. Il
+modello parte da una cassetta già autorizzata alla chiusura. Ogni
 consegna è una transazione `immediate` di SQLite, per questo nel modello è un
 passo solo.
 
 | Passaggio | Codice |
 | --- | --- |
-| Ammissione (sessione, archivio, mandato, client, operazione) | `admittedCassette`, `admittedClient` in `lib/agent-visit-application.ts` |
+| Ammissione (sessione, archivio, autorità al deposito e agente) | `admittedCassette` in `lib/agent-visit-application.ts` e `agentCassetteReviewBlock` in `lib/agent-cassette-store.ts` |
 | Voce ancora da decidere, ripetizione con ricevuta | `decideAgentVisitItem`, ricerca di `agent.item.applied` e `agent.item.discarded` |
 | Una sola scheda per visita | `visitRecipients` in `decideAgentVisitItem` e `commitAgentVisit` |
 | Chiusura applicata o decisa | `visitDecisionState`, `closeDecidedVisit` |

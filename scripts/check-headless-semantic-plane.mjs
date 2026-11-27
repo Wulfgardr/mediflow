@@ -28,9 +28,9 @@ export function validateHeadlessSemanticPlane(plane = json()) {
   if (plane.schema !== 'mediflow.headless.semantic-plane.v1' || plane.version !== 1 || plane.status !== 'candidate_not_integrated' || plane.semanticIdentity !== 'canonical_application_function') fail('semantic identity is invalid');
   if (plane.applyPolicy !== 'none' || plane.writesPerformed !== 0) fail('apply or write is forbidden');
   exact(plane.sources, ['adr0100', 'headlessInventory', 'fabricInventory'], 'sources');
-  source(plane.sources.adr0100, '54b56c2bb4a9eb1bd76f198fc58457ebd7623e5b:docs/adr/0100-fabric-vs-headless-semantic-plane.md', 'e9abf64d566ff54d7d767f03580ea911bc6ef32e', 0, 'ADR');
-  source(plane.sources.headlessInventory, 'a26141e406bd6a33e5c204b8a8d3c53a74176ab5:docs/capability-mapping/headless-plane-inventory.v1.json', '8ef68abef78170a61d7b8b5b0e43267d0ac038e6', 66, 'Headless inventory');
-  source(plane.sources.fabricInventory, 'a26141e406bd6a33e5c204b8a8d3c53a74176ab5:docs/capability-mapping/fabric-plane-inventory.v1.json', '13eaff27d01b8769320316f39181c83dfb924bab', 16, 'Fabric inventory');
+  source(plane.sources.adr0100, 'b168baff06ba36c997966b5715a43d7efe356888:docs/adr/0100-fabric-vs-headless-semantic-plane.md', 'e9abf64d566ff54d7d767f03580ea911bc6ef32e', 0, 'ADR');
+  source(plane.sources.headlessInventory, '39b9c7a6ac0e0bd85dd38046f1e5b229ba81263b:docs/capability-mapping/headless-plane-inventory.v1.json', '8ef68abef78170a61d7b8b5b0e43267d0ac038e6', 66, 'Headless inventory');
+  source(plane.sources.fabricInventory, '39b9c7a6ac0e0bd85dd38046f1e5b229ba81263b:docs/capability-mapping/fabric-plane-inventory.v1.json', '13eaff27d01b8769320316f39181c83dfb924bab', 16, 'Fabric inventory');
   if (!same(plane.intentAdapters, [{ kind: 'chat', role: 'input_only', authority: 'none' }, { kind: 'voice', role: 'input_only', authority: 'none' }]) || !same(plane.flow, FLOW) || !same(plane.graphScope, GRAPH_SCOPE)) fail('flow or intent adapter drifted');
   exact(plane.plannerPolicy, ['composition', 'authority', 'providerSelection', 'venueSelection', 'confirmation', 'freePromptExecution'], 'planner');
   if (!same(plane.plannerPolicy, { composition: 'dynamic_composition_of_named_operations', authority: 'host_owned_only', providerSelection: 'forbidden', venueSelection: 'forbidden', confirmation: 'host_owned_only', freePromptExecution: 'forbidden' })) fail('planner policy grants authority or provider choice');
