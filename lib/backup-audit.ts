@@ -8,6 +8,8 @@ export const BACKUP_AUDIT_FIELDS = [
 
 export const BACKUP_AGENT_AUDIT_FIELDS = ['proposerRef', 'mandateRef', 'modelProvider'] as const;
 
+const WEB_AGENT_LIFECYCLE_EVENTS = new Set(['agent.client.registered', 'agent.client.revoked', 'agent.mandate.renewed']);
+
 export type BackupAuditRow = {
     proposerRef?: string | null; mandateRef?: string | null; modelProvider?: string | null;
     eventId: string; schemaVersion: number; eventType: string; occurredAt: number;
@@ -53,13 +55,21 @@ export function canonicalizeBackupAuditRows(value: unknown): BackupAuditRow[] {
                     && typeof (row as Record<string, unknown>)[key] !== 'string')) {
             throw new Error('Backup audit row or duplicate event identity is invalid.');
         }
-        const agent = audit.sourceSurface === 'agent';
-        if (agent ? !hasProvenance || audit.actorType !== 'user'
-            || ![audit.proposerRef, audit.mandateRef].every(ref => typeof ref === 'string' && /^[A-Za-z0-9_-]{1,128}$/u.test(ref))
-            || !['openai', 'anthropic', 'local'].includes(audit.modelProvider ?? '')
-            : hasProvenance && BACKUP_AGENT_AUDIT_FIELDS.some(key => audit[key] !== null)) throw new Error('Backup agent audit provenance is invalid.');
+        const webAgentLifecycle = audit.sourceSurface === 'web' && WEB_AGENT_LIFECYCLE_EVENTS.has(audit.eventType);
+        const requiresProvenance = audit.sourceSurface === 'agent' || webAgentLifecycle;
+        if (requiresProvenance) {
+            if (!hasProvenance || audit.actorType !== 'user'
+                || ![audit.proposerRef, audit.mandateRef].every(ref => typeof ref === 'string' && /^[A-Za-z0-9_-]{1,128}$/u.test(ref))
+                || !['openai', 'anthropic', 'local'].includes(audit.modelProvider ?? '')
+                || (webAgentLifecycle && (audit.outcome !== 'success' || audit.subjectType !== 'agent_operation'
+                    || audit.subjectRef !== audit.proposerRef))) {
+                throw new Error('Backup agent audit provenance is invalid.');
+            }
+        } else if (hasProvenance && BACKUP_AGENT_AUDIT_FIELDS.some(key => audit[key] !== null)) {
+            throw new Error('Backup agent audit provenance is invalid.');
+        }
         identities.add(audit.eventId);
-        return Object.fromEntries((agent ? fields : BACKUP_AUDIT_FIELDS).map(key => [key, audit[key]])) as BackupAuditRow;
+        return Object.fromEntries((requiresProvenance ? fields : BACKUP_AUDIT_FIELDS).map(key => [key, audit[key]])) as BackupAuditRow;
     });
     return rows.sort((left, right) => left.eventId < right.eventId ? -1 : left.eventId > right.eventId ? 1 : 0);
 }
