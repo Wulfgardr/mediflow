@@ -15,7 +15,9 @@ const voiceDetail = { ready: 'Pronta.', missing: 'Manca il modello della voce.',
 /** @param {{ state: string, paired: boolean, port: number | null, reason: string | null }} lan */
 function lanDetail(lan, port) {
   if (lan.state === 'on') return lan.paired ? 'Collegamento acceso.' : 'Acceso. Nessun dispositivo abbinato: «Collega un dispositivo» nelle Impostazioni.';
-  if (lan.state === 'off') return 'Spento. Si accende con «Abilita home-base» nelle Impostazioni.';
+  if (lan.state === 'off') return lan.reason === 'no-network'
+    ? 'Spento: nessuna rete disponibile.'
+    : 'Spento. Si accende con «Abilita home-base» nelle Impostazioni.';
   if (lan.reason === 'port') return `Non acceso: la porta ${port} è occupata.`;
   if (lan.reason === 'certificate') return 'Non acceso: serve openssl per creare il certificato.';
   return 'Si è arrestato. Riapri MediFlow per riprovare.';

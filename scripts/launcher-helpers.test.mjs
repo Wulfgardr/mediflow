@@ -1880,6 +1880,7 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
     }
     mkdirSync(path.join(source, 'lib/security'), { recursive: true });
     for (const name of ['network-ingress-policy.mjs', 'loopback-ingress.mjs']) writeFileSync(path.join(source, 'lib/security', name), readFileSync(path.join(repoRoot, 'lib/security', name)));
+    writeFileSync(path.join(source, 'lib/network-pairing-address.mjs'), readFileSync(path.join(repoRoot, 'lib/network-pairing-address.mjs')));
     writeFileSync(path.join(source, 'scripts/local-api-tls-proxy.mjs'), readFileSync(path.join(repoRoot, 'scripts/local-api-tls-proxy.mjs')));
     mkdirSync(path.join(source, 'lib/local-voice'), { recursive: true });
     writeFileSync(path.join(source, 'lib/local-voice/client.mjs'), readFileSync(path.join(repoRoot, 'lib/local-voice/client.mjs')));
@@ -3882,9 +3883,12 @@ test('launcher keeps the iPhone proxy on only while the Web is in home-base mode
     const on = await settle(value => value.lan.state === 'on');
     assert.equal(on.lan.port, tlsPort);
     assert.equal(on.services.find(row => row.id === 'lan').detail, 'Acceso. Nessun dispositivo abbinato: «Collega un dispositivo» nelle Impostazioni.');
+    const { readPairingAddress } = await import('../lib/network-pairing-address.mjs');
+    const expectedBindHost = await readPairingAddress('0.0.0.0');
     const published = JSON.parse(readFileSync(path.join(f.data, 'runtime-status.json'), 'utf8'));
     assert.equal(published.port, tlsPort);
-    assert.equal(published.bindHost, '0.0.0.0');
+    assert.equal(published.bindHost, expectedBindHost);
+    assert.equal(published.loopbackProbe, true);
     const forwarded = await new Promise((resolve, reject) => {
         const request = https.request({ host: '127.0.0.1', port: tlsPort, path: '/api/auth/check', rejectUnauthorized: false }, response => {
             response.resume(); resolve({ status: response.statusCode, pin: response.socket.getPeerCertificate().fingerprint256.replaceAll(':', '').toLowerCase() });
@@ -3939,4 +3943,111 @@ test('the iPhone proxy ends and frees its port when the launcher that started it
     while ((alive() || await accepts()) && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 50));
     assert.equal(alive(), false, `proxy ${pid} still running after its launcher was killed`);
     assert.equal(await accepts(), false, `port ${port} still accepts connections`);
+});
+
+test('LAN proxy controller terminates an orphan proxy when archive is local-only and cleans stale files', { skip: process.platform === 'win32' || spawnSync('openssl', ['version'], { windowsHide: true }).error ? 'openssl non disponibile' : false, timeout: 30_000 }, async t => {
+    const { startLanProxy, createLanProxyController } = await import('./launcher-lan-proxy.mjs');
+    const data = mkdtempSync(path.join(tmpdir(), 'mediflow-lan-orphan-local-'));
+    t.after(() => rmSync(data, { recursive: true, force: true }));
+    const orphan = await startLanProxy({ root: repoRoot, dataDir: data, target: 'http://127.0.0.1:9', port: 0, bindHost: '127.0.0.1' });
+    t.after(async () => { await orphan.stop(); });
+    const controller = createLanProxyController({
+        root: repoRoot,
+        dataDir: data,
+        port: orphan.port,
+        readOverview: async () => ({ operatingMode: 'local-only', hasPairedClients: false }),
+    });
+    await controller.follow('http://127.0.0.1:9');
+    assert.deepEqual(controller.status(), { state: 'off', paired: false, port: null, reason: null });
+    assert.throws(() => process.kill(orphan.pid, 0), { code: 'ESRCH' });
+    assert.equal(existsSync(path.join(data, 'runtime-status.json')), false);
+    assert.equal(existsSync(path.join(data, 'local-api-tls-proxy.pid')), false);
+});
+
+test('LAN proxy controller re-syncs and stops the proxy if mode switches to local-only while busy', async () => {
+    const { createLanProxyController } = await import('./launcher-lan-proxy.mjs');
+    const data = mkdtempSync(path.join(tmpdir(), 'mediflow-lan-race-'));
+    try {
+        let mode = 'network-home-base';
+        let releaseStart;
+        const startGate = new Promise(resolve => { releaseStart = resolve; });
+        let stopCalled = 0;
+        const controller = createLanProxyController({
+            root: repoRoot,
+            dataDir: data,
+            port: 0,
+            readOverview: async () => ({ operatingMode: mode, hasPairedClients: false }),
+            start: async () => {
+                await startGate;
+                return { port: 43443, pin: 'a'.repeat(64), pid: 999999, exited: new Promise(() => {}), stop: async () => { stopCalled += 1; } };
+            },
+        });
+        const firstFollow = controller.follow('http://127.0.0.1:9');
+        await new Promise(resolve => setTimeout(resolve, 20));
+        mode = 'local-only';
+        const refreshDuringBusy = controller.refresh();
+        releaseStart();
+        await Promise.all([firstFollow, refreshDuringBusy]);
+        assert.deepEqual(controller.status(), { state: 'off', paired: false, port: null, reason: null });
+        assert.equal(controller.pid(), null);
+        assert.equal(stopCalled, 1);
+    } finally {
+        rmSync(data, { recursive: true, force: true });
+    }
+});
+
+test('LAN proxy controller moves listening address on network change and stays off with clean status when no network exists', async () => {
+    const { createLanProxyController } = await import('./launcher-lan-proxy.mjs');
+    const { launcherServices } = await import('./mediflow-launcher-page.mjs');
+    const data = mkdtempSync(path.join(tmpdir(), 'mediflow-lan-switch-'));
+    try {
+        let currentAddress = '172.20.10.3';
+        const startedHosts = [];
+        const stoppedHosts = [];
+        const controller = createLanProxyController({
+            root: repoRoot,
+            dataDir: data,
+            port: 3443,
+            readOverview: async () => ({ operatingMode: 'network-home-base', hasPairedClients: false }),
+            resolveBindHost: async () => currentAddress,
+            start: async ({ bindHost }) => {
+                startedHosts.push(bindHost);
+                return {
+                    port: 3443,
+                    bindHost,
+                    pin: 'a'.repeat(64),
+                    pid: 999000 + startedHosts.length,
+                    exited: new Promise(() => {}),
+                    stop: async () => { stoppedHosts.push(bindHost); },
+                };
+            },
+        });
+
+        await controller.follow('http://127.0.0.1:9');
+        assert.deepEqual(startedHosts, ['172.20.10.3']);
+        assert.deepEqual(stoppedHosts, []);
+        assert.deepEqual(controller.status(), { state: 'on', paired: false, port: 3443, reason: null });
+
+        currentAddress = '192.168.1.44';
+        await controller.refresh();
+        assert.deepEqual(startedHosts, ['172.20.10.3', '192.168.1.44']);
+        assert.deepEqual(stoppedHosts, ['172.20.10.3']);
+        assert.deepEqual(controller.status(), { state: 'on', paired: false, port: 3443, reason: null });
+
+        currentAddress = null;
+        await controller.refresh();
+        assert.deepEqual(stoppedHosts, ['172.20.10.3', '192.168.1.44']);
+        assert.deepEqual(controller.status(), { state: 'off', paired: false, port: null, reason: 'no-network' });
+        assert.deepEqual(
+            launcherServices({ lan: controller.status(), lanPort: 3443 }).find(row => row.id === 'lan'),
+            { id: 'lan', title: 'iPhone e iPad', detail: 'Spento: nessuna rete disponibile.', ready: false },
+        );
+
+        currentAddress = '10.0.0.15';
+        await controller.refresh();
+        assert.deepEqual(startedHosts, ['172.20.10.3', '192.168.1.44', '10.0.0.15']);
+        assert.deepEqual(controller.status(), { state: 'on', paired: false, port: 3443, reason: null });
+    } finally {
+        rmSync(data, { recursive: true, force: true });
+    }
 });

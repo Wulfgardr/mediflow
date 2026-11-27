@@ -66,8 +66,9 @@ test('a genuine non-loopback socket peer cannot issue or consume Web sessions th
     }
     if (!before) {
         assert.equal((await call('/api/auth/login', { direct: true, method: 'POST', body: {} })).status, 403);
-        const intent = await call('/api/v1/network/pairing-intents', { method: 'POST', body: { deviceName: 'Synthetic TLS peer', clientPlatform: 'ipados', appVersion: 'test', requestedCapabilities: ['network.replica.readonly-patients'] } });
-        assert.equal(intent.status, 201, 'Network route must survive the allowlist');
+        assert.equal((await call('/api/v1/network/pairing-intents', { method: 'POST', body: { deviceName: 'Synthetic TLS peer', clientPlatform: 'ipados', appVersion: 'test', requestedCapabilities: ['network.replica.readonly-patients'] } })).status, 403);
+        const intent = await call('/api/v1/network/pairing-intents', { method: 'POST', direct: true, remote: false, body: { deviceName: 'Synthetic TLS peer', clientPlatform: 'ipados', appVersion: 'test', requestedCapabilities: ['network.replica.readonly-patients'] } });
+        assert.equal(intent.status, 201);
         const pairing = await call(`/api/v1/network/pairing-intents/${intent.json.intentId}/confirm`, { method: 'POST', direct: true, remote: false, headers: local });
         assert.equal(pairing.status, 201);
         const pairedHeaders = { 'x-mediflow-paired-client-id': pairing.json.pairedClient.clientId, 'x-mediflow-paired-client-token': pairing.json.pairedClientToken };

@@ -7168,10 +7168,13 @@ components:
           type:
             - string
             - 'null'
+          maxLength: 64
         requestedCapabilities:
           type: array
+          maxItems: 32
           items:
             type: string
+            maxLength: 128
           uniqueItems: true
     NetworkPairingRequesterSummary:
       type: object
