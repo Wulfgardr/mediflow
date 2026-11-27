@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import { BACKUP_ROWS_HEADER, BACKUP_ROWS_MANIFEST, MAX_BACKUP_ROW_BYTES } from './backup-row-layout.ts';
 import { assertEntryRevisionBackup } from './entry-revision-backup.ts';
 import { assertAgentCassetteBackup } from './agent-cassette-contract.ts';
 import { validateAmbulatoryCommandRows } from './ambulatory-destructive-command-backup.ts';
@@ -47,6 +49,7 @@ export type BackupRecord = Record<string, unknown>;
 type AdditiveBackupCollection = 'entryRevisions' | 'agentCassettes' | 'ambulatoryDestructiveCommands' | 'therapyStatusCommands' | 'prostheticsCatalogSources' | 'prostheticsCatalogDocuments' | 'auditEvents' | 'prostheticsCatalogEntries' | 'prostheticsCatalogReceipts' | 'exemptionImportReceipts';
 export type BackupDataset = Record<Exclude<BackupCollectionName, AdditiveBackupCollection>, BackupRecord[]>
     & Partial<Record<AdditiveBackupCollection, BackupRecord[]>>;
+export type BackupRowDataset = { [Collection in keyof BackupDataset]: Iterable<BackupRecord> };
 
 /* Collections of the durable AI review and of the headless SOAP write, removed on
  * 2026-11-08. The product never wrote them, so an older artifact may carry them
@@ -118,10 +121,12 @@ export interface BackupArtifact {
     payload: BackupDataset;
 }
 
-const inputChecksums = new WeakMap<BackupArtifact, string>();
+export type BackupRowArtifact = Omit<BackupArtifact, 'payload'> & { payload: BackupRowDataset };
+
+const inputChecksums = new WeakMap<BackupRowArtifact, string>();
 
 /** Original input payload checksum before additive normalization; no authentication claim. */
-export function backupArtifactInputChecksum(artifact: BackupArtifact): string {
+export function backupArtifactInputChecksum(artifact: BackupRowArtifact): string {
     return inputChecksums.get(artifact) ?? artifact.manifest.checksum;
 }
 
@@ -217,7 +222,7 @@ function timestampMilliseconds(value: unknown): number | null {
     return Number.isFinite(date.getTime()) && date.toISOString() === value ? date.getTime() : null;
 }
 
-function assertPhysicianReviewAttestationRows(payload: Partial<Record<BackupCollectionName, BackupRecord[]>>): void {
+function assertPhysicianReviewAttestationRows(payload: Partial<BackupRowDataset>): void {
     const actorRefs = new Set<string>();
     for (const attestation of payload.physicianReviewAttestations ?? []) {
         if (!hasExactKeys(attestation, PHYSICIAN_REVIEW_ATTESTATION_KEYS)) {
@@ -306,7 +311,7 @@ function parseAssignedAmbulatoryMemberships(value: unknown): Array<{ ambulatoryI
 }
 
 /* Backups carry only already-host-minted attachment currentness; they never mint, default, or rebase it. */
-function assertAttachmentCurrentnessRows(rows: readonly BackupRecord[]): void {
+function assertAttachmentCurrentnessRows(rows: Iterable<BackupRecord>): void {
     const sourceRefs = new Set<string>();
     for (const row of rows) {
         try {
@@ -326,12 +331,13 @@ function assertAttachmentCurrentnessRows(rows: readonly BackupRecord[]): void {
 }
 
 function assertSamePatientLinks(
-    rows: readonly BackupRecord[],
+    rows: Iterable<BackupRecord>,
     reference: string,
-    targets: readonly BackupRecord[],
+    targets: Iterable<BackupRecord>,
     optional = false,
 ): void {
-    const patientById = new Map(targets.map(row => [row.id, row.patientId]));
+    const patientById = new Map<unknown, unknown>();
+    for (const row of targets) patientById.set(row.id, row.patientId);
     for (const row of rows) {
         const targetId = row[reference];
         if (optional && targetId == null) continue;
@@ -341,15 +347,16 @@ function assertSamePatientLinks(
     }
 }
 
-async function assertCollectionReferences(
-    payload: Partial<Record<BackupCollectionName, BackupRecord[]>>,
+function assertCollectionReferences(
+    payload: Partial<BackupRowDataset>,
     patientDependentCollections: readonly BackupCollectionName[] = PATIENT_DEPENDENT_COLLECTIONS,
-): Promise<void> {
-    const ambulatoryIds = new Set(
-        (payload.ambulatories ?? [])
-            .map((item) => item.id)
-            .filter((value): value is string => typeof value === 'string' && value.trim().length > 0),
-    );
+): void {
+    const ids = (rows: Iterable<BackupRecord>) => {
+        const result = new Set<string>();
+        for (const { id } of rows) if (typeof id === 'string' && id.trim().length > 0) result.add(id);
+        return result;
+    };
+    const ambulatoryIds = ids(payload.ambulatories ?? []);
     const patientIds = new Set<string>();
     for (const patient of payload.patients ?? []) {
         if (typeof patient.id !== 'string' || patient.id.trim().length === 0 || patientIds.has(patient.id)) {
@@ -357,11 +364,7 @@ async function assertCollectionReferences(
         }
         patientIds.add(patient.id);
     }
-    const conversationIds = new Set(
-        (payload.conversations ?? [])
-            .map((item) => item.id)
-            .filter((value): value is string => typeof value === 'string' && value.trim().length > 0),
-    );
+    const conversationIds = ids(payload.conversations ?? []);
 
     assertAttachmentCurrentnessRows(payload.attachments ?? []);
 
@@ -429,21 +432,22 @@ async function assertCollectionReferences(
     }
 
     /* Reject unsupported or inconsistent exemption receipts before restore/export. */
-    try { assertExemptionImportReceiptRows(payload.exemptionImportReceipts ?? []); }
+    try { assertExemptionImportReceiptRows([...(payload.exemptionImportReceipts ?? [])]); }
     catch { throw new BackupArtifactError('invalid-manifest', 'Exemption import receipts are invalid or unsupported.'); }
     try { assertProstheticsCatalogBackup(payload.prostheticsCatalogEntries ?? [], payload.prostheticsCatalogReceipts ?? [], payload.prostheticsCatalogSources ?? [], payload.prostheticsCatalogDocuments ?? [], payload.prostheticPrescriptions ?? []); }
     catch { throw new BackupArtifactError('invalid-manifest', 'Prosthetics catalog or provenance is invalid or unsupported.'); }
-    try { validateTherapyStatusCommandRows(payload.therapyStatusCommands ?? [], payload.auditEvents ?? []); }
+    const audits = [...(payload.auditEvents ?? [])];
+    try { validateTherapyStatusCommandRows([...(payload.therapyStatusCommands ?? [])], audits); }
     catch { throw new BackupArtifactError('invalid-manifest', 'Therapy status command ledger or audit is invalid.'); }
-    try { validateAmbulatoryCommandRows(payload.ambulatoryDestructiveCommands ?? [], payload.auditEvents ?? []); }
+    try { validateAmbulatoryCommandRows([...(payload.ambulatoryDestructiveCommands ?? [])], audits); }
     catch { throw new BackupArtifactError('invalid-manifest', 'Ambulatory command ledger or audit is invalid.'); }
     try { assertAgentCassetteBackup(payload.agentCassettes ?? []); }
     catch { throw new BackupArtifactError('invalid-manifest', 'Encrypted agent cassettes are invalid.'); }
-    try { assertEntryRevisionBackup(payload.entryRevisions ?? [], payload.entries ?? [], payload.auditEvents ?? []); }
+    try { assertEntryRevisionBackup(payload.entryRevisions ?? [], payload.entries ?? [], audits); }
     catch { throw new BackupArtifactError('invalid-manifest', 'Diary revision history is invalid.'); }
     assertPhysicianReviewAttestationRows(payload);
     if (backupAuditCoverage(payload) === 'included') {
-        try { canonicalizeBackupAuditRows(payload.auditEvents); }
+        try { canonicalizeBackupAuditRows(audits); }
         catch { throw new BackupArtifactError('invalid-manifest', 'Backup audit rows or identities are invalid.'); }
     }
 }
@@ -458,7 +462,7 @@ export async function createBackupArtifact(payload: BackupDataset, createdAt = n
         catch { throw new BackupArtifactError('invalid-manifest', 'Backup audit snapshot is invalid.'); }
     }
     assertCollectionSet(currentPayload as Record<string, unknown>, collections);
-    await assertCollectionReferences(currentPayload);
+    assertCollectionReferences(currentPayload);
     const canonicalPayload = {
         ...currentPayload,
         entryRevisions: [...(currentPayload.entryRevisions ?? [])].sort((a, b) => String(a.eventId).localeCompare(String(b.eventId))),
@@ -495,6 +499,71 @@ export async function createBackupArtifact(payload: BackupDataset, createdAt = n
 export async function serializeBackupArtifact(payload: BackupDataset, createdAt = new Date()): Promise<string> {
     const artifact = await createBackupArtifact(payload, createdAt);
     return JSON.stringify(normalizeJson(artifact), null, 2);
+}
+
+export function* serializeBackupRows(payload: BackupRowDataset, createdAt: Date): Generator<string> {
+    const includedAudit = backupAuditCoverage(payload) === 'included';
+    const collections = includedAudit ? BACKUP_COLLECTIONS : PRE_AUDIT_COLLECTIONS;
+    const audits = includedAudit ? canonicalizeBackupAuditRows(Array.from(payload.auditEvents!, snapshotBackupAudit)) : [];
+    const canonical = { ...payload,
+        exemptionImportReceipts: [...(payload.exemptionImportReceipts ?? [])].sort((a, b) => Number(a.id) - Number(b.id)),
+        therapyStatusCommands: validateTherapyStatusCommandRows([...(payload.therapyStatusCommands ?? [])], audits),
+        ambulatoryDestructiveCommands: validateAmbulatoryCommandRows([...(payload.ambulatoryDestructiveCommands ?? [])], audits),
+        ...(includedAudit ? { auditEvents: audits } : {}),
+    };
+    assertCollectionSet(canonical, collections);
+    assertCollectionReferences(canonical);
+    const recordCounts = createEmptyCounts(collections);
+    const hash = createHash('sha256').update('{');
+    yield BACKUP_ROWS_HEADER + '\n';
+    let separator = '';
+    for (const collection of [...collections].sort()) {
+        const start = separator + JSON.stringify(collection) + ':[';
+        hash.update(start);
+        yield start + '\n';
+        let comma = '';
+        for (const row of canonical[collection] ?? []) {
+            const line = comma + stableStringify(row);
+            if (Buffer.byteLength(line) > MAX_BACKUP_ROW_BYTES) {
+                throw new BackupArtifactError('invalid-manifest', 'Un record supera il limite del backup programmato. Crea un backup completo di recupero.');
+            }
+            hash.update(line);
+            yield line + '\n';
+            recordCounts[collection]++;
+            comma = ',';
+        }
+        hash.update(']');
+        yield ']\n';
+        separator = ',';
+    }
+    const manifest: BackupArtifactManifest = {
+        scope: BACKUP_ARTIFACT_SCOPE, createdAt: createdAt.toISOString(), checksumAlgorithm: 'sha256',
+        checksum: hash.update('}').digest('hex'), collections, recordCounts,
+    };
+    yield BACKUP_ROWS_MANIFEST + JSON.stringify(manifest) + '}\n';
+}
+
+export function validateBackupRowsArtifact(payload: BackupRowDataset, value: unknown, counts: Record<string, number>,
+    checksum: string): BackupRowArtifact {
+    const collections = backupAuditCoverage(payload) === 'included' ? BACKUP_COLLECTIONS : PRE_AUDIT_COLLECTIONS;
+    assertCollectionSet(payload, collections);
+    if (!value || typeof value !== 'object') throw new BackupArtifactError('invalid-manifest', 'Backup manifest is missing.');
+    const manifest = value as Partial<BackupArtifactManifest>;
+    if (manifest.scope !== BACKUP_ARTIFACT_SCOPE || manifest.checksumAlgorithm !== 'sha256'
+        || typeof manifest.createdAt !== 'string' || Number.isNaN(Date.parse(manifest.createdAt))
+        || !Array.isArray(manifest.collections) || manifest.collections.length !== collections.length
+        || collections.some((collection, index) => collection !== manifest.collections![index])
+        || !manifest.recordCounts || !hasCollectionSet(manifest.recordCounts, collections)) {
+        throw new BackupArtifactError('invalid-manifest', 'Backup manifest is incomplete or invalid.');
+    }
+    if (collections.some(collection => counts[collection] !== manifest.recordCounts![collection])) {
+        throw new BackupArtifactError('count-mismatch', 'Backup manifest counts do not match the payload.');
+    }
+    if (checksum !== manifest.checksum) {
+        throw new BackupArtifactError('checksum-mismatch', 'Backup checksum does not match the payload.');
+    }
+    assertCollectionReferences(payload);
+    return { format: BACKUP_ARTIFACT_FORMAT, version: BACKUP_ARTIFACT_VERSION, manifest: manifest as BackupArtifactManifest, payload };
 }
 
 export async function parseBackupArtifact(value: unknown): Promise<BackupArtifact> {
@@ -562,7 +631,7 @@ export async function parseBackupArtifact(value: unknown): Promise<BackupArtifac
     }
 
     assertCollectionCounts(currentPayload, recordCounts, expectedCollections);
-    await assertCollectionReferences(currentPayload as Partial<Record<BackupCollectionName, BackupRecord[]>>, expectedPatientDependentCollections);
+    assertCollectionReferences(currentPayload as Partial<BackupRowDataset>, expectedPatientDependentCollections);
 
     const createdAt = new Date(manifest.createdAt);
     if (Number.isNaN(createdAt.getTime())) {

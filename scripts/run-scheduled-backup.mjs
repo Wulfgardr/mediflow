@@ -2,7 +2,9 @@
 import { assertPrivateDirectory } from './windows-private-directory.mjs';
 /* @Codex */
 import { serializeProstheticsDocument } from '../lib/reference-data/prosthetics-catalog-backup.ts';
-import { serializeBackupArtifact as serializeCanonicalBackupArtifact } from '../lib/backup-artifact.ts';
+import { BACKUP_COLLECTIONS, serializeBackupRows } from '../lib/backup-artifact.ts';
+export { serializeBackupArtifact } from '../lib/backup-artifact.ts';
+import { createHash } from 'node:crypto';
 
 import fs from 'fs';
 import { backupStorageDirectory, validateBackupDestination } from './backup-destination-policy.mjs';
@@ -105,11 +107,6 @@ function readState(db) {
   } catch {
     return getDefaultState();
   }
-}
-
-/* One serializer for Web and scheduled exports: the canonical artifact lives in lib/backup-artifact. */
-export async function serializeBackupArtifact(payload, createdAt = new Date()) {
-  return serializeCanonicalBackupArtifact(payload, createdAt);
 }
 
 function classifyManagedBackupFile(name) {
@@ -232,6 +229,20 @@ function assertBackupDirectory(directory, identity) {
   }
 }
 
+function readPublishedDigest(file, ownFile) {
+  const descriptor = fs.openSync(file, 'r');
+  try {
+    if (!sameFile(fs.fstatSync(descriptor), ownFile)) throw new Error('Il file di backup è cambiato. Backup non confermato.');
+    const hash = createHash('sha256');
+    const buffer = Buffer.alloc(1024 * 1024);
+    let bytesRead;
+    while ((bytesRead = fs.readSync(descriptor, buffer, 0, buffer.length, null)) > 0) {
+      hash.update(buffer.subarray(0, bytesRead));
+    }
+    return hash.digest('hex');
+  } finally { fs.closeSync(descriptor); }
+}
+
 export function publishScheduledBackup(finalPath, artifact, directoryIdentity = fs.statSync(path.dirname(finalPath))) {
   const directory = path.dirname(finalPath);
   const tempPath = `${finalPath}.tmp`;
@@ -241,34 +252,42 @@ export function publishScheduledBackup(finalPath, artifact, directoryIdentity = 
   const assertOwnFile = file => {
     if (!sameFile(fs.lstatSync(file), ownFile)) throw new Error('Il file di backup è cambiato. Backup non confermato.');
   };
+  let linked = false;
+  let confirmed = false;
+  const removeOwnedFile = file => {
+    try {
+      assertBackupDirectory(directory, directoryIdentity);
+      assertOwnFile(file);
+    } catch { return; }
+    fs.unlinkSync(file);
+    syncBackupDirectory(directory);
+  };
   try {
     assertBackupDirectory(directory, directoryIdentity);
     assertOwnFile(tempPath);
-    fs.writeFileSync(descriptor, artifact, { encoding: 'utf8' });
+    const hash = createHash('sha256');
+    const write = chunk => {
+      fs.writeFileSync(descriptor, chunk, { encoding: 'utf8' });
+      hash.update(chunk);
+    };
+    if (typeof artifact === 'string') write(artifact);
+    else artifact(write);
     fs.fsyncSync(descriptor);
     assertBackupDirectory(directory, directoryIdentity);
     assertOwnFile(tempPath);
     fs.linkSync(tempPath, finalPath);
+    linked = true;
     assertBackupDirectory(directory, directoryIdentity);
     assertOwnFile(finalPath);
     syncBackupDirectory(directory);
-    if (fs.readFileSync(finalPath, 'utf8') !== artifact) throw new Error('Backup non confermato dalla rilettura.');
+    if (readPublishedDigest(finalPath, ownFile) !== hash.digest('hex')) throw new Error('Backup non confermato dalla rilettura.');
     assertOwnFile(finalPath);
     assertBackupDirectory(directory, directoryIdentity);
+    confirmed = true;
   } finally {
     fs.closeSync(descriptor);
-    let canRemoveTemp = false;
-    try {
-      assertBackupDirectory(directory, directoryIdentity);
-      assertOwnFile(tempPath);
-      canRemoveTemp = true;
-    } catch {
-      // A changed path cannot safely identify our temporary file for cleanup.
-    }
-    if (canRemoveTemp) {
-      fs.unlinkSync(tempPath);
-      syncBackupDirectory(directory);
-    }
+    if (linked && !confirmed) removeOwnedFile(finalPath);
+    removeOwnedFile(tempPath);
   }
   assertBackupDirectory(directory, directoryIdentity);
   assertOwnFile(finalPath);
@@ -307,11 +326,6 @@ function normalizeRowKeys(row) {
   );
 }
 
-/* @Codex */
-function filterRowsByReference(rows, foreignKey, validRefs) {
-  return rows.filter((row) => typeof row?.[foreignKey] === 'string' && validRefs.has(row[foreignKey]));
-}
-
 function buildAssignedAmbulatoryIds(patient, rows) {
   const ids = new Set();
   if (typeof patient.ambulatoryId === 'string' && patient.ambulatoryId.trim().length > 0) {
@@ -340,52 +354,65 @@ function buildAssignedAmbulatoryMemberships(patient, rows) {
     .sort((left, right) => left.ambulatoryId.localeCompare(right.ambulatoryId));
 }
 
-function buildDataset(db, backupCollections) {
-  return db.transaction(() => {
-    const schemaVersion = db.pragma('user_version', { simple: true });
-    if (!hasTable(db, 'therapy_status_commands') && (!Number.isSafeInteger(schemaVersion) || schemaVersion < 0 || schemaVersion > 4)) throw new Error('Therapy command ledger unavailable');
-    if (!hasTable(db, 'ambulatory_destructive_commands') && (!Number.isSafeInteger(schemaVersion) || schemaVersion < 0 || schemaVersion > 5)) throw new Error('Ambulatory command ledger unavailable');
-    if (!hasTable(db, 'entry_revisions') && (!Number.isSafeInteger(schemaVersion) || schemaVersion < 0 || schemaVersion > 16)) throw new Error('Entry revision history unavailable');
-    const dataset = Object.fromEntries(
-      backupCollections.filter(collection => collection !== 'auditEvents' || hasTable(db, 'audit_events')).map((collection) => [
-        collection,
-        hasTable(db, BACKUP_TABLES[collection])
-          ? db.prepare(`SELECT * FROM ${BACKUP_TABLES[collection]}`).all().map((row) =>
-            collection === 'prostheticsCatalogDocuments' ? serializeProstheticsDocument(normalizeRowKeys(row)) : (collection === 'auditEvents' || collection === 'therapyStatusCommands' || collection === 'ambulatoryDestructiveCommands') ? normalizeRowKeys(row) : normalizeRowDates(normalizeRowKeys(row)))
-          : [],
-      ]),
-    );
-    const patientAmbulatoryRows = hasTable(db, PATIENT_AMBULATORY_TABLE)
-      ? db.prepare(`SELECT * FROM ${PATIENT_AMBULATORY_TABLE}`).all().map((row) => normalizeRowDates(normalizeRowKeys(row)))
-      : [];
-    dataset.patients = dataset.patients.map((patient) => {
-      const assignedAmbulatoryIds = buildAssignedAmbulatoryIds(patient, patientAmbulatoryRows);
-      const assignedAmbulatoryMemberships = buildAssignedAmbulatoryMemberships(patient, patientAmbulatoryRows);
-      return assignedAmbulatoryIds.length > 0
-        ? { ...patient, assignedAmbulatoryIds, assignedAmbulatoryMemberships }
-        : patient;
-    });
+const ROWS_BY_PATIENT = new Set(['attachments', 'documentDiagnosisProposals', 'entries', 'observations',
+  'checkups', 'therapies', 'prostheticPrescriptions', 'sissHandoffs']);
 
-    const patientIds = new Set(dataset.patients.map((row) => row.id).filter((value) => typeof value === 'string' && value.length > 0));
-    const conversationIds = new Set(dataset.conversations.map((row) => row.id).filter((value) => typeof value === 'string' && value.length > 0));
-
-    dataset.attachments = filterRowsByReference(dataset.attachments, 'patientId', patientIds);
-    dataset.documentDiagnosisProposals = filterRowsByReference(dataset.documentDiagnosisProposals, 'patientId', patientIds);
-    dataset.entries = filterRowsByReference(dataset.entries, 'patientId', patientIds);
-    const entryIds = new Set(dataset.entries.map(row => row.id));
-    dataset.entryRevisions = filterRowsByReference(dataset.entryRevisions, 'entryId', entryIds);
-    dataset.observations = filterRowsByReference(dataset.observations, 'patientId', patientIds);
-    dataset.checkups = filterRowsByReference(dataset.checkups, 'patientId', patientIds);
-    dataset.therapies = filterRowsByReference(dataset.therapies, 'patientId', patientIds);
-    dataset.prostheticPrescriptions = filterRowsByReference(dataset.prostheticPrescriptions, 'patientId', patientIds);
-    dataset.sissHandoffs = filterRowsByReference(dataset.sissHandoffs, 'patientId', patientIds);
-    dataset.messages = filterRowsByReference(dataset.messages, 'conversationId', conversationIds);
-
-    for (const row of dataset.prostheticPrescriptions) {
-      if (typeof row.catalogSnapshot === 'string') row.catalogSnapshot = JSON.parse(row.catalogSnapshot);
+function datasetRows(db) {
+  const schemaVersion = db.pragma('user_version', { simple: true });
+  if (!hasTable(db, 'therapy_status_commands') && (!Number.isSafeInteger(schemaVersion) || schemaVersion < 0 || schemaVersion > 4)) throw new Error('Therapy command ledger unavailable');
+  if (!hasTable(db, 'ambulatory_destructive_commands') && (!Number.isSafeInteger(schemaVersion) || schemaVersion < 0 || schemaVersion > 5)) throw new Error('Ambulatory command ledger unavailable');
+  if (!hasTable(db, 'entry_revisions') && (!Number.isSafeInteger(schemaVersion) || schemaVersion < 0 || schemaVersion > 16)) throw new Error('Entry revision history unavailable');
+  const tables = new Set(Object.values(BACKUP_TABLES).filter(table => hasTable(db, table)));
+  const memberships = new Map();
+  if (hasTable(db, PATIENT_AMBULATORY_TABLE)) {
+    for (const raw of db.prepare(`SELECT * FROM ${PATIENT_AMBULATORY_TABLE}`).iterate()) {
+      const row = normalizeRowDates(normalizeRowKeys(raw));
+      let rows = memberships.get(row.patientId);
+      if (!rows) memberships.set(row.patientId, rows = []);
+      rows.push(row);
     }
-    return dataset;
-  })();
+  }
+
+  const patientRef = foreignKey => `EXISTS (SELECT 1 FROM patients AS parent
+    WHERE typeof(parent.id) = 'text' AND length(parent.id) > 0 AND parent.id = ${foreignKey})`;
+  const filterFor = collection => {
+    if (ROWS_BY_PATIENT.has(collection)) return tables.has('patients') ? patientRef('source.patient_id') : '0';
+    if (collection === 'entryRevisions') return tables.has('entries') && tables.has('patients')
+      ? `EXISTS (SELECT 1 FROM entries AS entry WHERE entry.id = source.entry_id AND ${patientRef('entry.patient_id')})` : '0';
+    if (collection === 'messages') return tables.has('conversations') ? `EXISTS (SELECT 1 FROM conversations AS parent
+      WHERE typeof(parent.id) = 'text' AND length(parent.id) > 0 AND parent.id = source.conversation_id)` : '0';
+    return '1';
+  };
+
+  function *rows(collection) {
+    const table = BACKUP_TABLES[collection];
+    if (!tables.has(table)) return;
+    const order = collection === 'entryRevisions' ? ' ORDER BY event_id' : '';
+    for (const raw of db.prepare(`SELECT source.* FROM ${table} AS source WHERE ${filterFor(collection)}${order}`).iterate()) {
+      const row = normalizeRowKeys(raw);
+      if (collection === 'prostheticsCatalogDocuments') {
+        yield serializeProstheticsDocument(row);
+      } else if (collection === 'auditEvents' || collection === 'therapyStatusCommands' || collection === 'ambulatoryDestructiveCommands') {
+        yield row;
+      } else {
+        const normalized = normalizeRowDates(row);
+        if (collection === 'patients') {
+          const assigned = memberships.get(row.id) ?? [];
+          const assignedAmbulatoryIds = buildAssignedAmbulatoryIds(normalized, assigned);
+          if (assignedAmbulatoryIds.length > 0) {
+            normalized.assignedAmbulatoryIds = assignedAmbulatoryIds;
+            normalized.assignedAmbulatoryMemberships = buildAssignedAmbulatoryMemberships(normalized, assigned);
+          }
+        } else if (collection === 'prostheticPrescriptions' && typeof normalized.catalogSnapshot === 'string') {
+          normalized.catalogSnapshot = JSON.parse(normalized.catalogSnapshot);
+        }
+        yield normalized;
+      }
+    }
+  }
+
+  return Object.fromEntries(BACKUP_COLLECTIONS.filter(collection => collection !== 'auditEvents' || tables.has('audit_events'))
+    .map(collection => [collection, { [Symbol.iterator]: () => rows(collection) }]));
 }
 
 async function main() {
@@ -415,11 +442,11 @@ async function main() {
     backupLock = acquireBackupLock(destinationDir);
 
     const createdAt = new Date();
-    const payload = buildDataset(db, Object.keys(BACKUP_TABLES));
-    const artifact = await serializeBackupArtifact(payload, createdAt);
     const fileName = `mediflow-backup-v1-${formatTimestamp(createdAt)}.mediflow`;
     const finalPath = path.join(destinationDir, fileName);
-    publishScheduledBackup(finalPath, artifact, directoryIdentity);
+    publishScheduledBackup(finalPath, write => db.transaction(() => {
+      for (const chunk of serializeBackupRows(datasetRows(db), createdAt)) write(chunk);
+    })(), directoryIdentity);
     restrictManagedBackupFiles(destinationDir);
     assertBackupDirectory(destinationDir, directoryIdentity);
 

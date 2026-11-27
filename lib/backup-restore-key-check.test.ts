@@ -35,7 +35,7 @@ test('the client restore sends nothing when the unlocked key cannot read the bac
     try {
         db.setKey(await generateMasterKey());
         const expectedSnapshot = 'a'.repeat(64), sourceChecksum = 'b'.repeat(64);
-        const decision = { id: '12345678-1234-4123-8123-123456789012', json: artifact,
+        const decision = { id: '12345678-1234-4123-8123-123456789012', source: artifact,
             verification: { expectedSnapshot, sourceChecksum, createdAt: null, collections: 0, records: 0, excludedRetiredPatients: 0 } };
         await assert.rejects(importRawDatabase(decision, { verifier: 'synthetic-verifier' }), /chiave diversa/);
         assert.equal(requests.length, 0);
@@ -56,7 +56,7 @@ test('the client tells a blocked restore from a failed one and verifies through 
         db.setKey(key);
         answer = () => Response.json({ success: false, code: 'restore_blocked', reason: 'audit', error: 'Ripristino bloccato: i dati attuali non sono stati modificati.' }, { status: 409 });
         const expectedSnapshot = 'a'.repeat(64), sourceChecksum = 'b'.repeat(64);
-        const decision = { id: '12345678-1234-4123-8123-123456789012', json: artifact,
+        const decision = { id: '12345678-1234-4123-8123-123456789012', source: artifact,
             verification: { expectedSnapshot, sourceChecksum, createdAt: null, collections: 0, records: 0, excludedRetiredPatients: 0 } };
         await assert.rejects(importRawDatabase(decision, { verifier: 'synthetic-verifier' }),
             (error: unknown) => error instanceof BackupRestoreBlockedError && error.reason === 'audit');

@@ -159,3 +159,19 @@ La verifica rifiuta le voci di una prescrizione assegnate a un altro paziente
 e le osservazioni collegate alla prestazione di un altro paziente. Un
 riferimento presente deve risolversi nel file. Le osservazioni dei backup
 precedenti senza un collegamento restano valide.
+
+## Emendamento WUL-975: backup programmato a flusso
+
+Il runner produce JSON v1 con una riga per record e il manifest in coda.
+L'ordine delle collezioni sul file è quello usato dal checksum canonico.
+È lo stesso oggetto JSON letto dai lettori v1. Formato, collezioni incluse,
+regole di validazione e SHA-256 del payload restano quelli di questo ADR.
+Il checksum rileva corruzione e alterazioni accidentali del payload.
+L'autenticazione con chiave riguarda il backup completo di recupero.
+
+La pagina Backup riconosce la disposizione per righe, controlla i dati
+cifrati un record per volta e invia il file direttamente come body JSON.
+Sul server, la verifica e il ripristino riusano le stesse regole e la stessa
+conferma. Durante la richiesta leggono i record da una copia privata su
+disco, rimossa alla fine. I file JSON v1 delle generazioni precedenti
+rimangono leggibili tramite il percorso esistente.

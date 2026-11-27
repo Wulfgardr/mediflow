@@ -23,8 +23,8 @@ test('runner-attacks: direct cloud, symlink retarget, missing volume, revoked ac
     fs.symlinkSync(cloud, alias, 'junction');
     const preload = path.join(root, 'probe-and-fault.mjs');
     fs.writeFileSync(preload, `import fs from 'node:fs'; import cp from 'node:child_process'; import {createRequire} from 'node:module'; import {syncBuiltinESMExports} from 'node:module';
-const spawn=cp.spawnSync,link=fs.linkSync,read=fs.readFileSync,open=fs.openSync;
-fs.openSync=(file,...args)=>{if(process.env.FAULT==='exchange'&&String(file).endsWith('.mediflow.tmp')){fs.renameSync(process.env.EXCHANGE_DEST,process.env.EXCHANGE_DEST+'.original');fs.symlinkSync(process.env.EXCHANGE_CLOUD,process.env.EXCHANGE_DEST,'junction');fs.writeFileSync(process.env.EXCHANGE_DEST+'/.mediflow-backup.lock','unrelated lock');}return open(file,...args);};
+const spawn=cp.spawnSync,link=fs.linkSync,read=fs.readSync,open=fs.openSync; let finalFd;
+fs.openSync=(file,...args)=>{if(process.env.FAULT==='exchange'&&String(file).endsWith('.mediflow.tmp')){fs.renameSync(process.env.EXCHANGE_DEST,process.env.EXCHANGE_DEST+'.original');fs.symlinkSync(process.env.EXCHANGE_CLOUD,process.env.EXCHANGE_DEST,'junction');fs.writeFileSync(process.env.EXCHANGE_DEST+'/.mediflow-backup.lock','unrelated lock');}const fd=open(file,...args);if(String(file).endsWith('.mediflow'))finalFd=fd;return fd;};
 cp.spawnSync=(file,args,options)=> {
  const volumeProbe=['/bin/df','/usr/sbin/diskutil','/usr/bin/plutil','findmnt','lsblk'].includes(file)||(file==='powershell.exe'&&args.some(arg=>String(arg).includes('Get-BitLockerVolume')));
  if(process.env.FAULT==='unverified'&&volumeProbe) return {status:1,stdout:'',stderr:'Access denied'};
@@ -37,7 +37,7 @@ cp.spawnSync=(file,args,options)=> {
  return spawn(file,args,options);
 };
 fs.linkSync=(...args)=>{if(process.env.FAULT==='enospc'){const error=new Error('Synthetic ENOSPC');error.code='ENOSPC';throw error;}const result=link(...args); if(process.env.FAULT==='concurrent-config'){const Database=createRequire(process.cwd()+'/package.json')('better-sqlite3'); const other=new Database(process.env.MEDIFLOW_DATA_DIR+'/medical.db');try{const state=JSON.parse(other.prepare('SELECT value FROM settings').get().value);state.config.hour=7;state.revision='concurrent-confirmed';other.prepare('UPDATE settings SET value=?').run(JSON.stringify(state));}finally{other.close();}}return result;};
-fs.readFileSync=(file,...args)=>{if(process.env.FAULT==='readback'&&String(file).endsWith('.mediflow'))return 'synthetic corrupt readback';return read(file,...args);};
+fs.readSync=(fd,buffer,...args)=>{const count=read(fd,buffer,...args);if(process.env.FAULT==='readback'&&fd===finalFd&&count)buffer[0]^=1;return count;};
 syncBuiltinESMExports();`);
     const run = (destination: string, fault = '', acknowledged = true) => {
         const config = { enabled: true, hour: 2, minute: 0, destinationDir: destination, retentionKeepArtifacts: 1, volumeProtectionAcknowledged: acknowledged, volumeProtectionIdentity: fs.existsSync(destination) ? backupDestinationIdentity(fs.realpathSync(destination)) : '' };
@@ -93,7 +93,8 @@ for (const phase of ['before-open', 'after-open', 'before-link', 'after-link', '
         const finalPath = path.join(destination, 'synthetic.mediflow');
         const tempPath = `${finalPath}.tmp`;
         const artifact = 'SYNTHETIC_TAX_SENTINEL';
-        const open = fs.openSync, link = fs.linkSync, read = fs.readFileSync;
+        const open = fs.openSync, link = fs.linkSync, read = fs.readSync;
+        let finalFd: number | undefined;
         const exchangeDirectory = () => {
             fs.renameSync(destination, path.join(root, 'original'));
             fs.symlinkSync(cloud, destination, 'junction');
@@ -104,6 +105,7 @@ for (const phase of ['before-open', 'after-open', 'before-link', 'after-link', '
         t.mock.method(fs, 'openSync', (...args: Parameters<typeof fs.openSync>) => {
             if (String(args[0]) === tempPath && phase === 'before-open') { exchanged = true; exchangeDirectory(); fs.unlinkSync(tempPath); }
             const fd = open(...args);
+            if (String(args[0]) === finalPath) finalFd = fd;
             if (String(args[0]) === tempPath && phase === 'after-open') { exchanged = true; exchangeDirectory(); }
             return fd;
         });
@@ -115,9 +117,9 @@ for (const phase of ['before-open', 'after-open', 'before-link', 'after-link', '
             if (phase === 'published-inode') { exchanged = true; fs.renameSync(finalPath, `${finalPath}.original`); fs.writeFileSync(finalPath, artifact); }
             return result;
         });
-        t.mock.method(fs, 'readFileSync', (...args: Parameters<typeof fs.readFileSync>) => {
+        t.mock.method(fs, 'readSync', (...args: Parameters<typeof fs.readSync>) => {
             const result = read(...args);
-            if (String(args[0]) === finalPath && phase === 'readback') { exchanged = true; exchangeDirectory(); }
+            if (args[0] === finalFd && phase === 'readback' && !exchanged) { exchanged = true; exchangeDirectory(); }
             return result;
         });
         try {

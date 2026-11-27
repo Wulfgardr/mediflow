@@ -28,6 +28,7 @@ import { revivePatientStructuredFields } from './patient-structured-fields';
 import type { BackupRestorePreflightResult } from './backup-restore-preflight';
 import type { DocumentEvidencePack } from './domain/documents/document-evidence-pack';
 import type { HostDocumentOcrQueueReason, DocumentOcrQueueState } from './domain/documents/document-ocr-queue';
+import { BACKUP_ROWS_HEADER, BACKUP_ROWS_TRANSPORT, BACKUP_ROWS_TRANSPORT_HEADER } from './backup-row-layout';
 import { assertBackupReadableWithKey, BackupRestoreKeyError } from './backup-restore-key-check';
 import {
     buildApiTableFetchErrorMessage,
@@ -1117,9 +1118,9 @@ class MedicalApiClient {
         return result;
     }
 
-    async assertBackupReadable(artifactJson: string): Promise<void> {
+    async assertBackupReadable(artifact: string | Blob, signal?: AbortSignal): Promise<void> {
         const key = this.masterKey;
-        await assertBackupReadableWithKey(artifactJson, key, ENCRYPTED_FIELDS);
+        await assertBackupReadableWithKey(artifact, key, ENCRYPTED_FIELDS, signal);
         // A lock or key change while the check ran voids its answer.
         if (this.masterKey !== key) throw new BackupRestoreKeyError('Ripristino non avviato: la sessione è stata bloccata durante il controllo. Sblocca e riprova.');
     }
@@ -1224,16 +1225,20 @@ export type BackupVerification = {
 
 export type PreparedBackupRestore = {
     id: string;
-    json: string;
+    source: string | Blob;
     verification: BackupVerification;
 };
 
-async function postBackup(url: string, jsonString: string, failure: string, headers?: Record<string, string>): Promise<Response> {
-    await db.assertBackupReadable(jsonString);
+async function postBackup(url: string, source: string | Blob, failure: string, headers?: Record<string, string>): Promise<Response> {
+    const streamLayout = typeof source !== 'string'
+        && await source.slice(0, BACKUP_ROWS_HEADER.length + 1).text() === BACKUP_ROWS_HEADER + '\n';
+    const body = typeof source === 'string' || streamLayout ? source : await source.text();
+    const signal = streamLayout ? db.getSessionReadSignal() : undefined;
+    await db.assertBackupReadable(body, signal);
     const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...headers },
-        body: jsonString,
+        headers: { 'Content-Type': 'application/json', ...(streamLayout ? { [BACKUP_ROWS_TRANSPORT_HEADER]: BACKUP_ROWS_TRANSPORT } : {}), ...headers },
+        body, signal,
     });
     if (response.ok) return response;
 
@@ -1254,7 +1259,7 @@ async function postBackup(url: string, jsonString: string, failure: string, head
 }
 
 export async function importRawDatabase(decision: PreparedBackupRestore, credential: { pin: string } | { verifier: string }) {
-    const response = await postBackup('/api/system/backup-restore', decision.json, 'Restore failed', {
+    const response = await postBackup('/api/system/backup-restore', decision.source, 'Restore failed', {
         'x-mediflow-restore-credential': JSON.stringify(credential),
         'x-mediflow-restore-id': decision.id,
         'x-mediflow-restore-snapshot': decision.verification.expectedSnapshot,
@@ -1274,8 +1279,8 @@ function readExcludedRetiredPatients(value: unknown): number {
 }
 
 /* Same key check and preflight as a restore, through a route that cannot write. */
-export async function verifyRawDatabase(jsonString: string): Promise<BackupVerification> {
-    const response = await postBackup('/api/system/backup-restore/verify', jsonString, 'Verify failed');
+export async function verifyRawDatabase(source: string | Blob): Promise<BackupVerification> {
+    const response = await postBackup('/api/system/backup-restore/verify', source, 'Verify failed');
     const payload = await response.json() as { expectedSnapshot?: unknown; sourceChecksum?: unknown; createdAt?: unknown; collections?: unknown; counts?: unknown; excludedRetiredPatients?: unknown };
     const { expectedSnapshot, sourceChecksum } = payload;
     const digest = /^[a-f0-9]{64}$/u;

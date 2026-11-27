@@ -1,7 +1,12 @@
 import { backupAuditCoverage, type BackupAuditCoverage } from './backup-audit';
 import fs from 'fs';
+import path from 'node:path';
+import { getDataDir, resolveDataPath } from './data-dir';
+import { restrictNewPrivateDirectory } from '../scripts/windows-private-directory.mjs';
+import { BACKUP_ROWS_TRANSPORT, BACKUP_ROWS_TRANSPORT_HEADER, invalidBackupRows } from './backup-row-layout';
+import { readBackupRowsFile } from './backup-row-file';
 import {
-    BackupArtifact,
+    type BackupRowArtifact,
     backupArtifactInputChecksum,
     BackupArtifactError,
     type BackupArtifactErrorCode,
@@ -51,22 +56,7 @@ type PreflightDeps = {
     resolveDataPath: (...segments: string[]) => string;
 };
 
-type DataDirModule = {
-    getDataDir: () => string;
-    resolveDataPath: (...segments: string[]) => string;
-};
-
-function loadDataDirModule(): DataDirModule {
-    // Load server-only filesystem helpers lazily so injected test deps stay isolated.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('./data-dir') as DataDirModule;
-}
-
-const defaultDeps: PreflightDeps = {
-    fs,
-    getDataDir: () => loadDataDirModule().getDataDir(),
-    resolveDataPath: (...segments) => loadDataDirModule().resolveDataPath(...segments),
-};
+const defaultDeps: PreflightDeps = { fs, getDataDir, resolveDataPath };
 
 function pass(
     id: BackupRestorePreflightCheckId,
@@ -144,12 +134,16 @@ function canAccess(targetPath: string, mode: number, deps: PreflightDeps): boole
     }
 }
 
-export async function runBackupRestorePreflight(
-    value: unknown,
-    deps: PreflightDeps = defaultDeps,
-): Promise<{ artifact: BackupArtifact | null; result: BackupRestorePreflightResult }> {
+export function runBackupRestorePreflight(value: unknown, deps: PreflightDeps = defaultDeps) {
+    return runPreflight(() => parseBackupArtifact(value), deps);
+}
+
+async function runPreflight<T extends BackupRowArtifact>(
+    parse: () => T | Promise<T>,
+    deps: PreflightDeps,
+): Promise<{ artifact: T | null; result: BackupRestorePreflightResult }> {
     const checks: BackupRestorePreflightCheck[] = [];
-    let artifact: BackupArtifact | null = null;
+    let artifact: T | null = null;
 
     let dataDir: string | null = null;
     let dbPath: string | null = null;
@@ -208,7 +202,7 @@ export async function runBackupRestorePreflight(
     }
 
     try {
-        artifact = await parseBackupArtifact(value);
+        artifact = await parse();
         checks.push(pass('artifact-json', 'Artifact JSON leggibile.'));
         checks.push(pass('artifact-format', 'Formato artifact valido.'));
         checks.push(pass('artifact-version', `Versione artifact ${artifact.version} supportata.`));
@@ -241,4 +235,41 @@ export async function runBackupRestorePreflight(
     };
 
     return { artifact, result };
+}
+
+export async function withBackupRestoreRequest<T>(request: Request,
+    apply: (preflight: { artifact: BackupRowArtifact | null; result: BackupRestorePreflightResult }) => T | Promise<T>): Promise<T> {
+    if (request.headers.get(BACKUP_ROWS_TRANSPORT_HEADER) !== BACKUP_ROWS_TRANSPORT) {
+        return apply(await runBackupRestorePreflight(await request.json()));
+    }
+    if (!request.body) invalidBackupRows();
+    const parent = defaultDeps.getDataDir();
+    const disk = fs.statfsSync(parent);
+    const budget = Math.max(0, disk.bavail * disk.bsize - 64 * 1024 * 1024);
+    const root = fs.mkdtempSync(path.join(parent, '.portable-restore-'));
+    try {
+        restrictNewPrivateDirectory(root);
+        const file = path.join(root, 'upload.json');
+        const handle = await fs.promises.open(file, 'wx+', 0o600);
+        try {
+            if (process.platform !== 'win32') fs.unlinkSync(file);
+            const reader = request.body.getReader();
+            try {
+                let size = 0;
+                for (;;) {
+                    request.signal.throwIfAborted();
+                    const chunk = await reader.read();
+                    if (chunk.done) break;
+                    size += chunk.value.byteLength;
+                    if (size > budget) invalidBackupRows();
+                    await handle.writeFile(chunk.value);
+                }
+            } finally {
+                await reader.cancel().catch(() => {});
+                reader.releaseLock();
+            }
+            request.signal.throwIfAborted();
+            return await apply(await runPreflight(() => readBackupRowsFile(handle.fd), defaultDeps));
+        } finally { await handle.close(); }
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
 }

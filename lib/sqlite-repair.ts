@@ -66,7 +66,15 @@ function canonicalTarget(file: string): string {
 
 function digest(file: string): string {
     if (!regularFile(file)) throw new SqliteSwapRecoveryRequiredError();
-    return createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+    const descriptor = fs.openSync(file, 'r');
+    try {
+        const hash = createHash('sha256');
+        const buffer = Buffer.alloc(1024 * 1024);
+        for (let count = fs.readSync(descriptor, buffer); count > 0; count = fs.readSync(descriptor, buffer)) {
+            hash.update(buffer.subarray(0, count));
+        }
+        return hash.digest('hex');
+    } finally { fs.closeSync(descriptor); }
 }
 
 function syncFile(file: string): void {

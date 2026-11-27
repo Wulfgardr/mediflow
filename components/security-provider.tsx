@@ -16,7 +16,8 @@ import {
     validatePinChangeInput,
 } from '@/lib/security/pin-change';
 import { db } from '@/lib/db';
-import { encryptRecoveryBackup, decryptRecoveryBackup, MAX_RECOVERY_DATABASE_BYTES } from '@/lib/recovery-backup';
+import { encryptRecoveryBackupStream, readRecoveryBackup } from '@/lib/recovery-backup-stream';
+import type { RecoveryBackupAction } from './recovery-backup-download';
 import { recoveryBackupRefusalMessage } from '@/lib/recovery-backup-refusal';
 import { OnboardingWizard, type SecuritySetup } from '@/components/onboarding-wizard';
 import { RecoveryKitPanel, type PreparedRecoveryKit, type RecoveryKit, type AccessResult } from './recovery-kit';
@@ -85,7 +86,7 @@ interface SecurityContextType {
         secret: string,
         options?: { shown?: UnlockParameters['credential']; longPinConfirmed?: boolean },
     ) => Promise<boolean | 'confirm'>;
-    recoveryBackup: (artifact?: Uint8Array) => Promise<Uint8Array | void>;
+    recoveryBackup: (action: RecoveryBackupAction) => Promise<void>;
     preparePassphraseChange: (secret: string, passphrase: string) => Promise<AccessResult>;
     preparePassphraseRecovery: (secret: string, passphrase: string, kit?: RecoveryKit) => Promise<AccessResult>;
     changePin: (currentPin: string, newPin: string) => Promise<{ ok: true } | { ok: false; message: string }>;
@@ -763,38 +764,47 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
         return { ok: true };
     };
 
-    const recoveryBackup = async (artifact?: Uint8Array): Promise<Uint8Array | void> => {
+    const recoveryBackup = async (action: RecoveryBackupAction): Promise<void> => {
         const key = masterKeyRef.current;
         const generation = authorityAttemptGenerationRef.current;
         if (!key || !isAuthenticated || isLocked || unlockCredential !== 'passphrase' || user?.role !== 'admin') {
             throw new Error('Sblocca con la passphrase dell’amministratore prima di continuare.');
         }
-        const current = () => generation === authorityAttemptGenerationRef.current && masterKeyRef.current === key;
-        let bytes: Uint8Array | undefined;
-        try {
-            if (artifact) {
-                bytes = await decryptRecoveryBackup(artifact, key);
-                if (!current()) throw new Error('Accesso scaduto. Rinnova l’accesso.');
-                return;
+        const requireCurrent = () => {
+            if (generation !== authorityAttemptGenerationRef.current || masterKeyRef.current !== key) {
+                throw new Error('Accesso scaduto. Rinnova l’accesso.');
             }
-            const response = await fetch('/api/system/recovery-backup', { method: 'POST', cache: 'no-store',
+        };
+        if (action.kind === 'verify') {
+            await readRecoveryBackup(action.artifact, key, requireCurrent);
+            requireCurrent();
+            return;
+        }
+        const controller = new AbortController();
+        const signal = AbortSignal.any([controller.signal, db.getSessionReadSignal()]);
+        const writer = action.output.getWriter();
+        try {
+            const response = await fetch('/api/system/recovery-backup', { method: 'POST', cache: 'no-store', signal,
                 headers: { 'Content-Type': 'application/json' }, body: '{}' });
-            if (!current()) throw new Error('Accesso scaduto. Rinnova l’accesso.');
+            requireCurrent();
             if (!response.ok) {
                 const problem = await response.json().catch(() => null);
                 if (response.status === 422 && ['backup_directory_existing', 'backup_directory_filesystem', 'backup_directory_blocked'].includes(problem?.code)
                     && typeof problem.error === 'string' && problem.error.length <= 500) throw new Error(problem.error);
                 throw new Error(recoveryBackupRefusalMessage(response.status, problem?.code));
             }
-            if (Number(response.headers.get('Content-Length')) > MAX_RECOVERY_DATABASE_BYTES) {
-                throw new Error(recoveryBackupRefusalMessage(413, 'archive_too_large'));
-            }
-            bytes = new Uint8Array(await response.arrayBuffer());
-            if (!current()) throw new Error('Accesso scaduto. Rinnova l’accesso.');
-            const encrypted = await encryptRecoveryBackup(bytes, key);
-            if (!current()) throw new Error('Accesso scaduto. Rinnova l’accesso.');
-            return encrypted;
-        } finally { bytes?.fill(0); }
+            if (!response.body) throw new Error(recoveryBackupRefusalMessage(500, null));
+            const size = Number(response.headers.get('Content-Length'));
+            await encryptRecoveryBackupStream(response.body, size, key, async chunk => {
+                requireCurrent();
+                await writer.write(chunk);
+            });
+            requireCurrent();
+            await writer.close();
+        } finally {
+            controller.abort();
+            writer.releaseLock();
+        }
     };
 
     const preparePassphraseChange = async (secret: string, passphrase: string): Promise<AccessResult> => {

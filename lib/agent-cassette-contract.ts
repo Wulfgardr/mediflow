@@ -25,7 +25,7 @@ export function cassetteItems(cassette: Pick<AgentCassette, 'itemsCiphertext'>):
         || new Set(items.map(item => item.id)).size !== items.length || items.reduce((sum, item) => sum + item.byteLength, 0) > 32 * 1024 * 1024) throw new Error('AGENT_CASSETTE_INVALID');
     return items;
 }
-export function assertAgentCassetteBackup(rows: Record<string, unknown>[]): void {
+export function assertAgentCassetteBackup(rows: Iterable<Record<string, unknown>>): void {
     const ids = new Set<string>();
     for (const row of rows) {
         if (Object.keys(row).sort().join(',') !== 'actorRef,agentRef,allowsClinicalEgress,anchorCiphertext,archiveGeneration,depositedAt,id,itemsCiphertext,mandateRef,modelProvider,modifiedAt,publicKey,revision,status,wrappedPrivateKey'

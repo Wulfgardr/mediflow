@@ -1,5 +1,5 @@
 /** Full-archive recovery envelope v1. No keys, kit or clinical metadata in its header. */
-const MAGIC = new TextEncoder().encode('MDFREC01');
+export const LEGACY_RECOVERY_MAGIC = new TextEncoder().encode('MDFREC01');
 const KEY_CONTEXT = new TextEncoder().encode('mediflow.recovery-backup.key.v1');
 const SQLITE_MAGIC = new TextEncoder().encode('SQLite format 3\0');
 const HEADER_BYTES = 80; // magic(8), wrapping nonce(12), wrapped AES-256 key + tag(48), payload nonce(12)
@@ -11,15 +11,20 @@ const source = (bytes: Uint8Array): BufferSource => bytes as unknown as BufferSo
 const matches = (bytes: Uint8Array, prefix: Uint8Array) => prefix.every((byte, index) => bytes[index] === byte);
 const invalid = () => new Error('RECOVERY_BACKUP_INVALID');
 
+export function assertRecoveryDatabaseHeader(bytes: Uint8Array): void {
+    if (bytes.length < 100 || !matches(bytes, SQLITE_MAGIC)) throw invalid();
+}
+
 export function assertRecoveryDatabaseBytes(bytes: Uint8Array): void {
-    if (bytes.length < 100 || bytes.length > MAX_RECOVERY_DATABASE_BYTES || !matches(bytes, SQLITE_MAGIC)) throw invalid();
+    if (bytes.length > MAX_RECOVERY_DATABASE_BYTES) throw invalid();
+    assertRecoveryDatabaseHeader(bytes);
 }
 
 /** The resident master key is used, never exported. Each backup has an independent data key. */
 export async function encryptRecoveryBackup(database: Uint8Array, masterKey: CryptoKey): Promise<Uint8Array> {
     assertRecoveryDatabaseBytes(database);
     const header = new Uint8Array(HEADER_BYTES);
-    header.set(MAGIC);
+    header.set(LEGACY_RECOVERY_MAGIC);
     crypto.getRandomValues(header.subarray(8, 20));
     crypto.getRandomValues(header.subarray(68, 80));
     const rawKey = crypto.getRandomValues(new Uint8Array(32));
@@ -37,7 +42,7 @@ export async function encryptRecoveryBackup(database: Uint8Array, masterKey: Cry
 
 /** No plaintext is returned until BOTH authentication tags and the format are valid. */
 export async function decryptRecoveryBackup(artifact: Uint8Array, masterKey: CryptoKey): Promise<Uint8Array> {
-    if (artifact.length < HEADER_BYTES + 100 + 16 || artifact.length > MAX_RECOVERY_BACKUP_BYTES || !matches(artifact, MAGIC)) throw invalid();
+    if (artifact.length < HEADER_BYTES + 100 + 16 || artifact.length > MAX_RECOVERY_BACKUP_BYTES || !matches(artifact, LEGACY_RECOVERY_MAGIC)) throw invalid();
     let rawKey: Uint8Array | undefined;
     try {
         const header = artifact.subarray(0, HEADER_BYTES);

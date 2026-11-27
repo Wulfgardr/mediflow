@@ -195,7 +195,8 @@ la release sorgente.
 Per prepararti a un guasto, vai in **Impostazioni → Backup e ripristino** e
 crea regolarmente un **backup completo cifrato**. È una copia dell'archivio
 SQLite, con account, chiavi protette e storico. Per crearlo usa un account
-amministratore sbloccato con passphrase. Conserva il file `.mediflow-recovery`
+amministratore sbloccato con passphrase, in Chrome o Edge. Conserva il file
+`.mediflow-recovery`
 fuori dal computer, insieme al kit di recupero corrispondente. Conserva la
 chiave su carta separatamente. Il backup non recupera originali esterni già
 mancanti.
@@ -210,9 +211,10 @@ esportabili in un archivio esistente. Non contiene account né involucri delle
 chiavi e non sostituisce il backup completo. Il ripristino sostituisce i dati
 del formato portabile, mentre account e chiavi dell'archivio restano invariati.
 
-La verifica e il ripristino elaborano il file interamente in memoria, sia per il
-backup completo sia per il file portabile: per archivi grandi serve memoria
-libera sufficiente sul computer.
+Il backup completo e il backup programmato elaborano i nuovi file a blocchi
+o per record. Per creare il backup completo serve spazio libero sul disco
+dell’archivio e su quello in cui salvi il file. I file precedenti restano
+leggibili e possono richiedere più memoria durante la verifica e il ripristino.
 
 All'apertura su macOS e Linux, MediFlow limita al proprietario l'accesso a
 `medical.db` e ai file di lavoro SQLite `-wal` e `-shm`. Non modifica file

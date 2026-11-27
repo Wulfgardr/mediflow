@@ -22,11 +22,11 @@ const timestamp = (value: unknown) => typeof value === 'string' && /^\d{4}-\d\d-
     && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
 
 /** Identical validation for web export, scheduled export and pre-mutation restore. */
-export function assertProstheticsCatalogBackup(entries: unknown[], receipts: unknown[], sources: unknown[] = [], documents: unknown[] = [], prescriptions: { catalogSnapshot?: unknown }[] = []): void {
-    if (!Array.isArray(entries) || !Array.isArray(receipts) || entries.length > 100_000 || receipts.length > 100_000) fail();
+export function assertProstheticsCatalogBackup(entries: Iterable<unknown>, receipts: Iterable<unknown>, sources: Iterable<unknown> = [], documents: Iterable<unknown> = [], prescriptions: Iterable<{ catalogSnapshot?: unknown }> = []): void {
     const sourceImports = new Set<string>();
     const receiptIds = new Set<number>(), operations = new Map<string, ProstheticsReceipt>();
     for (const value of receipts) {
+        if (receiptIds.size >= 100_000) fail();
         const row = keys(value, ['id', 'operationKey', 'receiptJson']);
         if (!count(row.id, Number.MAX_SAFE_INTEGER) || row.id === 0 || receiptIds.has(row.id as number)
             || !sha(row.operationKey) || operations.has(row.operationKey as string) || typeof row.receiptJson !== 'string' || row.receiptJson.length > 8192) fail();
@@ -58,9 +58,9 @@ export function assertProstheticsCatalogBackup(entries: unknown[], receipts: unk
         sourceImports.add(JSON.stringify([manifest.sha256, metadata.source, metadata.version, metadata.scope]));
         operations.set(row.operationKey as string, parsed as ProstheticsReceipt); receiptIds.add(row.id as number);
     }
-    if (!Array.isArray(sources) || sources.length > 100_000 || !Array.isArray(documents) || documents.length > 1000) fail();
     const sourceIds = new Set<string>();
     for (const value of sources) {
+        if (sourceIds.size >= 100_000) fail();
         const source = keys(value, ['id','name','authority','scope','version','date','sha256','notes']);
         if (!isProstheticsText(source.id, 1024) || sourceIds.has(source.id) || ['name','authority','scope','version'].some(k => !isProstheticsText(source[k]))
             || (source.date !== null && !isProstheticsDate(source.date)) || !sha(source.sha256) || typeof source.notes !== 'string'
@@ -68,12 +68,12 @@ export function assertProstheticsCatalogBackup(entries: unknown[], receipts: unk
         if (!sourceImports.has(JSON.stringify([source.sha256, source.name, source.version, source.scope]))) fail();
         sourceIds.add(source.id as string);
     }
-    const documentIds = new Set<string>();
     const documentRows = new Map<string, Record<string, unknown>>();
     let totalSize = 0;
     for (const value of documents) {
+        if (documentRows.size >= 1000) fail();
         const doc = keys(value, ['id','sourceId','name','sha256','size','page','base64','operationKey']);
-        if (typeof doc.id !== 'string' || !/^[a-f0-9-]{36}$/u.test(doc.id) || documentIds.has(doc.id) || !sourceIds.has(String(doc.sourceId)) || !operations.has(String(doc.operationKey))
+        if (typeof doc.id !== 'string' || !/^[a-f0-9-]{36}$/u.test(doc.id) || documentRows.has(doc.id) || !sourceIds.has(String(doc.sourceId)) || !operations.has(String(doc.operationKey))
             || !isProstheticsText(doc.name, 300) || buildAttachmentPath(`attachments/${doc.name}`, doc.name, doc.id) !== `attachments/${doc.name}`
             || !sha(doc.sha256) || !count(doc.size, 25 * 1024 * 1024) || doc.size === 0 || typeof doc.base64 !== 'string'
             || doc.base64.length > Math.ceil(25 * 1024 * 1024 / 3) * 4 || (doc.page !== null && !isProstheticsText(doc.page, 100))) fail();
@@ -82,10 +82,12 @@ export function assertProstheticsCatalogBackup(entries: unknown[], receipts: unk
         totalSize += bytes.length; if (totalSize > 100 * 1024 * 1024) fail();
         const manifest = operations.get(String(doc.operationKey))!.manifest;
         if ((manifest.options?.sourceDetails?.id ?? prostheticsSourceId(manifest.metadata!)) !== doc.sourceId) fail();
-        documentIds.add(doc.id as string); documentRows.set(doc.id as string, doc);
+        const { base64, ...metadata } = doc;
+        documentRows.set(doc.id as string, metadata);
     }
     const ids = new Set<string>();
     for (const value of entries) {
+        if (ids.size >= 100_000) fail();
         const row = keys(value, ['id', 'codeSystem', 'code', 'description', 'version', 'source', 'scope', 'startDate', 'endDate', 'sourceSha256', 'operationKey', 'importedAt', ...(Object.hasOwn(object(value), 'sourceId') ? ['sourceId'] : [])]);
         if (!isProstheticsText(row.description, 2000) || ['codeSystem', 'code', 'version', 'source', 'scope'].some(key => !isProstheticsText(row[key]))
             || (row.startDate !== null && !isProstheticsDate(row.startDate)) || (row.endDate !== null && !isProstheticsDate(row.endDate))

@@ -237,3 +237,33 @@ backup; i file esterni di `medical.db.reset-journal` non lo sono.
 Queste prove HTTP usano Next in sviluppo su Mac. Non qualificano il reset GPUI,
 una build standalone di produzione, altri sistemi o hardware, né la perdita di
 alimentazione. Il restore completo resta esclusivamente offline.
+
+## Emendamento WUL-975: recupero completo a blocchi
+
+Il formato `MDFREC02` usa la stessa master key residente nel browser e una
+chiave AES-256 casuale per ogni backup. Il kit e la chiave cartacea conservano
+il formato e il ruolo attuali. Il lettore continua ad aprire `MDFREC01`.
+
+L'intestazione è lunga 76 byte. Al prefisso di 8 byte seguono un nonce casuale
+di 12 byte, la chiave del file avvolta in 48 byte e la misura dello snapshot
+SQLite in un intero senza segno a 64 bit big-endian. Il wrapping AES-GCM usa
+il dominio `mediflow.recovery-backup.key.v2` come AAD. I dati seguono in
+blocchi da 1 MiB, con l'ultimo eventualmente più corto. Per ogni blocco il
+nonce di 96 bit codifica l'indice big-endian a partire da zero. L'AAD concatena
+l'intestazione, il tag precedente (16 zeri al primo blocco) e un byte di tipo
+(0 per i dati). Un record finale vuoto usa il nonce successivo e tipo 1.
+Tutti i tag sono di 128 bit. La misura dichiarata, l'esatta fine del file e
+il tag finale sono obbligatori. La catena lega il tag finale alla sequenza
+completa dei blocchi. Il tetto di 32 GiB limita l'uso della singola chiave a
+32.769 invocazioni. [NIST SP 800-38D](https://csrc.nist.gov/pubs/sp/800/38/d/final)
+
+Il server invia lo snapshot sotto la stessa autorità, a blocchi e con
+contropressione. La copia temporanea è privata e viene rimossa alla chiusura
+del flusso o all'annullamento. Nel browser il selettore di salvataggio apre
+una scrittura su disco che si conclude solo dopo l'ultimo tag. Il browser
+deve supportare il salvataggio a flusso. La verifica usa il file scelto
+dall'utente e la chiave sbloccata.
+
+La CLI decifra per blocchi in una destinazione di lavoro privata. Soltanto
+dopo l'autenticazione del file completo esamina lo snapshot, verifica
+l'account e accede al protocollo di sostituzione già previsto da questo ADR.

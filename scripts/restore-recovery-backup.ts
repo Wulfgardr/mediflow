@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { MAX_RECOVERY_BACKUP_BYTES, parseRecoveryKit } from '../lib/recovery-backup.ts';
+import { parseRecoveryKit } from '../lib/recovery-backup.ts';
 import { restoreRecoveryBackup } from '../lib/recovery-backup-server.ts';
 
 /** TTY only: neither pipes, argv, environment variables nor echo can carry the recovery key. */
@@ -49,7 +49,9 @@ async function main() {
         return fs.readFileSync(file);
     };
     const kit = parseRecoveryKit(read(fields.get('--kit')!, 4096).toString('utf8'));
-    const artifact = read(fields.get('--backup')!, MAX_RECOVERY_BACKUP_BYTES);
+    const backup = fields.get('--backup')!;
+    if (!fs.lstatSync(backup).isFile()) throw new Error();
+    const artifact = await fs.openAsBlob(backup);
     let recoveryKey = await hiddenRecoveryKey();
     try {
         await restoreRecoveryBackup({ artifact, kit, recoveryKey, destination: path.join(data, 'medical.db') });

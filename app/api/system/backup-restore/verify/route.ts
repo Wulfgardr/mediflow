@@ -9,7 +9,7 @@ import {
     unauthorizedResponse,
 } from '@/lib/security/server-auth';
 import { isWebAdminSession } from '@/lib/security/server-auth-policy';
-import { runBackupRestorePreflight } from '@/lib/backup-restore-preflight';
+import { withBackupRestoreRequest } from '@/lib/backup-restore-preflight';
 import { apiFailure, apiInternalError } from '@/lib/api-error-response';
 import { isTrustedWebMutationRequest } from '@/lib/security/request-transport';
 
@@ -26,25 +26,26 @@ export async function POST(request: Request) {
     }
 
     try {
-        const { artifact, result: preflight } = await runBackupRestorePreflight(await request.json());
-        if (!preflight.ok || !artifact) {
-            return NextResponse.json(
-                { success: false, error: preflight.error ?? 'Backup preflight failed.', preflight },
-                { status: 412 },
-            );
-        }
-        const response = NextResponse.json({
-            success: true,
-            ...readRestorePreview(artifact),
-            sourceChecksum: backupArtifactInputChecksum(artifact),
-            format: artifact.format,
-            version: artifact.version,
-            createdAt: artifact.manifest.createdAt,
-            collections: [...artifact.manifest.collections],
-            counts: artifact.manifest.recordCounts,
+        return await withBackupRestoreRequest(request, ({ artifact, result: preflight }) => {
+            if (!preflight.ok || !artifact) {
+                return NextResponse.json(
+                    { success: false, error: preflight.error ?? 'Backup preflight failed.', preflight },
+                    { status: 412 },
+                );
+            }
+            const response = NextResponse.json({
+                success: true,
+                ...readRestorePreview(artifact),
+                sourceChecksum: backupArtifactInputChecksum(artifact),
+                format: artifact.format,
+                version: artifact.version,
+                createdAt: artifact.manifest.createdAt,
+                collections: [...artifact.manifest.collections],
+                counts: artifact.manifest.recordCounts,
+            });
+            response.headers.set('Cache-Control', 'no-store');
+            return response;
         });
-        response.headers.set('Cache-Control', 'no-store');
-        return response;
     } catch (error) {
         if (error instanceof BackupRestoreBlockedError) return blockedRestoreResponse(error.reason);
         const malformato = error instanceof SyntaxError;

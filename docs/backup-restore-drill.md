@@ -92,7 +92,8 @@ fallimento va segnalato con il rapporto allegato: non contiene dati reali.
 
 Questo percorso è distinto dalla prova portabile sopra. In Impostazioni →
 Backup, «Crea backup completo cifrato» salva `.mediflow-recovery` con l’intero
-SQLite, account e chiavi protette compresi. Conserva il kit corrispondente a
+SQLite, account e chiavi protette compresi. Apri MediFlow in Chrome o Edge
+e scegli dove salvare il file. Conserva il kit corrispondente a
 quella copia; una rotazione successiva delle credenziali produce un altro kit.
 La chiave su carta resta separata. «Verifica il file cifrato» controlla
 l’autenticità con la chiave sbloccata, **non** dimostra un ripristino.
@@ -121,9 +122,17 @@ Per recuperare su un computer nuovo:
 6. Nella prova sintetica controlla una nota cifrata, lo storico e una ricevuta
    già applicata; la ricevuta non deve produrre una seconda scrittura.
 
-Il backup è limitato a 512 MiB e allo schema corrente. File incompleto, alterato,
-chiave o kit errati, schema incompatibile e destinazione non vuota vengono
-rifiutati prima dello swap. La prova automatica del confine SQLite è
-`lib/recovery-backup.test.ts`: usa solo archivi sintetici e verifica anche che
-un processo locale ancora ammesso impedisca la sostituzione. Non costituisce
-la prova operativa di un secondo operatore né certifica un backup dello studio.
+Il formato a blocchi accetta fino a 32 GiB di SQLite. Anche il formato
+precedente resta leggibile. File incompleti o alterati, chiavi o kit errati,
+schemi incompatibili e destinazioni già usate vengono rifiutati prima
+dello swap. `lib/recovery-backup.test.ts` verifica anche che un processo locale
+ancora ammesso impedisca la sostituzione. La prova sintetica di scala usa il
+runner, la verifica, il produttore di recupero e la CLI offline.
+
+```bash
+MEDIFLOW_DATA_DIR="$(mktemp -d)" MEDIFLOW_BACKUP_TEST_MIB=1024 \
+  node scripts/run-strip-types.mjs --test lib/backup-streaming-scale.test.ts lib/recovery-backup-stream.test.ts
+```
+
+L’opzione `MEDIFLOW_BACKUP_TEST_MIB=2048` genera un archivio sintetico di circa
+2 GiB. La prova richiede spazio per l’archivio e le copie di lavoro.

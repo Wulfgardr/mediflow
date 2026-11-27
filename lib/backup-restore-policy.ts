@@ -8,7 +8,7 @@ import { readSqliteArchiveGeneration } from './archive-generation';
 import { auditOrigin } from './backup-import-provenance';
 import { backupAuditsEqual, snapshotBackupAudit, type BackupAuditRow } from './backup-audit';
 import { ARCHIVE_POLICY_MESSAGES, BackupRestoreBlockedError, type ArchivePolicyReason } from './backup-restore-blocked';
-import type { BackupDataset, BackupRecord } from './backup-artifact';
+import type { BackupRowDataset, BackupRecord } from './backup-artifact';
 import { derivePatientAmbulatoryLinks, type RestoredPatientAmbulatoryLink } from './backup-patient-ambulatory-links';
 import { normalizeRestoreRow } from './backup-restore-row';
 import { PATIENT_CHILD_TABLES } from './patient-cascade';
@@ -21,39 +21,42 @@ function block(reason: ArchivePolicyReason): never {
 }
 
 type RestoreReader = Pick<RetentionRunner, 'get' | 'select'>;
-type RestorePlan = { payload: BackupDataset; memberships: RestoredPatientAmbulatoryLink[]; excludedRetiredPatients: number };
+type RestorePlan = { payload: BackupRowDataset; memberships: RestoredPatientAmbulatoryLink[]; excludedRetiredPatients: number };
 
-function retainPatientGraph(payload: BackupDataset, retired: ReadonlySet<unknown>): BackupDataset {
-    const kept = { ...payload, patients: payload.patients.filter(row => !retired.has(row.id)) };
+function matchingRows(rows: Iterable<BackupRecord>, keep: (row: BackupRecord) => boolean): Iterable<BackupRecord> {
+    return { *[Symbol.iterator]() { for (const row of rows) if (keep(row)) yield row; } };
+}
+
+function retainPatientGraph(payload: BackupRowDataset, retired: ReadonlySet<unknown>): BackupRowDataset {
+    const kept = { ...payload, patients: matchingRows(payload.patients, row => !retired.has(row.id)) };
     for (const { name } of PATIENT_CHILD_TABLES) {
         if (name === 'patientsToAmbulatories') continue;
         const collection = name === 'sissHandoffEvents' ? 'sissHandoffs' : name;
-        kept[collection] = (payload[collection] ?? []).filter(row => !retired.has(row.patientId));
+        kept[collection] = matchingRows(payload[collection] ?? [], row => !retired.has(row.patientId));
     }
-    const entryIds = new Set(kept.entries.map(row => row.id));
-    kept.entryRevisions = payload.entryRevisions?.filter(row => entryIds.has(row.entryId));
+    const entryIds = new Set<unknown>();
+    for (const entry of kept.entries) entryIds.add(entry.id);
+    kept.entryRevisions = matchingRows(payload.entryRevisions ?? [], row => entryIds.has(row.entryId));
     return kept;
 }
 
 function persistedRowsUnchanged(
-    db: Database.Database, table: SQLiteTable, incoming: BackupRecord[], identity: readonly string[], condition: string, refs: string[],
-    indexes: Map<SQLiteTable, Map<string, BackupRecord>>,
+    db: Database.Database, table: SQLiteTable, incoming: Iterable<BackupRecord>, identity: readonly string[], condition: string, refs: string[],
 ): boolean {
     const columns = getTableColumns(table);
-    const key = (row: BackupRecord) => JSON.stringify(identity.map(field => row[field]));
-    let replacements = indexes.get(table);
-    if (!replacements) {
-        replacements = new Map(incoming.map(row => [key(row), row]));
-        indexes.set(table, replacements);
-    }
-    const indexed = replacements;
-    const local = db.prepare(`SELECT * FROM ${getTableName(table)} WHERE ${condition}`).all(...refs) as BackupRecord[];
-    return local.every(row => {
-        const identityRow = Object.fromEntries(identity.map(field => [field, row[columns[field]!.name]]));
-        const replacement = indexed.get(key(identityRow));
-        if (!replacement) return false;
+    const tableName = getTableName(table);
+    const expected = db.prepare(`SELECT count(*) FROM ${tableName} WHERE ${condition}`).pluck().get(...refs);
+    if (expected === 0) return true;
+    const whereIdentity = identity.map(field => `${columns[field]!.name} = ?`).join(' AND ');
+    const find = db.prepare(`SELECT * FROM ${tableName} WHERE (${condition}) AND ${whereIdentity}`);
+    const matched = new Set<string>();
+    for (const replacement of incoming) {
+        const ids = identity.map(field => replacement[field]);
+        if (!ids.every(value => typeof value === 'string')) continue;
+        const row = find.get(...refs, ...ids) as BackupRecord | undefined;
+        if (!row) continue;
         const normalized = normalizeRestoreRow(replacement);
-        return Object.entries(columns).every(([field, column]) => {
+        const unchanged = Object.entries(columns).every(([field, column]) => {
             const value = normalized[field] === undefined ? column.default ?? null : normalized[field];
             const persisted = row[column.name];
             if (value === null || persisted === null) return value === persisted;
@@ -64,28 +67,30 @@ function persistedRowsUnchanged(
                     : Object.is(column.mapToDriverValue(value), persisted);
             } catch { return false; }
         });
-    });
+        if (!unchanged) return false;
+        matched.add(JSON.stringify(ids));
+    }
+    return matched.size === expected;
 }
 
 function assertRestorePreservesHolds(db: Database.Database, reader: RestoreReader, plan: RestorePlan): void {
     const document = readRetentionHolds(reader);
     if (!document) block('retention_unreadable');
-    const indexes = new Map<SQLiteTable, Map<string, BackupRecord>>();
     for (const hold of document.holds) {
         const patientId = hold.patientId;
         const { payload, memberships } = plan;
         if (hold.scope === 'document') {
-            if (!persistedRowsUnchanged(db, attachments, payload.attachments, ['id'], 'id = ? AND patient_id = ?', [hold.attachmentId!, patientId], indexes)) block('legal_hold');
+            if (!persistedRowsUnchanged(db, attachments, payload.attachments, ['id'], 'id = ? AND patient_id = ?', [hold.attachmentId!, patientId])) block('legal_hold');
             continue;
         }
-        if (!persistedRowsUnchanged(db, patients, payload.patients, ['id'], 'id = ?', [patientId], indexes)
-            || !persistedRowsUnchanged(db, patientsToAmbulatories, memberships, ['patientId', 'ambulatoryId'], 'patient_id = ?', [patientId], indexes)
+        if (!persistedRowsUnchanged(db, patients, payload.patients, ['id'], 'id = ?', [patientId])
+            || !persistedRowsUnchanged(db, patientsToAmbulatories, memberships, ['patientId', 'ambulatoryId'], 'patient_id = ?', [patientId])
             || !persistedRowsUnchanged(db, entryRevisions, payload.entryRevisions ?? [], ['eventId'],
-                'entry_id IN (SELECT id FROM entries WHERE patient_id = ?)', [patientId], indexes)) block('legal_hold');
+                'entry_id IN (SELECT id FROM entries WHERE patient_id = ?)', [patientId])) block('legal_hold');
         for (const { name, table } of PATIENT_CHILD_TABLES) {
             if (name === 'patientsToAmbulatories') continue;
             const collection = name === 'sissHandoffEvents' ? 'sissHandoffs' : name;
-            if (!persistedRowsUnchanged(db, table, payload[collection] ?? [], ['id'], 'patient_id = ?', [patientId], indexes)) block('legal_hold');
+            if (!persistedRowsUnchanged(db, table, payload[collection] ?? [], ['id'], 'patient_id = ?', [patientId])) block('legal_hold');
         }
     }
 }
@@ -137,12 +142,14 @@ function cassetteHeldHere(db: Database.Database, cassette: BackupRecord): boolea
 }
 
 function assertNoRetiredPatientMaterial(
-    db: Database.Database, reader: RestoreReader, payload: BackupDataset, retired: ReadonlySet<unknown>, excludesPatients: boolean,
+    db: Database.Database, reader: RestoreReader, payload: BackupRowDataset, retired: ReadonlySet<unknown>, excludesPatients: boolean,
 ): void {
     const cassetteAdmitted = (row: BackupRecord) => excludesPatients ? cassetteAttributedHere(db, reader, row, retired) : cassetteHeldHere(db, row);
     const auditInScope = (row: BackupRecord) => excludesPatients || retired.has(row.subjectRef);
-    if (payload.agentCassettes?.some(row => !cassetteAdmitted(row))
-        || payload.auditEvents?.some(row => auditInScope(row) && !minimizedAudit(reader, row))) block('retired_patient_material');
+    for (const row of payload.agentCassettes ?? []) if (!cassetteAdmitted(row)) block('retired_patient_material');
+    for (const row of payload.auditEvents ?? []) {
+        if (auditInScope(row) && !minimizedAudit(reader, row)) block('retired_patient_material');
+    }
 
     for (const row of payload.therapyStatusCommands ?? []) {
         if (!retired.has(row.patientId) || (row.target === null && row.resultEndDate === null)) continue;
@@ -151,9 +158,10 @@ function assertNoRetiredPatientMaterial(
     }
 }
 
-export function planBackupRestore(db: Database.Database, source: BackupDataset, reader: RestoreReader): RestorePlan {
+export function planBackupRestore(db: Database.Database, source: BackupRowDataset, reader: RestoreReader): RestorePlan {
     const retired = new Set(db.prepare('SELECT id FROM patient_retired_ids').pluck().all());
-    const excluded = new Set(source.patients.map(row => row.id).filter(id => retired.has(id)));
+    const excluded = new Set<unknown>();
+    if (retired.size) for (const { id } of source.patients) if (retired.has(id)) excluded.add(id);
     const payload = excluded.size > 0 ? retainPatientGraph(source, retired) : source;
     const plan = { payload, memberships: derivePatientAmbulatoryLinks(payload.patients), excludedRetiredPatients: excluded.size };
     assertRestorePreservesHolds(db, reader, plan);

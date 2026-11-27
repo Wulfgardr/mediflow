@@ -125,7 +125,7 @@ export default function BackupRestoreUI({ recoveryPrimary = true, onRestorePendi
         setIsLoading(true);
         setStatus({ type: 'info', message: 'Verifica in corso...' });
         try {
-            const verified = await verifyRawDatabase(await file.text());
+            const verified = await verifyRawDatabase(file);
             const exclusions = verified.excludedRetiredPatients > 0
                 ? ` Il ripristino escluderà ${retiredPatientsLabel(verified.excludedRetiredPatients)}.` : '';
             const created = verified.createdAt ? `, creato il ${new Date(verified.createdAt).toLocaleString('it-IT')}` : '';
@@ -159,9 +159,8 @@ export default function BackupRestoreUI({ recoveryPrimary = true, onRestorePendi
         setIsLoading(true);
         setStatus({ type: 'info', message: 'Verifica in corso...' });
         try {
-            const json = await file.text();
-            const verification = await verifyRawDatabase(json);
-            setPendingRestoreFile({ name: file.name, id: crypto.randomUUID(), json, verification });
+            const verification = await verifyRawDatabase(file);
+            setPendingRestoreFile({ name: file.name, id: crypto.randomUUID(), source: file, verification });
             setStatus(null);
         } catch (err) {
             setStatus(failedOutcome(err, 'verify'));

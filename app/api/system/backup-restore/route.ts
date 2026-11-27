@@ -57,7 +57,7 @@ import { enrichBackupPatientsWithAmbulatoryLinks } from '@/lib/backup-patient-am
 import { restoreBackupArtifact } from '@/lib/backup-restore-executor';
 import { BackupRestoreBlockedError } from '@/lib/backup-restore-blocked';
 import { blockedRestoreResponse } from './blocked-restore-response';
-import { runBackupRestorePreflight } from '@/lib/backup-restore-preflight';
+import { withBackupRestoreRequest } from '@/lib/backup-restore-preflight';
 import { apiFailure, apiInternalError } from '@/lib/api-error-response';
 import { disposeCheckupStatusTransitionForHostV1 } from
     '@/lib/security/headless-checkup-status-transition-web-production';
@@ -198,43 +198,43 @@ export async function POST(request: Request) {
         if (!intent || (!intent.expectedSourceChecksum && !isLocalClientSession(session.id))) {
             return apiFailure('restore_intent_required', 'Verifica il file prima di confermare il ripristino.', 400);
         }
-        const body = await request.json();
-        const { artifact, result: preflight } = await runBackupRestorePreflight(body);
-        if (!preflight.ok || !artifact) {
-            return NextResponse.json(
-                { success: false, error: preflight.error ?? 'Restore preflight failed.', preflight },
-                { status: 412 },
-            );
-        }
+        return await withBackupRestoreRequest(request, async ({ artifact, result: preflight }) => {
+            if (!preflight.ok || !artifact) {
+                return NextResponse.json(
+                    { success: false, error: preflight.error ?? 'Restore preflight failed.', preflight },
+                    { status: 412 },
+                );
+            }
 
-        if (intent.expectedSourceChecksum && intent.expectedSourceChecksum !== backupArtifactInputChecksum(artifact)) {
-            return blockedRestoreResponse('source');
-        }
-        assertArchiveGeneration(dbServer, archiveGeneration);
-        let credential: unknown;
-        try { credential = JSON.parse(request.headers.get('x-mediflow-restore-credential') ?? 'null'); }
-        catch { return apiFailure('restore_credential_required', 'Inserisci di nuovo la credenziale amministrativa.', 401); }
-        if (!credential || typeof credential !== 'object' || Array.isArray(credential)
-            || Object.keys(credential).length !== 1 || !['pin', 'verifier'].includes(Object.keys(credential)[0])) {
-            return apiFailure('restore_credential_required', 'Inserisci di nuovo la credenziale amministrativa.', 401);
-        }
-        const verified = await verifyRestoreCredentials({ ...credential, username: session.username });
-        if (verified.kind === 'denied') return NextResponse.json(verified.body, { status: verified.status });
-        if (verified.account.id !== session.userId || verified.account.role !== 'admin'
-            || !isCurrentServerSession(session)) return forbiddenResponse();
-
-        const restored = restoreBackupArtifact(artifact, () => {
+            if (intent.expectedSourceChecksum && intent.expectedSourceChecksum !== backupArtifactInputChecksum(artifact)) {
+                return blockedRestoreResponse('source');
+            }
             assertArchiveGeneration(dbServer, archiveGeneration);
-            return disposeCheckupStatusTransitionForHostV1();
-        }, intent, session.userId);
+            let credential: unknown;
+            try { credential = JSON.parse(request.headers.get('x-mediflow-restore-credential') ?? 'null'); }
+            catch { return apiFailure('restore_credential_required', 'Inserisci di nuovo la credenziale amministrativa.', 401); }
+            if (!credential || typeof credential !== 'object' || Array.isArray(credential)
+                || Object.keys(credential).length !== 1 || !['pin', 'verifier'].includes(Object.keys(credential)[0])) {
+                return apiFailure('restore_credential_required', 'Inserisci di nuovo la credenziale amministrativa.', 401);
+            }
+            const verified = await verifyRestoreCredentials({ ...credential, username: session.username });
+            if (verified.kind === 'denied') return NextResponse.json(verified.body, { status: verified.status });
+            if (verified.account.id !== session.userId || verified.account.role !== 'admin'
+                || !isCurrentServerSession(session)) return forbiddenResponse();
 
-        return NextResponse.json({
-            success: true,
-            format: artifact.format,
-            version: artifact.version,
-            collections: [...artifact.manifest.collections],
-            counts: artifact.manifest.recordCounts,
-            ...restored,
+            const restored = restoreBackupArtifact(artifact, () => {
+                assertArchiveGeneration(dbServer, archiveGeneration);
+                return disposeCheckupStatusTransitionForHostV1();
+            }, intent, session.userId);
+
+            return NextResponse.json({
+                success: true,
+                format: artifact.format,
+                version: artifact.version,
+                collections: [...artifact.manifest.collections],
+                counts: artifact.manifest.recordCounts,
+                ...restored,
+            });
         });
     } catch (error) {
         if (error instanceof BackupRestoreBlockedError) return blockedRestoreResponse(error.reason);
