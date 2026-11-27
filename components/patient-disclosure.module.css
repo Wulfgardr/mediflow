@@ -73,10 +73,10 @@
 
 .passthrough { display: contents; }
 
-.folderTray :global([data-folder-active='true']),
+.folderTray :global([data-folder-pane][data-folder-active='true']),
 .folderTray[data-record-tray='attenzione'] :global(#attenzione) {
     min-width: 0;
-    padding: 14px 16px;
+    padding: 16px 20px 20px;
     border: 1px solid var(--lume-record-island-rule);
     border-radius: 14px;
     background: var(--lume-record-island);
@@ -128,8 +128,8 @@
 .folderTray .clinicalSupport { padding-top: 12px; border-top: 1px solid var(--lume-record-island-rule); }
 
 @media (max-width: 699px) {
-    .folderTray :global([data-folder-active='true']),
-    .folderTray[data-record-tray='attenzione'] :global(#attenzione) { padding: 12px 14px; }
+    .folderTray :global([data-folder-pane][data-folder-active='true']),
+    .folderTray[data-record-tray='attenzione'] :global(#attenzione) { padding: 14px 16px 16px; }
 }
 
 .attentionHeading .folderOnly { display: none; }

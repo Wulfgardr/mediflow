@@ -65,8 +65,8 @@ una voce sola.
 | Voce | Newsreader 400 | 28 px, interlinea 1,1 | Nome del paziente in testata (26 px in larghezza compatta) |
 | Voce | Newsreader 400 | 26 px | Titolo di pagina: Pazienti, Agenda, Impostazioni |
 | Voce | Newsreader 400 | 22 px | Nome del paziente nell'anteprima |
-| Voce | Newsreader 400 | 17 px, interlinea 1,5 | Prosa del diario |
 | Voce | Newsreader 500 | 21 px | Nome del prodotto |
+| Registro | Sistema 400 | 15 px, interlinea 1,5 | Prosa clinica: diario, campi SOAP, testi da documento |
 | Registro | Sistema 400 | 14 px, interlinea 1,5 | Testo dei controlli, tabelle, etichette |
 | Registro | Sistema 600 | 14 px | Nomi in elenco, farmaci, valori, tipo di voce |
 | Registro | Sistema 600 | 15 px | Titolo della soglia |
@@ -77,8 +77,10 @@ una voce sola.
 Regole di armonia:
 
 - **Il serif sta dove si parla di una persona**: nome del paziente in testata e
-  in anteprima, prosa clinica, titoli di pagina, nome del prodotto. Non sta
-  nelle righe di una tabella, nei comandi, nella soglia, negli errori.
+  in anteprima, titoli di pagina, nome del prodotto. Non sta nella prosa
+  clinica (decisione di Leonardo del 26/11/2026: un solo carattere per il
+  contenuto della scheda), nelle righe di una tabella, nei comandi, nella
+  soglia, negli errori. `check:type-scale` lo fa rispettare.
 - **Il mono è solo per i codici.** Date, ore, dosi e valori usano il carattere
   di sistema con cifre tabulari. Così in una riga non convivono tre caratteri.
 - **Pochi corpi, vicini.** Nel registro: 12, 13, 14, 15. Nella voce: 17, 22,
@@ -120,7 +122,7 @@ si mostra solo se fornito dall'host.
 Lo stato `WritingInk` è passato esplicitamente anche al contenuto nativo:
 matita colora la prosa e aggiunge un bordo inferiore tratteggiato di 1 px a
 4 px dal blocco di testo; fresco colora la bozza; asciutto usa il colore testo.
-Il ruolo Prose resta Newsreader 17. Come per la parola di stato, GPUI rende
+Il ruolo Prose usa il carattere di sistema a 15 px. Come per la parola di stato, GPUI rende
 il tratteggio con un bordo del blocco: non è una sottolineatura tipografica
 per ciascuna riga impaginata. Il contenitore a matita si adatta al testo,
 anziché riempire la colonna. Su una sola riga il bordo segue la frase; su più
@@ -276,7 +278,7 @@ rimpiccioliscono.
 ### Voce di diario
 
 Griglia: margine di 84 px con data e ora, poi il corpo. Corpo: tipo in peso
-600 e luogo in colore secondario, prosa in serif, riga di registrazione con
+600 e luogo in colore secondario, prosa nel carattere di sistema, riga di registrazione con
 il punto asciutto ("Registrata da ..."). Filetto sotto ogni voce. In larghezza
 compatta il margine sale sopra il corpo.
 

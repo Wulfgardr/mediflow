@@ -49,7 +49,7 @@ e issue WUL-765, 766, 767, 768, 769, 771, 772.
 3. **Tutto il paziente in una schermata** su desktop: quadro a sinistra,
    diario a destra.
 4. **Due voci.** Serif (Newsreader) dove si parla di una persona: nome del
-   paziente, prosa clinica, titoli. Carattere di sistema per tutto il resto.
+   paziente e titoli. Carattere di sistema per la prosa clinica e tutto il resto.
    Il mono (IBM Plex Mono) solo per i codici.
 5. **Un solo piano in luce** su un fondo in penombra.
 6. **Tabelle a filetti**, mai una card per riga.

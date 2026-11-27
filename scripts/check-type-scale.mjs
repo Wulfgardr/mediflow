@@ -13,7 +13,7 @@ export const TYPE_ROLES = Object.freeze({
   person: '400 1.75rem/1.1 var(--lume-font-voice)',
   'person-compact': '400 1.625rem/1.1 var(--lume-font-voice)',
   'person-preview': '400 1.375rem/1.2 var(--lume-font-voice)',
-  prose: '400 1.0625rem/1.5 var(--lume-font-voice)',
+  prose: '400 0.9375rem/1.5 var(--lume-font-sans)',
   brand: '500 1.3125rem/1.2 var(--lume-font-voice)',
   body: '400 0.875rem/1.5 var(--lume-font-sans)',
   strong: '600 0.875rem/1.5 var(--lume-font-sans)',
@@ -31,6 +31,45 @@ export const TYPE_ROLES = Object.freeze({
   section: '600 0.75rem/1.5 var(--lume-font-sans)',
   code: '400 0.75rem/1.5 var(--font-registro), monospace',
 });
+
+export const VOICE_ROLES = Object.freeze(['page-title', 'person', 'person-compact', 'person-preview', 'brand']);
+const voiceFont = /--lume-font-voice|--font-voce|--font-serif|newsreader|georgia|(?<![\w-])serif\b/iu;
+const clinicalContent = /prose|clinical-rich|entry|diary|diario|soap|note|composer|editor|summary|transcript/iu;
+
+export function checkRoleFamilies(roles = TYPE_ROLES) {
+  return Object.entries(roles).filter(([role, value]) => !VOICE_ROLES.includes(role) && voiceFont.test(value))
+    .map(([role, value]) => ({ path: 'scripts/check-type-scale.mjs', line: 1, value: `--type-${role}: ${value} (il testo clinico usa var(--lume-font-sans))` }));
+}
+
+const roundedSurface = /data-folder-pane|data-folder-active=['"]true['"]|data-record-tray|#attenzione|\.(?:clinicalSection|recordTab|tray|island\w*)\b|mf-popover/u;
+const inactiveOnly = /data-folder-active=['"]false['"]|:not\(\[data-folder-(?:active=['"]true['"]|section=)/u;
+const zeroRadius = value => /^0(?:px|rem)?(?:\s+0(?:px|rem)?)*(?:\s*!important)?$/u.test(value.trim()) || value.includes('--lume-radius-card');
+
+function subject(selector) {
+  let depth = 0;
+  let start = 0;
+  for (let index = 0; index < selector.length; index += 1) {
+    const character = selector[index];
+    if (character === '(' || character === '[') depth += 1;
+    else if (character === ')' || character === ']') depth -= 1;
+    else if (depth === 0 && /[\s>+~]/u.test(character)) start = index + 1;
+  }
+  return selector.slice(start);
+}
+
+export function scanSurfaceRadius(relativePath, source) {
+  const problems = [];
+  postcss.parse(source, { from: relativePath }).walkDecls(/^border(?:-(?:top|bottom|start|end)-(?:left|right|start|end))?-radius$/u, declaration => {
+    if (!zeroRadius(declaration.value)) return;
+    for (const selector of (declaration.parent.selector ?? '').split(',')) {
+      if (roundedSurface.test(subject(selector.trim())) && !inactiveOnly.test(selector)) {
+        problems.push({ path: relativePath, line: declaration.source.start.line,
+          value: `${selector.trim()} { ${declaration.prop}: ${declaration.value} }: angoli retti su una superficie che il sistema arrotonda; togli il raggio zero o limita la regola allo stato inattivo` });
+      }
+    }
+  });
+  return problems;
+}
 
 export const TYPE_ALLOWLIST = Object.freeze([
   { path: 'components/runtime-twin-workspace.module.css', selector: ".workspace[data-rail-open='false'] .brand strong", property: 'font-size', value: '0', reason: 'Marchio contratto nella navigazione chiusa.' },
@@ -56,14 +95,16 @@ export function scanTypeSource(relativePath, source, allowlist = TYPE_ALLOWLIST)
       if (allowlist.some(entry => entry.path === relativePath && entry.selector === declaration.parent.selector
         && entry.property === prop && entry.value === value)) return;
       let valid = true;
-      if (prop.startsWith('--type-')) valid = relativePath === 'app/globals.css' && TYPE_ROLES[prop.slice(7)] === value;
+      const clinicalSelector = clinicalContent.test(declaration.parent.selector ?? '');
+      if (relativePath !== 'app/globals.css' && voiceFont.test(value)) valid = false;
+      else if (prop.startsWith('--type-')) valid = relativePath === 'app/globals.css' && TYPE_ROLES[prop.slice(7)] === value;
       else if (prop.startsWith('--twin-type-')) valid = relativePath === 'app/runtime-twin.css' && REGISTER_SIZES.has(value);
       else if (prop === '--twin-heading-weight') valid = value === '600';
       else if (prop === 'font-size') valid = REGISTER_SIZES.has(value) || value === 'inherit' || sizeVariable.test(value);
       else if (prop === 'font-weight') valid = ['400', '600', 'inherit', 'var(--twin-heading-weight)'].includes(value);
       else if (prop === 'font') {
         const role = typeVariable.exec(value)?.[1];
-        valid = value === 'inherit' || Boolean(role && TYPE_ROLES[role])
+        valid = value === 'inherit' || Boolean(role && TYPE_ROLES[role] && !(clinicalSelector && VOICE_ROLES.includes(role)))
           || /^(?:(?:400|600) )?0\.(?:75|8125|875|9375)rem(?:\/[\d.]+)? var\(--lume-font-sans\)$/.test(value);
       }
       else if (prop === 'font-family') valid = value === 'inherit' || /^var\(--lume-font-sans(?:, [^)]+)?\)$/.test(value);
@@ -93,12 +134,15 @@ export function checkTailwindScale(config) {
 }
 
 export function scanTypeScale(root = ROOT) {
-  const problems = checkTailwindScale(tailwindConfig).map(value => ({ path: 'tailwind.config.ts', line: 1, value }));
+  const problems = [...checkTailwindScale(tailwindConfig).map(value => ({ path: 'tailwind.config.ts', line: 1, value })), ...checkRoleFamilies()];
   function visit(directory) {
     for (const entry of readdirSync(path.join(root, directory), { withFileTypes: true })) {
       const file = `${directory}/${entry.name}`;
       if (entry.isDirectory()) visit(file);
-      else if (/\.(?:css|[jt]sx?)$/.test(file) && !/\.(?:test|spec)\.[jt]sx?$/.test(file)) problems.push(...scanTypeSource(file, readFileSync(path.join(root, file), 'utf8')));
+      else if (/\.(?:css|[jt]sx?)$/.test(file) && !/\.(?:test|spec)\.[jt]sx?$/.test(file)) {
+        const source = readFileSync(path.join(root, file), 'utf8');
+        problems.push(...scanTypeSource(file, source), ...(file.endsWith('.css') ? scanSurfaceRadius(file, source) : []));
+      }
     }
   }
   visit('app'); visit('components');
@@ -117,6 +161,6 @@ export function scanTypeScale(root = ROOT) {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const problems = scanTypeScale();
   for (const issue of problems) console.error(`${issue.path}:${issue.line}: ${issue.value}`);
-  console.log(`Scala tipografica: ${problems.length ? `${problems.length} violazioni` : 'OK'}`);
+  console.log(`Scala tipografica e raggi delle superfici: ${problems.length ? `${problems.length} violazioni` : 'OK'}`);
   process.exitCode = problems.length ? 1 : 0;
 }
