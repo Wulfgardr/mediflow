@@ -157,3 +157,31 @@ test('chiuso mentre il microfono si riapre dopo la pausa: nessuna ripresa e micr
     assert.equal(fake.state.session?.state, 'paused');
     assert.equal(fake.state.requests.filter((item) => item.path.endsWith('/commands')).length, 2);
 });
+
+test('due schede aperte: la scheda di un altro paziente non riceve né consegna il testo, e una risposta per un altro soggetto non si consegna', async () => {
+    const OTHER = 'paziente:44444444-4444-4444-8444-444444444444';
+    const recorder = new LocalVoiceRecorder(SUBJECT);
+    await recorder.refresh();
+    await recorder.start('visit', []);
+    await settle(() => recorder.getSnapshot().snapshot?.state === 'preparing', 'preparing');
+    microphones.emit(1, 500);
+    await settle(() => fake.state.blocks.length === 1, 'one block');
+    await recorder.stop();
+    await settle(() => recorder.getSnapshot().phase === 'review', 'review');
+
+    const elsewhere = new LocalVoiceRecorder(OTHER);
+    await elsewhere.refresh();
+    assert.equal(elsewhere.getSnapshot().phase, 'foreign');
+    assert.equal(elsewhere.getSnapshot().review, null);
+    assert.equal(await elsewhere.take(), null);
+    assert.equal(fake.state.session?.state, 'review');
+
+    fake.state.subjectOverride = OTHER;
+    const late = new LocalVoiceRecorder(SUBJECT);
+    await late.refresh();
+    fake.state.subjectOverride = null;
+    assert.equal(late.getSnapshot().review, null);
+    assert.equal(await late.take(), null);
+    assert.equal(await recorder.take(), 'Medico: Buongiorno.');
+    assert.equal(fake.state.session, null);
+});

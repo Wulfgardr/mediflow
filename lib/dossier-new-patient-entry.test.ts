@@ -186,6 +186,27 @@ test('trascrizione di una visita: il nome di un familiare non diventa una propos
         [['lastName', 'Neri', 'mi chiamo Paolo Neri'], ['firstName', 'Paolo', 'mi chiamo Paolo Neri']]);
 });
 
+const spokenIdentity = (text: string) => groupIdentityProposals(group(source('visita.pdf', { text, transcript: true })), 'visita.pdf')
+    .map((proposal) => [proposal.field, proposal.value]);
+
+test('trascrizione di una visita: ciò che si dice di un familiare o di un altro curante non diventa anagrafica del paziente', () => {
+    for (const text of [
+        'Medico: Buongiorno, chi è con lei?\nPaziente: Sono qui con mia moglie. Si chiama Anna Bianchi.',
+        'Paziente: Sono venuto con mia figlia. Cognome Rossi, nome Giulia.',
+        'Paziente: Mia moglie è nata il 3 aprile 1950 e soffre di cuore.',
+        'Paziente: Accompagno mio padre. È nato il 3/4/1940.',
+        'Medico: Il suo cardiologo come si chiama?\nPaziente: Si chiama Marco Verdi.',
+        'Medico: Buongiorno, mi chiamo Marco Verdi e sono il medico del distretto.',
+    ]) assert.deepEqual(spokenIdentity(text), [], text);
+});
+
+test('trascrizione di una visita: il paziente che parla di sé dopo un familiare propone ancora i suoi dati', () => {
+    assert.deepEqual(spokenIdentity('Paziente: Sono qui con mia moglie. Io mi chiamo Paolo Neri e sono nato il 5 maggio 1948.').sort(),
+        [['birthDate', '1948-05-05'], ['firstName', 'Paolo'], ['lastName', 'Neri']]);
+    assert.deepEqual(spokenIdentity('Medico: Come si chiama?\nPaziente: Mi chiamo Anna\nBianchi, sono nata il 12 marzo\n1951.').sort(),
+        [['birthDate', '1951-03-12'], ['firstName', 'Anna'], ['lastName', 'Bianchi']]);
+});
+
 test('un documento che non è una trascrizione resta alle etichette scritte', () => {
     assert.deepEqual(spokenNames('Paziente: Cognome Bianchi. Nome Anna. Mi chiamo Anna Bianchi.', false), []);
     assert.deepEqual(spokenNames('Cognome: Bianchi Nome: Anna', false), [['lastName', 'Bianchi', 'Cognome: Bianchi'], ['firstName', 'Anna', 'Nome: Anna']]);

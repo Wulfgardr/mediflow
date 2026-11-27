@@ -4,7 +4,7 @@ import { tmpdir, userInfo } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { localVoiceClient } from '../lib/local-voice/client.mjs';
-import { startLocalVoiceService } from './local-voice-service.mjs';
+import { readRegularBinaryBytes, sha256Buffer, startLocalVoiceService } from './local-voice-service.mjs';
 
 export const SAMPLE_RATE = 16_000;
 export const VOICES = { M: 'Eddy (Italian (Italy))', P: 'Grandma (Italian (Italy))' };
@@ -235,7 +235,9 @@ export async function main([whisper, vad] = process.argv.slice(2)) {
   const binary = serviceBinary();
   const work = mkdtempSync(path.join(process.env.TMPDIR || tmpdir(), 'ascolto-visita-'));
   const { audio, timeline } = synthesizeVisit(TURNS, work);
-  const service = await startLocalVoiceService({ binary, models });
+  const read = readRegularBinaryBytes(binary);
+  if (!read.ok) throw new Error(`binario della voce non leggibile (${read.reason})`);
+  const service = await startLocalVoiceService({ binary, expectedSha256: sha256Buffer(read.bytes), models });
   let listened;
   try {
     listened = await listenThroughService(service, audio);

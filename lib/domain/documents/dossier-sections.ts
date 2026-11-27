@@ -254,32 +254,65 @@ function birthMatch(text: string): [string, string, string, string] | null {
     return spoken ? [spoken[0], spoken[1], String(MONTHS.indexOf(spoken[2].toLowerCase()) + 1), spoken[3]] : null;
 }
 
+function birthProposal(text: string): DossierIdentityProposal | null {
+    const birth = birthMatch(text);
+    if (!birth) return null;
+    const [excerpt, d, m, y] = birth;
+    const iso = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    const date = new Date(`${iso}T00:00:00Z`);
+    return Number.isFinite(date.getTime()) && date.toISOString().startsWith(iso) ? { field: 'birthDate', value: iso, excerpt: excerpt.trim() } : null;
+}
+
 const SPOKEN_CUE = String.raw`(?:\s*[:,]\s*|\s+(?:è|fa)\s+|\s+)`;
 const SPOKEN_SURNAME = new RegExp(String.raw`\b[Cc]ognome${SPOKEN_CUE}(${NAME_TOKEN})`, 'u');
 const SPOKEN_GIVEN = new RegExp(String.raw`(?<![Cc]og)\b[Nn]ome${SPOKEN_CUE}(${NAME_TOKEN})`, 'u');
 const NAME_WORD = String.raw`(?!${LABEL_WORD})[A-ZÀ-Ý][A-Za-zÀ-ÿ'’]+`;
-const SPOKEN_CALLED = new RegExp(String.raw`\b[MmSs]i\s+chiam[oa]\s+(${NAME_WORD})((?:\s+${NAME_WORD}){0,2})`, 'u');
+const SPOKEN_CALLED = new RegExp(String.raw`\b[Mm]i\s+chiamo\s+(${NAME_WORD})((?:\s+${NAME_WORD}){0,2})`, 'u');
+const SPOKEN_REFERENT_CALLED = new RegExp(String.raw`(?<=\b(?:[Ll]a\s+(?:signora|paziente)|[Ii]l\s+(?:signore|signor|paziente))\s+)si\s+chiama\s+(${NAME_WORD})((?:\s+${NAME_WORD}){0,2})`, 'u');
 const RELATIVE = /\b(?:moglie|marit[oi]|figli[oae]?|madre|padre|mamma|papà|genitori|fratell[oi]|sorell[ae]|nonn[oai]|zi[oa]|nipot[ei]|cugin[oai]|compagn[oa]|fidanzat[oa]|suocer[oa]|cognat[oa]|genero|nuora|badante|vicin[oa]|amic[oa]|parente)\b/iu;
+const FIRST_PERSON = /\b(?:mi\s+chiamo|sono\s+nat[oa]|(?:il\s+)?mio\s+(?:cognome|nome)|io)\b/iu;
+const SPEAKER_TURN = /(?:^|\n|\s)(Medico|Paziente):\s*/gu;
+const SENTENCE_END = /[!?;]+|\.(?=\s|$)/u;
+
+function spokenTurns(text: string): Array<{ doctor: boolean; sentences: string[] }> {
+    const turns: Array<{ doctor: boolean; body: string }> = [];
+    let speaker: string | null = null;
+    let from = 0;
+    for (const match of text.matchAll(SPEAKER_TURN)) {
+        turns.push({ doctor: speaker === 'Medico', body: text.slice(from, match.index) });
+        speaker = match[1];
+        from = match.index + match[0].length;
+    }
+    turns.push({ doctor: speaker === 'Medico', body: text.slice(from) });
+    return turns.map(({ doctor, body }) => ({ doctor, sentences: body.replace(/\s+/gu, ' ').split(SENTENCE_END).map((part) => part.trim()).filter(Boolean) }));
+}
 
 /**
  * Forme parlate dell'anagrafica, solo per la trascrizione di una visita: «Cognome Bianchi», «di nome Anna»,
  * «mi chiamo Anna Bianchi». Una frase che nomina un familiare non propone nulla per il paziente.
  */
 export function proposeSpokenIdentityFields(text: string, patientTaxCode: string | null): DossierIdentityProposal[] {
-    const proposals = proposeIdentityFields(text, patientTaxCode);
+    const proposals: DossierIdentityProposal[] = [];
+    if (patientTaxCode) proposals.push({ field: 'taxCode', value: patientTaxCode, excerpt: `Codice fiscale paziente nel documento: ${patientTaxCode}` });
     const offer = (field: DossierIdentityProposal['field'], value: string, excerpt: string) => {
         if (!proposals.some((proposal) => proposal.field === field)) proposals.push({ field, value: value.trim(), excerpt: excerpt.trim() });
     };
-    for (const sentence of text.split(/[.!?;\n]+/u)) {
-        if (RELATIVE.test(sentence)) continue;
-        const surname = SPOKEN_SURNAME.exec(sentence);
-        if (surname) offer('lastName', surname[1], surname[0]);
-        const given = SPOKEN_GIVEN.exec(sentence);
-        if (given) offer('firstName', given[1], given[0]);
-        const called = SPOKEN_CALLED.exec(sentence);
-        if (called) {
-            offer('firstName', called[1], called[0]);
-            if (called[2].trim()) offer('lastName', called[2], called[0]);
+    for (const turn of spokenTurns(text)) {
+        let relativeNamed = false;
+        for (const sentence of turn.sentences) {
+            if (RELATIVE.test(sentence)) { relativeNamed = true; continue; }
+            if (relativeNamed && !FIRST_PERSON.test(sentence)) continue;
+            const surname = SPOKEN_SURNAME.exec(sentence);
+            if (surname) offer('lastName', surname[1], surname[0]);
+            const given = SPOKEN_GIVEN.exec(sentence);
+            if (given) offer('firstName', given[1], given[0]);
+            const called = (turn.doctor ? null : SPOKEN_CALLED.exec(sentence)) ?? SPOKEN_REFERENT_CALLED.exec(sentence);
+            if (called) {
+                offer('firstName', called[1], called[0]);
+                if (called[2].trim()) offer('lastName', called[2], called[0]);
+            }
+            const birth = birthProposal(sentence);
+            if (birth) offer(birth.field, birth.value, birth.excerpt);
         }
     }
     return proposals;
@@ -289,14 +322,9 @@ export function proposeSpokenIdentityFields(text: string, patientTaxCode: string
 export function proposeIdentityFields(text: string, patientTaxCode: string | null): DossierIdentityProposal[] {
     const proposals: DossierIdentityProposal[] = [];
     if (patientTaxCode) proposals.push({ field: 'taxCode', value: patientTaxCode, excerpt: `Codice fiscale paziente nel documento: ${patientTaxCode}` });
-    const surname = SURNAME.exec(text); const given = GIVEN.exec(text); const birth = birthMatch(text);
+    const surname = SURNAME.exec(text); const given = GIVEN.exec(text); const birth = birthProposal(text);
     if (surname) proposals.push({ field: 'lastName', value: surname[1].trim(), excerpt: surname[0].trim() });
     if (given) proposals.push({ field: 'firstName', value: given[1].trim(), excerpt: given[0].trim() });
-    if (birth) {
-        const [, d, m, y] = birth;
-        const iso = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-        const date = new Date(`${iso}T00:00:00Z`);
-        if (Number.isFinite(date.getTime()) && date.toISOString().startsWith(iso)) proposals.push({ field: 'birthDate', value: iso, excerpt: birth[0].trim() });
-    }
+    if (birth) proposals.push(birth);
     return proposals;
 }

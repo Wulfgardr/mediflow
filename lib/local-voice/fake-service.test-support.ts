@@ -58,7 +58,7 @@ export async function startFakeLocalVoice({ secret, port = 0, model = 'ready', l
             }
             if (request.method === 'POST' && path === '/v1/sessions') {
                 if (state.model !== 'ready') return reply(503, { error: 'model-missing' });
-                if (state.session && !['cancelled'].includes(state.session.state)) return reply(409, { error: 'session-active' });
+                if (state.session && !['cancelled'].includes(state.session.state)) return reply(409, { error: 'session-active', session: { id: state.session.id, state: state.session.state } });
                 const input = JSON.parse(body.toString('utf8'));
                 state.blocks = [];
                 state.session = { id: crypto.randomBytes(16).toString('hex'), subject: input.subject, mode: input.mode, vocabulary: input.vocabulary, state: 'ready', fault: null, pending: null };

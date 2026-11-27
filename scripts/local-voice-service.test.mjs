@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import http from 'node:http';
 import net from 'node:net';
 import os from 'node:os';
@@ -8,11 +8,21 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { localVoiceClient, localVoiceEndpoint, localVoiceRequest, signLocalVoiceRequest } from '../lib/local-voice/client.mjs';
-import { LOCAL_VOICE_SANDBOX_PROFILE, localVoiceBinary, localVoiceLaunch, startLocalVoiceService } from './local-voice-service.mjs';
+import { installLocalVoiceBinary } from './install-local-voice-binary.mjs';
+import {
+  localVoiceBinary,
+  localVoiceLaunch,
+  localVoiceSandboxProfile,
+  readRegularBinaryBytes,
+  sha256Buffer,
+  startLocalVoiceService,
+  verifyLocalVoiceBinary,
+} from './local-voice-service.mjs';
 import { MODEL_FILES, TURNS, listenThroughService, synthesizeVisit, wordErrorRate } from './prove-ascolto-visita.mjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const binary = localVoiceBinary(root);
+const binarySha256 = existsSync(binary) ? sha256Buffer(readFileSync(binary)) : null;
 const installedModels = path.join(os.homedir(), 'Library/Application Support/MediFlow GPUI/modelli-voce');
 const noBinary = process.platform !== 'darwin' ? 'richiede macOS' : existsSync(binary) ? false : `manca ${binary}: cargo build --release -p mediflow-voice`;
 const noModel = noBinary || (MODEL_FILES.every(name => existsSync(path.join(installedModels, name))) ? false : 'modello vocale non installato');
@@ -45,7 +55,7 @@ test('endpoint configuration accepts only a loopback URL and a 64 hex secret', (
   }
   assert.equal(localVoiceEndpoint('http://127.0.0.1:4100', 'A'.repeat(64)), null);
   assert.equal(localVoiceEndpoint('http://127.0.0.1:4100', 'a'.repeat(63)), null);
-  assert.deepEqual(localVoiceLaunch('/x/mediflow-voice', 'darwin'), { command: '/usr/bin/sandbox-exec', args: ['-p', LOCAL_VOICE_SANDBOX_PROFILE, '/x/mediflow-voice'] });
+  assert.deepEqual(localVoiceLaunch('/x/mediflow-voice', 'darwin'), { command: '/usr/bin/sandbox-exec', args: ['-p', localVoiceSandboxProfile(['/x/mediflow-voice']), '/x/mediflow-voice'] });
 });
 
 function impostor(mode) {
@@ -93,16 +103,38 @@ test('the sandbox profile of the service refuses outgoing connections, even to t
   try {
     const open = spawnSync(process.execPath, ['-e', probe], { encoding: 'utf8' });
     assert.equal(open.stdout.trim(), 'connected');
-    const confined = spawnSync('/usr/bin/sandbox-exec', ['-p', LOCAL_VOICE_SANDBOX_PROFILE, process.execPath, '-e', probe], { encoding: 'utf8' });
+    const { command, args } = localVoiceLaunch(realpathSync(process.execPath), 'darwin');
+    const confined = spawnSync(command, [...args, '-e', probe], { encoding: 'utf8' });
     assert.equal(confined.stdout.trim(), 'EPERM', confined.stderr);
   } finally {
     server.close();
   }
 });
 
+test('the sandbox of the service starts no other program, neither directly nor through LaunchServices', { skip: process.platform !== 'darwin' && 'richiede macOS' }, async () => {
+  const work = realpathSync(mkdtempSync(path.join(os.tmpdir(), 'voce-fuga-')));
+  const marker = path.join(work, 'fuori-dal-sandbox.txt');
+  const app = path.join(work, 'Fuga.app');
+  mkdirSync(path.join(app, 'Contents/MacOS'), { recursive: true });
+  writeFileSync(path.join(app, 'Contents/Info.plist'), '<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict>'
+    + '<key>CFBundleExecutable</key><string>fuga</string><key>CFBundleIdentifier</key><string>dev.mediflow.test.fuga</string>'
+    + '<key>LSBackgroundOnly</key><true/></dict></plist>');
+  writeFileSync(path.join(app, 'Contents/MacOS/fuga'), `#!/bin/sh\n/usr/bin/touch '${marker}'\n`, { mode: 0o755 });
+  try {
+    const opener = localVoiceLaunch('/usr/bin/open', 'darwin');
+    spawnSync(opener.command, [...opener.args, '-g', '-j', app], { encoding: 'utf8' });
+    const shell = localVoiceLaunch('/bin/sh', 'darwin');
+    spawnSync(shell.command, [...shell.args, '-c', `exec /usr/bin/touch '${marker}'`], { encoding: 'utf8' });
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    assert.equal(existsSync(marker), false, 'a program started from the sandbox wrote outside it');
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+});
+
 test('the service listens only on the loopback, opens no connection and answers only signed local calls', { skip: noBinary }, async () => {
   const models = mkdtempSync(path.join(os.tmpdir(), 'voce-vuota-'));
-  const service = await startLocalVoiceService({ binary, models });
+  const service = await startLocalVoiceService({ binary, expectedSha256: binarySha256, models });
   const port = Number(new URL(service.url).port);
   try {
     assert.deepEqual(sockets(service.pid), [`127.0.0.1:${port} (LISTEN)`]);
@@ -143,10 +175,24 @@ test('the service listens only on the loopback, opens no connection and answers 
   assert.equal(await service.exited, 0);
 });
 
+test('another process of the same user cannot read the service secret from the process table', { skip: noBinary }, async () => {
+  const models = mkdtempSync(path.join(os.tmpdir(), 'voce-vuota-'));
+  const service = await startLocalVoiceService({ binary, expectedSha256: binarySha256, models });
+  try {
+    assert.equal((await localVoiceClient(service).status()).service, 'mediflow-voice');
+    const table = spawnSync('/bin/ps', ['-E', '-ww', '-A', '-o', 'pid=,command='], { encoding: 'utf8' }).stdout;
+    assert.ok(table.split('\n').some(line => line.trim().startsWith(`${service.pid} `)), 'service missing from the process table');
+    assert.equal(table.includes(service.secret), false, 'secret readable with ps -E');
+  } finally {
+    await service.stop();
+    rmSync(models, { recursive: true, force: true });
+  }
+});
+
 test('synthetic visit audio streamed to the service comes back as text attributed to doctor and patient', { skip: noModel, timeout: 15 * 60_000 }, async () => {
   const work = mkdtempSync(path.join(os.tmpdir(), 'voce-visita-'));
   const turns = TURNS.slice(0, 12);
-  const service = await startLocalVoiceService({ binary, models: installedModels });
+  const service = await startLocalVoiceService({ binary, expectedSha256: binarySha256, models: installedModels });
   try {
     const { audio } = synthesizeVisit(turns, work);
     const { snapshot } = await listenThroughService(service, audio, { subject: 'paziente-sintetico-42', vocabulary: ['Metformina', 'Ramipril'] });
@@ -192,7 +238,7 @@ test('the launcher supervisor publishes null when the service falls and a new en
     return { url: `http://127.0.0.1:${4100 + count}`, secret: 'c'.repeat(64), pid: count, exited, stop: async () => exit(0) };
   };
   const { superviseLocalVoiceService } = await import('./local-voice-service.mjs');
-  const supervisor = superviseLocalVoiceService({ binary: '/x', publish: endpoint => published.push(endpoint?.url ?? null), restarts: 1, start });
+  const supervisor = superviseLocalVoiceService({ binary: '/x', expectedSha256: 'c'.repeat(64), publish: endpoint => published.push(endpoint?.url ?? null), restarts: 1, start });
   assert.equal((await supervisor.ensure()).url, 'http://127.0.0.1:4101');
   exits[0](137);
   await new Promise(resolve => setTimeout(resolve, 10));
@@ -203,4 +249,117 @@ test('the launcher supervisor publishes null when the service falls and a new en
   assert.equal(supervisor.current(), null);
   await supervisor.stop();
   assert.equal(count, 2);
+});
+
+test('verifyLocalVoiceBinary accepts only a regular file matching the pinned manifest SHA-256', () => {
+  const work = mkdtempSync(path.join(os.tmpdir(), 'voce-verify-'));
+  try {
+    mkdirSync(path.join(work, 'scripts'), { recursive: true });
+    mkdirSync(path.join(work, 'native/local-voice/target/release'), { recursive: true });
+    const binPath = path.join(work, 'native/local-voice/target/release/mediflow-voice');
+    const payload = Buffer.from('#!/bin/sh\necho ok\n');
+    writeFileSync(binPath, payload, { mode: 0o755 });
+    const digest = sha256Buffer(payload);
+    writeFileSync(path.join(work, 'scripts/local-voice-binary.json'), JSON.stringify({
+      schemaVersion: 1,
+      version: '0.9.1',
+      binary: 'mediflow-voice',
+      relativePath: 'native/local-voice/target/release/mediflow-voice',
+      platforms: { 'darwin-arm64': { sha256: digest, bytes: payload.length } },
+    }));
+
+    const ok = verifyLocalVoiceBinary(binPath, { root: work, platform: 'darwin', arch: 'arm64', version: '0.9.1' });
+    assert.equal(ok.ok, true);
+    assert.equal(ok.sha256, digest);
+
+    const wrongVersion = verifyLocalVoiceBinary(binPath, { root: work, platform: 'darwin', arch: 'arm64', version: '0.9.2' });
+    assert.deepEqual(wrongVersion, { ok: false, reason: 'version-mismatch' });
+
+    const unpinnedArch = verifyLocalVoiceBinary(binPath, { root: work, platform: 'darwin', arch: 'x64', version: '0.9.1' });
+    assert.equal(unpinnedArch.ok, false);
+    assert.equal(unpinnedArch.reason, 'unpinned');
+
+    const linkPath = path.join(work, 'link-voice');
+    symlinkSync(binPath, linkPath);
+    assert.deepEqual(verifyLocalVoiceBinary(linkPath, { root: work, platform: 'darwin', arch: 'arm64', version: '0.9.1' }), { ok: false, reason: 'invalid' });
+
+    const altered = Buffer.from(payload);
+    altered[altered.length - 1] ^= 0x01;
+    writeFileSync(binPath, altered, { mode: 0o755 });
+    const mismatch = verifyLocalVoiceBinary(binPath, { root: work, platform: 'darwin', arch: 'arm64', version: '0.9.1' });
+    assert.equal(mismatch.ok, false);
+    assert.equal(mismatch.reason, 'mismatch');
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+});
+
+test('startLocalVoiceService requires expectedSha256 and refuses mismatched binaries', async () => {
+  const work = mkdtempSync(path.join(os.tmpdir(), 'voce-start-guard-'));
+  try {
+    const binPath = path.join(work, 'mediflow-voice');
+    writeFileSync(binPath, '#!/bin/sh\necho bad\n', { mode: 0o755 });
+    await assert.rejects(startLocalVoiceService({ binary: binPath }), { message: 'local-voice-sha256-required' });
+    await assert.rejects(startLocalVoiceService({ binary: binPath, expectedSha256: '0'.repeat(64) }), { message: 'local-voice-binary-mismatch' });
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+});
+
+test('installLocalVoiceBinary downloads, verifies SHA-256 and rejects altered payloads from a local HTTP server', async () => {
+  const work = mkdtempSync(path.join(os.tmpdir(), 'voce-install-'));
+  const goodBytes = Buffer.from('#!/bin/sh\nexit 0\n');
+  const badBytes = Buffer.from(goodBytes);
+  badBytes[badBytes.length - 1] ^= 0x01;
+  const goodDigest = sha256Buffer(goodBytes);
+  let hits = 0;
+  const server = http.createServer((req, res) => {
+    hits++;
+    if (req.url === '/good') { res.writeHead(200, { 'content-length': String(goodBytes.length) }); res.end(goodBytes); return; }
+    if (req.url === '/bad') { res.writeHead(200, { 'content-length': String(badBytes.length) }); res.end(badBytes); return; }
+    res.writeHead(404); res.end('missing');
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const { port } = /** @type {net.AddressInfo} */ (server.address());
+  const baseUrl = `http://127.0.0.1:${port}`;
+  try {
+    mkdirSync(path.join(work, 'scripts'), { recursive: true });
+    writeFileSync(path.join(work, 'package.json'), JSON.stringify({ version: '0.9.1' }));
+    writeFileSync(path.join(work, 'scripts/local-voice-binary.json'), JSON.stringify({
+      schemaVersion: 1,
+      version: '0.9.1',
+      binary: 'mediflow-voice',
+      relativePath: 'native/local-voice/target/release/mediflow-voice',
+      platforms: { 'darwin-arm64': { asset: 'mediflow-voice-0.9.1-darwin-arm64', sha256: goodDigest, bytes: goodBytes.length } },
+    }));
+    const target = path.join(work, 'native/local-voice/target/release/mediflow-voice');
+
+    await assert.rejects(
+      installLocalVoiceBinary({ root: work, url: `${baseUrl}/bad`, platform: 'darwin', arch: 'arm64' }),
+      /Impronta SHA-256 non corrispondente/u,
+    );
+    assert.equal(existsSync(target), false);
+
+    await assert.rejects(
+      installLocalVoiceBinary({ root: work, url: `${baseUrl}/missing`, platform: 'darwin', arch: 'arm64' }),
+      /HTTP 404/u,
+    );
+    assert.equal(existsSync(target), false);
+
+    const installed = await installLocalVoiceBinary({ root: work, url: `${baseUrl}/good`, platform: 'darwin', arch: 'arm64' });
+    assert.equal(installed.status, 'installed');
+    assert.equal(installed.sha256, goodDigest);
+    assert.equal(existsSync(target), true);
+    const read = readRegularBinaryBytes(target);
+    assert.equal(read.ok, true);
+    assert.equal(sha256Buffer(read.bytes), goodDigest);
+
+    const beforeReuse = hits;
+    const reused = await installLocalVoiceBinary({ root: work, url: `${baseUrl}/good`, platform: 'darwin', arch: 'arm64' });
+    assert.equal(reused.status, 'already-installed');
+    assert.equal(hits, beforeReuse);
+  } finally {
+    await new Promise(resolve => server.close(() => resolve(undefined)));
+    rmSync(work, { recursive: true, force: true });
+  }
 });
