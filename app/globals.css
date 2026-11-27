@@ -170,6 +170,13 @@ body { caret-color: var(--lume-ink-fresh); }
 :root :focus-visible:not(h1[tabindex='-1']) { outline: 2px solid var(--lume-ink-fresh); outline-offset: 2px; }
 input::placeholder, textarea::placeholder { color: var(--lume-ink-secondary); opacity: 1; }
 
+:root {
+  --lume-scrollbar-thumb: color-mix(in srgb, var(--lume-ink-muted) 72%, transparent);
+  scrollbar-color: var(--lume-scrollbar-thumb) transparent;
+}
+:root.dark { --lume-scrollbar-thumb: color-mix(in srgb, var(--lume-ink-muted) 54%, transparent); }
+:where(*) { scrollbar-width: thin; }
+
 /* Ensure selected text is readable in dark mode */
 ::selection {
   background: color-mix(in srgb, var(--lume-ink) 14%, transparent);

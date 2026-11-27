@@ -48,7 +48,6 @@
     border: 1px solid var(--lume-record-island-rule);
     border-radius: 12px;
     background: var(--lume-record-compact-island);
-    scrollbar-width: thin;
 }
 
 .mobileStrip .item { flex: none; white-space: nowrap; }
@@ -174,8 +173,6 @@
         border: 1px solid var(--lume-record-island-rule);
         border-radius: 16px;
         background: var(--lume-record-rail);
-        scrollbar-width: thin;
-        scrollbar-color: var(--lume-ink-muted) var(--lume-record-rail);
     }
     :global(html[data-runtime-twin-design='proposal']) .workspace.workspace[data-runtime-settings] > .indexPane { max-height: 100%; }
     :global(html[data-runtime-twin-design='proposal']) .workspace.workspace[data-runtime-settings] > .content { padding: 0 4px 12px 0; }

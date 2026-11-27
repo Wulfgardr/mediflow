@@ -335,7 +335,6 @@
     :global([data-folder-section='quadro']) :is(.overview > .middle, .overview > .side) {
         max-height: max(320px, calc(100dvh - 212px));
         overflow-y: auto;
-        scrollbar-width: thin;
     }
     .diaryTools[data-reading='true'] {
         position: sticky;
@@ -357,7 +356,6 @@
     :global([data-folder-section='quadro']) .sheet:not([data-writing]) :is(.middle, .side > .stable, .side > .context) {
         max-height: max(320px, calc(100dvh - 212px));
         overflow-y: auto;
-        scrollbar-width: thin;
     }
 }
 @container record-sheet (width < 44rem) {
