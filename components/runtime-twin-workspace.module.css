@@ -59,6 +59,8 @@
   .navigation > a, .mobileMore > summary { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 3px; min-height: 56px; padding: 6px 2px; font-size: 0.75rem; border-radius: 10px; color: var(--lume-ink-muted); cursor: pointer; }
   .mobileMore { display: block; }
   .mobileMore summary { list-style: none; }
+  .workspace[data-rail-open='false'] .mobileMore span { display: inline; }
+  .moreCount { margin-inline-start: 4px; color: var(--lume-ink); font: var(--type-meta); }
   .mobileMore summary::-webkit-details-marker { display: none; }
   .mobileMenu { position: absolute; z-index: 60; bottom: calc(64px + env(safe-area-inset-bottom)); left: 12px; right: 12px; padding: 8px; border: 1px solid var(--lume-rule-strong); border-radius: 12px; background: var(--lume-surface-focal); }
   .mobileMenu a, .mobileMenu button { display: flex; align-items: center; gap: 12px; min-height: 44px; width: 100%; padding: 10px 12px; font: 0.875rem var(--lume-font-sans); color: var(--lume-ink); }

@@ -4,14 +4,15 @@ import { clientArchiveGeneration } from './security/client-auth-api';
 import { db } from './db';
 import { notifyDbChange } from './live-query';
 import { openAgentVisit } from './agent-cassette-client';
-import { agentItemDecided, agentVisitAwaitsReview, inspectAgentVisit, prepareAgentApplication, prepareAgentItemDecision, reopenReviewedAgentItems, type AgentVisitReview } from './agent-visit-review';
+import { agentItemDecided, agentVisitAwaitsReview, inspectAgentVisit, prepareAgentApplication, prepareAgentItemDecision, reopenReviewedAgentItems, type AgentPatientIdentity, type AgentVisitReview } from './agent-visit-review';
 import { agentVisitPresentation, sealVisitConfirmationPresentation } from './agent-visit-confirmation-browser';
 import type { VisitConfirmationTicket } from './agent-visit-confirmation-contract';
-import type { AgentApplicationReceipt, AgentCassetteIndexPage, AgentItemDecision, AgentItemDecisionReceipt, IncomingAgentCassette } from './agent-visit-application-contract';
+import type { AgentApplicationReceipt, AgentCassetteIndexEntry, AgentCassetteIndexPage, AgentItemDecision, AgentItemDecisionReceipt, IncomingAgentCassette } from './agent-visit-application-contract';
 import { publishAgentIncomingCount } from './agent-incoming-count';
 
 const empty = {
     visits: [] as AgentVisitReview[],
+    unreadableVisits: [] as AgentCassetteIndexEntry[],
     busy: false,
     error: null as string | null,
     applicationError: null as { visitId: string | null; itemId?: string; message: string } | null,
@@ -22,7 +23,7 @@ let inFlight: Promise<void> | null = null;
 export const agentIncomingSnapshot = () => snapshot;
 export const agentIncomingServerSnapshot = () => empty;
 export function subscribeAgentIncoming(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; }
-function publish(value: typeof empty) { snapshot = value; publishAgentIncomingCount(value.visits.length); for (const listener of listeners) listener(); }
+function publish(value: typeof empty) { snapshot = value; publishAgentIncomingCount(value.visits.length + value.unreadableVisits.length); for (const listener of listeners) listener(); }
 const inbox = '/api/agent-mandates/incoming';
 
 async function fetchIncoming<T>(query: string, signal: AbortSignal): Promise<T> {
@@ -46,14 +47,14 @@ const notApplied = 'La visita non è stata applicata. Rileggi la cassetta.';
 async function reopenForApplication(review: AgentVisitReview, signal: AbortSignal): Promise<AgentVisitReview> {
     const { id, revision } = review.visit.cassette;
     const row = await fetchIncoming<IncomingAgentCassette>('?visit=' + encodeURIComponent(id), signal);
-    if (row.id !== id || row.revision !== revision || row.status !== 'closed' || row.archiveGeneration !== clientArchiveGeneration()) throw new Error(notApplied);
+    if (row.id !== id || row.revision !== revision || row.status !== 'closed' || row.reviewBlock || row.archiveGeneration !== clientArchiveGeneration()) throw new Error(notApplied);
     const items = await reopenReviewedAgentItems(review, row);
     signal.throwIfAborted();
     if (!items) throw new Error(notApplied);
     return { ...review, appliedItemIds: row.appliedItemIds, discardedItemIds: row.discardedItemIds ?? [], correctedItemIds: row.correctedItemIds ?? [], visit: { ...review.visit, items } };
 }
-async function apply(review: AgentVisitReview, signal: AbortSignal) {
-    const input = await prepareAgentApplication(review, signal);
+async function apply(review: AgentVisitReview, signal: AbortSignal, identity?: AgentPatientIdentity) {
+    const input = await prepareAgentApplication(review, signal, identity);
     if (!input) throw new Error(notApplied);
     signal.throwIfAborted();
     const response = await fetch(inbox, { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -123,7 +124,7 @@ export async function refreshAgentIncoming(signal = db.getSessionReadSignal(), r
             const ambulatoryId = contextResponse.ok ? context.ambulatoryId
                 ?? (await db.ambulatories.toArray({ signal, rejectAuthUnavailable: true })).find(value => value.isDefault)?.id : undefined;
             const visits: AgentVisitReview[] = [];
-            let unreadable = false;
+            const unreadableVisits: AgentCassetteIndexEntry[] = [];
             for (;;) {
                 for (const summary of page.visits) {
                     signal.throwIfAborted();
@@ -133,12 +134,12 @@ export async function refreshAgentIncoming(signal = db.getSessionReadSignal(), r
                         review = await inspectAgentVisit(row, patients, profile.doctorTaxCode ?? null, signal, readPdf, ambulatoryId);
                     } catch (error) {
                         if (signal.aborted) throw error;
-                        unreadable = true;
+                        unreadableVisits.push(summary);
                         continue;
                     }
                     const { id, archiveGeneration, status, revision, depositedAt } = review.visit.cassette;
                     if (archiveGeneration !== clientArchiveGeneration()) review = { ...review, blockers: [...review.blockers, 'Visita da un archivio precedente. Apri i PDF per recuperarla nella scheda.'] };
-                    if (review.visit.items.every(item => agentItemDecided(review, item.id))) continue;
+                    if (status === 'closed' && review.visit.items.length && review.visit.items.every(item => agentItemDecided(review, item.id))) continue;
                     visits.push({ ...review, documents: [], visit: { ...review.visit, cassette: { id, archiveGeneration, status, revision, depositedAt },
                         items: review.visit.items.map(item => item.kind === 'pdf' ? { ...item, value: { name: item.value.name } } : item) } });
                 }
@@ -146,7 +147,7 @@ export async function refreshAgentIncoming(signal = db.getSessionReadSignal(), r
                 page = await fetchIncoming<AgentCassetteIndexPage>('?after=' + page.next, signal);
             }
             signal.throwIfAborted();
-            publish({ ...snapshot, visits, busy: false, error: unreadable ? 'Una visita non è leggibile. Riprova dopo lo sblocco.' : null });
+            publish({ ...snapshot, visits, unreadableVisits, busy: false, error: null });
         } catch (error) {
             if (!signal.aborted) publish({ ...snapshot, busy: false, error: error instanceof Error ? error.message : 'Cassetta non disponibile. Riprova.' });
         }
@@ -166,33 +167,38 @@ export function startAgentIncoming(): () => void {
     void run();
     return () => { controller.abort(); clearTimeout(timer); publish(empty); };
 }
-export async function applyReviewedAgentVisits(ids: string[]): Promise<void> {
+type ConfirmedAgentPatient = { visitId: string; revision: number; identity: AgentPatientIdentity };
+export function applyReviewedAgentVisitAndCreatePatient(confirmation: ConfirmedAgentPatient): Promise<void> {
+    return applyReviews([confirmation.visitId], confirmation);
+}
+export function applyReviewedAgentVisits(ids: string[]): Promise<void> {
+    return applyReviews(ids);
+}
+
+async function applyReviews(ids: string[], confirmation?: ConfirmedAgentPatient): Promise<void> {
     const signal = db.getSessionReadSignal();
     while (inFlight) await inFlight;
     signal.throwIfAborted();
     const task = (async () => {
         publish({ ...snapshot, busy: true, applicationError: null });
         const versions = new Map<string, { reviewed: number; committed: number }>();
-        const createdPatients = new Map<string, NonNullable<AgentVisitReview['patient']>>();
         try {
             for (const id of ids) {
                 if (signal.aborted) return;
                 const review = snapshot.visits.find(value => value.visit.cassette.id === id);
                 if (!review) continue;
-                const newPatient = review.newPatient;
-                const created = newPatient && createdPatients.get(newPatient.taxCode);
-                const patient = review.patient ?? created;
+                const patient = review.patient;
+                const identity = confirmation?.visitId === id && confirmation.revision === review.visit.cassette.revision
+                    ? confirmation.identity : undefined;
                 try {
-                    if (!agentVisitAwaitsReview(review)) throw new Error(notApplied);
+                    if ((confirmation && !identity) || !agentVisitAwaitsReview(review, identity)) throw new Error(notApplied);
                     const reopened = await reopenForApplication(review, signal);
-                    if (created && newPatient?.birthDate && created.birthDate?.toISOString().slice(0, 10) !== newPatient.birthDate) throw new Error(notApplied);
                     const known = patient && versions.get(patient.id);
                     const expectedVersion = known?.reviewed === patient?.version ? known?.committed : patient?.version;
-                    const current = patient ? { ...reopened, patient: { ...patient, version: expectedVersion }, newPatient: null } : reopened;
-                    const applied = await apply(current, signal);
-                    if (applied.patient?.version) {
-                        if (newPatient) createdPatients.set(newPatient.taxCode, applied.patient);
-                        if (patient?.version) versions.set(patient.id, { reviewed: patient.version, committed: applied.patient.version });
+                    const current = patient ? { ...reopened, patient: { ...patient, version: expectedVersion } } : reopened;
+                    const applied = await apply(current, signal, identity);
+                    if (applied.patient?.version && patient?.version) {
+                        versions.set(patient.id, { reviewed: patient.version, committed: applied.patient.version });
                     }
                     publish({ ...snapshot, visits: snapshot.visits.map(value => value === review ? { ...applied, visit: review.visit } : value) });
                 } catch (error) {

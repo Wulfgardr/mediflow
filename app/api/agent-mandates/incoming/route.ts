@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import { readAuthenticatedWebSession } from '@/lib/security/server-auth';
 import { createAgentIncomingReader } from '@/lib/security/agent-incoming-reader';
 import { hasAttestedLoopbackIngress } from '@/lib/security/loopback-ingress.mjs';
-import { readAgentCassette, readAgentCassetteIndex } from '@/lib/agent-cassette-store';
+import { agentCassetteReviewBlock, readAgentCassette, readAgentCassetteIndex } from '@/lib/agent-cassette-store';
 import { applyAgentVisit, agentAppliedItemIds, agentDiscardedItemIds, agentCorrectedItemIds, AgentApplicationDenied } from '@/lib/agent-visit-application';
 import { isTrustedWebMutationRequest } from '@/lib/security/request-transport';
 import { archiveWriteRequestDenial } from '@/lib/security/archive-write-request';
@@ -14,8 +14,9 @@ export const GET = createAgentIncomingReader({
     session: readAuthenticatedWebSession,
     index: (actorRef, after) => readAgentCassetteIndex(openDbServer(), actorRef, after),
     cassette: (actorRef, id) => {
-        const row = readAgentCassette(openDbServer(), id, actorRef);
-        return row && { ...row, appliedItemIds: agentAppliedItemIds(id), discardedItemIds: agentDiscardedItemIds(id), correctedItemIds: agentCorrectedItemIds(id) };
+        const database = openDbServer();
+        const row = readAgentCassette(database, id, actorRef);
+        return row && { ...row, reviewBlock: agentCassetteReviewBlock(database, row), appliedItemIds: agentAppliedItemIds(id), discardedItemIds: agentDiscardedItemIds(id), correctedItemIds: agentCorrectedItemIds(id) };
     },
 });
 

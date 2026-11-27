@@ -243,3 +243,11 @@
 @media (pointer: coarse) {
   .transcript > summary { min-height: 44px; }
 }
+
+.newPatient { display: flex; flex-wrap: wrap; gap: 12px; padding: 12px; }
+.newPatient legend { padding-inline: 4px; font: var(--type-record-label); }
+.newPatient label { display: grid; flex: 1 1 160px; gap: 4px; min-width: 0; }
+.newPatient input { width: 100%; }
+@media (max-width: 700px) {
+  .newPatient label:first-of-type { flex-basis: 100%; }
+}
