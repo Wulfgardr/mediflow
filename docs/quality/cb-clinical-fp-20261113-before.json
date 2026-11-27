@@ -14,7 +14,7 @@
   "sets": [
     {
       "name": "cb-clinical-independent",
-      "corpusSha256": "3f5e48faf1106960bba0e5911ee2f93022c4e23fd5a0389b3c0d09bc0ab71175",
+      "corpusSha256": "70ced33166df1631d19a994d72f085cfc43e21fa737e7bc137e9b95ea2302e62",
       "counts": {
         "texts": 332,
         "sourceOccurrences": 374,
@@ -1511,7 +1511,7 @@
         },
         {
           "id": "repo-0078",
-          "text": "REDACTED.pdf: epistassi risolta in PS, confermata necessita di rivalutare la ripresa dell'anticoagulante; mantenere follow-up diabetologico e ADI domiciliare.",
+          "text": "RefertoSintetico.pdf: epistassi risolta in PS, confermata necessita di rivalutare la ripresa dell'anticoagulante; mantenere follow-up diabetologico e ADI domiciliare.",
           "sourceRefs": [
             {
               "path": "scripts/fixtures/patient-insight-benchmark-corpus.json",
@@ -1552,7 +1552,7 @@
                   "text": "risolta"
                 }
               ],
-              "context": "REDACTED.pdf: epistassi risolta in PS, confermata necessita di rivalutare la ripresa dell'anticoagulante; mantenere follow-up diabe"
+              "context": "RefertoSintetico.pdf: epistassi risolta in PS, confermata necessita di rivalutare la ripresa dell'anticoagulante; mantenere follow-up diabe"
             }
           ],
           "newlyRemovedClinicalWords": [
