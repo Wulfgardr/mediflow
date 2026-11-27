@@ -7,14 +7,17 @@ import { clinicalContentAllowed } from './agent-mandate-contract';
 
 export type AgentCassetteIndexEntry = Pick<AgentCassette, 'id' | 'archiveGeneration' | 'status' | 'revision' | 'depositedAt'>;
 export type AgentCassetteIndexPage = { visits: AgentCassetteIndexEntry[]; next: string | null };
-export type IncomingAgentCassette = AgentCassette & { appliedItemIds: string[]; discardedItemIds?: string[]; correctedItemIds?: string[] };
+export type AgentCassetteReviewBlock = 'agent_revoked' | 'deposit_unverified';
+export type IncomingAgentCassette = AgentCassette & { appliedItemIds: string[]; discardedItemIds?: string[]; correctedItemIds?: string[]; reviewBlock?: AgentCassetteReviewBlock };
 
 const sealed = z.string().regex(/^ENC:[A-Za-z0-9+/]+=*:[A-Za-z0-9+/]+=*$/u);
 const noteValues = z.object({ title: sealed, content: sealed, date: dateInputSchema, metadata: sealed }).strict();
 const id = z.string().uuid();
 export const newAgentPatientSchema = z.object({
     ambulatoryId: z.string().min(1).max(256),
-    taxCode: z.string().regex(/^[A-Z0-9]{16}$/u),
+    firstName: z.string().trim().min(1).max(120),
+    lastName: z.string().trim().min(1).max(120),
+    taxCode: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{16}$/u),
     birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u).nullable(),
 }).strict();
 export type NewAgentPatient = z.output<typeof newAgentPatientSchema>;

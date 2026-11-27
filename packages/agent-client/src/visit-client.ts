@@ -202,7 +202,13 @@ export function prepareAgentVisit(publicKey: string, agentRef: string, mandateRe
         seal('transcription', { text: new TextDecoder('utf-8', { fatal: true }).decode(bytes) });
     }
     cassetteItems({ itemsCiphertext: JSON.stringify(items) });
-    const anchor = sealAgentItemNode(publicKey, { mandateRef, visitId, itemId: visitId, kind: 'anchor' }, new TextEncoder().encode(JSON.stringify({ fiscalCode })));
+    const identity = Object.fromEntries((['firstName', 'lastName'] as const).flatMap(field => {
+        const candidates = [...new Set(parsed.value.sources.flatMap(source => source.patient?.[field] ? [source.patient[field]] : []))];
+        return candidates.length === 1 ? [[field, candidates[0]]] : [];
+    }));
+    const anchorBytes = new TextEncoder().encode(JSON.stringify({ fiscalCode, ...identity }));
+    const anchor = sealAgentItemNode(publicKey, { mandateRef, visitId, itemId: visitId, kind: 'anchor' }, anchorBytes);
+    anchorBytes.fill(0);
     return { version: 1, inputFingerprint: fingerprint.digest('hex'), contentFingerprint: content.digest('hex'), ...(replaces ? { replaces } : {}), agentRef, mandateRef, visitId, anchor, items };
 }
 function credential(directory: string, agentRef: string): AgentCredential {

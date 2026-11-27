@@ -33,10 +33,11 @@ const snapshot = () => tables.map(table => database.prepare(`SELECT * FROM ${tab
 const version = () => (database.prepare('SELECT version FROM patients WHERE id=?').get(fixture.patientId) as { version: number }).version;
 test.after(() => { database.close(); rmSync(directory, { recursive: true, force: true }); });
 
-async function visit(provider: AgentMandateInput['provider'] = 'local', allowsClinicalEgress = false) {
+async function visit(provider: AgentMandateInput['provider'] = 'local', allowsClinicalEgress = false, content: 'all' | 'note' | 'transcription' = 'all', depositTime = Date.now()) {
     const keys = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
     const publicKey = agentBase64(new Uint8Array(await crypto.subtle.exportKey('raw', keys.publicKey)));
-    const mandates = createAgentMandateStore(database), pairings = createAgentPairingStore(database), store = createAgentCassetteStore(database);
+    const now = () => depositTime;
+    const mandates = createAgentMandateStore(database, now), pairings = createAgentPairingStore(database, now), store = createAgentCassetteStore(database, now);
     const generation = archiveGenerationForSession(fixture.session)!;
     const mandate = mandates.create({ id: randomUUID(), durationMs: 43200000, operations: [...AGENT_OPERATIONS], provider, allowsClinicalEgress,
         publicKey, wrappedPrivateKey: 'ENC:' + 'A'.repeat(16) + ':' + 'A'.repeat(64) }, fixture.session.userId, generation);
@@ -51,7 +52,7 @@ async function visit(provider: AgentMandateInput['provider'] = 'local', allowsCl
     const file = await sealPatientDocumentFile(new TextEncoder().encode('%PDF-1.4\nSYNTHETIC_APPLICATION\n%%EOF'), key);
     file.fileKey.fill(0);
     const note = { title: await field('Nota sintetica'), content: await field('SYNTHETIC_APPLICATION'), metadata: await field({ synthetic: true }), date: '2026-11-17' };
-    const items: AgentApplicationInput['items'] = [
+    const allItems: AgentApplicationInput['items'] = [
         { id: randomUUID(), kind: 'note', values: note },
         { id: randomUUID(), kind: 'transcription', values: { ...note, title: await field('Trascrizione sintetica') } },
         { id: randomUUID(), kind: 'pdf', values: { name: await field('synthetic.pdf'), data: file.data, size: 45 } },
@@ -63,6 +64,7 @@ async function visit(provider: AgentMandateInput['provider'] = 'local', allowsCl
         { id: randomUUID(), kind: 'exemption', values: { exemptions: await field(['SYNTHETIC']) } },
         { id: randomUUID(), kind: 'observation', values: { codeSystem: 'LOINC', code: 'SYNTHETIC', display: 'Osservazione sintetica', unitSystem: 'UCUM', unitCode: '1', value: '1', observedAt: '2026-11-17', notes: await field('Fonte sintetica') } },
     ];
+    const items = content === 'all' ? allItems : allItems.filter(item => item.kind === content);
     const operations = { note: 'visita.nota', pdf: 'visita.allega', therapy: 'visita.proponi.terapia', service: 'visita.proponi.prestazione', diagnosis: 'visita.proponi.diagnosi', exemption: 'visita.proponi.esenzione', observation: 'visita.proponi.osservazione', transcription: 'visita.trascrizione' } as const;
     for (const item of items) receipt = database.transaction(() => store.add(principal, id, receipt.revision, {
         id: item.id, kind: item.kind, envelope: seal(item.id, item.kind), byteLength: new TextEncoder().encode(JSON.stringify({ text: 'SYNTHETIC_APPLICATION' })).length,
@@ -151,15 +153,40 @@ test('review before the corrected deposit closes prevents the replacement; revie
     assert.throws(() => applyAgentVisit(request, fixture.session, oldPlan), /AGENT_APPLICATION_DENIED/);
     assert.deepEqual(snapshot(), afterCorrection);
 });
-test('a stale patient revision or a revoked mandate applies nothing and leaves the cassette recoverable', async () => {
-    const f = await visit(), stale = { ...f.whole(), expectedVersion: version() - 1 }, before = snapshot();
-    assert.throws(() => applyAgentVisit(request, fixture.session, stale));
+test('a closed deposit survives expiry and revocation of its mandate with its original audit provenance', async () => {
+    const f = await visit('local', false, 'all', Date.now() - 86400000);
+    const stale = { ...f.whole(), expectedVersion: version() - 1 };
+    const before = snapshot();
+    assert.throws(() => applyAgentVisit(request, fixture.session, stale), /AGENT_APPLICATION_DENIED/);
     assert.deepEqual(snapshot(), before);
-    f.mandates.revoke(f.mandate.id, fixture.session.userId, f.mandate.archiveGeneration);
-    const revoked = snapshot();
-    assert.throws(() => applyAgentVisit(request, fixture.session, f.whole()));
-    assert.deepEqual(snapshot(), revoked);
-    assert.equal(agentAppliedItemIds(f.id).length, 0);
+    assert.ok(readAgentCassetteIndex(database, fixture.session.userId, null).visits.some(row => row.id === f.id));
+    createAgentMandateStore(database).revoke(f.mandate.id, fixture.session.userId, f.mandate.archiveGeneration);
+    const input = f.whole();
+    const receipt = applyAgentVisit(request, fixture.session, input);
+    assert.equal(receipt.status, 'applied');
+    const after = snapshot();
+    assert.deepEqual(database.prepare('SELECT actor_ref, proposer_ref, mandate_ref FROM audit_events WHERE event_id=?').get(receipt.eventId),
+        { actor_ref: fixture.session.userId, proposer_ref: f.principal.agentRef, mandate_ref: f.mandate.id });
+    assert.equal(applyAgentVisit(request, fixture.session, input).eventId, receipt.eventId);
+    assert.deepEqual(snapshot(), after);
+});
+
+test('application requires a closed audit receipt, a current admin session and a non-revoked agent', async () => {
+    const f = await visit();
+    const before = snapshot();
+    for (const session of [{ ...fixture.session, role: 'viewer' as const }, { ...fixture.session, expiresAt: Date.now() - 1 },
+        { ...fixture.session, id: 'synthetic-unbound-session' }]) {
+        assert.throws(() => applyAgentVisit(request, session, f.whole()), /AGENT_APPLICATION_DENIED/);
+    }
+    assert.deepEqual(snapshot(), before);
+    database.prepare('UPDATE agent_clients SET revoked_at=? WHERE id=?').run(Date.now(), f.principal.agentRef);
+    assert.throws(() => applyAgentVisit(request, fixture.session, f.whole()), /AGENT_APPLICATION_DENIED/);
+    const unaudited = await visit();
+    const otherId = randomUUID();
+    database.prepare('UPDATE agent_cassettes SET id=? WHERE id=?').run(otherId, unaudited.id);
+    const after = snapshot();
+    assert.throws(() => applyAgentVisit(request, fixture.session, { ...unaudited.whole(), visitId: otherId }), /AGENT_APPLICATION_DENIED/);
+    assert.deepEqual(snapshot(), after);
 });
 
 test('failure of every audit position rolls back the whole review and its consumption receipts', async () => {
@@ -225,16 +252,17 @@ test('native approval commits and audits exactly one plan, and a valid proof can
     assert.deepEqual(snapshot(), after);
 });
 
-test('a new chart, its membership and all visit items commit together within the reviewed ambulatory', async () => {
-    const f = await visit();
+test('a note-only visit and the named new chart commit together within the reviewed ambulatory', async () => {
+    const f = await visit('local', false, 'note');
     const ambulatoryId = 'synthetic-visit-clinic';
     const other = 'synthetic-other-clinic';
     database.prepare('INSERT INTO ambulatories (id, name) VALUES (?, ?)').run(ambulatoryId, 'Ambulatorio sintetico');
     database.prepare('INSERT INTO ambulatories (id, name) VALUES (?, ?)').run(other, 'Altro ambulatorio sintetico');
-    const newPatient = { ambulatoryId, taxCode: 'RSSMRA80A01F205X', birthDate: '1980-01-01' };
+    const newPatient = { ambulatoryId, taxCode: 'RSSMRA80A01F205X', firstName: 'Ada', lastName: 'Sintetica', birthDate: '1980-01-01' };
     const plan = { ...f.whole(), patientId: f.id, expectedVersion: 1, newPatient };
     const before = snapshot();
     for (const [input, scope] of [[plan, other], [{ ...plan, patientId: fixture.patientId }, ambulatoryId],
+        [{ ...plan, newPatient: { ...newPatient, firstName: '  ' } }, ambulatoryId],
         [{ ...plan, newPatient: { ...newPatient, birthDate: '1980-02-01' } }, ambulatoryId]] as const) {
         assert.throws(() => applyAgentVisit(request, fixture.session, input, scope), /AGENT_APPLICATION_DENIED/);
         assert.deepEqual(snapshot(), before);
@@ -250,12 +278,15 @@ test('a new chart, its membership and all visit items commit together within the
     const receipt = applyAgentVisit(request, fixture.session, plan, ambulatoryId);
     const updated = snapshot();
     assert.equal(receipt.status, 'applied');
-    assert.deepEqual(added(updated, before), [2, 2, 1, 1, 2, 1]);
+    assert.deepEqual(added(updated, before), [1, 0, 0, 0, 0, 0]);
+    assert.deepEqual(database.prepare('SELECT first_name, last_name, tax_code FROM patients WHERE id=?').get(f.id),
+        { first_name: newPatient.firstName, last_name: newPatient.lastName, tax_code: newPatient.taxCode });
     const membership = database.prepare('SELECT ambulatory_id AS id FROM patients_to_ambulatories WHERE patient_id = ?').all(f.id);
     assert.deepEqual(membership, [{ id: ambulatoryId }]);
     assert.equal(applyAgentVisit(request, fixture.session, plan, ambulatoryId).eventId, receipt.eventId);
-    const duplicate = await visit(), duplicatePlan = { ...duplicate.whole(), patientId: duplicate.id, expectedVersion: 1, newPatient };
+    const duplicate = await visit('local', false, 'transcription'), duplicatePlan = { ...duplicate.whole(), patientId: duplicate.id, expectedVersion: 1, newPatient };
     const beforeDuplicate = snapshot();
     assert.throws(() => applyAgentVisit(request, fixture.session, duplicatePlan, ambulatoryId), /AGENT_APPLICATION_DENIED/);
     assert.deepEqual(snapshot(), beforeDuplicate);
+    assert.equal(applyAgentVisit(request, fixture.session, { ...duplicatePlan, newPatient: { ...newPatient, taxCode: 'RSSMRA85T10A562S', birthDate: null } }, ambulatoryId).status, 'applied');
 });
