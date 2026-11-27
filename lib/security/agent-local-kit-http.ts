@@ -144,6 +144,7 @@ export function createAgentLocalKitHttp(sources: Sources) {
                             token: connection.registrationToken,
                             origin,
                         },
+                        connection.patientReferenceKey,
                     );
                 } catch (writeError) {
                     store.disconnect(access.session.userId, access.generation);

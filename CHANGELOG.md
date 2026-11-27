@@ -68,6 +68,14 @@ release](https://github.com/Wulfgardr/mediflow/releases) raccoglie i pacchetti p
   già decisa in parte la conferma non parte e la visita si finisce dal Web
   ([ADR 0191](./docs/adr/0191-conferma-da-chat-e-cassetta-senza-finestra.md),
   [#1115](https://github.com/Wulfgardr/mediflow/pull/1115)).
+- **Invia a Codex** identifica il paziente con un riferimento a segreto
+  (HMAC-SHA256) invece dello SHA-256 del codice fiscale, nel file, nel suo
+  nome e nell'audit. Il segreto nasce al collegamento del kit; l'anno di
+  nascita non esce più. Un kit già collegato riceve il segreto al primo
+  invio, senza ricollegarlo; serve la versione del kit che legge il
+  formato `v2`. La lettura delle impostazioni per chiave non restituisce
+  il segreto
+  ([ADR 0197](./docs/adr/0197-contesto-paziente-locale-per-agente.md)).
 - Mini offre l'anteprima del cambio di stato di un controllo tramite lo
   stesso servizio di MCP. La conferma resta nel Web e l'agente non acquisisce
   permessi di scrittura

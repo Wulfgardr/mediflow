@@ -5,7 +5,6 @@ import { clientArchiveGeneration } from './security/client-auth-api';
 import {
     normalizeAgentPatientTaxCode,
     parseAgentPatientContextInput,
-    sha256HexClient,
     type AgentPatientContextIdentity,
     type AgentPatientContextInput,
     type AgentPatientContextRequest,
@@ -16,18 +15,6 @@ function toIsoDate(value: Date | string | null | undefined): string | undefined 
     const date = value instanceof Date ? value : new Date(value);
     if (Number.isNaN(date.getTime())) return undefined;
     return date.toISOString().slice(0, 10);
-}
-
-function resolveBirthYear(patient: Patient): number | undefined {
-    if (patient.birthDate && patient.birthDatePrecision !== 'unknown') {
-        const year = new Date(patient.birthDate).getFullYear();
-        if (Number.isInteger(year) && year >= 1900 && year <= 2100) return year;
-    }
-    if (typeof patient.birthYear === 'number' && Number.isInteger(patient.birthYear)
-        && patient.birthYear >= 1900 && patient.birthYear <= 2100) {
-        return patient.birthYear;
-    }
-    return undefined;
 }
 
 export async function buildAgentPatientContextPayload(input: {
@@ -41,9 +28,7 @@ export async function buildAgentPatientContextPayload(input: {
     const normalizedTaxCode = normalizeAgentPatientTaxCode(input.patient.taxCode ?? '');
     if (normalizedTaxCode.length < 4) return null;
 
-    const cfHash = await sha256HexClient(normalizedTaxCode);
     const taxCodeLast4 = normalizedTaxCode.slice(-4);
-    const birthYear = resolveBirthYear(input.patient);
 
     const diagnoses = (Array.isArray(input.patient.diagnoses) ? input.patient.diagnoses : [])
         .filter(item => Boolean(item?.description?.trim()))
@@ -128,9 +113,7 @@ export async function buildAgentPatientContextPayload(input: {
 
     return parseAgentPatientContextInput({
         patient: {
-            cfHash,
             taxCodeLast4,
-            ...(birthYear !== undefined ? { birthYear } : {}),
             ...(input.patient.isAdi === true ? { isAdi: true } : {}),
         },
         diagnoses,

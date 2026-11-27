@@ -5,7 +5,6 @@ import {
     AGENT_PATIENT_CONTEXT_TTL_MS,
     parseAgentPatientContextInput,
     sealAgentPatientContextEnvelope,
-    sha256HexClient,
 } from './agent-local-kit-context-contract';
 import { agentPatientContextIdentity, buildAgentPatientContextPayload } from './agent-local-kit-context-client';
 import { pseudonymizeAgentPatientContext } from './agent-local-kit-context-pseudonymization';
@@ -13,10 +12,11 @@ import type { Checkup, ClinicalEntry, Observation, Patient, Therapy } from './db
 
 const SYNTHETIC_CF = 'RSSMRA80A01H501U';
 
-test('parseAgentPatientContextInput accepts a valid minimal payload and seals with 24h TTL', async () => {
-    const cfHash = await sha256HexClient(SYNTHETIC_CF);
+const SYNTHETIC_REFERENCE = 'a'.repeat(64);
+
+test('parseAgentPatientContextInput accepts a valid minimal payload and seals with 24h TTL', () => {
     const parsed = parseAgentPatientContextInput({
-        patient: { cfHash, taxCodeLast4: '501U', birthYear: 1980, isAdi: false },
+        patient: { taxCodeLast4: '501U', isAdi: false },
         diagnoses: [{ description: 'Ipertensione arteriosa essenziale', code: 'BA00', system: 'ICD-11', date: '2026-01-10' }],
         therapies: [{ drugName: 'Ramipril 5 mg', activePrinciple: 'ramipril', dosage: '1 cp al mattino', status: 'active', startDate: '2026-01-10' }],
         exemptions: [{ code: '031' }],
@@ -26,20 +26,19 @@ test('parseAgentPatientContextInput accepts a valid minimal payload and seals wi
         openCheckups: [{ title: 'Controllo pressorio', status: 'pending' }],
     });
     assert.ok(parsed);
-    assert.equal(parsed.patient.cfHash, cfHash);
     assert.equal(parsed.patient.taxCodeLast4, '501U');
 
     const now = 1_700_000_000_000;
-    const envelope = sealAgentPatientContextEnvelope(parsed, now);
+    const envelope = sealAgentPatientContextEnvelope(parsed, SYNTHETIC_REFERENCE, now);
     assert.equal(envelope.schema, AGENT_PATIENT_CONTEXT_SCHEMA);
+    assert.deepEqual(envelope.patient, { cfHash: SYNTHETIC_REFERENCE, taxCodeLast4: '501U', isAdi: false });
     assert.equal(envelope.exportedAt, now);
     assert.equal(envelope.expiresAt, now + AGENT_PATIENT_CONTEXT_TTL_MS);
 });
 
-test('parseAgentPatientContextInput rejects unknown keys, invalid hashes, and oversized payloads', async () => {
-    const cfHash = await sha256HexClient(SYNTHETIC_CF);
+test('parseAgentPatientContextInput rejects unknown keys, a reference or birth year from the client, and oversized payloads', () => {
     const valid = {
-        patient: { cfHash, taxCodeLast4: '501U' },
+        patient: { taxCodeLast4: '501U' },
         diagnoses: [],
         therapies: [],
         exemptions: [],
@@ -49,13 +48,15 @@ test('parseAgentPatientContextInput rejects unknown keys, invalid hashes, and ov
         openCheckups: [],
     };
     assert.equal(parseAgentPatientContextInput({ ...valid, firstName: 'NonAmmesso' }), null);
-    assert.equal(parseAgentPatientContextInput({ ...valid, patient: { cfHash: 'short', taxCodeLast4: '501U' } }), null);
-    assert.equal(parseAgentPatientContextInput({ ...valid, patient: { cfHash, taxCodeLast4: '50' } }), null);
+    assert.ok(parseAgentPatientContextInput(valid));
+    assert.equal(parseAgentPatientContextInput({ ...valid, patient: { cfHash: SYNTHETIC_REFERENCE, taxCodeLast4: '501U' } }), null);
+    assert.equal(parseAgentPatientContextInput({ ...valid, patient: { taxCodeLast4: '501U', birthYear: 1980 } }), null);
+    assert.equal(parseAgentPatientContextInput({ ...valid, patient: { taxCodeLast4: '50' } }), null);
     assert.equal(parseAgentPatientContextInput({ ...valid, therapies: [{ drugName: 'X', dosage: '1 cp', status: 'unknown' }] }), null);
     assert.equal(parseAgentPatientContextInput({ ...valid, recentNotes: Array.from({ length: 11 }, () => ({ date: '2026-10-01', text: 'x' })) }), null);
 });
 
-test('buildAgentPatientContextPayload hashes taxCode, strips HTML, and with the server pseudonymization releases no identity written in notes; null without taxCode', async () => {
+test('buildAgentPatientContextPayload keeps only the last 4 of the taxCode, strips HTML, and with the server pseudonymization releases no identity written in notes; null without taxCode', async () => {
     const now = new Date('2026-11-01T09:00:00Z');
     const patient: Patient = {
         id: 'pat-synth-1',
@@ -119,10 +120,7 @@ test('buildAgentPatientContextPayload hashes taxCode, strips HTML, and with the 
     for (const value of ['NomeSintetico', 'CognomeSintetico', SYNTHETIC_CF, 'Via Sintetica', '0000000000']) {
         assert.equal(serialized.includes(value.toUpperCase()), false, value);
     }
-    assert.equal(payload.patient.cfHash, await sha256HexClient(SYNTHETIC_CF));
-    assert.equal(payload.patient.taxCodeLast4, '501U');
-    assert.equal(payload.patient.birthYear, 1980);
-    assert.equal(payload.patient.isAdi, true);
+    assert.deepEqual(payload.patient, { taxCodeLast4: '501U', isAdi: true });
     assert.equal(payload.therapies[0]?.drugName, 'Ramipril 5 mg');
     assert.equal(payload.recentNotes.length, 1);
     assert.equal(payload.recentNotes[0]?.text.includes('<p>'), false);

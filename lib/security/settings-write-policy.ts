@@ -100,7 +100,14 @@ export const SETTINGS_WRITE_REGISTRY: Record<string, SettingsKeyPolicy> = {
     backupScheduler: { write: [], note: 'backup config (app/api/system/backup-scheduler route, web-admin only)' },
     'agent.localKitPath': { write: [], note: 'ADR 0196 local kit path (app/api/agent-mandates/local-kit route only)' },
     'agent.localKitAgentRef': { write: [], note: 'ADR 0196 local kit active agent reference (app/api/agent-mandates/local-kit route only)' },
+    'agent.localKitPatientReferenceKey': { write: [], note: 'ADR 0197 local kit patient reference secret (app/api/agent-mandates/local-kit route only)' },
 };
+
+const SERVER_ONLY_SETTING_KEYS: ReadonlySet<string> = new Set([PAIRING_OFFERS_KEY, 'agent.localKitPatientReferenceKey']);
+
+export function isServerOnlySetting(key: string): boolean {
+    return key.startsWith('accountProfile.doctorTaxCode:') || SERVER_ONLY_SETTING_KEYS.has(key);
+}
 
 export function settingsWriteChannelForSession(session: ServerSession): SettingsWriteChannel {
     if (session.authChannel === 'system') return 'local-token';

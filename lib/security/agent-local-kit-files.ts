@@ -18,6 +18,8 @@ export class LocalKitPathError extends Error {
 const BLOCKED_HOME_FOLDERS = ['Documents', 'Desktop', 'Downloads', 'Library/Mobile Documents', 'Library/CloudStorage'];
 const MAX_DEPOSITO_BYTES = 65536;
 export const LOCAL_KIT_CONTEXT_DIR_NAME = 'contesto-pazienti';
+export const LOCAL_KIT_PATIENT_REFERENCE_FILE_NAME = 'riferimento-pazienti.json';
+const PATIENT_REFERENCE_KEY_RE = /^[a-f0-9]{64}$/u;
 const CONTEXT_FILE_RE = /^([a-f0-9]{64})\.json$/u;
 
 function isInside(root: string, target: string): boolean {
@@ -205,6 +207,7 @@ export function writeLocalKitCredentials(
     kitPath: string,
     access: AgentCredential,
     registration: AgentRegistrationCredential,
+    patientReferenceKey: string,
 ): void {
     const physicalKitDir = validateLocalKitDirectory(kitPath);
     const deposito = readDepositoJson(physicalKitDir);
@@ -213,8 +216,38 @@ export function writeLocalKitCredentials(
     const registrationFile = `${registration.agentRef}.registration.json`;
     writeAtomicPrivateFile(credsDir, accessFile, JSON.stringify(access), true);
     writeAtomicPrivateFile(credsDir, registrationFile, JSON.stringify(registration), true);
+    installLocalKitPatientReference(physicalKitDir, patientReferenceKey);
     const updatedDeposito = { ...deposito, agente: access.agentRef };
     writeAtomicPrivateFile(physicalKitDir, 'deposito.json', JSON.stringify(updatedDeposito, null, 2) + '\n', false);
+}
+
+function readLocalKitPatientReference(physicalKitDir: string): string | null {
+    let fd: number | undefined;
+    try {
+        fd = fs.openSync(path.join(physicalKitDir, LOCAL_KIT_PATIENT_REFERENCE_FILE_NAME), fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+        const stat = fs.fstatSync(fd);
+        if (!isPrivateFile(stat) || stat.size > 4096) return null;
+        const parsed: unknown = JSON.parse(fs.readFileSync(fd, 'utf8'));
+        const secret = parsed && typeof parsed === 'object' ? (parsed as { segreto?: unknown }).segreto : undefined;
+        return typeof secret === 'string' && PATIENT_REFERENCE_KEY_RE.test(secret) ? secret : null;
+    } catch {
+        return null;
+    } finally {
+        if (fd !== undefined) fs.closeSync(fd);
+    }
+}
+
+export function installLocalKitPatientReference(kitPath: string, patientReferenceKey: string): void {
+    if (!PATIENT_REFERENCE_KEY_RE.test(patientReferenceKey)) throw new LocalKitPathError('LOCAL_KIT_WRITE_FAILED');
+    const physicalKitDir = validateLocalKitDirectory(kitPath);
+    if (readLocalKitPatientReference(physicalKitDir) === patientReferenceKey) return;
+    clearLocalKitPatientContexts(physicalKitDir);
+    writeAtomicPrivateFile(
+        physicalKitDir,
+        LOCAL_KIT_PATIENT_REFERENCE_FILE_NAME,
+        JSON.stringify({ segreto: patientReferenceKey }) + '\n',
+        true,
+    );
 }
 
 function unlinkSafeRegularFile(directory: string, filename: string): void {
@@ -239,6 +272,10 @@ export function removeLocalKitCredentials(kitPath: string, agentRef: string): vo
         physicalKitDir = validateLocalKitDirectory(kitPath);
     } catch {
         return;
+    }
+    try {
+        unlinkSafeRegularFile(physicalKitDir, LOCAL_KIT_PATIENT_REFERENCE_FILE_NAME);
+    } catch {
     }
     let deposito: Record<string, unknown>;
     try {

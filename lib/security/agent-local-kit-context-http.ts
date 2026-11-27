@@ -11,12 +11,12 @@ import {
     normalizeAgentPatientTaxCode,
     parseAgentPatientContextRequest,
     sealAgentPatientContextEnvelope,
-    sha256HexClient,
     type AgentPatientContextRequest,
 } from '../agent-local-kit-context-contract';
 import { pseudonymizeAgentPatientContext } from '../agent-local-kit-context-pseudonymization';
 import {
     clearLocalKitPatientContexts,
+    installLocalKitPatientReference,
     listLocalKitPatientContexts,
     LocalKitPathError,
     removeLocalKitPatientContext,
@@ -31,10 +31,9 @@ type Sources = {
 const reply = (value: unknown, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'no-store' } });
 const denied = (status = 403, code = 'AGENT_LOCAL_KIT_DENIED') => reply({ code, error: 'Contesto agente non disponibile.' }, status);
 
-async function identityMatchesContext({ context, identity }: AgentPatientContextRequest): Promise<boolean> {
+function identityMatchesContext({ context, identity }: AgentPatientContextRequest): boolean {
     const taxCode = normalizeAgentPatientTaxCode(identity.taxCode);
-    return taxCode.length >= 4 && taxCode.slice(-4) === context.patient.taxCodeLast4
-        && await sha256HexClient(taxCode) === context.patient.cfHash;
+    return taxCode.length >= 4 && taxCode.slice(-4) === context.patient.taxCodeLast4;
 }
 
 export function createAgentLocalKitContextHttp(sources: Sources) {
@@ -87,7 +86,7 @@ export function createAgentLocalKitContextHttp(sources: Sources) {
                     deadline: performance.now() + 2000,
                 });
                 const parsed = parseAgentPatientContextRequest(body);
-                if (!parsed || !await identityMatchesContext(parsed)) return denied(400, 'INVALID_INPUT');
+                if (!parsed || !identityMatchesContext(parsed)) return denied(400, 'INVALID_INPUT');
                 const released = pseudonymizeAgentPatientContext(parsed.context, parsed.identity);
                 const fresh = await admitted(request, true, true);
                 if (!fresh || fresh.session.id !== access.session.id
@@ -96,10 +95,19 @@ export function createAgentLocalKitContextHttp(sources: Sources) {
                     return denied(403);
                 }
                 const freshStatus = store.status(access.session.userId);
-                if (!freshStatus.connected || !freshStatus.active || freshStatus.kitPath !== status.kitPath) {
+                if (!freshStatus.connected || !freshStatus.active || freshStatus.kitPath !== status.kitPath
+                    || freshStatus.agentRef !== status.agentRef) {
                     return denied(403, 'LOCAL_KIT_INACTIVE');
                 }
-                const envelope = sealAgentPatientContextEnvelope(released);
+                let patientReference: string;
+                try {
+                    patientReference = store.patientReference(parsed.identity.taxCode, access.session.userId, access.generation,
+                        key => installLocalKitPatientReference(freshStatus.kitPath, key));
+                } catch (error) {
+                    if (error instanceof LocalKitPathError) return denied(409, 'LOCAL_KIT_RECONNECT');
+                    throw error;
+                }
+                const envelope = sealAgentPatientContextEnvelope(released, patientReference);
                 writeLocalKitPatientContext(freshStatus.kitPath, envelope);
                 try {
                     store.recordContextAudit(

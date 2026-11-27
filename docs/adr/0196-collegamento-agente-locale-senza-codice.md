@@ -54,6 +54,11 @@ che il medico compie gia dentro MediFlow sbloccato.
      `<agentRef>.registration.json` (`agentRef`, `token` `mfr_...`, `origin`)
      per il rinnovo automatico allo sblocco. Il formato coincide con quello gia
      letto da `packages/agent-client` e da `visita.py` (`read_agent_access`).
+   - Accanto a `deposito.json` MediFlow scrive con le stesse regole
+     `riferimento-pazienti.json` (`{"segreto": "<64 esadecimali>"}`), il segreto
+     del riferimento del paziente dell'[ADR 0197](0197-contesto-paziente-locale-per-agente.md),
+     nuovo a ogni collegamento (per un kit collegato prima che esistesse nasce
+     al primo «Invia a Codex»). Prima di scriverlo svuota i contesti paziente.
    - `deposito.json` viene letto con `O_NOFOLLOW` e riscritto atomicamente
      aggiornando soltanto il campo `agente` (`agentRef` al collegamento, `null`
      allo scollegamento) e preservando invariati tutti gli altri campi.
@@ -74,9 +79,10 @@ che il medico compie gia dentro MediFlow sbloccato.
    registrazione, il client attivo e i mandati associati (iniziale e corrente),
    rendendo immediatamente inutilizzabili sia il token di accesso sia la
    credenziale di rinnovo anche se copiati altrove prima della revoca. Rimuove
-   inoltre `<agentRef>.json` e `<agentRef>.registration.json` dalla cartella
-   configurata (senza seguire collegamenti simbolici) e imposta `agente: null`
-   in `deposito.json`.
+   inoltre `<agentRef>.json`, `<agentRef>.registration.json` e
+   `riferimento-pazienti.json` dalla cartella configurata (senza seguire
+   collegamenti simbolici), cancella il segreto in MediFlow e imposta
+   `agente: null` in `deposito.json`.
 
 ## Prove
 
