@@ -34,7 +34,7 @@ export const SCHEDULED_BACKUP_RUNTIME_ROSTER = Object.freeze([
   ['lib/diary-revision-envelope.ts', '4fc45b1aa7a61453a183fb6ee911c47e328c9875334c56360104f54e9f37757e'],
   ['lib/security/attachment-file-envelope.ts', '4a87a1dbea779d97be8e8aece0bf9c8fe3dbef6caab1afab7237f79c6a098ff0'],
   ['lib/attachment-payload.ts', '2db6f0b35ef7fb41a527a7d83c91c10399e0351ad2057e43d99b52c3472bf9c8'],
-  ['lib/backup-audit.ts', '68d219d79cee938e1854199266f50ba53ff4598a5913982635a5c372bd44cd31'],
+  ['lib/backup-audit.ts', '439e8f380c60e1834f261db73492e85dcc3010f7fe7daee35501705d1c06a6db'],
   ['lib/exemption-import-receipt.ts', '894cc749fa4f512f65d10e3ff66f0a445b129cd23c56627bfe0c549a932c1e3a'],
   ['lib/exemption-import-contract.ts', '12b97b4a54bca6a3d56103f442035b81d5269ec276789ee2febc0560e533b0e0'],
   ['lib/reference-data/prosthetics-catalog-backup.ts', '5e267385e6a62d0eb3bb2151234f46c2dbf054d18a88bca20f45d965d494808b'],
