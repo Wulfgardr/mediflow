@@ -128,6 +128,12 @@ test('scheda paziente: schede aperte, testata, diario e sezioni restano nel sist
     expect(geometry.filter(tab => tab.active)).toHaveLength(1);
     expect(new Set(geometry.map(tab => tab.background)).size, 'la scheda attiva ha un fondo suo').toBe(2);
     await expect(tabs.last().getByRole('link', { name: new RegExp(sheets[2].name, 'u') })).toBeVisible();
+    const activeInView = await openRecords.evaluate(node => {
+        const bar = node.getBoundingClientRect();
+        const active = node.querySelector('[data-active="true"]')!.getBoundingClientRect();
+        return active.left >= bar.left - 1 && active.right <= bar.right + 1;
+    });
+    expect(activeInView, 'la scheda attiva si vede per intero').toBe(true);
 
     await openPatientSection(page, 'diario');
     const diary = page.locator('#diario');
