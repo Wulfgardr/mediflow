@@ -124,3 +124,23 @@ CLI equivalenti:
 npm run agent:visita -- apri-conferma --agente UUID-AGENTE --visita UUID-VISITA
 npm run agent:visita -- esito-conferma --agente UUID-AGENTE --riferimento UUID-CONFERMA
 ```
+
+## Seduta del giorno
+
+In **Da decidere → Seduta del giorno**, scegli la cartella `ambulatorio-AAAAMMGG`
+del kit. MediFlow legge i manifest di visite e sedute e le trascrizioni
+nella cartella scelta. La cronologia mostra l'ora della visita e l'ora del
+file per PDF e promemoria ricetta identificati nel manifest. I riferimenti ai
+tratti di terzi compaiono a parte. Se il manifest segnala tratti di terzi da
+verificare o separati, il dettato della visita resta fuori dal vassoio.
+
+Il browser sbloccato confronta gli indizi con le schede attive dell'ambulatorio.
+Per ogni proposta mostra gli indizi e indica quando più schede sono
+compatibili. Il medico può collegare un tratto o scartarlo. Il collegamento
+apre la scheda dalla cronologia e non registra una voce clinica. Le decisioni
+restano cifrate nel browser, per utente e archivio. Se si importa di nuovo la
+stessa giornata, le decisioni dei tratti invariati vengono conservate.
+
+Il kit tiene i tratti senza codice fiscale nella sua cartella locale e non li
+deposita nella cassetta. La vista usa la trascrizione disponibile e i riferimenti
+ai documenti, senza leggere le registrazioni audio o il contenuto dei PDF.
