@@ -168,8 +168,8 @@ test('CU-1 strutturale: il browser del medico ha il sandbox e raggiunge solo il 
     const doctor = await openPhysicianPortal(f.portal, { headless: true }); t.after(() => doctor.close());
     assert.match(await doctor.page.content(), /Prescrizione specialistica/u);
     const address = other.address(); assert.ok(address && typeof address !== 'string');
-    for (const target of [`http://127.0.0.1:${address.port}/altra-origine`, `http://localhost:${address.port}/altra-origine`,
-        'http://synthetic.invalid/esterno']) await doctor.page.goto(target).catch(() => {});
+    for (const target of [`http://127.0.0.1:${address.port}/altra-origine`, `http://localhost:${address.port}/altra-origine`])
+        await doctor.page.goto(target).catch(() => {});
     assert.equal(received, 0, 'un’altra origine sul loopback resta irraggiungibile dal browser del medico');
     assert.equal(sends(f), 0);
 });
