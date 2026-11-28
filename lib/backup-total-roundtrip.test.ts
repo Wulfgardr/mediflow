@@ -10,14 +10,15 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import Database from 'better-sqlite3';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { agentBase64, agentBytes, openAgentItem } from './agent-cassette-crypto';
 import { sealAgentItemNode } from '../packages/agent-client/src/cassette-crypto';
 import { commitExemptionImport, previewExemptionImport } from './exemption-catalog-import';
 import { EXEMPTION_COLUMNS } from './exemption-import-contract';
 import { createProstheticsCatalog } from './reference-data/prosthetics-catalog-service';
 import { PROSTHETICS_TEMPLATE } from './reference-data/prosthetics-catalog-contract';
-import { BACKUP_COLLECTIONS, createEmptyDataset, parseBackupArtifact, serializeBackupArtifact, stableStringify } from './backup-artifact';
+import { BACKUP_COLLECTIONS, createEmptyDataset, parseBackupArtifact, serializeBackupArtifact, stableStringify, type BackupArtifact } from './backup-artifact';
+import { BACKUP_ROWS_HEADER, BACKUP_ROWS_MANIFEST } from './backup-row-layout';
 import { decryptData, encryptData, generateMasterKey } from './security/security';
 
 const fileGolden = JSON.parse(fs.readFileSync('native/contracts/attachment-file-golden.v2.json', 'utf8'));
@@ -67,7 +68,7 @@ function runNode(args: string[], env: Record<string, string> = {}): string {
     if (env.MEDIFLOW_BACKUP_DEST_DIR) args = ['--import', prepareSyntheticBackupDestination(env.MEDIFLOW_DATA_DIR, env.MEDIFLOW_BACKUP_DEST_DIR), ...args];
     return execFileSync(process.execPath, args, {
         cwd: ROOT,
-        env: { ...process.env, ...env },
+        env: { ...process.env, ...env, MEDIFLOW_E2E_DISABLE_LEGACY_COPY: '1' },
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'pipe'],
     }).trim();
@@ -332,6 +333,50 @@ function restoreArtifact(
     );
 }
 
+function restoreScheduledRows(targetDataDir: string, artifactPath: string) {
+    const source = `
+        import fs from 'node:fs';
+        import { withBackupRestoreRequest } from './lib/backup-restore-preflight.ts';
+        import { BACKUP_ROWS_TRANSPORT, BACKUP_ROWS_TRANSPORT_HEADER } from './lib/backup-row-layout.ts';
+        const request = new Request('http://127.0.0.1/api/system/backup-restore', {
+            method: 'POST',
+            headers: { [BACKUP_ROWS_TRANSPORT_HEADER]: BACKUP_ROWS_TRANSPORT },
+            body: await fs.openAsBlob(process.env.W7_ARTIFACT_PATH),
+        });
+        const outcome = await withBackupRestoreRequest(request, async ({ artifact, result }) => {
+            if (!result.ok || !artifact) {
+                return { restored: false, failedChecks: result.checks.filter(check => check.status === 'fail').map(check => check.id) };
+            }
+            const { restoreBackupArtifact } = await import('./lib/backup-restore-executor.ts');
+            restoreBackupArtifact(artifact, () => true);
+            return { restored: true };
+        });
+        console.log(JSON.stringify(outcome));
+    `;
+    return JSON.parse(runNode(
+        ['--experimental-strip-types', '--import', LOADER, '--input-type=module', '--eval', source],
+        { MEDIFLOW_DATA_DIR: targetDataDir, W7_ARTIFACT_PATH: artifactPath },
+    ));
+}
+
+function withCrossPatientObservation(rows: string, { payload, manifest }: BackupArtifact): string {
+    const [observation] = payload.observations;
+    assert.equal(payload.observations.length, 1);
+    assert.equal(observation.patientId, 'w7-patient');
+    assert.equal(observation.servicePrescriptionItemId, 'w7-service-item');
+    const movedObservation = { ...observation, patientId: 'w7-other-patient' };
+    const invalidPayload = { ...payload, observations: [movedObservation] };
+    const checksum = createHash('sha256').update(stableStringify(invalidPayload)).digest('hex');
+    const lines = rows.split('\n');
+    const observationLine = lines.indexOf(stableStringify(observation));
+    const manifestLine = lines.length - 2;
+    assert.notEqual(observationLine, -1);
+    assert.ok(lines[manifestLine].startsWith(BACKUP_ROWS_MANIFEST));
+    lines[observationLine] = stableStringify(movedObservation);
+    lines[manifestLine] = BACKUP_ROWS_MANIFEST + JSON.stringify({ ...manifest, checksum }) + '}';
+    return lines.join('\n');
+}
+
 /* Exercises the real proposal owner across a same-ID/version restore in one Web process. */
 function exerciseCheckupAbaRestoreFence(targetDataDir: string, artifactPath: string): Record<string, unknown> {
     const artifactUrl = pathToFileURL(path.join(ROOT, 'lib/backup-artifact.ts')).href;
@@ -480,7 +525,7 @@ test('retires a pending Checkup proposal before a same-ID/version restore ABA sw
     } finally { fs.rmSync(workDir, { recursive: true, force: true }); }
 });
 
-test('scheduled backup restores every clinical table and preserves ciphertext bytes', async () => {
+test('scheduled row backup restores clinical tables, diary corrections and same-patient links', async () => {
     const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediflow-backup-roundtrip-'));
     const sourceDataDir = path.join(workDir, 'source');
     const targetDataDir = path.join(workDir, 'target');
@@ -514,6 +559,10 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
             clearBackupTables(targetDb, clinicalTables);
             const targetInitialAudits = readOrderedRows(targetDb, 'audit_events');
             const cassetteMasterKey = await populateSyntheticClinicalFixture(sourceDb, sourceActorRef);
+            insertRow(sourceDb, 'patients', {
+                id: 'w7-other-patient', first_name: 'Synthetic', last_name: 'Other',
+                tax_code: 'SYNTHETIC-W7-OTHER', created_at: 1_783_000_000, updated_at: 1_783_000_000,
+            });
             /* Include nonempty synthetic repertory and receipt in the total round-trip gate. */
             const prosthetics = createProstheticsCatalog(sourceDb), catalogBytes = Buffer.from(PROSTHETICS_TEMPLATE);
             const catalogPreview = prosthetics.preview(catalogBytes, 'synthetic-roundtrip.csv', 'synthetic-backup');
@@ -551,12 +600,23 @@ test('scheduled backup restores every clinical table and preserves ciphertext by
             assert.equal(typeof schedulerState.run.lastRunAt, 'string');
             assert.equal(schedulerState.run.lastRetentionMode, null);
 
-            const artifact = await parseBackupArtifact(JSON.parse(fs.readFileSync(runner.artifactPath, 'utf8')));
+            const rows = fs.readFileSync(runner.artifactPath, 'utf8');
+            assert.ok(rows.startsWith(BACKUP_ROWS_HEADER + '\n'));
+            const artifact = await parseBackupArtifact(JSON.parse(rows));
             for (const [collection, table] of Object.entries(BACKUP_TABLES)) {
                 assert.equal(artifact.manifest.recordCounts[collection as keyof typeof BACKUP_TABLES], readOrderedRows(sourceDb, table).length);
             }
 
-            restoreArtifact(targetDataDir, runner.artifactPath);
+            const invalidRowsPath = path.join(workDir, 'cross-patient.mediflow');
+            fs.writeFileSync(invalidRowsPath, withCrossPatientObservation(rows, artifact), { mode: 0o600 });
+            const beforeRejection = targetDb.serialize();
+            assert.deepEqual(restoreScheduledRows(targetDataDir, invalidRowsPath), {
+                restored: false,
+                failedChecks: ['artifact-references'],
+            });
+            assert.deepEqual(targetDb.serialize(), beforeRejection);
+
+            assert.deepEqual(restoreScheduledRows(targetDataDir, runner.artifactPath), { restored: true });
 
             let encryptedFieldCount = 0;
             for (const table of clinicalTables) {
