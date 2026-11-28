@@ -660,7 +660,7 @@ function DossierReview({ view, busy, ports, operation, setBusy, setNotice, reloa
     const withPrepared = view.documents.some((document) => document.record.facts.some((fact) => fact.origin === 'prepared'));
     return <>
         {withPrepared ? <div className={styles.section} data-testid="dossier-bulk-panel">
-            <p className={styles.muted}>Per i documenti con estrazione preparata: accetta e scrive le proposte la cui citazione si ritrova nel documento e la voce di diario con il documento intero. Mette da parte doppioni e altre letture automatiche, che restano nell’elenco con il motivo. Sintesi, conflitti, negazioni e citazioni non trovate restano a te.</p>
+            <p className={styles.muted}>Per i documenti con estrazione preparata: accetta e scrive le proposte la cui citazione si ritrova nel documento e la voce di diario con il documento intero. Mette da parte doppioni e altre letture automatiche, che restano nell’elenco con il motivo. Le voci con un codice ICD-11 proposto, le sintesi, i conflitti, le negazioni e le citazioni non trovate si decidono nel documento.</p>
             <label className={styles.consent}>
                 <input type="checkbox" checked={includeSummaries} disabled={busy} data-testid="dossier-bulk-summaries" onChange={(event) => setIncludeSummaries(event.currentTarget.checked)} />
                 <span>Ho letto le sintesi dei documenti e accetto anche quelle: sono testo riassunto, non verificabile parola per parola. La sintesi prende il posto della voce con il documento intero e il residuo si considera rivisto solo se le pagine lette coincidono.</span>
@@ -776,6 +776,10 @@ function DossierDocument({ document, view, busy, result, onSave, onApply, onRetr
                 <tbody>{draft.facts.map((fact) => {
                     const assessment = view.assessments.get(dossierFactRef(document.attachment.id, fact.factId));
                     const blockers = dossierFactBlockers(fact, { exemptionCodes: view.exemptionCodes });
+                    const proposedCode = fact.kind === 'diagnosis' ? fact.values.proposedCode : undefined;
+                    const setIcd11Code = (code: string) => updateFact(fact.factId, (item) => ({
+                        ...decideByPhysician(item, 'pending'), values: { ...item.values, code, system: code ? 'ICD-11' : '' },
+                    }));
                     const applied = latestAppliedOutcome(record, fact.factId);
                     const locked = written(fact) || busy || Boolean(record.pendingWrites?.some((claim) => claim.factId === fact.factId));
                     const evidence = fact.evidence;
@@ -788,8 +792,16 @@ function DossierDocument({ document, view, busy, result, onSave, onApply, onRetr
                                 onClick={() => showEvidence(fact)}>Mostra nel testo</button>}
                             {fact.values.textSource === 'document' ? <small>Testo: il testo completo del documento, conservato sopra.</small> : null}
                             {qualifierNotes(fact).map((note) => <small key={note} data-testid="dossier-qualifier">{note}</small>)}
-                            {FIELDS[fact.kind].filter((field) => !(field.name === 'text' && fact.values.textSource === 'document')).map((field) => <FactField key={field.name} spec={field} value={fact.values[field.name] ?? ''} disabled={locked}
+                            {FIELDS[fact.kind].filter((field) => !(field.name === 'text' && fact.values.textSource === 'document')
+                                && !(proposedCode && (field.name === 'code' || field.name === 'system'))).map((field) => <FactField key={field.name} spec={field} value={fact.values[field.name] ?? ''} disabled={locked}
                                 id={`${ids}-${fact.factId}-${field.name}`} onChange={(value) => updateFact(fact.factId, (item) => ({ ...item, values: { ...item.values, [field.name]: value } }))} />)}
+                            {proposedCode ? <>
+                                <small>Proposta ICD-11: {proposedCode} · {fact.values.proposedTitle}</small>
+                                <button type="button" className="mf-button-secondary" disabled={locked || fact.values.code === proposedCode}
+                                    onClick={() => setIcd11Code(proposedCode)}>Usa il codice proposto</button>
+                                <FactField spec={{ name: 'code', label: 'Codice ICD-11 da registrare' }} value={fact.values.code ?? ''} disabled={locked}
+                                    id={`${ids}-${fact.factId}-code`} onChange={(value) => setIcd11Code(value.trim().toUpperCase())} />
+                            </> : null}
                             {fact.negated || fact.origin !== 'manual' ? <label className={styles.consent}>
                                 <input type="checkbox" checked={fact.negated} disabled={locked} onChange={(event) => { const negated = event.currentTarget.checked; updateFact(fact.factId, (item) => ({ ...item, negated })); }} />
                                 <span>Il testo nega questa informazione</span></label> : null}
@@ -801,7 +813,8 @@ function DossierDocument({ document, view, busy, result, onSave, onApply, onRetr
                             <label htmlFor={`${ids}-${fact.factId}-decision`} className={styles.muted}>Decisione</label>
                             <select id={`${ids}-${fact.factId}-decision`} value={fact.decision} disabled={locked}
                                 onChange={(event) => { const decision = event.currentTarget.value as DossierFact['decision']; updateFact(fact.factId, (item) => decideByPhysician(item, decision)); }}>
-                                <option value="pending">Da decidere</option><option value="accepted">Accetta</option>
+                                <option value="pending">Da decidere</option>
+                                <option value="accepted">{proposedCode ? fact.values.code ? 'Accetta con codice ICD-11' : 'Accetta diagnosi senza codice' : 'Accetta'}</option>
                                 <option value="rejected">Rifiuta</option><option value="already_present">Già in scheda, non scrivere</option>
                             </select>
                             {fact.decidedBy ? <small data-testid="dossier-fact-decided-by">Da «Accetta il verificato»{fact.note ? `: ${fact.note}` : '.'}</small> : null}

@@ -634,3 +634,148 @@ test('WUL-927 Dossier: «Accetta il verificato» lascia aperte solo le sintesi, 
         rmSync(root, { recursive: true, force: true });
     }
 });
+
+isolatedTest('WUL-928: il medico conferma, corregge o scarta il codice ICD-11 del kit', async ({ page, isolatedRuntime }, info) => {
+    isolatedTest.setTimeout(150_000);
+    const pin = '314159';
+    const root = mkdtempSync(path.join(tmpdir(), 'mediflow-dossier-icd11-'));
+    const inbox = path.join(root, 'dossier');
+    mkdirSync(inbox);
+    const codeA = fixtureTaxCode(228);
+    const codeB = fixtureTaxCode(229);
+    const auditDbPath = path.join(isolatedRuntime.dataDirectory, 'medical.db');
+    const candidates = [
+        { description: 'Diabete mellito di tipo 2', proposedCode: '5A11' },
+        { description: 'Asma bronchiale persistente', proposedCode: 'CA22' },
+        { description: 'Ipertensione arteriosa essenziale', proposedCode: 'BA00' },
+        { description: 'Dolore lombare persistente', proposedCode: 'E11.9' },
+        { description: 'Reflusso gastroesofageo cronico', proposedCode: 'DA22', codeStatus: 'confermato' },
+        { description: 'Ipotiroidismo acquisito stabile', proposedCode: '5A00', proposedSystem: 'ICD-10' },
+    ];
+    try {
+        await bootstrapUnlockedSession(page, pin);
+        const patientA = await createPatient(page, codeA);
+        const patientB = await createPatient(page, codeB);
+        async function makeSource(fileName: string, taxCode: string, diagnoses: typeof candidates) {
+            const bytes = await textPdf(['Nota sintetica', `Codice fiscale paziente: ${taxCode}`, 'Data visita: 07/01/2026',
+                ...diagnoses.map(({ description }) => `Osservato: ${description}.`)]);
+            writeFileSync(path.join(inbox, fileName), bytes);
+            return { sha256: createHash('sha256').update(bytes).digest('hex'), fileName, patient: { taxCode }, documentDate: '2026-01-07',
+                facts: diagnoses.map(values => ({ kind: 'diagnosis',
+                    values: { proposedSystem: 'ICD-11', codeStatus: 'proposto', proposedTitle: 'Titolo del depositante', ...values },
+                    quote: `Osservato: ${values.description}.` })) };
+        }
+        const preparedPath = path.join(root, 'estrazione-preparata.json');
+        writeFileSync(preparedPath, JSON.stringify({ schema: 'mediflow.dossier_prepared_extraction.v1', sources: [
+            await makeSource('nota-a.pdf', codeA, candidates),
+            await makeSource('nota-b.pdf', codeB, [candidates[0]]),
+        ] }));
+        await openUnlockedDocument(page, '/patients/import/dossier', pin);
+        const panel = page.getByTestId('dossier-import');
+        await panel.getByTestId('dossier-prepared').setInputFiles(preparedPath);
+        await panel.getByTestId('dossier-folder').setInputFiles(inbox);
+        for (const code of [codeA, codeB]) {
+            const group = panel.locator(`[data-testid="dossier-group"][data-group="cf:${code}"]`);
+            await expect(group).toHaveAttribute('data-identity', 'matched', { timeout: 60_000 });
+            await group.getByLabel('Ho controllato le fonti e confermo che appartengono alla scheda scelta.').check();
+            await group.getByRole('button', { name: 'Salva 1 originale nella scheda' }).click();
+            await expect(group.getByTestId('dossier-acquire-outcome')).toHaveText('Originale salvato e riletto identico', { timeout: 60_000 });
+        }
+        const document = panel.getByTestId('dossier-document');
+        const selectPatient = panel.getByLabel('Scheda', { exact: true });
+        const fact = (description: string) => document.locator('[data-testid="dossier-fact"][data-kind="diagnosis"][data-origin="prepared"]')
+            .filter({ has: page.locator(`input[value="${description}"]`) });
+        const proposed = fact(candidates[0].description);
+        const decision = (description: string) => fact(description).getByLabel('Decisione', { exact: true });
+        const field = (description: string) => fact(description).getByLabel('Codice ICD-11 da registrare');
+        const save = document.getByRole('button', { name: 'Salva revisione' });
+        const clinicalAudit = () => {
+            const database = new Database(auditDbPath, { readonly: true, fileMustExist: true });
+            try {
+                return (database.prepare("SELECT subject_ref, source_surface, outcome, redacted_metadata FROM audit_events WHERE event_type = 'patient.updated' ORDER BY rowid")
+                    .all() as Array<{ subject_ref: string; source_surface: string; outcome: string; redacted_metadata: string }>).map(row => {
+                    expect(row).toMatchObject({ source_surface: 'web', outcome: 'success' });
+                    expect(JSON.parse(row.redacted_metadata).changedFields).toContain('diagnoses');
+                    return row.subject_ref;
+                });
+            } finally { database.close(); }
+        };
+        expect(clinicalAudit()).toEqual([]);
+        await expect(proposed).toContainText('Proposta ICD-11: 5A11 · Type 2 diabetes mellitus');
+        await expect(field(candidates[0].description)).toHaveValue('');
+        await proposed.getByRole('button', { name: 'Usa il codice proposto' }).click();
+        await decision(candidates[0].description).selectOption({ label: 'Accetta con codice ICD-11' });
+        await save.click();
+        await expect(save).toBeDisabled();
+        await panel.getByTestId('dossier-bulk').click();
+        await expect(panel.getByTestId('dossier-bulk-result')).toBeVisible();
+        expect(clinicalAudit()).toEqual([]);
+        await document.getByRole('button', { name: 'Applica 1 fatto accettato' }).click();
+        await expect(proposed.getByTestId('dossier-applied-outcome')).toHaveText('Ultima scrittura: applied');
+        expect(clinicalAudit()).toEqual([patientB]);
+
+        await selectPatient.selectOption(patientA);
+        await expect(document).toContainText('nota-a.pdf');
+        await expect(proposed).toHaveAttribute('data-decision', 'pending');
+        await expect(field(candidates[0].description)).toHaveValue('');
+        await expect(proposed).not.toContainText('Titolo del depositante');
+        for (const { description } of candidates.slice(3)) {
+            await expect(fact(description)).not.toContainText('Proposta ICD-11:');
+            await expect(fact(description).getByLabel('Codice (solo se scritto nel documento)')).toHaveValue('');
+        }
+        await panel.getByTestId('dossier-bulk').click();
+        await expect(panel.getByTestId('dossier-bulk-result')).toBeVisible();
+        await expect(proposed).toHaveAttribute('data-decision', 'pending');
+        expect(clinicalAudit().filter(id => id === patientA)).toHaveLength(3);
+
+        const [accept, correct, refuse] = candidates.map(({ description }) => description);
+        await proposed.getByRole('button', { name: 'Usa il codice proposto' }).click();
+        await decision(accept).selectOption({ label: 'Accetta con codice ICD-11' });
+        await field(correct).fill('E11.9');
+        await decision(correct).selectOption({ label: 'Accetta con codice ICD-11' });
+        await decision(refuse).selectOption({ label: 'Accetta diagnosi senza codice' });
+        await info.attach('revisione-icd11', { body: await document.screenshot(), contentType: 'image/png' });
+        await save.click();
+        await document.getByRole('button', { name: 'Applica 3 fatti accettati' }).click();
+        await expect(fact(correct)).toContainText('Impossibile verificare il codice ICD-11 nel catalogo WHO');
+        expect(clinicalAudit().filter(id => id === patientA)).toHaveLength(5);
+        await field(correct).fill('CA23');
+        await decision(correct).selectOption({ label: 'Accetta con codice ICD-11' });
+        await save.click();
+        await document.getByRole('button', { name: 'Applica 1 fatto accettato' }).click();
+        await expect(fact(correct).getByTestId('dossier-applied-outcome')).toHaveText('Ultima scrittura: applied');
+        expect(clinicalAudit()).toEqual([patientB, patientA, patientA, patientA, patientA, patientA, patientA]);
+        const database = new Database(auditDbPath, { readonly: true, fileMustExist: true });
+        try {
+            const rows = database.prepare('SELECT id, diagnoses, version FROM patients ORDER BY id').all() as Array<{ id: string; diagnoses: string; version: number }>;
+            expect(rows.map(row => [row.id, row.version])).toEqual([[patientA, 7], [patientB, 2]].sort());
+            for (const { diagnoses } of rows) expect(diagnoses).toMatch(/^ENC:/u);
+            const checks = database.prepare("SELECT redacted_metadata FROM audit_events WHERE event_type = 'reference_data.icd11.code_check'").all() as Array<{ redacted_metadata: string }>;
+            const flags = checks.map(({ redacted_metadata }) => JSON.parse(redacted_metadata).flags as string[]);
+            expect(flags).toHaveLength(8);
+            expect(flags.filter(row => row.includes('found:false'))).toHaveLength(2);
+            for (const row of flags) expect(row).toContain('source:embedded');
+        } finally {
+            database.close();
+        }
+        expect(await attachmentCount(page, patientA)).toBe(1);
+        expect(await attachmentCount(page, patientB)).toBe(1);
+        for (const [patient, expected] of [
+            [patientA, [[accept, '5A11'], [correct, 'CA23'], [refuse, ''], ...candidates.slice(3).map(({ description }) => [description, ''])]],
+            [patientB, [[accept, '5A11']]],
+        ] as const) {
+            await openUnlockedDocument(page, `/patients/${patient}/edit`, pin);
+            const descriptions = page.locator('input[name^="diagnoses."][name$=".description"]');
+            const codes = page.locator('input[name^="diagnoses."][name$=".code"]');
+            const systems = page.locator('input[name^="diagnoses."][name$=".system"]');
+            const dates = page.locator('input[name^="diagnoses."][name$=".date"]');
+            await expect(descriptions).toHaveCount(expected.length);
+            const actual = await Promise.all((await descriptions.evaluateAll(inputs => inputs.map(input => (input as HTMLInputElement).value)))
+                .map(async (description, index) => [description, await codes.nth(index).inputValue(), await systems.nth(index).inputValue(),
+                    new Date(await dates.nth(index).inputValue()).toISOString()]));
+            expect(actual.sort()).toEqual(expected.map(([description, code]) => [description, code, code ? 'ICD-11' : '', '2026-01-07T00:00:00.000Z']).sort());
+        }
+    } finally {
+        rmSync(root, { recursive: true, force: true });
+    }
+});

@@ -1053,6 +1053,10 @@ export function dossierFactBlockers(fact: DossierFact, context: { exemptionCodes
     if (fact.kind === 'diagnosis' && fact.values.code && !['ICD-9', 'ICD-10', 'ICD-11'].includes(fact.values.system ?? '')) {
         blockers.push('Un codice di diagnosi richiede il sistema di codifica.');
     }
+    if (fact.kind === 'diagnosis' && fact.values.proposedCode && fact.values.code
+        && (fact.values.system !== 'ICD-11' || fact.decidedBy === 'accept_verified')) {
+        blockers.push('Il codice proposto richiede una decisione sul singolo fatto.');
+    }
     if (fact.kind === 'exemption' && context.exemptionCodes && !context.exemptionCodes.has((fact.values.code ?? '').toUpperCase())) {
         blockers.push('Codice di esenzione assente dal catalogo locale.');
     }

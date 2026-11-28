@@ -12,6 +12,7 @@ import { parseClinicalDate } from './clinical-date';
 import { AttachmentCollectionChangedError, AttachmentCollectionView } from './attachment-collection-client';
 import { decodeBase64, encodeBase64 } from './security/attachment-file-envelope';
 import { isLockedDataPlaceholder } from './locked-field-guard';
+import { checkWhoCode } from './icd-code-check-client';
 import { entryFactRef, DossierCollectionChanged, DossierVersionConflict, DossierWriteRejected,
     type DossierAttachmentMeta, type DossierPatient, type DossierPorts, type DossierRecordTable } from './document-dossier-session';
 import type { DossierHostExtraction } from './domain/documents/dossier-import';
@@ -59,6 +60,10 @@ function dataUrl(type: string, bytes: Uint8Array): string { return `data:${type 
 export function createDossierPorts(): DossierPorts {
     return {
         sessionSignal: () => db.getSessionReadSignal(),
+        async icd11Title(code, signal) {
+            const result = await checkWhoCode(code, undefined, signal);
+            return result.entry?.stemTitle ?? null;
+        },
         async extract(bytes, signal): Promise<DossierHostExtraction | { status: 'busy' }> {
             try {
                 const response = await fetch(EXTRACTION_ENDPOINT, { method: 'POST', cache: 'no-store', credentials: 'same-origin', redirect: 'error', signal,

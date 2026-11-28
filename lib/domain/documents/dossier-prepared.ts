@@ -23,6 +23,7 @@ import { clinicalFactContext, clinicalSentence, clinicalTokens, contextReview, i
 import { isValidItalianTaxCodeChecksum } from './document-identity-resolution';
 import { catalogObservationCode } from './dossier-sections';
 import { anchorTabularQuote } from './dossier-tabular-quote';
+import { isWhoCheckCode } from '../../reference-data/icd11-who-code-check-contract';
 import {
     DOSSIER_FACT_TARGET, dossierFactBlockers, dossierFactId, latestAppliedOutcome, unitText,
     type DossierEvidence, type DossierFact, type DossierFactAssessment, type DossierFactKind, type DossierRecord, type DossierUnit,
@@ -138,10 +139,21 @@ export function parsePreparedExtraction(json: string): PreparedParseResult {
                 warnings.push(`Fonte ${index + 1}, fatto ${factIndex + 1}: tipo o valori non validi, ignorato.`); return;
             }
             const kind = item.kind as DossierFactKind;
+            const rawValues = item.values;
             const values: Record<string, string> = {};
             for (const field of [...FIELDS[kind], ...QUALIFIERS]) {
-                const value = str((item.values as Record<string, unknown>)[field]);
+                const value = str(rawValues[field]);
                 if (value) values[field] = value;
+            }
+            if (kind === 'diagnosis' && ['proposedCode', 'proposedSystem', 'codeStatus'].some((field) => Object.hasOwn(rawValues, field))) {
+                delete values.code;
+                delete values.system;
+                const code = str(rawValues.proposedCode);
+                if (str(rawValues.proposedSystem) === 'ICD-11' && str(rawValues.codeStatus) === 'proposto' && isWhoCheckCode(code) && !/[&/]/u.test(code)) {
+                    values.proposedCode = code;
+                } else {
+                    warnings.push(`Fonte ${index + 1}, fatto ${factIndex + 1}: proposta di codice ICD-11 non valida, ignorata.`);
+                }
             }
             facts.push({ kind, values, quote: str(item.quote, 600) || undefined });
         });
@@ -413,6 +425,7 @@ function percentageWritten(percentage: string, excerpt: string): boolean {
 
 export interface PreparedFactsInput {
     source: PreparedSource;
+    icd11Titles?: ReadonlyMap<string, string | null>;
     /** Testo estratto da MediFlow; null se l'estrazione non è riuscita. */
     text: string | null;
     units: readonly DossierUnit[];
@@ -496,7 +509,19 @@ export function preparedDossierFacts(input: PreparedFactsInput): PreparedFactsRe
                 values.code = coded.code; values.unitCode = coded.unitCode; values.codeSource = 'catalogo locale: nome e unità coincidenti';
                 break;
             }
-            case 'diagnosis': values.date ||= date; if (values.code && !values.system) values.system = 'ICD-10'; break;
+            case 'diagnosis': {
+                values.date ||= date;
+                if (values.code && !values.system) values.system = 'ICD-10';
+                if (values.proposedCode) {
+                    const title = input.icd11Titles?.get(values.proposedCode);
+                    if (title) values.proposedTitle = title;
+                    else {
+                        delete values.proposedCode;
+                        if (input.icd11Titles) factNotes.push('Codice proposto non verificato nel catalogo WHO.');
+                    }
+                }
+                break;
+            }
             case 'service_prescription': values.prescribedAt ||= date; break;
             case 'prosthetic': values.prescribedAt ||= date; values.status ||= 'prescribed'; break;
             case 'exemption': values.code = (values.code ?? '').toUpperCase(); break;
@@ -636,7 +661,7 @@ export function isPreparedSummary(fact: DossierFact): boolean {
 
 /** Una proposta entra nel blocco solo se verificabile sulla fonte (la sintesi solo su richiesta esplicita). */
 export function preparedFactEligible(fact: DossierFact, exemptionCodes: ReadonlySet<string>, includeSummaries = false): boolean {
-    if (fact.negated || dossierFactBlockers(fact, { exemptionCodes }).length) return false;
+    if (fact.values.proposedCode || fact.negated || dossierFactBlockers(fact, { exemptionCodes }).length) return false;
     if (fact.origin === 'prepared') {
         if (isPreparedSummary(fact)) return includeSummaries;
         return Boolean(fact.evidence) && (fact.values.preparedCheck === 'verified' || fact.values.preparedCheck === 'approximate');
@@ -685,7 +710,7 @@ export function preparedBulkDecisions(input: PreparedBulkInput): PreparedBulkRes
         return source === null ? `Doppione di ${voice} di questo documento.` : source ? `Doppione di ${voice} di «${source}».` : `Doppione di ${voice} di un altro documento.`;
     };
     const first = record.facts.map((fact) => {
-        if (fact.decision !== 'pending' || fact.origin === 'parser:document' || fact.origin === 'manual' || heldForPhysician(fact)) return fact;
+        if (fact.decision !== 'pending' || fact.values.proposedCode || fact.origin === 'parser:document' || fact.origin === 'manual' || heldForPhysician(fact)) return fact;
         const assessment = input.assessment(refOf(fact));
         if (assessment?.status === 'already_present') { counts.alreadyPresent += 1; return decide(fact, 'already_present'); }
         if (assessment?.status === 'duplicate_in_dossier') {

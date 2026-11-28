@@ -360,6 +360,15 @@ registrati in audit, secondo [ADR 0066](./docs/adr/0066-patient-soft-delete-life
 `patients.documentInsights` può convivere con artifact documentali più ricchi,
 ma gli artifact persistiti rimangono locali e cifrati.
 
+Nel Dossier, l’estrazione preparata può proporre un codice con
+`proposedCode`, `proposedSystem: "ICD-11"` e `codeStatus: "proposto"`.
+MediFlow conserva la descrizione e la citazione e mostra a parte il codice
+riconosciuto dal catalogo WHO locale. In revisione il medico può usare quel
+codice, sostituirlo oppure accettare la diagnosi senza codice. La voce si
+applica dal documento della scheda scelta, con una verifica del codice
+selezionato e la scrittura cifrata e tracciata del profilo paziente.
+L’accettazione in blocco e l’operatore lasciano queste voci alla revisione individuale.
+
 La root web `/` apre direttamente il cockpit Kree8, unica shell ufficiale su
 `main`, come stabilito da [ADR 0060](./docs/adr/0060-kree8-cockpit-live-root-entry.md).
 Graphite è un riferimento storico del principio no-selector. Nuove

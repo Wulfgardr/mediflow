@@ -565,3 +565,19 @@ test('the proposed patient groups the source only if MediFlow reads that name or
     assert.equal(preparedPatientKey({ taxCode: CF_A }, `${text}\nCF ${CF_A}`), `cf:${CF_A}`);
     assert.equal(preparedPatientKey({ firstName: 'PersonaUno', lastName: 'SinteticoUno' }, null), null, 'senza testo nessun raggruppamento');
 });
+
+test('WUL-928: only the marked ICD-11 candidate crosses the kit contract', () => {
+    const values = { description: 'Ipertensione arteriosa essenziale', proposedCode: 'BA00',
+        proposedSystem: 'ICD-11', codeStatus: 'proposto', proposedTitle: 'Titolo del depositante' };
+    const kitFacts = [values, { ...values, codeStatus: '' }, { ...values, proposedSystem: 'ICD-10' },
+        { description: values.description, code: 'I10', system: 'ICD-10' }];
+    const parsed = parsePreparedExtraction(JSON.stringify({ schema: DOSSIER_PREPARED_SCHEMA,
+        sources: [source(kitFacts.map((item) => ({ kind: 'diagnosis', values: item })), { summary: null })] }));
+    assert.ok(parsed.ok);
+    assert.deepEqual(parsed.value.sources[0].facts.map(({ values: fields }) => fields), [
+        { description: values.description, proposedCode: 'BA00' },
+        { description: values.description },
+        { description: values.description },
+        { description: values.description, code: 'I10', system: 'ICD-10' },
+    ]);
+});
