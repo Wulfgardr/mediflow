@@ -21,7 +21,7 @@
 .recordWhen::before { content: '·' / ''; margin-right: 6px; }
 .openRecords > .directoryTab { flex: none; padding: 8px 6px 8px 0; }
 .openRecords:has(.recordTab) { gap: 6px; }
-.recordTab:not([data-active='true']) { flex: 0 1 auto; min-width: 96px; }
+.recordTab:not([data-active='true']) { flex: 0 1 auto; min-width: 72px; }
 .recordTab:not([data-active='true']) > a:first-child { flex: 1 1 auto; min-width: 0; }
 .recordTab > a:first-child > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pageCrumb { display: inline-flex; align-items: center; flex: none; min-height: var(--lume-control-height); padding: 8px 6px; font-size: 0.75rem; color: var(--lume-ink-muted); white-space: nowrap; }
@@ -171,7 +171,7 @@
   .workspace[data-unified-shell='true']:has([data-page-frame], [data-runtime-settings]) .workspaceBar { z-index: 1001; }
   .workspace[data-patient-record='true']:has([data-testid='lume-scheda-header'] [role='toolbar'] > :nth-child(4)) .workspaceBar { max-width: calc(100% - 510px); }
   .workspace[data-unified-shell='true'] .workspaceBar .recordTab > a:first-child { max-width: 176px; }
-  .workspace[data-patient-record='true'] .recordWhen { color: var(--record-hint); }
+  .workspace[data-patient-record='true'] .recordWhen { display: inline; flex: none; color: var(--record-hint); }
   .workspace[data-patient-record='true'] .workarea[data-scrolled-record='true'] .workspaceBar { width: 100%; max-width: none; z-index: 6; }
   .workspace[data-patient-record='true'] .workarea[data-scrolled-record='true'] .patientNavigation { top: 36px; }
   .workspace[data-patient-record='true'] .patientNavigation {
@@ -204,4 +204,3 @@
   .workspace[data-unified-shell='true'] .railTools svg { width: 14px; height: 14px; }
   .workspace[data-rail-open='false'] .railTools, .workspace[data-rail-open='false'] .account { flex-direction: column; }
 }
-@media (min-width: 1441px) { .workspace[data-patient-record='true'] .recordWhen { display: inline; } }
