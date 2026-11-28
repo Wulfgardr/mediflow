@@ -4,8 +4,8 @@ import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Disclosure } from '@/components/disclosure';
 import { formatCountLabel } from '@/lib/format-count';
-import { db, type Diagnosis, type Observation, type ServicePrescription, type ServicePrescriptionItem } from '@/lib/db';
-import { notifyDbChange } from '@/lib/live-query';
+import type { Diagnosis, Observation, ServicePrescription, ServicePrescriptionItem } from '@/lib/db';
+import { submitServicePrescriptionSet, type ServicePrescriptionSetOutcome } from '@/lib/service-prescription-set-client';
 import type { TerritorialPackCapability } from '@/lib/territorial-pack-contract';
 import {
     ALL_LOMBARDIA_SERVICE_PACKAGES,
@@ -14,6 +14,7 @@ import {
     buildVisitServiceHistory,
     composeVisitPackageProposals,
     type GeneratedServiceRequest,
+    type PackagePrescriptionDraft,
     type VisitPackageProposal,
 } from '@/lib/territorial/lombardia/service-packages';
 import styles from './service-package-proposals.module.css';
@@ -30,7 +31,6 @@ type Props = {
 };
 
 type Choice = { selected: boolean; clinicalQuestion: string };
-type SaveOutcome = { kind: 'saved'; count: number } | { kind: 'partial'; saved: number; total: number; failedName: string; message: string };
 
 function exemptionText(request: GeneratedServiceRequest): string | null {
     if (request.exemptionStatus === 'active' && request.exemptionCode) return `Esenzione ${request.exemptionCode}`;
@@ -45,7 +45,8 @@ function periodicityText(months: number): string {
 function PackageProposal({ patientId, proposal, prescribedOn }: { patientId: string; proposal: VisitPackageProposal; prescribedOn: string }) {
     const [choices, setChoices] = useState<Record<string, Choice>>({});
     const [saving, setSaving] = useState(false);
-    const [outcome, setOutcome] = useState<SaveOutcome | null>(null);
+    const [unconfirmed, setUnconfirmed] = useState<readonly PackagePrescriptionDraft[] | null>(null);
+    const [outcome, setOutcome] = useState<ServicePrescriptionSetOutcome | null>(null);
     if (!proposal.outcome.ok) {
         return <section className={styles.package} aria-label={proposal.title}>
             <h3>{proposal.title}</h3>
@@ -56,13 +57,14 @@ function PackageProposal({ patientId, proposal, prescribedOn }: { patientId: str
     const choiceFor = (request: GeneratedServiceRequest): Choice => choices[request.itemId]
         ?? { selected: true, clinicalQuestion: request.clinicalQuestion };
     const selected = requests.filter((request) => choiceFor(request).selected);
+    const locked = saving || unconfirmed !== null;
     const update = (request: GeneratedServiceRequest, change: Partial<Choice>) => {
         setOutcome(null);
         setChoices((current) => ({ ...current, [request.itemId]: { ...choiceFor(request), ...change } }));
     };
 
     const prescribe = async () => {
-        const drafts = buildPackagePrescriptionDrafts({
+        const drafts = unconfirmed ?? buildPackagePrescriptionDrafts({
             patientId,
             proposal,
             choices: selected.map((request) => ({ request, clinicalQuestion: choiceFor(request).clinicalQuestion })),
@@ -71,26 +73,10 @@ function PackageProposal({ patientId, proposal, prescribedOn }: { patientId: str
         });
         setSaving(true);
         setOutcome(null);
-        let saved = 0;
-        try {
-            for (const draft of drafts) {
-                const now = new Date();
-                await db.servicePrescriptions.add({ ...draft.prescription, version: 1, createdAt: now, updatedAt: now });
-                await db.servicePrescriptionItems.add({ ...draft.item, version: 1, createdAt: now, updatedAt: now });
-                saved += 1;
-            }
-            setOutcome({ kind: 'saved', count: saved });
-        } catch (error) {
-            setOutcome({
-                kind: 'partial', saved, total: drafts.length,
-                failedName: drafts[saved]?.prescription.serviceName ?? '',
-                message: error instanceof Error ? error.message : 'Salvataggio non riuscito.',
-            });
-        } finally {
-            setSaving(false);
-            notifyDbChange('service_prescriptions');
-            notifyDbChange('service_prescription_items');
-        }
+        const result = await submitServicePrescriptionSet(drafts).catch((): ServicePrescriptionSetOutcome => ({ kind: 'unconfirmed' }));
+        setUnconfirmed(result.kind === 'unconfirmed' ? drafts : null);
+        setOutcome(result);
+        setSaving(false);
     };
 
     return <section className={styles.package} aria-labelledby={`pacchetto-${proposal.packageId}`} data-testid="service-package-proposal">
@@ -107,7 +93,7 @@ function PackageProposal({ patientId, proposal, prescribedOn }: { patientId: str
                     const questionId = `quesito-${proposal.packageId}-${request.itemId}`;
                     return <li key={request.itemId} className={styles.request} data-service-code={request.serviceCode}>
                         <label className={styles.pick}>
-                            <input type="checkbox" checked={choice.selected} disabled={saving}
+                            <input type="checkbox" checked={choice.selected} disabled={locked}
                                 onChange={(event) => update(request, { selected: event.target.checked })} />
                             <span><strong>{request.serviceName}</strong> <span className={styles.code}>{request.serviceCode}</span></span>
                         </label>
@@ -117,7 +103,7 @@ function PackageProposal({ patientId, proposal, prescribedOn }: { patientId: str
                             {exemption ? ` · ${exemption}` : ''}
                         </p>
                         <label className={styles.question} htmlFor={questionId}>Quesito</label>
-                        <input id={questionId} className={styles.questionInput} value={choice.clinicalQuestion} disabled={saving || !choice.selected}
+                        <input id={questionId} className={styles.questionInput} value={choice.clinicalQuestion} disabled={locked || !choice.selected}
                             onChange={(event) => update(request, { clinicalQuestion: event.target.value })} />
                         {request.appropriatenessConditions.length > 0 && <ul className={styles.conditions}>
                             {request.appropriatenessConditions.map((condition) => <li key={condition}>{condition}</li>)}
@@ -132,15 +118,14 @@ function PackageProposal({ patientId, proposal, prescribedOn }: { patientId: str
                 </li>)}
             </ul>
         </Disclosure>}
-        {requests.length > 0 && <div className={styles.actions}>
-            <Button variant="secondary" disabled={saving || selected.length === 0} onClick={() => void prescribe()}>
-                {saving ? 'Registrazione…' : `Prescrivi ${formatCountLabel(selected.length, 'prestazione', 'prestazioni')}`}
+        {(requests.length > 0 || unconfirmed) && <div className={styles.actions}>
+            <Button variant="secondary" disabled={saving || (!unconfirmed && selected.length === 0)} onClick={() => void prescribe()}>
+                {saving ? 'Registrazione…' : unconfirmed ? 'Riprova' : `Prescrivi ${formatCountLabel(selected.length, 'prestazione', 'prestazioni')}`}
             </Button>
         </div>}
         {outcome?.kind === 'saved' && <p role="status">{`Registrate fra le prestazioni prescritte: ${outcome.count}.`}</p>}
-        {outcome?.kind === 'partial' && <p role="alert">
-            {`Registrate ${outcome.saved} di ${outcome.total}. Non registrata: ${outcome.failedName} (${outcome.message}).`}
-        </p>}
+        {outcome?.kind === 'refused' && <p role="alert">{`Nessuna prestazione registrata: ${outcome.message}.`}</p>}
+        {outcome?.kind === 'unconfirmed' && <p role="alert">Esito della registrazione non confermato.</p>}
     </section>;
 }
 

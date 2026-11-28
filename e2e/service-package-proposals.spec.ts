@@ -1,7 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './fixtures/isolated-runtime';
 import { switchPreset } from './fixtures/territorial-preset';
 import { bootstrapUnlockedSession, openPatientSection, unlockIfNeeded } from './utils';
@@ -47,6 +47,16 @@ async function seedPatient(page: Page, seed: Seed): Promise<string> {
         }
         return patient.id;
     }, seed);
+}
+
+async function captureBothThemes(page: Page, target: Locator, path: string) {
+    for (const colorScheme of ['light', 'dark'] as const) {
+        try {
+            await page.emulateMedia({ colorScheme });
+            await expect(page.locator('html')).toHaveClass(new RegExp(`\\b${colorScheme}\\b`, 'u'));
+            await target.screenshot({ path: path.replace(/\.png$/u, `-${colorScheme}.png`) });
+        } finally { await page.emulateMedia({ colorScheme: 'light' }); }
+    }
 }
 
 test('approved packages propose in the Web visit only what is missing from the record, and write only on the physician gesture', async ({ page, isolatedRuntime }, info) => {
@@ -100,7 +110,7 @@ test('approved packages propose in the Web visit only what is missing from the r
         await expect(excluded('90.28.1')).toContainText(`(fino al ${hba1cValidUntil})`);
         await expect(proposals.getByTestId('service-package-uncompared')).toHaveCount(0);
         await expect(proposed('90.37.4'), 'without kidney disease the renal module stays off').toHaveCount(0);
-        await proposals.screenshot({ path: join(evidence, '1-proposta-hba1c-esclusa-fundus-proposto.png') });
+        await captureBothThemes(page, proposals, join(evidence, '1-proposta-hba1c-esclusa-fundus-proposto.png'));
         expect(writes, 'opening the visit and reading the proposal writes nothing').toEqual([]);
         expect(rows(plain).map((row) => row.code)).toEqual(['90.28.1']);
 
@@ -118,8 +128,8 @@ test('approved packages propose in the Web visit only what is missing from the r
         expect(created).toHaveLength(1);
         expect(created[0]).toMatchObject({ system: 'REGIONAL_PRESTAZIONI', status: 'prescribed' });
         expect(audited(created.map((row) => row.id))).toEqual([created[0].id]);
-        expect(writes).toEqual(['POST /api/service-prescriptions', 'POST /api/service-prescription-items']);
-        await proposals.screenshot({ path: join(evidence, '2-dopo-il-gesto-fundus-prescritto.png') });
+        expect(writes, 'the gesture is one request committed in one transaction, no longer a prescription request followed by an item request').toEqual(['POST /api/service-prescription-sets']);
+        await captureBothThemes(page, proposals, join(evidence, '2-dopo-il-gesto-fundus-prescritto.png'));
 
         await openPrestazioni(renal);
         await expect(proposals).toContainText('con malattia renale cronica');
@@ -128,15 +138,94 @@ test('approved packages propose in the Web visit only what is missing from the r
         await expect(proposed('90.37.4')).toContainText('Senza esenzione: 023 non registrata in scheda');
         await expect(proposed('90.33.4')).toContainText('ogni 6 mesi');
         expect(rows(renal)).toEqual([]);
-        await proposals.screenshot({ path: join(evidence, '3-modulo-renale-altro-paziente.png') });
+        await captureBothThemes(page, proposals, join(evidence, '3-modulo-renale-altro-paziente.png'));
 
         await switchPreset(page, 'core+it');
         await openPrestazioni(renal);
         await expect(page.locator('#prestazioni')).toBeVisible();
         await expect(proposals, 'without the Lombardy pack there are no package proposals').toHaveCount(0);
-        await page.screenshot({ path: join(evidence, '4-pacchetto-lombardia-spento.png'), fullPage: true });
+        await captureBothThemes(page, page.locator('#prestazioni'), join(evidence, '4-pacchetto-lombardia-spento.png'));
         expect(rows(renal)).toEqual([]);
-        expect(writes).toHaveLength(2);
+        expect(writes).toHaveLength(1);
+    } finally {
+        db.close();
+    }
+});
+
+test('a refused item leaves the whole gesture unwritten, and a lost answer is retried without duplicating the prescriptions', async ({ page, isolatedRuntime }, info) => {
+    test.setTimeout(240_000);
+    const evidence = process.env.SERVICE_PACKAGE_EVIDENCE_DIR || info.outputPath('pacchetti');
+    mkdirSync(evidence, { recursive: true });
+    await page.setViewportSize({ width: 1280, height: 3200 });
+    await bootstrapUnlockedSession(page, '314159');
+    await switchPreset(page, 'core+it+lom');
+    const patientId = await seedPatient(page, {
+        firstName: 'Carla', taxCode: 'PCCCRL58C54F205Z', exemptions: ['013'],
+        diagnoses: [{ code: '5A11', description: 'Diabete mellito di tipo 2' }],
+    });
+
+    const db = new Database(join(isolatedRuntime.dataDirectory, 'medical.db'), { readonly: true, fileMustExist: true });
+    const codes = () => db.prepare('SELECT service_code FROM service_prescriptions WHERE patient_id = ? ORDER BY service_code').pluck().all(patientId) as string[];
+    const itemCodes = () => db.prepare('SELECT service_code FROM service_prescription_items WHERE patient_id = ? ORDER BY service_code').pluck().all(patientId) as string[];
+    const audited = (ids: string[]) => db.prepare(`SELECT event_type || ' ' || subject_ref FROM audit_events WHERE subject_ref IN (${ids.map(() => '?').join(',')}) ORDER BY rowid`)
+        .pluck().all(...ids) as string[];
+    type SentEntry = { prescription: { id: string }; item: { id: string; status?: string } };
+    const sent: SentEntry[][] = [];
+    page.on('request', (request) => {
+        if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/service-prescription-sets') sent.push((request.postDataJSON() as { entries: SentEntry[] }).entries);
+    });
+    const idsOf = (entries: SentEntry[]) => entries.flatMap((entry) => [entry.prescription.id, entry.item.id]);
+
+    const proposals = page.getByTestId('service-package-proposals');
+    const proposed = (code: string) => proposals.getByTestId('service-package-requests').locator(`li[data-service-code="${code}"]`);
+    await page.goto(`/patients/${patientId}/modules`);
+    await unlockIfNeeded(page, '314159');
+    await openPatientSection(page, 'prestazioni');
+    await expect(proposed('95.11')).toContainText('Mai eseguita');
+    await expect(proposed('90.28.1')).toContainText('Mai eseguita');
+    const requestedCodes = await proposals.getByTestId('service-package-requests').locator('li[data-service-code]')
+        .evaluateAll((items) => items.map((item) => item.getAttribute('data-service-code')));
+    for (const code of requestedCodes) if (code !== '95.11' && code !== '90.28.1') await proposed(code!).getByRole('checkbox').uncheck();
+
+    try {
+        await page.route('**/api/service-prescription-sets', async (route) => {
+            const body = route.request().postDataJSON() as { entries: SentEntry[] };
+            body.entries[body.entries.length - 1].item.status = 'not-a-status';
+            await route.continue({ postData: JSON.stringify(body) });
+        }, { times: 1 });
+        await proposals.getByRole('button', { name: 'Prescrivi 2 prestazioni', exact: true }).click();
+        await expect(proposals.getByRole('alert')).toHaveText('Nessuna prestazione registrata: dati della prescrizione non validi.');
+        expect(codes(), 'the refused item leaves no prescription of the gesture, not even the one before it').toEqual([]);
+        expect(itemCodes()).toEqual([]);
+        expect(audited(idsOf(sent[0])), 'and no audit').toEqual([]);
+        await expect(proposed('95.11'), 'the proposal stays available after a refusal').toContainText('Mai eseguita');
+        await expect(proposed('90.28.1')).toContainText('Mai eseguita');
+        await captureBothThemes(page, proposals, join(evidence, '5-voce-rifiutata-nulla-registrato.png'));
+
+        await page.route('**/api/service-prescription-sets', async (route) => {
+            await route.fetch();
+            await route.abort('connectionreset');
+        }, { times: 1 });
+        await proposals.getByRole('button', { name: 'Prescrivi 2 prestazioni', exact: true }).click();
+        await expect(proposals.getByRole('alert')).toHaveText('Esito della registrazione non confermato.');
+        expect(codes(), 'the server committed although the browser never saw the answer').toEqual(['90.28.1', '95.11']);
+        await expect(proposals.getByRole('button', { name: 'Riprova', exact: true })).toBeEnabled();
+        await captureBothThemes(page, proposals, join(evidence, '6-risposta-persa-riprova.png'));
+
+        await proposals.getByRole('button', { name: 'Riprova', exact: true }).click();
+        await expect(proposals.getByRole('status')).toHaveText('Registrate fra le prestazioni prescritte: 2.');
+        expect(sent).toHaveLength(3);
+        expect(idsOf(sent[2]), 'the retry resends the gesture with the same ids').toEqual(idsOf(sent[1]));
+        expect(codes(), 'the retry does not duplicate the prescriptions').toEqual(['90.28.1', '95.11']);
+        expect(itemCodes()).toEqual(['90.28.1', '95.11']);
+        const [first, second] = sent[1];
+        expect(audited(idsOf(sent[1]))).toEqual([
+            `service.prescription.created ${first.prescription.id}`, `service.prescription_item.created ${first.item.id}`,
+            `service.prescription.created ${second.prescription.id}`, `service.prescription_item.created ${second.item.id}`,
+        ]);
+        await expect(proposed('95.11')).toHaveCount(0);
+        await expect(proposed('90.28.1')).toHaveCount(0);
+        await captureBothThemes(page, proposals, join(evidence, '7-riprova-senza-doppioni.png'));
     } finally {
         db.close();
     }
