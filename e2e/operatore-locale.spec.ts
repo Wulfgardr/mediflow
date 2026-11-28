@@ -6,7 +6,7 @@ import path from 'node:path';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 import type { Page } from '@playwright/test';
 
-import { bootstrapUnlockedSession, onboardingPassphrase } from './utils';
+import { bootstrapUnlockedSession, onboardingPassphrase, openUnlockedDocument } from './utils';
 import { expect, test } from './fixtures/isolated-runtime';
 import { isValidItalianTaxCode } from '../lib/patient-identity.ts';
 
@@ -85,7 +85,8 @@ test('Operatore locale: crea le schede di un lotto con un PIN dal Portachiavi, s
             summary: { title: 'Dimissione sintetica', text: 'Ricovero per ipertensione; dispnea da sforzo da circa due mesi.' },
             coverage: { pages: 1, unreadablePages: [], complete: true },
             facts: [
-                { kind: 'diagnosis', values: { description: 'Ipertensione arteriosa essenziale' }, quote: 'Diagnosi: Ipertensione arteriosa essenziale' },
+                { kind: 'diagnosis', values: { description: 'Ipertensione arteriosa essenziale',
+                    ...(person.code === P ? { proposedCode: 'BA00', proposedSystem: 'ICD-11', codeStatus: 'proposto' } : {}) }, quote: 'Diagnosi: Ipertensione arteriosa essenziale' },
                 { kind: 'therapy', values: { drugName: drug, activePrinciple: drug.toLowerCase(), dosage, status: 'active' }, quote },
                 { kind: 'therapy', values: { drugName: 'Metformina', dosage: '500 mg' }, quote: 'Metformina 500 mg due volte al giorno' },
             ],
@@ -127,6 +128,19 @@ test('Operatore locale: crea le schede di un lotto con un PIN dal Portachiavi, s
         expect(again.code, again.stderr).toBe(0);
         expect(JSON.parse(again.stdout)).toMatchObject({ schedeCreate: 0, originaliSalvati: 0, fattiScritti: 0 });
         expect((await rows(page, 'patients')).length).toBe(patients.length);
+
+        const id = String(created(P)!.id);
+        await openUnlockedDocument(page, '/patients/import/dossier', PIN);
+        const panel = page.getByTestId('dossier-import');
+        await panel.getByLabel('Scheda', { exact: true }).selectOption(id);
+        const proposed = panel.locator('[data-testid="dossier-fact"][data-kind="diagnosis"][data-origin="prepared"]')
+            .filter({ hasText: 'Proposta ICD-11: BA00' });
+        await expect(proposed).toHaveAttribute('data-decision', 'pending');
+        await expect(proposed.getByLabel('Codice ICD-11 da registrare')).toHaveValue('');
+        await openUnlockedDocument(page, `/patients/${id}/edit`, PIN);
+        await expect(page.locator('input[name="lastName"]')).toHaveValue(/^inventata$/iu);
+        const codes = page.locator('input[name^="diagnoses."][name$=".code"]');
+        expect(await codes.evaluateAll(inputs => inputs.map(input => (input as HTMLInputElement).value))).not.toContain('BA00');
 
         const audit = await page.evaluate(async () =>
             await (await fetch('/api/system/audit?eventType=auth.login.succeeded&limit=50', { cache: 'no-store' })).json() as Array<{ requestId?: string | null }>);
