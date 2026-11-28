@@ -395,10 +395,15 @@ Codice fiscale paziente: ${syntheticTaxCode(123)}`);
     const sourceName = 'esempio.pdf', sourceDigest = sha256(mixed.bytes);
     const mixedRow = { row: { identity, sourceDigest, sourceName }, source: mixed.source,
         digest: sha256(JSON.stringify(['dossier-patient-v1', sourceName, sourceDigest, identity.firstName, identity.lastName, identity.taxCode, identity.birthDate])) };
-    const confirmed = await batchReview(wrongDate, mixedRow);
+    const foreign = await documentSource(`Codice fiscale paziente: ${syntheticTaxCode(123)}`);
+    const foreignDigest = sha256(foreign.bytes);
+    const discordant = { source: foreign.source, row: { sourceName, sourceDigest: foreignDigest, identity },
+        digest: sha256(JSON.stringify(['dossier-patient-v1', sourceName, foreignDigest, identity.firstName, identity.lastName, identity.taxCode, identity.birthDate])) };
+    const confirmed = await batchReview(wrongDate, mixedRow, discordant);
     assert.equal((await batchConfirm(confirmed)).status, 200);
     assert.deepEqual(await batchStage(confirmed.batchId, wrongDate), { status: 422, body: { status: 'invalid-birth-date' } });
     assert.deepEqual(await batchStage(confirmed.batchId, mixedRow), { status: 422, body: { status: 'mixed-identity' } });
+    assert.deepEqual(await batchStage(confirmed.batchId, discordant), { status: 422, body: { status: 'discordant-identity' } });
     assert.deepEqual(effects(), before);
 });
 
