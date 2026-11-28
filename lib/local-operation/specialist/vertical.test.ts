@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { test as nodeTest, type TestContext } from 'node:test';
 import { chromium } from '@playwright/test';
@@ -8,7 +8,7 @@ import { createSyntheticSpecialistDemo as specialistFixture, SYNTHETIC_DECISION,
 import { BrowserInput } from './browser-input.ts';
 import { unique } from './unique.ts';
 import { physicianSubmit } from './browser-adapter.ts';
-import { launchConfinedBrowser } from './browser-network.ts';
+import { launchConfinedBrowser, openPhysicianPortal, physicianLaunch } from './browser-network.ts';
 import { portalAttributes, type ProcedureSnapshot } from '../contract.ts';
 import { recordSpecialistOutcome } from './outcome-service.ts';
 
@@ -29,6 +29,12 @@ async function beforeExecutorClick(f: Fixture, before: () => Promise<void>) {
         if (args[0] === 'click' && args[1] === 'button[formaction="/submit"]') await before();
         return command(...args);
     };
+}
+function ownTmpdir(t: TestContext) {
+    const previous = process.env.TMPDIR, directory = mkdtempSync(path.join(process.env.MEDIFLOW_DATA_DIR!, 'physician-tmp-'));
+    process.env.TMPDIR = directory;
+    t.after(() => { process.env.TMPDIR = previous; rmSync(directory, { recursive: true, force: true }); });
+    return directory;
 }
 function rows(f: Fixture) { return f.db.prepare('SELECT * FROM service_prescriptions WHERE request_reference IS NOT NULL').all(); }
 function sends(f: Fixture) { return f.portal.traffic.filter(item => ['/submit', '/physician-submit'].includes(item.path)).length; }
@@ -137,12 +143,35 @@ test('CU-1 verticale: atto manuale nel browser del medico, ricevuta assente e ri
     await assert.rejects(f.service.approve(cap)); await assert.rejects(f.service.execute(cap));
     await assert.rejects(f.service.reconcile(cap)); assert.equal(f.service.inspect(f.plan.operationId).state, 'uncertain');
     assert.equal(sends(f), 0);
-    const doctor = await chromium.launch(secureLaunch({ headless: true })); t.after(() => doctor.close());
-    const context = await doctor.newContext(); const page = await context.newPage();
-    await physicianSubmit(page, context, { origin: f.portal.origin, cookie: f.portal.cookie });
+    const temporary = ownTmpdir(t);
+    const doctor = await openPhysicianPortal(f.portal, { headless: true }); t.after(() => doctor.close());
+    await physicianSubmit(doctor.page, doctor.context, { origin: f.portal.origin, cookie: f.portal.cookie });
     assert.equal(f.portal.state.kind, 'submitted');
     assert.equal((await f.service.reconcile(cap)).state, 'confirmed'); assert.equal(sends(f), 1);
+    await assert.rejects(f.service.reconcile(cap)); assert.equal(sends(f), 1);
     assert.equal(f.portal.traffic.filter(item => item.path === '/submit').length, 0); assert.equal(rows(f).length, 1);
+    assert.notDeepEqual(readdirSync(temporary), [], 'il profilo del browser del medico vive nella cartella temporanea della prova');
+    await doctor.close();
+    assert.equal(doctor.browser.isConnected(), false);
+    assert.deepEqual(readdirSync(temporary), [], 'chiudere il browser del medico rimuove profilo e artefatti');
+});
+
+test('CU-1 strutturale: il browser del medico ha il sandbox e raggiunge solo il portale della pratica', async t => {
+    const { createServer } = await import('node:http'); let received = 0;
+    const other = createServer((_req, res) => { received++; res.end('synthetic'); });
+    await new Promise<void>(resolve => { other.listen(0, '127.0.0.1', resolve); });
+    t.after(() => new Promise<void>(resolve => { other.closeAllConnections(); other.close(() => resolve()); }));
+    const f = await fixture(t, 'manual');
+    const launch = physicianLaunch(f.portal.origin, false);
+    assert.equal(launch.headless, false); assert.equal(launch.chromiumSandbox, true);
+    assert.ok(launch.args?.includes(`--proxy-bypass-list=<-loopback>;${new URL(f.portal.origin).host}`));
+    const doctor = await openPhysicianPortal(f.portal, { headless: true }); t.after(() => doctor.close());
+    assert.match(await doctor.page.content(), /Prescrizione specialistica/u);
+    const address = other.address(); assert.ok(address && typeof address !== 'string');
+    for (const target of [`http://127.0.0.1:${address.port}/altra-origine`, `http://localhost:${address.port}/altra-origine`,
+        'http://synthetic.invalid/esterno']) await doctor.page.goto(target).catch(() => {});
+    assert.equal(received, 0, 'un’altra origine sul loopback resta irraggiungibile dal browser del medico');
+    assert.equal(sends(f), 0);
 });
 
 test('CU-1 verticale: disattivazione prima dell’atto blocca anche traffico di fondo e persiste al riavvio', async t => {

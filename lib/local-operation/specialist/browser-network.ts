@@ -1,7 +1,11 @@
 import { createServer } from 'node:http';
 import { createSocket } from 'node:dgram';
-import { chromium } from '@playwright/test';
+import { existsSync } from 'node:fs';
+import { chromium, type LaunchOptions } from '@playwright/test';
+import { isolatedChromeLaunch } from '../../../e2e/fixtures/secure-browser.ts';
 import { deny } from '../contract.ts';
+
+const INSTALLED_CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 
 const switches = ['--proxy-bypass-list=<-loopback>', '--force-webrtc-ip-handling-policy=disable_non_proxied_udp',
     '--disable-quic', '--host-resolver-rules=MAP * ~NOTFOUND'];
@@ -43,3 +47,26 @@ export async function launchConfinedBrowser() {
         return { browser, context, close };
     } catch (error) { await close(); throw error; }
 }
+
+export function physicianLaunch(origin: string, headless: boolean): LaunchOptions {
+    const { channel, ...confined } = isolatedChromeLaunch(origin);
+    return { ...confined, headless, ...(process.platform === 'darwin' && existsSync(INSTALLED_CHROME) ? { channel } : {}) };
+}
+
+export async function openPhysicianPortal(portal: { origin: string; cookie: { name: string; value: string; url: string } },
+    options: { headless: boolean }) {
+    const launch = physicianLaunch(portal.origin, options.headless);
+    const browser = await chromium.launch(launch);
+    try {
+        const cdp = await browser.newBrowserCDPSession();
+        const { arguments: actual } = await cdp.send('Browser.getBrowserCommandLine');
+        await cdp.detach();
+        if (actual.includes('--no-sandbox') || !(launch.args ?? []).every(value => actual.includes(value))) deny();
+        const context = await browser.newContext({ serviceWorkers: 'block', acceptDownloads: false });
+        await context.addCookies([portal.cookie]);
+        const page = await context.newPage();
+        await page.goto(`${portal.origin}/portal`);
+        return { browser, context, page, close: () => browser.close() };
+    } catch (error) { await browser.close(); throw error; }
+}
+
