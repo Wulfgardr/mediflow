@@ -6,6 +6,7 @@ import ts from 'typescript';
 import * as values from './settings-value';
 import * as serverErrorLog from './server-error-log';
 import * as accessibilityPreferences from './ui-accessibility-preferences';
+import * as servicePackageCandidates from './service-package-candidates';
 import { sanitizeAIInsightManualConfig } from './ai-insight-settings';
 
 function route() {
@@ -25,6 +26,7 @@ function route() {
         '@/lib/settings-value': values,
         '@/lib/server-error-log': serverErrorLog,
         '@/lib/ui-accessibility-preferences': accessibilityPreferences,
+        '@/lib/service-package-candidates': servicePackageCandidates,
         '@/lib/security/settings-write-policy': { evaluateSettingsWrite: () => ({ allowed: true }) },
     };
     const compiled = ts.transpileModule(readFileSync('app/api/settings/[key]/route.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } });

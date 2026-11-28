@@ -8,6 +8,7 @@ import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/security
 import { auditContextFromRequest, listChangedFields, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from '@/lib/security/audit';
 import { normalizeSettingValue } from '@/lib/settings-value';
 import { evaluateSettingsWrite } from '@/lib/security/settings-write-policy';
+import { PERSONAL_CANDIDATE_REVIEW_SETTING_KEY } from '@/lib/service-package-candidates';
 import { apiInternalError } from '@/lib/api-error-response';
 
 export async function POST(request: Request) {
@@ -20,6 +21,9 @@ export async function POST(request: Request) {
 
         if (!key || value === undefined) {
             return NextResponse.json({ error: "Key and value required" }, { status: 400 });
+        }
+        if (key === PERSONAL_CANDIDATE_REVIEW_SETTING_KEY) {
+            return NextResponse.json({ error: 'Candidate review requires conditional single-key update' }, { status: 400 });
         }
 
         const decision = evaluateSettingsWrite(key, session);

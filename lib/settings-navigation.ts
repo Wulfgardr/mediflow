@@ -108,7 +108,7 @@ export const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
                 href: '/settings/repertori',
                 label: 'Repertori',
                 description: 'AIFA, esenzioni e WHO ICD-11',
-                keywords: ['farmaci', 'aifa', 'esenzioni', 'repertori', 'import csv', 'database farmaci', 'who', 'oms', 'icd', 'icd11', 'icd-11', 'terminologia', 'codifiche'],
+                keywords: ['farmaci', 'aifa', 'esenzioni', 'repertori', 'import csv', 'database farmaci', 'who', 'oms', 'icd', 'icd11', 'icd-11', 'terminologia', 'codifiche', 'pacchetti', 'candidati', 'prestazioni ricorrenti'],
             },
         ],
     },

@@ -12,6 +12,7 @@ import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/security
 import { auditContextFromRequest, listChangedFields, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from '@/lib/security/audit';
 import { isValidInsightSetting, normalizeSettingValue } from '@/lib/settings-value';
 import { evaluateSettingsWrite } from '@/lib/security/settings-write-policy';
+import { PERSONAL_CANDIDATE_REVIEW_SETTING_KEY, parsePersonalCandidateReviewStoreStrict } from '@/lib/service-package-candidates';
 import { UI_REDUCE_MOTION_SETTING_KEY, UI_REDUCE_TRANSPARENCY_SETTING_KEY } from '@/lib/ui-accessibility-preferences';
 
 export async function GET(
@@ -72,7 +73,30 @@ export async function PUT(
         const networkModeDenial = networkModeWriteDenial(request, session, key, persistedValue);
         if (networkModeDenial) return networkModeDenial;
         const conditionalAccessibility = key === UI_REDUCE_MOTION_SETTING_KEY || key === UI_REDUCE_TRANSPARENCY_SETTING_KEY;
-        if ((key === 'network.mode' || conditionalAccessibility) && Object.hasOwn(body, 'expectedValue')) {
+        const conditionalCandidateReview = key === PERSONAL_CANDIDATE_REVIEW_SETTING_KEY;
+        if (conditionalCandidateReview) {
+            const parsedReview = parsePersonalCandidateReviewStoreStrict(persistedValue);
+            if (!parsedReview.ok) {
+                return NextResponse.json({ error: parsedReview.error }, { status: 400 });
+            }
+            if (!Object.hasOwn(body, 'expectedValue') || !(body.expectedValue === null || typeof body.expectedValue === 'string')) {
+                return NextResponse.json({ error: 'Invalid candidate review precondition' }, { status: 400 });
+            }
+            const result = runDbServerImmediateTransaction(() => {
+                const before = dbServer.select().from(settings).where(eq(settings.key, key)).get()?.value ?? null;
+                if (before !== body.expectedValue) {
+                    return { applied: false, before };
+                }
+                writeSettingWithFunctionModelGeneration(key, persistedValue);
+                return { applied: true, before };
+            });
+            if (!result.applied) {
+                return NextResponse.json(
+                    { error: 'Candidate review store changed', code: 'PERSONAL_CANDIDATE_REVIEW_CONFLICT', value: result.before },
+                    { status: 409 },
+                );
+            }
+        } else if ((key === 'network.mode' || conditionalAccessibility) && Object.hasOwn(body, 'expectedValue')) {
             if (!(body.expectedValue === null || typeof body.expectedValue === 'string')) {
                 const error = conditionalAccessibility ? 'Invalid accessibility preference precondition' : 'Invalid network mode precondition';
                 return NextResponse.json({ error }, { status: 400 });
