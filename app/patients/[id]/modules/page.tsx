@@ -42,6 +42,7 @@ import PatientReviewQueueSummaryPanel from '@/components/patient-review-queue-su
 import { PatientSmartImportFabricPreviewCard } from '@/components/patient-smart-import-fabric-preview-card';
 import ProstheticPrescriptionManager from '@/components/prosthetic-prescription-manager';
 import ServicePrescriptionManager from '@/components/service-prescription-manager';
+import ServicePackageProposals from '@/components/service-package-proposals';
 import SissWorkspace from '@/components/siss-workspace';
 import FseFolderHandoff from '@/components/fse-folder-handoff';
 import sissStyles from '@/components/siss-workspace.module.css';
@@ -84,6 +85,11 @@ import { buildAgentPatientContextPayload, sendPatientContextToLocalKit } from '@
    to React's purity checks. */
 function buildObservationRequestId(loop: OpenLoop): string {
     return `${loop.kind}:${loop.sourceRef.id ?? loop.sourceRef.code ?? 'unknown'}:${Date.now()}`;
+}
+
+function localCalendarDay(timestampMs: number): string {
+    const day = new Date(timestampMs);
+    return `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
 }
 
 function navigateToObservationForm(): void {
@@ -873,7 +879,11 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
                             observations={observations} attachments={attachments} />
                     </TherapyManager>
 
-                    <ServicePrescriptionManager patientId={id} embedded surfaceClassName={workspaceStyles.clinicalSection} />
+                    <ServicePrescriptionManager patientId={id} embedded surfaceClassName={workspaceStyles.clinicalSection}
+                        before={territorialPacks.lombardy ? <ServicePackageProposals patientId={id}
+                            territorialCapability={territorialPacks.capability} diagnoses={diagnosisItems}
+                            exemptionCodes={exemptionCodes} prescriptions={servicePrescriptions} items={servicePrescriptionItems}
+                            observations={observations} asOf={localCalendarDay(currentTimestampMs)} /> : null} />
 
                     <ObservationManager patientId={id} embedded prefill={observationPrefill}
                         surfaceClassName={workspaceStyles.clinicalSection} />

@@ -8,7 +8,7 @@ import { Disclosure } from '@/components/disclosure';
 import { formatCountLabel } from '@/lib/format-count';
 import { isServicePrescriptionForwardStep, isServicePrescriptionTransitionAllowed } from '@/lib/clinical-status-transitions';
 import styles from './clinical-register.module.css';
-import { type FormEvent, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { type FormEvent, type ReactNode, useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
     CalendarClock,
     FileText,
@@ -40,6 +40,7 @@ type Props = {
     patientId: string;
     embedded?: boolean;
     surfaceClassName?: string;
+    before?: ReactNode;
 };
 
 type FormState = {
@@ -194,7 +195,7 @@ function childServiceCodeForDraft(
     return draft.serviceCode ?? inheritedServiceCode;
 }
 
-export default function ServicePrescriptionManager({ patientId, embedded = false, surfaceClassName = 'patient-detail-section' }: Props) {
+export default function ServicePrescriptionManager({ patientId, embedded = false, surfaceClassName = 'patient-detail-section', before }: Props) {
     const confirm = useConfirm();
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -410,6 +411,7 @@ export default function ServicePrescriptionManager({ patientId, embedded = false
         onClick={() => setIsFormOpen(value => !value)}>Nuova prestazione</Button>;
     const content = (
         <section className={styles.register}>
+            {before}
             {!embedded && <header className={styles.therapyHeading}><h2>Prestazioni prescritte <span>{count}</span></h2>{newButton}</header>}
             {prescriptions && prescriptions.length > 0 ? <p className={styles.muted}>
                 {prescriptionItems !== undefined ? <>{formatCountLabel(prescriptionItems.length, 'voce di dettaglio', 'voci di dettaglio')} · </> : null}
