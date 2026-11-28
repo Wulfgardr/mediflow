@@ -35,7 +35,7 @@ export class PatientDocumentIntakeBusy extends Error {
     constructor(readonly reason: 'session' | 'host') { super('Patient document intake busy'); }
 }
 export class PatientDocumentBatchRowRejected extends Error {
-    constructor(readonly reason: 'source-changed' | 'mixed-identity' | 'missing-name' | 'invalid-tax-code' | 'invalid-birth-date') {
+    constructor(readonly reason: 'source-changed' | 'mixed-identity' | 'discordant-identity' | 'missing-name' | 'invalid-tax-code' | 'invalid-birth-date') {
         super('Dossier batch row rejected');
     }
 }
@@ -134,7 +134,7 @@ export function createPatientDocumentIntake<Context extends { request: Request }
         }, { behavior: 'immediate' });
     }
     async function stage(context: Context, owner: PatientDocumentCreateHost, value: unknown,
-        batch?: { sourceDigest: string; assertCurrent: () => void }) {
+        batch?: { sourceDigest: string; taxCode: string; assertCurrent: () => void }) {
         const reservation = batch ?? owner.session;
         if (reservations.has(reservation)) throw new PatientDocumentIntakeBusy('session');
         if (preparing >= 2 || reservations.size >= 16) throw new PatientDocumentIntakeBusy('host');
@@ -191,6 +191,7 @@ export function createPatientDocumentIntake<Context extends { request: Request }
                 const codes = new Set(collectDossierTaxCodes(extraction.markdown)
                     .filter(code => code.role === 'patient_cf' && code.checksumValid).map(code => code.value));
                 if (codes.size > 1) throw new PatientDocumentBatchRowRejected('mixed-identity');
+                if (codes.size && !codes.has(batch.taxCode)) throw new PatientDocumentBatchRowRejected('discordant-identity');
             }
             source = Object.freeze({ sourceId, ...sealedFile,
                 type: 'application/pdf', size: bytes.length, identity: 'ambiguous', quality: 'uncertain', candidates: Object.freeze({}) });
@@ -227,7 +228,7 @@ export function createPatientDocumentIntake<Context extends { request: Request }
                 if (birthError({ identifierType: 'cf', birthDate, birthDatePrecision: 'exact' }) || !birthDateMatchesTaxCode(taxCode, birthDate)) {
                     throw new PatientDocumentBatchRowRejected('invalid-birth-date');
                 }
-                const view = await stage(context, owner, source, { sourceDigest: row.sourceDigest, assertCurrent: claim.assertCurrent });
+                const view = await stage(context, owner, source, { sourceDigest: row.sourceDigest, taxCode: taxCode.trim().toUpperCase(), assertCurrent: claim.assertCurrent });
                 try {
                     const field = (value: string) => ({ action: 'correct' as const, value });
                     commands.preview(owner, view.viewId, {

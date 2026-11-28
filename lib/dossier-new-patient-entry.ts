@@ -1,5 +1,7 @@
 import { evaluateDraftGroupIdentity, type DossierDraftGroup, type DossierDraftSource, type DossierPatient } from './document-dossier-session';
 import { proposeIdentityFields, proposeSpokenIdentityFields, type DossierIdentityProposal } from './domain/documents/dossier-sections';
+import { collectDossierPatientNames, patientNameWords } from './domain/documents/dossier-import';
+import type { DossierBatchIdentity } from './patient-document-batch-contract';
 import { birthDateMatchesTaxCode } from './patient-identity';
 
 export const PATIENT_DOCUMENT_CREATE_MAX_BYTES = 10 * 1024 * 1024;
@@ -15,6 +17,16 @@ export function dossierPatientCode(source: DossierDraftSource): string | null {
 function textIdentityProposals(source: DossierDraftSource): DossierIdentityProposal[] {
     const read = source.file.origin === 'visit-transcript' ? proposeSpokenIdentityFields : proposeIdentityFields;
     return read(source.text ?? '', dossierPatientCode(source));
+}
+
+export function sourceConfirmsBatchIdentity(source: DossierDraftSource, identity: DossierBatchIdentity): boolean {
+    const proposals = textIdentityProposals(source);
+    const confirms = (field: IdentityField) => proposals.some(proposal => proposal.field === field && sameIdentityValue(proposal.value, identity[field]));
+    if (!confirms('taxCode') || !confirms('birthDate') || !identity.firstName || !identity.lastName) return false;
+    if (confirms('firstName') && confirms('lastName')) return true;
+    const expected = patientNameWords(identity).sort().join(' ');
+    const written = collectDossierPatientNames(source.text ?? '', true);
+    return written.length > 0 && written.every(name => name.toSorted().join(' ') === expected);
 }
 
 function identityEvidence(source: DossierDraftSource): number {

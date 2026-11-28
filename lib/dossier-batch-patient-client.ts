@@ -59,6 +59,7 @@ const ROW_REFUSALS: Record<string, string> = {
     'missing-name': 'Mancano nome o cognome.',
     'invalid-tax-code': 'Codice fiscale non valido.',
     'invalid-birth-date': 'Data di nascita mancante, non valida o diversa da quella del codice fiscale.',
+    'discordant-identity': 'Il codice fiscale del paziente nel documento è diverso da quello della riga.',
     'mixed-identity': 'Il documento si riferisce a più persone.',
     'source-changed': 'Il documento è cambiato. Rileggi la cartella.',
     'duplicate-review-required': 'Possibile doppione. Verifica la scheda esistente.',

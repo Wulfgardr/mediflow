@@ -821,6 +821,28 @@ test('accept verified and apply writes only what the source supports, with activ
     assert.equal((await loadPatientDossier(cautious.ports, 'pa', live.signal))!.documents[0].record.residualReview.state, 'pending');
 });
 
+test('applying a selected source leaves other pending documents of the same patient untouched', async () => {
+    const first = letterText(CF_A);
+    const earlier = `${letterText(CF_A, 'Bisoprololo 2,5 mg')}\nControllo precedente.`;
+    const { ports, files } = setup([['settimana/a.pdf', first], ['settimana/b.pdf', earlier]]);
+    const [group] = await buildDossierInventory(ports, files, { ...live, prepared: preparedFor([{ text: first, cf: CF_A }, { text: earlier, cf: CF_A }]) });
+    await acquireDossierGroup(ports, { group, patientId: 'pa', confirmed: true, ...live });
+    const before = (await loadPatientDossier(ports, 'pa', live.signal))!;
+    const selected = before.documents.find(doc => doc.record.source.sha256 === sha(enc.encode(first)))!;
+    const other = before.documents.find(doc => doc.attachment.id !== selected.attachment.id)!;
+    const attachmentSources = new Map([[selected.attachment.id, selected.record.source.sha256]]);
+    const result = await acceptVerifiedAndApply(ports, { patientId: 'pa', attachmentSources, ...live });
+    assert.equal(result.documents, 1);
+    assert.equal(result.applied.length, 1);
+    const after = (await loadPatientDossier(ports, 'pa', live.signal))!;
+    assert.deepEqual(after.documents.find(doc => doc.attachment.id === other.attachment.id)?.record, other.record);
+
+    const wrongSource = new Map([[other.attachment.id, selected.record.source.sha256]]);
+    const skipped = await acceptVerifiedAndApply(ports, { patientId: 'pa', attachmentSources: wrongSource, ...live });
+    assert.equal(skipped.documents, 0);
+    assert.deepEqual(skipped.applied, []);
+});
+
 test('WUL-927 a voce set aside by the gesture stays listed with its reason and the physician can recover it', async () => {
     const text = `${letterText(CF_A)}\nScala di Barthel 60/100.`;
     const { ports, files, records } = setup([['settimana/a.pdf', text]]);
