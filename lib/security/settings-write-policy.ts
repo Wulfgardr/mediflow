@@ -78,6 +78,7 @@ export const SETTINGS_WRITE_REGISTRY: Record<string, SettingsKeyPolicy> = {
 
     // --- Terminology registry (web session). ---
     terminologyRegistry: { write: ['web-session'], note: 'terminology registry (lib/terminology-registry.ts)' },
+    'servicePackageCandidates.personalReview.v1': { write: ['web-session'], note: 'personal recurring service candidate review decisions (minimized, no patient identifiers)' },
 
     // --- Clinic identity / network operating mode: written by the web settings
     // UI AND by the paired/native bootstrap (scripts/mobile-home-base-paired-smoke.sh,

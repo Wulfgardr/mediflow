@@ -1,0 +1,115 @@
+.controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 14px;
+}
+
+.meta {
+    color: var(--lume-ink-muted);
+    font: var(--type-meta);
+    font-variant-numeric: tabular-nums;
+}
+
+.notice {
+    color: var(--lume-ink);
+    font: var(--type-body);
+}
+
+.error {
+    color: var(--lume-danger, #b42318);
+    font: var(--type-body);
+}
+
+.list {
+    display: grid;
+    gap: 14px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.card {
+    display: grid;
+    gap: 10px;
+    padding: 14px 16px;
+    border: 1px solid var(--lume-record-island-rule);
+    border-radius: 10px;
+    background: var(--lume-surface, transparent);
+}
+
+.cardHead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 6px 12px;
+}
+
+.badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    font: var(--type-meta);
+}
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--lume-record-island-rule);
+    color: var(--lume-ink-muted);
+}
+
+.services {
+    display: grid;
+    gap: 4px;
+    margin: 0;
+    padding-left: 18px;
+    font: var(--type-body);
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-top: 4px;
+}
+
+.editor {
+    display: grid;
+    gap: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--lume-record-island-rule);
+}
+
+.field {
+    display: grid;
+    gap: 4px;
+}
+
+.input {
+    width: 100%;
+    max-width: 44ch;
+    padding: 8px 10px;
+    border: 1px solid var(--lume-record-island-rule);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--lume-ink);
+    font: var(--type-body);
+}
+
+.checkboxList {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.checkboxRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
