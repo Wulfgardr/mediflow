@@ -27,6 +27,19 @@ export function readPatientDiaryMetadata(input: unknown): DiaryMetadata {
     return { state: 'readable', value: record };
 }
 
+export type PatientDiaryMoment = { day: Date; dateTime: string; timed: boolean };
+
+export function patientDiaryMoment(date: Date | string, metadata: unknown): PatientDiaryMoment {
+    const value = new Date(date);
+    if (Number.isNaN(value.getTime())) return { day: value, dateTime: '', timed: false };
+    const read = readPatientDiaryMetadata(metadata);
+    const fromDocument = read.state === 'readable' && typeof read.value.dossier === 'object' && read.value.dossier !== null;
+    const civilDayOnly = fromDocument && value.getUTCHours() === 0 && value.getUTCMinutes() === 0
+        && value.getUTCSeconds() === 0 && value.getUTCMilliseconds() === 0;
+    if (!civilDayOnly) return { day: value, dateTime: value.toISOString(), timed: true };
+    return { day: new Date(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()), dateTime: value.toISOString().slice(0, 10), timed: false };
+}
+
 export function patientDiarySource(metadata: unknown, setting?: string): string {
     const read = readPatientDiaryMetadata(metadata);
     if (read.state === 'unreadable') return 'Fonte non disponibile';
