@@ -1,24 +1,8 @@
-import { expect, test } from '@playwright/test';
-import { isAbsolute } from 'node:path';
+import { expect, test } from './fixtures/isolated-runtime';
 import { assertNoHorizontalOverflow, bootstrapUnlockedSession, openUnlockedDocument, unlockIfNeeded } from './utils';
-
-function requireSynthetic(baseURL?: string) {
-    const dir = process.env.MEDIFLOW_DATA_DIR;
-    if (
-        process.env.MF085_SYNTHETIC_E2E !== '1'
-        || !dir
-        || !isAbsolute(dir)
-        || !baseURL
-        || new URL(baseURL).hostname !== '127.0.0.1'
-        || new URL(baseURL).port === '3000'
-    ) {
-        throw new Error('Runtime e archivio sintetici isolati richiesti');
-    }
-}
 
 test('WUL-923: candidati personali da storico in Impostazioni Repertori (vuoto, 50 prescrizioni, revisione, correzione, scarto)', async ({ page, baseURL }) => {
     test.setTimeout(180_000);
-    requireSynthetic(baseURL);
 
     const externalOrigins: string[] = [];
     const aiRequests: string[] = [];
