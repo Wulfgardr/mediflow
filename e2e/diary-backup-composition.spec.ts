@@ -49,6 +49,8 @@ test('il backup ripristina insieme rettifiche, osservazione e prestazione dello 
             db.prepare("INSERT INTO service_prescription_items (id,prescription_id,patient_id,service_name) VALUES (?,?,?,'Prestazione sintetica')").run(item, prescription, patient);
             db.prepare("INSERT INTO observations (id,patient_id,code_system,code,display,unit_system,unit_code,value,observed_at,service_prescription_item_id) VALUES (?,?,'synthetic','obs','Osservazione sintetica','synthetic','u','1',100,?)").run(observation, patient, item);
         })();
+        await page.reload();
+        await unlockIfNeeded(page, pin);
         await openDiary();
         await page.getByRole('link', { name: 'Nuova voce', exact: true }).click();
         const texts = ['Prima nota sintetica della composizione.', 'Seconda nota sintetica della composizione.', 'Terza nota sintetica della composizione.'];

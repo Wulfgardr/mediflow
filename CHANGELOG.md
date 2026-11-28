@@ -49,6 +49,26 @@ release](https://github.com/Wulfgardr/mediflow/releases) raccoglie i pacchetti p
 
 ### Accesso per agenti
 
+- In **Da decidere → Seduta del giorno** il medico apre la cartella del kit,
+  rilegge i tratti senza paziente e sceglie quali collegare a una scheda o
+  scartare. I tratti per conto di terzi compaiono a parte. Il browser conserva
+  le decisioni cifrate anche dopo una nuova importazione della stessa seduta.
+  [Seduta del giorno](https://github.com/Wulfgardr/mediflow/pull/1178)
+- L’operatore Dossier acquisisce automaticamente un gruppo solo se ogni
+  documento identifica il paziente con lo stesso codice fiscale. Per creare
+  una scheda verifica anche l’identità proposta sul documento. I gruppi incerti
+  restano da confermare nel Web. [Identità nel Dossier](https://github.com/Wulfgardr/mediflow/pull/1181)
+- Quando il kit propone un codice ICD-11 per una diagnosi già codificata nel
+  documento, il Dossier Web mostra entrambi i codici. Il medico può conservare il codice
+  del documento, confermare o correggere quello proposto oppure registrare la
+  diagnosi senza codice. MediFlow verifica la scelta ICD-11 nel catalogo OMS
+  locale. La proposta attende la scelta del medico anche dopo un deposito
+  tramite l’operatore o il comando «Accetta il verificato e applica».
+  [Codici proposti nel Dossier](https://github.com/Wulfgardr/mediflow/pull/1183)
+- Dal plugin di navigazione il medico può chiedere di aprire **Quadro paziente**,
+  **Sintesi dei documenti** o **Smart Import**. Conferma nella scheda Web
+  già aperta, dove sceglie le fonti e decide quando avviare la generazione.
+  [Aprire le tre funzioni dalla chat](https://github.com/Wulfgardr/mediflow/pull/1185)
 - Con il consenso del medico, la chat esterna riceve il profilo
   pseudonimizzato nei limiti del mandato. Le note, le trascrizioni e i PDF forniti dall’agente
   attendono il medico in **Da decidere**. Il medico esamina i contenuti prima
@@ -149,6 +169,12 @@ release](https://github.com/Wulfgardr/mediflow/releases) raccoglie i pacchetti p
 
 ### Profilo paziente
 
+- Con Lombardia attiva, **Prestazioni** confronta i pacchetti approvati con
+  lo storico del paziente. Il medico vede perché una prestazione è proposta
+  o esclusa, può cambiare il quesito e sceglie quali prescrivere. Un clic
+  registra insieme le voci scelte e gli eventi di audit. Dopo una risposta
+  persa può riprovare senza duplicare le prescrizioni.
+  [Proposte in visita](https://github.com/Wulfgardr/mediflow/pull/1180)
 - Nel Quadro una diagnosi o una sintesi di documento senza data resta
   esclusa dai cambiamenti recenti. Per le diagnosi, l’export FHIR riporta la data di
   registrazione e omette esordio e stato clinico. Una data di registrazione
@@ -199,6 +225,11 @@ release](https://github.com/Wulfgardr/mediflow/releases) raccoglie i pacchetti p
 
 ### Repertori
 
+- In **Impostazioni → Repertori** il medico può cercare le prestazioni
+  prescritte spesso insieme. Per ciascun gruppo vede quante prescrizioni
+  e quanti pazienti lo sostengono, e può conservarlo, correggerlo o scartarlo.
+  Le scelte si salvano nel repertorio personale.
+  [Candidati dallo storico](https://github.com/Wulfgardr/mediflow/pull/1177)
 - ICD-11: ricerca, verifica e salvataggio dei codici con il catalogo WHO MMS
   2026-01 in inglese incluso nell'applicazione, senza Docker, credenziali o
   rete ([#527](https://github.com/Wulfgardr/mediflow/pull/527)).
