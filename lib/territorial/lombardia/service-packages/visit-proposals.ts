@@ -3,6 +3,7 @@ import {
     type TerritorialPackCapability,
 } from '../../../territorial-pack-contract';
 import {
+    LOMBARDIA_SERVICE_CODE_SYSTEM,
     formatServicePackageApproval,
     type GeneratedServiceRequest,
     type LombardiaReferenceCatalog,
@@ -71,10 +72,14 @@ export function buildVisitServiceHistory(input: Readonly<{
     const items = input.items.filter((item) => item.patientId === input.patientId);
     const prescribedAtById = new Map(prescriptions.map((prescription) => [prescription.id, prescription.prescribedAt]));
     const itemsById = new Map(items.map((item) => [item.id, item]));
+    const serviceInPrescription = (id: string, system?: string | null, code?: string | null) =>
+        JSON.stringify([id, system?.trim().toUpperCase() || LOMBARDIA_SERVICE_CODE_SYSTEM, code?.trim().toUpperCase()]);
+    const itemServices = new Set(items.filter(item => hasCode(item.serviceCode))
+        .map(item => serviceInPrescription(item.prescriptionId, item.codeSystem, item.serviceCode)));
     const entries: PatientServiceHistoryEntry[] = [];
 
     for (const prescription of prescriptions) {
-        if (!hasCode(prescription.serviceCode)) continue;
+        if (!hasCode(prescription.serviceCode) || itemServices.has(serviceInPrescription(prescription.id, prescription.codeSystem, prescription.serviceCode))) continue;
         entries.push({
             serviceCode: prescription.serviceCode,
             codeSystem: prescription.codeSystem ?? null,
@@ -102,7 +107,8 @@ export function buildVisitServiceHistory(input: Readonly<{
     for (const observation of input.observations) {
         if (observation.patientId !== input.patientId || observation.deletedAt) continue;
         const linkedItem = observation.servicePrescriptionItemId ? itemsById.get(observation.servicePrescriptionItemId) : undefined;
-        if (linkedItem && hasCode(linkedItem.serviceCode) && linkedItem.status !== 'cancelled') {
+        if (linkedItem?.codeSystem?.trim().toUpperCase() === LOMBARDIA_SERVICE_CODE_SYSTEM
+            && hasCode(linkedItem.serviceCode) && linkedItem.status !== 'cancelled') {
             entries.push({
                 serviceCode: linkedItem.serviceCode,
                 codeSystem: linkedItem.codeSystem ?? null,

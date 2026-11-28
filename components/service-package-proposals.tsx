@@ -156,7 +156,7 @@ export default function ServicePackageProposals(props: Props) {
         {view.proposals.proposals.map((proposal) => <PackageProposal key={`${patientId}:${proposal.packageId}`}
             patientId={patientId} proposal={proposal} prescribedOn={asOf} />)}
         {uncompared.length > 0 && <p className={styles.muted} data-testid="service-package-uncompared">
-            {`Valori in scheda senza prestazione collegata, non confrontati con il pacchetto: ${uncompared.join(', ')}.`}
+            {`Manca una prestazione regionale collegata per ${uncompared.join(', ')}.`}
         </p>}
     </div>;
 }

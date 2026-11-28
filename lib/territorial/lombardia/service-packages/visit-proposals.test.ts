@@ -132,6 +132,30 @@ test('an observation explicitly linked to a regional HbA1c item counts as perfor
     assert.equal(codes(onlyProposal(deleted)).requested.has('90.28.1'), true);
 });
 
+test('a cancelled item overrides the matching parent status while a standalone parent still counts', () => {
+    const result = compose({
+        prescriptions: [
+            prescription({ id: 'fundus', serviceCode: '95.11' }),
+            prescription({ id: 'ecg', serviceCode: '89.52' }),
+        ],
+        items: [item({ id: 'void', prescriptionId: 'fundus', serviceCode: '95.11', status: 'cancelled' })],
+    });
+    const { requested, skipped } = codes(onlyProposal(result));
+    assert.ok(requested.has('95.11'));
+    assert.ok(skipped.has('89.52'));
+});
+
+test('a linked result without an explicit regional code remains available for review', () => {
+    for (const codeSystem of ['LOINC', null]) {
+        const result = compose({
+            prescriptions: [prescription({ id: 'other-system', serviceCode: null })],
+            items: [item({ id: 'value-item', prescriptionId: 'other-system', serviceCode: '9999', codeSystem })],
+            observations: [{ patientId: PATIENT, display: 'Misura sintetica', observedAt: '2026-10-20', servicePrescriptionItemId: 'value-item' }],
+        });
+        assert.deepEqual(result.history.uncomparedObservationNames, ['Misura sintetica']);
+    }
+});
+
 test('a pending prescription is excluded and an old one is proposed again', () => {
     const { requested, skipped } = codes(onlyProposal(compose({
         prescriptions: [
