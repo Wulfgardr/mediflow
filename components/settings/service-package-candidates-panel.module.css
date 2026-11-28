@@ -17,7 +17,7 @@
 }
 
 .error {
-    color: var(--lume-danger, #b42318);
+    color: var(--lume-signal-critical);
     font: var(--type-body);
 }
 
