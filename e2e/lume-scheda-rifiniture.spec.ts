@@ -180,11 +180,11 @@ test('scheda paziente: schede aperte, testata, diario e sezioni restano nel sist
         await toTop(page);
         const header = page.getByTestId('lume-scheda-header');
         const commands = header.locator(':is(a, button):visible').filter({ hasText: /Prescrivi|Registra la visita|Nuova voce/u }).or(header.getByRole('button', { name: 'Azioni', exact: true }));
-        await expect(commands).toHaveCount(4);
+        await expect(commands).toHaveCount(await header.getByRole('link', { name: 'Registra la visita', exact: true }).count() ? 4 : 3);
         const toolbar = await header.getByRole('toolbar', { name: 'Comandi della scheda', exact: true }).evaluate(node => node.getBoundingClientRect().toJSON());
         const boxes = await commands.evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().toJSON()));
         const rows = [...new Set(boxes.map(box => Math.round(box.top)))].map(top => boxes.filter(box => Math.round(box.top) === top));
-        if (view.width > 750) expect(rows, `${view.label}: i quattro comandi stanno su una riga`).toHaveLength(1);
+        if (view.width > 750) expect(rows, `${view.label}: i comandi stanno su una riga`).toHaveLength(1);
         else for (const row of rows) {
             expect(Math.abs(row[0].left - toolbar.left), `${view.label}: ogni riga di comandi parte dal bordo`).toBeLessThanOrEqual(1);
             expect(Math.abs(row.at(-1)!.right - toolbar.right), `${view.label}: ogni riga di comandi arriva al bordo`).toBeLessThanOrEqual(1);

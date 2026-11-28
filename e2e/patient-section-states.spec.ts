@@ -21,9 +21,10 @@ async function alignedHeader(pane: Locator) {
     await expect(heading).toBeVisible();
     const boxes = await heading.evaluate(element => {
         const headerElement = element.closest('[data-section-header]') ?? element;
-        const header = headerElement.getBoundingClientRect(), pane = headerElement.parentElement!.getBoundingClientRect();
-        const style = getComputedStyle(headerElement);
-        return { left: header.left - pane.left, right: pane.right - header.right, rule: style.borderBottomWidth };
+        const header = headerElement.getBoundingClientRect(), paneElement = headerElement.parentElement!, pane = paneElement.getBoundingClientRect();
+        const style = getComputedStyle(headerElement), frame = getComputedStyle(paneElement);
+        const inset = (side: 'Left' | 'Right') => parseFloat(frame[`border${side}Width`]) + parseFloat(frame[`padding${side}`]);
+        return { left: header.left - pane.left - inset('Left'), right: pane.right - header.right - inset('Right'), rule: style.borderBottomWidth };
     });
     expect(Math.abs(boxes.left)).toBeLessThanOrEqual(1);
     expect(Math.abs(boxes.right)).toBeLessThanOrEqual(1);
@@ -110,7 +111,10 @@ test('sezioni vuote: ricetta unica, creazione presso il titolo e Nuova voce stab
                 try { return getComputedStyle(sample).color; } finally { sample.remove(); }
             });
             await expect(message).toHaveCSS('color', muted);
-            expect(await message.evaluate(element => Math.abs(element.getBoundingClientRect().left - element.closest('[data-folder-pane]')!.getBoundingClientRect().left))).toBeLessThanOrEqual(1);
+            expect(await message.evaluate(element => {
+                const pane = element.closest('[data-folder-pane]')!, frame = getComputedStyle(pane);
+                return Math.abs(element.getBoundingClientRect().left - pane.getBoundingClientRect().left - parseFloat(frame.borderLeftWidth) - parseFloat(frame.paddingLeft));
+            })).toBeLessThanOrEqual(1);
             await expect(state.locator('button,a')).toHaveCount(0);
             if (creation) {
                 const control = pane.getByRole(section === 'follow-up' ? 'link' : 'button', { name: creation, exact: true });
