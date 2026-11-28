@@ -6,6 +6,7 @@ export const UNIT_SCRIPT_TESTS = Object.freeze([
   'packages/agent-client/src/credentials.test.ts',
   'packages/agent-client/src/ambulatorio.test.ts',
   'packages/agent-client/src/visit-client.test.ts',
+  'tools/operatore/operatore.test.ts',
   'scripts/local-provider-cold-start.test.ts',
   'scripts/measure-cb-redaction.test.ts',
   'scripts/measure-local-load.test.ts',
