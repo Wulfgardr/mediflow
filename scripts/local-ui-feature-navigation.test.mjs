@@ -149,10 +149,12 @@ async function productionFixture(t, respond, seedProvider) {
     await page.getByRole('button', { name: 'Sblocca', exact: true }).click();
     await expect(pin).toBeHidden();
 
-    const openFolder = async patient => {
-        const stream = page.waitForResponse(response => response.url().endsWith('/api/plugin-local-ui/events') && response.status() === 200);
-        await page.goto(`/patients/${patient}/modules`);
-        await stream;
+    const openFolder = async (patient, navigate = () => page.goto(`/patients/${patient}/modules`)) => {
+        await Promise.all([
+            page.waitForResponse(response => response.url().endsWith('/api/plugin-local-ui/events') && response.status() === 200),
+            navigate(),
+        ]);
+        await expect(page).toHaveURL(new URL(`/patients/${patient}/modules`, baseURL).href);
         await expect.poll(() => page.evaluate(() => performance.getEntriesByType('resource')
             .some(entry => entry.name.includes('/api/patient-profile/selection-epoch')))).toBe(true);
         await expect(page.getByTestId('patient-profile-notes')).not.toContainText('Lettura delle note in corso…');
@@ -277,7 +279,11 @@ test('real packaged local-ui requests reveal the three Web functions after confi
     await pending('search', 'Ricerca locale', 'Sintetico B');
     await confirmation.click();
     await expect(page).toHaveURL(/\/\?area=incarico$/u);
-    await openFolder(noSources);
+    await page.getByRole('searchbox', { name: 'Cerca nella lista pazienti' }).fill('Sintetico B');
+    await page.getByRole('option').filter({ hasText: 'Sintetico B' }).click();
+    const openSelected = page.getByRole('link', { name: 'Apri scheda paziente', exact: true });
+    await expect(openSelected).toHaveAttribute('href', `/patients/${noSources}/modules`);
+    await openFolder(noSources, () => openSelected.click());
 
     await pending('smart_import', 'Smart Import', 'Sintetico B');
     await page.getByRole('button', { name: 'Blocca', exact: true }).click();
