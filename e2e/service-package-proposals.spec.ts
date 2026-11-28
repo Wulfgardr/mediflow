@@ -2,6 +2,7 @@ import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import type { Locator, Page } from '@playwright/test';
+import { DIABETES_T2_PACKAGE } from '../lib/territorial/lombardia/service-packages/diabetes-type2';
 import { test, expect } from './fixtures/isolated-runtime';
 import { switchPreset } from './fixtures/territorial-preset';
 import { fetchInterceptedRequest } from './fixtures/trusted-web-request';
@@ -103,7 +104,8 @@ test('approved packages propose in the Web visit only what is missing from the r
         await openPrestazioni(plain);
         await expect(proposals).toBeVisible();
         await expect(proposals.getByRole('heading', { name: 'Monitoraggio diabete mellito tipo 2', exact: true })).toBeVisible();
-        await expect(proposals).toContainText('Approvato da Leonardo Pegollo il 2026-11-25');
+        const { approvedBy, approvedAt } = DIABETES_T2_PACKAGE.approval;
+        await expect(proposals).toContainText(`Approvato da ${approvedBy} il ${approvedAt}`);
         await expect(proposed('95.11')).toContainText('Mai eseguita');
         await expect(proposed('95.11')).toContainText('Esenzione 013');
         await expect(proposed('90.28.1')).toHaveCount(0);
