@@ -54,7 +54,7 @@ test('Diario paziente: prosa, provenienza e storico senza cambiare Scale o Timel
             const margin = row.locator(':scope > time'); await expect(margin).toHaveCount(1);
             await expect(row).toHaveCSS('grid-template-columns', /^84px /u);
             await expect(row.locator('[data-ink="dry"]')).toContainText('Firmata');
-            await expect(row.locator('.prose')).toHaveCSS('font-size', '17px');
+            await expect(row.locator('.prose')).toHaveCSS('font-size', '15px');
         }
         const directory = process.env.PATIENT_DIARY_SCREENSHOTS; if (directory) await mkdir(directory, { recursive: true });
         const surfaces: unknown[] = [];

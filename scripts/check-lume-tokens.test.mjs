@@ -424,7 +424,7 @@ test('palette guard fails a regression beyond the declared allowlist entry', () 
   assert.equal(result.allowlistIssues.length, 0);
 });
 
-const { scanTypeSource, scanTypeScale, checkTailwindScale, TYPE_ALLOWLIST } = await import('./check-type-scale.mjs');
+const { scanTypeSource, scanTypeScale, scanSurfaceRadius, checkTailwindScale, checkRoleFamilies, TYPE_ALLOWLIST, TYPE_ROLES } = await import('./check-type-scale.mjs');
 
 test('type scale: committed web sources use the bounded roles', () => {
   assert.deepEqual(scanTypeScale(), []);
@@ -447,6 +447,30 @@ test('type scale rejects responsive utilities, CSS drift and inline styles', () 
   }
   for (const style of ['fontSize: 11', "fontSize: '16px'", 'fontWeight: 550', "fontFamily: 'Georgia'"]) {
     assert.ok(scanTypeSource('components/example.tsx', `<span style={{ ${style} }}>Test</span>`).length, style);
+  }
+});
+
+test('type scale keeps the serif voice out of clinical content', () => {
+  assert.deepEqual(checkRoleFamilies(), []);
+  assert.equal(checkRoleFamilies({ ...TYPE_ROLES, prose: '400 1.0625rem/1.5 var(--lume-font-voice)' }).length, 1);
+  assert.equal(scanTypeSource('app/globals.css', '.x { --type-prose: 400 1.0625rem/1.5 var(--lume-font-voice); }').length, 1);
+  for (const rule of ['.entry :global(.prose) { font: var(--type-page-title); }', '.soapField { font: var(--type-person); }',
+    '.note { font-family: var(--lume-font-voice); }', '.diary { --reading: var(--font-voce), Georgia, serif; }', '.entry { font-family: Newsreader; }']) {
+    assert.equal(scanTypeSource('components/example.module.css', rule).length, 1, rule);
+  }
+  assert.deepEqual(scanTypeSource('components/example.module.css', '.entry :global(.prose) { font: var(--type-prose); } .name { font: var(--type-person); } .x { font-family: var(--lume-font-sans, system-ui, sans-serif); }'), []);
+});
+
+test('surface radius rejects square corners on the surfaces the system rounds', () => {
+  for (const rule of ['.patientBody :global([data-folder-pane]) { border-radius: 0; }', '.clinicalSection { border-radius: 0px; }',
+    '.patientBody :global(#attenzione) { border-radius: 0 !important; }', '.recordTab { border-top-left-radius: 0; }',
+    '.folderTray :global([data-folder-active="true"]) { border-radius: var(--lume-radius-card); }', '.x :global(.mf-popover) { border-radius: 0 0; }']) {
+    assert.equal(scanSurfaceRadius('components/example.module.css', rule).length, 1, rule);
+  }
+  for (const rule of ['.patientBody :global([data-folder-pane]:not([data-folder-active="true"])) { border-radius: 0; }',
+    ':global([data-record-tray="dati"]) .patientSummary { border-end-start-radius: 0; }', '.clinicalSection { border-radius: 14px; }',
+    '.patientBody:not([data-folder-section="attenzione"]) :global(#attenzione) { border-radius: 0; }', '.row { border-radius: 0; }']) {
+    assert.deepEqual(scanSurfaceRadius('components/example.module.css', rule), [], rule);
   }
 });
 

@@ -84,9 +84,11 @@ densità di contenuti.
 ## Gerarchia e tipografia
 
 Il [dossier Punto d'inchiostro](./docs/design/punto-inchiostro/README.md) definisce
-misure, componenti e adattamenti. Newsreader locale accompagna titoli, nomi
-in testata e prosa clinica. Il carattere di sistema serve controlli, tabelle,
-date e valori. IBM Plex Mono resta riservato ai codici. Voce e registro
+misure, componenti e adattamenti. Newsreader locale resta al marchio e ai
+titoli di pagina. Il carattere di sistema serve la prosa clinica (note, campi
+SOAP, testi da documento), controlli, tabelle, date e valori.
+`check:type-scale` blocca il carattere con grazie nel contenuto clinico.
+IBM Plex Mono resta riservato ai codici. Voce e registro
 mantengono due funzioni:
 
 - **Voce** identifica la domanda, il paziente, il compito o l'azione corrente.

@@ -73,10 +73,10 @@
 
 .passthrough { display: contents; }
 
-.folderTray :global([data-folder-active='true']),
+.folderTray :global([data-folder-pane][data-folder-active='true']),
 .folderTray[data-record-tray='attenzione'] :global(#attenzione) {
     min-width: 0;
-    padding: 14px 16px;
+    padding: 16px 20px 20px;
     border: 1px solid var(--lume-record-island-rule);
     border-radius: 14px;
     background: var(--lume-record-island);
@@ -117,6 +117,9 @@
 }
 
 .folderTray :global([data-section-header] > .mf-button-text) { color: var(--lume-accent); }
+.folderTray.folderTray :global([data-folder-pane][data-folder-active='true'] .mf-button-text) { padding-inline: 0; }
+.folderTray.folderTray :global([data-folder-pane][data-folder-active='true'] .mf-button-text:hover) { background-color: transparent; text-decoration: underline; text-underline-offset: 3px; }
+.folderTray.folderTray :global([data-folder-pane][data-folder-active='true'] .mf-button-text + .mf-button-text) { margin-inline-start: 16px; }
 .folderTray :global(form) :is(input:not([type='checkbox'], [type='radio'], [type='range'], [type='file']), select, textarea):not([aria-invalid='true']) {
     border-color: var(--lume-ink-muted);
     border-radius: 10px;
@@ -128,8 +131,8 @@
 .folderTray .clinicalSupport { padding-top: 12px; border-top: 1px solid var(--lume-record-island-rule); }
 
 @media (max-width: 699px) {
-    .folderTray :global([data-folder-active='true']),
-    .folderTray[data-record-tray='attenzione'] :global(#attenzione) { padding: 12px 14px; }
+    .folderTray :global([data-folder-pane][data-folder-active='true']),
+    .folderTray[data-record-tray='attenzione'] :global(#attenzione) { padding: 14px 16px 16px; }
 }
 
 .attentionHeading .folderOnly { display: none; }

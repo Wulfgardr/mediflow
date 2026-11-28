@@ -74,7 +74,7 @@
   --type-person: 400 1.75rem/1.1 var(--lume-font-voice);
   --type-person-compact: 400 1.625rem/1.1 var(--lume-font-voice);
   --type-person-preview: 400 1.375rem/1.2 var(--lume-font-voice);
-  --type-prose: 400 1.0625rem/1.5 var(--lume-font-voice);
+  --type-prose: 400 0.9375rem/1.5 var(--lume-font-sans);
   --type-brand: 500 1.3125rem/1.2 var(--lume-font-voice);
   --type-body: 400 0.875rem/1.5 var(--lume-font-sans);
   --type-strong: 600 0.875rem/1.5 var(--lume-font-sans);

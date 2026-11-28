@@ -16,15 +16,15 @@
 .patientBody:not([data-folder-section='quadro']):not([data-folder-section='diario']) :global(#quadro),
 .patientBody:not([data-folder-section='quadro']):not([data-folder-section='attenzione']) :global(#attenzione) { display: none; }
 .patientBody[data-folder-section='quadro'] :global(#attenzione[data-has-attention='false']) { display: none; }
-.patientBody :global(#attenzione) { order: 2; padding: 18px 0; border-radius: 0; border: 0; border-top: 1px solid color-mix(in srgb, var(--lume-ink) 13%, transparent); background: transparent; }
+.patientBody:not([data-folder-section='attenzione']) :global(#attenzione) { order: 2; padding: 18px 0; border-radius: 0; border: 0; border-top: 1px solid color-mix(in srgb, var(--lume-ink) 13%, transparent); background: transparent; }
 .patientBody :global(#attenzione h2) { margin: 0 0 12px; }
 .patientBody :global(#attenzione > div) { margin: 0; }
-.patientBody :global([data-folder-pane]) { padding: 0; border: 0; border-radius: 0; box-shadow: none; background: transparent; }
+.patientBody :global([data-folder-pane]:not([data-folder-active='true'])) { padding: 0; border: 0; border-radius: 0; box-shadow: none; background: transparent; }
 .patientBody :global([data-folder-pane] > h3 > div > span > span[class*='kicker']) { display: none; }
 :global(html[data-twin-composition='stream']) .patientBody { max-width: 1020px; margin: auto; }
 :global(html[data-twin-composition='stream']) .patientHeader { max-width: 1020px; margin: auto; }
 
-@media (max-width: 750px) { .patientHeader { padding: 14px var(--ink-plane-inset); flex-direction: column; align-items: stretch; gap: 12px; } .actions { justify-content: flex-start; } .patientBody { padding: 24px var(--ink-plane-inset) 40px; } .actions > :is(a,button) { min-height: 44px; } }
+@media (max-width: 750px) { .patientHeader { padding: 14px var(--ink-plane-inset); flex-direction: column; align-items: stretch; gap: 12px; } .actions { justify-content: flex-start; } .patientBody { padding: 24px var(--ink-plane-inset) 40px; } .actions > :is(a,button) { min-height: 44px; } .patientCanvas .actions > * { flex: 1 1 auto; } .patientCanvas .actions > :last-child { flex: none; } .patientCanvas .actions > div:not(:last-child) > button { width: 100%; } }
 
 .patientShell {
   --k8-surface: var(--lume-surface-field);
@@ -122,7 +122,7 @@
     padding: 18px 15px 14px;
   }
   .patientCanvas .readingPane { max-width: none; }
-  .patientCanvas .actions { position: relative; margin-top: -20px; z-index: 2; }
+  .patientCanvas .actions { position: relative; margin-top: -20px; }
   .patientCanvas .actions :is(a, button):not([role='menuitem']) { min-height: 36px; height: 36px; }
   .patientCanvas .actions :is(a,button):not([role='menuitem'],[aria-label='Azioni']) { padding-inline: 14px; }
   .patientCanvas .actions button[aria-label='Azioni'] { padding: 0; width: 36px; }

@@ -12,7 +12,7 @@ read_when:
 Su ogni piattaforma, senza eccezioni:
 
 - il punto e i tre inchiostri, con le stesse parole;
-- Newsreader per nome del paziente, prosa clinica e titoli; IBM Plex Mono solo
+- Newsreader per nome del paziente e titoli; IBM Plex Mono solo
   per i codici;
 - i colori dei token, Giorno e Grafite;
 - l'ordine delle informazioni: identità e allergia, quadro, diario, soglia;
