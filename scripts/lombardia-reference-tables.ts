@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import {
     LOMBARDIA_SERVICE_CODE_SYSTEM,
+    type ApprovedServicePackage,
     type LombardiaReferenceCatalog,
     type RegionalExemptionCoverageEntry,
     type RegionalServiceCatalogEntry,
@@ -97,4 +98,41 @@ export function readLombardiaReferenceCatalog(): LombardiaReferenceCatalog {
         services: nomenclatoreCatalogEntries(nomenclatore),
         exemptions: expandControlVisitCoverage(readExemptionCoverageTable(), nomenclatore),
     };
+}
+
+export const PACKAGE_CATALOG_MODULE_PATH = 'lib/territorial/lombardia/service-packages/generated-package-catalog.ts';
+
+function packageServiceCodes(packages: readonly ApprovedServicePackage[]): Set<string> {
+    return new Set(packages.flatMap((pkg) => [
+        ...pkg.baseItems,
+        ...pkg.complicationModules.flatMap((module) => module.items),
+    ]).map((item) => item.serviceCode));
+}
+
+export function selectPackageReferenceCatalog(
+    catalog: LombardiaReferenceCatalog,
+    packages: readonly ApprovedServicePackage[],
+): LombardiaReferenceCatalog {
+    const codes = packageServiceCodes(packages);
+    return {
+        services: catalog.services.filter((entry) => codes.has(entry.serviceCode)),
+        exemptions: catalog.exemptions.filter((entry) => codes.has(entry.serviceCode)),
+    };
+}
+
+export function renderPackageCatalogModule(catalog: LombardiaReferenceCatalog): string {
+    const lines = (items: readonly object[]) => items.map((item) => `        ${JSON.stringify(item)},`);
+    return [
+        "import type { LombardiaReferenceCatalog } from './contract';",
+        '',
+        'export const APPROVED_PACKAGE_REFERENCE_CATALOG: LombardiaReferenceCatalog = {',
+        '    services: [',
+        ...lines(catalog.services),
+        '    ],',
+        '    exemptions: [',
+        ...lines(catalog.exemptions),
+        '    ],',
+        '};',
+        '',
+    ].join('\n');
 }

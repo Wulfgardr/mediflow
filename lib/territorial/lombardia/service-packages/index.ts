@@ -77,3 +77,20 @@ export const ALL_LOMBARDIA_SERVICE_PACKAGES: readonly ServicePackage[] = [
     DIABETES_T2_PACKAGE,
     ...DRAFT_SET_MINIMI_PACKAGES,
 ];
+
+export { APPROVED_PACKAGE_REFERENCE_CATALOG } from './generated-package-catalog';
+export {
+    buildPackagePrescriptionDrafts,
+    buildVisitServiceHistory,
+    composeVisitPackageProposals,
+    packagePrescriptionNote,
+    type PackagePrescriptionDraft,
+    type PackageRequestChoice,
+    type VisitDiagnosis,
+    type VisitHistoryItem,
+    type VisitHistoryObservation,
+    type VisitHistoryPrescription,
+    type VisitPackageProposal,
+    type VisitPackageProposals,
+    type VisitServiceHistory,
+} from './visit-proposals';

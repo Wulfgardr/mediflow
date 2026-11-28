@@ -234,6 +234,7 @@ export type GeneratedServiceRequest = Readonly<{
     priority: ServicePackagePriority;
     exemptionCode: string | null;
     exemptionStatus: ExemptionApplicationStatus;
+    declaredExemptionCode: string | null;
     clinicalQuestion: string;
     appropriatenessConditions: readonly string[];
     periodicityMonths: number;

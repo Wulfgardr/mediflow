@@ -6,6 +6,7 @@ import {
     servicePrescriptionCreateSchema,
     servicePrescriptionItemCreateSchema,
     servicePrescriptionItemUpdateSchema,
+    servicePrescriptionSetCreateSchema,
     servicePrescriptionUpdateSchema,
     type ServicePrescriptionCreatePayload,
     type ServicePrescriptionItemCreatePayload,
@@ -609,6 +610,86 @@ export function createHostServicePrescriptionItemInTransaction(tx: ServicePrescr
     const parsed = servicePrescriptionItemCreateSchema.safeParse(rawBody);
     if (!parsed.success) return badRequest('Payload non valido');
     return createServicePrescriptionItemInTransaction(tx, context, parsed.data, 'host', null);
+}
+
+export type ServicePrescriptionSetReceipt = {
+    entries: Array<{ prescriptionId: string; itemId: string }>;
+    replayed: boolean;
+};
+
+type MutationRefusal = Extract<MutationResponse, { status: 400 | 401 | 403 | 404 | 409 }>;
+
+export type ServicePrescriptionSetResponse =
+    | { status: 200 | 201; value: ServicePrescriptionSetReceipt }
+    | MutationRefusal;
+
+type ServicePrescriptionSetEntry = {
+    prescriptionId: string;
+    itemId: string;
+    patientId: string;
+    serviceCode: string | null;
+    prescription: Record<string, unknown>;
+    item: Record<string, unknown>;
+};
+
+class ServicePrescriptionSetRefused extends Error {
+    constructor(readonly response: MutationRefusal) { super('SERVICE_PRESCRIPTION_SET_REFUSED'); }
+}
+
+function refusedUnlessCreated(result: MutationResponse): void {
+    if (result.status !== 201) throw new ServicePrescriptionSetRefused(result as MutationRefusal);
+}
+
+function readServicePrescriptionSetEntries(rawBody: Record<string, unknown>): ServicePrescriptionSetEntry[] | null {
+    const parsed = servicePrescriptionSetCreateSchema.safeParse(rawBody);
+    if (!parsed.success) return null;
+    const entries = parsed.data.entries.map(({ prescription, item }) => ({
+        prescriptionId: optionalPrescriptionText(prescription.id) ?? '',
+        itemId: optionalPrescriptionText(item.id) ?? '',
+        patientId: optionalPrescriptionText(prescription.patientId) ?? '',
+        serviceCode: optionalPrescriptionText(prescription.serviceCode) ?? null,
+        prescription,
+        item,
+    }));
+    const ids = entries.flatMap(entry => [entry.prescriptionId, entry.itemId]);
+    const patientId = entries[0].patientId;
+    const coherent = entries.every(entry => entry.prescriptionId && entry.itemId && entry.patientId === patientId
+        && optionalPrescriptionText(entry.item.prescriptionId) === entry.prescriptionId);
+    return coherent && patientId && new Set(ids).size === ids.length ? entries : null;
+}
+
+function servicePrescriptionSetState(tx: ServicePrescriptionWriteTx, entries: ServicePrescriptionSetEntry[]): 'absent' | 'committed' | 'conflict' {
+    const parents = tx.select({ id: servicePrescriptions.id, patientId: servicePrescriptions.patientId, serviceCode: servicePrescriptions.serviceCode })
+        .from(servicePrescriptions).where(inArray(servicePrescriptions.id, entries.map(entry => entry.prescriptionId))).all();
+    const items = tx.select({ id: servicePrescriptionItems.id, prescriptionId: servicePrescriptionItems.prescriptionId })
+        .from(servicePrescriptionItems).where(inArray(servicePrescriptionItems.id, entries.map(entry => entry.itemId))).all();
+    if (parents.length === 0 && items.length === 0) return 'absent';
+    const committed = parents.length === entries.length && items.length === entries.length && entries.every(entry =>
+        parents.some(parent => parent.id === entry.prescriptionId && parent.patientId === entry.patientId && (parent.serviceCode ?? null) === entry.serviceCode)
+        && items.some(item => item.id === entry.itemId && item.prescriptionId === entry.prescriptionId));
+    return committed ? 'committed' : 'conflict';
+}
+
+/** Creates every prescription of one gesture with its item in one transaction; resending the same ids returns the receipt. */
+export async function createHostServicePrescriptionSet(context: HostContext, rawBody: Record<string, unknown>): Promise<ServicePrescriptionSetResponse> {
+    const entries = readServicePrescriptionSetEntries(rawBody);
+    if (!entries) return badRequest('Payload non valido') as MutationRefusal;
+    const receipt = entries.map(({ prescriptionId, itemId }) => ({ prescriptionId, itemId }));
+    try {
+        return dbServer.transaction((tx): ServicePrescriptionSetResponse => {
+            const state = servicePrescriptionSetState(tx, entries);
+            if (state === 'committed') return { status: 200, value: { entries: receipt, replayed: true } };
+            if (state === 'conflict') return { status: 409, value: { error: 'Prescription ID already exists' } };
+            for (const entry of entries) {
+                refusedUnlessCreated(createHostServicePrescriptionInTransaction(tx, context, entry.prescription));
+                refusedUnlessCreated(createHostServicePrescriptionItemInTransaction(tx, context, entry.item));
+            }
+            return { status: 201, value: { entries: receipt, replayed: false } };
+        }, { behavior: 'immediate' });
+    } catch (error) {
+        if (error instanceof ServicePrescriptionSetRefused) return error.response;
+        throw error;
+    }
 }
 
 async function createServicePrescriptionItem(context: HostContext | NetworkWriteContext, body: ServicePrescriptionItemCreatePayload, surface: 'host' | 'network'): Promise<MutationResponse> {
