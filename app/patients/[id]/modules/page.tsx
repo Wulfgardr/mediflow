@@ -685,6 +685,10 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
                     showToast('Collega e attiva Codex in Impostazioni · Agenti.', 'error');
                     return;
                 }
+                if (result.code === 'LOCAL_KIT_RECONNECT') {
+                    showToast('Impossibile scrivere nella cartella del kit di Codex.', 'error');
+                    return;
+                }
                 showToast('Impossibile inviare il contesto a Codex.', 'error');
                 return;
             }

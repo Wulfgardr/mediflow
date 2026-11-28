@@ -4,7 +4,7 @@ import { createServer } from 'node:http';
 import { Readable } from 'node:stream';
 import os from 'node:os';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { createHash, createHmac, randomUUID } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import test from 'node:test';
 import { createAgentLocalKitHttp } from './agent-local-kit-http';
@@ -12,7 +12,6 @@ import { createAgentLocalKitContextHttp } from './agent-local-kit-context-http';
 import { createAgentLocalKitStore } from '../agent-local-kit-store';
 import { installLoopbackIngress } from './loopback-ingress.mjs';
 import { AGENT_OPERATIONS } from '../agent-mandate-contract';
-import { sha256HexClient } from '../agent-local-kit-context-contract';
 import { buildAgentPatientContextPayload, sendPatientContextToLocalKit } from '../agent-local-kit-context-client';
 import { observeArchiveGeneration } from './client-auth-api';
 import type { Patient } from '../db';
@@ -120,10 +119,17 @@ function mutationHeaders(extra: Record<string, string> = {}) {
     };
 }
 
-async function sampleContextPayload(taxCode = 'RSSMRA80A01H501U') {
-    const cfHash = await sha256HexClient(taxCode);
+const contextDir = path.join(kitDir, LOCAL_KIT_CONTEXT_DIR_NAME);
+const referenceFile = path.join(kitDir, 'riferimento-pazienti.json');
+const plainSha256 = (taxCode: string) => createHash('sha256').update(taxCode).digest('hex');
+const kitSecret = () => JSON.parse(fs.readFileSync(referenceFile, 'utf8')).segreto as string;
+const kitReference = (taxCode: string, secret = kitSecret()) =>
+    createHmac('sha256', Buffer.from(secret, 'hex')).update(taxCode).digest('hex');
+const contextFiles = () => (fs.existsSync(contextDir) ? fs.readdirSync(contextDir).filter(name => name.endsWith('.json')) : []);
+
+function sampleContextPayload(taxCode = 'RSSMRA80A01H501U') {
     return {
-        patient: { cfHash, taxCodeLast4: taxCode.slice(-4), birthYear: 1980 },
+        patient: { taxCodeLast4: taxCode.slice(-4) },
         diagnoses: [{ description: 'Ipertensione arteriosa', code: 'BA00', system: 'ICD-11' }],
         therapies: [{ drugName: 'Ramipril 5 mg', dosage: '1 cp al mattino', status: 'active' }],
         exemptions: [{ code: '031' }],
@@ -141,8 +147,21 @@ function syntheticIdentity(taxCode: string) {
     };
 }
 
-async function contextRequest(taxCode = 'RSSMRA80A01H501U') {
-    return { context: await sampleContextPayload(taxCode), identity: syntheticIdentity(taxCode) };
+function contextRequest(taxCode = 'RSSMRA80A01H501U') {
+    return { context: sampleContextPayload(taxCode), identity: syntheticIdentity(taxCode) };
+}
+
+async function postContext(request: unknown) {
+    return fetch(`${origin}/context`, { method: 'POST', headers: mutationHeaders(), body: JSON.stringify(request) });
+}
+
+async function disconnectKit() {
+    const response = await fetch(`${origin}/kit`, {
+        method: 'DELETE',
+        headers: { Origin: origin, 'Sec-Fetch-Site': 'same-origin', 'Content-Type': 'application/json',
+            'x-mediflow-archive-generation': readSqliteArchiveGeneration(database) },
+    });
+    assert.equal(response.status, 200);
 }
 
 async function connectKit() {
@@ -178,8 +197,7 @@ test.after(async () => {
 });
 
 test('blocks unauthenticated, cross-origin, bearer, and disconnected exports without writing files', async () => {
-    const request = await contextRequest();
-    const payload = request.context;
+    const request = contextRequest();
 
     current = null;
     try {
@@ -213,8 +231,8 @@ test('blocks unauthenticated, cross-origin, bearer, and disconnected exports wit
 
 test('exports audited patient context when kit is active, rolls back file on audit failure, hides cfHash on GET, and clears on DELETE', async () => {
     await connectKit();
-    const request = await contextRequest();
-    const payload = request.context;
+    const request = contextRequest();
+    const reference = kitReference('RSSMRA80A01H501U');
 
     failAuditOnce = true;
     const failedAuditRes = await fetch(`${origin}/context`, {
@@ -223,7 +241,7 @@ test('exports audited patient context when kit is active, rolls back file on aud
         body: JSON.stringify(request),
     });
     assert.equal(failedAuditRes.status, 503);
-    assert.equal(fs.existsSync(path.join(kitDir, LOCAL_KIT_CONTEXT_DIR_NAME, `${payload.patient.cfHash}.json`)), false);
+    assert.deepEqual(contextFiles(), []);
 
     const exportRes = await fetch(`${origin}/context`, {
         method: 'POST',
@@ -232,22 +250,22 @@ test('exports audited patient context when kit is active, rolls back file on aud
     });
     assert.equal(exportRes.status, 201);
     const exportedText = await exportRes.text();
-    assert.equal(exportedText.includes(payload.patient.cfHash), false);
+    assert.equal(exportedText.includes(reference), false);
     const exported = JSON.parse(exportedText);
     assert.equal(exported.status, 'exported');
     assert.equal(exported.taxCodeLast4, '501U');
 
-    const contextFile = path.join(kitDir, LOCAL_KIT_CONTEXT_DIR_NAME, `${payload.patient.cfHash}.json`);
+    const contextFile = path.join(contextDir, `${reference}.json`);
     assert.equal(fs.existsSync(contextFile), true);
     const onDisk = JSON.parse(fs.readFileSync(contextFile, 'utf8'));
-    assert.equal(onDisk.schema, 'mediflow.agent_patient_context.v1');
-    assert.equal(onDisk.patient.cfHash, payload.patient.cfHash);
+    assert.equal(onDisk.schema, 'mediflow.agent_patient_context.v2');
+    assert.equal(onDisk.patient.cfHash, reference);
     assert.equal(onDisk.diagnoses[0].code, 'BA00');
 
     const listRes = await fetch(`${origin}/context`);
     assert.equal(listRes.status, 200);
     const listText = await listRes.text();
-    assert.equal(listText.includes(payload.patient.cfHash), false);
+    assert.equal(listText.includes(reference), false);
     assert.equal(listText.includes('Ipertensione'), false);
     const listed = JSON.parse(listText);
     assert.equal(listed.count, 1);
@@ -266,13 +284,12 @@ test('exports audited patient context when kit is active, rolls back file on aud
     assert.equal(fs.existsSync(contextFile), false);
 
     const audits = database.prepare('SELECT event_type, subject_ref FROM audit_events WHERE actor_ref=? ORDER BY rowid').all(actor) as Array<{ event_type: string; subject_ref: string }>;
-    assert.ok(audits.some(row => row.event_type === 'agent.context.exported' && row.subject_ref === payload.patient.cfHash));
+    assert.ok(audits.some(row => row.event_type === 'agent.context.exported' && row.subject_ref === reference));
     assert.ok(audits.some(row => row.event_type === 'agent.context.cleared' && row.subject_ref === 'all'));
 });
 
 test('revalidates kit authorization after awaiting POST body if disconnected mid-flight', async () => {
-    const request = await contextRequest('VRDLGI75B12F205X');
-    const payload = request.context;
+    const request = contextRequest('VRDLGI75B12F205X');
     const encoded = new TextEncoder().encode(JSON.stringify(request));
     const mid = Math.floor(encoded.length / 2);
     let releaseSecondHalf!: () => void;
@@ -304,7 +321,7 @@ test('revalidates kit authorization after awaiting POST body if disconnected mid
     const response = await responsePromise;
     assert.equal(response.status, 403);
     assert.equal((await response.json()).code, 'LOCAL_KIT_INACTIVE');
-    assert.equal(fs.existsSync(path.join(kitDir, LOCAL_KIT_CONTEXT_DIR_NAME, `${payload.patient.cfHash}.json`)), false);
+    assert.deepEqual(contextFiles(), []);
 });
 
 const KIT_PATIENT_TAX_CODE = 'SNTRMN80A41F205X';
@@ -364,19 +381,20 @@ async function exportThroughClient(patient: Patient) {
 test('Invia a Codex: identity written in notes and free-text fields never reaches the kit file', async () => {
     await connectKit();
     observeArchiveGeneration(readSqliteArchiveGeneration(database));
-    const { payload, result } = await exportThroughClient(kitPatient);
+    const { result } = await exportThroughClient(kitPatient);
     assert.equal(result.ok, true);
 
-    const contextFile = path.join(kitDir, LOCAL_KIT_CONTEXT_DIR_NAME, `${payload.patient.cfHash}.json`);
+    const [written] = contextFiles();
+    const contextFile = path.join(contextDir, written);
     const bytes = fs.readFileSync(contextFile, 'utf8');
     const leaked = identityValues.filter(value => bytes.toLowerCase().includes(value.toLowerCase()) || compact(bytes).includes(compact(value)));
     assert.deepEqual(leaked, []);
     assert.equal(/01\/01\/1980/u.test(bytes), false);
 
     const onDisk = JSON.parse(bytes);
-    assert.equal(onDisk.schema, 'mediflow.agent_patient_context.v1');
+    assert.equal(onDisk.schema, 'mediflow.agent_patient_context.v2');
     assert.deepEqual(Object.keys(onDisk).sort(), ['allergies', 'diagnoses', 'exemptions', 'expiresAt', 'exportedAt', 'observations', 'openCheckups', 'patient', 'recentNotes', 'schema', 'therapies']);
-    assert.equal(onDisk.patient.cfHash, await sha256HexClient(KIT_PATIENT_TAX_CODE));
+    assert.equal(onDisk.patient.cfHash, kitReference(KIT_PATIENT_TAX_CODE));
     assert.equal(onDisk.patient.taxCodeLast4, '205X');
     assert.match(onDisk.recentNotes[0].text, /\[\[MF_PAZ[0-9]+_[a-z2-7]{8}\]\]/u);
     assert.match(onDisk.recentNotes[0].text, /Ricovero dal 12\/10\/2026, ramipril sospeso\./u);
@@ -387,13 +405,123 @@ test('Invia a Codex: identity written in notes and free-text fields never reache
     fs.rmSync(contextFile);
 });
 
-test('Invia a Codex: a context whose identity does not match its cfHash is refused and nothing is written', async () => {
+test('Invia a Codex: a context whose identity does not match it, or that brings its own reference, is refused and nothing is written', async () => {
     await connectKit();
-    const request = await contextRequest('VRDLGI75B12F205X');
+    const request = contextRequest('VRDLGI75B12F205X');
     const mismatched = { ...request, identity: { ...request.identity, taxCode: 'RSSMRA80A01H501U' } };
-    const response = await fetch(`${origin}/context`, { method: 'POST', headers: mutationHeaders(), body: JSON.stringify(mismatched) });
-    assert.equal(response.status, 400);
-    const bare = await fetch(`${origin}/context`, { method: 'POST', headers: mutationHeaders(), body: JSON.stringify(request.context) });
-    assert.equal(bare.status, 400);
-    assert.equal(fs.existsSync(path.join(kitDir, LOCAL_KIT_CONTEXT_DIR_NAME, `${request.context.patient.cfHash}.json`)), false);
+    assert.equal((await postContext(mismatched)).status, 400);
+    assert.equal((await postContext(request.context)).status, 400);
+    const ownReference = { ...request, context: { ...request.context, patient: { ...request.context.patient, cfHash: plainSha256('VRDLGI75B12F205X') } } };
+    assert.equal((await postContext(ownReference)).status, 400);
+    const withBirthYear = { ...request, context: { ...request.context, patient: { ...request.context.patient, birthYear: 1975 } } };
+    assert.equal((await postContext(withBirthYear)).status, 400);
+    assert.deepEqual(contextFiles(), []);
+});
+
+test('Invia a Codex: the kit file, its name and the audit carry the keyed reference, never the plain SHA-256 of the tax code', async () => {
+    await connectKit();
+    observeArchiveGeneration(readSqliteArchiveGeneration(database));
+    const secret = kitSecret();
+    assert.match(secret, /^[a-f0-9]{64}$/u);
+    assert.equal(fs.statSync(referenceFile).mode & 0o777, 0o600);
+    const sha = plainSha256(KIT_PATIENT_TAX_CODE);
+    const reference = kitReference(KIT_PATIENT_TAX_CODE, secret);
+    assert.notEqual(reference, sha);
+
+    assert.equal((await exportThroughClient(kitPatient)).result.ok, true);
+    assert.deepEqual(contextFiles(), [`${reference}.json`]);
+    const bytes = fs.readFileSync(path.join(contextDir, `${reference}.json`), 'utf8');
+    assert.equal(bytes.includes(sha), false);
+    assert.deepEqual(Object.keys(JSON.parse(bytes).patient).sort(), ['cfHash', 'taxCodeLast4']);
+
+    assert.equal((await exportThroughClient({ ...kitPatient, taxCode: ` ${KIT_PATIENT_TAX_CODE.toLowerCase()} ` })).result.ok, true);
+    assert.deepEqual(contextFiles(), [`${reference}.json`]);
+
+    const exported = database.prepare("SELECT subject_ref FROM audit_events WHERE event_type='agent.context.exported'").all() as Array<{ subject_ref: string }>;
+    assert.ok(exported.some(row => row.subject_ref === reference));
+    const everyAuditRow = JSON.stringify(database.prepare('SELECT * FROM audit_events').all());
+    assert.equal(everyAuditRow.includes(sha), false);
+});
+
+const storedSecret = () => (database.prepare('SELECT value FROM settings WHERE key=?').get('agent.localKitPatientReferenceKey') as { value: string } | undefined)?.value;
+const exportedAudits = () => (database.prepare("SELECT count(*) AS n FROM audit_events WHERE event_type='agent.context.exported'").get() as { n: number }).n;
+
+async function connectedKitWithoutSecret() {
+    await connectKit();
+    observeArchiveGeneration(readSqliteArchiveGeneration(database));
+    const agentRef = createAgentLocalKitStore(database).status(actor).agentRef;
+    database.prepare('DELETE FROM settings WHERE key=?').run('agent.localKitPatientReferenceKey');
+    fs.rmSync(referenceFile, { force: true });
+    return agentRef;
+}
+
+test('Invia a Codex: a kit connected before the secret existed gets it on the first export, without reconnecting', async () => {
+    const agentRef = await connectedKitWithoutSecret();
+    const { result } = await exportThroughClient(kitPatient);
+    assert.equal(result.ok, true);
+    const secret = storedSecret() ?? '';
+    assert.match(secret, /^[a-f0-9]{64}$/u);
+    assert.equal(kitSecret(), secret);
+    assert.equal(fs.statSync(referenceFile).mode & 0o777, 0o600);
+    assert.deepEqual(contextFiles(), [`${kitReference(KIT_PATIENT_TAX_CODE, secret)}.json`]);
+    assert.equal(fs.existsSync(path.join(contextDir, `${plainSha256(KIT_PATIENT_TAX_CODE)}.json`)), false);
+    assert.equal(createAgentLocalKitStore(database).status(actor).agentRef, agentRef);
+    assert.equal((await exportThroughClient(kitPatient)).result.ok, true);
+    assert.equal(storedSecret(), secret);
+    fs.rmSync(path.join(contextDir, `${kitReference(KIT_PATIENT_TAX_CODE, secret)}.json`));
+});
+
+test('Invia a Codex: two concurrent first exports create one secret', async () => {
+    await connectedKitWithoutSecret();
+    const responses = await Promise.all([postContext(contextRequest('RSSMRA80A01H501U')), postContext(contextRequest('VRDLGI75B12F205X'))]);
+    assert.deepEqual(responses.map(response => response.status), [201, 201]);
+    const secret = storedSecret() ?? '';
+    assert.equal(kitSecret(), secret);
+    assert.deepEqual(contextFiles().sort(), [kitReference('RSSMRA80A01H501U', secret), kitReference('VRDLGI75B12F205X', secret)].map(name => `${name}.json`).sort());
+    fs.rmSync(contextDir, { recursive: true, force: true });
+});
+
+test('Invia a Codex: if the secret cannot be written in the kit, no secret is kept and no context is written', async () => {
+    await connectedKitWithoutSecret();
+    fs.mkdirSync(referenceFile, { mode: 0o700 });
+    try {
+        const auditsBefore = exportedAudits();
+        const { result } = await exportThroughClient(kitPatient);
+        assert.deepEqual(result, { ok: false, code: 'LOCAL_KIT_RECONNECT' });
+        assert.equal(storedSecret(), undefined);
+        assert.deepEqual(contextFiles(), []);
+        assert.equal(exportedAudits(), auditsBefore);
+    } finally {
+        fs.rmSync(referenceFile, { recursive: true, force: true });
+    }
+    assert.equal((await exportThroughClient(kitPatient)).result.ok, true);
+    const secret = storedSecret() ?? '';
+    assert.equal(kitSecret(), secret);
+    assert.deepEqual(contextFiles(), [`${kitReference(KIT_PATIENT_TAX_CODE, secret)}.json`]);
+    fs.rmSync(path.join(contextDir, `${kitReference(KIT_PATIENT_TAX_CODE, secret)}.json`));
+});
+
+test('Invia a Codex: disconnecting and reconnecting the kit changes the secret and empties the contexts', async () => {
+    await connectKit();
+    observeArchiveGeneration(readSqliteArchiveGeneration(database));
+    const before = kitSecret();
+    assert.equal((await exportThroughClient(kitPatient)).result.ok, true);
+    assert.deepEqual(contextFiles(), [`${kitReference(KIT_PATIENT_TAX_CODE, before)}.json`]);
+
+    await disconnectKit();
+    assert.equal(fs.existsSync(referenceFile), false);
+    assert.deepEqual(contextFiles(), []);
+    assert.equal(storedSecret(), undefined);
+
+    await connectKit();
+    observeArchiveGeneration(readSqliteArchiveGeneration(database));
+    const after = kitSecret();
+    assert.notEqual(after, before);
+    assert.equal((await exportThroughClient(kitPatient)).result.ok, true);
+    assert.notEqual(kitReference(KIT_PATIENT_TAX_CODE, after), kitReference(KIT_PATIENT_TAX_CODE, before));
+    assert.deepEqual(contextFiles(), [`${kitReference(KIT_PATIENT_TAX_CODE, after)}.json`]);
+
+    await connectKit();
+    assert.notEqual(kitSecret(), after);
+    assert.deepEqual(contextFiles(), []);
 });

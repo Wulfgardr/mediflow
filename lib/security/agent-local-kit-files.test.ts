@@ -59,7 +59,14 @@ test('writes 0700 creds dir, 0600 credential files readable by agent-client, and
             origin: 'http://127.0.0.1:3000',
         };
 
-        writeLocalKitCredentials(kitDir, access, registration);
+        const patientReferenceKey = randomBytes(32).toString('hex');
+        writeLocalKitCredentials(kitDir, access, registration, patientReferenceKey);
+
+        const referenceFile = path.join(kitDir, 'riferimento-pazienti.json');
+        const referenceStat = fs.lstatSync(referenceFile);
+        assert.equal(referenceStat.isSymbolicLink(), false);
+        assert.equal(referenceStat.mode & 0o7777, 0o600);
+        assert.deepEqual(JSON.parse(fs.readFileSync(referenceFile, 'utf8')), { segreto: patientReferenceKey });
 
         const dirStat = fs.lstatSync(credsDir);
         assert.equal(dirStat.isSymbolicLink(), false);
@@ -84,6 +91,7 @@ test('writes 0700 creds dir, 0600 credential files readable by agent-client, and
         assert.equal(updatedDeposito.campoExtra, 'conservato');
 
         removeLocalKitCredentials(kitDir, agentRef);
+        assert.equal(fs.existsSync(referenceFile), false);
         assert.equal(fs.existsSync(path.join(credsDir, `${agentRef}.json`)), false);
         assert.equal(fs.existsSync(path.join(credsDir, `${agentRef}.registration.json`)), false);
         const afterRemove = readDepositoJson(kitDir);

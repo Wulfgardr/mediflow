@@ -2,12 +2,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHmac, randomBytes, randomUUID } from 'node:crypto';
 import test from 'node:test';
 import {
     parseAgentPatientContextInput,
     sealAgentPatientContextEnvelope,
-    sha256HexClient,
 } from '../agent-local-kit-context-contract';
 import {
     clearLocalKitPatientContexts,
@@ -37,10 +36,12 @@ function makeKitFixture(root: string) {
     return { kitDir, credsDir };
 }
 
-async function sampleEnvelope(taxCode: string, nowMs: number) {
-    const cfHash = await sha256HexClient(taxCode);
+const syntheticKey = randomBytes(32);
+
+function sampleEnvelope(taxCode: string, nowMs: number) {
+    const reference = createHmac('sha256', syntheticKey).update(taxCode).digest('hex');
     const parsed = parseAgentPatientContextInput({
-        patient: { cfHash, taxCodeLast4: taxCode.slice(-4) },
+        patient: { taxCodeLast4: taxCode.slice(-4) },
         diagnoses: [{ description: 'Ipertensione' }],
         therapies: [],
         exemptions: [],
@@ -50,7 +51,7 @@ async function sampleEnvelope(taxCode: string, nowMs: number) {
         openCheckups: [],
     });
     assert.ok(parsed);
-    return sealAgentPatientContextEnvelope(parsed, nowMs);
+    return sealAgentPatientContextEnvelope(parsed, reference, nowMs);
 }
 
 test('writes private 0700/0600 context files, auto-purges expired entries, and clears them on disconnect', async () => {
@@ -58,8 +59,8 @@ test('writes private 0700/0600 context files, auto-purges expired entries, and c
     try {
         const { kitDir } = makeKitFixture(root);
         const now = 1_750_000_000_000;
-        const first = await sampleEnvelope('RSSMRA80A01H501U', now);
-        const expired = await sampleEnvelope('VRDLGI75B12F205X', now - 25 * 60 * 60 * 1000);
+        const first = sampleEnvelope('RSSMRA80A01H501U', now);
+        const expired = sampleEnvelope('VRDLGI75B12F205X', now - 25 * 60 * 60 * 1000);
 
         writeLocalKitPatientContext(kitDir, first, now);
         writeLocalKitPatientContext(kitDir, expired, now - 25 * 60 * 60 * 1000);
@@ -84,6 +85,7 @@ test('writes private 0700/0600 context files, auto-purges expired entries, and c
             kitDir,
             { agentRef, mandateRef: randomUUID(), token: 'mfa_' + randomBytes(32).toString('base64url'), expiresAt: now + 3600_000, origin: 'http://127.0.0.1:3000' },
             { agentRef, token: 'mfr_' + randomBytes(32).toString('base64url'), origin: 'http://127.0.0.1:3000' },
+            randomBytes(32).toString('hex'),
         );
         removeLocalKitCredentials(kitDir, agentRef);
         assert.equal(listLocalKitPatientContexts(kitDir, now).length, 0);
@@ -100,7 +102,7 @@ test('rejects symlink context directory and clears contexts explicitly', async (
         const outside = path.join(root, 'outside');
         fs.mkdirSync(outside, { mode: 0o700 });
         fs.symlinkSync(outside, path.join(kitDir, LOCAL_KIT_CONTEXT_DIR_NAME));
-        const env = await sampleEnvelope('RSSMRA80A01H501U', Date.now());
+        const env = sampleEnvelope('RSSMRA80A01H501U', Date.now());
         assert.throws(() => writeLocalKitPatientContext(kitDir, env), LocalKitPathError);
 
         fs.unlinkSync(path.join(kitDir, LOCAL_KIT_CONTEXT_DIR_NAME));

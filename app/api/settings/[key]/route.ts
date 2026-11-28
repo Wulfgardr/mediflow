@@ -1,4 +1,3 @@
-import { PAIRING_OFFERS_KEY } from '@/lib/network-pairing-offer-contract';
 import { logServerError, logServerWarning } from '@/lib/server-error-log';
 import { RESTORE_RECEIPT_PREFIX } from '@/lib/backup-restore-receipt-contract';
 import { writeSettingWithFunctionModelGeneration } from '@/lib/ai-providers/fabric/function-model-settings-write';
@@ -11,7 +10,7 @@ import { eq } from 'drizzle-orm';
 import { requireSessionOrLocalToken, unauthorizedResponse } from '@/lib/security/server-auth';
 import { auditContextFromRequest, listChangedFields, requestIdFromRequest, withAuditContextMetadata, writeAuditEvent } from '@/lib/security/audit';
 import { isValidInsightSetting, normalizeSettingValue } from '@/lib/settings-value';
-import { evaluateSettingsWrite } from '@/lib/security/settings-write-policy';
+import { evaluateSettingsWrite, isServerOnlySetting } from '@/lib/security/settings-write-policy';
 import { UI_REDUCE_MOTION_SETTING_KEY, UI_REDUCE_TRANSPARENCY_SETTING_KEY } from '@/lib/ui-accessibility-preferences';
 
 export async function GET(
@@ -23,7 +22,7 @@ export async function GET(
 
     try {
         const { key } = await params;
-        if (key.startsWith('accountProfile.doctorTaxCode:') || key === PAIRING_OFFERS_KEY) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+        if (isServerOnlySetting(key)) return NextResponse.json({ error: 'Not found' }, { status: 404 });
         if (key.startsWith(RESTORE_RECEIPT_PREFIX)) return NextResponse.json({ error: 'Dedicated restore receipt service required' }, { status: 403 });
         const result = await dbServer.select().from(settings).where(eq(settings.key, key)).get();
 

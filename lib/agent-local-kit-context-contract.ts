@@ -1,4 +1,4 @@
-export const AGENT_PATIENT_CONTEXT_SCHEMA = 'mediflow.agent_patient_context.v1' as const;
+export const AGENT_PATIENT_CONTEXT_SCHEMA = 'mediflow.agent_patient_context.v2' as const;
 export const AGENT_PATIENT_CONTEXT_TTL_MS = 24 * 60 * 60 * 1000;
 export const AGENT_PATIENT_CONTEXT_MAX_BYTES = 128 * 1024;
 
@@ -48,9 +48,7 @@ export type AgentPatientContextCheckup = {
 
 export type AgentPatientContextInput = {
     patient: {
-        cfHash: string;
         taxCodeLast4: string;
-        birthYear?: number;
         isAdi?: boolean;
     };
     diagnoses: AgentPatientContextDiagnosis[];
@@ -62,13 +60,13 @@ export type AgentPatientContextInput = {
     openCheckups: AgentPatientContextCheckup[];
 };
 
-export type AgentPatientContextEnvelope = AgentPatientContextInput & {
+export type AgentPatientContextEnvelope = Omit<AgentPatientContextInput, 'patient'> & {
+    patient: AgentPatientContextInput['patient'] & { cfHash: string };
     schema: typeof AGENT_PATIENT_CONTEXT_SCHEMA;
     exportedAt: number;
     expiresAt: number;
 };
 
-const CF_HASH_RE = /^[a-f0-9]{64}$/u;
 const LAST4_RE = /^[A-Z0-9]{4}$/u;
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/u;
 const ALLOWED_TOP_KEYS = 'allergies,diagnoses,exemptions,observations,openCheckups,patient,recentNotes,therapies';
@@ -93,18 +91,12 @@ export function parseAgentPatientContextInput(value: unknown): AgentPatientConte
     if (!isRecord(value)) return null;
     const keys = Object.keys(value).sort().join(',');
     if (keys !== ALLOWED_TOP_KEYS) return null;
-    if (!isRecord(value.patient)) return null;
+    if (!isRecord(value.patient) || Object.keys(value.patient).some(key => key !== 'taxCodeLast4' && key !== 'isAdi')) return null;
 
-    const cfHash = typeof value.patient.cfHash === 'string' ? value.patient.cfHash.trim().toLowerCase() : '';
     const taxCodeLast4 = typeof value.patient.taxCodeLast4 === 'string' ? value.patient.taxCodeLast4.trim().toUpperCase() : '';
-    if (!CF_HASH_RE.test(cfHash) || !LAST4_RE.test(taxCodeLast4)) return null;
+    if (!LAST4_RE.test(taxCodeLast4)) return null;
 
-    const patient: AgentPatientContextInput['patient'] = { cfHash, taxCodeLast4 };
-    if (value.patient.birthYear !== undefined) {
-        if (typeof value.patient.birthYear !== 'number' || !Number.isInteger(value.patient.birthYear)
-            || value.patient.birthYear < 1900 || value.patient.birthYear > 2100) return null;
-        patient.birthYear = value.patient.birthYear;
-    }
+    const patient: AgentPatientContextInput['patient'] = { taxCodeLast4 };
     if (value.patient.isAdi !== undefined) {
         if (typeof value.patient.isAdi !== 'boolean') return null;
         patient.isAdi = value.patient.isAdi;
@@ -263,17 +255,16 @@ export function normalizeAgentPatientTaxCode(value: string): string {
     return value.replace(/\s+/gu, '').toUpperCase();
 }
 
-export function sealAgentPatientContextEnvelope(input: AgentPatientContextInput, nowMs = Date.now()): AgentPatientContextEnvelope {
+export function sealAgentPatientContextEnvelope(
+    input: AgentPatientContextInput,
+    patientReference: string,
+    nowMs = Date.now(),
+): AgentPatientContextEnvelope {
     return {
         schema: AGENT_PATIENT_CONTEXT_SCHEMA,
         exportedAt: nowMs,
         expiresAt: nowMs + AGENT_PATIENT_CONTEXT_TTL_MS,
         ...input,
+        patient: { cfHash: patientReference, ...input.patient },
     };
-}
-
-export async function sha256HexClient(value: string): Promise<string> {
-    const bytes = new TextEncoder().encode(value.trim().toUpperCase());
-    const digest = await crypto.subtle.digest('SHA-256', bytes);
-    return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
 }

@@ -1,14 +1,17 @@
 import type Database from 'better-sqlite3';
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
 import { readSqliteArchiveGeneration, ArchiveReplacedError } from './archive-generation';
 import { validMandateInput, type AgentMandateInput } from './agent-mandate-contract';
 import { AgentMandateDenied, createAgentMandateStore } from './agent-mandate-store';
 import { createAgentRegistrationStore } from './agent-registration-store';
 import { defaultLocalKitPath } from './security/agent-local-kit-files';
+import { normalizeAgentPatientTaxCode } from './agent-local-kit-context-contract';
 
 export const LOCAL_KIT_PATH_SETTING_KEY = 'agent.localKitPath';
 export const LOCAL_KIT_AGENT_SETTING_KEY = 'agent.localKitAgentRef';
+export const LOCAL_KIT_PATIENT_REFERENCE_KEY_SETTING_KEY = 'agent.localKitPatientReferenceKey';
 export const LOCAL_KIT_AGENT_NAME = 'Codex · Ambulatorio';
+const PATIENT_REFERENCE_KEY_RE = /^[a-f0-9]{64}$/u;
 
 export type AgentLocalKitStatus = {
     kitPath: string;
@@ -25,6 +28,7 @@ export type AgentLocalKitConnection = {
     expiresAt: number;
     bearerToken: string;
     registrationToken: string;
+    patientReferenceKey: string;
 };
 
 const hash = (domain: string, value: string) => createHash('sha256').update(JSON.stringify([domain, value])).digest('hex');
@@ -191,13 +195,16 @@ export function createAgentLocalKitStore(database: Database.Database, now = Date
                     .run(agentRef, mandate.id, LOCAL_KIT_AGENT_NAME, JSON.stringify(mandate.operations), hash('mediflow.agent.bearer.v1', bearerToken), mandate.expiresAt);
                 if (insertedClient.changes !== 1) throw new AgentMandateDenied();
 
+                const patientReferenceKey = randomBytes(32).toString('hex');
                 writeSetting(database, LOCAL_KIT_AGENT_SETTING_KEY, agentRef);
+                writeSetting(database, LOCAL_KIT_PATIENT_REFERENCE_KEY_SETTING_KEY, patientReferenceKey);
                 return {
                     agentRef,
                     mandateRef: mandate.id,
                     expiresAt: mandate.expiresAt,
                     bearerToken,
                     registrationToken: registrationCredential.token,
+                    patientReferenceKey,
                 };
             }).immediate();
         },
@@ -209,8 +216,24 @@ export function createAgentLocalKitStore(database: Database.Database, now = Date
                     revokeExistingAgent(agentRef, actorRef, generation);
                     deleteSetting(database, LOCAL_KIT_AGENT_SETTING_KEY);
                 }
+                deleteSetting(database, LOCAL_KIT_PATIENT_REFERENCE_KEY_SETTING_KEY);
                 return { agentRef };
             }).immediate();
+        },
+        patientReference(taxCode: string, actorRef: string, generation: string, installInKit: (key: string) => void): string {
+            const normalized = normalizeAgentPatientTaxCode(taxCode);
+            if (!normalized) throw new AgentMandateDenied();
+            const key = database.transaction(() => {
+                if (readSqliteArchiveGeneration(database) !== generation) throw new ArchiveReplacedError();
+                const current = this.status(actorRef);
+                if (!current.connected || !current.active) throw new AgentMandateDenied();
+                const stored = readSetting(database, LOCAL_KIT_PATIENT_REFERENCE_KEY_SETTING_KEY);
+                const secret = stored && PATIENT_REFERENCE_KEY_RE.test(stored) ? stored : randomBytes(32).toString('hex');
+                if (secret !== stored) writeSetting(database, LOCAL_KIT_PATIENT_REFERENCE_KEY_SETTING_KEY, secret);
+                installInKit(secret);
+                return secret;
+            }).immediate();
+            return createHmac('sha256', Buffer.from(key, 'hex')).update(normalized, 'utf8').digest('hex');
         },
         recordContextAudit(
             eventType: 'agent.context.exported' | 'agent.context.cleared',

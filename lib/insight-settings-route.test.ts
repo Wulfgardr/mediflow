@@ -7,6 +7,7 @@ import * as values from './settings-value';
 import * as serverErrorLog from './server-error-log';
 import * as accessibilityPreferences from './ui-accessibility-preferences';
 import { sanitizeAIInsightManualConfig } from './ai-insight-settings';
+import { isServerOnlySetting } from './security/settings-write-policy';
 
 function route() {
     const writes: unknown[] = [], audits: unknown[] = [];
@@ -25,7 +26,7 @@ function route() {
         '@/lib/settings-value': values,
         '@/lib/server-error-log': serverErrorLog,
         '@/lib/ui-accessibility-preferences': accessibilityPreferences,
-        '@/lib/security/settings-write-policy': { evaluateSettingsWrite: () => ({ allowed: true }) },
+        '@/lib/security/settings-write-policy': { evaluateSettingsWrite: () => ({ allowed: true }), isServerOnlySetting },
     };
     const compiled = ts.transpileModule(readFileSync('app/api/settings/[key]/route.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } });
     runInNewContext(compiled.outputText, { module: routeModule, exports: routeModule.exports, console, require: (key: string) => { assert.ok(Object.hasOwn(imports, key), key); return imports[key]; } });
