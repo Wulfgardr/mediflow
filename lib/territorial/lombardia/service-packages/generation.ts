@@ -428,6 +428,7 @@ export function generatePackageServiceRequests(
             priority: item.priority,
             exemptionCode: exemption.exemptionCode,
             exemptionStatus: exemption.exemptionStatus,
+            declaredExemptionCode: item.exemptionCode ? normalizeCode(item.exemptionCode) : null,
             clinicalQuestion: item.clinicalQuestion,
             appropriatenessConditions: item.appropriatenessConditions,
             periodicityMonths: item.periodicityMonths,

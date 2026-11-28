@@ -1,0 +1,16 @@
+.proposals { display: grid; gap: 16px; padding-bottom: 16px; margin-bottom: 16px; border-bottom: 1px solid var(--lume-rule-strong); }
+.title { margin: 0; font: 600 0.75rem/1.5 var(--lume-font-sans); letter-spacing: .05em; text-transform: uppercase; }
+.package { display: grid; gap: 12px; min-width: 0; }
+.head h3 { margin: 0; font: 600 0.9375rem/1.4 var(--lume-font-sans); }
+.head p, .muted, .reason, .conditions { margin: 0; color: var(--lume-ink-muted); font-size: 0.8125rem; }
+.list, .skipped, .conditions { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; }
+.conditions { gap: 2px; padding-left: 26px; }
+.skipped { gap: 4px; font-size: 0.8125rem; }
+.request { display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
+.pick { display: flex; gap: 10px; align-items: baseline; }
+.reason { padding-left: 26px; }
+.code { color: var(--lume-ink-muted); font-variant-numeric: tabular-nums; }
+.question { padding-left: 26px; font-size: 0.75rem; color: var(--lume-ink-muted); }
+.questionInput { margin-left: 26px; width: calc(100% - 26px); min-width: 0; padding: 6px 8px; border: 1px solid var(--lume-rule-strong); border-radius: 4px; background: var(--lume-surface, transparent); color: var(--lume-ink); font: inherit; }
+.questionInput:focus-visible { outline: 2px solid var(--lume-ink-fresh); outline-offset: 2px; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; }

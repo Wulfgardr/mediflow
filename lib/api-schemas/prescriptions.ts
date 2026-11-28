@@ -173,6 +173,15 @@ export const servicePrescriptionItemUpdateSchema = z.object({
 
 export type ProstheticPrescriptionCreatePayload = z.infer<typeof prostheticPrescriptionCreateSchema>;
 export type ProstheticPrescriptionUpdatePayload = z.infer<typeof prostheticPrescriptionUpdateSchema>;
+export const SERVICE_PRESCRIPTION_SET_MAX_ENTRIES = 50;
+
+export const servicePrescriptionSetCreateSchema = z.object({
+    entries: z.array(z.object({
+        prescription: z.record(z.string(), z.unknown()),
+        item: z.record(z.string(), z.unknown()),
+    }).strict()).min(1).max(SERVICE_PRESCRIPTION_SET_MAX_ENTRIES),
+}).strict();
+
 export type ServicePrescriptionCreatePayload = z.infer<typeof servicePrescriptionCreateSchema>;
 export type ServicePrescriptionUpdatePayload = z.infer<typeof servicePrescriptionUpdateSchema>;
 export type ServicePrescriptionItemCreatePayload = z.infer<typeof servicePrescriptionItemCreateSchema>;
