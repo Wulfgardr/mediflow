@@ -79,7 +79,6 @@ function PackageProposal({ patientId, proposal, prescribedOn }: { patientId: str
                 await db.servicePrescriptionItems.add({ ...draft.item, version: 1, createdAt: now, updatedAt: now });
                 saved += 1;
             }
-            setChoices({});
             setOutcome({ kind: 'saved', count: saved });
         } catch (error) {
             setOutcome({

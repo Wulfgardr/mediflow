@@ -56,6 +56,7 @@ test('approved packages propose in the Web visit only what is missing from the r
     const today = new Date();
     const hba1c = { prescribedAt: fifteenthOfMonth(today, -3), observedAt: fifteenthOfMonth(today, -2) };
     const hba1cValidUntil = fifteenthOfMonth(today, 4);
+    await page.setViewportSize({ width: 1280, height: 3200 });
     await bootstrapUnlockedSession(page, '314159');
     await switchPreset(page, 'core+it+lom');
 
@@ -95,11 +96,11 @@ test('approved packages propose in the Web visit only what is missing from the r
         await expect(proposed('95.11')).toContainText('Mai eseguita');
         await expect(proposed('95.11')).toContainText('Esenzione 013');
         await expect(proposed('90.28.1')).toHaveCount(0);
-        await proposals.getByRole('button', { name: /prestazioni? esclus[ae]$/u }).click();
+        await proposals.getByRole('button', { name: /^\d+ prestazion[ei] esclus[ae]$/u }).click();
         await expect(excluded('90.28.1')).toContainText(`(fino al ${hba1cValidUntil})`);
         await expect(proposals.getByTestId('service-package-uncompared')).toHaveCount(0);
         await expect(proposed('90.37.4'), 'without kidney disease the renal module stays off').toHaveCount(0);
-        await page.screenshot({ path: join(evidence, '1-proposta-hba1c-esclusa-fundus-proposto.png'), fullPage: true });
+        await proposals.screenshot({ path: join(evidence, '1-proposta-hba1c-esclusa-fundus-proposto.png') });
         expect(writes, 'opening the visit and reading the proposal writes nothing').toEqual([]);
         expect(rows(plain).map((row) => row.code)).toEqual(['90.28.1']);
 
@@ -111,13 +112,14 @@ test('approved packages propose in the Web visit only what is missing from the r
         await proposals.getByRole('button', { name: 'Prescrivi 1 prestazione', exact: true }).click();
         await expect(proposals.getByRole('status')).toHaveText('Registrate fra le prestazioni prescritte: 1.');
         await expect(proposed('95.11')).toHaveCount(0);
+        await expect(proposals.getByRole('button', { name: 'Prescrivi 0 prestazioni', exact: true }), 'choices the physician removed stay removed').toBeDisabled();
         await expect(excluded('95.11')).toContainText(`Già prescritta o prenotata (${isoDay(today)})`);
         const created = rows(plain).filter((row) => row.code === '95.11');
         expect(created).toHaveLength(1);
         expect(created[0]).toMatchObject({ system: 'REGIONAL_PRESTAZIONI', status: 'prescribed' });
         expect(audited(created.map((row) => row.id))).toEqual([created[0].id]);
         expect(writes).toEqual(['POST /api/service-prescriptions', 'POST /api/service-prescription-items']);
-        await page.screenshot({ path: join(evidence, '2-dopo-il-gesto-fundus-prescritto.png'), fullPage: true });
+        await proposals.screenshot({ path: join(evidence, '2-dopo-il-gesto-fundus-prescritto.png') });
 
         await openPrestazioni(renal);
         await expect(proposals).toContainText('con malattia renale cronica');
@@ -126,7 +128,7 @@ test('approved packages propose in the Web visit only what is missing from the r
         await expect(proposed('90.37.4')).toContainText('Senza esenzione: 023 non registrata in scheda');
         await expect(proposed('90.33.4')).toContainText('ogni 6 mesi');
         expect(rows(renal)).toEqual([]);
-        await page.screenshot({ path: join(evidence, '3-modulo-renale-altro-paziente.png'), fullPage: true });
+        await proposals.screenshot({ path: join(evidence, '3-modulo-renale-altro-paziente.png') });
 
         await switchPreset(page, 'core+it');
         await openPrestazioni(renal);
