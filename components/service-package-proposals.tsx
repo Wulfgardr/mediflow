@@ -101,7 +101,7 @@ function PackageProposal({ patientId, proposal, prescribedOn }: { patientId: str
         </header>
         {requests.length === 0
             ? <p className={styles.muted}>Nulla da prescrivere: le prestazioni del pacchetto sono in corso di validità o già prescritte.</p>
-            : <ul className={styles.list}>
+            : <ul className={styles.list} data-testid="service-package-requests">
                 {requests.map((request) => {
                     const choice = choiceFor(request);
                     const exemption = exemptionText(request);

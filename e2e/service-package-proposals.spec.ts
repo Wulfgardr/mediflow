@@ -79,7 +79,7 @@ test('approved packages propose in the Web visit only what is missing from the r
     });
 
     const proposals = page.getByTestId('service-package-proposals');
-    const proposed = (code: string) => proposals.locator(`li[data-service-code="${code}"]`);
+    const proposed = (code: string) => proposals.getByTestId('service-package-requests').locator(`li[data-service-code="${code}"]`);
     const excluded = (code: string) => proposals.getByTestId('service-package-skipped').locator(`li[data-service-code="${code}"]`);
     const openPrestazioni = async (patientId: string) => {
         await page.goto(`/patients/${patientId}/modules`);
@@ -103,7 +103,7 @@ test('approved packages propose in the Web visit only what is missing from the r
         expect(writes, 'opening the visit and reading the proposal writes nothing').toEqual([]);
         expect(rows(plain).map((row) => row.code)).toEqual(['90.28.1']);
 
-        const requested = proposals.locator('li[data-service-code]').filter({ has: page.getByRole('checkbox') });
+        const requested = proposals.getByTestId('service-package-requests').locator('li[data-service-code]');
         const requestedCodes = await requested.evaluateAll((items) => items.map((item) => item.getAttribute('data-service-code')));
         for (const code of requestedCodes) if (code !== '95.11') await proposed(code!).getByRole('checkbox').uncheck();
         await proposed('95.11').getByLabel('Quesito', { exact: true }).fill('Diabete tipo 2, screening retinopatia mai eseguito');
