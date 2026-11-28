@@ -142,6 +142,36 @@ test('Operatore locale: crea le schede di un lotto con un PIN dal Portachiavi, s
         const codes = page.locator('input[name^="diagnoses."][name$=".code"]');
         expect(await codes.evaluateAll(inputs => inputs.map(input => (input as HTMLInputElement).value))).not.toContain('BA00');
 
+        const incerti = path.join(root, 'Da-verificare');
+        const prepara = (gruppo: string, nome: string, bytes: Uint8Array) => {
+            const directory = path.join(incerti, gruppo);
+            mkdirSync(directory, { recursive: true });
+            writeFileSync(path.join(directory, nome), bytes);
+        };
+        prepara('delegato', 'delega.pdf', await textPdf(['Delega per il ritiro.', `Riferimento: ${P}`]));
+        prepara('misto', 'identificato.pdf', await letter(personQ, 'Inventato Secondo', 'Bisoprololo'));
+        prepara('misto', 'senza-identita.pdf', await textPdf(['Allegato con intestazione mancante.']));
+        const senzaCodice = await textPdf(['Promemoria di controllo senza anagrafica.']);
+        prepara('estrazione', 'promemoria.pdf', senzaCodice);
+        const proposta = syntheticPerson();
+        const parziale = syntheticPerson();
+        const senzaNome = await textPdf([`Codice fiscale paziente: ${parziale.code}`, `Nato il ${parziale.birth}`]);
+        prepara('nome-mancante', 'fonte.pdf', senzaNome);
+        writeFileSync(estrazione, JSON.stringify({ schema: 'mediflow.dossier_prepared_extraction.v1', sources: [
+            entry(senzaCodice, proposta, 'Proposta', 'Terza', 'Ramipril', '5 mg', 'Ramipril'),
+            entry(senzaNome, parziale, 'Proposta', 'Quarta', 'Ramipril', '5 mg', 'Ramipril'),
+        ] }));
+        const incerto = await operatore(isolatedRuntime.url, stato, ['dossier', '--cartella', incerti, '--estrazione', estrazione, '--ricevuta', ricevuta], credenziali);
+        expect(incerto.code, incerto.stderr).toBe(0);
+        expect.soft(JSON.parse(incerto.stdout), readFileSync(ricevuta, 'utf8')).toMatchObject({
+            gruppiDaConfermare: 4, schedeCreate: 0, schedeAggiornate: 0, originaliSalvati: 0, fattiScritti: 0,
+        });
+        expect.soft((await rows(page, 'patients')).length).toBe(patients.length);
+        for (const persona of [created(P)!, created(Q)!]) {
+            const originali = await rows(page, 'attachments', String(persona.id));
+            expect.soft(originali.filter(row => row.patientId === persona.id)).toHaveLength(1);
+        }
+
         const audit = await page.evaluate(async () =>
             await (await fetch('/api/system/audit?eventType=auth.login.succeeded&limit=50', { cache: 'no-store' })).json() as Array<{ requestId?: string | null }>);
         expect(audit.filter(row => row.requestId?.startsWith('mfop-')).length).toBeGreaterThanOrEqual(2);

@@ -1114,20 +1114,23 @@ function bulkContext(view: DossierPatientView) {
 }
 
 export async function acceptVerifiedAndApply(
-    ports: DossierPorts, input: { patientId: string; signal: AbortSignal; isCurrent: () => boolean; includeSummaries?: boolean },
+    ports: DossierPorts, input: { patientId: string; signal: AbortSignal; isCurrent: () => boolean; includeSummaries?: boolean; attachmentSources?: ReadonlyMap<string, string> },
 ): Promise<DossierBulkResult> {
-    const { patientId, signal, isCurrent } = input;
+    const { patientId, signal, isCurrent, attachmentSources } = input;
     const includeSummaries = input.includeSummaries === true;
     const guard = guardOf(signal, isCurrent);
     const result: DossierBulkResult = { documents: 0, accepted: 0, alreadyPresent: 0, superseded: 0, setAside: 0, leftPending: 0, residualAcknowledged: 0, applied: [], skipped: 0 };
     const view = await loadPatientDossier(ports, patientId, signal);
     guard();
     if (!view) return result;
+    const selectedDocuments = (current: DossierPatientView) => attachmentSources
+        ? current.documents.filter(doc => attachmentSources.get(doc.attachment.id) === doc.record.source.sha256)
+        : current.documents;
     const context = bulkContext(view);
     const acceptedElsewhere = new Set(view.documents.flatMap((document) => document.record.facts
         .filter((fact) => fact.decision === 'accepted' || fact.decision === 'already_present').map((fact) => dossierFactRef(document.attachment.id, fact.factId))));
     const setAsideElsewhere = new Set<string>();
-    for (const document of view.documents) {
+    for (const document of selectedDocuments(view)) {
         if (document.coverage.gaps.includes('identity_conflict') || !document.preservationCurrent || !document.attachment.currentness) { result.skipped += 1; continue; }
         const decide = (record: DossierRecord) => preparedBulkDecisions({ ...context, record, documentKey: document.attachment.id, acceptedElsewhere, setAsideElsewhere, includeSummaries });
         const preview = decide(document.record);
@@ -1159,9 +1162,10 @@ export async function acceptVerifiedAndApply(
     const hasPrepared = (record: DossierRecord) => record.facts.some((fact) => fact.origin === 'prepared');
     const fresh = await loadPatientDossier(ports, patientId, signal);
     guard();
-    for (const document of fresh?.documents ?? []) {
+    if (!fresh) return result;
+    for (const document of selectedDocuments(fresh)) {
         if (!hasPrepared(document.record) || !document.attachment.currentness || document.coverage.gaps.includes('identity_conflict')) continue;
-        const ready = document.record.facts.some((fact) => eligible(document.record, fact, fresh!.exemptionCodes, true));
+        const ready = document.record.facts.some((fact) => eligible(document.record, fact, fresh.exemptionCodes, true));
         if (!ready) continue;
         result.applied.push(await applyDossierDocument(ports, { patientId, attachmentId: document.attachment.id, expected: document.attachment.currentness, signal, isCurrent, verifiedOnly: true }));
         guard();
@@ -1175,7 +1179,7 @@ export async function acceptVerifiedAndApply(
         const facts = record.facts.map((fact, index) => fact.origin === 'parser:document' && fact.decision === 'pending' && decided.facts[index].decision === 'rejected' ? decided.facts[index] : fact);
         return { facts, superseded: facts.filter((fact, index) => fact !== record.facts[index]).length, acknowledgeResidual: decided.acknowledgeResidual };
     };
-    for (const document of after.documents) {
+    for (const document of selectedDocuments(after)) {
         if (!hasPrepared(document.record) || !document.attachment.currentness) continue;
         const final = supersededAfterWrite(document.record, document.attachment.id);
         const acknowledge = final.acknowledgeResidual && document.record.residualReview.state !== 'acknowledged';

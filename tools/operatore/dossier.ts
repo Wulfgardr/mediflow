@@ -8,6 +8,7 @@ import {
     type DossierDraftGroup, type DossierInputFile, type DossierPatient,
 } from '@/lib/document-dossier-session';
 import { DOSSIER_PREPARED_MAX_BYTES, parsePreparedExtraction, type PreparedExtraction } from '@/lib/domain/documents/dossier-prepared';
+import { dossierPatientCode, sourceConfirmsBatchIdentity } from '@/lib/dossier-new-patient-entry';
 import { dossierBatchProposals, type DossierBatchProposal } from '@/lib/dossier-batch-patients';
 import { createDossierBatchPatient, readDossierBatchScope } from '@/lib/dossier-batch-patient-client';
 import { DOSSIER_BATCH_LIMIT, dossierBatchDigest, dossierBatchRowDigest, type DossierBatchRow } from '@/lib/patient-document-batch-contract';
@@ -95,6 +96,14 @@ function cf4(group: DossierDraftGroup, patients: readonly DossierPatient[], pati
     return codice ? codice.slice(-4) : '----';
 }
 
+function codiceDocumentato(gruppo: DossierDraftGroup): string | null {
+    const identita = evaluateDraftGroupIdentity(gruppo, [], null);
+    if (identita.blocking || identita.uncertainDocuments?.length || identita.documentPatientCodes.length !== 1) return null;
+    const [codice] = identita.documentPatientCodes;
+    const fonti = gruppo.sources.filter(fonte => fonte.status === 'ready');
+    return fonti.length > 0 && fonti.every(fonte => dossierPatientCode(fonte) === codice) ? codice : null;
+}
+
 function righeDaCreare(proposte: readonly DossierBatchProposal[]) {
     return proposte.filter(proposta => !proposta.blocked).map(proposta => {
         const segmenti = proposta.source.relativePath.split('/');
@@ -148,8 +157,15 @@ export async function importaDossier(opzioni: OpzioniDossier): Promise<Riepilogo
         onProgress: (fatti, totale) => avanzamento(`Lettura locale: ${fatti} di ${totale}`) });
     let pazienti = await ports.listPatients(signal);
     const collegamenti: Record<string, string> = {};
+    const codici = new Map(gruppi.map(gruppo => [gruppo.key, codiceDocumentato(gruppo)]));
+    const daConfermare = new Set<string>();
+    const proposte = opzioni.creaSchede ? dossierBatchProposals(gruppi, pazienti, collegamenti).filter(proposta => {
+        if (codici.get(proposta.groupKey) === proposta.identity.taxCode && sourceConfirmsBatchIdentity(proposta.source, proposta.identity)) return true;
+        daConfermare.add(proposta.groupKey);
+        return false;
+    }) : [];
     const creazioni = opzioni.creaSchede
-        ? await creaSchede(dossierBatchProposals(gruppi, pazienti, collegamenti), opzioni.pin, signal, avanzamento)
+        ? await creaSchede(proposte, opzioni.pin, signal, avanzamento)
         : new Map<string, { patientId?: string; motivo?: string; incerta?: boolean }>();
     for (const [gruppo, esito] of creazioni) if (esito.patientId) collegamenti[gruppo] = esito.patientId;
     if (creazioni.size) pazienti = await ports.listPatients(signal);
@@ -160,6 +176,12 @@ export async function importaDossier(opzioni: OpzioniDossier): Promise<Riepilogo
         const patientId = dossierGroupDestination(gruppo, pazienti, collegamenti[gruppo.key]) || null;
         const base = { gruppo: gruppoAnonimo(gruppo.key), cf4: cf4(gruppo, pazienti, patientId), originaliSalvati: 0, originaliGiaPresenti: 0,
             originaliSaltati: 0, originaliFalliti: 0, fattiScritti: 0, vociDaDecidere: 0 };
+        if (!codici.get(gruppo.key) || daConfermare.has(gruppo.key)) {
+            const identita = evaluateDraftGroupIdentity(gruppo, pazienti, patientId);
+            esiti.push({ ...base, scheda: identita.blocking ? 'bloccata' : 'da confermare',
+                motivo: 'Verifica nel Dossier a chi si riferiscono i documenti.' });
+            continue;
+        }
         if (!patientId) {
             esiti.push({ ...base, scheda: creazione?.incerta ? 'incerta' : creazione ? 'non creata' : 'da confermare',
                 ...(creazione?.motivo ? { motivo: creazione.motivo } : { motivo: 'Nessuna scheda con questo codice fiscale.' }) });
@@ -177,7 +199,13 @@ export async function importaDossier(opzioni: OpzioniDossier): Promise<Riepilogo
             esiti.push({ ...base, scheda: 'bloccata', motivo: error instanceof DossierIdentityBlocked ? error.message : 'Acquisizione interrotta.' });
             continue;
         }
-        const applicati = await acceptVerifiedAndApply(ports, { patientId, signal, isCurrent, includeSummaries: false });
+        const digests = new Map(gruppo.sources.map(fonte => [fonte.key, fonte.sha256]));
+        const attachmentSources = new Map<string, string>();
+        for (const esito of acquisiti) {
+            const digest = digests.get(esito.key);
+            if (digest && (esito.status === 'stored' || esito.status === 'reused') && esito.verified) attachmentSources.set(esito.attachmentId, digest);
+        }
+        const applicati = await acceptVerifiedAndApply(ports, { patientId, signal, isCurrent, attachmentSources });
         esiti.push({
             ...base, scheda,
             originaliSalvati: acquisiti.filter(item => item.status === 'stored').length,

@@ -388,7 +388,9 @@ function nameWords(value: string): string[] {
     return value.normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase('it-IT').match(/\p{L}+/gu) ?? [];
 }
 
-const PATIENT_NAME_LINE = /^[\s>*#_-]*(?:paziente|assistit[oa]|nominativo|cognome\s+e\s+nome|nome\s+e\s+cognome)[\s*_]*[:.][\s*_]*(.+)$/iu;
+const PATIENT_NAME_FIELD = String.raw`(?:paziente|assistit[oa]|nominativo|cognome[ \t]+e[ \t]+nome|nome[ \t]+e[ \t]+cognome)[ \t*_]*[:.]`;
+const PATIENT_NAME_LINE = new RegExp(String.raw`^[\s>*#_-]*${PATIENT_NAME_FIELD}[\s*_]*(.+)$`, 'iu');
+const PATIENT_FIELD_START = new RegExp(String.raw`[ \t]+(?=${PATIENT_NAME_FIELD})`, 'giu');
 const NAME_STOP = /^(?:nat[oa]|cf|c|codice|cod|data|nascita|eta|anni|residente|tel|sesso|n|id)$/u;
 /** Parole funzionali: un nome finisce prima di «e», «di», «con»… */
 const NAME_FUNCTION_WORD = /^(?:e|ed|o|od|di|del|della|dei|degli|in|con|per|a|al|alla|non|ha|se|su|da|dal|dalla)$/u;
@@ -399,9 +401,10 @@ const CLINICAL_DESCRIPTOR = /^(?:vigil|collabor|orientat|disorientat|lucid|cosci
  * Nomi del paziente che il documento scrive su una riga con etichetta esplicita
  * («Paziente:», «Assistito:», «Cognome e nome:»). Si fermano alla prima parola che non è nome.
  */
-export function collectDossierPatientNames(text: string): string[][] {
+export function collectDossierPatientNames(text: string, includeInlineFields = false): string[][] {
     const names: string[][] = [];
-    for (const line of text.split(/\r?\n/u)) {
+    const lines = includeInlineFields ? text.replace(PATIENT_FIELD_START, '\n') : text;
+    for (const line of lines.split(/\r?\n/u)) {
         const match = PATIENT_NAME_LINE.exec(line);
         if (!match) continue;
         const head = match[1].replace(/[*_]/gu, ' ').split(/[,;(|]|\d/u)[0];
@@ -420,9 +423,13 @@ export function collectDossierPatientNames(text: string): string[][] {
     return names;
 }
 
+export function patientNameWords(patient: Pick<DossierPatientIdentity, 'firstName' | 'lastName'>): string[] {
+    return [...nameWords(patient.lastName ?? ''), ...nameWords(patient.firstName ?? '')];
+}
+
 /** Il nome scritto nel documento contiene nome e cognome della scheda, in qualunque ordine. */
 function nameMatches(written: readonly string[], patient: DossierPatientIdentity): boolean {
-    const wanted = [...nameWords(patient.lastName ?? ''), ...nameWords(patient.firstName ?? '')];
+    const wanted = patientNameWords(patient);
     return wanted.length > 0 && wanted.every((word) => written.includes(word));
 }
 
