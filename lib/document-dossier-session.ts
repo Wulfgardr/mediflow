@@ -28,7 +28,7 @@ import {
     type DossierSourceClassification, type DossierTaxCodeEvidence, type DossierWriteClaim,
 } from './domain/documents/dossier-import';
 import type { DocumentDecisionClassification } from './domain/documents/document-decision';
-import { preparedBulkDecisions, preparedDossierFacts, preparedPatientKey, preparedPatientLabel, type PreparedExtraction, type PreparedPatient } from './domain/documents/dossier-prepared';
+import { preparedBulkDecisions, preparedDossierFacts, preparedPatientKey, preparedPatientLabel, type PreparedExtraction, type PreparedFactsInput, type PreparedPatient } from './domain/documents/dossier-prepared';
 import { sameClinicalText, sameClinicalValue, sameDay, sameDosage, sameOptional, sameUnit } from './domain/documents/dossier-clinical-equality';
 
 // ---------------------------------------------------------------------------
@@ -57,6 +57,7 @@ export class DossierCollectionChanged extends Error { constructor() { super('Att
 
 export interface DossierPorts {
     sessionSignal(): AbortSignal;
+    icd11Title?(code: string, signal: AbortSignal): Promise<string | null>;
     extract(bytes: Uint8Array, signal: AbortSignal): Promise<DossierHostExtraction | { status: 'busy' }>;
     sha256(bytes: Uint8Array): Promise<string>;
     physicianTaxCode?(signal: AbortSignal): Promise<string | null>;
@@ -160,6 +161,7 @@ export async function buildDossierInventory(
 ): Promise<DossierDraftGroup[]> {
     const { signal, isCurrent } = options;
     const preparedSources = new Map((options.prepared?.sources ?? []).map((source) => [source.sha256, source]));
+    const icd11Checks: Record<string, NonNullable<PreparedFactsInput['icd11Checks']>[string]> = Object.create(null);
     const physicianTaxCode = await ports.physicianTaxCode?.(signal) ?? null;
     const exemptionCodes = await ports.exemptionCodes(signal);
     const imported = options.skipImportedFor ? preservedBySha(await ports.listAttachments(options.skipImportedFor, signal)) : new Set<string>();
@@ -232,8 +234,15 @@ export async function buildDossierInventory(
         let prepared: DossierDraftSource['prepared'];
         let preparedDate: string | null = null;
         if (match) {
+            for (const { values } of match.facts) {
+                const code = values.proposedCode;
+                if (!code || !ports.icd11Title || Object.hasOwn(icd11Checks, code)) continue;
+                const title = await ports.icd11Title(code, signal).catch(() => undefined);
+                assertLive(signal, isCurrent);
+                icd11Checks[code] = title ? { title } : title === null ? 'not_found' : 'unavailable';
+            }
             const merged = preparedDossierFacts({ source: match, text, units: extraction.state === 'extracted' ? extraction.units : [],
-                documentDate: date?.date ?? null, parserFacts: candidates.facts, now: ports.now() });
+                documentDate: date?.date ?? null, parserFacts: candidates.facts, now: ports.now(), icd11Checks });
             facts = merged.facts;
             preparedDate = merged.documentDate;
             const label = preparedPatientLabel(match.patient);
@@ -870,6 +879,12 @@ async function writeIdempotent(
 async function applyPatientCode(
     ports: DossierPorts, patientId: string, fact: DossierFact, signal: AbortSignal, guard: Guard, authorize: () => Promise<boolean>,
 ): Promise<WriteResult | 'unauthorized'> {
+    if (fact.kind === 'diagnosis' && fact.values.proposedCode && fact.values.code && fact.values.codeSelection !== 'document') {
+        const code = fact.values.code;
+        const title = await ports.icd11Title?.(code, signal).catch(() => null);
+        guard();
+        if (!title) return { outcome: 'failed', detail: 'Impossibile verificare il codice ICD-11 nel catalogo WHO. Controlla il codice e riprova.' };
+    }
     const present = (patient: DossierPatient) => fact.kind === 'exemption'
         ? patient.exemptions.some((code) => code.toUpperCase() === fact.values.code.toUpperCase())
         : patient.diagnoses.some((diagnosis) => fact.values.code
@@ -907,7 +922,8 @@ async function applyPatientCode(
     return after && present(after) ? { outcome: 'applied' } : { outcome: 'uncertain', detail: 'Scrittura confermata ma non riletta.' };
 }
 
-function eligible(record: DossierRecord, fact: DossierFact, exemptionCodes: ReadonlySet<string>): boolean {
+function eligible(record: DossierRecord, fact: DossierFact, exemptionCodes: ReadonlySet<string>, verifiedOnly = false): boolean {
+    if (verifiedOnly && fact.values.proposedCode) return false;
     if (fact.decision !== 'accepted' || dossierFactBlockers(fact, { exemptionCodes }).length) return false;
     const last = latestAppliedOutcome(record, fact.factId);
     if (!last || (last.outcome !== 'applied' && last.outcome !== 'already_present')) return true;
@@ -925,7 +941,7 @@ function eligible(record: DossierRecord, fact: DossierFact, exemptionCodes: Read
  */
 export async function applyDossierDocument(
     ports: DossierPorts,
-    input: { patientId: string; attachmentId: string; expected: DossierCurrentness; signal: AbortSignal; isCurrent: () => boolean },
+    input: { patientId: string; attachmentId: string; expected: DossierCurrentness; signal: AbortSignal; isCurrent: () => boolean; verifiedOnly?: boolean },
 ): Promise<DossierApplyResult> {
     const { patientId, attachmentId, signal } = input;
     const guard = guardOf(signal, input.isCurrent);
@@ -945,7 +961,7 @@ export async function applyDossierDocument(
         || evaluateDossierGroupIdentity([first.record.identity], [patient], patientId, physicianTaxCode).blocking) return finish('identity');
     const exemptionCodes = await ports.exemptionCodes(signal);
     guard();
-    const planned = first.record.facts.filter((fact) => eligible(first.record, fact, exemptionCodes)).map((fact) => fact.factId);
+    const planned = first.record.facts.filter((fact) => eligible(first.record, fact, exemptionCodes, input.verifiedOnly)).map((fact) => fact.factId);
     let documentText: string | null | undefined;
     for (const factId of planned) {
         guard();
@@ -954,7 +970,7 @@ export async function applyDossierDocument(
         guard();
         if (!doc || !preservationIsCurrent(doc.record, doc.attachment.currentness?.sourceRef)) return finish('stale');
         let fact = doc.record.facts.find((item) => item.factId === factId);
-        if (!fact || !eligible(doc.record, fact, exemptionCodes)) continue;
+        if (!fact || !eligible(doc.record, fact, exemptionCodes, input.verifiedOnly)) continue;
         let claim = doc.record.pendingWrites?.find((item) => item.factId === factId);
         const target = DOSSIER_FACT_TARGET[fact.kind];
         const codeTarget = target === 'patient_diagnoses' || target === 'patient_exemptions';
@@ -1149,9 +1165,9 @@ export async function acceptVerifiedAndApply(
     if (!fresh) return result;
     for (const document of selectedDocuments(fresh)) {
         if (!hasPrepared(document.record) || !document.attachment.currentness || document.coverage.gaps.includes('identity_conflict')) continue;
-        const ready = document.record.facts.some((fact) => eligible(document.record, fact, fresh.exemptionCodes));
+        const ready = document.record.facts.some((fact) => eligible(document.record, fact, fresh.exemptionCodes, true));
         if (!ready) continue;
-        result.applied.push(await applyDossierDocument(ports, { patientId, attachmentId: document.attachment.id, expected: document.attachment.currentness, signal, isCurrent }));
+        result.applied.push(await applyDossierDocument(ports, { patientId, attachmentId: document.attachment.id, expected: document.attachment.currentness, signal, isCurrent, verifiedOnly: true }));
         guard();
     }
     const after = await loadPatientDossier(ports, patientId, signal);

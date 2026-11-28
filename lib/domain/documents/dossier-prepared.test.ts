@@ -565,3 +565,66 @@ test('the proposed patient groups the source only if MediFlow reads that name or
     assert.equal(preparedPatientKey({ taxCode: CF_A }, `${text}\nCF ${CF_A}`), `cf:${CF_A}`);
     assert.equal(preparedPatientKey({ firstName: 'PersonaUno', lastName: 'SinteticoUno' }, null), null, 'senza testo nessun raggruppamento');
 });
+
+test('WUL-928: only the marked ICD-11 candidate crosses the kit contract', () => {
+    const values = { description: 'Ipertensione arteriosa essenziale', code: 'I10', system: 'ICD-10', proposedCode: 'BA00',
+        proposedSystem: 'ICD-11', codeStatus: 'proposto', proposedTitle: 'Titolo del depositante' };
+    const documented = { description: values.description, code: values.code, system: values.system };
+    const kitFacts = [values, { ...values, codeStatus: '' }, { ...values, proposedSystem: 'ICD-10' },
+        { ...documented, codeStatus: 'proposto' }, documented];
+    const parsed = parsePreparedExtraction(JSON.stringify({ schema: DOSSIER_PREPARED_SCHEMA,
+        sources: [source(kitFacts.map((item) => ({ kind: 'diagnosis', values: item })), { summary: null })] }));
+    assert.ok(parsed.ok);
+    assert.equal(parsed.warnings.length, 3);
+    assert.deepEqual(parsed.value.sources[0].facts.map(({ values: fields }) => fields), [
+        { ...documented, proposedCode: 'BA00' }, documented, documented, documented, documented,
+    ]);
+});
+
+test('WUL-928: only a literally documented code can be the alternative to a proposal', () => {
+    const description = 'Ipertensione arteriosa essenziale';
+    const original = 'Diagnosi: I10 ' + description;
+    const parsed = (values: Record<string, string>, quote: string) => {
+        const result = parsePreparedExtraction(JSON.stringify({ schema: DOSSIER_PREPARED_SCHEMA, sources: [source([{
+            kind: 'diagnosis', values: { description, code: 'I10', system: 'ICD-10', proposedCode: 'BA00',
+                proposedSystem: 'ICD-11', codeStatus: 'proposto', ...values }, quote,
+        }], { summary: null })] }));
+        assert.ok(result.ok);
+        return result.value.sources[0];
+    };
+    const run = (values: Record<string, string>, text: string, icd11Checks?: Parameters<typeof preparedDossierFacts>[0]['icd11Checks']) => {
+        const units = splitDossierUnits(text, null).units;
+        const parserFacts = extractDossierCandidates({ fileName: 'lettera.pdf', text, units, documentDate: '2026-10-20', exemptionCodes: new Set() }).facts;
+        return preparedDossierFacts({ source: parsed(values, text), text, units, documentDate: '2026-10-20', parserFacts, now, icd11Checks })
+            .facts.filter(fact => fact.kind === 'diagnosis' && fact.origin !== 'parser:section');
+    };
+    const catalog = { BA00: { title: 'Essential hypertension' } };
+    const fromDocument = { documentCode: 'I10', documentSystem: 'ICD-10' };
+    for (const text of [original, 'ICD-10 I10 ' + description]) {
+        const [fact, ...rest] = run({}, text, catalog);
+        assert.deepEqual(rest, []);
+        assert.deepEqual(fact.values, { description, date: '2026-10-20', ...fromDocument, proposedCode: 'BA00',
+            proposedTitle: catalog.BA00.title, preparedCheck: 'verified' });
+        assert.equal(preparedFactEligible(fact, new Set()), false);
+    }
+    const [same] = run({ code: 'BA00', system: 'ICD-11' }, 'Diagnosi: BA00 ' + description, catalog);
+    assert.equal(same.values.proposedCode, same.values.documentCode);
+    assert.equal(same.values.code, undefined);
+    const [unavailable] = run({}, original, { BA00: 'unavailable' });
+    assert.equal(unavailable.values.documentCode, 'I10');
+    assert.equal(unavailable.values.proposedCode, 'BA00');
+    assert.equal(unavailable.values.proposedTitle, undefined);
+    assert.equal(preparedFactEligible(unavailable, new Set()), false);
+    for (const [fields, lookups] of [[{}, { BA00: 'not_found' }], [{ codeStatus: 'confermato' }, catalog], [{}, undefined]] as const) {
+        const [fact] = run(fields, original, lookups);
+        assert.equal(fact.values.code, 'I10');
+        assert.equal(fact.values.proposedCode, undefined);
+        assert.equal(preparedFactEligible(fact, new Set()), true);
+    }
+    for (const text of ['Diagnosi: ' + description, 'Diagnosi: I10.1 ' + description]) {
+        const [fact] = run({ codeStatus: 'confermato' }, text, catalog);
+        assert.equal(fact.values.documentCode, undefined);
+        assert.equal(fact.values.code, undefined);
+        assert.equal(preparedFactEligible(fact, new Set()), false);
+    }
+});

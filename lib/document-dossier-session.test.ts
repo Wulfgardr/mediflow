@@ -1128,3 +1128,81 @@ test('WUL-949 si salta solo un originale con conservazione verificata e attuale;
         else assert.deepEqual([outcome.status, 'verified' in outcome && outcome.verified], ['reused', true], damage);
     }
 });
+
+test('WUL-928: the operator path deposits evidence but leaves an ICD-11 proposal to individual review', async () => {
+    const text = letterText(CF_A);
+    const description = 'Ipertensione arteriosa essenziale';
+    const { ports, files } = setup([['sintetico/lettera.pdf', text]]);
+    ports.icd11Title = async (code) => code === 'BA00' ? 'Essential hypertension' : null;
+    const prepared = preparedFor([{ text, cf: CF_A, facts: [
+        { kind: 'diagnosis', values: { description, proposedCode: 'BA00', proposedSystem: 'ICD-11', codeStatus: 'proposto',
+            code: 'BA00', system: 'ICD-11' }, quote: `Diagnosi: ${description}` },
+    ] }]);
+    const [group] = await buildDossierInventory(ports, files, { ...live, prepared });
+    const [acquired] = await acquireDossierGroup(ports, { group, patientId: 'pa', confirmed: true, ...live });
+    assert.equal(acquired.status, 'stored');
+    await acceptVerifiedAndApply(ports, { patientId: 'pa', ...live, includeSummaries: false });
+    const doc = (await loadPatientDossier(ports, 'pa', live.signal))!.documents[0];
+    const proposal = doc.record.facts.find((fact) => fact.kind === 'diagnosis' && fact.origin === 'prepared')!;
+    assert.equal(proposal.decision, 'pending');
+    assert.equal(proposal.values.proposedCode, 'BA00');
+    assert.equal(proposal.values.proposedTitle, 'Essential hypertension');
+    assert.equal(proposal.values.code, undefined);
+    assert.equal(proposal.evidence?.excerpt, `Diagnosi: ${description}`);
+    assert.deepEqual((await ports.getPatient('pa', live.signal))!.diagnoses, []);
+    const attachmentId = doc.attachment.id;
+    await saveDossierReview(ports, { patientId: 'pa', attachmentId, expected: doc.attachment.currentness!, ...live,
+        change: (record) => ({ ...record, facts: record.facts.map((fact) => fact.factId !== proposal.factId ? fact
+            : decideByPhysician({ ...fact, values: { ...fact.values, code: 'BA00', system: 'ICD-11' } }, 'accepted')) }) });
+    assert.deepEqual((await acceptVerifiedAndApply(ports, { patientId: 'pa', ...live, includeSummaries: false })).applied, []);
+    const current = (await loadPatientDossier(ports, 'pa', live.signal))!.documents[0];
+    const expected = current.attachment.currentness!;
+    assert.equal((await applyDossierDocument(ports, { patientId: 'pb', attachmentId, expected, ...live })).stopped, 'stale');
+    assert.deepEqual((await ports.getPatient('pa', live.signal))!.diagnoses, []);
+    assert.deepEqual((await ports.getPatient('pb', live.signal))!.diagnoses, []);
+    const applied = await applyDossierDocument(ports, { patientId: 'pa', attachmentId, expected, ...live });
+    assert.deepEqual(applied.outcomes.map(({ factId, target, outcome }) => ({ factId, target, outcome })), [
+        { factId: proposal.factId, target: 'patient_diagnoses', outcome: 'applied' },
+    ]);
+    assert.deepEqual((await ports.getPatient('pa', live.signal))!.diagnoses, [
+        { code: 'BA00', system: 'ICD-11', description, date: '2026-10-20T00:00:00.000Z' },
+    ]);
+});
+
+test('WUL-928: an unavailable catalog cannot commit a selected candidate and the same fact can be retried', async () => {
+    const description = 'Ipertensione arteriosa essenziale';
+    const quote = `Diagnosi: I10 ${description}`;
+    const text = letterText(CF_A).replace(`Diagnosi: ${description}`, quote);
+    const { ports, files } = setup([['sintetico/lettera.pdf', text]]);
+    let available = false;
+    ports.icd11Title = async () => {
+        if (!available) throw new Error('Catalog unavailable');
+        return 'Essential hypertension';
+    };
+    const prepared = preparedFor([{ text, cf: CF_A, facts: [
+        { kind: 'diagnosis', values: { description, code: 'I10', system: 'ICD-10',
+            proposedCode: 'BA00', proposedSystem: 'ICD-11', codeStatus: 'proposto' }, quote },
+    ] }]);
+    const [group] = await buildDossierInventory(ports, files, { ...live, prepared });
+    const [acquired] = await acquireDossierGroup(ports, { group, patientId: 'pa', confirmed: true, ...live });
+    assert.equal(acquired.status, 'stored');
+    const read = async () => (await loadPatientDossier(ports, 'pa', live.signal))!.documents[0];
+    const document = await read();
+    const [proposal] = document.record.facts.filter(fact => fact.kind === 'diagnosis' && fact.origin === 'prepared');
+    assert.equal(proposal.values.documentCode, 'I10');
+    assert.equal(proposal.values.proposedCode, 'BA00');
+    assert.equal(proposal.values.code, undefined);
+    const attachmentId = document.attachment.id;
+    await saveDossierReview(ports, { patientId: 'pa', attachmentId, expected: document.attachment.currentness!, ...live,
+        change: (record) => ({ ...record, facts: record.facts.map(fact => fact.factId !== proposal.factId ? fact
+            : decideByPhysician({ ...fact, values: { ...fact.values, code: 'BA00', system: 'ICD-11' } }, 'accepted')) }) });
+    const apply = async () => applyDossierDocument(ports, { patientId: 'pa', attachmentId, expected: (await read()).attachment.currentness!, ...live });
+    assert.deepEqual((await apply()).outcomes.map(item => item.outcome), ['failed']);
+    assert.deepEqual((await ports.getPatient('pa', live.signal))!.diagnoses, []);
+    available = true;
+    assert.deepEqual((await apply()).outcomes.map(item => item.outcome), ['applied']);
+    assert.deepEqual((await apply()).outcomes, []);
+    assert.deepEqual((await ports.getPatient('pa', live.signal))!.diagnoses, [
+        { code: 'BA00', system: 'ICD-11', description, date: '2026-10-20T00:00:00.000Z' },
+    ]);
+});

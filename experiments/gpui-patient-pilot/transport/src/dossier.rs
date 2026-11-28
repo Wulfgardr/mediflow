@@ -482,6 +482,7 @@ pub fn prepared_facts(input: &Value) -> Value {
     }
     let mut facts = array(&input["parserFacts"]).to_vec();
     let mut ids = BTreeSet::new();
+    let mut represented_parser = BTreeSet::new();
     let mut uncoded = Vec::new();
     let mut uncoded_names = BTreeSet::new();
     for item in array(&source["facts"]) {
@@ -731,6 +732,61 @@ pub fn prepared_facts(input: &Value) -> Value {
             ));
             v.as_object_mut().unwrap().remove("activePrinciple");
         }
+        if kind == "diagnosis"
+            && (item["hasDiagnosisCodeProposal"] == true || !string(&v["proposedCode"]).is_empty())
+        {
+            let verified = ["verified", "approximate"].contains(&check.as_str());
+            let code = string(&v["code"]).to_uppercase();
+            let written = re(r"[\p{L}\p{N}]+(?:[./&-][\p{L}\p{N}]+)*")
+                .find_iter(&string(&evidence["excerpt"]).to_uppercase())
+                .any(|token| token.as_str() == code);
+            if !verified
+                || !written
+                || !["ICD-9", "ICD-10", "ICD-11"].contains(&string(&v["system"]))
+            {
+                if verified && !code.is_empty() {
+                    check = "value_missing".into();
+                }
+                let fields = v.as_object_mut().unwrap();
+                fields.remove("code");
+                fields.remove("system");
+            }
+            if !string(&v["proposedCode"]).is_empty() {
+                let lookup = &input["icd11Checks"][string(&v["proposedCode"])];
+                if lookup.is_object() {
+                    v["proposedTitle"] = lookup["title"].clone();
+                } else if lookup == "unavailable" {
+                    fact_notes.push("Catalogo WHO non disponibile. Il codice ICD-11 sarà verificato all’applicazione.".into());
+                } else {
+                    v.as_object_mut().unwrap().remove("proposedCode");
+                    if lookup == "not_found" {
+                        fact_notes.push("Codice proposto assente dal catalogo WHO.".into());
+                    }
+                }
+            }
+            if !string(&v["proposedCode"]).is_empty() && !string(&v["code"]).is_empty() {
+                v["documentCode"] = v["code"].clone();
+                v["documentSystem"] = v["system"].clone();
+                for fact in array(&input["parserFacts"]) {
+                    let other = &fact["evidence"];
+                    if fact["kind"] == "diagnosis"
+                        && fact["origin"] == "parser:icd"
+                        && same_identity(fact, &v)
+                        && fact["values"]["system"] == v["system"]
+                        && !evidence.is_null()
+                        && !other.is_null()
+                        && evidence["unit"] == other["unit"]
+                        && evidence["start"].as_u64() < other["end"].as_u64()
+                        && other["start"].as_u64() < evidence["end"].as_u64()
+                    {
+                        represented_parser.insert(string(&fact["factId"]));
+                    }
+                }
+                let fields = v.as_object_mut().unwrap();
+                fields.remove("code");
+                fields.remove("system");
+            }
+        }
         v["preparedCheck"] = json!(check);
         if !fact_notes.is_empty() {
             v["preparedNotes"] = json!(fact_notes.join(" "));
@@ -768,6 +824,7 @@ pub fn prepared_facts(input: &Value) -> Value {
     } else {
         notes.push(json!("L’estrazione preparata non contiene una sintesi: resta la voce di diario col testo completo."));
     }
+    facts.retain(|fact| !represented_parser.contains(string(&fact["factId"])));
     json!({"facts":facts,"notes":notes,"documentDate":doc_date})
 }
 fn name_words(value: &str) -> Vec<String> {
@@ -1268,6 +1325,19 @@ pub fn blockers(fact: &Value, exemptions: Option<&[Value]>) -> Value {
     {
         out.push("Un codice di diagnosi richiede il sistema di codifica.".into());
     }
+    if kind == "diagnosis"
+        && !string(&v["proposedCode"]).is_empty()
+        && !string(&v["code"]).is_empty()
+    {
+        let valid = if v["codeSelection"] == "document" {
+            v["code"] == v["documentCode"] && v["system"] == v["documentSystem"]
+        } else {
+            v["system"] == "ICD-11"
+        };
+        if !valid || fact["decidedBy"] == "accept_verified" {
+            out.push("Scegli il codice nel singolo fatto.".into());
+        }
+    }
     if kind == "exemption"
         && exemptions.is_some_and(|codes| {
             !codes
@@ -1294,7 +1364,10 @@ pub fn blockers(fact: &Value, exemptions: Option<&[Value]>) -> Value {
     json!(unique)
 }
 pub fn eligible(fact: &Value, exemptions: &[Value], summaries: bool) -> bool {
-    if fact["negated"] == true || !array(&blockers(fact, Some(exemptions))).is_empty() {
+    if !string(&fact["values"]["proposedCode"]).is_empty()
+        || fact["negated"] == true
+        || !array(&blockers(fact, Some(exemptions))).is_empty()
+    {
         return false;
     }
     if fact["origin"] == "prepared" {
@@ -1454,6 +1527,26 @@ pub fn parse_prepared(text: &str) -> Value {
                 }
             }
             let mut fact = json!({"kind":kind,"values":values});
+            if kind == "diagnosis"
+                && ["proposedCode", "proposedSystem", "codeStatus"]
+                    .iter()
+                    .any(|field| item["values"].as_object().unwrap().contains_key(*field))
+            {
+                fact["hasDiagnosisCodeProposal"] = json!(true);
+                let code = trimmed(&item["values"]["proposedCode"], 20000);
+                if trimmed(&item["values"]["proposedSystem"], 20000) == "ICD-11"
+                    && trimmed(&item["values"]["codeStatus"], 20000) == "proposto"
+                    && code.len() <= 32
+                    && re(r"^[A-Z0-9][A-Z0-9.\-]*$").is_match(&code)
+                {
+                    fact["values"]["proposedCode"] = json!(code);
+                } else {
+                    warnings.push(format!(
+                        "Fonte {n}, fatto {}: proposta di codice ICD-11 non valida, ignorata.",
+                        i + 1
+                    ));
+                }
+            }
             let quote = trimmed(&item["quote"], 600);
             if !quote.is_empty() {
                 fact["quote"] = json!(quote);
@@ -1579,6 +1672,7 @@ pub fn bulk(input: &Value) -> Value {
         .collect();
     for fact in &mut facts {
         if fact["decision"] != "pending"
+            || !string(&fact["values"]["proposedCode"]).is_empty()
             || fact["origin"] == "parser:document"
             || fact["origin"] == "manual"
             || held(fact)
