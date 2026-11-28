@@ -69,7 +69,7 @@ clinica è inclusa; WUL-759 riserva il contatto a Leonardo.
 
 Chiedi “Apri la ricerca locale di MediFlow”. Il tool accetta soltanto un
 intento fra `search`, `identity`, `history`, `prescribing`, `patient_insight`,
-`document_synthesis`, `smart_import` e, quando accettato, torna
+`document_synthesis`, `smart_import`, `new_patient_from_documents` e, quando accettato, torna
 `continue_in_mediflow`. La ricevuta non attesta apertura o un esito clinico.
 Il primo comando avvia il launcher ordinario staccato, con lo stesso ingresso di
 `MediFlow.command`. L'invocazione effettiva è:
@@ -121,6 +121,13 @@ resta responsabile di terapia, conferma, firma e trasmissione. In modalità Web,
 Quadro paziente, Sintesi dei documenti e Smart Import aprono le rispettive
 sezioni della cartella. Fonti e generazione si scelgono nei controlli della
 funzione in MediFlow, dopo l’apertura.
+
+Nuova scheda dai documenti apre, dopo la conferma locale, la creazione di un
+nuovo paziente anche senza cartella aperta. Il medico sceglie i documenti nel
+selettore della finestra MediFlow: il tool non riceve file, nomi o esiti. Il
+selettore annullato non scrive nulla; la scheda nasce solo dalla conferma con
+PIN nella revisione. Un documento già allegato alla chat è fuori da questo
+canale: la skill avvisa senza citarlo e non apre l'importazione in quel turno.
 
 Nessun intento viene conservato o ripreso alla riconnessione/login. Le
 notifiche sono volatili, scadono dopo 15 secondi e vengono ritirate al cambio

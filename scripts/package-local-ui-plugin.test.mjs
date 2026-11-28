@@ -261,3 +261,17 @@ for (const mutation of ['revision', 'ledger', 'payload']) {
     assert.equal(fs.existsSync(f.marker), false);
   });
 }
+
+test('the skill shows the ADR 0160 import warnings next to the new patient from documents intent', () => {
+  const flat = text => text.replace(/\s+/gu, ' ');
+  const adr = flat(fs.readFileSync('docs/adr/0160-mediflow-in-desktop-chat.md', 'utf8'));
+  const skill = flat(fs.readFileSync(path.join(root, 'skills/local-ui/SKILL.md'), 'utf8'));
+  const before = adr.match(/vicino all'azione di importazione, mostrare: («Carica i documenti[^»]+»)/u)?.[1];
+  const attached = adr.match(/allegato nel compositore, interrompere il percorso di importazione del plugin e avvisare senza citare il contenuto: («[^»]+»)/u)?.[1];
+  assert.ok(before && attached);
+  const section = skill.slice(skill.indexOf('## Nuova scheda dai documenti'));
+  assert.match(section, /`new_patient_from_documents`/u);
+  assert.ok(section.includes(before));
+  assert.ok(section.includes(attached));
+  assert.match(section, /non invocare l'intento in questo turno/u);
+});

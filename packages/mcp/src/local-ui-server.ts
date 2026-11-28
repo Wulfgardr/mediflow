@@ -9,7 +9,7 @@ export function createLocalUiMcpServer() {
   try { client = createLocalUiClient(); } catch { /* calls fail closed */ }
   server.registerTool(LOCAL_UI_TOOL_ID, {
     title: 'Continue in local MediFlow',
-    description: 'Requests local MediFlow navigation. Open search, identity, history, prescribing, patient insight, document synthesis or smart import in the separate trusted UI. The user selects the patient and confirms the destination there. Opening a view does not select sources or generate a proposal. No patient data is returned. Continue there; this receipt does not confirm display or any clinical action.',
+    description: 'Requests local MediFlow navigation. Open search, identity, history, prescribing, patient insight, document synthesis, smart import or new patient from documents in the separate trusted UI. Documents are chosen in that UI; this tool takes no files. The user selects the patient and confirms the destination there. Opening a view does not select sources or generate a proposal. No patient data is returned. Continue there; this receipt does not confirm display or any clinical action.',
     inputSchema: localUiArgumentsSchema,
     outputSchema: z.object({ status: z.literal('continue_in_mediflow') }).strict(),
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
