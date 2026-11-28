@@ -53,6 +53,7 @@ import {
     type LoginFailurePayload,
     type UnlockParameters,
 } from '@/lib/security/client-auth-api';
+import { confirmAgentUnlock } from '@/lib/security/agent-unlock-confirm';
 import { createUnlockWrapping, createRecoveryWrapping, openRecoveryWrapping, deriveUnlockMaterial, openUnlockWrapping } from '@/lib/security/unlock-credential';
 import { planUnlock } from '@/lib/security/unlock-plan';
 import { MEDIFLOW_API_AUTH_UNAVAILABLE_EVENT } from '@/lib/api-table-response';
@@ -140,14 +141,6 @@ function canOfferLegacyRepair(health: AuthHealthPayload | null): boolean {
         default:
             return health.db?.state === 'missing' || health.db?.state === 'schema-missing';
     }
-}
-
-function confirmAgentUnlock(gesture: { ticket: string } | { sharedTab: string; etag: string }): Promise<boolean> {
-    const headers = new Headers({ 'Content-Type': 'application/json' });
-    if ('etag' in gesture) headers.set('If-Match', gesture.etag);
-    const body = 'ticket' in gesture ? { ticket: gesture.ticket } : { sharedTab: gesture.sharedTab };
-    return fetch('/api/agent-mandates/unlock', { method: 'POST', cache: 'no-store', headers, body: JSON.stringify(body),
-        signal: AbortSignal.timeout(4000) }).then(response => response.ok, () => false);
 }
 
 const SecurityContext = createContext<SecurityContextType | undefined>(undefined);
