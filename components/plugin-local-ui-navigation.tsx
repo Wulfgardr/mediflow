@@ -1,21 +1,31 @@
 'use client';
 
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { createLocalUiWork, readLocalUiWorkScope, LOCAL_UI_REVOKE_EVENT, type LocalUiWorkScope } from '@/lib/plugin-local-ui-work';
+import { PluginLocalUiWorkContext } from './use-plugin-local-ui-work';
 import { Disclosure } from './disclosure';
 import PrivacyBlur from './privacy-blur';
 import { useSecurity } from './security-provider';
 import { db } from '@/lib/db';
-import { LOCAL_UI_INTENTS, type LocalUiIntent } from '@/packages/mcp/src/local-ui-contract';
+import { isLocalUiIntent } from '@/packages/mcp/src/local-ui-intents.mjs';
+import type { LocalUiIntent } from '@/packages/mcp/src/local-ui-contract';
 
 const PluginLocalUiRuntime = createContext(false);
 
 export function PluginLocalUiRuntimeProvider({ enabled, children }: Readonly<{ enabled: boolean; children: ReactNode }>) {
-  return <PluginLocalUiRuntime.Provider value={enabled}>{children}</PluginLocalUiRuntime.Provider>;
+  const [work] = useState(createLocalUiWork);
+  return <PluginLocalUiRuntime.Provider value={enabled}>
+    <PluginLocalUiWorkContext.Provider value={enabled ? work : null}>{children}</PluginLocalUiWorkContext.Provider>
+  </PluginLocalUiRuntime.Provider>;
 }
 
 const labels: Record<LocalUiIntent, string> = { search: 'Ricerca locale', identity: 'Anagrafica',
-  history: 'Storia clinica e fonti', prescribing: 'Guida alla prescrizione' };
-const anchors = { identity: 'identita', history: 'timeline', prescribing: 'plugin-prescribing' };
+  history: 'Storia clinica e fonti', prescribing: 'Guida alla prescrizione',
+  patient_insight: 'Quadro paziente', document_synthesis: 'Sintesi dei documenti', smart_import: 'Smart Import' };
+const anchors = {
+  identity: 'identita', history: 'timeline', prescribing: 'plugin-prescribing',
+  patient_insight: 'patient-insight', document_synthesis: 'document-synthesis', smart_import: 'smart-import',
+};
 async function selectionEpoch(signal: AbortSignal): Promise<number> {
   const response = await fetch('/api/patient-profile/selection-epoch', { cache: 'no-store', signal, credentials: 'same-origin' });
   if (!response.ok) throw new Error('context_unavailable');
@@ -24,11 +34,12 @@ async function selectionEpoch(signal: AbortSignal): Promise<number> {
   return value.selectionEpoch;
 }
 
-type Pending = { intent: LocalUiIntent; epoch: number | null; expiresAt: number; generation: number };
+type Pending = { intent: LocalUiIntent; epoch: number | null; expiresAt: number; generation: number; scope: LocalUiWorkScope | null };
 export function PluginLocalUiNavigation({ patientId, patientVersion, patientLabel }: Readonly<{
   patientId?: string; patientVersion?: number; patientLabel?: string;
 }>) {
   const pluginLocalUi = useContext(PluginLocalUiRuntime);
+  const work = useContext(PluginLocalUiWorkContext);
   const { user, isLocked, isAuthenticated } = useSecurity();
   const [pending, setPending] = useState<Pending | null>(null);
   const [message, setMessage] = useState('');
@@ -44,30 +55,60 @@ export function PluginLocalUiNavigation({ patientId, patientVersion, patientLabe
     const events = new EventSource('/api/plugin-local-ui/events');
     let expiry: ReturnType<typeof setTimeout> | undefined;
     let epochRead: AbortController | undefined;
+    let pendingScope: LocalUiWorkScope | null = null;
     const clear = () => {
-      generation.current++; clearTimeout(expiry); epochRead?.abort(); epochRead = undefined; setPending(null);
+      generation.current++; pendingScope = null; clearTimeout(expiry); epochRead?.abort(); epochRead = undefined; setPending(null);
     };
+    const revoke = (link: string) => {
+      if (pendingScope?.link === link) clear();
+      work?.revoke(link);
+    };
+    const reset = () => { clear(); work?.reset(); };
+    const onRevoke = (event: Event) => revoke((event as CustomEvent<string>).detail);
+    const onMove = () => work?.move(window.location.hash);
     clear();
     events.onmessage = event => {
+      if (event.data === 'revoke') { revoke(event.lastEventId); return; }
+      if (event.data === 'reset') {
+        if (!event.lastEventId) { clear(); work?.open(null); }
+        else {
+          if (pendingScope?.request === event.lastEventId) clear();
+          work?.cancel(event.lastEventId);
+        }
+        return;
+      }
       clear(); setMessage('');
-      if (!LOCAL_UI_INTENTS.includes(event.data as LocalUiIntent) || signal.aborted || document.visibilityState !== 'visible') return;
+      if (!isLocalUiIntent(event.data) || signal.aborted || document.visibilityState !== 'visible') return;
       const intent = event.data as LocalUiIntent, token = generation.current, expiresAt = Date.now() + 15_000;
+      const scope = readLocalUiWorkScope(event.lastEventId);
+      if (scope && work?.isRevoked(scope)) return;
+      pendingScope = scope;
       expiry = setTimeout(clear, 15_000);
       const read = new AbortController(); epochRead = read;
       const requestSignal = AbortSignal.any([signal, read.signal]);
       const publish = (epoch: number | null) => {
         if (!current || requestSignal.aborted || token !== generation.current || expiresAt <= Date.now()) return;
-        setPending({ intent, epoch, generation: token, expiresAt });
+        setPending({ intent, epoch, generation: token, expiresAt, scope });
       };
       if (!patientId || intent === 'search') publish(null);
       else void selectionEpoch(requestSignal).then(publish).catch(() => { if (current && token === generation.current) clear(); });
     };
     const onVisibility = () => { if (document.visibilityState !== 'visible') clear(); };
     document.addEventListener('visibilitychange', onVisibility);
-    events.onerror = () => { clear(); events.close(); };
-    signal.addEventListener('abort', clear, { once: true });
-    return () => { current = false; clear(); events.close(); document.removeEventListener('visibilitychange', onVisibility); signal.removeEventListener('abort', clear); };
-  }, [pluginLocalUi, patientId, patientVersion, user?.id, isAuthenticated, isLocked, signal]);
+    window.addEventListener(LOCAL_UI_REVOKE_EVENT, onRevoke);
+    window.addEventListener('hashchange', onMove);
+    window.addEventListener('pagehide', reset);
+    events.onerror = () => { reset(); events.close(); };
+    signal.addEventListener('abort', reset, { once: true });
+    return () => {
+      current = false; reset(); events.close();
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener(LOCAL_UI_REVOKE_EVENT, onRevoke);
+      window.removeEventListener('hashchange', onMove);
+      window.removeEventListener('pagehide', reset);
+      signal.removeEventListener('abort', reset);
+    };
+  }, [pluginLocalUi, patientId, patientVersion, user?.id, isAuthenticated, isLocked, signal, work]);
   const confirm = async () => {
     const request = pending;
     if (!request || signal.aborted || isLocked || !isAuthenticated || request.expiresAt <= Date.now() || document.visibilityState !== 'visible') { setPending(null); return; }
@@ -75,11 +116,11 @@ export function PluginLocalUiNavigation({ patientId, patientVersion, patientLabe
     try {
       if (request.epoch !== null && await selectionEpoch(signal) !== request.epoch) throw new Error('context_changed');
       if (signal.aborted || request.generation !== generation.current || request.expiresAt <= Date.now() || document.visibilityState !== 'visible') return;
-      if (request.intent === 'search' || !patientId) { window.location.assign('/?area=incarico'); return; }
-      const target = document.getElementById(anchors[request.intent]);
-      target?.querySelector<HTMLButtonElement>('[data-disclosure-control][aria-expanded="false"]')?.click();
-      window.location.hash = anchors[request.intent];
-      target?.scrollIntoView({ block: 'start' });
+      if (request.intent === 'search' || !patientId) { work?.open(null); window.location.assign('/?area=incarico'); return; }
+      const anchor = anchors[request.intent];
+      work?.open(request.scope ? { scope: request.scope, intent: request.intent, patientId, anchor: `#${anchor}` } : null);
+      if (window.location.hash === `#${anchor}`) window.dispatchEvent(new HashChangeEvent('hashchange'));
+      else window.location.hash = anchor;
     } catch { setMessage('La selezione è cambiata o non è disponibile. Richiedi di nuovo il percorso.'); }
   };
   if (isLocked || !isAuthenticated || (!pending && !message)) return null;

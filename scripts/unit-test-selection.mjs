@@ -23,6 +23,7 @@ export const UNIT_SCRIPT_TESTS = Object.freeze([
   'scripts/loopback-ingress.test.mjs',
   'scripts/network-ingress-policy.test.mjs',
   'scripts/local-ui-lifecycle.test.mjs',
+  'scripts/local-ui-feature-navigation.test.mjs',
   'scripts/local-ui-work-preservation.test.mjs',
   'scripts/runtime-leases.test.mjs',
   'scripts/local-ui-browser-port.test.mjs',

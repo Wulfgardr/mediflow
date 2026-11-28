@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
 import ts from 'typescript';
+import * as workExports from '../lib/plugin-local-ui-work.ts';
+import { isLocalUiIntent } from '../packages/mcp/src/local-ui-intents.mjs';
 
 type Element = { type: any; props: Record<string, any> };
 function fixture(pluginRuntime = true) {
@@ -12,9 +14,11 @@ function fixture(pluginRuntime = true) {
   const reads: Array<{ signal: AbortSignal; release(): void }> = [];
   const session = new AbortController();
   const subscriptions: string[] = [];
+  const work = workExports.createLocalUiWork();
+  const workContext = {};
   const hooks = {
     createContext: (value: boolean) => ({ Provider: 'PluginLocalUiRuntimeProvider', defaultValue: value }),
-    useContext: () => pluginRuntime,
+    useContext: (context: unknown) => context === workContext ? work : pluginRuntime,
     useState(initial: unknown) {
       const key = index++;
       if (!(key in values)) values[key] = initial;
@@ -40,18 +44,20 @@ function fixture(pluginRuntime = true) {
   } };
   vm.runInNewContext(compile('./privacy-blur.tsx'), privacyModule, { timeout: 2_000 });
   const environment: any = { exports: {}, require(name: string) {
+    if (name === '@/lib/plugin-local-ui-work') return workExports;
+    if (name === './use-plugin-local-ui-work') return { PluginLocalUiWorkContext: workContext };
     if (name === './disclosure') return { Disclosure: ({ children }: { children: unknown }) => jsx('div', { children }) };
     if (name === './security-provider') return { useSecurity: () => ({ user: { id: 'synthetic-user' }, isLocked: false, isAuthenticated: true }) };
     if (name === './privacy-blur' || name === '@/components/privacy-blur') return privacyModule.exports;
     if (name === '@/lib/db') return { db: { getSessionReadSignal: () => session.signal } };
-    if (name === '@/packages/mcp/src/local-ui-contract') return { LOCAL_UI_INTENTS: ['search', 'identity', 'history', 'prescribing'] };
+    if (name === '@/packages/mcp/src/local-ui-intents.mjs') return { isLocalUiIntent };
     return common(name);
   }, Date: { now: () => now }, AbortController, AbortSignal,
   setTimeout(run: () => void, delay: number) { const timer = { at: now + delay, cancelled: false, run }; timers.push(timer); return timer; },
   clearTimeout(timer: typeof timers[number] | undefined) { if (timer) timer.cancelled = true; },
   EventSource: function (url: string) { subscriptions.push(url); events = { close() {} }; return events; },
   document: { visibilityState: 'visible', addEventListener() {}, removeEventListener() {}, getElementById() { return null; } },
-  window: { location: { hash: '' } }, HTMLDetailsElement: class {},
+  window: { location: { hash: '' }, addEventListener() {}, removeEventListener() {} }, HTMLDetailsElement: class {},
   fetch(_url: string, options: { signal: AbortSignal }) { return new Promise(resolve => {
     reads.push({ signal: options.signal, release: () => resolve({ ok: true, json: async () => ({ contractVersion: 1, selectionEpoch: 1 }) }) });
   }); } };

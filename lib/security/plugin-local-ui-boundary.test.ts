@@ -4,7 +4,7 @@ import { EventEmitter } from 'node:events';
 import test from 'node:test';
 import { LOCAL_UI_WEB_READY, createLocalUiSupervisorRuntime } from './portable-supervisor-local-ui.ts';
 import type { PortableSupervisorProductionChildProcessesV1 } from './portable-supervisor-child-processes.ts';
-import { LOCAL_UI_TOOL_ID, LOCAL_UI_RESULT, LOCAL_UI_INTENTS } from '../../packages/mcp/src/local-ui-contract.ts';
+import { LOCAL_UI_TOOL_ID, LOCAL_UI_RESULT } from '../../packages/mcp/src/local-ui-contract.ts';
 import { installLocalUiWebNavigation } from '../../scripts/local-ui-web-navigation.mjs';
 
 import { fixture } from './local-ui-mcp-test-fixture.ts';
@@ -16,13 +16,14 @@ test('real MCP and parent admit only enum navigation before any clinical binding
   try {
     const listed = await f.request('tools/list', {});
     assert.deepEqual(listed.result.tools.map((tool: any) => tool.name), [LOCAL_UI_TOOL_ID]);
-    for (const intent of LOCAL_UI_INTENTS) {
+    const intents = ['search', 'identity', 'history', 'prescribing', 'patient_insight', 'document_synthesis', 'smart_import'];
+    for (const intent of intents) {
       const result = await f.request('tools/call', { name: LOCAL_UI_TOOL_ID, arguments: { intent } });
       assert.deepEqual(result.result, { content: [{ type: 'text', text: 'continue_in_mediflow' }], structuredContent: LOCAL_UI_RESULT });
     }
-    assert.equal(f.web.length, 4);
+    assert.deepEqual(f.web.map(frame => JSON.parse(frame).intent), intents);
     for (const input of [{ intent: SENTINEL }, { intent: 'search', patientId: SENTINEL },
-      { intent: 'history', profile: 'clinical' }, { intent: 'search', capability: SENTINEL },
+      { intent: 'document_synthesis', source: SENTINEL }, { intent: 'history', profile: 'clinical' }, { intent: 'search', capability: SENTINEL },
       { intent: 'search', _meta: { secret: SENTINEL } }, {}, { [SENTINEL]: 'history' }]) {
       const result = await f.request('tools/call', { name: LOCAL_UI_TOOL_ID, arguments: input });
       assert.equal(result.result.isError, true);
@@ -35,7 +36,7 @@ test('real MCP and parent admit only enum navigation before any clinical binding
     }
     await f.request('resources/read', { uri: `ui://${SENTINEL}` });
     await f.request('prompts/get', { name: SENTINEL });
-    assert.equal(f.web.length, 4);
+    assert.deepEqual(f.web.map(frame => JSON.parse(frame).intent), intents);
     assert.doesNotMatch([...f.wire, ...f.stderr, ...f.web].join('\n'), new RegExp(SENTINEL));
     f.terminal(); await f.runtime.closed; assert.equal(f.stopped(), true);
     assert.equal(f.runtime.terminate(), false);

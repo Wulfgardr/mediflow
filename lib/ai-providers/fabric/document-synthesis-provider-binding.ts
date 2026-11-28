@@ -1,5 +1,5 @@
 import 'server-only';
-import { functionModelBindingSettings, captureFunctionModelTransportGuard } from './function-model-dispatch';
+import { functionModelBindingSettings, guardFunctionModelResolution } from './function-model-dispatch';
 
 import { types } from 'node:util';
 import { inArray } from 'drizzle-orm';
@@ -153,14 +153,13 @@ function attestationMatches(value: unknown, model: string): boolean {
 function sealResolution(snapshot: ResolutionSnapshot): LocalProviderResolution | null {
     try {
         const { raw, prototype, getBaseUrl, getModel, chat, listModels, endpoint, model } = snapshot;
-        const verifyChoice = captureFunctionModelTransportGuard('ollama', model, endpoint);
         const authentic = () => { try { return !types.isProxy(raw) && Object.getPrototypeOf(raw) === prototype && !Object.hasOwn(raw, 'getBaseUrl') && !Object.hasOwn(raw, 'getModel') && !Object.hasOwn(raw, 'chat') && !Object.hasOwn(raw, 'listModels') && Object.getOwnPropertyDescriptor(prototype, 'getBaseUrl')?.value === getBaseUrl && Object.getOwnPropertyDescriptor(prototype, 'getModel')?.value === getModel && Object.getOwnPropertyDescriptor(prototype, 'chat')?.value === chat && Object.getOwnPropertyDescriptor(prototype, 'listModels')?.value === listModels && getBaseUrl.call(raw) === endpoint && getModel.call(raw) === model; } catch { return false; } };
         const adapter: LocalProviderResolution['adapter'] = Object.freeze({
             id: 'ollama', kind: 'local' as const, capabilities: Object.freeze({ ...snapshot.manifest.capabilities }), getBaseUrl: () => endpoint, getModel: () => model,
-            async chat(messages: ChatMessage[], signal?: AbortSignal, maxTokens?: number, options?: AIChatOptions): Promise<{ content: string; stats: AIStats }> { if (!authentic()) throw new ProviderRegistryError('provider_not_local'); await verifyChoice(); const result = await chat.call(raw, messages, signal, maxTokens, options); await verifyChoice(); return result; },
+            async chat(messages: ChatMessage[], signal?: AbortSignal, maxTokens?: number, options?: AIChatOptions): Promise<{ content: string; stats: AIStats }> { if (!authentic()) throw new ProviderRegistryError('provider_not_local'); return chat.call(raw, messages, signal, maxTokens, options); },
             async listModels(): Promise<AIModel[]> { if (!authentic()) throw new ProviderRegistryError('provider_not_local'); return listModels.call(raw); },
         });
-        return Object.freeze({ adapter, manifest: snapshot.manifest, receipt: snapshot.receipt, fallback: Object.freeze({ strategy: 'none' as const, candidates: Object.freeze([] as const) }) });
+        return guardFunctionModelResolution(Object.freeze({ adapter, manifest: snapshot.manifest, receipt: snapshot.receipt, fallback: Object.freeze({ strategy: 'none' as const, candidates: Object.freeze([] as const) }) }));
     } catch { return null; }
 }
 

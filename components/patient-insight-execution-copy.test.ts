@@ -31,6 +31,12 @@ for (const remote of [false, true]) test(`verification copy follows the ${remote
         props: { patient: { id: 'synthetic-patient', version: 1 } },
         states: { 0: { patientId: 'synthetic-patient', patientKey: 'synthetic-patient:1', sourceSignature: 'synthetic', value: parsed!.preview } },
         imports: {
+            './use-plugin-local-ui-work': {
+                usePluginLocalUiWork: () => ({
+                    begin: () => assert.fail('Rendering a receipt must not start a generation'),
+                    finish: () => {},
+                }),
+            },
             '@/components/function-models/function-model-picker': {
                 FunctionModelPicker: () => null,
                 useFunctionModelPicker: () => ({ active: true, canGenerate: true, view: { remote: remote ? {} : null }, client: {} }),

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, type MouseEvent } from 'react';
+import { LOCAL_UI_REVOKE_EVENT } from '@/lib/plugin-local-ui-work';
 import { useSecurity } from './security-provider';
 
 type Status = { available?: boolean; pending: { nonce: string; expiresAt: number }[]; active: string[] };
@@ -33,6 +34,7 @@ export function PluginLocalUiPairing() {
   }, [isAuthenticated, isLocked, user?.id]);
   const decide = (event: MouseEvent<HTMLButtonElement>, nonce: string, action: 'allow' | 'deny' | 'revoke') => {
     if (!event.isTrusted || !navigator.userActivation.isActive || document.visibilityState !== 'visible' || !isAuthenticated || isLocked) return;
+    if (action === 'revoke') window.dispatchEvent(new CustomEvent(LOCAL_UI_REVOKE_EVENT, { detail: nonce }));
     setStatus(empty); setCode('');
     void fetch('/api/plugin-local-ui/pairing', { method: 'POST', credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nonce, action, ...(action === 'allow' ? { code } : {}) }) }).catch(() => {});

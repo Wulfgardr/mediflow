@@ -12,6 +12,24 @@ const roots: Readonly<Record<string, string>> = {
     treatment_reasoning: 'lib/ai-providers/fabric/resolver.ts',
     ocr: 'lib/ai-providers/fabric/resolver.ts',
 };
+const localUiContract = 'packages/mcp/src/local-ui-intents.mjs';
+const localUiWebNavigation = 'components/plugin-local-ui-navigation.tsx';
+
+function declaredStringProperties(file: ts.SourceFile | undefined, name: string): Map<string, string> {
+    const initializer = file?.statements.filter(ts.isVariableStatement).flatMap(statement => [...statement.declarationList.declarations])
+        .find(declaration => ts.isIdentifier(declaration.name) && declaration.name.text === name)?.initializer;
+    const object = initializer && ts.isCallExpression(initializer) && initializer.expression.getText() === 'Object.freeze'
+        ? initializer.arguments[0] : initializer;
+    const values = new Map<string, string>();
+    if (!object || !ts.isObjectLiteralExpression(object)) return values;
+    for (const property of object.properties) {
+        if (ts.isPropertyAssignment(property) && ts.isIdentifier(property.name) && ts.isStringLiteral(property.initializer)) {
+            values.set(property.name.text, property.initializer.text);
+        }
+    }
+    return values;
+}
+
 export function buildOperationalCatalog(sources: Map<string, string>, descriptors = Object.values(FABRIC_CAPABILITY_DESCRIPTORS)) {
     const dependencies = new Map<string, string[]>(), callers = new Map<string, string[]>();
     const testFile = (file: string) => /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file);
@@ -129,6 +147,8 @@ export function buildOperationalCatalog(sources: Map<string, string>, descriptor
         permissionCache.set(key, result);
         return result;
     }
+    const localUiIntents = declaredStringProperties(sourceFiles.get(localUiContract), 'LOCAL_UI_INTENT');
+    const localUiAnchors = declaredStringProperties(sourceFiles.get(localUiWebNavigation), 'anchors');
     const code = (value: string) => `\`${value}\``;
     const cell = (values: string[]) => values.length ? values.map(code).join('<br>') : 'Nessun percorso rilevato';
     const rows = descriptors.map(descriptor => {
@@ -154,9 +174,11 @@ export function buildOperationalCatalog(sources: Map<string, string>, descriptor
         const clients = [...sources].filter(([file, text]) => !testFile(file) && !file.startsWith('scripts/') && !file.startsWith('app/api/') && !/(?:^|\/)(?:Tests|tests|test_support)\//.test(file) && routePaths.some(route => matchesRoute(file.endsWith('.rs') ? text.split(/#\[cfg\(test\)\]\s*mod\s/)[0] : text, route)));
         const web = [...upstream.filter(file => /^(?:components\/|app\/.*page\.)/.test(file)), ...clients.filter(([file]) => /^(?:components|app|lib)\//.test(file)).map(([file]) => file)];
         const native = (pattern: RegExp) => clients.filter(([file]) => pattern.test(file)).map(([file]) => file);
-        return [code(descriptor.id), code(service), descriptor.id === 'treatment_reasoning' ? 'Negata nella release' : descriptor.venues.length ? cell([...descriptor.venues]) : 'Nessuna venue ammessa', cell(guards.slice(0, 4)), cell([...new Set(web)].sort().slice(0, 4)), cell(native(/^experiments\/gpui-patient-pilot\//).slice(0, 4)), cell(native(/^native\/(?:MediFlow|Shared)/).slice(0, 4)), cell(native(/(?:chat_access|chat-access|mcp\/|plugins\/)/).slice(0, 4)), cell(tests.slice(0, 4))];
+        const anchor = localUiIntents.get(descriptor.id) === descriptor.id ? localUiAnchors.get(descriptor.id) : undefined;
+        const webOpening = anchor ? `${code(descriptor.id)} → ${code(`#${anchor}`)}` : 'Nessun percorso rilevato';
+        return [code(descriptor.id), code(service), descriptor.id === 'treatment_reasoning' ? 'Negata nella release' : descriptor.venues.length ? cell([...descriptor.venues]) : 'Nessuna venue ammessa', cell(guards.slice(0, 4)), cell([...new Set(web)].sort().slice(0, 4)), cell(native(/^experiments\/gpui-patient-pilot\//).slice(0, 4)), cell(native(/^native\/(?:MediFlow|Shared)/).slice(0, 4)), cell(native(/(?:chat_access|chat-access|mcp\/|plugins\/)/).slice(0, 4)), webOpening, cell(tests.slice(0, 4))];
     });
-    const text = `# Catalogo operativo Fabric\n\nGenerato da \`scripts/check-fabric-operational-catalog.ts\`. Non modificare a mano.\n\nOgni cella mostra fino a quattro riferimenti, ordinati per percorso. Il catalogo deriva dai descriptor e dai percorsi di importazione del codice corrente. Le route sono collegate tramite richiami al servizio o riferimenti API del servizio; la sola inizializzazione di un modulo condiviso non costituisce un ingresso alla funzione. I controlli elencati sono chiamate raggiungibili dagli export del servizio e dei suoi chiamanti o dagli handler API, seguendo simboli e callback fino a cinque passaggi fra moduli. Ogni route deve avere evidenza propria; la loro presenza non concede permessi. I test sono riferimenti di copertura del servizio, non prove dei desktop installati. I consumatori sono riferimenti sorgente alle route o importazioni: nessun percorso rilevato significa raccordo non dimostrato, non parità. Le dipendenze sono seguite per cinque passaggi verso i chiamanti e cinque verso i controlli API.\n\nOllama e ChatGPT hanno tre celle ciascuno nel gate 0.9.1. La venue del descriptor è distinta dal trasporto ChatGPT (cloud, abbonamento e consenso sui byte). OCR resta indisponibile; Treatment Reasoning è negato da \`assertFunctionAvailableInRelease\`. Le API opzionali non qualificano il gate.\n\n| Funzione | Servizio | Venue descriptor | Permesso e controllo | Web | GPUI | Apple | Chat/plugin | Test del servizio |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n${rows.map(row => `| ${row.join(' | ')} |`).join('\n')}\n`;
+    const text = `# Catalogo operativo Fabric\n\nGenerato da \`scripts/check-fabric-operational-catalog.ts\`. Non modificare a mano.\n\nOgni cella mostra fino a quattro riferimenti, ordinati per percorso. Il catalogo deriva dai descriptor e dai percorsi di importazione del codice corrente. Le route sono collegate tramite richiami al servizio o riferimenti API del servizio; la sola inizializzazione di un modulo condiviso non costituisce un ingresso alla funzione. I controlli elencati sono chiamate raggiungibili dagli export del servizio e dei suoi chiamanti o dagli handler API, seguendo simboli e callback fino a cinque passaggi fra moduli. Ogni route deve avere evidenza propria; la loro presenza non concede permessi. I test sono riferimenti di copertura del servizio, non prove dei desktop installati. I consumatori sono riferimenti sorgente alle route o importazioni: nessun percorso rilevato significa raccordo non dimostrato, non parità. Le dipendenze sono seguite per cinque passaggi verso i chiamanti e cinque verso i controlli API.\n\nOllama e ChatGPT hanno tre celle ciascuno nel gate 0.9.1. La venue del descriptor è distinta dal trasporto ChatGPT (cloud, abbonamento e consenso sui byte). OCR resta indisponibile; Treatment Reasoning è negato da \`assertFunctionAvailableInRelease\`. Le API opzionali non qualificano il gate.\n\nLa colonna «Chat/plugin · chiamate al servizio» censisce i client delle route del servizio. «Apertura Web dal plugin» incrocia gli [intenti ammessi](../../../${localUiContract}) con le [destinazioni della scheda Web](../../../${localUiWebNavigation}). Il medico conferma l’apertura nella scheda Web e avvia la generazione nella funzione aperta con un gesto separato.\n\n| Funzione | Servizio | Venue descriptor | Permesso e controllo | Web | GPUI | Apple | Chat/plugin · chiamate al servizio | Apertura Web dal plugin | Test del servizio |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n${rows.map(row => `| ${row.join(' | ')} |`).join('\n')}\n`;
     return { text, count: rows.length };
 }
 

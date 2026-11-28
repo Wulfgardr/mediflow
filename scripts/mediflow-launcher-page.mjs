@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 
-const navigationIntents = new Set(['search', 'identity', 'history', 'prescribing']);
+import { isLocalUiIntent } from '../packages/mcp/src/local-ui-intents.mjs';
 
 const escape = value => String(value).replace(/[&<>"']/gu, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
@@ -169,7 +169,7 @@ export async function createChoiceServer({ root, state, choose, install, stop, n
       }
       const data = JSON.parse(body);
       if (route === `${base}/navigate`) {
-        if (!data || Object.keys(data).sort().join(',') !== 'expiresAt,intent,requestId' || !navigationIntents.has(data.intent)
+        if (!data || Object.keys(data).sort().join(',') !== 'expiresAt,intent,requestId' || !isLocalUiIntent(data.intent)
           || !validId(data.requestId) || !Number.isSafeInteger(data.expiresAt)
           || data.expiresAt <= Date.now() || data.expiresAt > Date.now() + 8000
           || requests.has(data.requestId) || !state().ready || state().navigationReady !== true

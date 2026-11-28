@@ -68,7 +68,8 @@ clinica è inclusa; WUL-759 riserva il contatto a Leonardo.
 ## Percorso del medico
 
 Chiedi “Apri la ricerca locale di MediFlow”. Il tool accetta soltanto un
-intento fra `search`, `identity`, `history`, `prescribing` e torna sempre
+intento fra `search`, `identity`, `history`, `prescribing`, `patient_insight`,
+`document_synthesis`, `smart_import` e, quando accettato, torna
 `continue_in_mediflow`. La ricevuta non attesta apertura o un esito clinico.
 Il primo comando avvia il launcher ordinario staccato, con lo stesso ingresso di
 `MediFlow.command`. L'invocazione effettiva è:
@@ -105,7 +106,7 @@ di nuovo il percorso; il plugin non riprende un intento scaduto.
 «Revoca il collegamento del plugin» ritira la capacità. Lock, logout,
 sostituzione dell'archivio, riavvio e chiusura dell'host richiedono un nuovo
 abbinamento. La chiusura dell'host lascia vivo il lavoro locale in MediFlow.
-L'abbinamento concede soltanto i quattro intenti, senza autorità clinica.
+L'abbinamento concede soltanto gli intenti di navigazione elencati.
 La receipt su disco e il fingerprint pubblico non autorizzano un listener;
 il Web deve dimostrare la propria generazione a ogni inoltro.
 Attende soltanto la readiness tecnica, entro il timeout; non attende lookup o rendering di un paziente.
@@ -116,7 +117,10 @@ scelta del paziente restano in MediFlow. Apri la cartella: un successivo intento
 richiede una conferma locale sulla cartella visibile. Anagrafica riusa
 PatientIdentityLens, storia la Timeline clinica con fonti. La guida distingue
 farmaco, prestazione e protesica e rimanda ai gestori esistenti. Il medico
-resta responsabile di terapia, conferma, firma e trasmissione.
+resta responsabile di terapia, conferma, firma e trasmissione. In modalità Web,
+Quadro paziente, Sintesi dei documenti e Smart Import aprono le rispettive
+sezioni della cartella. Fonti e generazione si scelgono nei controlli della
+funzione in MediFlow, dopo l’apertura.
 
 Nessun intento viene conservato o ripreso alla riconnessione/login. Le
 notifiche sono volatili, scadono dopo 15 secondi e vengono ritirate al cambio
