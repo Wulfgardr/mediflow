@@ -4,6 +4,7 @@ import { formatCountLabel } from '@/lib/format-count';
 import { InkState } from '@/components/ui/ink-state';
 import type { PatientSmartImportProjectionCaptureInput } from '@/lib/domain/documents/patient-smart-import-projection-capture';
 import styles from './patient-smart-import.module.css';
+import { usePluginLocalUiWork } from './use-plugin-local-ui-work';
 import { Disclosure } from '@/components/disclosure';
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { ChoiceField } from '@/components/choice-field';
@@ -20,22 +21,26 @@ export function PatientSmartImportFabricPreviewCard({ patientId, captureInput, e
     enabled: boolean;
     onProposalChange?: (capture: PatientSmartImportProjectionCaptureInput | null) => void;
 }) {
+    const { begin: beginPluginWork, finish: finishPluginWork } = usePluginLocalUiWork('smart_import', patientId);
     const picker = useFunctionModelPicker('smart_import', patientId, captureInput, enabled);
     const [controller] = useState(() => createSmartImportReviewBrowserController({ fetch: picker.client.fetch }));
     const generation = useRef(0); const handler = useRef(false);
     const [proposal, setProposal] = useState<SmartImportContextProposal | null>(null);
     const [ambulatory, setAmbulatory] = useState<SmartImportAmbulatoryChoice | null>(null); const [confirmed, setConfirmed] = useState(false);
     const [result, setResult] = useState<{ wire: SmartImportPreviewWireRoot; capture: PatientSmartImportProjectionCaptureInput } | null>(null); const [error, setError] = useState<string | null>(null); const [phase, setPhase] = useState<'idle' | 'loading' | 'confirm' | 'running' | 'terminal'>('idle');
-    const reset = () => { generation.current += 1; handler.current = false; controller.reset(); setProposal(null); setAmbulatory(null); setConfirmed(false); setResult(null); setError(null); setPhase('idle'); };
+    const reset = () => { finishPluginWork(); generation.current += 1; handler.current = false; controller.reset(); setProposal(null); setAmbulatory(null); setConfirmed(false); setResult(null); setError(null); setPhase('idle'); };
     const resetFromContext = useEffectEvent(reset);
     const resetFromChoice = useEffectEvent(() => { if (phase === 'running') reset(); else { setResult(null); setConfirmed(false); } });
-    useEffect(() => () => { generation.current += 1; controller.reset(); }, [controller]);
+    useEffect(() => () => { finishPluginWork(); generation.current += 1; controller.reset(); }, [controller, finishPluginWork]);
     useEffect(() => { resetFromContext(); }, [controller, patientId, captureInput, picker.active, picker.view.blocked, picker.view.preparationRevision]);
     useEffect(() => { resetFromChoice(); }, [picker.view.choice]);
+    const cancel = () => { picker.client.reset(picker.active); reset(); };
     const load = async () => {
-        if (phase !== 'idle' || handler.current || !enabled) return; handler.current = true; const token = ++generation.current; setPhase('loading'); setError(null);
+        if (phase !== 'idle' || handler.current || !enabled) return;
+        beginPluginWork(cancel);
+        handler.current = true; const token = ++generation.current; setPhase('loading'); setError(null);
         try { const value = await controller.readProposal(patientId); if (token !== generation.current) return; setProposal(value); setAmbulatory(null); setPhase('confirm'); }
-        catch (loadError) { if (token !== generation.current) return; setError(loadError instanceof SmartImportContextProposalBrowserAdapterError && loadError.code === 'context_missing'
+        catch (loadError) { if (token !== generation.current) return; finishPluginWork(); setError(loadError instanceof SmartImportContextProposalBrowserAdapterError && loadError.code === 'context_missing'
             ? 'Aggiungi un ambulatorio nelle impostazioni, poi riprova.' : 'Impossibile leggere paziente e ambulatori. Controlla la sessione e riprova.'); setPhase('terminal'); }
         finally { if (token === generation.current) handler.current = false; }
     };
@@ -43,7 +48,7 @@ export function PatientSmartImportFabricPreviewCard({ patientId, captureInput, e
         if (phase !== 'confirm' || !proposal || !ambulatory || !confirmed || handler.current || !enabled) return; handler.current = true; const token = ++generation.current; const currentProposal = proposal; setPhase('running'); setError(null);
         try { const modelToken = await picker.client.begin(); const value = await controller.run({ patientId, proposal: currentProposal, ambulatory, captureInput }, true); if (token !== generation.current || !picker.client.isCurrent(modelToken)) return; setResult({ wire: value, capture: captureInput }); setProposal(null); setAmbulatory(null); setConfirmed(false); setPhase('terminal'); }
         catch { if (token !== generation.current) return; setProposal(null); setConfirmed(false); setError('Anteprima non disponibile. Scegli Ricomincia per ripartire.'); setPhase('terminal'); }
-        finally { if (token === generation.current) handler.current = false; }
+        finally { if (token === generation.current) { finishPluginWork(); handler.current = false; } }
     };
     const preview = picker.active && result?.capture === captureInput ? result.wire.preview : undefined;
     useEffect(() => {
@@ -72,7 +77,10 @@ export function PatientSmartImportFabricPreviewCard({ patientId, captureInput, e
                     <button type="button" className="ui-btn-secondary" onClick={reset}>Annulla</button></div>
                 </div>
             )}
-            {phase === 'running' && <p className="mt-2">Generazione anteprima…</p>}
+            {phase === 'running' && <div className="mt-2 flex items-center gap-3">
+                <p role="status">Generazione anteprima…</p>
+                <button type="button" className="mf-button-secondary" onClick={cancel}>Annulla</button>
+            </div>}
             {phase === 'terminal' && (
                 <>
                     <div className="mt-3 space-y-3">

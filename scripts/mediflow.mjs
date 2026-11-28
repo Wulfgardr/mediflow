@@ -712,8 +712,12 @@ export async function main(args = process.argv.slice(2)) {
   const onParentMessage = message => handleNavigation(message, frame => process.send(frame, () => {}), () => process.connected);
   const onDisconnect = () => {
     for (const requestId of pendingNavigation) cancelNavigation(requestId);
-    if (pluginChannel && leases) leases.releaseInitial();
-    else onSignal();
+    if (pluginChannel && leases) {
+      if (state.navigationReady && child?.connected && ipcStopChildren.has(child)) {
+        child.send('{"schemaVersion":"mediflow.local-ui.client-closed.v1"}', () => {});
+      }
+      leases.releaseInitial();
+    } else onSignal();
   };
   for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.once(signal, onSignal);
   if (process.connected) {

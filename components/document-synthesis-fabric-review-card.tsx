@@ -1,6 +1,7 @@
 
 'use client';
 
+import { usePluginLocalUiWork } from './use-plugin-local-ui-work';
 import { Disclosure } from '@/components/disclosure';
 import styles from './clinical-register.module.css';
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
@@ -46,6 +47,7 @@ function DocumentSynthesisFabricReviewCardSession({
     attachmentName,
     enabled,
 }: DocumentSynthesisFabricReviewCardProps) {
+    const { begin: beginPluginWork, finish: finishPluginWork } = usePluginLocalUiWork('document_synthesis', patientId);
     const picker = useFunctionModelPicker('document_synthesis', patientId, attachmentId, enabled);
     const [controller] = useState(() => createDocumentSynthesisReviewBrowserController({
         fetch: picker.client.fetch,
@@ -64,6 +66,7 @@ function DocumentSynthesisFabricReviewCardSession({
     const [error, setError] = useState<Failure | null>(null);
 
     const reset = () => {
+        finishPluginWork();
         generation.current += 1;
         running.current = false;
         controller.reset();
@@ -76,9 +79,10 @@ function DocumentSynthesisFabricReviewCardSession({
     };
 
     useEffect(() => () => {
+        finishPluginWork();
         generation.current += 1;
         controller.reset();
-    }, [controller]);
+    }, [controller, finishPluginWork]);
 
     const resetFromContext = useEffectEvent(reset);
     const resetFromChoice = useEffectEvent(() => { if (phase === 'running') reset(); else { setPreview(null); setConfirmed(false); } });
@@ -87,6 +91,7 @@ function DocumentSynthesisFabricReviewCardSession({
 
     const load = async () => {
         if (!enabled || running.current || phase !== 'idle') return;
+        beginPluginWork(cancelPreview);
         running.current = true; const token = ++generation.current;
         setPhase('loading'); setError(null);
         try {
@@ -95,6 +100,7 @@ function DocumentSynthesisFabricReviewCardSession({
             setProposal(value); setPhase('confirm');
         } catch (loadError) {
             if (token !== generation.current) return;
+            finishPluginWork();
             setError(failure(loadError)); setPhase('terminal');
         } finally { if (token === generation.current) running.current = false; }
     };
@@ -116,6 +122,7 @@ function DocumentSynthesisFabricReviewCardSession({
             setError(failure(runError));
         } finally {
             if (token === generation.current) {
+                finishPluginWork();
                 running.current = false;
                 setProposal(null); setAmbulatory(null); setConfirmed(false);
                 setPhase('terminal');

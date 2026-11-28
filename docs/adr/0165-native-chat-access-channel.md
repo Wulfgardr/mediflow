@@ -492,3 +492,24 @@ Gli avvisi dell’import appartengono alla sua vista: senza note, diario o sinte
 la vista isolata spiega come aggiungere una fonte o revocare la richiesta.
 Il contenitore Documenti riusa lo stesso avviso senza ripeterlo. I test
 controllano i testi dipinti degli stati vuoti e del consenso, oltre ai comandi.
+
+
+## Apertura e ritiro nel Web con il plugin locale
+
+Il plugin local-ui apre Quadro paziente, Sintesi dei documenti e Smart Import
+nella scheda Web dopo la conferma del medico. Scelta delle fonti, consenso
+e generazione usano i controlli ordinari della funzione. La chat riceve
+`continue_in_mediflow`.
+
+L'apertura confermata lega la prima preparazione o generazione alla richiesta
+del plugin, per quella funzione e quella scheda. Revocare il collegamento o
+chiudere il client ritira il lavoro ancora in corso aperto da quel collegamento.
+La generazione avviata direttamente nel Web e la proposta già consegnata
+restano nella finestra. I comandi di annullamento della funzione usano lo stesso
+percorso di cancellazione. Il cambio di scheda paziente e il blocco ritirano il
+contesto attraverso i controlli di sessione.
+
+La prova di produzione usa il pacchetto local-ui, Chrome con sandbox, archivi
+sintetici e un provider loopback cooperativo che trattiene la risposta. Osserva
+il ritiro dell'output e la chiusura della richiesta dopo l'invio al provider.
+La qualifica degli host desktop e dei provider effettivi resta separata.

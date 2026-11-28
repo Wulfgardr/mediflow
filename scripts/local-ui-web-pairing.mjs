@@ -1,12 +1,8 @@
 import { createPairingAuthority } from './local-ui-pairing-authority.mjs';
 
-export function installWebPairing(channel, binding, deliver, target = globalThis) {
-  let currentNavigation = null;
+export function installWebPairing(channel, binding, deliver, target = globalThis, retire = () => {}) {
   const send = frame => {
-    if (frame.type === 'mediflow-local-ui-pair-revoked' && currentNavigation?.nonce === frame.nonce) {
-      deliver(JSON.stringify({ schemaVersion: 'mediflow.local-ui.cancel.v1', requestId: currentNavigation.requestId }));
-      currentNavigation = null;
-    }
+    if (frame.type === 'mediflow-local-ui-pair-revoked') retire(frame.nonce);
     if (channel.connected) channel.send(frame, () => {});
   };
   const authority = createPairingAuthority(binding, send);
@@ -15,8 +11,7 @@ export function installWebPairing(channel, binding, deliver, target = globalThis
     if (frame?.type === 'mediflow-local-ui-pair-offer') authority.offer(frame.request);
     if (frame?.type === 'mediflow-local-ui-pair-revoke') authority.revoke(frame.nonce);
     if (frame?.type === 'mediflow-local-ui-pair-use') {
-      const accepted = authority.use(frame.nonce, frame.host) && deliver(frame.navigation) === true;
-      if (accepted) currentNavigation = { nonce: frame.nonce, requestId: frame.requestId };
+      const accepted = authority.use(frame.nonce, frame.host) && deliver(frame.navigation, frame.nonce) === true;
       send({ type: 'mediflow-local-ui-pair-result', requestId: frame.requestId, status: accepted ? 'accepted' : 'denied' });
     }
   };

@@ -3,13 +3,13 @@ import { isPluginLocalUiRuntime } from './plugin-local-ui-runtime';
 import type { LocalUiIntent } from '../../packages/mcp/src/local-ui-contract';
 
 const symbol = Symbol.for('mediflow.local-ui.navigation.v1');
-type Listener = (intent: LocalUiIntent | 'reset') => void;
+type Listener = (intent: LocalUiIntent | 'reset' | 'revoke', id?: string) => void;
 type State = { listeners: Set<Listener> };
 const stateKey = Symbol.for('mediflow.local-ui.listeners.v1');
 const host = globalThis as unknown as Record<symbol, unknown>;
 const state = (host[stateKey] ??= { listeners: new Set<Listener>() }) as State;
-host[symbol] = (intent: LocalUiIntent) => {
-  for (const listener of [...state.listeners]) listener(intent);
+host[symbol] = (intent: Parameters<Listener>[0], id?: string) => {
+  for (const listener of [...state.listeners]) listener(intent, id);
   return state.listeners.size > 0;
 };
 
@@ -27,8 +27,8 @@ export function localUiEvents(request: Request): Response {
     start(controller) {
       const encoder = new TextEncoder();
       let closed = false;
-      const listener: Listener = intent => {
-        if (!closed) controller.enqueue(encoder.encode(`data: ${intent}\n\n`));
+      const listener: Listener = (intent, id) => {
+        if (!closed) controller.enqueue(encoder.encode(`id: ${id ?? ''}\ndata: ${intent}\n\n`));
       };
       const timer = setInterval(() => { if (!closed) controller.enqueue(encoder.encode(': keepalive\n\n')); }, 10_000);
       const disconnected = () => { cleanup(); };

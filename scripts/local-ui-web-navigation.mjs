@@ -9,16 +9,21 @@ export function installLocalUiWebNavigation(channel, origin, open, target = glob
   if (!/^http:\/\/127\.0\.0\.1:[1-9][0-9]{0,4}$/u.test(origin)) throw new Error('navigation_unavailable');
   const closeLease = installWebLease(channel, target);
   let connected = true, currentRequestId = null;
-  const receive = frame => {
+  const publish = (intent, id) => target[Symbol.for(SCHEMA)]?.(intent, id);
+  const deliver = (frame, link = 'initial') => {
     if (!connected || typeof frame !== 'string' || Buffer.byteLength(frame) > 256) return;
     let value;
     try { value = JSON.parse(frame); } catch { return; }
     if (!value) return;
-    const publish = target[Symbol.for(SCHEMA)];
+    if (value.schemaVersion === 'mediflow.local-ui.client-closed.v1' && Object.keys(value).length === 1 && link === 'initial') {
+      currentRequestId = null;
+      publish('revoke', link);
+      return;
+    }
     if (value.schemaVersion === 'mediflow.local-ui.cancel.v1' && Object.keys(value).sort().join(',') === 'requestId,schemaVersion') {
       if (value.requestId === currentRequestId) {
         currentRequestId = null;
-        try { if (typeof publish === 'function') publish('reset'); } catch { /* Navigation has no clinical effect. */ }
+        try { publish('reset', value.requestId); } catch {}
       }
       return;
     }
@@ -27,13 +32,14 @@ export function installLocalUiWebNavigation(channel, origin, open, target = glob
       || !/^[a-f0-9-]{36}$/u.test(value.requestId) || localUiNavigationDeadline(value.expiresAt) === null) return;
     currentRequestId = value.requestId;
     try {
-      if (typeof publish === 'function' && publish(value.intent) === true) return true;
+      if (publish(value.intent, `${value.requestId}/${link}`) === true) return true;
       open(`${origin}/plugin-local-ui`);
       return true;
     } catch { /* navigation has no clinical effect */ }
   };
+  const receive = frame => deliver(frame);
   const closePairing = installWebPairing(channel, { instance: process.env.MEDIFLOW_LOCAL_UI_INSTANCE,
-    dataDir: process.env.MEDIFLOW_DATA_DIR, sourceFingerprint: process.env.MEDIFLOW_APP_SOURCE_FINGERPRINT }, receive, target);
+    dataDir: process.env.MEDIFLOW_DATA_DIR, sourceFingerprint: process.env.MEDIFLOW_APP_SOURCE_FINGERPRINT }, deliver, target, link => publish('revoke', link));
   const close = () => { closeLease(); closePairing(); connected = false; channel.off('message', receive); channel.off('disconnect', close); };
   channel.on('message', receive); channel.once('disconnect', close);
   channel.send?.('{"schemaVersion":"mediflow.local-ui.ready.v1"}');

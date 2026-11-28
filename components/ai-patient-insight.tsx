@@ -2,6 +2,7 @@
 
 import { Disclosure } from '@/components/disclosure';
 import { FunctionModelPicker, useFunctionModelPicker } from '@/components/function-models/function-model-picker';
+import { usePluginLocalUiWork } from './use-plugin-local-ui-work';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { AlertTriangle, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react';
@@ -69,6 +70,7 @@ function InsightList({ items, warning = false }: Readonly<{ items: readonly stri
 }
 
 export default function AIPatientInsight({ patient, stale = false, onProposalChange }: AIPatientInsightProps) {
+    const { begin: beginPluginWork, finish: finishPluginWork } = usePluginLocalUiWork('patient_insight', patient.id);
     const patientKey = `${patient.id}:${patient.version ?? 'unknown'}`;
     const picker = useFunctionModelPicker('patient_insight', patientKey, stale);
     const [storedPreview, setPreview] = useState<StoredPreview | null>(null);
@@ -104,14 +106,15 @@ export default function AIPatientInsight({ patient, stale = false, onProposalCha
         abortControllerRef.current?.abort(); setGeneration({ patientKey, active: false });
         /* a newer revision of the same patient keeps the proposal, declared superseded; anything else clears it. */
         setPreview(previous => previous && previous.patientId === patient.id && previous.patientKey !== patientKey ? previous : null);
-        return () => abortControllerRef.current?.abort();
-    }, [patient.id, patientKey, picker.active, picker.view.choice, picker.view.blocked, picker.view.preparationRevision]);
+        return () => { finishPluginWork(); abortControllerRef.current?.abort(); };
+    }, [patient.id, patientKey, picker.active, picker.view.choice, picker.view.blocked, picker.view.preparationRevision, finishPluginWork]);
 
     const generateInsight = async () => {
         if (!enabled) {
             setError('Quadro paziente è disabilitato. Si riattiva in Impostazioni IA.');
             return;
         }
+        beginPluginWork(stopGeneration);
         const controller = new AbortController(); abortControllerRef.current = controller;
         setGeneration({ patientKey, active: true }); setPreview(null); setError(null); setProgress('Raccolta del contesto clinico minimo…');
         try {
@@ -147,12 +150,13 @@ export default function AIPatientInsight({ patient, stale = false, onProposalCha
             if (!controller.signal.aborted) setError('Quadro paziente non è disponibile in questo momento.');
         } finally {
             if (abortControllerRef.current === controller) {
-                abortControllerRef.current = null; setGeneration({ patientKey, active: false }); setProgress('');
+                finishPluginWork(); abortControllerRef.current = null; setGeneration({ patientKey, active: false }); setProgress('');
             }
         }
     };
 
     const stopGeneration = () => {
+        finishPluginWork();
         picker.client.reset(picker.active);
         abortControllerRef.current?.abort(); abortControllerRef.current = null;
         setGeneration({ patientKey, active: false }); setProgress(''); setError('Generazione interrotta. Nessuna modifica è stata applicata.');
