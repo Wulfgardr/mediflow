@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { test } from 'node:test';
-import { CL_SCENARIOS, deriveCellQualification, I4_RECEIPT_SCHEMA, LOCAL_RUN_RECEIPT_SCHEMA, ReceiptRejectedError, SURFACE_RECEIPT_SCHEMA } from './release-register-qualification';
+import { CL_SCENARIOS, deriveCellQualification, HISTORICAL_2026_11_14_CONTRACT_SHA256, I4_RECEIPT_SCHEMA, LOCAL_RUN_RECEIPT_SCHEMA, ReceiptRejectedError, SURFACE_RECEIPT_SCHEMA } from './release-register-qualification';
 
 const SHA = 'a'.repeat(40);
 const DIGEST = 'b'.repeat(64);
 const register = { sourceRevision: SHA, localProfile: { modelIdentifier: 'Mac17,10', osBuild: '26C5047e' } };
+const historicalRegister = { ...register, contractSha256: HISTORICAL_2026_11_14_CONTRACT_SHA256 };
 const common = { method: 'real', plan: 'contract', sourceRevision: SHA, buildId: 'build', profile: { model: 'Mac17,10', osBuild: '26C5047e' } };
 const fids = Object.keys(CL_SCENARIOS);
 
@@ -35,24 +36,37 @@ function surfaceReceipt(criterion: 'G-5' | 'C-7', client = criterion === 'G-5' ?
     return { schema: SURFACE_RECEIPT_SCHEMA, criterion, ...common, path: criterion === 'G-5' ? 'gpui_installed_client' : 'chat_host_channel', surface: criterion === 'G-5' ? 'gpui' : 'chat',
         host: { client }, attestedBy: 'leonardo', functions: Object.fromEntries(fids.map(fid => [fid, { ollama: { ...f }, chatgpt: { ...f } }])) };
 }
-function derive(receipts: readonly object[], cell: Record<string, unknown>) {
+function derive(receipts: readonly object[], cell: Record<string, unknown>, reg: Record<string, unknown> = register) {
     const files = new Map(receipts.map((r, i) => [`r${i}.json`, Buffer.from(JSON.stringify(r))]));
     const refs = [...files].map(([path, bytes]) => ({ path, sha256: createHash('sha256').update(bytes).digest('hex') }));
     const provider = cell.provider as string;
     const full = { functionId: 'smart_import', venue: provider === 'ollama' ? 'local_process' : 'host_subscription', modelIdentity: provider === 'ollama' ? { digest: DIGEST } : null, blockedBy: [], ...cell, receipts: refs };
-    return deriveCellQualification(register, full, path => files.get(path)!);
+    return deriveCellQualification(reg, full, path => files.get(path)!);
 }
 const ollama = { provider: 'ollama' };
 const chatgpt = { provider: 'chatgpt' };
 const chat = () => [surfaceReceipt('C-7'), surfaceReceipt('C-7', 'codex_desktop')] as const;
-const local = () => [localReceipt(), surfaceReceipt('G-5'), ...chat()] as const;
+const local = () => [localReceipt(), ...chat()] as const;
 
-test('qualifica solo con le ricevute reali di ogni criterio della sede, sulla revisione e sul profilo del registro', () => {
-    const d = derive(local(), ollama);
+test('sul contratto corrente qualifica senza ricevuta GPUI G-5, tenendo distinte Web, chat e headless', () => {
+    const d = derive(local(), { ...ollama, blockedBy: ['gpu_memory_not_measured', 'surfaces_not_verified'] });
     assert.equal(d.qualification, 'qualified');
-    assert.deepEqual(d.surfaces, { web: 'not_verified', gpui: 'verified', chat: 'verified', headless: 'not_verified' });
-    assert.equal(derive([i4Receipt(), surfaceReceipt('G-5'), ...chat()], chatgpt).qualification, 'qualified');
-    assert.equal(derive([localReceipt()], ollama).qualification, 'not_qualified');
+    assert.deepEqual(d.blockedBy, []);
+    assert.ok(!('G-5' in d.criteria));
+    assert.deepEqual(d.surfaces, { web: 'not_verified', gpui: 'not_verified', chat: 'verified', headless: 'not_verified' });
+    const remote = derive([i4Receipt(), ...chat()], { ...chatgpt, blockedBy: ['local_only_task', 'surfaces_not_verified'] });
+    assert.equal(remote.qualification, 'qualified');
+    assert.deepEqual(remote.blockedBy, []);
+    assert.ok(!('G-5' in remote.criteria));
+    assert.deepEqual(remote.surfaces, { web: 'verified', gpui: 'not_verified', chat: 'verified', headless: 'not_verified' });
+    const onlyLocal = derive([localReceipt()], ollama);
+    assert.equal(onlyLocal.qualification, 'not_qualified');
+    assert.deepEqual(onlyLocal.blockedBy, ['C-7_surface_not_proved']);
+    assert.deepEqual(onlyLocal.surfaces, { web: 'not_verified', gpui: 'not_verified', chat: 'not_verified', headless: 'not_verified' });
+    const withG5InsteadOfC7 = derive([localReceipt(), surfaceReceipt('G-5')], ollama);
+    assert.equal(withG5InsteadOfC7.qualification, 'not_qualified');
+    assert.deepEqual(withG5InsteadOfC7.blockedBy, ['C-7_surface_not_proved']);
+    assert.equal(withG5InsteadOfC7.surfaces.gpui, 'not_verified');
 });
 
 test('un caso simulato, tecnico, diagnostico, di altra revisione, profilo o modello non qualifica', () => {
@@ -98,26 +112,36 @@ test('un percorso parziale resta espresso criterio per criterio e non qualifica'
         assert.ok(d.criteria[criterion].reasons.includes(reason), reason);
     }
     const unobserved = localReceipt(); unobserved.functions.smart_import.memory.systemGpu = null;
-    assert.equal(derive([unobserved, surfaceReceipt('G-5'), ...chat()], ollama).criteria.memoria.status, 'met');
+    assert.equal(derive([unobserved, ...chat()], ollama).criteria.memoria.status, 'met');
+});
+
+test('sul contratto storico del 14/11 G-5 resta obbligatoria e verificabile', () => {
+    const withoutG5 = derive(local(), { ...ollama, blockedBy: ['surfaces_not_verified'] }, historicalRegister);
+    assert.equal(withoutG5.qualification, 'not_qualified');
+    assert.deepEqual(withoutG5.blockedBy, ['surfaces_not_verified', 'G-5_surface_not_proved']);
+    assert.equal(withoutG5.surfaces.gpui, 'not_verified');
     const g5 = surfaceReceipt('G-5'); g5.functions.smart_import.ollama.revokeObserved = false;
-    const d = derive([localReceipt(), g5, ...chat()], ollama);
-    assert.deepEqual(d.blockedBy, ['G-5_surface_not_proved']);
-    assert.equal(d.surfaces.gpui, 'not_verified');
+    const partial = derive([localReceipt(), g5, ...chat()], ollama, historicalRegister);
+    assert.deepEqual(partial.blockedBy, ['G-5_surface_not_proved']);
+    assert.equal(partial.surfaces.gpui, 'not_verified');
     const swapped = { ...surfaceReceipt('G-5'), surface: 'chat' };
-    assert.ok(derive([localReceipt(), swapped, ...chat()], ollama).criteria['G-5'].reasons.includes('surface_mismatch'));
+    assert.ok(derive([localReceipt(), swapped, ...chat()], ollama, historicalRegister).criteria['G-5'].reasons.includes('surface_mismatch'));
+    const complete = derive([localReceipt(), surfaceReceipt('G-5'), ...chat()], { ...ollama, blockedBy: ['surfaces_not_verified'] }, historicalRegister);
+    assert.equal(complete.qualification, 'qualified');
+    assert.equal(complete.surfaces.gpui, 'verified');
 });
 
 test('C-7 si chiude solo con le prove in Claude Desktop e in Codex desktop', () => {
-    const claudeOnly = derive([localReceipt(), surfaceReceipt('G-5'), surfaceReceipt('C-7')], ollama);
+    const claudeOnly = derive([localReceipt(), surfaceReceipt('C-7')], ollama);
     assert.equal(claudeOnly.qualification, 'not_qualified');
     assert.ok(claudeOnly.criteria['C-7'].reasons.includes('host_missing:codex_desktop'));
     assert.equal(claudeOnly.surfaces.chat, 'not_verified');
-    const twiceClaude = derive([localReceipt(), surfaceReceipt('G-5'), surfaceReceipt('C-7'), surfaceReceipt('C-7')], ollama);
+    const twiceClaude = derive([localReceipt(), surfaceReceipt('C-7'), surfaceReceipt('C-7')], ollama);
     assert.equal(twiceClaude.criteria['C-7'].status, 'not_met');
-    const other = derive([localReceipt(), surfaceReceipt('G-5'), surfaceReceipt('C-7'), surfaceReceipt('C-7', 'chatgpt_app')], ollama);
+    const other = derive([localReceipt(), surfaceReceipt('C-7'), surfaceReceipt('C-7', 'chatgpt_app')], ollama);
     assert.ok(other.criteria['C-7'].reasons.includes('host_not_required'));
     const codexPartial = surfaceReceipt('C-7', 'codex_desktop'); codexPartial.functions.smart_import.ollama.staleContextRejected = false;
-    assert.ok(derive([localReceipt(), surfaceReceipt('G-5'), surfaceReceipt('C-7'), codexPartial], ollama).criteria['C-7'].reasons.includes('host_missing:codex_desktop'));
+    assert.ok(derive([localReceipt(), surfaceReceipt('C-7'), codexPartial], ollama).criteria['C-7'].reasons.includes('host_missing:codex_desktop'));
     assert.equal(derive(local(), ollama).surfaces.chat, 'verified');
 });
 
@@ -136,11 +160,11 @@ test('una ricevuta mutata viene respinta e un\'etichetta non sostituisce il calc
 
 test('dopo la seduta una I-4 reale della sede approvata chiude il limite della campagna locale, una parziale no', () => {
     const before = derive([], { ...chatgpt, blockedBy: ['local_only_task', 'I-4'] });
-    assert.deepEqual(before.blockedBy, ['local_only_task', 'I-4', 'G-5_surface_not_proved', 'C-7_surface_not_proved']);
+    assert.deepEqual(before.blockedBy, ['local_only_task', 'I-4', 'C-7_surface_not_proved']);
     const onlyI4 = derive([i4Receipt()], { ...chatgpt, blockedBy: ['local_only_task', 'I-4'] });
-    assert.deepEqual(onlyI4.blockedBy, ['G-5_surface_not_proved', 'C-7_surface_not_proved']);
+    assert.deepEqual(onlyI4.blockedBy, ['C-7_surface_not_proved']);
     assert.equal(onlyI4.surfaces.web, 'verified');
-    const after = derive([i4Receipt(), surfaceReceipt('G-5'), ...chat()], { ...chatgpt, blockedBy: ['local_only_task', 'I-4'] });
+    const after = derive([i4Receipt(), ...chat()], { ...chatgpt, blockedBy: ['local_only_task', 'I-4'] });
     assert.equal(after.qualification, 'qualified');
     const partials: Array<[string, (r: ReturnType<typeof i4Receipt>) => void]> = [
         ['product_receipt_missing', r => { r.functions.smart_import.productReceiptSha256 = ''; }],
@@ -153,10 +177,10 @@ test('dopo la seduta una I-4 reale della sede approvata chiude il limite della c
     ];
     for (const [reason, mutate] of partials) {
         const receipt = i4Receipt(); mutate(receipt);
-        const d = derive([receipt, surfaceReceipt('G-5'), ...chat()], { ...chatgpt, blockedBy: ['local_only_task', 'I-4'] });
+        const d = derive([receipt, ...chat()], { ...chatgpt, blockedBy: ['local_only_task', 'I-4'] });
         assert.equal(d.qualification, 'not_qualified', reason);
         assert.deepEqual(d.blockedBy, ['local_only_task', 'I-4'], reason);
         assert.ok(d.criteria['I-4'].reasons.includes(reason), reason);
     }
-    assert.deepEqual(derive([i4Receipt(), surfaceReceipt('G-5'), ...chat()], { ...chatgpt, blockedBy: ['product_veto'] }).blockedBy, ['product_veto']);
+    assert.deepEqual(derive([i4Receipt(), ...chat()], { ...chatgpt, blockedBy: ['product_veto'] }).blockedBy, ['product_veto']);
 });

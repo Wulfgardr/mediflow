@@ -434,7 +434,6 @@
         "physical_revocation_not_proved",
         "C-L_errors_or_incomplete_distribution",
         "memory_not_recorded",
-        "G-5_surface_not_proved",
         "C-7_surface_not_proved"
       ],
       "modelObservedInOperation": true,
@@ -484,13 +483,6 @@
           ],
           "receipt": null
         },
-        "G-5": {
-          "status": "not_executed",
-          "reasons": [
-            "no_receipt"
-          ],
-          "receipt": null
-        },
         "C-7": {
           "status": "not_executed",
           "reasons": [
@@ -519,7 +511,6 @@
       "blockedBy": [
         "local_only_task",
         "I-4",
-        "G-5_surface_not_proved",
         "C-7_surface_not_proved"
       ],
       "runtimeProof": {
@@ -531,13 +522,6 @@
       "receipts": [],
       "criteria": {
         "I-4": {
-          "status": "not_executed",
-          "reasons": [
-            "no_receipt"
-          ],
-          "receipt": null
-        },
-        "G-5": {
           "status": "not_executed",
           "reasons": [
             "no_receipt"
@@ -587,7 +571,6 @@
         "surfaces_not_verified",
         "physical_revocation_not_proved",
         "memory_not_recorded",
-        "G-5_surface_not_proved",
         "C-7_surface_not_proved"
       ],
       "modelObservedInOperation": true,
@@ -629,13 +612,6 @@
           ],
           "receipt": null
         },
-        "G-5": {
-          "status": "not_executed",
-          "reasons": [
-            "no_receipt"
-          ],
-          "receipt": null
-        },
         "C-7": {
           "status": "not_executed",
           "reasons": [
@@ -664,7 +640,6 @@
       "blockedBy": [
         "local_only_task",
         "I-4",
-        "G-5_surface_not_proved",
         "C-7_surface_not_proved"
       ],
       "runtimeProof": {
@@ -676,13 +651,6 @@
       "receipts": [],
       "criteria": {
         "I-4": {
-          "status": "not_executed",
-          "reasons": [
-            "no_receipt"
-          ],
-          "receipt": null
-        },
-        "G-5": {
           "status": "not_executed",
           "reasons": [
             "no_receipt"
@@ -733,7 +701,6 @@
         "physical_revocation_not_proved",
         "C-L_errors_or_incomplete_distribution",
         "memory_not_recorded",
-        "G-5_surface_not_proved",
         "C-7_surface_not_proved"
       ],
       "modelObservedInOperation": true,
@@ -783,13 +750,6 @@
           ],
           "receipt": null
         },
-        "G-5": {
-          "status": "not_executed",
-          "reasons": [
-            "no_receipt"
-          ],
-          "receipt": null
-        },
         "C-7": {
           "status": "not_executed",
           "reasons": [
@@ -818,7 +778,6 @@
       "blockedBy": [
         "local_only_task",
         "I-4",
-        "G-5_surface_not_proved",
         "C-7_surface_not_proved"
       ],
       "runtimeProof": {
@@ -830,13 +789,6 @@
       "receipts": [],
       "criteria": {
         "I-4": {
-          "status": "not_executed",
-          "reasons": [
-            "no_receipt"
-          ],
-          "receipt": null
-        },
-        "G-5": {
           "status": "not_executed",
           "reasons": [
             "no_receipt"
