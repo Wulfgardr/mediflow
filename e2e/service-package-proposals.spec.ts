@@ -4,6 +4,7 @@ import Database from 'better-sqlite3';
 import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './fixtures/isolated-runtime';
 import { switchPreset } from './fixtures/territorial-preset';
+import { fetchInterceptedRequest } from './fixtures/trusted-web-request';
 import { bootstrapUnlockedSession, openPatientSection, unlockIfNeeded } from './utils';
 
 type Seed = { firstName: string; taxCode: string; diagnoses: { code: string; description: string }[]; exemptions: string[]; hba1c?: { prescribedAt: string; observedAt: string } };
@@ -202,12 +203,15 @@ test('a refused item leaves the whole gesture unwritten, and a lost answer is re
         await expect(proposed('90.28.1')).toContainText('Mai eseguita');
         await captureBothThemes(page, proposals, join(evidence, '5-voce-rifiutata-nulla-registrato.png'));
 
+        const lostAnswer: number[] = [];
         await page.route('**/api/service-prescription-sets', async (route) => {
-            await route.fetch();
+            const committed = await fetchInterceptedRequest(route);
+            lostAnswer.push(committed.status());
             await route.abort('connectionreset');
         }, { times: 1 });
         await proposals.getByRole('button', { name: 'Prescrivi 2 prestazioni', exact: true }).click();
         await expect(proposals.getByRole('alert')).toHaveText('Esito della registrazione non confermato.');
+        expect(lostAnswer, 'the server answered and committed, the browser saw a reset connection').toEqual([201]);
         expect(codes(), 'the server committed although the browser never saw the answer').toEqual(['90.28.1', '95.11']);
         await expect(proposals.getByRole('button', { name: 'Riprova', exact: true })).toBeEnabled();
         await captureBothThemes(page, proposals, join(evidence, '6-risposta-persa-riprova.png'));
