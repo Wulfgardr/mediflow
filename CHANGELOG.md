@@ -13,14 +13,19 @@ release](https://github.com/Wulfgardr/mediflow/releases) raccoglie i pacchetti p
 
 ### Aggiornamento dalla 0.9.0
 
-- Prima dell’aggiornamento, salva un backup completo cifrato e conserva il
-  kit e la chiave di recupero. Al primo avvio l’archivio passa dallo schema 3 al
-  17. MediFlow conserva una copia dell’archivio di partenza.
+- Prima di aggiornare, apri **Impostazioni → Backup** nella 0.9.0 e scegli
+  **Crea backup completo cifrato**. Conserva il kit di recupero corrispondente
+  e tieni separata la chiave cartacea. Al primo avvio la 0.9.1 salva una copia
+  dell’archivio originale prima di aggiornare lo schema da 3 a 18.
 - Per tornare alla 0.9.0, conserva a parte l’archivio aggiornato e riapri
   la copia iniziale oppure ripristina il backup completo cifrato creato con
   la 0.9.0 prima dell’aggiornamento. La 0.9.0 rifiuta in anteprima un backup
   portabile `.mediflow` esportato dalla 0.9.1.
   Per rileggere le voci scritte dopo l’aggiornamento, usa la 0.9.1.
+- Nella 0.9.1 il backup completo cifrato viene scritto a blocchi. In Chrome o
+  Edge scegli dove salvare il file `.mediflow-recovery`. La 0.9.1 può leggere
+  anche i backup completi cifrati della 0.9.0.
+  [Recuperare l’archivio su un computer nuovo](./docs/backup-restore-drill.md#backup-completo-dopo-la-perdita-del-computer)
 
 ### Avvio
 
