@@ -46,6 +46,26 @@ function storageProxy(storage: MemoriaStorage): Storage {
 
 const COOKIE = /^([A-Za-z0-9_-]+)=([^;]*)/u;
 
+const AUTH_CONSENTITE = new Set(['/api/auth/login', '/api/auth/logout']);
+const SISTEMA_VIETATE = ['backup-restore', 'restore-patient', 'purge-patient', 'migrate', 'migrate-m2m', 'repair-db', 'fix-orphans', 'retention']
+    .map(nome => `/api/system/${nome}`);
+
+export class GestoRiservatoAlMedico extends Error {
+    constructor(readonly gesto: string) { super(`L’operatore non può ${gesto}: è un gesto del medico nell’interfaccia.`); }
+}
+
+/** Gesti che restano al medico anche con l’operatore acceso (ADR 0206): il client li rifiuta prima di chiamare il server. */
+export function gestoRiservato(method: string, pathname: string): string | null {
+    const lettura = method === 'GET' || method === 'HEAD';
+    const sotto = (prefisso: string) => pathname === prefisso || pathname.startsWith(`${prefisso}/`);
+    if (sotto('/api/agent')) return 'usare il canale degli agenti';
+    if (sotto('/api/agent-mandates') && !lettura && pathname !== '/api/agent-mandates/unlock') return 'collegare, scollegare o modificare gli agenti';
+    if (sotto('/api/auth') && !lettura && !AUTH_CONSENTITE.has(pathname)) return 'cambiare credenziali, bloccare o ricollegare le schede';
+    if (SISTEMA_VIETATE.some(sotto) && !lettura) return 'ripristinare, migrare, riparare o cancellare l’archivio';
+    if (method === 'DELETE') return 'cancellare';
+    return null;
+}
+
 /**
  * Installa in Node le sole API del browser che il client Web di MediFlow usa: finestra con
  * eventi, `location` sull'origine loopback, storage e `fetch` same-origin con i cookie della
@@ -66,6 +86,8 @@ export function installaAmbienteOperatore(options: { origin: string; storageFile
         if (url.origin !== origin) throw new Error('L’operatore non chiama indirizzi fuori da MediFlow.');
         const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
         const method = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase();
+        const riservato = gestoRiservato(method, url.pathname);
+        if (riservato) throw new GestoRiservatoAlMedico(riservato);
         if (cookies.size) headers.set('cookie', [...cookies].map(([name, cookie]) => `${name}=${cookie.value}`).join('; '));
         headers.set('sec-fetch-site', 'same-origin');
         if (method !== 'GET' && method !== 'HEAD') headers.set('origin', origin);
