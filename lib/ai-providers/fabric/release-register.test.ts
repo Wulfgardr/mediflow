@@ -63,6 +63,9 @@ test('I-0 copre esattamente le sei celle del gate e separa API opzionali e Treat
         }
         assert.equal(cell.dataClass, 'synthetic_only');
         assert.ok(cell.blockedBy.length > 0);
+        assert.ok(!('G-5' in cell.criteria), cell.id);
+        assert.ok(!cell.blockedBy.includes('G-5_surface_not_proved'), cell.id);
+        assert.equal(cell.surfaces.gpui, 'not_verified', cell.id);
         assert.ok(cell.blockedBy.every((criterion: string) => !['I-3', 'I-3b', 'I-7'].includes(criterion)));
         assert.deepEqual(cell.surfaces, derived.surfaces, cell.id);
     }

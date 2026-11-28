@@ -5,8 +5,15 @@ export const I4_RECEIPT_SCHEMA = 'mediflow.intelligence-i4-receipt.v1';
 export const SURFACE_RECEIPT_SCHEMA = 'mediflow.intelligence-surface-receipt.v1';
 const SCHEMAS = [LOCAL_RUN_RECEIPT_SCHEMA, I4_RECEIPT_SCHEMA, SURFACE_RECEIPT_SCHEMA];
 
-/** Criteri per sede dal contratto 0.9.1: I-2 e C-L per la sede locale, I-4 per l'abbonamento ChatGPT, G-5 e C-7 per entrambe. */
+export const HISTORICAL_2026_11_14_CONTRACT_SHA256 = 'e40182be2d5551553ce9e07de8c14d113b8cc3b62487bcf0b1de863e71115b7a';
+
+/** Criteri per sede dal contratto 0.9.1 (emendamento 25/11): I-2, arresto, C-L e memoria per la sede locale, I-4 per l'abbonamento ChatGPT, C-7 per entrambe. */
 export const CELL_CRITERIA = Object.freeze({
+    ollama: Object.freeze(['I-2', 'I-2-arresto', 'C-L', 'memoria', 'C-7']),
+    chatgpt: Object.freeze(['I-4', 'C-7']),
+});
+
+const HISTORICAL_GPUI_CELL_CRITERIA = Object.freeze({
     ollama: Object.freeze(['I-2', 'I-2-arresto', 'C-L', 'memoria', 'G-5', 'C-7']),
     chatgpt: Object.freeze(['I-4', 'G-5', 'C-7']),
 });
@@ -25,6 +32,12 @@ export const CRITERION_BLOCKERS: Readonly<Record<string, string>> = Object.freez
 
 /** Limiti di campagne passate: restano finché i criteri indicati non sono soddisfatti, non vengono mai aggiunti. */
 export const CLOSABLE_LIMITS: Readonly<Record<string, readonly string[]>> = Object.freeze({
+    local_only_task: Object.freeze(['I-4']),
+    gpu_memory_not_measured: Object.freeze(['memoria']),
+    surfaces_not_verified: Object.freeze(['C-7']),
+});
+
+const HISTORICAL_GPUI_CLOSABLE_LIMITS: Readonly<Record<string, readonly string[]>> = Object.freeze({
     local_only_task: Object.freeze(['I-4']),
     gpu_memory_not_measured: Object.freeze(['memoria']),
     surfaces_not_verified: Object.freeze(['G-5', 'C-7']),
@@ -189,7 +202,10 @@ function evaluate(criterion: string, register: Json, cell: Json, receipts: Json[
 
 /** La qualifica si calcola da ricevute legate per hash; una cella non diventa mai qualificata per un'etichetta. */
 export function deriveCellQualification(register: Json, cell: Json, read: (path: string) => Buffer): CellDerivation {
-    const required = CELL_CRITERIA[cell.provider as keyof typeof CELL_CRITERIA];
+    const gpuiRequired = register?.contractSha256 === HISTORICAL_2026_11_14_CONTRACT_SHA256;
+    const criteriaByProvider = gpuiRequired ? HISTORICAL_GPUI_CELL_CRITERIA : CELL_CRITERIA;
+    const closableLimits = gpuiRequired ? HISTORICAL_GPUI_CLOSABLE_LIMITS : CLOSABLE_LIMITS;
+    const required = criteriaByProvider[cell.provider as keyof typeof CELL_CRITERIA];
     if (!required) throw new Error(`provider_unknown:${cell.provider}`);
     if (cell.venue !== VENUES[cell.provider]) throw new Error(`venue_unknown:${cell.venue}`);
     const receipts = (cell.receipts ?? []).map((ref: ReceiptRef) => loadReceipt(ref, read));
@@ -198,13 +214,13 @@ export function deriveCellQualification(register: Json, cell: Json, read: (path:
     const met = (c: string) => criteria[c]?.status === 'met';
     const derivable = new Set(Object.values(CRITERION_BLOCKERS));
     const declared: string[] = cell.blockedBy ?? [];
-    const vetoes = declared.filter(b => !derivable.has(b) && !CLOSABLE_LIMITS[b]);
-    const limits = declared.filter(b => CLOSABLE_LIMITS[b] && !CLOSABLE_LIMITS[b].every(met));
+    const vetoes = declared.filter(b => !derivable.has(b) && !closableLimits[b]);
+    const limits = declared.filter(b => closableLimits[b] && !closableLimits[b].every(met));
     const derived = required.filter(c => !met(c)).map(c => CRITERION_BLOCKERS[c]);
     const blockedBy = [...vetoes, ...limits, ...derived];
     const surfaces: Surfaces = {
         web: cell.provider === 'chatgpt' && met('I-4') ? 'verified' : 'not_verified',
-        gpui: met('G-5') ? 'verified' : 'not_verified',
+        gpui: gpuiRequired && met('G-5') ? 'verified' : 'not_verified',
         chat: met('C-7') ? 'verified' : 'not_verified',
         headless: 'not_verified',
     };
