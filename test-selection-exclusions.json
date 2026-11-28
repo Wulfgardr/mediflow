@@ -1,5 +1,15 @@
 [
   {
+    "path": "e2e/fixtures/recovery-file-picker.ts",
+    "reason": "WUL-975. Selettore su disco usato dalle prove Playwright di backup completo e Dossier.",
+    "owner": "@Wulfgardr"
+  },
+  {
+    "path": "lib/test-fixtures/backup-streaming-probe.ts",
+    "reason": "WUL-975. Processo figlio invocato dal test di scala per misurare creazione, verifica e ripristino.",
+    "owner": "@Wulfgardr"
+  },
+  {
     "path": "scripts/codex-local-ui-probe.mjs",
     "reason": "WUL-757: harness importato da scripts/package-local-ui-plugin.test.mjs; nessun test autonomo.",
     "owner": "@Wulfgardr"

@@ -1,4 +1,4 @@
-import type { BackupArtifact } from './backup-artifact';
+import type { BackupRowArtifact } from './backup-artifact';
 
 export type RestoredPatientAmbulatoryLink = {
     patientId: string;
@@ -92,10 +92,11 @@ function parseAssignedAt(value: unknown, fallback: Date): Date {
 }
 
 export function derivePatientAmbulatoryLinks(
-    patientsPayload: BackupArtifact['payload']['patients'],
+    patientsPayload: BackupRowArtifact['payload']['patients'],
 ): RestoredPatientAmbulatoryLink[] {
-    return patientsPayload.flatMap((patient) => {
-        if (typeof patient.id !== 'string') return [];
+    const links: RestoredPatientAmbulatoryLink[] = [];
+    for (const patient of patientsPayload) {
+        if (typeof patient.id !== 'string') continue;
         const patientId = patient.id;
 
         const assignedAt = typeof patient.updatedAt === 'string'
@@ -115,10 +116,7 @@ export function derivePatientAmbulatoryLinks(
             if (!memberships.has(patient.ambulatoryId)) memberships.set(patient.ambulatoryId, normalizedAssignedAt);
         }
 
-        return Array.from(memberships, ([ambulatoryId, assignedAt]) => ({
-            patientId,
-            ambulatoryId,
-            assignedAt,
-        }));
-    });
+        for (const [ambulatoryId, assignedAt] of memberships) links.push({ patientId, ambulatoryId, assignedAt });
+    }
+    return links;
 }

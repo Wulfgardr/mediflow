@@ -1,5 +1,5 @@
 {
-  "syncCommit": "97db41ae624e069e029800e806b8946f2789bfbb",
+  "syncCommit": "e2644fd381b9a1441dddccd4ea95a3a56328bb9a",
   "tool": {
     "release": "v1.7.4",
     "url": "https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar",
@@ -33,7 +33,7 @@
   "files": {
     "lib/therapy-status-confirmation.ts": "33eebc3197e988f3f1c134f1ac8499da1de95171e21d0ac7e3396c2a202c6486",
     "components/therapy-manager.tsx": "78698513ca3d092725d6e6def10c3a7b8e2b5d58656b1206f89e92ccb58f695b",
-    "lib/db.ts": "e69414da935b885f8ee7b3065f8161e54c1a28c434ea2f78bfb67f6b64087886",
+    "lib/db.ts": "ffe63447b448c89027041c5fdab4e071324e3d22f8724c6983cf4ffae5a4cf3c",
     "lib/security/client-auth-api.ts": "8aed0c5b2c38112dbfd0aef783aa4fe925c99cafb15fcbe82a25decd637ff304",
     "lib/therapy-write-operation.ts": "8fa4abf13ad501bdb1d199b2abeaee5e18331f84e6dcdb19caa0b040b5c63345",
     "app/api/therapies/[id]/route.ts": "ecc8f661c1f2521e567a6666c4c9da89097ef8da2874281285066b266f6fdcc1",
@@ -53,14 +53,14 @@
     "lib/backup-import-provenance.ts": "13eb1cc6083b5a07489d64cc9d195b82b6b8b660cb9874e4dc46b93fdf25999e",
     "lib/sqlite-schema.ts": "784fa488d11577d5ce493fde0ad84b3353fbd76c8bbe3f64f1f6d0d0c127e41d",
     "lib/sqlite-schema-open.ts": "ce645331a3e1bd5c13ee25e04051c90c8e8ee982e0a0e6abb90eb298e006160e",
-    "lib/backup-restore-executor.ts": "eee7696262a2b3d019d903a16c068fe5a45fd2e9454cb6e92964c50a2432a7a3",
+    "lib/backup-restore-executor.ts": "3a160b2ab5292fa2963d3b20263d77015fb694763424ebcbd867f987583870e2",
     "lib/security/archive-maintenance-owner.ts": "57a026cca85845bf2ed3ae5b8c47dbc88caa8184b3d41639ea7ad9e90a420802",
     "lib/clinical-status-transitions.ts": "787915f339911dd4846d29d1fe3232be373242287390989d6a97d7a5dcea460f",
     "lib/status-normalization.ts": "fa2bbdeef55384ed1bf4a851f09a5d899d56e6331cde018f68f3d8a74d3a4e51",
     "docs/domain/clinical-status-transitions.json": "70233eaac55960b999f25768bb9f8897dcce27197ed99c1a692a2d98a0582f04",
-    "lib/recovery-backup-server.ts": "586b10f747c888e07c74c51508c2b65536e7ee3c5ab38d2eb3d4f71402375f17",
+    "lib/recovery-backup-server.ts": "3f1647f1216b26dbfe34986bdecb53d7b16f81cd967be7e04cbcab029a47a3e7",
     "lib/schema.ts": "a63799addd6217f91f39794a25881376c052b8e2012a115ff129fdd0aec5394b",
-    "lib/backup-artifact.ts": "cdbf37a1a5d9ee71c70a2a77242d7ca60afca394fd4bba3452f4482602baab76"
+    "lib/backup-artifact.ts": "2f2d0a7dee28672966648baac5f6fd5ec8d1fe36733f0a089a510937b1863954"
   },
   "verificationInputs": [
     "docs/formal/therapy-status/",
@@ -100,7 +100,7 @@
     "baseRevision": "3828bb17d4883b28a646c16af10f9505fddded38",
     "proof": "causal controller/client/HTTP tests and real SQLite crashes/races/restore; TLC remains legacy ADR0156",
     "recoveryCompatibility": {
-      "reviewedRevision": "09642085a7c6efd9863a9b980a4e174116d86036",
+      "reviewedRevision": "e2644fd381b9a1441dddccd4ea95a3a56328bb9a",
       "contract": {
         "adrs": [
           "0168",
@@ -127,7 +127,7 @@
         "exactPredecessorOnly": true,
         "currentPhysicalExtensions": "preserved"
       },
-      "proof": "Causal canonical and drift tests, portable clinical links and encrypted v17/v18 recovery with 24h agent mandate ceiling. Formal model scope is unchanged.",
+      "proof": "Canonical predecessor and durable command tests, v1 compatibility and streamed portable and encrypted restore through the existing ledger and audit boundaries. Formal model scope is unchanged.",
       "outsideTlc": "schema, migration, encryption, keys and durable receipts are not modeled by TherapyStatus.tla",
       "canonicalSchemaFingerprints": {
         "3": "f7a926813c169edfd7c75ce5e6a1d1b9f5b1e9201c7a20456dc557b943bbaac5",
@@ -157,5 +157,5 @@
     }
   },
   "legacyModelSyncCommit": "64e190438da8287928f0903b9b719c18b329a7ec",
-  "filesSha256": "3e6d1ce1c62cc0290e52ec0180a1cc2086e6a85ef109fda99e29fad8fa9a7cfa"
+  "filesSha256": "775f5cd6c57ce741b36233cf7c32ce8fe39eea9e8bcf5d850989373f7a60f0a2"
 }

@@ -9,7 +9,8 @@ import { copySqliteDatabaseSync, createVerifiedSqliteSnapshotSync, hasSqliteSwap
 import { CURRENT_SQLITE_SCHEMA_VERSION, openVersionedSqliteDatabase } from './sqlite-schema-open';
 import { readSqliteArchiveGeneration, rotateSqliteArchiveGeneration } from './archive-generation';
 import { runWithSqliteMaintenance } from './sqlite-maintenance-admission.mjs';
-import { assertRecoveryDatabaseBytes, decryptRecoveryBackup, MAX_RECOVERY_DATABASE_BYTES, type RecoveryKit } from './recovery-backup';
+import { assertRecoveryDatabaseBytes, MAX_RECOVERY_DATABASE_BYTES, type RecoveryKit } from './recovery-backup';
+import { MAX_STREAMED_RECOVERY_DATABASE_BYTES, readRecoveryBackup, RECOVERY_BLOCK_BYTES } from './recovery-backup-stream';
 import { hashAccessVerifier, openRecoveryWrapping } from './security/unlock-credential';
 import { validateRecoveryAuditSchema } from './sqlite-schema';
 import { TERRITORIAL_PACK_INITIALIZATION_KEY, TERRITORIAL_PACK_OWNER } from './territorial-packs';
@@ -33,10 +34,22 @@ function validateCandidate(file: string, prepareReplacement = false): Database.D
     catch (error) { candidate.close(); throw error; }
 }
 
-/** Called synchronously under the Web process's existing admission; no unowned source or raw file copy. */
-export function createRecoverySnapshot(connection: Database.Database, actorId: string): Uint8Array {
+export function recoveryBackupCapacity(connection: Database.Database): 'archive_limit' | 'local_space' | null {
+    const occupied = connection.transaction(() => {
+        const pageSize = Number(connection.pragma('page_size', { simple: true }));
+        const pages = Number(connection.pragma('page_count', { simple: true }));
+        const freePages = Number(connection.pragma('freelist_count', { simple: true }));
+        return pageSize * (pages - freePages);
+    })();
+    if (occupied >= MAX_STREAMED_RECOVERY_DATABASE_BYTES * 0.8) return 'archive_limit';
+    const disk = fs.statfsSync(path.dirname(connection.name));
+    return disk.bavail * disk.bsize < occupied * 1.25 ? 'local_space' : null;
+}
+
+function prepareRecoverySnapshot(connection: Database.Database, actorId: string) {
     const root = fs.mkdtempSync(path.join(path.dirname(connection.name), '.recovery-backup-'));
     const file = path.join(root, 'snapshot.db');
+    const remove = () => fs.rmSync(root, { recursive: true, force: true });
     try {
         restrictNewPrivateDirectory(root);
         copySqliteDatabaseSync(connection.name, file);
@@ -51,11 +64,76 @@ export function createRecoverySnapshot(connection: Database.Database, actorId: s
             candidate.pragma('wal_checkpoint(TRUNCATE)');
             candidate.pragma('journal_mode = DELETE');
         } finally { candidate.close(); }
-        if (fs.statSync(file).size > MAX_RECOVERY_DATABASE_BYTES) refuse('archive_too_large');
-        const bytes = fs.readFileSync(file);
+        return { file, size: fs.statSync(file).size, remove };
+    } catch (error) {
+        remove();
+        throw error;
+    }
+}
+
+export function createRecoverySnapshot(connection: Database.Database, actorId: string): Uint8Array {
+    const snapshot = prepareRecoverySnapshot(connection, actorId);
+    try {
+        if (snapshot.size > MAX_RECOVERY_DATABASE_BYTES) refuse('archive_too_large');
+        const bytes = fs.readFileSync(snapshot.file);
         assertRecoveryDatabaseBytes(bytes);
         return bytes;
-    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+    } finally { snapshot.remove(); }
+}
+
+export function createRecoverySnapshotStream(connection: Database.Database, actorId: string,
+    { signal, assertCurrent }: { signal?: AbortSignal; assertCurrent?: () => void } = {}) {
+    signal?.throwIfAborted();
+    const snapshot = prepareRecoverySnapshot(connection, actorId);
+    let descriptor: number | undefined;
+    let abort: (() => void) | undefined;
+    let disposed = false;
+    const dispose = () => {
+        if (disposed) return;
+        disposed = true;
+        if (abort) signal?.removeEventListener('abort', abort);
+        try { if (descriptor !== undefined) fs.closeSync(descriptor); }
+        finally { descriptor = undefined; snapshot.remove(); }
+    };
+    try {
+        if (snapshot.size > MAX_STREAMED_RECOVERY_DATABASE_BYTES) refuse('archive_too_large');
+        descriptor = fs.openSync(snapshot.file, 'r');
+        if (process.platform !== 'win32') snapshot.remove();
+        let remaining = snapshot.size;
+        const body = new ReadableStream<Uint8Array<ArrayBuffer>>({
+            start(controller) {
+                abort = () => {
+                    try { dispose(); }
+                    catch (error) { controller.error(error); return; }
+                    controller.error(signal?.reason);
+                };
+                signal?.addEventListener('abort', abort, { once: true });
+            },
+            pull(controller) {
+                if (descriptor === undefined) return;
+                try {
+                    assertCurrent?.();
+                    const chunk = new Uint8Array(Math.min(RECOVERY_BLOCK_BYTES, remaining));
+                    const read = fs.readSync(descriptor, chunk);
+                    if (read === 0) fail();
+                    remaining -= read;
+                    controller.enqueue(chunk.subarray(0, read));
+                    if (remaining === 0) {
+                        dispose();
+                        controller.close();
+                    }
+                } catch (error) {
+                    dispose();
+                    controller.error(error);
+                }
+            },
+            cancel: dispose,
+        }, { highWaterMark: 0 });
+        return { body, size: snapshot.size };
+    } catch (error) {
+        dispose();
+        throw error;
+    }
 }
 
 function isHostBootstrap(destination: Database.Database): boolean {
@@ -101,7 +179,7 @@ function assertEmptyDestination(file: string): void {
 
 /** Offline only. The caller owns the local process, not a Web session or a second maintenance owner. */
 export async function restoreRecoveryBackup(options: {
-    artifact: Uint8Array; kit: RecoveryKit; recoveryKey: string; destination: string;
+    artifact: Uint8Array | Blob; kit: RecoveryKit; recoveryKey: string; destination: string;
 }): Promise<{ archiveGeneration: string; username: string }> {
     const requested = path.resolve(options.destination);
     const parent = fs.realpathSync(path.dirname(requested));
@@ -109,13 +187,14 @@ export async function restoreRecoveryBackup(options: {
     const destination = path.join(parent, 'medical.db');
     // Wrong/missing key, truncated data and failed authentication never open the destination for writes.
     const recovered = await openRecoveryWrapping(options.kit.wrappedMasterKey, options.kit.salt, options.recoveryKey);
-    const bytes = await decryptRecoveryBackup(options.artifact, recovered.masterKey);
     const root = fs.mkdtempSync(path.join(parent, '.recovery-restore-'));
     const source = path.join(root, 'snapshot.db');
     try {
         restrictNewPrivateDirectory(root);
-        fs.writeFileSync(source, bytes, { flag: 'wx', mode: 0o600 });
-        bytes.fill(0);
+        const descriptor = fs.openSync(source, 'wx', 0o600);
+        try {
+            await readRecoveryBackup(options.artifact, recovered.masterKey, chunk => fs.writeFileSync(descriptor, chunk));
+        } finally { fs.closeSync(descriptor); }
         const verifierHash = await hashAccessVerifier(recovered.verifier);
         const accountProbe = new Database(source, { readonly: true, fileMustExist: true });
         try {
@@ -159,5 +238,5 @@ export async function restoreRecoveryBackup(options: {
             }
         });
         return { archiveGeneration, username: options.kit.username };
-    } finally { bytes.fill(0); fs.rmSync(root, { recursive: true, force: true }); }
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
 }

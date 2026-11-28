@@ -41,7 +41,7 @@ import {
     sissHandoffEvents,
     therapies,
 } from './schema';
-import { backupArtifactInputChecksum, type BackupArtifact, type BackupCollectionName } from './backup-artifact';
+import { backupArtifactInputChecksum, type BackupRowArtifact, type BackupCollectionName } from './backup-artifact';
 import { backupAuditCoverage, backupAuditsEqual, canonicalizeBackupAuditRows, snapshotBackupAudit,
     type BackupAuditCoverage, type BackupAuditRow } from './backup-audit';
 import { revokeAttachmentExtractionLocatorGeneration } from './domain/documents/attachment-extraction-locator-revocation';
@@ -145,12 +145,12 @@ type InsertRunner = Pick<typeof dbServer, 'insert'>;
 type InsertableTable = (typeof TABLE_LOOKUP)[BackupCollectionName] | typeof patientsToAmbulatories;
 export type BackupRestoreMutationFence = () => boolean;
 
-function chunk<T>(items: T[], size: number): T[][] {
-    const chunks: T[][] = [];
-    for (let index = 0; index < items.length; index += size) {
-        chunks.push(items.slice(index, index + size));
+function *groups<T>(items: Iterable<T>): Generator<T[]> {
+    if (Array.isArray(items)) {
+        for (let index = 0; index < items.length; index += 250) yield items.slice(index, index + 250);
+    } else {
+        for (const row of items) yield [row];
     }
-    return chunks;
 }
 
 function clearRows(table: InsertableTable): void {
@@ -163,15 +163,13 @@ function clearRows(table: InsertableTable): void {
 function insertRows<T extends Record<string, unknown>>(
     runner: InsertRunner,
     table: InsertableTable,
-    rows: T[],
+    rows: Iterable<T>,
 ): void {
-    if (rows.length === 0) return;
-    const insertableRows: Record<string, unknown>[] = table === prostheticsCatalogDocuments ? rows.map(row => {
-        const { base64, ...metadata } = row;
-        return { ...metadata, bytes: Buffer.from(base64 as string, 'base64') };
-    }) : rows;
-    for (const group of chunk(insertableRows, 250)) {
-        /* Repertory dates are declared source text, not clinical timestamp columns. */
+    for (const page of groups(rows)) {
+        const group: Record<string, unknown>[] = table === prostheticsCatalogDocuments ? page.map(row => {
+            const { base64, ...metadata } = row;
+            return { ...metadata, bytes: Buffer.from(base64 as string, 'base64') };
+        }) : page;
         const inserted = runner.insert(table).values((table === prostheticsCatalogEntries || table === prostheticsCatalogSources) ? group : group.map(normalizeRestoreRow)).run();
         if (inserted.changes !== group.length) throw new Error('RESTORE_ROWS_NOT_PERSISTED');
     }
@@ -192,11 +190,11 @@ function runMutationFence(fence: BackupRestoreMutationFence): void {
     }
 }
 
-function physicianAttestationsWithoutRestoredAuthority(rows: Record<string, unknown>[]): Record<string, unknown>[] {
+function physicianAttestationsWithoutRestoredAuthority(rows: Iterable<Record<string, unknown>>): Record<string, unknown>[] {
     const revokedHere = dbServer.select().from(physicianReviewAttestations)
         .where(eq(physicianReviewAttestations.status, 'revoked')).all();
     const actors = new Set<unknown>(revokedHere.map(row => row.actorRef));
-    return [...revokedHere, ...rows.filter(row => !actors.has(row.actorRef))
+    return [...revokedHere, ...[...rows].filter(row => !actors.has(row.actorRef))
         .map(row => row.status === 'active' ? { ...row, status: 'inactive' } : row)];
 }
 
@@ -257,12 +255,12 @@ function recordPortableImport(plan: AuditRestorePlan, checksum: string, imported
 }
 
 export function restoreBackupArtifact(
-    artifact: BackupArtifact,
+    artifact: BackupRowArtifact,
     beforeMutation: BackupRestoreMutationFence,
     intent?: RestoreIntent,
     actorRef?: string,
 ): BackupRestoreResult {
-    assertExemptionImportReceiptRows(artifact.payload.exemptionImportReceipts ?? []);
+    assertExemptionImportReceiptRows([...(artifact.payload.exemptionImportReceipts ?? [])]);
     assertProstheticsCatalogBackup(artifact.payload.prostheticsCatalogEntries ?? [], artifact.payload.prostheticsCatalogReceipts ?? [], artifact.payload.prostheticsCatalogSources ?? [], artifact.payload.prostheticsCatalogDocuments ?? [], artifact.payload.prostheticPrescriptions ?? []);
 
     const coverage = backupAuditCoverage(artifact.payload);
@@ -273,12 +271,12 @@ export function restoreBackupArtifact(
         if (intent && restoreSnapshot(openDbServer()) !== intent.expectedSnapshot) {
             throw new BackupRestoreBlockedError('snapshot', 'archive changed after preview.');
         }
-        const rows = canonicalizeBackupAuditRows(coverage === 'included' ? artifact.payload.auditEvents : []);
+        const rows = canonicalizeBackupAuditRows([...(artifact.payload.auditEvents ?? [])]);
         let therapyCommands;
-        try { therapyCommands = planTherapyStatusCommandUnion(openDbServer(), artifact.payload.therapyStatusCommands ?? [], rows); }
+        try { therapyCommands = planTherapyStatusCommandUnion(openDbServer(), [...(artifact.payload.therapyStatusCommands ?? [])], rows); }
         catch { throw new BackupRestoreBlockedError('therapy_status_commands', 'therapy status command or audit collision.'); }
         let ambulatoryCommands;
-        try { ambulatoryCommands = planAmbulatoryCommandUnion(openDbServer(), artifact.payload.ambulatoryDestructiveCommands ?? [], rows); }
+        try { ambulatoryCommands = planAmbulatoryCommandUnion(openDbServer(), [...(artifact.payload.ambulatoryDestructiveCommands ?? [])], rows); }
         catch { throw new BackupRestoreBlockedError('ambulatory_destructive_commands', 'ambulatory command or audit collision.'); }
         const importedCommands = therapyCommands.filter(row => !openDbServer().prepare('SELECT 1 FROM therapy_status_commands WHERE command_id=?').get(row.commandId)).map(row => row.commandId as string);
         const plan = planBackupAuditRestore(rows);

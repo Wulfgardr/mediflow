@@ -1,4 +1,6 @@
 import fs from 'node:fs';
+import { RECOVERY_SNAPSHOT_BYTES_HEADER } from '../lib/recovery-backup-stream';
+import { saveRecoveryToTestDownload } from './fixtures/recovery-file-picker';
 import { test, expect } from './fixtures/isolated-runtime';
 import { bootstrapUnlockedSession } from './utils';
 import { trustedWebRequestHeaders } from './fixtures/trusted-web-request';
@@ -7,6 +9,7 @@ test.describe.configure({ retries: 0 });
 const phrase = 'Passphrase recupero soltanto sintetica';
 
 test('complete backup is encrypted in the browser and verification never claims a proven restore', async ({ page, baseURL }, testInfo) => {
+    await saveRecoveryToTestDownload(page);
     await page.route('**/api/siss/session-status', route => route.fulfill({ json: { status: 'unavailable', source: 'fixture', checkpoints: [] } }));
     const pageErrors: string[] = []; const sent: string[] = [];
     page.on('pageerror', error => pageErrors.push(error.message));
@@ -35,18 +38,27 @@ test('complete backup is encrypted in the browser and verification never claims 
     const navigation = page.getByRole('navigation', { name: 'Navigazione principale', exact: true });
     await expect(navigation).toBeVisible();
     await navigation.locator('summary').filter({ hasText: /^Altro$/u }).click();
+    await page.route('**/api/system/recovery-backup', route => route.request().method() === 'GET'
+        ? route.fulfill({ json: { warning: 'local_space' } }) : route.fallback());
     await page.getByRole('link', { name: 'Impostazioni', exact: true }).click();
     await page.locator('a[href="/settings/backup"]:visible').click();
     const panel = page.getByRole('region', { name: 'Backup completo di recupero', exact: true });
     await expect(panel).toBeVisible();
+    await expect(panel.getByRole('alert')).toContainText('Libera spazio prima di creare la copia.');
     const requested = page.waitForRequest(request =>
         new URL(request.url()).pathname === '/api/system/recovery-backup' && request.method() === 'POST');
+    const snapshot = page.waitForResponse(response => new URL(response.url()).pathname === '/api/system/recovery-backup'
+        && response.request().method() === 'POST');
     const downloadEvent = page.waitForEvent('download');
     await panel.getByRole('button', { name: 'Crea backup completo cifrato', exact: true }).click();
+    const raw = await snapshot;
+    expect(raw.status()).toBe(200);
+    expect(Number(await raw.headerValue(RECOVERY_SNAPSHOT_BYTES_HEADER))).toBeGreaterThan(0);
+    await expect(panel.getByRole('status')).toContainText('Backup creato');
     const download = await downloadEvent;
     const artifactPath = testInfo.outputPath('synthetic.mediflow-recovery'); await download.saveAs(artifactPath);
     const bytes = fs.readFileSync(artifactPath);
-    expect(bytes.subarray(0, 8).toString()).toBe('MDFREC01');
+    expect(bytes.subarray(0, 8).toString()).toBe('MDFREC02');
     expect(bytes.includes(Buffer.from('SQLite format 3'))).toBe(false);
     expect(bytes.includes(Buffer.from('Medico Sintetico Recupero'))).toBe(false);
     await expect(panel.getByRole('status')).toContainText('Non è ancora stato provato un ripristino.');

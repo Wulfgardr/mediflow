@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { saveRecoveryToTestDownload } from './fixtures/recovery-file-picker';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { Page } from '@playwright/test';
@@ -49,6 +50,7 @@ async function attachmentCount(page: Page): Promise<number> {
 
 test('Dossier: a batch of five patients proposes a complete backup before writing, and the backup passes the existing verification', async ({ page }, testInfo) => {
     test.setTimeout(240_000);
+    await saveRecoveryToTestDownload(page);
     const codes = new Set<string>();
     while (codes.size < 5) codes.add(randomSyntheticTaxCode());
     const [first, ...others] = [...codes];
@@ -84,7 +86,7 @@ test('Dossier: a batch of five patients proposes a complete backup before writin
         const artifactPath = testInfo.outputPath('lotto.mediflow-recovery');
         await (await download).saveAs(artifactPath);
         const bytes = fs.readFileSync(artifactPath);
-        expect(bytes.subarray(0, 8).toString()).toBe('MDFREC01');
+        expect(bytes.subarray(0, 8).toString()).toBe('MDFREC02');
         expect(bytes.includes(Buffer.from('SQLite format 3'))).toBe(false);
         await expect(proposal).toBeHidden();
         await expect(panel.getByTestId('dossier-backup-made')).toContainText('Backup creato: mediflow-recovery-');

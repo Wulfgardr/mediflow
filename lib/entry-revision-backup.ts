@@ -5,9 +5,8 @@ import { isDiaryRevisionEnvelope } from './diary-revision-envelope.ts';
 type Row = Record<string, unknown>;
 const fields = ['eventId', 'entryId', 'version', 'title', 'content', 'correctedAt', 'correctedBy'];
 
-export function assertEntryRevisionBackup(revisions: Row[], entries: Row[], audit: Row[]): void {
-    if (!revisions.length) return;
-    const parents = new Map(entries.map(entry => [entry.id, entry]));
+export function assertEntryRevisionBackup(revisions: Iterable<Row>, entries: Iterable<Row>, audit: Row[]): void {
+    let parents: Map<unknown, unknown> | undefined;
     const auditById = new Map(audit.map(row => [row.eventId, row]));
     const eventIds = new Set<string>();
     const versionsByEntry = new Map<string, Set<number>>();
@@ -19,10 +18,14 @@ export function assertEntryRevisionBackup(revisions: Row[], entries: Row[], audi
             || (!isSealedAttachmentValue(row.title) && !isDiaryRevisionEnvelope(row.title))
             || (!isSealedAttachmentValue(row.content) && !isDiaryRevisionEnvelope(row.content))) throw new Error('Invalid diary revision');
 
-        const parent = parents.get(row.entryId);
+        if (!parents) {
+            parents = new Map();
+            for (const entry of entries) parents.set(entry.id, entry.version);
+        }
+        const parentVersion = parents.get(row.entryId);
         const event = auditById.get(row.eventId);
         const versions = versionsByEntry.get(row.entryId) ?? new Set<number>();
-        if (!parent || typeof parent.version !== 'number' || parent.version <= row.version
+        if (typeof parentVersion !== 'number' || parentVersion <= row.version
             || eventIds.has(row.eventId) || versions.has(row.version) || !event) throw new Error('Invalid diary revision reference');
 
         const auditRow = snapshotBackupAudit(event);

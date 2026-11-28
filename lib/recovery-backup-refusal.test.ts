@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { openVersionedSqliteDatabase } from './sqlite-schema-open';
-import { createRecoverySnapshot } from './recovery-backup-server';
+import { createRecoverySnapshot, createRecoverySnapshotStream, recoveryBackupCapacity } from './recovery-backup-server';
 import { decryptRecoveryBackup, encryptRecoveryBackup } from './recovery-backup';
 import { generateMasterKey } from './security/security';
 import { createRecoveryWrapping, createUnlockWrapping, hashAccessVerifier } from './security/unlock-credential';
@@ -83,4 +83,38 @@ test('every refusal is an explained response with its code, and only an internal
     assert.equal(recoveryBackupRefusalMessage(401, null), RECOVERY_BACKUP_REFUSALS.session_expired.message);
     assert.equal(recoveryBackupRefusalMessage(403, 'forged'), RECOVERY_BACKUP_REFUSALS.administrator_required.message);
     assert.equal(recoveryBackupRefusalMessage(409, 'archive_too_large'), RECOVERY_BACKUP_REFUSALS.backup_failed.message);
+});
+
+test('the capacity check sees a nearly full archive disk before a copy is made', async t => {
+    const a = await archive('passphrase');
+    try {
+        const disk = fs.statfsSync(path.dirname(a.db.name));
+        t.mock.method(fs, 'statfsSync', () => ({ ...disk, bavail: 1 }));
+        assert.equal(recoveryBackupCapacity(a.db), 'local_space');
+        assert.deepEqual(fs.readdirSync(path.dirname(a.db.name)).filter(name => name.startsWith('.recovery-backup-')), []);
+    } finally { a.cleanup(); }
+});
+
+test('cancel and expiry release the snapshot descriptor', async t => {
+    const a = await archive('passphrase');
+    const open = fs.openSync;
+    let descriptor = -1;
+    t.mock.method(fs, 'openSync', (...args: Parameters<typeof fs.openSync>) => {
+        const fd = open(...args);
+        if (String(args[0]).endsWith('snapshot.db') && args[1] === 'r') descriptor = fd;
+        return fd;
+    });
+    try {
+        const canceled = createRecoverySnapshotStream(a.db, actor);
+        assert.ok(descriptor >= 0);
+        await canceled.body.cancel();
+        assert.throws(() => fs.fstatSync(descriptor), { code: 'EBADF' });
+
+        const session = new AbortController();
+        const expired = createRecoverySnapshotStream(a.db, actor, { signal: session.signal });
+        session.abort();
+        await assert.rejects(expired.body.getReader().read(), { name: 'AbortError' });
+        assert.throws(() => fs.fstatSync(descriptor), { code: 'EBADF' });
+        assert.deepEqual(fs.readdirSync(path.dirname(a.db.name)).filter(name => name.startsWith('.recovery-backup-')), []);
+    } finally { a.cleanup(); }
 });

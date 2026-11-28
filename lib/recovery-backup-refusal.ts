@@ -1,4 +1,4 @@
-import { MAX_RECOVERY_DATABASE_BYTES } from './recovery-backup';
+import { MAX_STREAMED_RECOVERY_DATABASE_BYTES } from './recovery-backup-stream';
 
 export const RECOVERY_BACKUP_REFUSALS = {
     session_expired: { status: 401, message: 'La sessione è scaduta. Sblocca di nuovo MediFlow e riprova.' },
@@ -6,7 +6,7 @@ export const RECOVERY_BACKUP_REFUSALS = {
     recovery_wrapping_missing: { status: 409,
         message: 'Questo account non ha ancora una chiave di recupero, quindi il backup non si potrebbe ripristinare. Passa alla passphrase in Impostazioni › Accesso.' },
     archive_too_large: { status: 413,
-        message: `L’archivio supera ${MAX_RECOVERY_DATABASE_BYTES / (1024 * 1024)} MiB, il limite del backup completo creato dall’app. Usa il backup del Mac.` },
+        message: `L’archivio supera il limite di ${MAX_STREAMED_RECOVERY_DATABASE_BYTES / (1024 ** 3)} GiB. Chiedi assistenza per conservarne una copia completa.` },
     archive_inconsistent: { status: 409,
         message: 'L’archivio non supera il controllo di integrità, quindi una sua copia non si potrebbe ripristinare. Non importare documenti e chiedi assistenza.' },
     archive_schema_unsupported: { status: 409, message: 'L’archivio non è nella versione attesa da questo MediFlow. Riavvia MediFlow e riprova.' },

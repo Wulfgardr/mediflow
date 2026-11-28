@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { BACKUP_ROWS_TRANSPORT_HEADER, BACKUP_ROWS_TRANSPORT } from '../lib/backup-row-layout';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import type { Page } from '@playwright/test';
@@ -77,9 +80,17 @@ test('il Web rifiuta una conferma superata e consente il ripristino e il recuper
         await enterConfirmation();
         db.prepare('UPDATE patients SET version=version+1 WHERE id=?').run(id);
 
-        const previous = await web.get(backupPath);
-        expect(previous.ok()).toBe(true);
-        const previousFile = backupFile('prima-del-ripristino.mediflow', await previous.body());
+        const destination = join(isolatedRuntime.dataDirectory, 'scheduled');
+        const preload = execFileSync(process.execPath, ['--import', './scripts/register-strip-types-loader.mjs',
+            '--input-type=module', '--eval',
+            "import { prepareSyntheticBackupDestination } from './lib/scheduled-backup.test-support.ts'; console.log(prepareSyntheticBackupDestination(process.argv[1], process.argv[2]));",
+            isolatedRuntime.dataDirectory, destination], { encoding: 'utf8' }).trim();
+        const previous = JSON.parse(execFileSync(process.execPath, ['--import', preload, 'scripts/run-scheduled-backup.mjs'], {
+            encoding: 'utf8', env: { ...process.env, MEDIFLOW_DATA_DIR: isolatedRuntime.dataDirectory,
+                MEDIFLOW_BACKUP_DEST_DIR: destination, MEDIFLOW_BACKUP_FORCE: '1' },
+        }));
+        expect(previous.ok).toBe(true);
+        expect(fs.existsSync(previous.artifactPath)).toBe(true);
         const before = archiveRows(db);
         const conflict = waitForRestore();
         await submit.click();
@@ -125,13 +136,15 @@ test('il Web rifiuta una conferma superata e consente il ripristino e il recuper
         expect(readback.status()).toBe(200);
         expect(await readback.json()).toMatchObject({ id, version: 1 });
 
-        await input.setInputFiles(previousFile);
+        await input.setInputFiles(previous.artifactPath);
         await expect(panel).toBeVisible();
         await enterConfirmation();
         const recovered = waitForRestore();
         const reloaded = page.waitForEvent('framenavigated', { predicate: frame => frame === page.mainFrame() });
         await submit.click();
-        expect((await recovered).status()).toBe(200);
+        const recoveredResponse = await recovered;
+        expect(recoveredResponse.status()).toBe(200);
+        expect(await recoveredResponse.request().headerValue(BACKUP_ROWS_TRANSPORT_HEADER)).toBe(BACKUP_ROWS_TRANSPORT);
         expect((await web.get(`/api/patients/${id}`)).status()).toBe(401);
         await reloaded;
         await expect(page.getByRole('heading', { name: 'Sblocca MediFlow' })).toBeVisible();

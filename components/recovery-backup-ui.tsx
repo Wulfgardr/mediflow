@@ -1,22 +1,53 @@
 'use client';
-import { useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
+import { MAX_STREAMED_RECOVERY_DATABASE_BYTES } from '@/lib/recovery-backup-stream';
 import { useSecurity } from './security-provider';
 import { Disclosure } from './disclosure';
 import composition from './settings/backup-composition.module.css';
-import { MAX_RECOVERY_BACKUP_BYTES, MAX_RECOVERY_DATABASE_BYTES } from '@/lib/recovery-backup';
-import { createRecoveryBackupFile, RECOVERY_BACKUP_REQUIREMENT, recoveryBackupAllowed, recoveryBackupFailure } from './recovery-backup-download';
+import { createRecoveryBackupFile, RECOVERY_BACKUP_REQUIREMENT, recoveryBackupAllowed, recoveryBackupFailure, recoveryBackupSaveSupported, RECOVERY_BACKUP_BROWSER_REQUIREMENT } from './recovery-backup-download';
+
+const noWarning = () => '';
+const inactiveSubscription = () => () => {};
+
+function capacityStore() {
+    let warning = '';
+    return {
+        snapshot: () => warning,
+        subscribe(listener: () => void) {
+            const controller = new AbortController();
+            void fetch('/api/system/recovery-backup', { cache: 'no-store', signal: controller.signal })
+                .then(response => response.ok ? response.json() : null)
+                .then(result => {
+                    if (controller.signal.aborted) return;
+                    warning = result?.warning === 'archive_limit'
+                        ? `L’archivio si avvicina al limite di ${MAX_STREAMED_RECOVERY_DATABASE_BYTES / (1024 ** 3)} GiB. Chiedi assistenza per conservarne una copia completa.`
+                        : result?.warning === 'local_space'
+                            ? 'Lo spazio sul disco dell’archivio potrebbe non bastare. Libera spazio prima di creare la copia.'
+                            : '';
+                    listener();
+                }).catch(() => {});
+            return () => { controller.abort(); warning = ''; };
+        },
+    };
+}
 
 export function RecoveryBackupUI({ primary = true }: { primary?: boolean }) {
     const { recoveryBackup, unlockCredential, user } = useSecurity();
     const [busy, setBusy] = useState(false);
     const [message, setMessage] = useState('');
     const allowed = recoveryBackupAllowed(unlockCredential, user?.role);
+    const saveSupported = recoveryBackupSaveSupported();
+    const [capacity] = useState(capacityStore);
+    const warning = useSyncExternalStore(allowed ? capacity.subscribe : inactiveSubscription,
+        allowed ? capacity.snapshot : noWarning, noWarning);
     return <section className={composition.section} aria-labelledby="recovery-backup-heading">
         <h3 id="recovery-backup-heading" className={composition.sectionTitle}>Backup completo di recupero</h3>
-        <p>Copia cifrata dell’intero archivio, compresi account, chiavi protette e storico. Per recuperarla servono il kit corrispondente a questo backup e la sua chiave su carta, conservata separatamente. Limite: {MAX_RECOVERY_DATABASE_BYTES / (1024 * 1024)} MiB.</p>
+        <p>Copia cifrata dell’intero archivio, compresi account, chiavi protette e storico. Per recuperarla servono il kit corrispondente a questo backup e la sua chiave su carta, conservata separatamente.</p>
         {!allowed && <p>{RECOVERY_BACKUP_REQUIREMENT}</p>}
+        {allowed && !saveSupported && <p>{RECOVERY_BACKUP_BROWSER_REQUIREMENT}</p>}
+        {warning && <p role="alert">{warning}</p>}
         <div className={composition.actions}>
-            <button className={primary ? 'ui-btn-primary' : 'mf-btn-secondary'} data-backup-primary={primary || undefined} disabled={!allowed || busy} onClick={async () => {
+            <button className={primary ? 'ui-btn-primary' : 'mf-btn-secondary'} data-backup-primary={primary || undefined} disabled={!allowed || !saveSupported || busy} onClick={async () => {
                 setBusy(true); setMessage('Creazione in corso…');
                 try {
                     await createRecoveryBackupFile(recoveryBackup);
@@ -29,8 +60,7 @@ export function RecoveryBackupUI({ primary = true }: { primary?: boolean }) {
                     const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; if (!file || busy) return;
                     setBusy(true); setMessage('Verifica in corso…');
                     try {
-                        if (file.size > MAX_RECOVERY_BACKUP_BYTES) throw new Error();
-                        await recoveryBackup(new Uint8Array(await file.arrayBuffer()));
+                        await recoveryBackup({ kind: 'verify', artifact: file });
                         setMessage('Cifratura e integrità del file verificate con la chiave sbloccata. Il ripristino non è ancora provato: serve una prova su un archivio vuoto, con kit e chiave cartacea.');
                     } catch { setMessage('File non verificato: è incompleto, alterato o appartiene a un’altra chiave. Non usarlo per recuperare l’archivio.'); }
                     finally { setBusy(false); }

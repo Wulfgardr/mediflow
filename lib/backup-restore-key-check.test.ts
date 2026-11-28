@@ -35,7 +35,7 @@ test('the client restore sends nothing when the unlocked key cannot read the bac
     try {
         db.setKey(await generateMasterKey());
         const expectedSnapshot = 'a'.repeat(64), sourceChecksum = 'b'.repeat(64);
-        const decision = { id: '12345678-1234-4123-8123-123456789012', json: artifact,
+        const decision = { id: '12345678-1234-4123-8123-123456789012', source: artifact,
             verification: { expectedSnapshot, sourceChecksum, createdAt: null, collections: 0, records: 0, excludedRetiredPatients: 0 } };
         await assert.rejects(importRawDatabase(decision, { verifier: 'synthetic-verifier' }), /chiave diversa/);
         assert.equal(requests.length, 0);
@@ -56,7 +56,7 @@ test('the client tells a blocked restore from a failed one and verifies through 
         db.setKey(key);
         answer = () => Response.json({ success: false, code: 'restore_blocked', reason: 'audit', error: 'Ripristino bloccato: i dati attuali non sono stati modificati.' }, { status: 409 });
         const expectedSnapshot = 'a'.repeat(64), sourceChecksum = 'b'.repeat(64);
-        const decision = { id: '12345678-1234-4123-8123-123456789012', json: artifact,
+        const decision = { id: '12345678-1234-4123-8123-123456789012', source: artifact,
             verification: { expectedSnapshot, sourceChecksum, createdAt: null, collections: 0, records: 0, excludedRetiredPatients: 0 } };
         await assert.rejects(importRawDatabase(decision, { verifier: 'synthetic-verifier' }),
             (error: unknown) => error instanceof BackupRestoreBlockedError && error.reason === 'audit');
@@ -117,5 +117,30 @@ test('Web restore admits legacy history only with the same key and patient bindi
         assert.equal(requests, 0);
         await verifyRawDatabase(backup());
         assert.equal(requests, 1);
+    } finally { db.setKey(null); }
+});
+
+test('a scheduled restore receives its receipt when completion retires the former client authority', async t => {
+    const { db, importRawDatabase, verifyRawDatabase } = await import('./db.ts');
+    const { createEmptyDataset, serializeBackupRows } = await import('./backup-artifact.ts');
+    const key = await generateMasterKey();
+    const payload = { ...createEmptyDataset(), patients: [{ id: 'synthetic-patient', notes: await seal(key) }] };
+    const file = new Blob([...serializeBackupRows(payload, new Date('2026-11-27T00:00:00Z'))]);
+    const snapshot = 'a'.repeat(64), checksum = 'b'.repeat(64);
+    t.mock.method(globalThis, 'fetch', async (url: string, request: RequestInit) => {
+        assert.equal(request.body, file);
+        if (url.endsWith('/verify')) {
+            assert.ok(request.signal && !request.signal.aborted);
+            return Response.json({ expectedSnapshot: snapshot, sourceChecksum: checksum });
+        }
+        db.setKey(null);
+        request.signal?.throwIfAborted();
+        return Response.json({ receipt: { excludedRetiredPatients: 1 } });
+    });
+    try {
+        db.setKey(key);
+        const verification = await verifyRawDatabase(file);
+        assert.deepEqual(await importRawDatabase({ id: 'synthetic-restore', source: file, verification }, { verifier: 'synthetic-proof' }),
+            { excludedRetiredPatients: 1 });
     } finally { db.setKey(null); }
 });

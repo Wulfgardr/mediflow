@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import type Database from 'better-sqlite3';
 import { dbServer, openDbServer } from './db-server';
 import { readSqliteArchiveGeneration } from './archive-generation';
-import type { BackupArtifact } from './backup-artifact';
+import type { BackupRowArtifact } from './backup-artifact';
 import { planBackupRestore } from './backup-restore-policy';
 
 import { RESTORE_RECEIPT_PREFIX as PREFIX } from './backup-restore-receipt-contract';
@@ -26,7 +26,7 @@ export function readRestorePreviewSnapshot(): string {
     const db = openDbServer();
     return db.transaction(() => restoreSnapshot(db))();
 }
-export function readRestorePreview(artifact: BackupArtifact): { expectedSnapshot: string; excludedRetiredPatients: number } {
+export function readRestorePreview(artifact: BackupRowArtifact): { expectedSnapshot: string; excludedRetiredPatients: number } {
     const db = openDbServer();
     return db.transaction(() => {
         const { excludedRetiredPatients } = planBackupRestore(db, artifact.payload, dbServer);
@@ -41,9 +41,19 @@ export function restoreSnapshot(db: Database.Database): string {
     const tables = db.prepare("SELECT name FROM sqlite_schema WHERE type='table' AND name NOT GLOB 'sqlite_*' ORDER BY name").all() as { name: string }[];
     for (const { name } of tables) {
         if (name === 'archive_session_generations') continue;
-        const rows = db.prepare(`SELECT * FROM ${quote(name)}`).all() as Record<string, unknown>[];
-        const included = name === 'settings' ? rows.filter(row => !String(row.key).startsWith(PREFIX)) : rows;
-        hash.update(JSON.stringify([name, included.map(row => JSON.stringify(row)).sort()]));
+        const digests: string[] = [];
+        for (const row of db.prepare(`SELECT * FROM ${quote(name)}`).iterate() as Iterable<Record<string, unknown>>) {
+            if (name === 'settings' && String(row.key).startsWith(PREFIX)) continue;
+            const digest = createHash('sha256');
+            for (const [key, value] of Object.entries(row)) {
+                digest.update(JSON.stringify(key) + '\0');
+                if (Buffer.isBuffer(value)) digest.update(`blob:${value.length}\0`).update(value);
+                else digest.update(JSON.stringify(value) + '\0');
+            }
+            digests.push(digest.digest('hex'));
+        }
+        hash.update(JSON.stringify(name) + '\0');
+        for (const digest of digests.sort()) hash.update(digest);
     }
     return hash.digest('hex');
 }
