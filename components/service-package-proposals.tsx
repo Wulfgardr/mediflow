@@ -45,6 +45,7 @@ function periodicityText(months: number): string {
 function PackageProposal({ patientId, proposal, prescribedOn }: { patientId: string; proposal: VisitPackageProposal; prescribedOn: string }) {
     const [choices, setChoices] = useState<Record<string, Choice>>({});
     const [saving, setSaving] = useState(false);
+    const [savedCodes, setSavedCodes] = useState<readonly string[]>([]);
     const [unconfirmed, setUnconfirmed] = useState<readonly PackagePrescriptionDraft[] | null>(null);
     const [outcome, setOutcome] = useState<ServicePrescriptionSetOutcome | null>(null);
     if (!proposal.outcome.ok) {
@@ -53,7 +54,10 @@ function PackageProposal({ patientId, proposal, prescribedOn }: { patientId: str
             <p role="alert">{proposal.outcome.message}</p>
         </section>;
     }
-    const { requests, skipped } = proposal.outcome;
+    const { requests: offered, skipped } = proposal.outcome;
+    const waitingForHistory = savedCodes.filter(code => offered.some(request => request.serviceCode === code));
+    if (waitingForHistory.length < savedCodes.length) setSavedCodes(waitingForHistory);
+    const requests = offered.filter(request => !savedCodes.includes(request.serviceCode));
     const choiceFor = (request: GeneratedServiceRequest): Choice => choices[request.itemId]
         ?? { selected: true, clinicalQuestion: request.clinicalQuestion };
     const selected = requests.filter((request) => choiceFor(request).selected);
@@ -74,6 +78,7 @@ function PackageProposal({ patientId, proposal, prescribedOn }: { patientId: str
         setSaving(true);
         setOutcome(null);
         const result = await submitServicePrescriptionSet(drafts).catch((): ServicePrescriptionSetOutcome => ({ kind: 'unconfirmed' }));
+        if (result.kind === 'saved') setSavedCodes(previous => [...previous, ...drafts.map(draft => draft.prescription.serviceCode)]);
         setUnconfirmed(result.kind === 'unconfirmed' ? drafts : null);
         setOutcome(result);
         setSaving(false);
@@ -99,11 +104,12 @@ function PackageProposal({ patientId, proposal, prescribedOn }: { patientId: str
                         </label>
                         <p className={styles.reason}>
                             {request.reason.kind === 'overdue' ? `${request.reason.label} (ultima il ${request.reason.lastPerformedAt})` : request.reason.label}
-                            {` · ${periodicityText(request.periodicityMonths)}`}
+                            {` · ${periodicityText(request.periodicityMonths)} · Priorità ${request.priority}`}
                             {exemption ? ` · ${exemption}` : ''}
                         </p>
                         <label className={styles.question} htmlFor={questionId}>Quesito</label>
                         <input id={questionId} className={styles.questionInput} value={choice.clinicalQuestion} disabled={locked || !choice.selected}
+                            onBlur={event => { if (!event.currentTarget.value.trim()) update(request, { clinicalQuestion: request.clinicalQuestion }); }}
                             onChange={(event) => update(request, { clinicalQuestion: event.target.value })} />
                         {request.appropriatenessConditions.length > 0 && <ul className={styles.conditions}>
                             {request.appropriatenessConditions.map((condition) => <li key={condition}>{condition}</li>)}
@@ -124,7 +130,7 @@ function PackageProposal({ patientId, proposal, prescribedOn }: { patientId: str
             </Button>
         </div>}
         {outcome?.kind === 'saved' && <p role="status">{`Registrate fra le prestazioni prescritte: ${outcome.count}.`}</p>}
-        {outcome?.kind === 'refused' && <p role="alert">{`Nessuna prestazione registrata: ${outcome.message}.`}</p>}
+        {outcome?.kind === 'refused' && <p role="alert">{`Registrazione rifiutata (${outcome.message}).`}</p>}
         {outcome?.kind === 'unconfirmed' && <p role="alert">Esito della registrazione non confermato.</p>}
     </section>;
 }

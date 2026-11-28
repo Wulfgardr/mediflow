@@ -118,10 +118,28 @@ test('approved packages propose in the Web visit only what is missing from the r
         const requested = proposals.getByTestId('service-package-requests').locator('li[data-service-code]');
         const requestedCodes = await requested.evaluateAll((items) => items.map((item) => item.getAttribute('data-service-code')));
         for (const code of requestedCodes) if (code !== '95.11') await proposed(code!).getByRole('checkbox').uncheck();
-        await proposed('95.11').getByLabel('Quesito', { exact: true }).fill('Diabete tipo 2, screening retinopatia mai eseguito');
+        const question = proposed('95.11').getByLabel('Quesito', { exact: true });
+        const suggestedQuestion = await question.inputValue();
+        await question.fill('');
+        await question.blur();
+        await expect(question).toHaveValue(suggestedQuestion);
+        await expect(proposed('95.11')).toContainText('Priorità P');
+        await question.fill('Diabete tipo 2, screening retinopatia mai eseguito');
         expect(writes, 'choosing and editing write nothing').toEqual([]);
-        await proposals.getByRole('button', { name: 'Prescrivi 1 prestazione', exact: true }).click();
-        await expect(proposals.getByRole('status')).toHaveText('Registrate fra le prestazioni prescritte: 1.');
+        const refresh = Promise.withResolvers<void>();
+        const historyRoutes = /\/api\/service-prescription(?:s|-items)(?:\?|$)/u;
+        await page.route(historyRoutes, async route => {
+            await refresh.promise;
+            await route.continue();
+        });
+        try {
+            await proposals.getByRole('button', { name: 'Prescrivi 1 prestazione', exact: true }).click();
+            await expect(proposals.getByRole('status')).toHaveText('Registrate fra le prestazioni prescritte: 1.');
+            await expect(proposals.getByRole('button', { name: 'Prescrivi 1 prestazione', exact: true })).toHaveCount(0, { timeout: 1200 });
+            expect(writes).toEqual(['POST /api/service-prescription-sets']);
+        } finally {
+            refresh.resolve();
+        }
         await expect(proposed('95.11')).toHaveCount(0);
         await expect(proposals.getByRole('button', { name: 'Prescrivi 0 prestazioni', exact: true }), 'choices the physician removed stay removed').toBeDisabled();
         await expect(excluded('95.11')).toContainText(`Già prescritta o prenotata (${isoDay(today)})`);
@@ -195,7 +213,7 @@ test('a refused item leaves the whole gesture unwritten, and a lost answer is re
             await route.continue({ postData: JSON.stringify(body) });
         }, { times: 1 });
         await proposals.getByRole('button', { name: 'Prescrivi 2 prestazioni', exact: true }).click();
-        await expect(proposals.getByRole('alert')).toHaveText('Nessuna prestazione registrata: dati della prescrizione non validi.');
+        await expect(proposals.getByRole('alert')).toHaveText('Registrazione rifiutata (dati della prescrizione non validi).');
         expect(codes(), 'the refused item leaves no prescription of the gesture, not even the one before it').toEqual([]);
         expect(itemCodes()).toEqual([]);
         expect(audited(idsOf(sent[0])), 'and no audit').toEqual([]);
