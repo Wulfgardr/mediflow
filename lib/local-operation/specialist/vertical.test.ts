@@ -33,7 +33,11 @@ async function beforeExecutorClick(f: Fixture, before: () => Promise<void>) {
 function ownTmpdir(t: TestContext) {
     const previous = process.env.TMPDIR, directory = mkdtempSync(path.join(process.env.MEDIFLOW_DATA_DIR!, 'physician-tmp-'));
     process.env.TMPDIR = directory;
-    t.after(() => { process.env.TMPDIR = previous; rmSync(directory, { recursive: true, force: true }); });
+    t.after(() => {
+        if (previous === undefined) delete process.env.TMPDIR;
+        else process.env.TMPDIR = previous;
+        rmSync(directory, { recursive: true, force: true });
+    });
     return directory;
 }
 function rows(f: Fixture) { return f.db.prepare('SELECT * FROM service_prescriptions WHERE request_reference IS NOT NULL').all(); }
