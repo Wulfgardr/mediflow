@@ -170,7 +170,8 @@
   .workspace[data-unified-shell='true']:has([data-page-frame], [data-runtime-settings]) .workspaceBar { position: absolute; z-index: 3; top: 0; left: 0; max-width: calc(100% - 335px); width: max-content; }
   .workspace[data-unified-shell='true']:has([data-page-frame], [data-runtime-settings]) .workspaceBar { z-index: 1001; }
   .workspace[data-patient-record='true']:has([data-testid='lume-scheda-header'] [role='toolbar'] > :nth-child(4)) .workspaceBar { max-width: calc(100% - 510px); }
-  .workspace[data-unified-shell='true'] .workspaceBar .recordTab > a:first-child { max-width: 176px; }
+  .workspace[data-unified-shell='true'] .workspaceBar .recordTab > a:first-child { max-width: none; }
+  .workspace[data-unified-shell='true'] .workspaceBar .recordTab > a:first-child > span:first-child { max-width: 176px; }
   .workspace[data-patient-record='true'] .recordWhen { display: inline; flex: none; color: var(--record-hint); }
   .workspace[data-patient-record='true'] .workarea[data-scrolled-record='true'] .workspaceBar { width: 100%; max-width: none; z-index: 6; }
   .workspace[data-patient-record='true'] .workarea[data-scrolled-record='true'] .patientNavigation { top: 36px; }
