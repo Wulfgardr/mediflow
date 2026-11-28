@@ -169,7 +169,7 @@ export function prepareAgentVisit(publicKey: string, agentRef: string, mandateRe
     if (!isAgentId(visitId) || !isAgentId(agentRef) || !isAgentId(mandateRef) || !isValidItalianTaxCode(fiscalCode) || fiscalCode !== fiscalCode.toUpperCase()) throw invalid();
     if (replaces !== undefined && (!isAgentId(replaces) || replaces === visitId)) throw invalid();
     const extractionBytes = readSource(extractionFile, DOSSIER_PREPARED_MAX_BYTES);
-    const parsed = parsePreparedExtraction(new TextDecoder('utf-8', { fatal: true }).decode(extractionBytes));
+    const parsed = parsePreparedExtraction(new TextDecoder('utf-8', { fatal: true }).decode(extractionBytes), 'document-only');
     if (!parsed.ok || parsed.warnings.length || !parsed.value.sources.length) throw invalid();
     const fingerprintSource = replaces ? JSON.stringify([replaces, parsed.value.sources]) : extractionBytes;
     const fingerprint = createHash('sha256').update(JSON.stringify([agentRef, mandateRef, fiscalCode])).update(fingerprintSource);

@@ -28,7 +28,7 @@ import {
     type DossierSourceClassification, type DossierTaxCodeEvidence, type DossierWriteClaim,
 } from './domain/documents/dossier-import';
 import type { DocumentDecisionClassification } from './domain/documents/document-decision';
-import { preparedBulkDecisions, preparedDossierFacts, preparedPatientKey, preparedPatientLabel, type PreparedExtraction, type PreparedPatient } from './domain/documents/dossier-prepared';
+import { preparedBulkDecisions, preparedDossierFacts, preparedPatientKey, preparedPatientLabel, type PreparedExtraction, type PreparedFactsInput, type PreparedPatient } from './domain/documents/dossier-prepared';
 import { sameClinicalText, sameClinicalValue, sameDay, sameDosage, sameOptional, sameUnit } from './domain/documents/dossier-clinical-equality';
 
 // ---------------------------------------------------------------------------
@@ -161,7 +161,7 @@ export async function buildDossierInventory(
 ): Promise<DossierDraftGroup[]> {
     const { signal, isCurrent } = options;
     const preparedSources = new Map((options.prepared?.sources ?? []).map((source) => [source.sha256, source]));
-    const icd11Titles = new Map<string, string | null>();
+    const icd11Checks: Record<string, NonNullable<PreparedFactsInput['icd11Checks']>[string]> = Object.create(null);
     const physicianTaxCode = await ports.physicianTaxCode?.(signal) ?? null;
     const exemptionCodes = await ports.exemptionCodes(signal);
     const imported = options.skipImportedFor ? preservedBySha(await ports.listAttachments(options.skipImportedFor, signal)) : new Set<string>();
@@ -236,13 +236,13 @@ export async function buildDossierInventory(
         if (match) {
             for (const { values } of match.facts) {
                 const code = values.proposedCode;
-                if (!code || icd11Titles.has(code)) continue;
-                const title = await ports.icd11Title?.(code, signal).catch(() => null);
+                if (!code || !ports.icd11Title || Object.hasOwn(icd11Checks, code)) continue;
+                const title = await ports.icd11Title(code, signal).catch(() => undefined);
                 assertLive(signal, isCurrent);
-                icd11Titles.set(code, title ?? null);
+                icd11Checks[code] = title ? { title } : title === null ? 'not_found' : 'unavailable';
             }
             const merged = preparedDossierFacts({ source: match, text, units: extraction.state === 'extracted' ? extraction.units : [],
-                documentDate: date?.date ?? null, parserFacts: candidates.facts, now: ports.now(), icd11Titles });
+                documentDate: date?.date ?? null, parserFacts: candidates.facts, now: ports.now(), icd11Checks });
             facts = merged.facts;
             preparedDate = merged.documentDate;
             const label = preparedPatientLabel(match.patient);
@@ -879,7 +879,7 @@ async function writeIdempotent(
 async function applyPatientCode(
     ports: DossierPorts, patientId: string, fact: DossierFact, signal: AbortSignal, guard: Guard, authorize: () => Promise<boolean>,
 ): Promise<WriteResult | 'unauthorized'> {
-    if (fact.kind === 'diagnosis' && fact.values.proposedCode && fact.values.code) {
+    if (fact.kind === 'diagnosis' && fact.values.proposedCode && fact.values.code && fact.values.codeSelection !== 'document') {
         const code = fact.values.code;
         const title = await ports.icd11Title?.(code, signal).catch(() => null);
         guard();

@@ -71,9 +71,10 @@ test('Operatore locale: crea le schede di un lotto con un PIN dal Portachiavi, s
         const today = new Date();
         const day = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
         const iso = today.toISOString().slice(0, 10);
+        const diagnosisQuote = (code: string) => `Diagnosi: ${code === P ? 'I10 ' : ''}Ipertensione arteriosa essenziale`;
         const letter = (person: { code: string; birth: string }, name: string, drug: string) => textPdf(['Lettera di dimissione sintetica',
             `Paziente: ${name}`, `Nato il ${person.birth}`, `Codice fiscale paziente: ${person.code}`, `Data referto: ${day}`,
-            'Diagnosi: Ipertensione arteriosa essenziale', `Terapia: ${drug}`, 'Il paziente riferisce dispnea da sforzo da circa due mesi.']);
+            diagnosisQuote(person.code), `Terapia: ${drug}`, 'Il paziente riferisce dispnea da sforzo da circa due mesi.']);
         const a = await letter(personP, 'Inventata Prima', 'Ramipril 5 mg 1 cp al mattino');
         const b = await letter(personQ, 'Inventato Secondo', 'Bisoprololo 2,5 mg 1 cp');
         writeFileSync(path.join(inbox, 'lettera-a.pdf'), a);
@@ -86,7 +87,8 @@ test('Operatore locale: crea le schede di un lotto con un PIN dal Portachiavi, s
             coverage: { pages: 1, unreadablePages: [], complete: true },
             facts: [
                 { kind: 'diagnosis', values: { description: 'Ipertensione arteriosa essenziale',
-                    ...(person.code === P ? { proposedCode: 'BA00', proposedSystem: 'ICD-11', codeStatus: 'proposto' } : {}) }, quote: 'Diagnosi: Ipertensione arteriosa essenziale' },
+                    ...(person.code === P ? { code: 'I10', system: 'ICD-10', proposedCode: 'BA00', proposedSystem: 'ICD-11', codeStatus: 'proposto' } : {}) },
+                    quote: diagnosisQuote(person.code) },
                 { kind: 'therapy', values: { drugName: drug, activePrinciple: drug.toLowerCase(), dosage, status: 'active' }, quote },
                 { kind: 'therapy', values: { drugName: 'Metformina', dosage: '500 mg' }, quote: 'Metformina 500 mg due volte al giorno' },
             ],
@@ -136,11 +138,12 @@ test('Operatore locale: crea le schede di un lotto con un PIN dal Portachiavi, s
         const proposed = panel.locator('[data-testid="dossier-fact"][data-kind="diagnosis"][data-origin="prepared"]')
             .filter({ hasText: 'Proposta ICD-11: BA00' });
         await expect(proposed).toHaveAttribute('data-decision', 'pending');
+        await expect(proposed).toContainText('Codice nel documento: I10 · ICD-10');
         await expect(proposed.getByLabel('Codice ICD-11 da registrare')).toHaveValue('');
         await openUnlockedDocument(page, `/patients/${id}/edit`, PIN);
         await expect(page.locator('input[name="lastName"]')).toHaveValue(/^inventata$/iu);
         const codes = page.locator('input[name^="diagnoses."][name$=".code"]');
-        expect(await codes.evaluateAll(inputs => inputs.map(input => (input as HTMLInputElement).value))).not.toContain('BA00');
+        await expect(codes).toHaveCount(0);
 
         const incerti = path.join(root, 'Da-verificare');
         const prepara = (gruppo: string, nome: string, bytes: Uint8Array) => {

@@ -777,8 +777,10 @@ function DossierDocument({ document, view, busy, result, onSave, onApply, onRetr
                     const assessment = view.assessments.get(dossierFactRef(document.attachment.id, fact.factId));
                     const blockers = dossierFactBlockers(fact, { exemptionCodes: view.exemptionCodes });
                     const proposedCode = fact.kind === 'diagnosis' ? fact.values.proposedCode : undefined;
-                    const setIcd11Code = (code: string) => updateFact(fact.factId, (item) => ({
-                        ...decideByPhysician(item, 'pending'), values: { ...item.values, code, system: code ? 'ICD-11' : '' },
+                    const { documentCode, documentSystem } = fact.values;
+                    const selectedDocumentCode = fact.values.codeSelection === 'document';
+                    const chooseCode = (code: string, system = '', codeSelection = '') => updateFact(fact.factId, (item) => ({
+                        ...decideByPhysician(item, 'pending'), values: { ...item.values, code, system, codeSelection },
                     }));
                     const applied = latestAppliedOutcome(record, fact.factId);
                     const locked = written(fact) || busy || Boolean(record.pendingWrites?.some((claim) => claim.factId === fact.factId));
@@ -796,11 +798,21 @@ function DossierDocument({ document, view, busy, result, onSave, onApply, onRetr
                                 && !(proposedCode && (field.name === 'code' || field.name === 'system'))).map((field) => <FactField key={field.name} spec={field} value={fact.values[field.name] ?? ''} disabled={locked}
                                 id={`${ids}-${fact.factId}-${field.name}`} onChange={(value) => updateFact(fact.factId, (item) => ({ ...item, values: { ...item.values, [field.name]: value } }))} />)}
                             {proposedCode ? <>
-                                <small>Proposta ICD-11: {proposedCode} · {fact.values.proposedTitle}</small>
-                                <button type="button" className="mf-button-secondary" disabled={locked || fact.values.code === proposedCode}
-                                    onClick={() => setIcd11Code(proposedCode)}>Usa il codice proposto</button>
-                                <FactField spec={{ name: 'code', label: 'Codice ICD-11 da registrare' }} value={fact.values.code ?? ''} disabled={locked}
-                                    id={`${ids}-${fact.factId}-code`} onChange={(value) => setIcd11Code(value.trim().toUpperCase())} />
+                                {documentCode ? <>
+                                    <small>Codice nel documento: {documentCode} · {documentSystem}</small>
+                                    <button type="button" className="mf-button-secondary" disabled={locked || selectedDocumentCode}
+                                        onClick={() => chooseCode(documentCode, documentSystem, 'document')}>Usa il codice del documento</button>
+                                </> : null}
+                                <small>Proposta ICD-11: {proposedCode}{fact.values.proposedTitle ? ` · ${fact.values.proposedTitle}` : ''}</small>
+                                <button type="button" className="mf-button-secondary" disabled={locked || (!selectedDocumentCode && fact.values.code === proposedCode)}
+                                    onClick={() => chooseCode(proposedCode, 'ICD-11')}>Usa il codice proposto</button>
+                                <FactField spec={{ name: 'code', label: 'Codice ICD-11 da registrare' }} value={selectedDocumentCode ? '' : fact.values.code ?? ''} disabled={locked}
+                                    id={`${ids}-${fact.factId}-code`} onChange={(value) => {
+                                        const code = value.trim().toUpperCase();
+                                        chooseCode(code, code ? 'ICD-11' : '');
+                                    }} />
+                                {selectedDocumentCode ? <button type="button" className="mf-button-secondary" disabled={locked}
+                                    onClick={() => chooseCode('')}>Togli il codice</button> : null}
                             </> : null}
                             {fact.negated || fact.origin !== 'manual' ? <label className={styles.consent}>
                                 <input type="checkbox" checked={fact.negated} disabled={locked} onChange={(event) => { const negated = event.currentTarget.checked; updateFact(fact.factId, (item) => ({ ...item, negated })); }} />
@@ -814,7 +826,10 @@ function DossierDocument({ document, view, busy, result, onSave, onApply, onRetr
                             <select id={`${ids}-${fact.factId}-decision`} value={fact.decision} disabled={locked}
                                 onChange={(event) => { const decision = event.currentTarget.value as DossierFact['decision']; updateFact(fact.factId, (item) => decideByPhysician(item, decision)); }}>
                                 <option value="pending">Da decidere</option>
-                                <option value="accepted">{proposedCode ? fact.values.code ? 'Accetta con codice ICD-11' : 'Accetta diagnosi senza codice' : 'Accetta'}</option>
+                                <option value="accepted">{proposedCode
+                                    ? selectedDocumentCode ? 'Accetta con il codice del documento'
+                                        : fact.values.code ? 'Accetta con codice ICD-11' : 'Accetta diagnosi senza codice'
+                                    : 'Accetta'}</option>
                                 <option value="rejected">Rifiuta</option><option value="already_present">Già in scheda, non scrivere</option>
                             </select>
                             {fact.decidedBy ? <small data-testid="dossier-fact-decided-by">Da «Accetta il verificato»{fact.note ? `: ${fact.note}` : '.'}</small> : null}

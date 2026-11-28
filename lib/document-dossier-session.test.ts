@@ -1168,3 +1168,41 @@ test('WUL-928: the operator path deposits evidence but leaves an ICD-11 proposal
         { code: 'BA00', system: 'ICD-11', description, date: '2026-10-20T00:00:00.000Z' },
     ]);
 });
+
+test('WUL-928: an unavailable catalog cannot commit a selected candidate and the same fact can be retried', async () => {
+    const description = 'Ipertensione arteriosa essenziale';
+    const quote = `Diagnosi: I10 ${description}`;
+    const text = letterText(CF_A).replace(`Diagnosi: ${description}`, quote);
+    const { ports, files } = setup([['sintetico/lettera.pdf', text]]);
+    let available = false;
+    ports.icd11Title = async () => {
+        if (!available) throw new Error('Catalog unavailable');
+        return 'Essential hypertension';
+    };
+    const prepared = preparedFor([{ text, cf: CF_A, facts: [
+        { kind: 'diagnosis', values: { description, code: 'I10', system: 'ICD-10',
+            proposedCode: 'BA00', proposedSystem: 'ICD-11', codeStatus: 'proposto' }, quote },
+    ] }]);
+    const [group] = await buildDossierInventory(ports, files, { ...live, prepared });
+    const [acquired] = await acquireDossierGroup(ports, { group, patientId: 'pa', confirmed: true, ...live });
+    assert.equal(acquired.status, 'stored');
+    const read = async () => (await loadPatientDossier(ports, 'pa', live.signal))!.documents[0];
+    const document = await read();
+    const [proposal] = document.record.facts.filter(fact => fact.kind === 'diagnosis' && fact.origin === 'prepared');
+    assert.equal(proposal.values.documentCode, 'I10');
+    assert.equal(proposal.values.proposedCode, 'BA00');
+    assert.equal(proposal.values.code, undefined);
+    const attachmentId = document.attachment.id;
+    await saveDossierReview(ports, { patientId: 'pa', attachmentId, expected: document.attachment.currentness!, ...live,
+        change: (record) => ({ ...record, facts: record.facts.map(fact => fact.factId !== proposal.factId ? fact
+            : decideByPhysician({ ...fact, values: { ...fact.values, code: 'BA00', system: 'ICD-11' } }, 'accepted')) }) });
+    const apply = async () => applyDossierDocument(ports, { patientId: 'pa', attachmentId, expected: (await read()).attachment.currentness!, ...live });
+    assert.deepEqual((await apply()).outcomes.map(item => item.outcome), ['failed']);
+    assert.deepEqual((await ports.getPatient('pa', live.signal))!.diagnoses, []);
+    available = true;
+    assert.deepEqual((await apply()).outcomes.map(item => item.outcome), ['applied']);
+    assert.deepEqual((await apply()).outcomes, []);
+    assert.deepEqual((await ports.getPatient('pa', live.signal))!.diagnoses, [
+        { code: 'BA00', system: 'ICD-11', description, date: '2026-10-20T00:00:00.000Z' },
+    ]);
+});

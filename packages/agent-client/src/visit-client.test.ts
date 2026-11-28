@@ -17,6 +17,7 @@ import { decryptData } from '../../../lib/security/security';
 import { AGENT_OPERATIONS, MANDATE_MAX_DURATION_MS } from '../../../lib/agent-mandate-contract';
 import { createAgentMandateStore } from '../../../lib/agent-mandate-store';
 import { readAgentCassetteIndex } from '../../../lib/agent-cassette-store';
+import { reviewAgentFact } from '../../../lib/agent-visit-facts';
 
 const cf = 'RSSMRA80A01H501U', sentinel = 'SYNTHETIC_CLI_VISIT_ONLY_6742';
 async function fixture(model: 'local' | 'openai' = 'local') {
@@ -131,6 +132,40 @@ test('the real CLI reuses the kit extraction and deposits separate encrypted PDF
         const saved = fs.readFileSync(path.join(f.credentials, 'visit-' + receipt.visitId + '.json'), 'utf8');
         assert.ok(!saved.includes(sentinel)); assert.ok(!saved.includes(cf)); assert.ok(!saved.includes(f.token));
         if (process.platform !== 'win32') assert.equal(fs.statSync(path.join(f.credentials, 'visit-' + receipt.visitId + '.json')).mode & 0o777, 0o600);
+    } finally { await f.cleanup(); }
+});
+
+test('WUL-928: agent deposit seals the documented diagnosis with its source and ignores the kit candidate', async () => {
+    const f = await fixture();
+    try {
+        const source = f.extraction.sources[0];
+        const quote = 'Diagnosi: ICD-10 I10 Ipertensione arteriosa essenziale';
+        const text = `Codice fiscale paziente: ${cf}\nData visita: 17/11/2026\n${quote}`;
+        const bytes = Buffer.from('%PDF-1.4\n' + text);
+        fs.writeFileSync(path.join(f.files, source.fileName), bytes);
+        source.sha256 = createHash('sha256').update(bytes).digest('hex');
+        const documented = { description: 'Ipertensione arteriosa essenziale', code: 'I10', system: 'ICD-10' };
+        const diagnosis = { kind: 'diagnosis', values: { ...documented, proposedCode: 'BA00',
+            proposedSystem: 'ICD-11', codeStatus: 'proposto' }, quote };
+        const facts = source.facts.map(fact => fact.kind === 'diagnosis' ? diagnosis : fact);
+        fs.writeFileSync(f.file, JSON.stringify({ ...f.extraction, sources: [{ ...source, facts }] }));
+        const result = await cli(['deposita', '--credenziali', f.credentials, '--agente', f.principal.agentRef,
+            '--estrazione', f.file, '--cf', cf, '--visita', randomUUID()], f.root);
+        assert.equal(result.code, 0, result.stderr);
+        const row = f.rows()[0];
+        const [, iv, wrapped] = row.wrappedPrivateKey.split(':');
+        const privateBytes = agentBytes(await decryptData(wrapped, iv, f.masterKey) as string);
+        try {
+            const key = await crypto.subtle.importKey('pkcs8', privateBytes, { name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveBits']);
+            const [item] = JSON.parse(row.itemsCiphertext).filter((item: { kind: string }) => item.kind === 'diagnosis');
+            const opened = JSON.parse(new TextDecoder().decode(await openAgentItem(key, { mandateRef: row.mandateRef,
+                visitId: row.id, itemId: item.id, kind: 'diagnosis' }, item.envelope)));
+            assert.deepEqual(opened, { values: documented, quote,
+                source: { sha256: source.sha256, fileName: source.fileName, documentDate: source.documentDate } });
+            assert.deepEqual(reviewAgentFact('diagnosis', opened.values, text, quote)?.blockers, []);
+            const unlabelledQuote = 'Diagnosi: I10 Ipertensione arteriosa essenziale';
+            assert.ok(reviewAgentFact('diagnosis', opened.values, unlabelledQuote, unlabelledQuote)?.blockers.includes('Codice della diagnosi da verificare sulla fonte.'));
+        } finally { privateBytes.fill(0); }
     } finally { await f.cleanup(); }
 });
 test('CLI replacement preserves the pending original until the corrected deposit closes and retries with the same receipt', async () => {

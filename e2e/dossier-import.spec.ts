@@ -635,7 +635,7 @@ test('WUL-927 Dossier: «Accetta il verificato» lascia aperte solo le sintesi, 
     }
 });
 
-isolatedTest('WUL-928: il medico conferma, corregge o scarta il codice ICD-11 del kit', async ({ page, isolatedRuntime }, info) => {
+isolatedTest('WUL-928: il medico sceglie fra codice nel documento, proposta ICD-11 e diagnosi senza codice', async ({ page, isolatedRuntime }, info) => {
     isolatedTest.setTimeout(150_000);
     const pin = '314159';
     const root = mkdtempSync(path.join(tmpdir(), 'mediflow-dossier-icd11-'));
@@ -645,9 +645,9 @@ isolatedTest('WUL-928: il medico conferma, corregge o scarta il codice ICD-11 de
     const codeB = fixtureTaxCode(229);
     const auditDbPath = path.join(isolatedRuntime.dataDirectory, 'medical.db');
     const candidates = [
-        { description: 'Diabete mellito di tipo 2', proposedCode: '5A11' },
+        { description: 'Ipertensione arteriosa essenziale', code: 'I10', system: 'ICD-10', proposedCode: 'BA00' },
         { description: 'Asma bronchiale persistente', proposedCode: 'CA22' },
-        { description: 'Ipertensione arteriosa essenziale', proposedCode: 'BA00' },
+        { description: 'Diabete mellito di tipo 2', code: 'E11.9', system: 'ICD-10', proposedCode: '5A11' },
         { description: 'Dolore lombare persistente', proposedCode: 'E11.9' },
         { description: 'Reflusso gastroesofageo cronico', proposedCode: 'DA22', codeStatus: 'confermato' },
         { description: 'Ipotiroidismo acquisito stabile', proposedCode: '5A00', proposedSystem: 'ICD-10' },
@@ -657,13 +657,14 @@ isolatedTest('WUL-928: il medico conferma, corregge o scarta il codice ICD-11 de
         const patientA = await createPatient(page, codeA);
         const patientB = await createPatient(page, codeB);
         async function makeSource(fileName: string, taxCode: string, diagnoses: typeof candidates) {
+            const passages = diagnoses.map(({ description, code }) => code ? `Diagnosi: ${code} ${description}.` : `Osservato: ${description}.`);
             const bytes = await textPdf(['Nota sintetica', `Codice fiscale paziente: ${taxCode}`, 'Data visita: 07/01/2026',
-                ...diagnoses.map(({ description }) => `Osservato: ${description}.`)]);
+                ...passages]);
             writeFileSync(path.join(inbox, fileName), bytes);
             return { sha256: createHash('sha256').update(bytes).digest('hex'), fileName, patient: { taxCode }, documentDate: '2026-01-07',
-                facts: diagnoses.map(values => ({ kind: 'diagnosis',
+                facts: diagnoses.map((values, index) => ({ kind: 'diagnosis',
                     values: { proposedSystem: 'ICD-11', codeStatus: 'proposto', proposedTitle: 'Titolo del depositante', ...values },
-                    quote: `Osservato: ${values.description}.` })) };
+                    quote: passages[index] })) };
         }
         const preparedPath = path.join(root, 'estrazione-preparata.json');
         writeFileSync(preparedPath, JSON.stringify({ schema: 'mediflow.dossier_prepared_extraction.v1', sources: [
@@ -701,10 +702,11 @@ isolatedTest('WUL-928: il medico conferma, corregge o scarta il codice ICD-11 de
             } finally { database.close(); }
         };
         expect(clinicalAudit()).toEqual([]);
-        await expect(proposed).toContainText('Proposta ICD-11: 5A11 · Type 2 diabetes mellitus');
+        await expect(proposed).toContainText('Codice nel documento: I10 · ICD-10');
+        await expect(proposed).toContainText('Proposta ICD-11: BA00 · Essential hypertension');
         await expect(field(candidates[0].description)).toHaveValue('');
-        await proposed.getByRole('button', { name: 'Usa il codice proposto' }).click();
-        await decision(candidates[0].description).selectOption({ label: 'Accetta con codice ICD-11' });
+        await proposed.getByRole('button', { name: 'Usa il codice del documento' }).click();
+        await decision(candidates[0].description).selectOption({ label: 'Accetta con il codice del documento' });
         await save.click();
         await expect(save).toBeDisabled();
         await panel.getByTestId('dossier-bulk').click();
@@ -717,6 +719,7 @@ isolatedTest('WUL-928: il medico conferma, corregge o scarta il codice ICD-11 de
         await selectPatient.selectOption(patientA);
         await expect(document).toContainText('nota-a.pdf');
         await expect(proposed).toHaveAttribute('data-decision', 'pending');
+        await expect(proposed).toContainText('Codice nel documento: I10 · ICD-10');
         await expect(field(candidates[0].description)).toHaveValue('');
         await expect(proposed).not.toContainText('Titolo del depositante');
         for (const { description } of candidates.slice(3)) {
@@ -752,7 +755,7 @@ isolatedTest('WUL-928: il medico conferma, corregge o scarta il codice ICD-11 de
             for (const { diagnoses } of rows) expect(diagnoses).toMatch(/^ENC:/u);
             const checks = database.prepare("SELECT redacted_metadata FROM audit_events WHERE event_type = 'reference_data.icd11.code_check'").all() as Array<{ redacted_metadata: string }>;
             const flags = checks.map(({ redacted_metadata }) => JSON.parse(redacted_metadata).flags as string[]);
-            expect(flags).toHaveLength(8);
+            expect(flags).toHaveLength(7);
             expect(flags.filter(row => row.includes('found:false'))).toHaveLength(2);
             for (const row of flags) expect(row).toContain('source:embedded');
         } finally {
@@ -761,8 +764,8 @@ isolatedTest('WUL-928: il medico conferma, corregge o scarta il codice ICD-11 de
         expect(await attachmentCount(page, patientA)).toBe(1);
         expect(await attachmentCount(page, patientB)).toBe(1);
         for (const [patient, expected] of [
-            [patientA, [[accept, '5A11'], [correct, 'CA23'], [refuse, ''], ...candidates.slice(3).map(({ description }) => [description, ''])]],
-            [patientB, [[accept, '5A11']]],
+            [patientA, [[accept, 'BA00', 'ICD-11'], [correct, 'CA23', 'ICD-11'], [refuse, '', ''], ...candidates.slice(3).map(({ description }) => [description, '', ''])]],
+            [patientB, [[accept, 'I10', 'ICD-10']]],
         ] as const) {
             await openUnlockedDocument(page, `/patients/${patient}/edit`, pin);
             const descriptions = page.locator('input[name^="diagnoses."][name$=".description"]');
@@ -773,7 +776,7 @@ isolatedTest('WUL-928: il medico conferma, corregge o scarta il codice ICD-11 de
             const actual = await Promise.all((await descriptions.evaluateAll(inputs => inputs.map(input => (input as HTMLInputElement).value)))
                 .map(async (description, index) => [description, await codes.nth(index).inputValue(), await systems.nth(index).inputValue(),
                     new Date(await dates.nth(index).inputValue()).toISOString()]));
-            expect(actual.sort()).toEqual(expected.map(([description, code]) => [description, code, code ? 'ICD-11' : '', '2026-01-07T00:00:00.000Z']).sort());
+            expect(actual.sort()).toEqual(expected.map(row => [...row, '2026-01-07T00:00:00.000Z']).sort());
         }
     } finally {
         rmSync(root, { recursive: true, force: true });
