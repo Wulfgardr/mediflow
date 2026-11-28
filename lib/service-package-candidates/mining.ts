@@ -187,14 +187,184 @@ function buildCandidateServiceItem(key: string, meta: ServiceMetadataAccumulator
     };
 }
 
+function compareKeyArrays(a: readonly string[], b: readonly string[]): number {
+    const minLen = Math.min(a.length, b.length);
+    for (let i = 0; i < minLen; i += 1) {
+        const cmp = a[i].localeCompare(b[i]);
+        if (cmp !== 0) return cmp;
+    }
+    return a.length - b.length;
+}
+
+class BoundedTopK<T> {
+    private readonly heap: T[] = [];
+    private wasCapped = false;
+
+    constructor(
+        private readonly maxSize: number,
+        private readonly isBetter: (candidate: T, reference: T) => boolean,
+    ) {}
+
+    get capped(): boolean {
+        return this.wasCapped;
+    }
+
+    isFull(): boolean {
+        return this.heap.length >= this.maxSize;
+    }
+
+    peekWorst(): T | undefined {
+        return this.heap[0];
+    }
+
+    push(item: T): void {
+        if (this.maxSize <= 0) {
+            this.wasCapped = true;
+            return;
+        }
+        if (this.heap.length < this.maxSize) {
+            this.heap.push(item);
+            this.siftUp(this.heap.length - 1);
+            return;
+        }
+        this.wasCapped = true;
+        if (this.isBetter(item, this.heap[0])) {
+            this.heap[0] = item;
+            this.siftDown(0);
+        }
+    }
+
+    toSortedArray(): T[] {
+        return [...this.heap].sort((a, b) => (this.isBetter(a, b) ? -1 : this.isBetter(b, a) ? 1 : 0));
+    }
+
+    private isWorse(a: T, b: T): boolean {
+        return this.isBetter(b, a);
+    }
+
+    private siftUp(startIndex: number): void {
+        let index = startIndex;
+        while (index > 0) {
+            const parent = (index - 1) >> 1;
+            if (!this.isWorse(this.heap[index], this.heap[parent])) break;
+            const temp = this.heap[parent];
+            this.heap[parent] = this.heap[index];
+            this.heap[index] = temp;
+            index = parent;
+        }
+    }
+
+    private siftDown(startIndex: number): void {
+        let index = startIndex;
+        const length = this.heap.length;
+        while (true) {
+            const left = index * 2 + 1;
+            const right = left + 1;
+            let worst = index;
+            if (left < length && this.isWorse(this.heap[left], this.heap[worst])) {
+                worst = left;
+            }
+            if (right < length && this.isWorse(this.heap[right], this.heap[worst])) {
+                worst = right;
+            }
+            if (worst === index) break;
+            const temp = this.heap[index];
+            this.heap[index] = this.heap[worst];
+            this.heap[worst] = temp;
+            index = worst;
+        }
+    }
+}
+
+function collectObservedPairs(
+    eligiblePrescriptions: readonly NormalizedPrescription[],
+    levelOne: readonly ObservedGroup[],
+    postingLists: ReadonlyMap<string, readonly number[]>,
+    thresholds: MiningThresholds,
+): { groups: ObservedGroup[]; capped: boolean } {
+    const frequentKeys = levelOne
+        .map((group) => group.keys[0])
+        .sort((a, b) => a.localeCompare(b));
+    const numKeys = frequentKeys.length;
+    if (numKeys < 2) {
+        return { groups: [], capped: false };
+    }
+
+    const keyToId = new Map<string, number>();
+    for (let i = 0; i < numKeys; i += 1) {
+        keyToId.set(frequentKeys[i], i);
+    }
+
+    const pairCounts = new Map<number, number>();
+    for (const prescription of eligiblePrescriptions) {
+        const presentIds: number[] = [];
+        for (const key of prescription.serviceKeys) {
+            const id = keyToId.get(key);
+            if (id !== undefined) presentIds.push(id);
+        }
+        for (let i = 0; i < presentIds.length; i += 1) {
+            const leftId = presentIds[i];
+            const rowOffset = leftId * numKeys;
+            for (let j = i + 1; j < presentIds.length; j += 1) {
+                const pairCode = rowOffset + presentIds[j];
+                pairCounts.set(pairCode, (pairCounts.get(pairCode) ?? 0) + 1);
+            }
+        }
+    }
+
+    const topPairs = new BoundedTopK<{ idA: number; idB: number; count: number }>(
+        thresholds.maxCandidateSetsPerLevel,
+        (a, b) =>
+            a.count !== b.count
+                ? a.count > b.count
+                : a.idA !== b.idA
+                    ? a.idA < b.idA
+                    : a.idB < b.idB,
+    );
+
+    for (const [pairCode, count] of pairCounts.entries()) {
+        if (count < thresholds.minObservationCount) continue;
+        const idA = Math.floor(pairCode / numKeys);
+        const idB = pairCode - idA * numKeys;
+        topPairs.push({ idA, idB, count });
+    }
+
+    const groups: ObservedGroup[] = [];
+    for (const entry of topPairs.toSortedArray()) {
+        const keyA = frequentKeys[entry.idA];
+        const keyB = frequentKeys[entry.idB];
+        const intersection = intersectSortedIndices(
+            postingLists.get(keyA) ?? [],
+            postingLists.get(keyB) ?? [],
+        );
+        if (intersection.length < thresholds.minObservationCount) continue;
+        const keys = [keyA, keyB];
+        groups.push({
+            keys,
+            signature: buildSignature(keys),
+            prescriptionCount: intersection.length,
+            patientCount: countDistinctPatients(intersection, eligiblePrescriptions),
+            prescriptionIndices: intersection,
+        });
+    }
+
+    return {
+        groups,
+        capped: topPairs.capped,
+    };
+}
+
 function generateNextLevelCandidates(
     previousLevel: readonly ObservedGroup[],
     levelSize: number,
     maxCandidates: number,
 ): { candidates: readonly (readonly string[])[]; capped: boolean } {
     const previousSignatures = new Set(previousLevel.map((group) => group.signature));
-    const sortedPrev = [...previousLevel].sort((a, b) => a.signature.localeCompare(b.signature));
-    const generated = new Map<string, { keys: readonly string[]; score: number }>();
+    const sortedPrev = [...previousLevel].sort((a, b) => compareKeyArrays(a.keys, b.keys));
+    const topCandidates = new BoundedTopK<{ keys: readonly string[]; score: number }>(
+        maxCandidates,
+        (a, b) => (a.score !== b.score ? a.score > b.score : compareKeyArrays(a.keys, b.keys) < 0),
+    );
 
     for (let i = 0; i < sortedPrev.length; i += 1) {
         const left = sortedPrev[i];
@@ -209,12 +379,16 @@ function generateNextLevelCandidates(
             }
             if (!samePrefix) break;
 
+            const score = Math.min(left.prescriptionCount, right.prescriptionCount);
+            const worst = topCandidates.peekWorst();
+            if (topCandidates.isFull() && topCandidates.capped && worst && score < worst.score) {
+                continue;
+            }
+
             const merged = [...left.keys, right.keys[levelSize - 2]];
-            const signature = buildSignature(merged);
-            if (generated.has(signature)) continue;
 
             let allSubsetsFrequent = true;
-            for (let drop = 0; drop < merged.length; drop += 1) {
+            for (let drop = 0; drop < levelSize - 2; drop += 1) {
                 const subset = merged.filter((_, index) => index !== drop);
                 if (!previousSignatures.has(buildSignature(subset))) {
                     allSubsetsFrequent = false;
@@ -223,20 +397,16 @@ function generateNextLevelCandidates(
             }
             if (!allSubsetsFrequent) continue;
 
-            generated.set(signature, {
+            topCandidates.push({
                 keys: merged,
-                score: Math.min(left.prescriptionCount, right.prescriptionCount),
+                score,
             });
         }
     }
 
-    const ordered = [...generated.values()].sort(
-        (a, b) => b.score - a.score || buildSignature(a.keys).localeCompare(buildSignature(b.keys)),
-    );
-    const capped = ordered.length > maxCandidates;
     return {
-        candidates: (capped ? ordered.slice(0, maxCandidates) : ordered).map((entry) => entry.keys),
-        capped,
+        candidates: topCandidates.toSortedArray().map((entry) => entry.keys),
+        capped: topCandidates.capped,
     };
 }
 
@@ -379,7 +549,7 @@ export function deriveRecurringServiceCandidates(
     let truncatedPrescriptions = 0;
 
     for (const prescription of input.prescriptions) {
-        if (activePatientIds.size > 0 && !activePatientIds.has(prescription.patientId)) continue;
+        if (!activePatientIds.has(prescription.patientId)) continue;
         if (prescription.status === 'cancelled') {
             cancelledPrescriptionsExcluded += 1;
             continue;
@@ -466,11 +636,25 @@ export function deriveRecurringServiceCandidates(
         });
     }
 
-    let currentLevel = levelOne;
+    let currentLevel: ObservedGroup[] = [];
     let candidatePoolCapped = false;
     const allObservedGroups: ObservedGroup[] = [];
 
-    for (let size = 2; size <= thresholds.maxGroupSize; size += 1) {
+    if (levelOne.length >= 2 && thresholds.maxGroupSize >= 2) {
+        const levelTwo = collectObservedPairs(
+            eligiblePrescriptions,
+            levelOne,
+            postingLists,
+            thresholds,
+        );
+        if (levelTwo.capped) candidatePoolCapped = true;
+        currentLevel = levelTwo.groups;
+        if (2 >= thresholds.minGroupSize) {
+            allObservedGroups.push(...levelTwo.groups);
+        }
+    }
+
+    for (let size = 3; size <= thresholds.maxGroupSize; size += 1) {
         if (currentLevel.length < 2) break;
         const { candidates: nextKeySets, capped } = generateNextLevelCandidates(
             currentLevel,

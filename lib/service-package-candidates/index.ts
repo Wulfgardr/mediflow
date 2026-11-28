@@ -42,8 +42,10 @@ export {
     findCandidateDecision,
     keepCandidateDecision,
     parsePersonalCandidateReviewStore,
+    parsePersonalCandidateReviewStoreStrict,
     restoreCandidateDecision,
     serializePersonalCandidateReviewStore,
     type CandidateCorrectionInput,
     type CandidateCorrectionOutcome,
+    type ParseReviewStoreResult,
 } from './review-state';

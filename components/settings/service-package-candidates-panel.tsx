@@ -15,7 +15,7 @@ import {
     findCandidateDecision,
     formatCandidateDefaultTitle,
     keepCandidateDecision,
-    parsePersonalCandidateReviewStore,
+    parsePersonalCandidateReviewStoreStrict,
     restoreCandidateDecision,
     serializePersonalCandidateReviewStore,
     type CandidateDiagnosisReference,
@@ -34,6 +34,16 @@ type PanelPhase =
     | { kind: 'error'; message: string }
     | { kind: 'ready'; analysis: RecurringServiceCandidateAnalysis };
 
+type ReviewSnapshot = Readonly<{
+    store: PersonalCandidateReviewStore;
+    rawValue: string | null;
+}>;
+
+type ReviewLoadState =
+    | { kind: 'idle' }
+    | { kind: 'ready'; snapshot: ReviewSnapshot }
+    | { kind: 'error'; message: string };
+
 type CorrectionDraft = {
     candidateId: string;
     title: string;
@@ -44,6 +54,9 @@ type CorrectionDraft = {
 };
 
 const NONE_DIAGNOSIS_VALUE = '__none__';
+const MAX_CAS_ATTEMPTS = 4;
+const REVIEW_READ_ERROR_MESSAGE = 'Impossibile leggere le valutazioni salvate. Riprova.';
+const REVIEW_CONFLICT_ERROR_MESSAGE = 'Valutazioni aggiornate in un’altra scheda. Riprova.';
 
 function diagnosisOptionValue(diagnosis: CandidateDiagnosisReference): string {
     return `${diagnosis.system}\u0000${diagnosis.code}\u0000${diagnosis.description}`;
@@ -71,30 +84,88 @@ function sufficiencyNote(candidate: RecurringServiceGroupCandidate, minPrescript
     return `Dati insufficienti: ${formatCountLabel(candidate.prescriptionCount, 'prescrizione', 'prescrizioni')} (soglia minima ${minPrescriptions}).`;
 }
 
-async function readSavedReviewStore(): Promise<PersonalCandidateReviewStore> {
-    const response = await fetch(`/api/settings/${encodeURIComponent(PERSONAL_CANDIDATE_REVIEW_SETTING_KEY)}`, {
-        cache: 'no-store',
-        credentials: 'same-origin',
-    });
-    if (!response.ok) return emptyPersonalCandidateReviewStore();
-    const payload = (await response.json().catch(() => null)) as { value?: unknown } | null;
-    return parsePersonalCandidateReviewStore(payload?.value);
+function parseReviewSnapshotValue(raw: unknown): ReviewSnapshot {
+    if (raw !== null && raw !== undefined && typeof raw !== 'string') {
+        throw new Error(REVIEW_READ_ERROR_MESSAGE);
+    }
+    const rawValue = raw ?? null;
+    const parsed = parsePersonalCandidateReviewStoreStrict(rawValue);
+    if (!parsed.ok) {
+        throw new Error(parsed.error);
+    }
+    return {
+        store: parsed.store,
+        rawValue,
+    };
 }
 
-async function persistReviewStore(store: PersonalCandidateReviewStore): Promise<void> {
-    const response = await fetch(`/api/settings/${encodeURIComponent(PERSONAL_CANDIDATE_REVIEW_SETTING_KEY)}`, {
-        method: 'PUT',
-        cache: 'no-store',
-        credentials: 'same-origin',
-        headers: {
-            'Content-Type': 'application/json',
-            'x-mediflow-archive-generation': clientArchiveGeneration(),
-        },
-        body: JSON.stringify({ value: serializePersonalCandidateReviewStore(store) }),
-    });
+async function readSavedReviewSnapshot(): Promise<ReviewSnapshot> {
+    let response: Response;
+    try {
+        response = await fetch(`/api/settings/${encodeURIComponent(PERSONAL_CANDIDATE_REVIEW_SETTING_KEY)}`, {
+            cache: 'no-store',
+            credentials: 'same-origin',
+        });
+    } catch {
+        throw new Error(REVIEW_READ_ERROR_MESSAGE);
+    }
+    if (!response.ok) {
+        throw new Error(REVIEW_READ_ERROR_MESSAGE);
+    }
+    let payload: unknown;
+    try {
+        payload = await response.json();
+    } catch {
+        throw new Error(REVIEW_READ_ERROR_MESSAGE);
+    }
+    if (!payload || typeof payload !== 'object' || !Object.hasOwn(payload, 'value')) {
+        throw new Error(REVIEW_READ_ERROR_MESSAGE);
+    }
+    return parseReviewSnapshotValue((payload as { value?: unknown }).value);
+}
+
+type PersistReviewResult =
+    | Readonly<{ kind: 'saved'; snapshot: ReviewSnapshot }>
+    | Readonly<{ kind: 'conflict'; latestRawValue: string | null | undefined }>;
+
+async function persistReviewStoreConditional(
+    store: PersonalCandidateReviewStore,
+    expectedValue: string | null,
+): Promise<PersistReviewResult> {
+    const serialized = serializePersonalCandidateReviewStore(store);
+    let response: Response;
+    try {
+        response = await fetch(`/api/settings/${encodeURIComponent(PERSONAL_CANDIDATE_REVIEW_SETTING_KEY)}`, {
+            method: 'PUT',
+            cache: 'no-store',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-mediflow-archive-generation': clientArchiveGeneration(),
+            },
+            body: JSON.stringify({ value: serialized, expectedValue }),
+        });
+    } catch {
+        throw new Error('Salvataggio delle valutazioni non riuscito.');
+    }
+    if (response.status === 409) {
+        const conflictBody = (await response.json().catch(() => null)) as { value?: unknown } | null;
+        const latestRawValue = conflictBody && Object.hasOwn(conflictBody, 'value')
+            && (conflictBody.value === null || typeof conflictBody.value === 'string')
+            ? conflictBody.value
+            : undefined;
+        return { kind: 'conflict', latestRawValue };
+    }
     if (!response.ok) {
         throw new Error('Salvataggio delle valutazioni non riuscito.');
     }
+    return {
+        kind: 'saved',
+        snapshot: {
+            store,
+            rawValue: serialized,
+        },
+    };
 }
 
 export function ServicePackageCandidatesPanel({
@@ -105,20 +176,26 @@ export function ServicePackageCandidatesPanel({
     onExpandedChange?: (value: boolean) => void;
 } = {}) {
     const [phase, setPhase] = useState<PanelPhase>({ kind: 'idle' });
-    const [reviewStore, setReviewStore] = useState<PersonalCandidateReviewStore>(() => emptyPersonalCandidateReviewStore());
-    const [reviewLoaded, setReviewLoaded] = useState(false);
+    const [reviewState, setReviewState] = useState<ReviewLoadState>({ kind: 'idle' });
     const [saving, setSaving] = useState(false);
     const [feedback, setFeedback] = useState<string | null>(null);
+    const [actionError, setActionError] = useState<string | null>(null);
     const [draft, setDraft] = useState<CorrectionDraft | null>(null);
 
+    const reviewStore = reviewState.kind === 'ready'
+        ? reviewState.snapshot.store
+        : emptyPersonalCandidateReviewStore();
+
     async function ensureSavedDecisionsLoaded() {
-        if (reviewLoaded) return;
+        if (reviewState.kind === 'ready') return;
         try {
-            const loaded = await readSavedReviewStore();
-            setReviewStore(loaded);
-            setReviewLoaded(true);
-        } catch {
-            setReviewLoaded(true);
+            const loaded = await readSavedReviewSnapshot();
+            setReviewState({ kind: 'ready', snapshot: loaded });
+        } catch (error) {
+            setReviewState({
+                kind: 'error',
+                message: error instanceof Error ? error.message : REVIEW_READ_ERROR_MESSAGE,
+            });
         }
     }
 
@@ -132,21 +209,29 @@ export function ServicePackageCandidatesPanel({
     async function runLocalAnalysis() {
         setPhase({ kind: 'loading' });
         setFeedback(null);
+        setActionError(null);
         setDraft(null);
+        let saved: ReviewSnapshot;
         try {
-            const [patients, prescriptions, items, saved] = await Promise.all([
+            saved = await readSavedReviewSnapshot();
+        } catch (error) {
+            const message = error instanceof Error ? error.message : REVIEW_READ_ERROR_MESSAGE;
+            setReviewState({ kind: 'error', message });
+            setPhase({ kind: 'error', message });
+            return;
+        }
+        try {
+            const [patients, prescriptions, items] = await Promise.all([
                 db.patients.toArray(),
                 db.servicePrescriptions.toArray(),
                 db.servicePrescriptionItems.toArray(),
-                readSavedReviewStore(),
             ]);
             const analysis = deriveRecurringServiceCandidates({
                 patients,
                 prescriptions,
                 items,
             });
-            setReviewStore(saved);
-            setReviewLoaded(true);
+            setReviewState({ kind: 'ready', snapshot: saved });
             setPhase({ kind: 'ready', analysis });
         } catch {
             setPhase({
@@ -156,16 +241,41 @@ export function ServicePackageCandidatesPanel({
         }
     }
 
-    async function saveDecisions(nextStore: PersonalCandidateReviewStore, message: string) {
+    async function mutateDecision(
+        applyMutation: (currentStore: PersonalCandidateReviewStore) => PersonalCandidateReviewStore,
+        message: string,
+    ): Promise<boolean> {
         setSaving(true);
         setFeedback(null);
+        setActionError(null);
         try {
-            await persistReviewStore(nextStore);
-            setReviewStore(nextStore);
-            setReviewLoaded(true);
-            setFeedback(message);
+            let baseSnapshot: ReviewSnapshot;
+            if (reviewState.kind === 'ready') {
+                baseSnapshot = reviewState.snapshot;
+            } else {
+                baseSnapshot = await readSavedReviewSnapshot();
+                setReviewState({ kind: 'ready', snapshot: baseSnapshot });
+            }
+
+            for (let attempt = 0; attempt < MAX_CAS_ATTEMPTS; attempt += 1) {
+                const nextStore = applyMutation(baseSnapshot.store);
+                const persisted = await persistReviewStoreConditional(nextStore, baseSnapshot.rawValue);
+                if (persisted.kind === 'saved') {
+                    setReviewState({ kind: 'ready', snapshot: persisted.snapshot });
+                    setFeedback(message);
+                    return true;
+                }
+                baseSnapshot = persisted.latestRawValue !== undefined
+                    ? parseReviewSnapshotValue(persisted.latestRawValue)
+                    : await readSavedReviewSnapshot();
+                setReviewState({ kind: 'ready', snapshot: baseSnapshot });
+            }
+
+            setActionError(REVIEW_CONFLICT_ERROR_MESSAGE);
+            return false;
         } catch (error) {
-            setFeedback(error instanceof Error ? error.message : 'Salvataggio non riuscito.');
+            setActionError(error instanceof Error ? error.message : 'Salvataggio non riuscito.');
+            return false;
         } finally {
             setSaving(false);
         }
@@ -198,18 +308,27 @@ export function ServicePackageCandidatesPanel({
         const selectedServices: CandidateServiceItem[] = candidate.services.filter((service) =>
             draft.selectedKeys.includes(service.key),
         );
-        const outcome = correctCandidateDecision(reviewStore, candidate, {
+        const correctionInput = {
             title: draft.title,
             services: selectedServices,
             associatedDiagnosis: parseDiagnosisOptionValue(draft.diagnosisSelection),
             note: draft.note,
-        });
-        if (!outcome.ok) {
-            setDraft({ ...draft, error: outcome.error });
+        };
+        const validation = correctCandidateDecision(reviewStore, candidate, correctionInput);
+        if (!validation.ok) {
+            setDraft({ ...draft, error: validation.error });
             return;
         }
-        setDraft(null);
-        await saveDecisions(outcome.store, 'Correzione salvata nei candidati personali.');
+        const saved = await mutateDecision((latestStore) => {
+            const outcome = correctCandidateDecision(latestStore, candidate, correctionInput);
+            if (!outcome.ok) {
+                throw new Error(outcome.error);
+            }
+            return outcome.store;
+        }, 'Correzione salvata nei candidati personali.');
+        if (saved) {
+            setDraft(null);
+        }
     }
 
     const activeCandidates = phase.kind === 'ready'
@@ -272,9 +391,21 @@ export function ServicePackageCandidatesPanel({
                         </p>
                     ) : null}
 
+                    {actionError ? (
+                        <p className={styles.error} role="alert" data-testid="service-candidates-error">
+                            {actionError}
+                        </p>
+                    ) : null}
+
                     {phase.kind === 'error' ? (
-                        <p className={styles.error} role="alert">
+                        <p className={styles.error} role="alert" data-testid="service-candidates-error">
                             {phase.message}
+                        </p>
+                    ) : null}
+
+                    {phase.kind === 'ready' && phase.analysis.summary.candidatePoolCapped ? (
+                        <p className={styles.notice} role="status" data-testid="service-candidates-partial-notice">
+                            Analisi parziale: raggiunto il limite di gruppi per livello, mostrati i più frequenti.
                         </p>
                     ) : null}
 
@@ -344,7 +475,7 @@ export function ServicePackageCandidatesPanel({
                                                 <Button
                                                     variant="secondary"
                                                     disabled={saving}
-                                                    onClick={() => void saveDecisions(keepCandidateDecision(reviewStore, candidate), 'Candidato conservato.')}
+                                                    onClick={() => void mutateDecision((current) => keepCandidateDecision(current, candidate), 'Candidato conservato.')}
                                                 >
                                                     Conserva
                                                 </Button>
@@ -360,8 +491,9 @@ export function ServicePackageCandidatesPanel({
                                                 variant="text"
                                                 disabled={saving}
                                                 onClick={() => {
-                                                    if (isEditing) setDraft(null);
-                                                    void saveDecisions(discardCandidateDecision(reviewStore, candidate), 'Candidato scartato.');
+                                                    void mutateDecision((current) => discardCandidateDecision(current, candidate), 'Candidato scartato.').then((saved) => {
+                                                        if (saved && isEditing) setDraft(null);
+                                                    });
                                                 }}
                                             >
                                                 Scarta
@@ -370,7 +502,7 @@ export function ServicePackageCandidatesPanel({
                                                 <Button
                                                     variant="text"
                                                     disabled={saving}
-                                                    onClick={() => void saveDecisions(restoreCandidateDecision(reviewStore, candidate.id), 'Valutazione rimossa.')}
+                                                    onClick={() => void mutateDecision((current) => restoreCandidateDecision(current, candidate.id), 'Valutazione rimossa.')}
                                                 >
                                                     Rimetti da valutare
                                                 </Button>
@@ -514,7 +646,7 @@ export function ServicePackageCandidatesPanel({
                                                 <Button
                                                     variant="secondary"
                                                     disabled={saving}
-                                                    onClick={() => void saveDecisions(restoreCandidateDecision(reviewStore, candidate.id), 'Candidato ripristinato.')}
+                                                    onClick={() => void mutateDecision((current) => restoreCandidateDecision(current, candidate.id), 'Candidato ripristinato.')}
                                                 >
                                                     Ripristina
                                                 </Button>

@@ -11,6 +11,7 @@ import {
     findCandidateDecision,
     keepCandidateDecision,
     parsePersonalCandidateReviewStore,
+    parsePersonalCandidateReviewStoreStrict,
     restoreCandidateDecision,
     serializePersonalCandidateReviewStore,
     type CandidateHistoryPatientInput,
@@ -317,4 +318,116 @@ test('WUL-923: gesti di revisione, correzione, scarto, ripristino e minimizzazio
 
     store = restoreCandidateDecision(store, candidate.id);
     assert.equal(findCandidateDecision(store, candidate.id), null);
+});
+
+test('WUL-923: archivio senza pazienti attivi (vuoto o tutti eliminati) esclude prescrizioni orfane', () => {
+    const orphanPrescriptions: CandidateHistoryPrescriptionInput[] = [];
+    const orphanItems: CandidateHistoryPrescriptionItemInput[] = [];
+    for (let i = 1; i <= 5; i += 1) {
+        const patientId = i % 2 === 0 ? 'pat-del-2' : 'pat-del-1';
+        const prescriptionId = `rx-orphan-${i}`;
+        orphanPrescriptions.push({ id: prescriptionId, patientId, status: 'prescribed', serviceName: 'Orfana' });
+        orphanItems.push(
+            { id: `${prescriptionId}-1`, patientId, prescriptionId, status: 'prescribed', codeSystem: 'REGIONAL_PRESTAZIONI', serviceCode: '90.28.1', serviceName: 'EMOGLOBINA GLICATA' },
+            { id: `${prescriptionId}-2`, patientId, prescriptionId, status: 'prescribed', codeSystem: 'REGIONAL_PRESTAZIONI', serviceCode: '90.27.1', serviceName: 'GLUCOSIO [S/P]' },
+        );
+    }
+
+    const noPatients = deriveRecurringServiceCandidates({
+        patients: [],
+        prescriptions: orphanPrescriptions,
+        items: orphanItems,
+    });
+    assert.equal(noPatients.status, 'empty_history');
+    assert.equal(noPatients.summary.totalPrescriptionsScanned, 0);
+    assert.equal(noPatients.summary.eligiblePrescriptions, 0);
+    assert.equal(noPatients.summary.distinctPatients, 0);
+    assert.deepEqual(noPatients.candidates, []);
+    assert.deepEqual(noPatients.insufficientCandidates, []);
+
+    const onlyDeletedPatients = deriveRecurringServiceCandidates({
+        patients: [
+            { id: 'pat-del-1', deletedAt: '2026-10-01T00:00:00.000Z' },
+            { id: 'pat-del-2', deletedAt: '2026-10-02T00:00:00.000Z' },
+        ],
+        prescriptions: orphanPrescriptions,
+        items: orphanItems,
+    });
+    assert.equal(onlyDeletedPatients.status, 'empty_history');
+    assert.equal(onlyDeletedPatients.summary.totalPrescriptionsScanned, 0);
+    assert.deepEqual(onlyDeletedPatients.candidates, []);
+    assert.deepEqual(onlyDeletedPatients.insufficientCandidates, []);
+});
+
+test('WUL-923: storico ad alta cardinalita rispetta il tetto durante generazione senza prodotto cartesiano e resta deterministico', () => {
+    const patients: CandidateHistoryPatientInput[] = [];
+    for (let i = 1; i <= 6; i += 1) {
+        patients.push({
+            id: `pat-hc-${i}`,
+            diagnoses: [{ code: '5A11', system: 'ICD-11', description: 'Diabete mellito di tipo 2' }],
+        });
+    }
+
+    const prescriptions: CandidateHistoryPrescriptionInput[] = [];
+    const items: CandidateHistoryPrescriptionItemInput[] = [];
+
+    for (let g = 0; g < 1200; g += 1) {
+        for (let rep = 0; rep < 2; rep += 1) {
+            const patientId = `pat-hc-${(rep % 2) + 1}`;
+            const prescriptionId = `rx-hc-${g}-${rep}`;
+            prescriptions.push({ id: prescriptionId, patientId, status: 'prescribed', serviceName: `Coppia ${g}` });
+            items.push(
+                { id: `${prescriptionId}-a`, patientId, prescriptionId, status: 'prescribed', codeSystem: 'REGIONAL_PRESTAZIONI', serviceCode: `HC.${g}.A`, serviceName: `Codice ${g} A` },
+                { id: `${prescriptionId}-b`, patientId, prescriptionId, status: 'prescribed', codeSystem: 'REGIONAL_PRESTAZIONI', serviceCode: `HC.${g}.B`, serviceName: `Codice ${g} B` },
+            );
+        }
+    }
+
+    for (let r = 0; r < 12; r += 1) {
+        const patientId = `pat-hc-${(r % 4) + 1}`;
+        const prescriptionId = `rx-hc-tri-${r}`;
+        prescriptions.push({ id: prescriptionId, patientId, status: 'prescribed', serviceName: 'Tripletta frequente' });
+        items.push(
+            { id: `${prescriptionId}-1`, patientId, prescriptionId, status: 'prescribed', codeSystem: 'REGIONAL_PRESTAZIONI', serviceCode: 'Z90.01', serviceName: 'Esame Z1' },
+            { id: `${prescriptionId}-2`, patientId, prescriptionId, status: 'prescribed', codeSystem: 'REGIONAL_PRESTAZIONI', serviceCode: 'Z90.02', serviceName: 'Esame Z2' },
+            { id: `${prescriptionId}-3`, patientId, prescriptionId, status: 'prescribed', codeSystem: 'REGIONAL_PRESTAZIONI', serviceCode: 'Z90.03', serviceName: 'Esame Z3' },
+        );
+    }
+
+    const startedAt = Date.now();
+    const first = deriveRecurringServiceCandidates({
+        patients,
+        prescriptions,
+        items,
+        thresholds: { maxCandidateSetsPerLevel: 50, maxGroupSize: 4 },
+    });
+    const elapsedMs = Date.now() - startedAt;
+    const second = deriveRecurringServiceCandidates({
+        patients,
+        prescriptions,
+        items,
+        thresholds: { maxCandidateSetsPerLevel: 50, maxGroupSize: 4 },
+    });
+
+    assert.ok(elapsedMs < 1500, `Generazione ad alta cardinalita troppo lenta: ${elapsedMs}ms`);
+    assert.equal(first.summary.candidatePoolCapped, true);
+    assert.equal(first.status, 'ready');
+    assert.equal(first.candidates.length, 1);
+    assert.equal(first.candidates[0].prescriptionCount, 12);
+    assert.equal(first.candidates[0].patientCount, 4);
+    assert.deepEqual(
+        first.candidates[0].services.map((service) => service.serviceCode),
+        ['Z90.01', 'Z90.02', 'Z90.03'],
+    );
+    assert.deepEqual(first, second);
+});
+
+test('WUL-923: parser rigoroso rifiuta payload corrotti e accetta solo null o schema valido', () => {
+    const empty = parsePersonalCandidateReviewStoreStrict(null);
+    assert.equal(empty.ok, true);
+    if (empty.ok) assert.deepEqual(empty.store.decisions, []);
+
+    assert.equal(parsePersonalCandidateReviewStoreStrict('').ok, false);
+    assert.equal(parsePersonalCandidateReviewStoreStrict('{malformed').ok, false);
+    assert.equal(parsePersonalCandidateReviewStoreStrict(JSON.stringify({ schemaVersion: 'wrong', decisions: [] })).ok, false);
 });

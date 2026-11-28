@@ -229,6 +229,120 @@ test('WUL-923: candidati personali da storico in Impostazioni Repertori (vuoto, 
     await panel.getByTestId('analyze-service-candidates-button').click();
     await expect(panel.getByTestId('service-candidate-card').first().getByTestId('candidate-review-status')).toHaveText('Conservato');
 
+    let failSettingsRead = true;
+    let putCountDuringFailedRead = 0;
+    await page.route('**/api/settings/servicePackageCandidates.personalReview.v1', (route) => {
+        if (route.request().method() === 'GET' && failSettingsRead) {
+            return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Simulated read failure' }) });
+        }
+        if (route.request().method() === 'PUT' && failSettingsRead) {
+            putCountDuringFailedRead += 1;
+        }
+        return route.continue();
+    });
+
+    await panel.getByTestId('analyze-service-candidates-button').click();
+    await expect(panel.getByTestId('service-candidates-error')).toBeVisible();
+    await expect(panel.getByTestId('service-candidates-error')).toContainText('Impossibile leggere le valutazioni salvate');
+    expect(putCountDuringFailedRead).toBe(0);
+
+    failSettingsRead = false;
+    await page.unroute('**/api/settings/servicePackageCandidates.personalReview.v1');
+    trackingReviewWrites = false;
+
+    await page.evaluate(async () => {
+        const resPatients = await fetch('/api/patients', { cache: 'no-store' });
+        const allPatients = (await resPatients.json()) as Array<{ id: string }>;
+        const targetPatients = allPatients.slice(0, 3);
+        const secondPair = [
+            { code: '90.62.2', name: 'EMOCROMO CON FORMULA' },
+            { code: '90.22.3', name: 'FERRITINA [S]' },
+        ];
+        for (let p = 0; p < 6; p += 1) {
+            const patientId = targetPatients[p % targetPatients.length].id;
+            const rxRes = await fetch('/api/service-prescriptions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    patientId,
+                    prescribedAt: '2026-10-16T09:00:00.000Z',
+                    status: 'prescribed',
+                    category: 'lab',
+                    serviceName: `Controllo ematochimico ${p + 1}`,
+                    source: 'manual',
+                }),
+            });
+            if (rxRes.status !== 201) throw new Error(`Second pair rx failed: ${rxRes.status}`);
+            const rx = (await rxRes.json()) as { id: string };
+            for (let ordinal = 0; ordinal < secondPair.length; ordinal += 1) {
+                const itemRes = await fetch('/api/service-prescription-items', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        patientId,
+                        prescriptionId: rx.id,
+                        ordinal,
+                        status: 'prescribed',
+                        category: 'lab',
+                        codeSystem: 'REGIONAL_PRESTAZIONI',
+                        serviceCode: secondPair[ordinal].code,
+                        serviceName: secondPair[ordinal].name,
+                        matchStatus: 'matched',
+                    }),
+                });
+                if (itemRes.status !== 201) throw new Error(`Second pair item failed: ${itemRes.status}`);
+            }
+        }
+    });
+
+    trackingReviewWrites = true;
+    await panel.getByTestId('analyze-service-candidates-button').click();
+    await expect(panel.getByTestId('service-candidate-card')).toHaveCount(2);
+    const firstCard = panel.getByTestId('service-candidate-card').filter({ hasText: 'EMOGLOBINA GLICATA' });
+    const secondCard = panel.getByTestId('service-candidate-card').filter({ hasText: 'FERRITINA [S]' });
+    await expect(firstCard.getByTestId('candidate-review-status')).toHaveText('Conservato');
+    await expect(secondCard.getByTestId('candidate-review-status')).toHaveText('Da valutare');
+
+    const secondTab = await page.context().newPage();
+    secondTab.on('pageerror', (error) => pageErrors.push(error.message));
+    await secondTab.route('**/*', (route) => {
+        const url = new URL(route.request().url());
+        if (url.origin !== new URL(baseURL!).origin) {
+            externalOrigins.push(url.origin);
+            return route.abort();
+        }
+        return route.continue();
+    });
+    await secondTab.route('**/api/siss/session-status', (route) =>
+        route.fulfill({ json: { status: 'unavailable', source: 'synthetic', checkpoints: [] } }),
+    );
+
+    await openUnlockedDocument(secondTab, '/settings/repertori');
+    const secondPanel = secondTab.getByTestId('service-package-candidates-panel');
+    await secondPanel.getByRole('button', { name: /^Gruppi di prestazioni dallo storico/u }).click();
+    await secondPanel.getByTestId('analyze-service-candidates-button').click();
+    await expect(secondPanel.getByTestId('service-candidate-card')).toHaveCount(2);
+
+    await firstCard.getByRole('button', { name: 'Rimetti da valutare', exact: true }).click();
+    await expect(firstCard.getByTestId('candidate-review-status')).toHaveText('Da valutare');
+    await firstCard.getByRole('button', { name: 'Correggi', exact: true }).click();
+    const firstEditor = firstCard.getByTestId('candidate-correction-editor');
+    await firstEditor.getByLabel('Nome del gruppo').fill('Profilo glicemico scheda 1');
+    await firstEditor.getByRole('button', { name: 'Salva correzione', exact: true }).click();
+    await expect(firstCard.getByTestId('candidate-review-status')).toHaveText('Corretto');
+
+    const secondTabSecondCard = secondPanel.getByTestId('service-candidate-card').filter({ hasText: 'FERRITINA [S]' });
+    await secondTabSecondCard.getByRole('button', { name: 'Conserva', exact: true }).click();
+    await expect(secondTabSecondCard.getByTestId('candidate-review-status')).toHaveText('Conservato');
+
+    const mergedRaw = await page.evaluate(async () => {
+        const res = await fetch('/api/settings/servicePackageCandidates.personalReview.v1', { cache: 'no-store' });
+        return res.text();
+    });
+    expect(mergedRaw).toContain('Profilo glicemico scheda 1');
+    expect(mergedRaw).toContain('EMOCROMO CON FORMULA');
+    await secondTab.close();
+
     await assertNoHorizontalOverflow(page, [{ label: 'repertori-candidati', selector: 'document' }]);
     expect(externalOrigins).toEqual([]);
     expect(aiRequests).toEqual([]);

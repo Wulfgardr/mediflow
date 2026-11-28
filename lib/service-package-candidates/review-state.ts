@@ -23,6 +23,10 @@ export type CandidateCorrectionOutcome =
     | Readonly<{ ok: true; store: PersonalCandidateReviewStore; decision: CandidateReviewDecision }>
     | Readonly<{ ok: false; error: string }>;
 
+export type ParseReviewStoreResult =
+    | Readonly<{ ok: true; store: PersonalCandidateReviewStore }>
+    | Readonly<{ ok: false; error: string }>;
+
 export function emptyPersonalCandidateReviewStore(): PersonalCandidateReviewStore {
     return {
         schemaVersion: PERSONAL_CANDIDATE_REVIEW_SCHEMA,
@@ -30,19 +34,32 @@ export function emptyPersonalCandidateReviewStore(): PersonalCandidateReviewStor
     };
 }
 
-export function parsePersonalCandidateReviewStore(raw: unknown): PersonalCandidateReviewStore {
-    if (raw === null || raw === undefined || raw === '') return emptyPersonalCandidateReviewStore();
-    const candidate = typeof raw === 'string'
-        ? (() => {
-            try {
-                return JSON.parse(raw) as unknown;
-            } catch {
-                return null;
-            }
-        })()
-        : raw;
+export function parsePersonalCandidateReviewStoreStrict(raw: unknown): ParseReviewStoreResult {
+    if (raw === null || raw === undefined) {
+        return { ok: true, store: emptyPersonalCandidateReviewStore() };
+    }
+    let candidate: unknown = raw;
+    if (typeof raw === 'string') {
+        if (raw.trim() === '') {
+            return { ok: false, error: 'Valutazioni salvate non leggibili.' };
+        }
+        try {
+            candidate = JSON.parse(raw) as unknown;
+        } catch {
+            return { ok: false, error: 'Valutazioni salvate non leggibili.' };
+        }
+    }
     const parsed = personalCandidateReviewStoreSchema.safeParse(candidate);
-    return parsed.success ? parsed.data : emptyPersonalCandidateReviewStore();
+    if (!parsed.success) {
+        return { ok: false, error: 'Valutazioni salvate non valide.' };
+    }
+    return { ok: true, store: parsed.data };
+}
+
+export function parsePersonalCandidateReviewStore(raw: unknown): PersonalCandidateReviewStore {
+    if (raw === '') return emptyPersonalCandidateReviewStore();
+    const parsed = parsePersonalCandidateReviewStoreStrict(raw);
+    return parsed.ok ? parsed.store : emptyPersonalCandidateReviewStore();
 }
 
 export function serializePersonalCandidateReviewStore(store: PersonalCandidateReviewStore): string {
