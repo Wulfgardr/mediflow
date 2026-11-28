@@ -8,7 +8,7 @@ import { FileText, Stethoscope, Activity, Trash2, AlertCircle, Undo, Phone, Home
 import { Button } from '@/components/ui/button';
 import { PatientSheetMenu } from '@/components/patient-sheet-menu';
 import { InkState } from '@/components/ui/ink-state';
-import { PATIENT_DIARY_WORKFLOW_LABELS, patientDiarySource, patientDiaryWorkflowState, patientDiaryRegistration, readPatientDiaryMetadata } from '@/lib/patient-diary-metadata';
+import { PATIENT_DIARY_WORKFLOW_LABELS, patientDiaryMoment, patientDiarySource, patientDiaryWorkflowState, patientDiaryRegistration, readPatientDiaryMetadata } from '@/lib/patient-diary-metadata';
 import { ClinicalRichTextContent } from '@/components/clinical-rich-text-content';
 import { Disclosure } from '@/components/disclosure';
 import PrivacyBlur from '@/components/privacy-blur';
@@ -145,6 +145,7 @@ export function TimelineEntryCard({
     const settingLabel = entry.setting === 'home' ? 'Assistenza domiciliare' : entry.setting === 'hospital' ? 'Ospedale' : entry.setting === 'ambulatory' ? 'Ambulatorio' : undefined;
     const typeLabel = TYPE_LABELS[entry.type] || (diaryPresentation ? PATIENT_TYPE_LABELS[entry.type] : undefined) || (proposal && entry.type === 'phone' ? 'Telefonata' : entry.type);
     const basePresentation = presentEntry(entry, diaryMetadata ? diaryMetadata.value : entry.metadata);
+    const moment = patientDiaryMoment(entry.date, entry.metadata);
     const stateKnown = basePresentation.stateKnown;
     const presentation = { ...basePresentation,
         source: metadataUnreadable ? 'Non leggibile' : basePresentation.source,
@@ -180,9 +181,9 @@ export function TimelineEntryCard({
                 tone={isDeleted ? 'critical' : 'accent'}
             />}
 
-            {diaryPresentation ? <time className={twin.margin} dateTime={new Date(entry.date).toISOString()}>
-                <span>{format(new Date(entry.date), reading ? (new Date(entry.date).getFullYear() === new Date().getFullYear() ? 'dd/MM' : 'dd/MM/yyyy') : 'dd MMM yyyy', { locale: it })}</span>
-                <span>{format(new Date(entry.date), 'HH:mm', { locale: it })}</span>
+            {diaryPresentation ? <time className={twin.margin} dateTime={moment.dateTime}>
+                <span>{format(moment.day, reading ? (moment.day.getFullYear() === new Date().getFullYear() ? 'dd/MM' : 'dd/MM/yyyy') : 'dd MMM yyyy', { locale: it })}</span>
+                {moment.timed ? <span>{format(moment.day, 'HH:mm', { locale: it })}</span> : null}
             </time> : null}
 
             {/* Content */}
@@ -201,7 +202,7 @@ export function TimelineEntryCard({
                                 {!diaryPresentation ? <span className="rounded-md border border-[color:var(--lume-border-color)] px-1.5 py-0.5 font-semibold uppercase">
                                     {presentation.stateLabel}
                                 </span> : null}
-                                {!diaryPresentation ? <span className="lume-registro">{format(new Date(entry.date), 'dd MMMM yyyy HH:mm', { locale: it })}</span> : null}
+                                {!diaryPresentation ? <span className="lume-registro">{format(moment.day, moment.timed ? 'dd MMMM yyyy HH:mm' : 'dd MMMM yyyy', { locale: it })}</span> : null}
                                 {diaryPresentation && !reading ? <span>{settingLabel ?? 'Luogo non registrato'}</span> : null}
                                 {reading && settingLabel ? <span>{settingLabel}</span> : null}
                                 {!diaryPresentation || (presentation.source !== settingLabel && presentation.source !== 'Diario locale') ? <span>{proposal && !diaryPresentation ? '' : 'Fonte: '}{presentation.source}</span> : null}
