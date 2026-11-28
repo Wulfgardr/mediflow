@@ -643,11 +643,11 @@ export async function main(args = process.argv.slice(2)) {
   const onSignal = () => {
     if (!leases || leases.requestStop()) void shutdown();
   };
-  const pendingNavigation = new Set();
+  const pendingNavigation = new Map();
   const navigationControllers = new Map();
-  const rememberNavigation = requestId => {
+  const rememberNavigation = (requestId, owner) => {
     if (pendingNavigation.size >= 256) return false;
-    pendingNavigation.add(requestId);
+    pendingNavigation.set(requestId, owner);
     setTimeout(() => pendingNavigation.delete(requestId), 8000).unref();
     return true;
   };
@@ -683,10 +683,12 @@ export async function main(args = process.argv.slice(2)) {
     if (message?.type === 'mediflow-launcher-stop') { if (!pair && !pluginChannel) onSignal(); return; }
     if ((!pluginChannel && !pair) || typeof message?.requestId !== 'string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/u.test(message.requestId)) return;
     const { requestId } = message;
+    const owner = pair?.nonce ?? 'initial';
     if (message.type === 'mediflow-local-ui-cancel') {
       if (Object.keys(message).sort().join(',') !== 'requestId,type') return;
-      if (!pendingNavigation.has(requestId)) rememberNavigation(requestId);
-      cancelNavigation(requestId); return;
+      if (!pendingNavigation.has(requestId)) rememberNavigation(requestId, owner);
+      if (pendingNavigation.get(requestId) === owner) cancelNavigation(requestId);
+      return;
     }
     if (message.type !== 'mediflow-local-ui-navigate') return;
     let status = 'denied';
@@ -696,7 +698,7 @@ export async function main(args = process.argv.slice(2)) {
       && !pendingNavigation.has(requestId)
       && isLocalUiIntent(message.intent)
       && expiresAt !== null
-      && rememberNavigation(requestId)) {
+      && rememberNavigation(requestId, owner)) {
       if (!state.ready && !closing && state.step !== 'errore') status = 'waiting';
       else {
         const controller = new AbortController(); navigationControllers.set(requestId, controller);
@@ -711,7 +713,9 @@ export async function main(args = process.argv.slice(2)) {
   };
   const onParentMessage = message => handleNavigation(message, frame => process.send(frame, () => {}), () => process.connected);
   const onDisconnect = () => {
-    for (const requestId of pendingNavigation) cancelNavigation(requestId);
+    for (const [requestId, owner] of pendingNavigation) {
+      if (owner === 'initial') cancelNavigation(requestId);
+    }
     if (pluginChannel && leases) {
       if (state.navigationReady && child?.connected && ipcStopChildren.has(child)) {
         child.send('{"schemaVersion":"mediflow.local-ui.client-closed.v1"}', () => {});

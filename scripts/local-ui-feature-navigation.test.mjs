@@ -13,6 +13,7 @@ import { chromium, expect } from '@playwright/test';
 import { fetchInterceptedRequest } from '../e2e/fixtures/trusted-web-request.ts';
 import { isolatedChromeLaunch } from '../e2e/fixtures/secure-browser.ts';
 import { archiveBrowserPort } from './local-ui-runtime.mjs';
+import { prepareLauncherState } from './launcher-state.mjs';
 import { packageLocalUiPlugin } from './package-local-ui-plugin.mjs';
 
 const success = { content: [{ type: 'text', text: 'continue_in_mediflow' }], structuredContent: { status: 'continue_in_mediflow' } };
@@ -74,7 +75,7 @@ async function createPatient(page, lastName, notes) {
     }, { lastName, notes });
 }
 
-async function productionFixture(t, respond, seedProvider) {
+async function productionFixture(t, respond, seedProvider, { startFromPlugin = false } = {}) {
     const root = fs.realpathSync(fs.mkdtempSync('/tmp/mf-navigation-'));
     const data = path.join(root, 'data'), home = path.join(root, 'home'), bin = path.join(root, 'bin');
     for (const directory of [data, home, bin]) fs.mkdirSync(directory, { mode: 0o700 });
@@ -83,6 +84,7 @@ async function productionFixture(t, respond, seedProvider) {
     fs.writeFileSync(path.join(bin, 'ollama'), '#!/bin/sh\nexit 0\n', { mode: 0o700 });
 
     let browser;
+    let pluginLauncherActive;
     const children = [];
     const provider = http.createServer(respond);
     t.after(async () => {
@@ -101,6 +103,9 @@ async function productionFixture(t, respond, seedProvider) {
         } finally {
             provider.closeAllConnections();
             await new Promise(resolve => provider.close(resolve));
+            if (pluginLauncherActive) {
+                await expect.poll(() => fs.existsSync(pluginLauncherActive), { timeout: 30_000 }).toBe(false);
+            }
             fs.rmSync(root, { recursive: true, force: true });
         }
     });
@@ -125,12 +130,34 @@ async function productionFixture(t, respond, seedProvider) {
         children.push(record);
         return record;
     };
-    const launcher = run(process.execPath, ['scripts/mediflow.mjs', '--scelta', 'web', '--senza-browser'], { PORT: String(port) });
-    launcher.child.stdout.resume();
-    await expect.poll(() => {
-        assert.equal(launcher.child.exitCode, null, launcher.stderr);
-        return launcher.stderr;
-    }, { timeout: 45_000 }).toContain('Pronto:');
+    const connectClient = async () => {
+        const plugin = run(path.join(destination, 'bin', 'mediflow-local-ui'), []).child;
+        const client = mcp(plugin);
+        const initialized = await client.request('initialize', { protocolVersion: '2025-03-26', capabilities: {},
+            clientInfo: { name: 'synthetic-navigation', version: '1' } });
+        assert.equal(initialized.serverInfo.name, 'mediflow-local-ui');
+        client.send({ method: 'notifications/initialized' });
+        const listed = await client.request('tools/list', {});
+        assert.deepEqual(listed.tools.map(tool => tool.name), ['mediflow.local_ui.navigate.v1']);
+        return { client, plugin };
+    };
+    let initial;
+    if (startFromPlugin) {
+        const settings = prepareLauncherState(process.cwd(), { env, home });
+        pluginLauncherActive = path.join(settings.lockDirectory, 'active');
+        fs.writeFileSync(settings.preferencesFile, JSON.stringify({ schemaVersion: 1, choice: 'web' }), { mode: 0o600 });
+        initial = await connectClient();
+        const first = await initial.client.navigate({ intent: 'search' });
+        assert.deepEqual(first, first.isError ? denial : success);
+        await expect.poll(() => fetch(baseURL + '/api/system/revision').then(r => r.ok, () => false), { timeout: 45_000 }).toBe(true);
+    } else {
+        const launcher = run(process.execPath, ['scripts/mediflow.mjs', '--scelta', 'web', '--senza-browser'], { PORT: String(port) });
+        launcher.child.stdout.resume();
+        await expect.poll(() => {
+            assert.equal(launcher.child.exitCode, null, launcher.stderr);
+            return launcher.stderr;
+        }, { timeout: 45_000 }).toContain('Pronto:');
+    }
 
     browser = await chromium.launch({
         ...isolatedChromeLaunch(baseURL),
@@ -161,14 +188,7 @@ async function productionFixture(t, respond, seedProvider) {
     };
     const confirmation = page.getByRole('button', { name: 'Apri sulla cartella aperta', exact: true });
     const pair = async () => {
-        const plugin = run(path.join(destination, 'bin', 'mediflow-local-ui'), []).child;
-        const client = mcp(plugin);
-        const initialized = await client.request('initialize', { protocolVersion: '2025-03-26', capabilities: {},
-            clientInfo: { name: 'synthetic-navigation', version: '1' } });
-        assert.equal(initialized.serverInfo.name, 'mediflow-local-ui');
-        client.send({ method: 'notifications/initialized' });
-        const listed = await client.request('tools/list', {});
-        assert.deepEqual(listed.tools.map(tool => tool.name), ['mediflow.local_ui.navigate.v1']);
+        const { client, plugin } = await connectClient();
         const pairing = client.navigate({ intent: 'search' });
         await expect(page.getByText('Consenti a Codex/Claude di aprire schermate qui?', { exact: true })).toBeVisible();
         const pairingUrl = fs.readFileSync(`${opener}.urls`, 'utf8').trim().split('\n').at(-1);
@@ -189,7 +209,7 @@ async function productionFixture(t, respond, seedProvider) {
         await expect(confirmation).toHaveCount(0);
         return { client, plugin };
     };
-    return { data, page, provider, pair, openFolder, confirmation };
+    return { data, page, provider, initial, pair, openFolder, confirmation };
 }
 
 test('real packaged local-ui requests reveal the three Web functions after confirmation', {
@@ -570,4 +590,65 @@ for (const [intent, feature] of Object.entries(functionCases)) {
             events.push('archive-unchanged');
         });
     }
+}
+
+for (const scenario of ['initial running', 'paired running', 'paired confirmed']) {
+    test(`initial client EOF with two packaged clients: ${scenario}`, {
+        skip: process.env.MEDIFLOW_NAVIGATION_REAL !== '1' || process.platform === 'win32',
+        timeout: 120_000,
+    }, async t => {
+        const slow = slowProvider('patient_insight', []);
+        const { data, page, provider, initial, pair, openFolder, confirmation } =
+            await productionFixture(t, slow.respond, seedProviderLifecycle, { startFromPlugin: true });
+        await saveSetting(page, 'aiProvider', 'ollama');
+        await saveSetting(page, 'aiUrl', `http://127.0.0.1:${provider.address().port}`);
+        await saveSetting(page, 'aiModel_clinical', model);
+        await saveSetting(page, 'aiModel_reasoning', model);
+        await saveSetting(page, 'aiPatientInsightKillSwitch', 'enabled');
+        const patient = await createPatient(page, 'Sintetico A', sourceText);
+        const network = await page.context().newCDPSession(page);
+        const withdrawn = [];
+        network.on('Network.eventSourceMessageReceived', frame => {
+            if (frame.data === 'revoke') withdrawn.push(frame.eventId);
+        });
+        await network.send('Network.enable');
+        await openFolder(patient);
+        const paired = await pair();
+        const owner = scenario === 'initial running' ? initial : paired;
+        assert.deepEqual(await owner.client.navigate({ intent: 'patient_insight' }), success);
+        await confirmation.click();
+        await expect(page).toHaveURL(/#patient-insight$/u);
+        const before = clinicalSnapshot(data);
+        const start = page.locator('#patient-insight').getByRole('button', { name: 'Genera proposta', exact: true });
+        const result = page.getByTestId('patient-insight-review-proposal');
+        const closeClient = async plugin => {
+            const exit = once(plugin, 'exit');
+            plugin.stdin.end();
+            assert.deepEqual(await exit, [0, null]);
+        };
+        const closeInitial = async () => {
+            await closeClient(initial.plugin);
+            await expect.poll(() => withdrawn.includes('initial')).toBe(true);
+        };
+        if (scenario === 'paired confirmed') await closeInitial();
+        await start.click();
+        const held = await slow.pending();
+        if (scenario === 'paired confirmed') await closeClient(paired.plugin);
+        else await closeInitial();
+        if (scenario === 'paired running') {
+            slow.release();
+            await expect(result).toContainText(marker);
+            assert.equal(held.finished, true);
+        } else {
+            try {
+                await expect.poll(() => held.disconnected, { timeout: 5_000 }).toBe(true);
+            } finally {
+                slow.release();
+            }
+            await expect(start).toBeVisible();
+            await expect(result).toHaveCount(0);
+        }
+        assert.equal(slow.dispatches(), 1);
+        assert.deepEqual(clinicalSnapshot(data), before);
+    });
 }
