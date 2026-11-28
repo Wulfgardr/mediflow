@@ -64,6 +64,11 @@ try {
         'canale non mediato sconosciuto');
     mutate('renderer-sandbox', 'lib/local-operation/specialist/browser-network.ts',
         "chromiumSandbox: true, ", '', 'sandbox del renderer');
+    mutate('physician-network-boundary', 'lib/local-operation/specialist/browser-network.ts',
+        'const { channel, ...confined } = isolatedChromeLaunch(origin);', 'const { channel, args: _args, ...confined } = isolatedChromeLaunch(origin);',
+        'browser del medico ha il sandbox');
+    mutate('physician-renderer-sandbox', 'lib/local-operation/specialist/browser-network.ts',
+        'return { ...confined, headless,', 'return { ...confined, chromiumSandbox: false, headless,', 'browser del medico ha il sandbox');
     mutate('close-on-revoke', 'lib/local-operation/specialist/browser-adapter.ts', 'runtime.close(), ', '', 'revoca chiude un canale');
     mutate('resource-channel', 'lib/local-operation/specialist/browser-adapter.ts', "request.resourceType() !== 'document' || ", '', 'risorsa con URL');
     mutateFiles('control-inventory', [

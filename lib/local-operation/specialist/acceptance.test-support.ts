@@ -1,15 +1,15 @@
 import assert from 'node:assert/strict';
 import { createInterface } from 'node:readline/promises';
-import { chromium } from '@playwright/test';
 import { createSyntheticSpecialistDemo } from './synthetic-demo.test-support.ts';
 import { createSpecialistNativeSurface } from './native-surface.ts';
+import { openPhysicianPortal } from './browser-network.ts';
 
 // Harness manuale: usa l'helper nativo reale, mai una conferma simulata.
 const [scenario, executable] = process.argv.slice(2);
 assert.ok(['cancel', 'protected', 'manual'].includes(scenario!));
 assert.ok(executable && process.env.MEDIFLOW_DATA_DIR);
 const f = await createSyntheticSpecialistDemo(scenario === 'manual' ? 'manual' : 'protected', createSpecialistNativeSurface(executable));
-let doctor: Awaited<ReturnType<typeof chromium.launch>> | undefined;
+let doctor: Awaited<ReturnType<typeof openPhysicianPortal>> | undefined;
 try {
     assert.notEqual(new URL(f.portal.origin).port, '3000');
     const cap = await f.selectLocal();
@@ -25,10 +25,7 @@ try {
         assert.equal(f.service.inspect(f.plan.operationId).state, 'awaiting_manual_act');
         await assert.rejects(f.service.execute(cap));
         assert.equal(f.portal.traffic.filter(item => ['/submit', '/physician-submit'].includes(item.path)).length, 0);
-        doctor = await chromium.launch({ headless: false });
-        const context = await doctor.newContext({ serviceWorkers: 'block', acceptDownloads: false });
-        await context.addCookies([f.portal.cookie]);
-        const page = await context.newPage(); await page.goto(`${f.portal.origin}/portal`);
+        doctor = await openPhysicianPortal(f.portal, { headless: false });
         const input = createInterface({ input: process.stdin, output: process.stdout });
         try { await input.question('Controlla i dati inventati, invia e firma nel simulatore; premi Invio per riconciliare.\n'); }
         finally { input.close(); }
