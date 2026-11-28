@@ -1,8 +1,11 @@
-import { z } from 'zod';export const LOCAL_UI_TOOL_ID = 'mediflow.local_ui.navigate.v1' as const;
+import { z } from 'zod';
+import { LOCAL_UI_INTENT } from './local-ui-intents.mjs';
+
+export const LOCAL_UI_TOOL_ID = 'mediflow.local_ui.navigate.v1' as const;
 export const LOCAL_UI_IPC_SCHEMA = 'mediflow.local-ui.navigation.v1' as const;
 export const LOCAL_UI_RPC_MODE = 'navigation_inherited_child_ipc_v1' as const;
-export const LOCAL_UI_INTENTS = ['search', 'identity', 'history', 'prescribing'] as const;
-export const localUiArgumentsSchema = z.object({ intent: z.enum(LOCAL_UI_INTENTS) }).strict();
+export const LOCAL_UI_INTENTS = Object.freeze(Object.values(LOCAL_UI_INTENT));
+export const localUiArgumentsSchema = z.object({ intent: z.enum(LOCAL_UI_INTENT) }).strict();
 export type LocalUiIntent = typeof LOCAL_UI_INTENTS[number];
 export const LOCAL_UI_OPERATION = Object.freeze({ operationId: LOCAL_UI_TOOL_ID,
   capabilityId: LOCAL_UI_TOOL_ID, serviceRef: 'mediflow.local-ui.navigation', maximumStage: 'read_only' as const });

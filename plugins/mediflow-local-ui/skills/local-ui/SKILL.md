@@ -1,14 +1,17 @@
 ---
 name: local-ui
-description: Apri ricerca, anagrafica, storia o guida prescrittiva nella UI locale separata di MediFlow, senza ricevere dati del paziente.
+description: Apri ricerca, anagrafica, storia, guida prescrittiva, Quadro paziente, Sintesi dei documenti o Smart Import nella UI locale di MediFlow.
 ---
 
 Il server MCP pubblica `mediflow.local_ui.navigate.v1`. Invocalo attraverso
 il nome esposto dal client, con un solo intento: `search`, `identity`,
-`history`, `prescribing`. Per aprire MediFlow usa `search`, anche prima del
+`history`, `prescribing`, `patient_insight` (Quadro paziente),
+`document_synthesis` (Sintesi dei documenti), `smart_import` (Import assistito). Per aprire MediFlow usa `search`, anche prima del
 login. Non chiedere né inserire nomi, codice fiscale, identificativi, storia,
 URL o prove negli argomenti. Il medico effettua accesso, ricerca e selezione
-in MediFlow e conferma la vista sulla cartella locale aperta.
+in MediFlow e conferma la vista sulla cartella locale aperta. Per Quadro, Sintesi e
+Smart Import, il medico sceglie le fonti ove richiesto e avvia la generazione
+con un gesto separato nella funzione aperta.
 
 In Codex CLI puoi richiamare esplicitamente la skill del plugin installato
 con `$mediflow-local-ui:local-ui` nel messaggio. Verifica la presenza del tool

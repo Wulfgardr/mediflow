@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
 import ts from 'typescript';
+import { isLocalUiIntent } from '../packages/mcp/src/local-ui-intents.mjs';
 
 type Element = { type: any; props: Record<string, any> };
 function fixture(pluginRuntime = true) {
@@ -44,7 +45,7 @@ function fixture(pluginRuntime = true) {
     if (name === './security-provider') return { useSecurity: () => ({ user: { id: 'synthetic-user' }, isLocked: false, isAuthenticated: true }) };
     if (name === './privacy-blur' || name === '@/components/privacy-blur') return privacyModule.exports;
     if (name === '@/lib/db') return { db: { getSessionReadSignal: () => session.signal } };
-    if (name === '@/packages/mcp/src/local-ui-contract') return { LOCAL_UI_INTENTS: ['search', 'identity', 'history', 'prescribing'] };
+    if (name === '@/packages/mcp/src/local-ui-intents.mjs') return { isLocalUiIntent };
     return common(name);
   }, Date: { now: () => now }, AbortController, AbortSignal,
   setTimeout(run: () => void, delay: number) { const timer = { at: now + delay, cancelled: false, run }; timers.push(timer); return timer; },

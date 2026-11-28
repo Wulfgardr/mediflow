@@ -1889,6 +1889,9 @@ async function ordinaryLauncherFixture(t, remembered, args = [], reuse = true, w
                 ? rawBytes.replaceAll("choice === 'web' && process.platform === 'win32'", "choice === 'web'") : rawBytes;
         writeFileSync(path.join(source, 'scripts', name), name === 'mediflow.mjs' ? bytes.replace('const startOptionalOllama = () => {', 'const startOptionalOllama = () => { process.stderr.write(\"FIXTURE_OLLAMA_START\\n\"); return;') : bytes);
     }
+    mkdirSync(path.join(source, 'packages/mcp/src'), { recursive: true });
+    const intentContract = 'packages/mcp/src/local-ui-intents.mjs';
+    writeFileSync(path.join(source, intentContract), readFileSync(path.join(repoRoot, intentContract)));
     writeFileSync(path.join(source, 'scripts/local-voice-binary.json'), voice.manifest
         ? JSON.stringify(voice.manifest, null, 2) + '\n'
         : readFileSync(path.join(repoRoot, 'scripts/local-voice-binary.json')));

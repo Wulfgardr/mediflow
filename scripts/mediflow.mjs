@@ -24,6 +24,7 @@ import { LAN_PROXY_DEFAULT_PORT, createLanProxyController, readNetworkOverview }
 import { pairingDirectory, readPairingRequests, bridgeExistingLocalUi, frames, writeFrame } from './local-ui-pairing-transport.mjs';
 
 import { localUiNavigationDeadline } from './local-ui-navigation-deadline.mjs';
+import { isLocalUiIntent } from '../packages/mcp/src/local-ui-intents.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const CHOICES = ['web', 'mac', 'agenti', 'sviluppo'];
@@ -693,7 +694,7 @@ export async function main(args = process.argv.slice(2)) {
     if (Object.keys(message).sort().join(',') === 'dataDir,expiresAt,intent,requestId,sourceFingerprint,type'
       && message.dataDir === dataDir && message.sourceFingerprint === identity.sourceFingerprint
       && !pendingNavigation.has(requestId)
-      && ['search', 'identity', 'history', 'prescribing'].includes(message.intent)
+      && isLocalUiIntent(message.intent)
       && expiresAt !== null
       && rememberNavigation(requestId)) {
       if (!state.ready && !closing && state.step !== 'errore') status = 'waiting';

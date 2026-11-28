@@ -50,6 +50,6 @@ test('keeps the exact MCP and Mini runtime graph on portable Application Service
     ...allowedMini,
     resolve(root, 'scripts/intelligent-host-mcp-stdio.mjs'), resolve(root, 'scripts/local-ui-mcp-stdio.mjs'),
     resolve(root, 'packages/mcp/src/local-ui-server.ts'), resolve(root, 'packages/mcp/src/local-ui-client.ts'),
-    resolve(root, 'packages/mcp/src/local-ui-contract.ts'),
+    resolve(root, 'packages/mcp/src/local-ui-contract.ts'), resolve(root, 'packages/mcp/src/local-ui-intents.mjs'),
   ].sort());
 });

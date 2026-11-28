@@ -1,9 +1,9 @@
 import { localUiNavigationDeadline } from './local-ui-navigation-deadline.mjs';
+import { isLocalUiIntent } from '../packages/mcp/src/local-ui-intents.mjs';
 import { installWebLease } from './local-ui-web-lease.mjs';
 import { installWebPairing } from './local-ui-web-pairing.mjs';
 
 const SCHEMA = 'mediflow.local-ui.navigation.v1';
-const INTENTS = new Set(['search', 'identity', 'history', 'prescribing']);
 
 export function installLocalUiWebNavigation(channel, origin, open, target = globalThis) {
   if (!/^http:\/\/127\.0\.0\.1:[1-9][0-9]{0,4}$/u.test(origin)) throw new Error('navigation_unavailable');
@@ -23,7 +23,7 @@ export function installLocalUiWebNavigation(channel, origin, open, target = glob
       return;
     }
     if (Object.keys(value).sort().join(',') !== 'expiresAt,intent,requestId,schemaVersion'
-      || value.schemaVersion !== SCHEMA || !INTENTS.has(value.intent)
+      || value.schemaVersion !== SCHEMA || !isLocalUiIntent(value.intent)
       || !/^[a-f0-9-]{36}$/u.test(value.requestId) || localUiNavigationDeadline(value.expiresAt) === null) return;
     currentRequestId = value.requestId;
     try {

@@ -5,7 +5,8 @@ import { Disclosure } from './disclosure';
 import PrivacyBlur from './privacy-blur';
 import { useSecurity } from './security-provider';
 import { db } from '@/lib/db';
-import { LOCAL_UI_INTENTS, type LocalUiIntent } from '@/packages/mcp/src/local-ui-contract';
+import { isLocalUiIntent } from '@/packages/mcp/src/local-ui-intents.mjs';
+import type { LocalUiIntent } from '@/packages/mcp/src/local-ui-contract';
 
 const PluginLocalUiRuntime = createContext(false);
 
@@ -14,8 +15,12 @@ export function PluginLocalUiRuntimeProvider({ enabled, children }: Readonly<{ e
 }
 
 const labels: Record<LocalUiIntent, string> = { search: 'Ricerca locale', identity: 'Anagrafica',
-  history: 'Storia clinica e fonti', prescribing: 'Guida alla prescrizione' };
-const anchors = { identity: 'identita', history: 'timeline', prescribing: 'plugin-prescribing' };
+  history: 'Storia clinica e fonti', prescribing: 'Guida alla prescrizione',
+  patient_insight: 'Quadro paziente', document_synthesis: 'Sintesi dei documenti', smart_import: 'Smart Import' };
+const anchors = {
+  identity: 'identita', history: 'timeline', prescribing: 'plugin-prescribing',
+  patient_insight: 'patient-insight', document_synthesis: 'document-synthesis', smart_import: 'smart-import',
+};
 async function selectionEpoch(signal: AbortSignal): Promise<number> {
   const response = await fetch('/api/patient-profile/selection-epoch', { cache: 'no-store', signal, credentials: 'same-origin' });
   if (!response.ok) throw new Error('context_unavailable');
@@ -50,7 +55,7 @@ export function PluginLocalUiNavigation({ patientId, patientVersion, patientLabe
     clear();
     events.onmessage = event => {
       clear(); setMessage('');
-      if (!LOCAL_UI_INTENTS.includes(event.data as LocalUiIntent) || signal.aborted || document.visibilityState !== 'visible') return;
+      if (!isLocalUiIntent(event.data) || signal.aborted || document.visibilityState !== 'visible') return;
       const intent = event.data as LocalUiIntent, token = generation.current, expiresAt = Date.now() + 15_000;
       expiry = setTimeout(clear, 15_000);
       const read = new AbortController(); epochRead = read;
@@ -76,10 +81,9 @@ export function PluginLocalUiNavigation({ patientId, patientVersion, patientLabe
       if (request.epoch !== null && await selectionEpoch(signal) !== request.epoch) throw new Error('context_changed');
       if (signal.aborted || request.generation !== generation.current || request.expiresAt <= Date.now() || document.visibilityState !== 'visible') return;
       if (request.intent === 'search' || !patientId) { window.location.assign('/?area=incarico'); return; }
-      const target = document.getElementById(anchors[request.intent]);
-      target?.querySelector<HTMLButtonElement>('[data-disclosure-control][aria-expanded="false"]')?.click();
-      window.location.hash = anchors[request.intent];
-      target?.scrollIntoView({ block: 'start' });
+      const anchor = anchors[request.intent];
+      if (window.location.hash === `#${anchor}`) window.dispatchEvent(new HashChangeEvent('hashchange'));
+      else window.location.hash = anchor;
     } catch { setMessage('La selezione è cambiata o non è disponibile. Richiedi di nuovo il percorso.'); }
   };
   if (isLocked || !isAuthenticated || (!pending && !message)) return null;

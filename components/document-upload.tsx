@@ -480,7 +480,7 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
             </section>
 
             {Boolean(currentAttachments?.length) || Boolean(selectedId && currentAttachments) ? (
-                <section aria-labelledby={summaryTitleId} data-document-area="summary" className={disclosure.summaries}>
+                <section id="document-synthesis" aria-labelledby={summaryTitleId} data-document-area="summary" className={disclosure.summaries}>
                     <h3 id={summaryTitleId} ref={summaryHeading} tabIndex={-1}>Nuova sintesi</h3>
                     <p className={disclosure.hint}>Scegli una fonte e genera una proposta solo dopo la conferma. Nessun aggiornamento automatico della cartella.</p>
                     <div className={styles.sourceChoice}>
@@ -510,7 +510,11 @@ function DocumentUploadSession({ patientId, children }: DocumentUploadProps) {
                             enabled={documentSynthesisEnabled && deletingId !== selectedAttachment.id}
                         />}
                 </section>
-            ) : null}
+            ) : <section id="document-synthesis" className={cn('hidden target:block', disclosure.summaries)}>
+                <h3>Sintesi dei documenti</h3>
+                <p>{listLoading ? 'Caricamento documenti…' : listError ? 'Elenco documenti non disponibile.'
+                    : 'Carica un documento per preparare una sintesi.'}</p>
+            </section>}
             {children ? <section data-document-area="archive" aria-label="Archivio delle sintesi" className={styles.documentArchive}>
                 {children}
             </section> : null}

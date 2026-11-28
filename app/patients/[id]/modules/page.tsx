@@ -945,7 +945,12 @@ function PatientDetail({ id, writing: requested }: { id: string; writing: boolea
                                 enabled={isAiSmartImportEnabledValue(smartImportKillSwitch?.value)}
                                 onProposalChange={setSmartImportProposalCapture} />
                         </Disclosure>
-                    </section> : null}
+                    </section> : <section id="smart-import" className={`hidden target:block ${disclosure.clinicalSupport}`}>
+                        <h3>Smart Import</h3>
+                        <p>{entriesError || attachmentsError || therapiesError ? 'Fonti non disponibili.'
+                            : !smartImportFabricCaptureInput ? 'Caricamento fonti…'
+                            : 'Aggiungi fonti cliniche alla cartella per preparare una proposta.'}</p>
+                    </section>}
                 </CollapsibleSection>
 
                     <CollapsibleSection

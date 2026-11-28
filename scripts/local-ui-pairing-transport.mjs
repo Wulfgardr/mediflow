@@ -5,6 +5,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import http from 'node:http';
 import { localUiNavigationDeadline } from './local-ui-navigation-deadline.mjs';
+import { isLocalUiIntent } from '../packages/mcp/src/local-ui-intents.mjs';
 import { openUrl } from './launcher-helpers.mjs';
 
 function privateDirectory(directory, create = false) {
@@ -119,7 +120,7 @@ export async function bridgeExistingLocalUi(directory, expected, channel = proce
     const expiresAt = localUiNavigationDeadline(frame.expiresAt);
     if (Object.keys(frame).sort().join(',') === 'dataDir,expiresAt,intent,requestId,sourceFingerprint,type'
       && frame.dataDir === expected.dataDir && frame.sourceFingerprint === expected.sourceFingerprint
-      && ['search', 'identity', 'history', 'prescribing'].includes(frame.intent)
+      && isLocalUiIntent(frame.intent)
       && expiresAt !== null
       && !pendingNavigation.has(requestId) && rememberNavigation(requestId)) {
       if (connected) { writeFrame(peer, { ...frame, expiresAt }); return; }
