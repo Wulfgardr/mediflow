@@ -43,9 +43,14 @@ async function capture(info: TestInfo, page: Page, name: string) {
 }
 
 function dominantFrequency(samples: Int16Array, rate: number): number {
+    const first = samples.findIndex(sample => sample !== 0);
+    if (first < 0) return 0;
+    const last = samples.findLastIndex(sample => sample !== 0);
     let crossings = 0;
-    for (let index = 1; index < samples.length; index += 1) if ((samples[index - 1] < 0) !== (samples[index] < 0)) crossings += 1;
-    return crossings / 2 / (samples.length / rate);
+    for (let index = first + 1; index <= last; index += 1) {
+        if ((samples[index - 1] < 0) !== (samples[index] < 0)) crossings += 1;
+    }
+    return crossings / 2 / ((last - first + 1) / rate);
 }
 
 async function browserKeepsNoText(page: Page, words: string[]) {

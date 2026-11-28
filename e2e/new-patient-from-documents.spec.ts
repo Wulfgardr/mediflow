@@ -219,9 +219,14 @@ test('nuova scheda: due documenti propongono cognomi diversi, «Usa tutte le pro
     await create.getByLabel('PIN di conferma').fill(pin);
     await create.getByRole('button', { name: 'Conferma creazione con PIN' }).click();
     await expect(create.getByRole('heading', { name: 'Scheda creata', exact: true })).toBeVisible({ timeout: 30_000 });
-    const patientId = await group.getByLabel('Scheda di destinazione').inputValue();
-    const patient = await page.evaluate(async (id) => (await fetch(`/api/patients/${id}`, { cache: 'no-store' })).json(), patientId);
+    const patientPath = await create.getByRole('link', { name: 'Apri la scheda' }).getAttribute('href');
+    expect(patientPath).toMatch(/^\/patients\/[^/]+$/u);
+    const patient = await page.evaluate(async (path) => {
+        const response = await fetch(`/api${path}`, { cache: 'no-store' });
+        return response.json();
+    }, patientPath);
     expect(patient).toMatchObject({ firstName: 'Elena', lastName: 'Sintetico', taxCode });
+    await expect(group.getByLabel('Scheda di destinazione')).toHaveValue(patientPath!.slice('/patients/'.length));
 });
 
 test('nuova scheda: la data di nascita di un familiare, senza codice fiscale, non entra con «Usa tutte le proposte»', async ({ page }, info) => {
