@@ -50,6 +50,23 @@ test('quarantines speech overlapping a third-party segment and retains its separ
     assert.throws(() => recordDaySessionDecision(rows, rows[0], { kind: 'linked', patientId: correct.id }), /entry changed/u);
 });
 
+test('keeps an unfinished third-party segment active across later visits', async () => {
+    const read = (timing: { inizio_epoch: number; fine_epoch?: number }) => readDaySession([
+        ...visitFiles({ cf_dettato_parziale: 'RSSMRA' }, 'Lina Esempia, controllo.'),
+        file('S01/seduta.json', { seduta: 'S01', tratti_terzi: [{ id: 'T01', stato: 'aperto', ...timing }] }),
+    ]);
+    for (const timing of [{ inizio_epoch: start - 60 }, { inizio_epoch: start + 10 }]) {
+        const rows = await read(timing);
+        const visit = rows.find(row => row.id.endsWith('/V01'))!;
+        assert.deepEqual([visit.type, visit.text, visit.fragment], ['visit', '', null]);
+        assert.deepEqual(daySessionCandidates(visit, [correct]), []);
+    }
+    for (const timing of [{ inizio_epoch: start - 60, fine_epoch: start - 1 }, { inizio_epoch: start + 61 }]) {
+        const rows = await read(timing);
+        assert.equal(rows.find(row => row.id.endsWith('/V01'))?.type, 'pending');
+    }
+});
+
 test('retains only decisions for unchanged evidence on reimport and rejects stale or repeated decisions', async () => {
     const previous = await readDaySession(visitFiles({}, 'Lina Esempia, controllo.'));
     const linked = recordDaySessionDecision(previous, previous[0], { kind: 'linked', patientId: correct.id });

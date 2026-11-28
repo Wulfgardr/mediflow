@@ -24,7 +24,7 @@ function writeKitDay(directory: string) {
     const farPdf = { ...pdf, origine: '/synthetic/pdf-fuori-finestra.pdf', sha256: 'b'.repeat(64), mtime: start + 70, promemoria: false };
     const session = path.join(directory, 'S01');
     mkdirSync(session, { recursive: true });
-    writeFileSync(path.join(session, 'seduta.json'), JSON.stringify({ seduta: 'S01', tratti_terzi: [{ id: 'T01', stato: 'confermato', inizio_epoch: start + 90 }] }));
+    writeFileSync(path.join(session, 'seduta.json'), JSON.stringify({ seduta: 'S01', tratti_terzi: [{ id: 'T01', stato: 'confermato', inizio_epoch: start + 90, fine_epoch: start + 105 }] }));
     for (const [index, text] of ['Lina Esempia, controllo sintetico.', 'Visita Lina Esempia, nata il 01/01/1980.', 'Richiamo di prova, senza dati identificativi.'].entries()) {
         const visita = `V0${index + 1}`;
         const subdirectory = path.join(directory, visita);

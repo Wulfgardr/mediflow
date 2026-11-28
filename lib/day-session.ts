@@ -89,7 +89,7 @@ export async function readDaySession(files: Iterable<File>): Promise<DaySessionE
         if (end < row.aperta_epoch) throw new Error('Invalid visit times');
         const thirds = thirdEntries(day, folder, row.tratti_terzi);
         const hasThird = thirds.length > 0 || (sessionThirds.get(row.seduta ?? '') ?? []).some(trait =>
-            trait.inizio_epoch == null || (trait.inizio_epoch < end && (trait.fine_epoch ?? trait.inizio_epoch) >= row.aperta_epoch));
+            trait.inizio_epoch == null || (trait.inizio_epoch < end && (trait.fine_epoch == null || trait.fine_epoch >= row.aperta_epoch)));
         const transcript = hasThird ? undefined : sources.get(`${folder}/trascrizione.txt`);
         const documents = row.pdf.filter(pdf => pdf.esito === 'candidato' || pdf.esito === 'accettato').map(pdf => ({
             name: pdf.origine.split(/[/\\]/u).at(-1) || 'PDF', at: pdf.mtime, hash: pdf.sha256, receipt: pdf.promemoria ?? false,
