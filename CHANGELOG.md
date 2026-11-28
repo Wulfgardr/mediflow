@@ -58,11 +58,17 @@ release](https://github.com/Wulfgardr/mediflow/releases) raccoglie i pacchetti p
   documento identifica il paziente con lo stesso codice fiscale. Per creare
   una scheda verifica anche l’identità proposta sul documento. I gruppi incerti
   restano da confermare nel Web. [Identità nel Dossier](https://github.com/Wulfgardr/mediflow/pull/1181)
-- Nel Dossier Web il medico può confermare un codice ICD-11 proposto dal kit,
-  correggerlo o registrare la diagnosi senza codice. MediFlow verifica il codice
-  scelto nel catalogo OMS locale. La scelta resta individuale anche con il comando
-  «Accetta il verificato e applica» o con il deposito tramite l’operatore.
+- Quando il kit propone un codice ICD-11 per una diagnosi già codificata nel
+  documento, il Dossier Web mostra entrambi i codici. Il medico può conservare il codice
+  del documento, confermare o correggere quello proposto oppure registrare la
+  diagnosi senza codice. MediFlow verifica la scelta ICD-11 nel catalogo OMS
+  locale. La proposta attende la scelta del medico anche dopo un deposito
+  tramite l’operatore o il comando «Accetta il verificato e applica».
   [Codici proposti nel Dossier](https://github.com/Wulfgardr/mediflow/pull/1183)
+- Dal plugin di navigazione il medico può chiedere di aprire **Quadro paziente**,
+  **Sintesi dei documenti** o **Smart Import**. Conferma nella scheda Web
+  già aperta, dove sceglie le fonti e decide quando avviare la generazione.
+  [Aprire le tre funzioni dalla chat](https://github.com/Wulfgardr/mediflow/pull/1185)
 - Con il consenso del medico, la chat esterna riceve il profilo
   pseudonimizzato nei limiti del mandato. Le note, le trascrizioni e i PDF forniti dall’agente
   attendono il medico in **Da decidere**. Il medico esamina i contenuti prima
