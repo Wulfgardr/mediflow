@@ -69,6 +69,7 @@ async function openAssistantAccess(page: Page) {
 }
 
 async function capture(page: Page, label: string) {
+    await expect(page.getByTestId('lume-scheda-header').getByRole('heading', { level: 1 })).toBeVisible();
     for (const theme of ['light', 'dark'] as const) {
         await setTheme(page, theme);
         await toTop(page);
