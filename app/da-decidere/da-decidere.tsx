@@ -6,33 +6,37 @@ import { useSecurity } from '@/components/security-provider';
 import { DossierFolderReview } from '@/components/dossier-import-panel';
 import { agentIncomingSnapshot, agentIncomingServerSnapshot, subscribeAgentIncoming, refreshAgentIncoming, applyAllReadyAgentVisits } from '@/lib/agent-incoming';
 import { agentVisitAwaitsReview } from '@/lib/agent-visit-review';
+import { clientArchiveGeneration } from '@/lib/security/client-auth-api';
 import surface from '@/components/record-surface.module.css';
 import { PageHeader } from '@/components/ui/page-header';
 import { VisitQueue } from './visit-queue';
+import { DaySession } from './day-session';
 import css from './da-decidere.module.css';
 
-export type DaDecidereView = 'visite' | 'documenti';
+export type DaDecidereView = 'visite' | 'documenti' | 'seduta';
 
 function Filters({ view, visits }: { view: DaDecidereView; visits: number }) {
     return <nav className={surface.segmented} aria-label="Filtri">
         <Link href="/da-decidere" aria-current={view === 'visite' ? 'page' : undefined}>Visite{visits ? <span>{visits}</span> : null}</Link>
         <Link href="/da-decidere?vista=documenti" aria-current={view === 'documenti' ? 'page' : undefined}>Documenti</Link>
+        <Link href="/da-decidere?vista=seduta" aria-current={view === 'seduta' ? 'page' : undefined}>Seduta del giorno</Link>
     </nav>;
 }
 
-function UnlockedDaDecidere({ view, patientId }: { view: DaDecidereView; patientId: string | null }) {
+function UnlockedDaDecidere({ view, patientId, userId }: { view: DaDecidereView; patientId: string | null; userId: string }) {
     const snapshot = useSyncExternalStore(subscribeAgentIncoming, agentIncomingSnapshot, agentIncomingServerSnapshot);
     const { visits, unreadableVisits, busy, error, batch } = snapshot;
     const applicable = visits.filter(visit => agentVisitAwaitsReview(visit));
     const total = visits.length + unreadableVisits.length;
     const blockedCount = total - applicable.length;
+    const archive = clientArchiveGeneration();
     const meta = view === 'visite' && total > 0 ? <>
         {applicable.length === 1 ? '1 visita pronta' : `${applicable.length} visite pronte`}
         {blockedCount > 0 ? ` · ${blockedCount === 1 ? '1 da verificare' : `${blockedCount} da verificare`}` : ''}
     </> : null;
     return <main className={`${surface.page} ${css.page}`} data-record-page>
         <PageHeader
-            title="Da decidere"
+            title={view === 'seduta' ? 'Seduta del giorno' : 'Da decidere'}
             meta={meta}
             actions={view === 'visite' ? <>
                 <Link href="/settings/agenti" className="mf-button-secondary">Agenti</Link>
@@ -57,11 +61,12 @@ function UnlockedDaDecidere({ view, patientId }: { view: DaDecidereView; patient
             </div>
             {error && <p role="alert" className={css.alert}>{error}</p>}
             <VisitQueue {...snapshot} />
-        </> : <DossierFolderReview initialPatientId={patientId} />}
+        </> : view === 'seduta' ? <DaySession key={JSON.stringify([archive, userId])} scope={{ archive, user: userId }} />
+            : <DossierFolderReview initialPatientId={patientId} />}
     </main>;
 }
 
 export function DaDecidere({ view, patientId }: { view: DaDecidereView; patientId: string | null }) {
-    const { isLocked } = useSecurity();
-    return isLocked ? null : <UnlockedDaDecidere view={view} patientId={patientId} />;
+    const { isLocked, user } = useSecurity();
+    return isLocked || !user ? null : <UnlockedDaDecidere view={view} patientId={patientId} userId={user.id} />;
 }
