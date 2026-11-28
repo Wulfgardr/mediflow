@@ -21,7 +21,11 @@ export function PluginLocalUiRuntimeProvider({ enabled, children }: Readonly<{ e
 
 const labels: Record<LocalUiIntent, string> = { search: 'Ricerca locale', identity: 'Anagrafica',
   history: 'Storia clinica e fonti', prescribing: 'Guida alla prescrizione',
-  patient_insight: 'Quadro paziente', document_synthesis: 'Sintesi dei documenti', smart_import: 'Smart Import' };
+  patient_insight: 'Quadro paziente', document_synthesis: 'Sintesi dei documenti', smart_import: 'Smart Import',
+  new_patient_from_documents: 'Nuova scheda dai documenti' };
+const routes = { search: '/?area=incarico', new_patient_from_documents: '/patients/new#documento' };
+type RouteIntent = keyof typeof routes;
+const opensRoute = (intent: LocalUiIntent): intent is RouteIntent => Object.hasOwn(routes, intent);
 const anchors = {
   identity: 'identita', history: 'timeline', prescribing: 'plugin-prescribing',
   patient_insight: 'patient-insight', document_synthesis: 'document-synthesis', smart_import: 'smart-import',
@@ -90,7 +94,7 @@ export function PluginLocalUiNavigation({ patientId, patientVersion, patientLabe
         if (!current || requestSignal.aborted || token !== generation.current || expiresAt <= Date.now()) return;
         setPending({ intent, epoch, generation: token, expiresAt, scope });
       };
-      if (!patientId || intent === 'search') publish(null);
+      if (!patientId || opensRoute(intent)) publish(null);
       else void selectionEpoch(requestSignal).then(publish).catch(() => { if (current && token === generation.current) clear(); });
     };
     const onVisibility = () => { if (document.visibilityState !== 'visible') clear(); };
@@ -116,7 +120,11 @@ export function PluginLocalUiNavigation({ patientId, patientVersion, patientLabe
     try {
       if (request.epoch !== null && await selectionEpoch(signal) !== request.epoch) throw new Error('context_changed');
       if (signal.aborted || request.generation !== generation.current || request.expiresAt <= Date.now() || document.visibilityState !== 'visible') return;
-      if (request.intent === 'search' || !patientId) { work?.open(null); window.location.assign('/?area=incarico'); return; }
+      if (opensRoute(request.intent) || !patientId) {
+        work?.open(null);
+        window.location.assign(opensRoute(request.intent) ? routes[request.intent] : routes.search);
+        return;
+      }
       const anchor = anchors[request.intent];
       work?.open(request.scope ? { scope: request.scope, intent: request.intent, patientId, anchor: `#${anchor}` } : null);
       if (window.location.hash === `#${anchor}`) window.dispatchEvent(new HashChangeEvent('hashchange'));
@@ -126,8 +134,13 @@ export function PluginLocalUiNavigation({ patientId, patientVersion, patientLabe
   if (isLocked || !isAuthenticated || (!pending && !message)) return null;
   return <aside aria-label="Richieste dal plugin" className="col-span-full space-y-3" data-testid="plugin-local-ui-navigation">
     {pending ? <div role="status" className="rounded-xl border border-current/20 p-4">
-      <p>{labels[pending.intent]}: {patientId ? <>conferma sulla cartella aperta di <PrivacyBlur>{patientLabel ?? 'questo paziente'}</PrivacyBlur>.</> : 'cerca e scegli il paziente in MediFlow.'}</p>
-      <button type="button" className="mf-button-primary mt-3" onClick={() => { void confirm(); }}>{patientId ? 'Apri sulla cartella aperta' : 'Vai alla ricerca locale'}</button>
+      {pending.intent === 'new_patient_from_documents' ? <>
+        <p>{labels[pending.intent]}: scegli i documenti in questa finestra.</p>
+        <button type="button" className="mf-button-primary mt-3" onClick={() => { void confirm(); }}>Apri la nuova scheda</button>
+      </> : <>
+        <p>{labels[pending.intent]}: {patientId ? <>conferma sulla cartella aperta di <PrivacyBlur>{patientLabel ?? 'questo paziente'}</PrivacyBlur>.</> : 'cerca e scegli il paziente in MediFlow.'}</p>
+        <button type="button" className="mf-button-primary mt-3" onClick={() => { void confirm(); }}>{patientId ? 'Apri sulla cartella aperta' : 'Vai alla ricerca locale'}</button>
+      </>}
       <button type="button" className="mf-button-secondary ml-2" onClick={() => { generation.current++; setPending(null); }}>Annulla</button>
     </div> : null}
     {message ? <p role="alert">{message}</p> : null}

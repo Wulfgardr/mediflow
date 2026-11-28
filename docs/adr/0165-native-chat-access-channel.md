@@ -513,3 +513,14 @@ La prova di produzione usa il pacchetto local-ui, Chrome con sandbox, archivi
 sintetici e un provider loopback cooperativo che trattiene la risposta. Osserva
 il ritiro dell'output e la chiusura della richiesta dopo l'invio al provider.
 La qualifica degli host desktop e dei provider effettivi resta separata.
+
+Nuova scheda dai documenti (`new_patient_from_documents`) apre, dopo la
+conferma locale, la creazione di un nuovo paziente su `/patients/new#documento`,
+anche senza cartella aperta e senza nominare il paziente visibile. Selettore,
+revisione e creazione con PIN sono quelli ordinari; l'apertura non lega lavoro
+alla richiesta del plugin. Il tool non accetta file né campi aggiuntivi. MCP
+non segnala gli allegati del compositore: la skill mostra gli avvisi
+dell'[ADR 0160](0160-mediflow-in-desktop-chat.md) e, con un documento già
+allegato, non apre l'importazione in quel turno. La prova di produzione copre
+apertura, selettore annullato, ritiro della revisione e creazione su un archivio
+sintetico; il gate C-6 resta aperto.

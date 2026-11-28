@@ -1,17 +1,39 @@
 ---
 name: local-ui
-description: Apri ricerca, anagrafica, storia, guida prescrittiva, Quadro paziente, Sintesi dei documenti o Smart Import nella UI locale di MediFlow.
+description: Apri ricerca, anagrafica, storia, guida prescrittiva, Quadro paziente, Sintesi dei documenti, Smart Import o Nuova scheda dai documenti nella UI locale di MediFlow.
 ---
 
 Il server MCP pubblica `mediflow.local_ui.navigate.v1`. Invocalo attraverso
 il nome esposto dal client, con un solo intento: `search`, `identity`,
 `history`, `prescribing`, `patient_insight` (Quadro paziente),
-`document_synthesis` (Sintesi dei documenti), `smart_import` (Import assistito). Per aprire MediFlow usa `search`, anche prima del
+`document_synthesis` (Sintesi dei documenti), `smart_import` (Import assistito),
+`new_patient_from_documents` (Nuova scheda dai documenti). Per aprire MediFlow usa `search`, anche prima del
 login. Non chiedere né inserire nomi, codice fiscale, identificativi, storia,
 URL o prove negli argomenti. Il medico effettua accesso, ricerca e selezione
 in MediFlow e conferma la vista sulla cartella locale aperta. Per Quadro, Sintesi e
 Smart Import, il medico sceglie le fonti ove richiesto e avvia la generazione
 con un gesto separato nella funzione aperta.
+
+## Nuova scheda dai documenti
+
+Per «crea un paziente da documenti» usa `new_patient_from_documents`, anche
+senza una cartella aperta. Il tool non riceve file: il medico conferma
+l'apertura, sceglie i documenti, rivede i dati e crea la scheda in MediFlow.
+Prima di invocarlo mostra:
+
+«Carica i documenti nella finestra MediFlow. Se li alleghi a questa chat,
+li condividi direttamente con il suo fornitore prima della protezione MediFlow.»
+
+Se un documento è già allegato a questa chat, non usarne il contenuto, non
+citarlo e non invocare l'intento in questo turno. Rispondi soltanto:
+
+«Questo file è stato allegato alla chat e può essere già stato acquisito dal
+suo fornitore. MediFlow non può annullare quell'invio. Rimuovilo dagli allegati
+e dalle copie salvate dall'host, se disponibili, e caricalo dalla finestra
+MediFlow. La rimozione non garantisce la cancellazione immediata delle copie.»
+
+Non scaricare né ripetere il file per ripulirlo. Non dichiarare né escludere
+una violazione dei dati: un'esposizione reale segue la procedura del titolare.
 
 In Codex CLI puoi richiamare esplicitamente la skill del plugin installato
 con `$mediflow-local-ui:local-ui` nel messaggio. Verifica la presenza del tool

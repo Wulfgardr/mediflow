@@ -14,6 +14,7 @@ function fixture(pluginRuntime = true) {
   const reads: Array<{ signal: AbortSignal; release(): void }> = [];
   const session = new AbortController();
   const subscriptions: string[] = [];
+  const assigned: string[] = [];
   const work = workExports.createLocalUiWork();
   const workContext = {};
   const hooks = {
@@ -57,7 +58,7 @@ function fixture(pluginRuntime = true) {
   clearTimeout(timer: typeof timers[number] | undefined) { if (timer) timer.cancelled = true; },
   EventSource: function (url: string) { subscriptions.push(url); events = { close() {} }; return events; },
   document: { visibilityState: 'visible', addEventListener() {}, removeEventListener() {}, getElementById() { return null; } },
-  window: { location: { hash: '' }, addEventListener() {}, removeEventListener() {} }, HTMLDetailsElement: class {},
+  window: { location: { hash: '', assign(url: string) { assigned.push(url); } }, addEventListener() {}, removeEventListener() {} }, HTMLDetailsElement: class {},
   fetch(_url: string, options: { signal: AbortSignal }) { return new Promise(resolve => {
     reads.push({ signal: options.signal, release: () => resolve({ ok: true, json: async () => ({ contractVersion: 1, selectionEpoch: 1 }) }) });
   }); } };
@@ -75,7 +76,7 @@ function fixture(pluginRuntime = true) {
     return [node, ...elements(node.props?.children)];
   };
   render();
-  return { render, elements, reads, session, subscriptions, setPrivacy(value: boolean) { privacy = value; },
+  return { render, elements, reads, session, subscriptions, assigned, setPrivacy(value: boolean) { privacy = value; },
     emit(intent = 'history') { events.onmessage({ data: intent }); },
     advance(time: number) { now = time; for (const timer of timers) if (!timer.cancelled && timer.at <= now) { timer.cancelled = true; timer.run(); } },
     async release(index: number) { reads[index].release(); await new Promise(resolve => setImmediate(resolve)); },
@@ -125,4 +126,16 @@ test('ordinary runtime never subscribes to plugin navigation events', () => {
   assert.equal(f.render(), null);
   assert.deepEqual(f.subscriptions, []);
   assert.deepEqual(f.reads, []);
+});
+
+test('new patient from documents opens the new record entry without reading or naming the open patient', async () => {
+  const f = fixture(); f.emit('new_patient_from_documents');
+  const shown = JSON.stringify(f.render());
+  assert.deepEqual(f.reads, []);
+  assert.ok(shown.includes('Nuova scheda dai documenti'));
+  assert.ok(!shown.includes('Nome Sintetico R1'));
+  f.confirm(); await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(f.assigned, ['/patients/new#documento']);
+  assert.equal(f.hash(), '');
+  assert.equal(f.render(), null);
 });

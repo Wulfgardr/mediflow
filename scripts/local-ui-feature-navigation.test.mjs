@@ -15,6 +15,7 @@ import { isolatedChromeLaunch } from '../e2e/fixtures/secure-browser.ts';
 import { archiveBrowserPort } from './local-ui-runtime.mjs';
 import { prepareLauncherState } from './launcher-state.mjs';
 import { packageLocalUiPlugin } from './package-local-ui-plugin.mjs';
+import { randomSyntheticTaxCode } from '../lib/patient-identity.test-support.ts';
 
 const success = { content: [{ type: 'text', text: 'continue_in_mediflow' }], structuredContent: { status: 'continue_in_mediflow' } };
 const denial = { isError: true, content: [{ type: 'text', text: 'MediFlow navigation unavailable. Complete startup or pairing in MediFlow, then retry. This request is no longer pending.' }] };
@@ -313,6 +314,126 @@ test('real packaged local-ui requests reveal the three Web functions after confi
     assert.deepEqual(generationRequests, []);
     assert.deepEqual(providerCalls, []);
     assert.deepEqual(clinicalSnapshot(data), before);
+});
+
+async function syntheticLetter(taxCode) {
+    const pdf = await PDFDocument.create();
+    const font = await pdf.embedFont(StandardFonts.Helvetica);
+    const sheet = pdf.addPage([595, 842]);
+    ['Lettera di dimissione sintetica', 'Cognome: Sintetica', 'Nome: Elena', `Codice fiscale paziente: ${taxCode}`, 'Data referto: 02/02/2025']
+        .forEach((line, index) => sheet.drawText(line, { x: 40, y: 800 - index * 40, size: 11, font }));
+    return Buffer.from(await pdf.save());
+}
+
+test('real packaged local-ui opens Nuova scheda dai documenti after confirmation, also without a patient', {
+    skip: process.env.MEDIFLOW_NAVIGATION_REAL !== '1' || process.platform === 'win32',
+    timeout: 240_000,
+}, async t => {
+    const providerCalls = [];
+    const { data, page, provider, pair, openFolder } = await productionFixture(t, (request, response) => {
+        providerCalls.push(`${request.method} ${request.url}`);
+        response.writeHead(503).end();
+    });
+    await saveSetting(page, 'aiUrl', `http://127.0.0.1:${provider.address().port}`);
+    const open = await createPatient(page, 'Sintetico A');
+    await openFolder(open);
+    const { client } = await pair();
+    const frames = [];
+    const network = await page.context().newCDPSession(page);
+    network.on('Network.eventSourceMessageReceived', frame => { frames.push(`${frame.eventId} ${frame.data}`); });
+    await network.send('Network.enable');
+
+    const intent = 'new_patient_from_documents';
+    const fileName = 'Referto sintetico allegato.pdf';
+    const prompt = page.getByTestId('plugin-local-ui-navigation');
+    const confirmation = page.getByRole('button', { name: 'Apri la nuova scheda', exact: true });
+    const entry = new URL('/patients/new#documento', page.url()).href;
+    const before = clinicalSnapshot(data);
+
+    for (const extra of [{ attachment: fileName }, { files: [{ name: fileName, mimeType: 'application/pdf' }] }, { uri: `file:///tmp/${fileName}` }]) {
+        assert.deepEqual(await client.navigate({ intent, ...extra }), denial);
+    }
+    await expect(prompt).toHaveCount(0);
+    assert.deepEqual(await client.request('tools/call', { name: 'mediflow.local_ui.navigate.v1', arguments: { intent },
+        _meta: { attachments: [{ name: fileName, mimeType: 'application/pdf' }] } }), success);
+    await expect(prompt).toContainText('Nuova scheda dai documenti: scegli i documenti in questa finestra.');
+    await expect(prompt).not.toContainText('Sintetico A');
+    await prompt.getByRole('button', { name: 'Annulla', exact: true }).click();
+    await expect(prompt).toHaveCount(0);
+    assert.equal(new URL(page.url()).pathname, `/patients/${open}/modules`);
+
+    assert.deepEqual(await client.navigate({ intent }), success);
+    await confirmation.click();
+    await expect(page).toHaveURL(entry);
+    const create = page.locator('#documento').getByTestId('patient-document-create');
+    await expect(create.getByRole('button', { name: 'Scegli i documenti', exact: true })).toBeVisible();
+    assert.deepEqual(clinicalSnapshot(data), before);
+
+    await Promise.all([
+        page.waitForResponse(response => response.url().endsWith('/api/plugin-local-ui/events') && response.status() === 200),
+        page.goto('/plugin-local-ui'),
+    ]);
+    assert.deepEqual(await client.navigate({ intent }), success);
+    await expect(prompt).toContainText('Nuova scheda dai documenti');
+    await confirmation.click();
+    await expect(page).toHaveURL(entry);
+    if (process.env.MEDIFLOW_NAVIGATION_EVIDENCE) {
+        await page.screenshot({ path: path.join(process.env.MEDIFLOW_NAVIGATION_EVIDENCE, `${intent}-senza-paziente.png`) });
+    }
+    assert.deepEqual(clinicalSnapshot(data), before);
+
+    const choose = async files => {
+        const [chooser] = await Promise.all([page.waitForEvent('filechooser'),
+            create.getByRole('button', { name: 'Scegli i documenti', exact: true }).click()]);
+        await chooser.setFiles(files);
+    };
+    await choose([]);
+    await expect(page.getByTestId('dossier-group')).toHaveCount(0);
+    await expect(create.getByRole('button', { name: 'Scegli i documenti', exact: true })).toBeVisible();
+    assert.deepEqual(clinicalSnapshot(data), before);
+
+    const taxCode = randomSyntheticTaxCode();
+    const letter = { name: 'Lettera sintetica.pdf', mimeType: 'application/pdf', buffer: await syntheticLetter(taxCode) };
+    const panel = page.getByTestId('dossier-import');
+    const group = panel.getByTestId('dossier-group');
+    const review = group.getByTestId('dossier-new-patient').getByTestId('patient-document-create');
+    await choose([letter]);
+    await expect(group).toHaveAttribute('data-identity', 'unmatched_cf', { timeout: 120_000 });
+    await review.getByRole('button', { name: 'Avvia la revisione del documento' }).click();
+    await expect(review.getByRole('heading', { name: 'Revisione dei dati' })).toBeVisible({ timeout: 60_000 });
+    await review.getByRole('button', { name: 'Annulla e ritira', exact: true }).click();
+    await expect(review.getByRole('heading', { name: 'Revisione dei dati' })).toHaveCount(0);
+    assert.deepEqual(clinicalSnapshot(data), before);
+    await panel.getByRole('button', { name: 'Scegli altri documenti', exact: true }).click();
+    await expect(group).toHaveCount(0);
+
+    await choose([letter]);
+    await expect(group).toHaveAttribute('data-identity', 'unmatched_cf', { timeout: 120_000 });
+    await review.getByRole('button', { name: 'Avvia la revisione del documento' }).click();
+    await expect(review.getByRole('heading', { name: 'Revisione dei dati' })).toBeVisible({ timeout: 60_000 });
+    await review.getByRole('button', { name: 'Usa tutte le proposte' }).click();
+    await expect(review.getByLabel('Codice fiscale', { exact: true })).toHaveValue(taxCode);
+    assert.deepEqual(clinicalSnapshot(data), before);
+    await review.getByRole('button', { name: 'Prosegui alla conferma' }).click();
+    await review.getByLabel('PIN di conferma').fill('1234');
+    await review.getByRole('button', { name: 'Conferma creazione con PIN' }).click();
+    await expect(review.getByRole('heading', { name: 'Scheda creata', exact: true })).toBeVisible({ timeout: 30_000 });
+    if (process.env.MEDIFLOW_NAVIGATION_EVIDENCE) {
+        await page.screenshot({ path: path.join(process.env.MEDIFLOW_NAVIGATION_EVIDENCE, `${intent}-scheda-creata.png`) });
+    }
+
+    const after = clinicalSnapshot(data);
+    const created = after.patients.filter(row => !before.patients.some(old => old.id === row.id));
+    assert.equal(created.length, 1);
+    assert.equal(after.patients.length, before.patients.length + 1);
+    const stored = after.attachments.filter(row => !before.attachments.some(old => old.id === row.id));
+    assert.ok(stored.length > 0);
+    assert.ok(stored.every(row => row.patient_id === created[0].id));
+    for (const table of ['therapies', 'observations', 'service_prescriptions', 'prosthetic_prescriptions']) assert.deepEqual(after[table], before[table]);
+    assert.ok(frames.length > 0);
+    for (const frame of frames) assert.match(frame, /^(?:[a-f0-9-]{36}\/(?:initial|[a-f0-9-]{36}) [a-z_]+|[a-f0-9-]{36} reset| ?revoke| )$/u);
+    assert.ok(!frames.some(frame => frame.includes('Referto') || frame.includes(taxCode)));
+    assert.deepEqual(providerCalls, []);
 });
 
 const model = 'synthetic-c7:latest';
