@@ -21,6 +21,9 @@
 .recordWhen::before { content: '·' / ''; margin-right: 6px; }
 .openRecords > .directoryTab { flex: none; padding: 8px 6px 8px 0; }
 .openRecords:has(.recordTab) { gap: 6px; }
+.recordTab:not([data-active='true']) { flex: 0 1 auto; min-width: 96px; }
+.recordTab:not([data-active='true']) > a:first-child { flex: 1 1 auto; min-width: 0; }
+.recordTab > a:first-child > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pageCrumb { display: inline-flex; align-items: center; flex: none; min-height: var(--lume-control-height); padding: 8px 6px; font-size: 0.75rem; color: var(--lume-ink-muted); white-space: nowrap; }
 /* preserve the shared toggle's touch target inside the 48px header. */
 .privacy { width: 44px !important; height: 44px !important; min-width: 44px !important; border-radius: var(--lume-radius-control) !important; border: 0 !important; padding: 0 !important; flex: none; }
