@@ -1,5 +1,8 @@
+import { v5 as uuidv5 } from 'uuid';
 import { isEncryptedFieldValue, isLockedDataPlaceholder } from '../locked-field-guard';
 import {
+    CANDIDATE_TEXT_LIMIT,
+    candidateLabel,
     DEFAULT_MINING_THRESHOLDS,
     PERSONAL_SERVICE_CANDIDATE_KIND,
     type AssociatedDiagnosisStat,
@@ -111,15 +114,18 @@ function normalizeServiceEntry(
     const displayName = serviceName ?? serviceCode;
     if (!displayName) return null;
 
-    const key = serviceCode
-        ? `code:${normalizeLookupToken(codeSystem ?? 'unspecified')}:${normalizeLookupToken(serviceCode)}`
-        : `name:${normalizeLookupToken(displayName)}`;
+    if ((codeSystem?.length ?? 0) > CANDIDATE_TEXT_LIMIT || (serviceCode?.length ?? 0) > CANDIDATE_TEXT_LIMIT) return null;
+    const prefix = serviceCode ? 'code' : 'name';
+    const parts = serviceCode ? [normalizeLookupToken(codeSystem ?? 'unspecified'), normalizeLookupToken(serviceCode)] : [normalizeLookupToken(displayName)];
+    const readable = [prefix, ...parts].join(':');
+    const key = readable.length <= CANDIDATE_TEXT_LIMIT && !parts.some(part => /[:|]/u.test(part))
+        ? readable : `service:${uuidv5(JSON.stringify([prefix, ...parts]), uuidv5.URL)}`;
 
     return {
         key,
         codeSystem,
         serviceCode,
-        serviceName: displayName,
+        serviceName: candidateLabel(displayName),
         category: input.category ?? null,
     };
 }
@@ -133,7 +139,8 @@ function normalizePatientDiagnoses(diagnoses: readonly CandidateHistoryDiagnosis
         if (!code && !description) continue;
         const system = cleanReadableText(diagnosis?.system) ?? 'ICD-11';
         const resolvedCode = code ?? normalizeLookupToken(description ?? '');
-        const resolvedDescription = description ?? resolvedCode;
+        if (system.length > CANDIDATE_TEXT_LIMIT || resolvedCode.length > CANDIDATE_TEXT_LIMIT) continue;
+        const resolvedDescription = candidateLabel(description ?? resolvedCode);
         const key = `${normalizeLookupToken(system)}:${normalizeLookupToken(resolvedCode)}`;
         if (!seen.has(key)) {
             seen.set(key, {
@@ -148,7 +155,8 @@ function normalizePatientDiagnoses(diagnoses: readonly CandidateHistoryDiagnosis
 }
 
 function buildSignature(sortedKeys: readonly string[]): string {
-    return sortedKeys.join('|');
+    const signature = sortedKeys.join('|');
+    return signature.length <= CANDIDATE_TEXT_LIMIT ? signature : `group:${uuidv5(JSON.stringify(sortedKeys), uuidv5.URL)}`;
 }
 
 function isSubset(smaller: readonly string[], larger: readonly string[]): boolean {
@@ -295,23 +303,6 @@ function collectObservedPairs(
         keyToId.set(frequentKeys[i], i);
     }
 
-    const pairCounts = new Map<number, number>();
-    for (const prescription of eligiblePrescriptions) {
-        const presentIds: number[] = [];
-        for (const key of prescription.serviceKeys) {
-            const id = keyToId.get(key);
-            if (id !== undefined) presentIds.push(id);
-        }
-        for (let i = 0; i < presentIds.length; i += 1) {
-            const leftId = presentIds[i];
-            const rowOffset = leftId * numKeys;
-            for (let j = i + 1; j < presentIds.length; j += 1) {
-                const pairCode = rowOffset + presentIds[j];
-                pairCounts.set(pairCode, (pairCounts.get(pairCode) ?? 0) + 1);
-            }
-        }
-    }
-
     const topPairs = new BoundedTopK<{ idA: number; idB: number; count: number }>(
         thresholds.maxCandidateSetsPerLevel,
         (a, b) =>
@@ -322,11 +313,17 @@ function collectObservedPairs(
                     : a.idB < b.idB,
     );
 
-    for (const [pairCode, count] of pairCounts.entries()) {
-        if (count < thresholds.minObservationCount) continue;
-        const idA = Math.floor(pairCode / numKeys);
-        const idB = pairCode - idA * numKeys;
-        topPairs.push({ idA, idB, count });
+    for (const [idA, key] of frequentKeys.entries()) {
+        const counts = new Map<number, number>();
+        for (const index of postingLists.get(key) ?? []) {
+            for (const other of eligiblePrescriptions[index].serviceKeys) {
+                const idB = keyToId.get(other);
+                if (idB !== undefined && idB > idA) counts.set(idB, (counts.get(idB) ?? 0) + 1);
+            }
+        }
+        for (const [idB, count] of counts) {
+            if (count >= thresholds.minObservationCount) topPairs.push({ idA, idB, count });
+        }
     }
 
     const groups: ObservedGroup[] = [];

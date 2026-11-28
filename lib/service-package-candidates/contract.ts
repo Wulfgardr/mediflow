@@ -26,8 +26,9 @@ export type CandidateServicePrescriptionStatus = (typeof SERVICE_PRESCRIPTION_ST
 export type CandidateSufficiencyStatus = (typeof CANDIDATE_SUFFICIENCY_STATUSES)[number];
 export type CandidateReviewStatus = (typeof CANDIDATE_REVIEW_STATUSES)[number];
 
-const nonEmptyShortText = z.string().trim().min(1).max(240);
-const optionalShortText = z.string().trim().max(240).nullable();
+export const CANDIDATE_TEXT_LIMIT = 240;
+const nonEmptyShortText = z.string().trim().min(1).max(CANDIDATE_TEXT_LIMIT);
+const optionalShortText = z.string().trim().max(CANDIDATE_TEXT_LIMIT).nullable();
 
 export const candidateServiceItemSchema = z.object({
     key: nonEmptyShortText,
@@ -171,9 +172,16 @@ export type DeriveRecurringCandidatesInput = Readonly<{
     thresholds?: Partial<MiningThresholds>;
 }>;
 
+export function candidateLabel(value: string): string {
+    if (value.length <= CANDIDATE_TEXT_LIMIT) return value;
+    const tail = 48;
+    const left = value.slice(0, CANDIDATE_TEXT_LIMIT - tail - 1).replace(/[\uD800-\uDBFF]$/u, '').trimEnd();
+    const right = value.slice(-tail).replace(/^[\uDC00-\uDFFF]/u, '').trimStart();
+    return `${left}…${right}`;
+}
+
 export function formatCandidateDefaultTitle(services: readonly CandidateServiceItem[]): string {
     const names = services.map((service) => service.serviceName).filter(Boolean);
     if (names.length === 0) return 'Gruppo di prestazioni';
-    if (names.length <= 3) return names.join(' + ');
-    return `${names.slice(0, 2).join(' + ')} + altre ${names.length - 2}`;
+    return candidateLabel(names.length <= 3 ? names.join(' + ') : `${names.slice(0, 2).join(' + ')} + altre ${names.length - 2}`);
 }

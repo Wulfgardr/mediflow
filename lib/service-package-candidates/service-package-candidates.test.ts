@@ -12,6 +12,7 @@ import {
     keepCandidateDecision,
     parsePersonalCandidateReviewStore,
     parsePersonalCandidateReviewStoreStrict,
+    recurringServiceGroupCandidateSchema,
     restoreCandidateDecision,
     serializePersonalCandidateReviewStore,
     type CandidateHistoryPatientInput,
@@ -257,6 +258,25 @@ test('WUL-923: evita potenze dell’insieme senza tetto su prescrizioni con molt
     assert.ok(analysis.summary.candidatePoolCapped);
     assert.ok(elapsedMs < 2000, `Analisi troppo lenta: ${elapsedMs}ms`);
     assert.ok(analysis.candidates.every((candidate) => candidate.services.length <= 4));
+});
+
+test('long uncoded service labels remain distinct, reviewable and stable after reordering the history', () => {
+    const fixture = buildSynthetic50PrescriptionsFixture();
+    const originalItems = fixture.items.filter(item => item.id.startsWith('rx-tri-'));
+    const history = (repetitions: number, ending: string) => originalItems.map(item => ({
+        ...item, codeSystem: null, serviceCode: null, catalogDisplayName: null,
+        serviceName: `${'Prestazione sintetica '.repeat(repetitions)}${item.serviceCode}${ending}`,
+    }));
+    for (const repetitions of [6, 15]) {
+        const items = history(repetitions, ' A');
+        const candidate = deriveRecurringServiceCandidates({ ...fixture, items }).candidates[0];
+        assert.ok(recurringServiceGroupCandidateSchema.safeParse(candidate).success);
+        const empty = emptyPersonalCandidateReviewStore();
+        assert.equal(keepCandidateDecision(empty, candidate).decisions[0].candidateId, candidate.id);
+        assert.equal(discardCandidateDecision(empty, candidate).decisions[0].candidateId, candidate.id);
+        assert.equal(deriveRecurringServiceCandidates({ ...fixture, items: items.toReversed() }).candidates[0].id, candidate.id);
+        assert.notEqual(deriveRecurringServiceCandidates({ ...fixture, items: history(repetitions, ' B') }).candidates[0].id, candidate.id);
+    }
 });
 
 test('WUL-923: gesti di revisione, correzione, scarto, ripristino e minimizzazione del payload persistito', () => {
